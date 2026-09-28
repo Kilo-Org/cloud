@@ -401,8 +401,6 @@ export async function updateGoogleOAuthConnectionTokenData(
     .where(eq(kiloclaw_google_oauth_connections.instance_id, instanceId));
 }
 
-// ─── Scheduled Actions (PR 1: scheduled_restart) ───────────────────────
-
 export type DueScheduledActionTarget = {
   target_id: string;
   scheduled_action_id: string;
@@ -719,7 +717,6 @@ export async function maybePromoteScheduledActionsToCompleted(
   `);
 }
 
-// ─── Version pins (read-only access from the DO apply path) ──────────
 //
 // The web layer is the canonical writer for kiloclaw_version_pins (via
 // admin-kiloclaw-instances-router and the user pin UI). The worker DO
@@ -782,7 +779,6 @@ export async function deleteVersionPinWithCAS(
   return { deleted: result.length > 0 };
 }
 
-// ─── Morning Briefing configs ────────────────────────────────────────
 //
 // Denormalized desired-state mirror for "is briefing enabled?
 // cron/timezone/interests?" The plugin's local config.json on the

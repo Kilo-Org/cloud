@@ -1,6 +1,6 @@
 import { AudioModule, AudioQuality, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { File } from 'expo-file-system';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { fetchTranscriptionModels } from '@/lib/hooks/use-transcription-models';

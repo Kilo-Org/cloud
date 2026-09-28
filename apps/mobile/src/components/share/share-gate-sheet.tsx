@@ -62,8 +62,10 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
-  // Org-scoped stored page only (cloud-agent + cli). Active list is an
-  // id/capability lookup — never a row source.
+  // Org-scoped stored page (cloud-agent + cli) narrowed to live sessions:
+  // a session that is not live cannot receive the share, so it is never
+  // offered. The active list supplies the liveness filter and the
+  // attachments capability — never a row source.
   const sessions = useAgentSessions({
     createdOnPlatform: expandPlatformFilter(['cloud-agent', 'cli']),
     organizationId,
@@ -145,7 +147,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
   const attachmentsCapableBySessionId = useMemo(() => {
     const map = new Map<string, boolean>();
     for (const session of sessions.activeSessions) {
-      map.set(session.id, session.capabilities?.attachments === true);
+      // Optimistic: only an explicit `attachments: false` marks the row
+      // incapable; an unknown capability stays capable.
+      map.set(session.id, session.capabilities?.attachments !== false);
     }
     return map;
   }, [sessions.activeSessions]);
@@ -158,8 +162,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
         validation,
         storedIsError: sessions.storedIsError,
         storedIsSuccess: sessions.storedIsSuccess,
+        storedIsPaused: sessions.storedIsPaused,
         activeIsError: sessions.activeIsError,
-        storedRowCount: destinations.length,
+        activeIsPaused: sessions.activeIsPaused,
+        liveRowCount: destinations.length,
+        storedSessionCount: sessions.storedSessions.length,
         isLoading: sessions.isLoading || !orgLoaded,
       }),
     [
@@ -168,8 +175,11 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       validation,
       sessions.storedIsError,
       sessions.storedIsSuccess,
+      sessions.storedIsPaused,
       sessions.activeIsError,
+      sessions.activeIsPaused,
       sessions.isLoading,
+      sessions.storedSessions.length,
       destinations.length,
       orgLoaded,
     ]
@@ -272,7 +282,9 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       const admission: ShareDestinationAdmission = resolveShareDestinationAdmission({
         createdOnPlatform: row.created_on_platform,
         live: row.live,
-        attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? false,
+        // Optimistic fallback: a live row missing from the map is unknown, not
+        // explicitly incapable.
+        attachmentsCapable: attachmentsCapableBySessionId.get(row.session_id) ?? true,
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {
@@ -297,7 +309,8 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       const admission = resolveShareDestinationAdmission({
         createdOnPlatform: 'cli',
         live: true,
-        attachmentsCapable: instance.capabilities?.attachments === true,
+        // Optimistic: only an explicit `attachments: false` blocks files.
+        attachmentsCapable: instance.capabilities?.attachments !== false,
         hasFiles: resolveShareHasFiles(validation, payload?.files.length ?? 0),
       });
       if (!admission.ok) {

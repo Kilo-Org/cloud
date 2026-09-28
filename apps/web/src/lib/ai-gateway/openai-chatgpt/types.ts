@@ -3,11 +3,14 @@ import { z } from 'zod';
 /**
  * The delegated OpenAI OAuth token pair. `expires_at` is epoch seconds, the
  * same unit `Account.expires_at` uses in the sign-in callback.
+ * `earliest_refresh_at`, when OpenAI returns it, is epoch seconds before which
+ * the token must not be refreshed again.
  */
 export const OpenAiChatGptTokensSchema = z.object({
   access_token: z.string(),
   refresh_token: z.string().optional(),
   expires_at: z.number(),
+  earliest_refresh_at: z.number().optional(),
   scope: z.string().optional(),
   token_type: z.string().optional(),
 });

@@ -50,12 +50,14 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// so the wait is a hard bound, never a hang.
   static let registrationTimeout: TimeInterval = 25
 
-  /// The gap between two registration checks.
-  private static let registrationPollInterval: Duration = .milliseconds(50)
-
   private let lock = NSLock()
   private var dispatcher: JavaScriptValue?
   private var runtime: JavaScriptRuntime?
+  /// Runs already waiting for `register(dispatcher:runtime:)`, keyed so that
+  /// registration and the deadline each take exactly the waiter they own.
+  private var waiters: [
+    UUID: CheckedContinuation<(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime), Error>
+  ] = [:]
   /// Payloads that arrived before the dispatcher registered. iOS never parks
   /// one — `perform` waits for registration instead — but the module's
   /// registration contract returns this buffer to the JS side, which is the
@@ -64,12 +66,19 @@ final class KiloAppActionBridge: @unchecked Sendable {
 
   private init() {}
 
-  /// Stores the JS dispatcher and the runtime it belongs to.
+  /// Stores the JS dispatcher and the runtime it belongs to and hands the pair
+  /// to every run already waiting. A late registration resumes its callers
+  /// directly instead of them re-checking on a timer.
   func register(dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
     lock.lock()
     self.dispatcher = dispatcher
     self.runtime = runtime
+    let waiting = waiters
+    waiters = [:]
     lock.unlock()
+    for waiter in waiting.values {
+      waiter.resume(returning: (dispatcher, runtime))
+    }
   }
 
   /// Drops the registered dispatcher and runtime when the JS runtime goes away.
@@ -79,12 +88,23 @@ final class KiloAppActionBridge: @unchecked Sendable {
   /// makes the next run wait for the replacement registration, which
   /// `waitUntilRegistered` already bounds. The parked buffer goes with it — a
   /// payload delivered to a dead runtime is not replayed against the next one.
+  /// A run parked here fails now rather than at its deadline: the registration
+  /// it waited for went away with the runtime.
   func unregister() {
     lock.lock()
     dispatcher = nil
     runtime = nil
     parkedPayloads = []
+    let waiting = waiters
+    waiters = [:]
     lock.unlock()
+    for waiter in waiting.values {
+      waiter.resume(
+        throwing: KiloAppActionError.dispatcherUnavailable(
+          seconds: Int(KiloAppActionBridge.registrationTimeout)
+        )
+      )
+    }
   }
 
   /// Hands back the parked payloads and clears the buffer.
@@ -103,22 +123,54 @@ final class KiloAppActionBridge: @unchecked Sendable {
     lock.unlock()
   }
 
-  /// Waits, bounded, for the JS dispatcher. Throws
-  /// `KiloAppActionError.dispatcherUnavailable` at the deadline, so a caller
-  /// always gets a result.
+  /// Waits, bounded, for the JS dispatcher.
+  ///
+  /// Returns the registered pair at once when there is one; otherwise parks a
+  /// `CheckedContinuation` that `register(dispatcher:runtime:)` resumes, and
+  /// starts the one deadline task that fails it with
+  /// `KiloAppActionError.dispatcherUnavailable`. A waiter removed from the
+  /// store is the only one resumed, so registration, teardown and the deadline
+  /// cannot resume the same continuation twice.
+  ///
+  /// Waiting is the capability iOS has and Android does not: an App Intent's
+  /// `perform` answers its caller, so the bridge has to hold the run until JS
+  /// registers. Android's counterpart (`KiloAppActionsModule.kt`'s
+  /// `AppActionDispatcher`) never waits at all — it buffers a payload that
+  /// arrives before registration and hands it back at `register`, and its
+  /// `KiloActionActivity` answers through `setResult`.
   func waitUntilRegistered(
     timeout: TimeInterval = KiloAppActionBridge.registrationTimeout
   ) async throws -> (dispatcher: JavaScriptValue, runtime: JavaScriptRuntime) {
-    let deadline = Date().addingTimeInterval(timeout)
-    while true {
-      if let registered = registered() {
-        return registered
+    try await withCheckedThrowingContinuation { continuation in
+      lock.lock()
+      if let dispatcher, let runtime {
+        lock.unlock()
+        continuation.resume(returning: (dispatcher, runtime))
+        return
       }
-      if Date() >= deadline {
-        throw KiloAppActionError.dispatcherUnavailable(seconds: Int(timeout))
-      }
-      try await Task.sleep(for: KiloAppActionBridge.registrationPollInterval)
+      let id = UUID()
+      waiters[id] = continuation
+      lock.unlock()
+      startDeadline(for: id, timeout: timeout)
     }
+  }
+
+  /// Starts the one task that fails `id` when registration has not arrived
+  /// inside `timeout`.
+  private func startDeadline(for id: UUID, timeout: TimeInterval) {
+    Task {
+      try? await Task.sleep(for: .seconds(timeout))
+      self.failWaiter(id, seconds: Int(timeout))
+    }
+  }
+
+  /// Fails one parked waiter at its deadline. Taking it out of the store first
+  /// is what makes this the only resume for that continuation.
+  private func failWaiter(_ id: UUID, seconds: Int) {
+    lock.lock()
+    let waiter = waiters.removeValue(forKey: id)
+    lock.unlock()
+    waiter?.resume(throwing: KiloAppActionError.dispatcherUnavailable(seconds: seconds))
   }
 
   /// Runs one action through the JS pipeline.
@@ -145,16 +197,6 @@ final class KiloAppActionBridge: @unchecked Sendable {
     } catch {
       throw KiloAppActionError.refused(message: error.localizedDescription, retryable: true)
     }
-  }
-
-  /// The registered dispatcher and runtime, or nil while JS has not registered.
-  private func registered() -> (dispatcher: JavaScriptValue, runtime: JavaScriptRuntime)? {
-    lock.lock()
-    defer { lock.unlock() }
-    guard let dispatcher, let runtime else {
-      return nil
-    }
-    return (dispatcher, runtime)
   }
 
   /// The fields this side reads from the JS `AppActionResult`.

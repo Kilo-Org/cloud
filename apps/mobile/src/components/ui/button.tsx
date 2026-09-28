@@ -103,10 +103,25 @@ function Button({
 }: ButtonProps) {
   const colors = useThemeColors();
   const isDisabled = Boolean(disabled) || Boolean(loading);
+  const isPrimary = (variant ?? 'default') === 'default';
+  // A default-variant fill is a saturated brand colour with a contrasting ink
+  // label. Halving the whole control's opacity for the disabled state
+  // composites that pair into olive-on-olive (about 2.4:1 in light, 4.4:1 in
+  // dark), and it also washes out any child that hard-codes primaryForeground.
+  // A disabled (not busy) primary instead takes a muted fill that still
+  // contrasts with the ink label, so the label stays legible. A busy primary
+  // keeps the brand fill and its spinner so it still reads as working.
+  const isMutedDisabled = isDisabled && !loading && isPrimary;
+  const isDimmed = isDisabled && !isPrimary;
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
-        className={cn(isDisabled && 'opacity-50', buttonVariants({ variant, size }), className)}
+        className={cn(
+          isDimmed && 'opacity-50',
+          buttonVariants({ variant, size }),
+          isMutedDisabled && 'bg-primary-disabled',
+          className
+        )}
         role="button"
         disabled={isDisabled}
         accessibilityState={{ ...accessibilityState, disabled: isDisabled, busy: loading }}

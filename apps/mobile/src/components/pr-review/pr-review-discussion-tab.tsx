@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the tab is the one surface that owns the Discussion state machine (merge/sort, expansion settle, pagination, reply-focus scroll) AND the single own-comment write path (edit route push + one-step delete confirm) this slice defines; moving the write out would scatter the one path the design keeps in one place. */
 // PR review Discussion tab body.
 //
 // State matrix (per S7b §6 Discussion + Batch F item 2):
@@ -6,6 +7,13 @@
 //                   "Load more" paginates threads. Full re-sort of
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
+//   - filtered-empty: every row the page returned belongs to a
+//                   blocked or muted author (the list owns the
+//                   hidden-user filter). The list body renders the
+//                   empty state this tab hands it and keeps its
+//                   Load more / later-page retry footer, so the body
+//                   never reads as blank. A distinct message needs a
+//                   catalog key the translation slice owns.
 //   - loading:      first page in flight; render `Skeleton`
 //                   placeholders matching the row dimensions. A first
 //                   page that is pending but PAUSED (offline, or a fetch
@@ -55,11 +63,12 @@
 import { type FlashListRef } from '@shopify/flash-list';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { type Href, useIsFocused, useRouter } from 'expo-router';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { Alert, Platform, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CommentModerationProvider } from '@/components/pr-review/discussion/comment-moderation';
 import { PrReviewDiscussionList } from '@/components/pr-review/discussion/pr-review-discussion-list';
 import { PrCommentCta } from '@/components/pr-review/discussion/pr-comment-cta';
 import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
@@ -71,11 +80,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
+  type ConversationComment,
   type DiscussionListItem,
   isDiscussionEmpty,
-  mergeDiscussionListItems,
+  type PrCommentKind,
+  type ReviewComment,
   type ReviewThread,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { mergeDiscussionListItemsBySortKey } from '@/lib/pr-review/discussion/merge-discussion-list-items';
 import { useMotionPolicy } from '@/lib/a11y/motion';
 import {
   expandedForThread,
@@ -85,10 +97,13 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { useDeletePrCommentMutation } from '@/lib/pr-review/discussion/use-pr-comment-crud-mutations';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useReplyFocusScroll } from '@/lib/pr-review/discussion/use-reply-focus-scroll';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 
 type PrReviewDiscussionTabProps = {
   readonly owner: string;
@@ -103,12 +118,26 @@ type PrReviewDiscussionTabProps = {
 
 const SKELETON_ROW_COUNT = 4;
 
+// One shared empty reference for the common "first page carries no
+// conversation comments" case. `retainConversationAcrossMounts` falls back to
+// a brand-new `[]` literal on every call when nothing was retained, so a memo
+// keyed on the raw `conversation` would re-merge and re-sort on every render of
+// such a PR. Substituting this reference keeps the key stable when the set is
+// empty; a non-empty conversation is already identity-stable (it is read from
+// the memoized first page).
+const EMPTY_CONVERSATION: readonly ConversationComment[] = [];
+
 // The GitHub conversation-comment formSheet. GitLab and Bitbucket reach their
 // own sibling route inside the provider layout (providerPrSheetHref) so
 // the sheet mounts under the live provider scope; GitHub keeps the exact
 // object-form push it shipped with (PR 6023).
 const CONVERSATION_COMMENT_PATH =
   '/(app)/pr-review/[owner]/[repo]/[number]/conversation-comment' as const;
+
+// The own-comment edit formSheet (s3/s4). The tab pushes it with the posted
+// comment's body, so the sheet opens as the READ surface and Save is the
+// UPDATE surface.
+const COMMENT_EDIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit' as const;
 
 export function PrReviewDiscussionTab({
   owner,
@@ -130,6 +159,11 @@ export function PrReviewDiscussionTab({
   const { ref } = useProviderPrScope({ owner, repo, number });
   const isMergeRequest = ref.platform === 'gitlab';
   const router = useRouter();
+
+  // s4: the tab is the only place that owns the own-comment writes. Edit pushes
+  // the `comment-edit` formSheet (which reads the body and saves the update);
+  // delete asks exactly one confirmation, then runs the optimistic mutation.
+  const deleteComment = useDeletePrCommentMutation();
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
@@ -162,6 +196,19 @@ export function PrReviewDiscussionTab({
   // className gutter must survive portrait untouched (inline style wins over
   // className). Same treatment as the diff floating-actions bar.
   const insets = useSafeAreaInsets();
+
+  // Full re-sort of every loaded thread + first-page conversation comments
+  // (R4: "Load more" may insert rows mid-list; accepted). Both inputs are
+  // identity-stable (`threads` is memoized on `pages`; `conversation` is the
+  // retained first page, or EMPTY_CONVERSATION when the PR has none), so
+  // memoize the merge: an expand tap, optimistic reaction or reply focus must
+  // not re-merge and re-sort the whole loaded set.
+  // The merge parses each item's timestamp once (merge-discussion-list-items.ts).
+  const stableConversation = conversation.length === 0 ? EMPTY_CONVERSATION : conversation;
+  const listItems = useMemo(
+    () => mergeDiscussionListItemsBySortKey(threads, stableConversation),
+    [threads, stableConversation]
+  );
 
   // Single write path: the ref is the tap-time source of truth (render-closure
   // state can lag a queued update on rapid taps).
@@ -288,6 +335,56 @@ export function PrReviewDiscussionTab({
     router.push(href);
   };
 
+  // Own-comment edit / delete are GitHub-only: the two procedures live on
+  // `githubPrReview` and no provider note-edit seam exists, so the provider
+  // arms withhold the callbacks entirely and their rows keep today's
+  // read-only affordances (s4).
+  const canWriteOwnComments = ref.platform === 'github';
+
+  const handleEditComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    const href: Href = {
+      pathname: COMMENT_EDIT_PATH,
+      params: {
+        owner,
+        repo,
+        number,
+        commentId: String(comment.commentId),
+        kind,
+        body: comment.bodyMarkdown,
+      },
+    };
+    router.push(href);
+  };
+
+  const handleDeleteComment = (comment: ReviewComment, kind: PrCommentKind) => {
+    Alert.alert(
+      t('prReview.discussion.deleteCommentTitle'),
+      t('prReview.discussion.deleteCommentMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: () => {
+            // Confirmed offline: fail the confirmed destructive action at once
+            // with the retryable copy instead of starting a write React Query
+            // pauses. Without this the row is optimistically removed while the
+            // write is paused (a false success, lost if the app is killed
+            // before reconnect, and the row reappears later), and the user gets
+            // no failure feedback from a confirmed delete (ux2 spot check).
+            // The row stays, nothing is pending, and the same row action
+            // retries once the banner clears.
+            if (getCommittedConnectivityStatus() === 'offline') {
+              announcingToast.error(t('prReview.discussion.commentDeleteFailed'));
+              return;
+            }
+            deleteComment.mutate({ owner, repo, number, commentId: comment.commentId, kind });
+          },
+        },
+      ]
+    );
+  };
+
   // The bottom CTA bar is static chrome for the two content-bearing views
   // only (happy list + empty). The loading skeleton and the four
   // terminal/error states render exactly as before — full-body, no bar.
@@ -296,6 +393,33 @@ export function PrReviewDiscussionTab({
       <View className="flex-1">{body}</View>
       <PrCommentCta onPress={openConversationComment} keyboardLift={isFocused} />
     </View>
+  );
+
+  // The tab owns the empty copy for both the empty view and the list, whose
+  // blocked / muted filter can remove every row the page returned. The list
+  // renders this node instead of its rows when that happens, so the body never
+  // reads as blank.
+  const emptyState = (
+    <EmptyState
+      icon={MessageSquarePlus}
+      title={t('prReview.discussion.noDiscussion')}
+      description={
+        isMergeRequest
+          ? t('prReview.terms.noDiscussionDescription')
+          : t('prReview.discussion.noDiscussionDescription')
+      }
+      action={
+        onRequestFiles ? (
+          <Button
+            variant="outline"
+            onPress={onRequestFiles}
+            accessibilityLabel={t('prReview.discussion.reviewFiles')}
+          >
+            <Text>{t('prReview.discussion.reviewFiles')}</Text>
+          </Button>
+        ) : null
+      }
+    />
   );
 
   if (view.kind === 'permission') {
@@ -368,64 +492,47 @@ export function PrReviewDiscussionTab({
     );
   }
 
-  // ── Empty (neither threads nor conversation comments) ──────────────
-  if (view.kind === 'empty') {
-    return withCommentCta(
-      <EmptyState
-        icon={MessageSquarePlus}
-        title={t('prReview.discussion.noDiscussion')}
-        description={
-          isMergeRequest
-            ? t('prReview.terms.noDiscussionDescription')
-            : t('prReview.discussion.noDiscussionDescription')
-        }
-        action={
-          onRequestFiles ? (
-            <Button
-              variant="outline"
-              onPress={onRequestFiles}
-              accessibilityLabel={t('prReview.discussion.reviewFiles')}
-            >
-              <Text>{t('prReview.discussion.reviewFiles')}</Text>
-            </Button>
-          ) : null
-        }
-      />
-    );
+  // An empty normalized page can still have more discussion to load. Keep
+  // the list's empty message and pagination footer reachable in that case.
+  // The node is the same `emptyState` this tab owns and hands to the list, so
+  // the copy stays on one surface instead of being duplicated inline.
+  if (view.kind === 'empty' && !query.hasNextPage && !query.isFetchingNextPage && !laterPageError) {
+    return withCommentCta(emptyState);
   }
 
   // ── Happy / paginated list ─────────────────────────────────────────
-  // Full re-sort of every loaded thread + first-page conversation
-  // comments (R4: "Load more" may insert rows mid-list; accepted).
-  const listItems = mergeDiscussionListItems(threads, conversation);
-
   return withCommentCta(
-    <PrReviewDiscussionList
-      owner={owner}
-      repo={repo}
-      number={number}
-      listItems={listItems}
-      listRef={listRef}
-      expansion={expansion}
-      suppressContentPosition={suppressContentPosition}
-      onToggleExpand={handleToggleExpand}
-      onScrollBeginDrag={() => {
-        invalidateSettle();
-        // A user drag wins over the keyboard-open reply park: drop the
-        // pending focus scroll (useReplyFocusScroll).
-        replyScroll.invalidate();
-      }}
-      hasNextPage={query.hasNextPage}
-      isFetchingNextPage={query.isFetchingNextPage}
-      laterPageError={laterPageError || retainedContentError}
-      onLoadMore={() => {
-        void query.fetchNextPage();
-      }}
-      onRetryLoadMore={() => {
-        void query.refetch();
-      }}
-      onReplyInputFocus={handleReplyInputFocus}
-      onViewportLayout={handleViewportLayout}
-    />
+    <CommentModerationProvider>
+      <PrReviewDiscussionList
+        owner={owner}
+        repo={repo}
+        number={number}
+        listItems={listItems}
+        listRef={listRef}
+        emptyState={emptyState}
+        expansion={expansion}
+        suppressContentPosition={suppressContentPosition}
+        onToggleExpand={handleToggleExpand}
+        onScrollBeginDrag={() => {
+          invalidateSettle();
+          // A user drag wins over the keyboard-open reply park: drop the
+          // pending focus scroll (useReplyFocusScroll).
+          replyScroll.invalidate();
+        }}
+        hasNextPage={query.hasNextPage}
+        isFetchingNextPage={query.isFetchingNextPage}
+        laterPageError={laterPageError || retainedContentError}
+        onLoadMore={() => {
+          void query.fetchNextPage();
+        }}
+        onRetryLoadMore={() => {
+          void query.refetch();
+        }}
+        onReplyInputFocus={handleReplyInputFocus}
+        onViewportLayout={handleViewportLayout}
+        onEditComment={canWriteOwnComments ? handleEditComment : undefined}
+        onDeleteComment={canWriteOwnComments ? handleDeleteComment : undefined}
+      />
+    </CommentModerationProvider>
   );
 }

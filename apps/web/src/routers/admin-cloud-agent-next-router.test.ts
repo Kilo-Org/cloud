@@ -215,6 +215,7 @@ describe('adminCloudAgentNextRouter', () => {
       sessionsObserved: 4,
       setupFailures: 2,
       platformFailures: 1,
+      providerFailures: 0,
       userFailures: 2,
       unknownFailures: 1,
       runFailureRate: 2 / 3,
@@ -274,6 +275,85 @@ describe('adminCloudAgentNextRouter', () => {
     );
     expect(JSON.stringify(health.topErrors)).not.toContain('user_interrupt');
     expect(JSON.stringify(health.topErrors)).not.toContain('wrapper_start_failed');
+  });
+
+  it('counts provider failures and filters to provider groups without changing the global summary', async () => {
+    await db.insert(cloud_agent_session_runs).values({
+      ...matchingRun,
+      message_id: 'msg_admin_provider_failed',
+      terminal_at: at(9),
+      failure_stage: 'agent_activity',
+      failure_code: 'assistant_error',
+      failure_responsibility: 'provider',
+      failure_reason: 'provider_unavailable',
+    });
+    const caller = await createCallerForUser(adminUser.id);
+    const allHealth = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+    const providerHealth = await caller.admin.cloudAgentNext.getHealthOverview({
+      ...interval(),
+      responsibility: 'provider',
+    });
+    const providerError = {
+      source: 'run',
+      stage: 'agent_activity',
+      code: 'assistant_error',
+      responsibility: 'provider',
+      reason: 'provider_unavailable',
+    } as const;
+    const sessions = await caller.admin.cloudAgentNext.listHealthErrorSessions({
+      ...interval(),
+      ...providerError,
+    });
+
+    expect(allHealth.summary).toMatchObject({
+      completedRuns: 1,
+      failedRuns: 3,
+      interruptedRuns: 1,
+      setupFailures: 2,
+      platformFailures: 1,
+      providerFailures: 1,
+      userFailures: 2,
+      unknownFailures: 1,
+    });
+    expect(providerHealth.summary).toEqual(allHealth.summary);
+    expect(providerHealth.topErrors).toEqual([
+      expect.objectContaining({ ...providerError, count: 1 }),
+    ]);
+    expect(providerHealth.errorTotals).toEqual({ events: 1, groups: 1 });
+    expect(allHealth.errorTotals).toEqual({ events: 5, groups: 5 });
+    expect(sessions).toMatchObject({
+      totalSessions: 1,
+      rows: [expect.objectContaining({ cloudAgentSessionId: ids.mapped, matchingEvents: 1 })],
+    });
+  });
+
+  it('counts a setup-level provider responsibility in providerFailures', async () => {
+    await db
+      .update(cloud_agent_sessions)
+      .set({ failure_responsibility: 'provider', failure_reason: 'provider_unavailable' })
+      .where(eq(cloud_agent_sessions.cloud_agent_session_id, ids.setupFailed));
+    const caller = await createCallerForUser(adminUser.id);
+    const health = await caller.admin.cloudAgentNext.getHealthOverview(interval());
+    const providerHealth = await caller.admin.cloudAgentNext.getHealthOverview({
+      ...interval(),
+      responsibility: 'provider',
+    });
+
+    expect(health.summary).toMatchObject({
+      setupFailures: 2,
+      providerFailures: 1,
+      unknownFailures: 0,
+    });
+    expect(providerHealth.topErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source: 'setup',
+          responsibility: 'provider',
+          reason: 'provider_unavailable',
+          count: 1,
+        }),
+      ])
+    );
   });
 
   it('counts distinct affected sessions and known sandboxes without multiplying setup failures', async () => {

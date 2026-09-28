@@ -24,6 +24,7 @@ describe('OpenCode Go session headers', () => {
         id: 'direct-byok',
         apiUrl: openCodeGo.base_url,
         apiUrlOverrides: {},
+        disableUrlSuffix: false,
         apiKey: 'test-api-key',
         apiKeyHeader: null,
         supportedChatApis: openCodeGo.supported_chat_apis,

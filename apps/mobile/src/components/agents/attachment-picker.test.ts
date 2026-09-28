@@ -7,6 +7,7 @@ import * as Sentry from '@sentry/react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import { normalizeImageAsset, pickAgentAttachments, pickAgentPicture } from './attachment-picker';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 const reactNativeMock = vi.hoisted(() => ({
   alert: vi.fn(),
@@ -82,6 +83,14 @@ const getDocumentAsyncMock = vi.mocked(DocumentPicker.getDocumentAsync);
 type ShowActionSheet = ActionSheetProps['showActionSheetWithOptions'];
 type SheetButtonHandler = Parameters<ShowActionSheet>[1];
 
+const themedSheet: ThemedActionSheetOptions = {
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 24 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
+};
+
 /**
  * Drive `pickAgentAttachments` by capturing the sheet handler the
  * production code registers, then invoking it with a button index.
@@ -93,11 +102,15 @@ async function pickWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentAttachments(showActionSheet, {
-    userId: 'user-1',
-    surface: 'agent-chat',
-    sessionId: 'sess-1',
-  });
+  const resultPromise = pickAgentAttachments(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-chat',
+      sessionId: 'sess-1',
+    },
+    themedSheet
+  );
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
@@ -111,11 +124,15 @@ async function pickPictureWithSheetSelection(
   const showActionSheet = vi.fn() as unknown as ShowActionSheet & {
     mock: { calls: [unknown, SheetButtonHandler][] };
   };
-  const resultPromise = pickAgentPicture(showActionSheet, {
-    userId: 'user-1',
-    surface: 'agent-picture',
-    sessionId: null,
-  });
+  const resultPromise = pickAgentPicture(
+    showActionSheet,
+    {
+      userId: 'user-1',
+      surface: 'agent-picture',
+      sessionId: null,
+    },
+    themedSheet
+  );
   const registered = showActionSheet.mock.calls[0]?.[1];
   expect(registered).toEqual(expect.any(Function));
   await Promise.resolve(registered?.(buttonIndex));
@@ -185,16 +202,21 @@ describe('agent attachment picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentAttachments(showActionSheet, {
-      userId: 'user-1',
-      surface: 'agent-chat',
-      sessionId: null,
-    });
+    void pickAgentAttachments(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-chat',
+        sessionId: null,
+      },
+      themedSheet
+    );
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {
         options: ['Camera', 'Photo Library', 'Files', 'Cancel'],
         cancelButtonIndex: 3,
+        ...themedSheet,
       },
       expect.any(Function)
     );
@@ -319,16 +341,21 @@ describe('agent picture picker', () => {
       mock: { calls: unknown[][] };
     };
 
-    void pickAgentPicture(showActionSheet, {
-      userId: 'user-1',
-      surface: 'agent-picture',
-      sessionId: null,
-    });
+    void pickAgentPicture(
+      showActionSheet,
+      {
+        userId: 'user-1',
+        surface: 'agent-picture',
+        sessionId: null,
+      },
+      themedSheet
+    );
 
     expect(showActionSheet).toHaveBeenCalledWith(
       {
         options: ['Camera', 'Photo Library', 'Cancel'],
         cancelButtonIndex: 2,
+        ...themedSheet,
       },
       expect.any(Function)
     );

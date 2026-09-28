@@ -2,19 +2,31 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { ACTIVE_AGENTS_LIVE_ACTIVITY_NAME, APPROVE_TARGET } from './approve-action';
+import { i18n } from '@/i18n';
+
 import { glanceableLayoutCopy, withGlanceableCopy } from './layout-copy';
 
-// `approve-action` imports expo-widgets, whose native module is unreachable
-// under vitest. This suite only reads the identifier it exports.
-vi.mock('expo-widgets', () => ({ addUserInteractionListener: vi.fn() }));
-
 const PLACEHOLDER = '__KILO_GLANCEABLE_COPY__';
-const LAYOUT_FILES = ['active-agents-live-activity.tsx', 'active-agents-widget.tsx'];
+const LAYOUT_FILE = 'active-agents-live-activity.tsx';
+const LAYOUT_FILES = [LAYOUT_FILE, 'active-agents-widget.tsx'];
+/**
+ * The module that routes a Live Activity press. Read, never imported: it loads
+ * the native widget modules a node test cannot.
+ */
+const INTERACTION_FILE = 'interaction.ts';
 
 const read = (file: string) => readFileSync(join(__dirname, file), 'utf8');
+
+/** The literal a source file declares for its exported `name`. */
+function declaredLiteral(file: string, name: string): string {
+  const match = new RegExp(`export const ${name} = '([^']+)'`).exec(read(file));
+  if (match === null) {
+    throw new Error(`${file} declares no ${name}`);
+  }
+  return match[1] ?? '';
+}
 
 /** Stands in for an untransformed layout, which is a function, not a string. */
 const untransformedLayout = () => null;
@@ -39,7 +51,7 @@ describe('glanceable layout copy placeholder', () => {
 });
 
 describe('glanceable approve target', () => {
-  const source = read('active-agents-live-activity.tsx');
+  const source = read(LAYOUT_FILE);
 
   /**
    * Extract one section of the returned layout object, from its key to the next
@@ -53,25 +65,32 @@ describe('glanceable approve target', () => {
     return match?.[1] ?? '';
   };
 
-  it('is a literal in the layout, equal to APPROVE_TARGET', () => {
-    // The handler matches the event's `target` against APPROVE_TARGET, and the
-    // widget process reads the target off the layout source. A `target` written
-    // as the imported identifier would be an undefined global there, so the
-    // literal is the contract: this reads the source because no widget
-    // transform runs under vitest.
+  it('is a literal in the layout, equal to the target interaction.ts routes', () => {
+    // The handler matches the event's `target` against
+    // `GLANCEABLE_APPROVE_TARGET` (interaction.ts), and the widget process reads
+    // the target off the layout source. A `target` written as the imported
+    // identifier would be an undefined global there, so the literal is the
+    // contract: this reads the sources because no widget transform runs under
+    // vitest.
     const targets = [...source.matchAll(/target=(['"])([^'"]*)\1/g)].map(match => match[2]);
-    expect(targets).toContain(APPROVE_TARGET);
-    expect(source).not.toContain('target={APPROVE_TARGET}');
+    expect(targets).toContain(declaredLiteral(INTERACTION_FILE, 'GLANCEABLE_APPROVE_TARGET'));
+    expect(source).not.toMatch(/target=\{/);
   });
 
-  it('is gated on the card still drawing a wait, not the approvable count alone', () => {
-    // `withStatus` (lib/glanceable/publisher) zeroes every count on expiry but
-    // keeps `needsApproval`, so the retained expired frame carries an approvable
-    // count with nothing to approve. `hasCounts` is false exactly when every
-    // count is zero, and the gate must include it or the card reads Expired and
-    // still offers Approve. `view-props.test.ts` pins that expired shape.
-    expect(source).toMatch(/const needsApproval\s*=\s*hasCounts\s*&&/);
-    expect(source).not.toMatch(/const needsApproval\s*=\s*\(props\.needsApproval/);
+  it('is gated on the recorded ask and the approvable count, never the count alone', () => {
+    // The control has to be one its own press can answer: the press resolves
+    // the ask the app recorded, so the app's `canApprove` flag withholds it,
+    // and the approvable count alone cannot gate it because a permission row
+    // the control plane does not own is `needsApproval` but not approvable.
+    // Both count terms are still required: `needsInput` withholds the control
+    // from the expired frame `withStatus` (lib/glanceable/publisher) leaves
+    // `needsApproval` on, and `needsApproval` withholds it from a server-written
+    // question-only state, where `runGlanceableApprove` answers `none`.
+    // `view-props.test.ts` pins that expired shape.
+    expect(source).toContain('props.canApprove !== false');
+    expect(source).toMatch(/\(props\.needsInput \?\? 0\) > 0/);
+    expect(source).toMatch(/\(props\.needsApproval \?\? 0\) > 0/);
+    expect(source).not.toMatch(/const needsApproval/);
   });
 
   it('declares the bannerSmall section the Apple Watch and CarPlay draw', () => {
@@ -86,10 +105,12 @@ describe('glanceable approve target', () => {
   it('carries the control in the bannerSmall block under the wait gate', () => {
     // The watch draws one row and the Approve control after it. The press has to
     // answer on the wrist, so the block itself must hold the literal target and
-    // the same wait gate the phone banner uses.
+    // the same gate the phone banner uses: `canApprove`, the flag that says the
+    // recorded ask is one the press can answer.
     const block = section('bannerSmall');
     expect(block).toContain('target="approve"');
-    expect(block).toMatch(/needsApproval/);
+    expect(block).toMatch(/\{canApprove \? \(/);
+    expect(block).not.toMatch(/needsApproval/);
   });
 
   it('draws the watch card count row outside the Approve gate', () => {
@@ -98,7 +119,7 @@ describe('glanceable approve target', () => {
     // from the count payload, and the gate that hides the control must sit after
     // it, so a permission-less wait still reads on the watch.
     const block = section('bannerSmall');
-    const gate = block.indexOf('{needsApproval ? (');
+    const gate = block.indexOf('{canApprove ? (');
     expect(gate).toBeGreaterThanOrEqual(0);
     expect(block.slice(0, gate)).toContain('countRow(primary, true, false)');
     expect(block.slice(gate)).toContain('target="approve"');
@@ -120,7 +141,10 @@ describe('glanceable approve target', () => {
     // instead of a source name. The registration name still has to be this
     // value: the activity's content state carries it, and it is what makes the
     // card mirror into the Apple Watch Smart Stack.
-    expect(source).toContain(`'${ACTIVE_AGENTS_LIVE_ACTIVITY_NAME}'`);
+    expect(declaredLiteral(LAYOUT_FILE, 'LIVE_ACTIVITY_NAME')).toBe('ActiveAgentsLiveActivity');
+    expect(source).toMatch(/createLiveActivity<ContentState>\(\s*LIVE_ACTIVITY_NAME,/);
+    // The handler recognises a press from this surface by that same constant.
+    expect(read(INTERACTION_FILE)).toContain('source === LIVE_ACTIVITY_NAME');
   });
 });
 
@@ -165,6 +189,8 @@ describe('withGlanceableCopy', () => {
       'locale',
       'needsInput',
       'newAgent',
+      'newestResult',
+      'open',
       'openAgents',
       'privacy',
       'running',
@@ -173,5 +199,15 @@ describe('withGlanceableCopy', () => {
       'starting',
       'waiting',
     ]);
+  });
+
+  it('bakes both Live Activity action labels from the reviewed keys', () => {
+    // A missing key would come back as the key itself, so the copy is asserted
+    // against the catalog and not only against the slot.
+    const copy = glanceableLayoutCopy();
+    expect(copy.approve).toBe(i18n.t('common.approve'));
+    expect(copy.approve).not.toBe('common.approve');
+    expect(copy.open).toBe(i18n.t('glanceable.openSession'));
+    expect(copy.open).not.toBe('glanceable.openSession');
   });
 });

@@ -76,6 +76,25 @@ function platformFailedRun(messageId: string, terminalAt: string): CloudAgentRun
   };
 }
 
+function providerFailedRun(
+  messageId: string,
+  terminalAt: string,
+  failureReason: NonNullable<
+    CloudAgentRunStateReport['run']['failureReason']
+  > = 'provider_unavailable'
+): CloudAgentRunStateReport['run'] {
+  return {
+    messageId,
+    status: 'failed',
+    queuedAt: terminalAt,
+    terminalAt,
+    failureStage: 'agent_activity',
+    failureCode: 'assistant_error',
+    failureResponsibility: 'provider',
+    failureReason,
+  };
+}
+
 function unclassifiedFailedRun(
   messageId: string,
   terminalAt: string
@@ -380,7 +399,13 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     const result = await aggregate(window);
     expect(legacy(result).totals.failureStages).toEqual([{ stage: 'unknown', count: 1 }]);
     expect(legacy(result).totals.failureStageCodes).toEqual([
-      { stage: 'unknown', code: 'unclassified', responsibility: 'unknown', count: 1 },
+      {
+        stage: 'unknown',
+        code: 'unclassified',
+        responsibility: 'unknown',
+        reason: 'unclassified',
+        count: 1,
+      },
     ]);
   });
 
@@ -395,6 +420,53 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     const result = await aggregate(window);
     expect(legacy(result).totals.platformFailed).toBe(3);
     expect(legacy(result).distinctPlatformAffectedSessions).toBe(1);
+  });
+
+  it('counts one distinct provider-affected session across many failing turns', async () => {
+    const window = nextWindow();
+    const sessionId = uniqueSessionId('agent');
+    const initial = await createSession(sessionId, window.start);
+    await saveReport(sessionId, providerFailedRun(initial, window.start), window.end);
+    await saveReport(sessionId, providerFailedRun(uniqueMessageId(), window.start), window.end);
+    await saveReport(sessionId, providerFailedRun(uniqueMessageId(), window.start), window.end);
+
+    const result = await aggregate(window);
+    expect(legacy(result).totals.providerFailed).toBe(3);
+    expect(legacy(result).totals.unknownFailed).toBe(0);
+    expect(legacy(result).distinctProviderAffectedSessions).toBe(1);
+    expect(legacy(result).distinctUnknownAffectedSessions).toBe(0);
+  });
+
+  it('keeps the same stage, code and responsibility separate per failure reason', async () => {
+    const window = nextWindow();
+    const sessionId = uniqueSessionId('agent');
+    const initial = await createSession(sessionId, window.start);
+    await saveReport(sessionId, providerFailedRun(initial, window.start), window.end);
+    await saveReport(
+      sessionId,
+      providerFailedRun(uniqueMessageId(), window.start, 'request_timeout'),
+      window.end
+    );
+
+    const result = await aggregate(window);
+    expect(legacy(result).totals.providerFailed).toBe(2);
+    expect(legacy(result).totals.failureStages).toEqual([{ stage: 'agent_activity', count: 2 }]);
+    expect(legacy(result).totals.failureStageCodes).toEqual([
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'provider',
+        reason: 'provider_unavailable',
+        count: 1,
+      },
+      {
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        responsibility: 'provider',
+        reason: 'request_timeout',
+        count: 1,
+      },
+    ]);
   });
 
   it('labels the run whose message_id matches initial_message_id as initial and others as follow-up', async () => {
@@ -472,14 +544,16 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
       terminalAt: window.start,
       failureStage: 'agent_activity',
       failureCode: 'assistant_error',
-      failureResponsibility: 'provider',
+      failureResponsibility: 'provider_retired',
       failureReason: 'assistant_unknown',
     });
 
     const result = await aggregate(window);
     expect(legacy(result).totals.unknownFailed).toBe(1);
+    expect(legacy(result).totals.providerFailed).toBe(0);
     expect(legacy(result).totals.allFailed).toBe(1);
     expect(legacy(result).distinctUnknownAffectedSessions).toBe(1);
+    expect(legacy(result).distinctProviderAffectedSessions).toBe(0);
   });
 
   it('retains only sessions created strictly after the retention cutoff', async () => {

@@ -15,8 +15,8 @@ import { cn } from '@/lib/utils';
  * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
  *   status bar, so it reserves no top clearance on either platform — the
  *   window inset would only be a dead band above the header (p7). Android
- *   caps the detents just below the inset (useFormSheetDetents) and the iOS
- *   sheet clears the top edge with its grabber, so the same rule holds
+ *   caps the detents just below the inset (useFormSheetScreenOptions) and the
+ *   iOS sheet clears the top edge with its grabber, so the same rule holds
  *   everywhere.
  * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
  *   on both platforms, so the header reserves no top clearance — the native
@@ -117,7 +117,7 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Text className="text-center text-base font-medium text-foreground">
                 {resolvedCancelLabel}
@@ -145,7 +145,7 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text className="text-center text-base font-medium text-foreground">
               {resolvedDoneLabel}

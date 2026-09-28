@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { LAST_OPENED_SESSION_KEY } from '@/lib/storage-keys';
+import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
 /**
  * The durable "Open last session" record behind the launcher shortcut and the
@@ -69,9 +70,11 @@ function parseStoredRecord(raw: string): LastOpenedSessionRecord | null {
 async function mirrorRecord(serialized: string): Promise<void> {
   try {
     await getSecureStore().setItemAsync(LAST_OPENED_SESSION_KEY, serialized);
-  } catch {
+  } catch (error) {
     // An absent or older development client has no secure store, and a failed
-    // mirror leaves the in-memory record authoritative.
+    // mirror leaves the in-memory record authoritative. Reported at warning
+    // level so a keychain failure is visible.
+    reportSecureStoreFailure('write', error);
   }
 }
 
@@ -79,9 +82,10 @@ async function mirrorRecord(serialized: string): Promise<void> {
 async function dropMirroredRecord(): Promise<void> {
   try {
     await getSecureStore().deleteItemAsync(LAST_OPENED_SESSION_KEY);
-  } catch {
+  } catch (error) {
     // An absent or older development client has no secure store, and a failed
     // delete leaves the record to be discarded on the next write.
+    reportSecureStoreFailure('delete', error);
   }
 }
 
@@ -124,8 +128,9 @@ async function restore(): Promise<void> {
       record = parsed;
       notify();
     }
-  } catch {
+  } catch (error) {
     // A mirror that cannot be read is treated as absent; the next write fills it.
+    reportSecureStoreFailure('read', error);
   }
 }
 

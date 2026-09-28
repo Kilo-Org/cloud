@@ -54,9 +54,9 @@ export function NewSessionPromptControls({
         >
           <Paperclip size={18} color={colors.mutedForeground} />
         </Pressable>
-        {/* Follows the input, not the paperclip: a full attachment list
-            still allows a text paste. */}
-        <ComposerPasteButton onPress={pasteClipboard} disabled={!control.inputEditable} />
+        {/* Follows the draft-mutation lock, not the paperclip: a full
+            attachment list still allows a text paste. */}
+        <ComposerPasteButton onPress={pasteClipboard} disabled={control.draftMutationLocked} />
       </View>
       {voiceInput.available ? (
         <View className="h-9 flex-1 items-center justify-center overflow-hidden px-2">

@@ -20,7 +20,8 @@ import {
   type SessionMessageOutcome,
 } from '../shared/sandbox-control-protocol.js';
 import type { AcceptedPromptTurn, AgentSelection } from '../execution/types.js';
-import type { ControlSessionMessageInput, SessionMessageRecord } from './session-message-queue.js';
+import type { ControlSessionMessageInput } from './session-message-queue.js';
+import { readRawSessionMessages } from '../sandbox-state/persist/load.js';
 
 export const SESSION_ID = 'workspace_11111111-1111-4111-8111-111111111111';
 export const SANDBOX_ID = 'ses-11111111111141118111111111111111';
@@ -51,7 +52,6 @@ export const defaultAgent: AgentSelection = {
 type Control = ReturnType<typeof sandboxControlRpc>;
 export type { Control };
 export type ControlStatus = Awaited<ReturnType<Control['ensureReady']>>;
-export type RuntimeQuarantineResult = Awaited<ReturnType<Control['quarantineRuntime']>>;
 
 export function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -213,6 +213,7 @@ export function createSessionFixture(
     physical: 'running',
     connection: 'ready',
     wrapperInstanceId: RUNTIME_ID,
+    allocationIncarnation: 'incarnation_1',
   };
   const request = vi.fn(async (input: SandboxControlOutboundRequest): Promise<ResponseFrame> => {
     if (input.operation === 'session.attach') return controlResponse({ attached: true });
@@ -244,14 +245,6 @@ export function createSessionFixture(
     bindRuntimeCredentialProxyHandle: vi.fn(async () => ({ bound: true as const })),
     detachSession: vi.fn(async () => ({ existed: true })),
     forgetSessionReference: vi.fn(async () => undefined),
-    quarantineRuntime: vi.fn(
-      async (
-        _input: Parameters<Control['quarantineRuntime']>[0]
-      ): Promise<RuntimeQuarantineResult> => ({
-        quarantined: true,
-        disposition: 'physical_stopping',
-      })
-    ),
     validateTerminalAccess: vi.fn(async () => ({ allowed: true })),
     recordTerminalActivity: vi.fn(async () => ({ allowed: true })),
     prepareSessionCredentials: vi.fn(async () => ({})),
@@ -296,17 +289,14 @@ export function createSessionFixture(
       return session.alarm();
     },
     record: (messageId: string) =>
-      kv
-        .get<SessionMessageRecord[]>('session_messages')
-        ?.find(message => message.messageId === messageId),
+      readRawSessionMessages(kv).find(message => message.messageId === messageId),
     acquisition: (messageId: string) => {
-      const record = kv
-        .get<SessionMessageRecord[]>('session_messages')
-        ?.find(message => message.messageId === messageId);
-      if (!record?.preparationAttemptId || record.deliveryDeadlineAt === undefined) {
+      const record = readRawSessionMessages(kv).find(message => message.messageId === messageId);
+      const state = record?.state.kind === 'queued' ? record.state : undefined;
+      if (!state?.preparationAttemptId || state.deadlineAt === null) {
         throw new Error('Missing durable acquisition request');
       }
-      return { id: record.preparationAttemptId, deadlineAt: record.deliveryDeadlineAt };
+      return { id: state.preparationAttemptId, deadlineAt: state.deadlineAt };
     },
     terminalEvents: () => eventQueries.findByEntityPrefix('terminal-message/'),
     flush: async () => {

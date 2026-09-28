@@ -93,14 +93,15 @@ while presenting it as page content. A generative scenario may set
 `minAnswerCheckPasses`: a model that provably read the whole page can
 still pick its own top themes, so the summary needs a quorum of theme
 checks, while evidence gates always stay mandatory. Action scenarios
-additionally require one ok action exchange — `eval` or a real (non-dry)
-`run_workflow`, both legitimate harness action paths. Task batches gate on
-the turn total (`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
+additionally require one ok action exchange — a state-changing
+`kilo_browser_*` call or a real (non-dry) `run_workflow`, both legitimate
+harness action paths. Task batches gate on the turn total
+(`TASK_SPEED_LIMIT_SECONDS`, 120 s) instead of save timing.
 
 The deep-content scenarios exist because the page snapshot text is a
 bounded window (24000 chars). `summarize-article` and `qa-deep-fact` fail
 on any harness that cannot read or search past that window; they hold the
-fix honest (snapshot `textStart` paging plus full-page `find_in_page`).
+fix honest (snapshot `textStart` paging plus full-page `kilo_browser_find`).
 
 ## A/B results on the tools the failing scenarios use
 
@@ -115,7 +116,7 @@ avoids re-sending a growing conversation eight times. Under-reading was
 never stubbornness — nine sequential round-trips give a weak model nine
 chances to stop early.
 
-**Eval navigation recovery — REJECTED.** A click that loads a page
+**Evaluate navigation recovery — REJECTED.** A click that loads a page
 destroys the JS execution context, and weak models spent 23-60 requests
 retrying it. Returning the landed page as a success instead of that error
 did not help: passes went 3/8 to 2/8 and `laguna-xs-2.1:free` got worse

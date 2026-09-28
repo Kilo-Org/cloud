@@ -45,9 +45,6 @@ function chat(
 // code, service config, or request contracts; low = read-only, test-only,
 // docs-only, or isolated reversible code.
 export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
-  // ---------------------------------------------------------------------------
-  // implementation / feature_development
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-feat-members-endpoint',
     input: chat(
@@ -117,9 +114,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // implementation / code_generation
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-gen-semver-helper',
     input: chat(
@@ -189,9 +183,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // implementation / test_creation
-  // ---------------------------------------------------------------------------
   {
     id: 'impl-test-slugify-units',
     input: chat(
@@ -261,9 +252,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / bug_fixing
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-fix-import-mismatch',
     input: chat(
@@ -333,9 +321,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / test_repair
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-repair-bcrypt-stub',
     input: chat(
@@ -405,9 +390,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // debugging / root_cause_analysis
-  // ---------------------------------------------------------------------------
   {
     id: 'debug-rca-sidebar-overflow',
     input: chat(
@@ -477,9 +459,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / code_cleanup
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-cleanup-rename-total',
     input: chat(
@@ -549,9 +528,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / architecture_improvement
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-arch-order-service',
     input: chat(
@@ -621,9 +597,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // refactoring / migration
-  // ---------------------------------------------------------------------------
   {
     id: 'refactor-migrate-async-await',
     input: chat(
@@ -693,9 +666,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / architecture_design
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-arch-express-structure',
     input: chat(
@@ -765,9 +735,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / technical_planning
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-steps-optimistic-ui',
     input: chat(
@@ -837,9 +804,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // planning_design / system_design
-  // ---------------------------------------------------------------------------
   {
     id: 'plan-system-catalog-caching',
     input: chat(
@@ -909,9 +873,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / repo_exploration
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-repo-feature-flags',
     input: chat(
@@ -981,9 +942,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / codebase_understanding
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-code-cart-reducer',
     input: chat(
@@ -1053,9 +1011,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // investigation / external_research
-  // ---------------------------------------------------------------------------
   {
     id: 'invest-ext-stripe-webhooks',
     input: chat(
@@ -1125,9 +1080,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / tool_usage
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-tool-pricing-toggle',
     input: chat(
@@ -1197,9 +1149,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / terminal_operations
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-term-run-tests',
     input: chat(
@@ -1272,9 +1221,6 @@ export const CLASSIFIER_CASES: readonly ClassifierCase[] = [
     },
   },
 
-  // ---------------------------------------------------------------------------
-  // agentic_execution / multi_step_execution
-  // ---------------------------------------------------------------------------
   {
     id: 'agentic-multi-cut-release',
     input: chat(

@@ -7,6 +7,7 @@
       "instanceLifecycle": "Ihe atụ gị nwere mmelite",
       "scheduledAction": "Omume ahaziri nwere mmelite",
       "lowBalance": "Nguzozi gị chọrọ nlebara anya",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Nchọpụta nchekwa chọrọ nlebara anya",
       "activeAgentsGlanceable": "Ndị ọrụ na-arụ ọrụ nwere mmelite"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Ọkwa ịdọ aka na ntị nguzozi dị ala",
       "body": "Nguzozi {{organizationName}} dara n'okpuru ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nchọpụta nchekwa ọhụrụ ({{severity}})",

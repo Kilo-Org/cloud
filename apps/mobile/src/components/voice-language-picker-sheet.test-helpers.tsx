@@ -103,7 +103,7 @@ vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic', SearchX: 'SearchX' }));
+vi.mock('@/components/ui/icons', () => ({ Mic: 'Mic', Search: 'Search', SearchX: 'SearchX' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 

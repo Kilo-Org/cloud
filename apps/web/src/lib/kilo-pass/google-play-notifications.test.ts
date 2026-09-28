@@ -4,6 +4,7 @@ import { and, eq, sql } from 'drizzle-orm';
 
 import {
   credit_transactions,
+  kilo_pass_audit_log,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
   kilocode_users,
@@ -14,6 +15,8 @@ import {
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
   KiloPassCadence,
   KiloPassTier,
   KiloPassIssuanceItemKind,
@@ -25,6 +28,8 @@ import { toMicrodollars } from '@/lib/utils';
 const mockAcknowledge = jest
   .fn<(...args: unknown[]) => Promise<void>>()
   .mockResolvedValue(undefined);
+
+const mockRevoke = jest.fn<(purchaseToken: string) => Promise<void>>().mockResolvedValue(undefined);
 
 const mockGetGooglePlaySubscriptionPurchase =
   jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
@@ -52,6 +57,7 @@ jest.mock('./google-play-sdk', () => ({
   acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledge,
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
+  revokeGooglePlaySubscriptionPurchase: mockRevoke,
   GOOGLE_PLAY_PACKAGE_NAME: 'com.kilocode.kiloapp',
 }));
 
@@ -165,6 +171,7 @@ describe('processGooglePlayKiloPassNotification', () => {
 
   beforeEach(() => {
     mockAcknowledge.mockReset().mockResolvedValue(undefined);
+    mockRevoke.mockReset().mockResolvedValue(undefined);
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
     dateNowSpy.mockReturnValue(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS);
     mockGetGooglePlaySubscriptionOrder.mockClear();
@@ -346,6 +353,127 @@ describe('processGooglePlayKiloPassNotification', () => {
         environment: 'Production',
       })
     );
+  });
+
+  it('reverses a second paid subscription instead of dropping the order', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, `GPA.${crypto.randomUUID()}`)
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'first-pass-token',
+        messageId: 'msg-first-pass',
+      }),
+    });
+
+    const duplicateOrderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, duplicateOrderId)
+    );
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId: duplicateOrderId,
+      purchaseToken: 'duplicate-pass-token',
+      state: 'PROCESSED',
+      total: { currencyCode: 'USD', units: '24', nanos: 700000000 },
+      tax: { currencyCode: 'USD' },
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { currencyCode: 'USD', units: '24', nanos: 700000000 },
+          tax: { currencyCode: 'USD' },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    const result = await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'duplicate-pass-token',
+        messageId: 'msg-duplicate-pass',
+      }),
+    });
+
+    expect(result).toEqual({ processed: true });
+    expect(mockRevoke).toHaveBeenCalledTimes(1);
+    expect(mockRevoke).toHaveBeenCalledWith('duplicate-pass-token');
+
+    const duplicatePurchase = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_transaction_id, duplicateOrderId),
+    });
+    expect(duplicatePurchase).toBeUndefined();
+
+    const audit = await db.query.kilo_pass_audit_log.findFirst({
+      where: and(
+        eq(kilo_pass_audit_log.action, KiloPassAuditLogAction.StoreSubscriptionRefunded),
+        sql`${kilo_pass_audit_log.payload_json}->>'providerTransactionId' = ${duplicateOrderId}`
+      ),
+    });
+    expect(audit).toMatchObject({
+      kilo_user_id: user.id,
+      result: KiloPassAuditLogResult.Success,
+    });
+    expect(audit?.payload_json).toMatchObject({
+      duplicateActiveSubscription: true,
+      amountChargedMinorUnits: 2470,
+      currency: 'USD',
+      taxMinorUnits: 0,
+    });
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_store_events.provider_transaction_id, duplicateOrderId)
+      ),
+    });
+    expect(event?.processed_at).not.toBeNull();
+  });
+
+  it('keeps a duplicate purchase unprocessed when the reversal fails', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, `GPA.${crypto.randomUUID()}`)
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: 'first-pass-token-fail',
+        messageId: 'msg-first-pass-fail',
+      }),
+    });
+
+    const duplicateOrderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, duplicateOrderId)
+    );
+    mockRevoke.mockRejectedValueOnce(new Error('play unavailable'));
+
+    await expect(
+      processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({
+          notificationType: 4,
+          purchaseToken: 'duplicate-pass-token-fail',
+          messageId: 'msg-duplicate-pass-fail',
+        }),
+      })
+    ).rejects.toThrow('play unavailable');
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+        eq(kilo_pass_store_events.provider_transaction_id, duplicateOrderId)
+      ),
+    });
+    expect(event?.processed_at).toBeNull();
+    const reversalAudit = await db.query.kilo_pass_audit_log.findFirst({
+      where: sql`${kilo_pass_audit_log.payload_json}->>'providerTransactionId' = ${duplicateOrderId}`,
+    });
+    expect(reversalAudit).toBeUndefined();
   });
 
   it('stores the charged amount, currency and tax from the Play order', async () => {

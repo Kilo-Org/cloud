@@ -49,9 +49,8 @@ import {
   createRuntimeAuthorization,
   sealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
-import jwt from 'jsonwebtoken';
 
-import type { Env, SandboxId } from '../types.js';
+import { agentSandboxProviderSchema, type Env, type SandboxId } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import {
   getControlPlaneCredentialContainment,
@@ -82,6 +81,7 @@ import { sha256Hex } from '../utils/sha256.js';
 import { assertKiloModelAvailable } from '../model-validation.js';
 import { initialAdmissionFailure } from './admission-failure.js';
 import { createMessageId } from './message-id.js';
+import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
   AcceptedExecutionTurn,
@@ -98,10 +98,11 @@ type SharedSandboxRouteMetadata = NonNullable<
 >;
 
 /**
- * The plane a new session will be created on. Vercel sandboxes exist only on the
- * control plane, so those allocations force it; every other request — including a
- * Cloudflare allocation — defers to `sessionPlaneForNewOwner`. Single source of
- * truth: the allocation checks and the session-ID generation must agree.
+ * The plane a new session will be created on. Vercel and DO-managed Cloudflare
+ * containers exist only on the control plane, so those allocations force it;
+ * every other request — including a Cloudflare allocation — defers to
+ * `sessionPlaneForNewOwner`. Single source of truth: the allocation checks and
+ * the session-ID generation must agree.
  */
 function sessionPlaneForCreate(
   input: SessionRegistrationInput,
@@ -560,15 +561,7 @@ async function issueSessionRuntimeAuthorization(
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
-  // authMiddleware has verified this bearer (including legacy tokens) against
-  // its audience and current pepper. Decode only selects the compatibility path;
-  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
-  const claims = jwt.decode(ctx.authToken);
-  const isPolicyBearing =
-    claims !== null &&
-    typeof claims === 'object' &&
-    ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
-  if (isPolicyBearing) {
+  if (isPolicyBearingAuthToken(ctx.authToken)) {
     if (cloudAgentSessionId.startsWith('workspace_')) assertRuntimeIsolationAdmission(ctx.env);
     const secret = ctx.env.NEXTAUTH_SECRET;
     const nextAuthSecret = typeof secret === 'string' ? secret : await secret.get();
@@ -710,6 +703,7 @@ async function allocateNewSession(
       sandboxProvider = selectSandboxProvider({
         env: ctx.env,
         orgId,
+        userId: ctx.userId,
         sandboxId,
         sessionId: cloudAgentSessionId,
         devcontainer: input.runtime?.devcontainer,
@@ -771,6 +765,7 @@ async function allocateNewSession(
       ctx.userId,
       ctx.env,
       input.options?.kilocodeOrganizationId,
+      input.profile?.resolvedProfileId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -925,6 +920,7 @@ function rebuildRecordedSessionAllocation(
     .optional()
     .safeParse(canonical.reportingCreatedAt);
   const worktreeCreate = worktreeEnabledForCreate(input, ctx, row);
+  const recordedProvider = agentSandboxProviderSchema.safeParse(sandboxProvider);
 
   if (
     !reportingCreatedAt.success ||
@@ -934,7 +930,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId.length === 0 ||
     typeof sandboxId !== 'string' ||
     sandboxId.length === 0 ||
-    (sandboxProvider !== 'cloudflare' && sandboxProvider !== 'vercel')
+    !recordedProvider.success
   ) {
     throw creationInProgressError();
   }
@@ -983,7 +979,7 @@ function rebuildRecordedSessionAllocation(
     kiloSessionId,
     sandboxId: sandboxId as SandboxId,
     sandboxRoute: route,
-    sandboxProvider,
+    sandboxProvider: recordedProvider.data,
     ...(worktreeId ? { worktreeId } : {}),
     ...(recorded.data ? { sandboxAllocation: recorded.data } : {}),
     initialTurn,
@@ -1410,6 +1406,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         type: 'github',
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
+        githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
         branch: repository.branch,
       };
     case 'gitlab':
@@ -1873,6 +1870,7 @@ async function resumeCloneCreate(
       ctx.userId,
       ctx.env,
       input.options?.kilocodeOrganizationId,
+      input.profile?.resolvedProfileId,
       createdOnPlatform,
       defaultTitle,
       canonicalRepositoryUrl,
@@ -1968,6 +1966,7 @@ async function resumeFirstWorktreeCreate(
         ctx.userId,
         ctx.env,
         input.options?.kilocodeOrganizationId,
+        input.profile?.resolvedProfileId,
         input.options?.createdOnPlatform ?? 'cloud-agent',
         `New session - ${new Date().toISOString()}`,
         deriveCanonicalRepositoryUrl(input.repository),

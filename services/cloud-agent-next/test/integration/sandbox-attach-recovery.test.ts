@@ -1,6 +1,6 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SessionMessageRecord } from '../../src/sandbox-session/session-message-queue.js';
+import type { SessionMessage } from '../../src/sandbox-session/session-message-queue.js';
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
 
@@ -35,12 +35,14 @@ describe('sandbox attach recovery after a replaced wrapper runtime', () => {
       let attachAttempts = 0;
       const control = {
         getStatus: async () => ({
+          allocationIncarnation: 'incarnation_1',
           physical: 'running' as const,
           connection: 'ready' as const,
           wrapperInstanceId,
           operationResults: true as const,
         }),
         ensureReady: async () => ({
+          allocationIncarnation: 'incarnation_1',
           physical: 'running' as const,
           connection: 'ready' as const,
           wrapperInstanceId,
@@ -125,7 +127,7 @@ describe('sandbox attach recovery after a replaced wrapper runtime', () => {
       // transport failure settle before the retry pass runs.
       await instance['dispatchQueued'](messageId, { allowCreate: true });
       const afterFailure = instance['loadMessages']().find(
-        (message: SessionMessageRecord) => message.messageId === messageId
+        (message: SessionMessage) => message.messageId === messageId
       );
 
       // The retryable transport failure arms a queue retry but stores no
@@ -133,7 +135,7 @@ describe('sandbox attach recovery after a replaced wrapper runtime', () => {
       // honest retry path rather than a shortcut around it.
       await instance['dispatchQueued'](messageId, { allowCreate: true });
       const stored = instance['loadMessages']().find(
-        (message: SessionMessageRecord) => message.messageId === messageId
+        (message: SessionMessage) => message.messageId === messageId
       );
 
       return { previousAttachment, admitted, afterFailure, stored, requests };
@@ -142,11 +144,10 @@ describe('sandbox attach recovery after a replaced wrapper runtime', () => {
     expect(result.previousAttachment).toBe(previousWrapperInstanceId);
     expect(result.admitted).toMatchObject({ success: true, outcome: 'queued' });
     expect(result.afterFailure).toMatchObject({
-      state: 'queued',
-      unresolvedDispatch: true,
-      operations: { attach: { dispatched: true } },
+      state: { kind: 'queued', unresolvedDispatch: true },
+      proofs: { attach: { dispatched: true } },
     });
-    expect(result.afterFailure?.operations?.attach).not.toHaveProperty('result');
+    expect(result.afterFailure?.proofs?.attach).not.toHaveProperty('result');
 
     // The retry reconciles the dispatched attach against the replacement
     // runtime, retires the unconfirmed proof, and lands a fresh attach plus the
@@ -158,15 +159,15 @@ describe('sandbox attach recovery after a replaced wrapper runtime', () => {
       'session.prompt',
     ]);
 
-    expect(result.stored).toMatchObject({ state: 'accepted' });
-    expect(result.stored?.failedReason).toBeUndefined();
-    expect(result.stored?.unresolvedDispatch).toBeUndefined();
-    expect(result.stored?.operations?.retiredAttach).toMatchObject({
+    expect(result.stored).toMatchObject({ state: { kind: 'accepted' } });
+    expect(result.stored?.state).not.toHaveProperty('reason');
+    expect(result.stored?.state).not.toHaveProperty('unresolvedDispatch');
+    expect(result.stored?.proofs?.retiredAttach).toMatchObject({
       dispatched: true,
-      authorization: { operationId: result.afterFailure?.preparationAttemptId },
+      authorization: { operationId: result.afterFailure?.state.preparationAttemptId },
     });
-    expect(result.stored?.operations?.retiredAttach?.completedAt).toBeUndefined();
-    expect(result.stored?.operations?.attach).toMatchObject({
+    expect(result.stored?.proofs?.retiredAttach?.completedAt).toBeUndefined();
+    expect(result.stored?.proofs?.attach).toMatchObject({
       dispatched: true,
       completedAt: expect.any(Number),
     });

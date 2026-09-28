@@ -16,6 +16,7 @@ import { useWorkersLogger } from 'workers-tagged-logger';
 import { presenceContextForConversation } from '@kilocode/event-service';
 import {
   badgeBucketForConversation,
+  glanceableScopeRefreshRequestSchema,
   internalDispatchRequestSchema,
   markBadgeReadInputSchema,
   refreshGlanceableSessionsInputSchema,
@@ -127,8 +128,9 @@ async function hasValidInternalSecret(c: {
   return timingSafeEqual(provided, expected);
 }
 
-// Internal service-to-service dispatch (low-balance + security-finding).
-// Intentionally outside `/v1/*` so user-JWT auth middleware does not apply.
+// Internal service-to-service dispatch (low-balance + spend-alert +
+// security-finding). Intentionally outside `/v1/*` so user-JWT auth
+// middleware does not apply.
 app.post('/internal/v1/dispatch', async c => {
   if (!(await hasValidInternalSecret(c))) {
     return c.json({ error: 'Unauthorized' }, 401);
@@ -153,6 +155,31 @@ app.post('/internal/v1/dispatch', async c => {
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
   return c.json(result);
+});
+
+// Registering a replacement iOS activity token retires the previous live
+// `ios_activity` row; the retired card is only sent its `end` by a delivery
+// pass, and those are otherwise driven by agent-session transitions. The web
+// router asks for one here so an orphan card the client cannot see after
+// process death is dismissed at registration instead of staying stacked under
+// the new card for as long as the current agent state does not change. Same
+// internal-secret auth as the dispatch route; the DO owns the rate limit, so a
+// refresh inside the delivery window is deferred rather than dropped.
+app.post('/internal/v1/glanceable-refresh', async c => {
+  if (!(await hasValidInternalSecret(c))) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const body: unknown = await c.req.json().catch(() => null);
+  const parsed = glanceableScopeRefreshRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json({ error: 'Invalid body' }, 400);
+  }
+
+  const { userId, organizationId } = parsed.data;
+  const stub = c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId));
+  await stub.refreshGlanceableSnapshot({ userId, organizationId });
+  return c.json({ ok: true });
 });
 
 type RecipientDOStub = {
@@ -325,7 +352,8 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 
   /** Refresh each affected scope without notification preferences or viewer-presence gates. */
   async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
-    const { userId, cliSessionIds } = refreshGlanceableSessionsInputSchema.parse(params);
+    const { userId, cliSessionIds, approvalChangedSessionIds } =
+      refreshGlanceableSessionsInputSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     // Read ownership too: an absent row is personal, but a foreign row is not authorized.
     const rows = await db
@@ -337,19 +365,34 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
       .from(cli_sessions_v2)
       .where(inArray(cli_sessions_v2.session_id, cliSessionIds));
     const byId = new Map(rows.map(row => [row.sessionId, row]));
-    const scopes = new Set<string | null>();
-    for (const sessionId of cliSessionIds) {
-      const row = byId.get(sessionId);
-      if (!row) scopes.add(null);
-      else if (row.userId === userId) scopes.add(row.organizationId);
-    }
+    const scopesOf = (sessionIds: readonly string[]): Set<string | null> => {
+      const scopes = new Set<string | null>();
+      for (const sessionId of sessionIds) {
+        const row = byId.get(sessionId);
+        if (!row) scopes.add(null);
+        else if (row.userId === userId) scopes.add(row.organizationId);
+      }
+      return scopes;
+    };
+    const scopes = scopesOf(cliSessionIds);
+    // The window exemption reaches only the scope(s) that actually moved into or
+    // out of `permission`. Forwarding the caller's flag to every scope would skip
+    // the rate-limit/deferral branch for scopes with no approval change — an extra
+    // build and device wake, the cost this window exists to prevent.
+    const approvalScopes = scopesOf(approvalChangedSessionIds ?? []);
 
     // Every entrypoint uses the same user DO. The snapshot route still rechecks membership.
     const stub = this.env.NOTIFICATION_CHANNEL_DO.get(
       this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
     );
     const results = await Promise.allSettled(
-      [...scopes].map(organizationId => stub.refreshGlanceableSnapshot({ userId, organizationId }))
+      [...scopes].map(organizationId =>
+        stub.refreshGlanceableSnapshot({
+          userId,
+          organizationId,
+          approvalChanged: approvalScopes.has(organizationId),
+        })
+      )
     );
     for (const result of results) {
       if (result.status === 'rejected') {
@@ -543,6 +586,7 @@ async function readPreferencesRow(
       sessionStatusEnabled: user_notification_preferences.session_status_enabled,
       kiloclawActivityEnabled: user_notification_preferences.kiloclaw_activity_enabled,
       balanceAlertsEnabled: user_notification_preferences.balance_alerts_enabled,
+      spendAlertsEnabled: user_notification_preferences.spend_alerts_enabled,
       securityFindingsEnabled: user_notification_preferences.security_findings_enabled,
     })
     .from(user_notification_preferences)

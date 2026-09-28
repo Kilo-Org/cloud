@@ -403,6 +403,136 @@ describe('useNativeAuth SSO recovery', () => {
   });
 });
 
+describe('useNativeAuth email validation feedback', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(['INVALID_REQUEST', 'INVALID_EMAIL'])(
+    'keeps %s beside the email field instead of overlaying Continue with a toast',
+    async errorCode => {
+      mockPostAuth.mockResolvedValue({ ok: false, errorCode, ssoOrganizationId: undefined });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        await resultRef.current?.requestEmailCode('http://localhost:3000/device-auth?code=test');
+      });
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(resultRef.current?.emailError).toBe(mapError(errorCode));
+      expect(resultRef.current?.busy).toBeUndefined();
+    }
+  );
+
+  it('keeps an empty-email error inline without sending a request', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('   ');
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(mockPostAuth).not.toHaveBeenCalled();
+    expect(resultRef.current?.emailError).toBe('Please enter your email address.');
+  });
+
+  it('clears validation on edit and allows a corrected address to request a code', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    act(() => {
+      resultRef.current?.clearEmailError();
+    });
+    expect(resultRef.current?.emailError).toBeUndefined();
+
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(' User@Example.com ')).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', {
+      email: 'user@example.com',
+    });
+    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('clears old validation while a request is pending and preserves retryable delivery feedback', async () => {
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      await resultRef.current?.requestEmailCode('');
+    });
+    let finish: ((result: Awaited<ReturnType<typeof postAuth>>) => void) | undefined = undefined;
+    mockPostAuth.mockReturnValueOnce(
+      new Promise(resolve => {
+        finish = resolve;
+      })
+    );
+    act(() => {
+      void resultRef.current?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+    expect(resultRef.current?.emailError).toBeUndefined();
+    await act(async () => {
+      finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
+      await Promise.resolve();
+    });
+    expect(toast.error).toHaveBeenCalledWith(mapError('EMAIL_DELIVERY_FAILED'));
+    expect(resultRef.current?.busy).toBeUndefined();
+
+    mockPostAuth.mockResolvedValueOnce({ ok: true, data: { success: true } });
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode('user@example.com')).toBe(true);
+    });
+  });
+});
+
+// ── In-flight refusal ──────────────────────────────────────────────────
+
+type PostAuthResult = Awaited<ReturnType<typeof postAuth>>;
+
+describe('useNativeAuth in-flight refusal', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('surfaces the reason and does not post again when a second submit is refused', async () => {
+    let resolvePost: ((value: PostAuthResult) => void) | undefined = undefined;
+    mockPostAuth.mockImplementation(async () => {
+      const held = await new Promise<PostAuthResult>(resolve => {
+        resolvePost = resolve;
+      });
+      return held;
+    });
+
+    const resultRef = await mountNativeAuth();
+    const result = resultRef.current;
+    expect(result).not.toBeNull();
+
+    // Hold the first request pending so the busy guard stays set.
+    let firstSubmit: Promise<boolean> | undefined = undefined;
+    act(() => {
+      firstSubmit = result?.requestEmailCode('user@example.com');
+    });
+    expect(resultRef.current?.busy).toBe('otp-send');
+
+    let secondResult: boolean | undefined = undefined;
+    await act(async () => {
+      secondResult = await result?.requestEmailCode('user@example.com');
+    });
+
+    expect(secondResult).toBe(false);
+    expect(mockPostAuth).toHaveBeenCalledTimes(1);
+    expect(toast.error).toHaveBeenCalledWith('Could not complete sign in. Please try again.');
+
+    await act(async () => {
+      resolvePost?.({ ok: true, data: { success: true } });
+      await firstSubmit;
+    });
+
+    expect(resultRef.current?.busy).toBeUndefined();
+  });
+});
+
 // ── Created-account announcement ────────────────────────────────────────
 
 describe('useNativeAuth created-account announcement', () => {

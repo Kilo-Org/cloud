@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import {
   createContext,
   type ReactNode,
@@ -15,7 +15,19 @@ import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-me
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
 import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
-import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
+import { ORGANIZATION_PERSONAL_STORAGE_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
+
+/**
+ * `ORGANIZATION_PERSONAL_STORAGE_KEY` is a SECOND key beside
+ * `ORGANIZATION_STORAGE_KEY`. Every other reader of that key (glanceable
+ * scope, widget actions, voice input, tool-summary) treats the stored value as
+ * an organization id, so an explicit Personal choice keeps deleting it; the
+ * settled "Personal was chosen" marker lives beside it. An absent organization
+ * key alone now means "not chosen yet", which the default rule resolves from
+ * the organization list.
+ */
+const PERSONAL_MARKER = 'personal';
 
 type OrganizationContextValue = {
   /** null = personal, string = org UUID */
@@ -38,6 +50,14 @@ const OrganizationContext = createContext<OrganizationContextValue | undefined>(
 
 export function OrganizationProvider({ children }: { readonly children: ReactNode }) {
   const { token } = useAuth();
+  const {
+    data: organizations,
+    isFetched: organizationsFetched,
+    isFetching: organizationsFetching,
+    isError: organizationsError,
+    isPaused: organizationsPaused,
+    refetch: refetchOrganizations,
+  } = useOrganizationsList();
   const [state, setState] = useState<OrganizationState>({
     token,
     organizationId: null,
@@ -47,25 +67,53 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
   });
   const generation = useRef(0);
   const activeId = useRef<string | null>(null);
+  // Set by `restore` when nothing explicit is stored: the organization list
+  // owns the publish then. A ref (not state) so `setOrganizationId` clears it
+  // synchronously, before the list can publish over an explicit selection.
+  const awaitingDefault = useRef(false);
+  const defaultFence = useRef<{ operation: number; epoch: number } | null>(null);
+  // Whether the current Personal selection is an explicit choice (its marker is
+  // stored). An auto-resolved Personal — from an empty list or a failed restore
+  // — is not explicit, so selecting Personal must still write the marker.
+  const personalExplicit = useRef(false);
 
   const restore = useCallback(async () => {
     generation.current += 1;
     const operation = generation.current;
     const epoch = currentAuthEpoch();
+    awaitingDefault.current = false;
+    defaultFence.current = null;
     setState(current => ({ ...current, token, isLoaded: false, isSaving: false, error: null }));
     try {
-      // Existing installs store a raw organization string; an absent value means
-      // Personal. Keep both forms until those installations and records cannot exist.
+      // A stored organization is an explicit choice; the marker beside it is an
+      // explicit Personal choice. An absent value is 'not chosen yet': the
+      // organization list decides the default and the effect below publishes it.
+      // A legacy absent value is treated the same way.
+      // The two reads are kept apart: a stored organization stands alone, so a
+      // marker-read failure must not discard it. The marker is only consulted
+      // when no organization is stored, and a failure there stays a restore
+      // error — the selection is then genuinely undetermined.
       const stored = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+      const marker =
+        stored === null ? await SecureStore.getItemAsync(ORGANIZATION_PERSONAL_STORAGE_KEY) : null;
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
-        activeId.current = stored ?? null;
-        setState({
-          token,
-          organizationId: stored ?? null,
-          isLoaded: true,
-          isSaving: false,
-          error: null,
-        });
+        if (stored) {
+          activeId.current = stored;
+          personalExplicit.current = false;
+          setState({ token, organizationId: stored, isLoaded: true, isSaving: false, error: null });
+        } else if (marker === PERSONAL_MARKER) {
+          activeId.current = null;
+          personalExplicit.current = true;
+          setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
+        } else {
+          personalExplicit.current = false;
+          awaitingDefault.current = true;
+          defaultFence.current = { operation, epoch };
+          // Re-publish the resolving state so the list effect re-runs even when
+          // the list settled before this read returned. Never publish Personal
+          // here: an empty list, not this branch, is what means Personal.
+          setState(current => ({ ...current, isLoaded: false }));
+        }
       }
     } catch {
       if (generation.current === operation && isCurrentAuthEpoch(epoch)) {
@@ -81,9 +129,15 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     setState(current => ({ ...current, isSaving: true }));
     let error: 'save' | null = null;
     try {
+      // An organization writes the organization key and clears the Personal
+      // marker; Personal deletes the organization key every other reader relies
+      // on and writes the marker in its place.
       await (id
         ? setAccountMetadata(ORGANIZATION_STORAGE_KEY, id)
         : deleteAccountMetadata(ORGANIZATION_STORAGE_KEY));
+      await (id
+        ? deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY)
+        : setAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY, PERSONAL_MARKER));
     } catch {
       error = 'save';
     }
@@ -91,6 +145,67 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       setState(current => ({ ...current, error, isSaving: false }));
     }
   }, []);
+
+  // Publish the default organization once the shared list has settled. Fenced
+  // by the generation and auth epoch captured in `restore()`, so a sign-out or
+  // a newer sign-in during the fetch publishes nothing stale.
+  useEffect(() => {
+    if (!awaitingDefault.current) {
+      return;
+    }
+    const fence = defaultFence.current;
+    if (generation.current !== fence?.operation || !isCurrentAuthEpoch(fence.epoch)) {
+      awaitingDefault.current = false;
+      defaultFence.current = null;
+      return;
+    }
+    // A paused list is offline and may never fetch. Waiting on it would leave
+    // `isLoaded` false forever, so publish Personal to keep the app usable, and
+    // keep `awaitingDefault` set: the default still applies when the list
+    // arrives. Only reached when nothing explicit was stored, so this never
+    // overrides a stored choice.
+    if (!organizationsFetched && organizationsPaused) {
+      if (!state.isLoaded) {
+        activeId.current = null;
+        setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
+      }
+      return;
+    }
+    // A refetch of an already-failed list must settle before it republishes.
+    if (!organizationsFetched || organizationsFetching) {
+      return;
+    }
+    awaitingDefault.current = false;
+    defaultFence.current = null;
+    if (organizationsError) {
+      activeId.current = null;
+      personalExplicit.current = false;
+      setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: 'restore' });
+      return;
+    }
+    const defaultId = organizations?.[0]?.organizationId ?? null;
+    activeId.current = defaultId;
+    personalExplicit.current = false;
+    setState({ token, organizationId: defaultId, isLoaded: true, isSaving: false, error: null });
+    // The default must land in storage, not only in React context: every other
+    // reader of the organization key (glanceable scope, widget actions, voice
+    // input, tool-summary translation) resolves the selection from SecureStore,
+    // so publishing this id only here would leave them on Personal while the
+    // app shows the organization. Personal (no organizations) writes nothing:
+    // an absent key with no marker is still 'not chosen yet'.
+    if (defaultId) {
+      void persist(defaultId);
+    }
+  }, [
+    state,
+    organizations,
+    organizationsFetched,
+    organizationsFetching,
+    organizationsError,
+    organizationsPaused,
+    token,
+    persist,
+  ]);
 
   // This provider stays mounted above the auth gate. Reset on sign-out and
   // invalidate obsolete reads/saves on token changes and unmount.
@@ -100,6 +215,9 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     } else {
       generation.current += 1;
       activeId.current = null;
+      awaitingDefault.current = false;
+      defaultFence.current = null;
+      personalExplicit.current = false;
       setState({ token, organizationId: null, isLoaded: true, isSaving: false, error: null });
     }
     return () => {
@@ -109,10 +227,23 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
 
   const setOrganizationId = useCallback(
     (id: string | null) => {
+      // An explicit selection always settles a pending default, even when it
+      // matches the placeholder published while waiting; otherwise the default
+      // would publish later and override the user's choice.
+      const settlingDefault = awaitingDefault.current;
+      awaitingDefault.current = false;
+      defaultFence.current = null;
       // A same-value selection is a no-op: blanking it would bump the terminal
       // epoch and permanently gate the publisher, because React bails out of the
       // state update and no effect re-runs to rebuild it.
-      if (id === state.organizationId) {
+      if (id === state.organizationId && !settlingDefault) {
+        // An auto-resolved Personal is not an explicit choice yet. Write the
+        // marker so the choice survives the next launch, but skip the terminal
+        // blank above for the same publisher reason.
+        if (id === null && !personalExplicit.current) {
+          personalExplicit.current = true;
+          void persist(null);
+        }
         return;
       }
       // Blank the current surface before the selection changes so the prior
@@ -124,6 +255,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       // the Expo push token (logout-only).
       void unregisterActivityTokensAndTombstone();
       activeId.current = id;
+      personalExplicit.current = id === null;
       setState(current => ({
         token,
         organizationId: id,
@@ -136,13 +268,21 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
     [token, persist, state.organizationId]
   );
 
+  // `restore` re-reads the keys, but a default that failed on the shared list
+  // would be republished from the same failed query. Refresh the list first so
+  // Retry re-resolves the default instead of echoing the error.
+  const retryRestore = useCallback(async () => {
+    await refetchOrganizations();
+    await restore();
+  }, [refetchOrganizations, restore]);
+
   const retry = useCallback(() => {
     if (state.error === 'restore') {
-      void restore();
+      void retryRestore();
     } else if (state.error === 'save') {
       void persist(activeId.current);
     }
-  }, [state.error, restore, persist]);
+  }, [state.error, retryRestore, persist]);
 
   const value = useMemo<OrganizationContextValue>(
     () => ({

@@ -8,6 +8,7 @@ import {
   type KiloPassNativeIapContextValue,
   KiloPassNativeIapOwner,
 } from '@/components/kilo-pass/kilo-pass-native-iap-owner';
+import { i18n } from '@/i18n';
 import {
   createAppStoreKiloPassPurchaseActions,
   getKiloPassPurchaseErrorMessage,
@@ -39,6 +40,7 @@ const mockedAuth = vi.hoisted(() => ({ authEpoch: 0 }));
 const mockedCurrentUserId = vi.hoisted(() => ({ userId: 'user-1' }));
 
 const mockedReactQuery = vi.hoisted(() => ({
+  backendProductsStaleTime: undefined as number | undefined,
   completeAppStorePurchase: vi.fn(),
   completeAppStorePurchaseIsPending: false,
   fetchQuery: vi.fn(),
@@ -48,6 +50,7 @@ const mockedReactQuery = vi.hoisted(() => ({
     | { products: { appleProductId: string; googleProductId?: string }[] }
     | undefined,
   removeQueries: vi.fn(),
+  storeProductsData: undefined as readonly AppStoreKiloPassProduct[] | undefined,
   useMutation: vi.fn(),
   useQuery: vi.fn(),
   useQueryClient: vi.fn(),
@@ -92,12 +95,20 @@ vi.mock('@tanstack/react-query', () => ({
       mutateAsync: mockedReactQuery.completeAppStorePurchase,
     };
   },
-  useQuery: (options: { queryKey: unknown[] }) => {
+  useQuery: (options: { queryKey: unknown[]; staleTime?: number }) => {
     mockedReactQuery.useQuery();
     mockedReactQuery.lastQueryKey = options.queryKey;
     const isMobileStoreProducts = options.queryKey[0] === 'mobile-products';
+    const isStoreProducts = options.queryKey[0] === 'kilo-pass';
+    let data: unknown = undefined;
+    if (isMobileStoreProducts) {
+      mockedReactQuery.backendProductsStaleTime = options.staleTime;
+      data = mockedReactQuery.mobileStoreProductsData;
+    } else if (isStoreProducts) {
+      data = mockedReactQuery.storeProductsData;
+    }
     return {
-      data: isMobileStoreProducts ? mockedReactQuery.mobileStoreProductsData : undefined,
+      data,
       error: null,
       isError: false,
       isLoading: false,
@@ -143,7 +154,10 @@ vi.mock('@/lib/trpc', () => ({
         completeAppStorePurchase: { mutationOptions: () => ({}) },
         completePlayPurchase: { mutationOptions: () => ({}) },
         getCreditHistory: { pathFilter: () => ({ queryKey: ['credit-history'] }) },
-        getMobileStoreProducts: { queryOptions: () => ({ queryKey: ['mobile-products'] }) },
+        getMobileStoreProducts: {
+          pathFilter: () => ({ queryKey: ['mobile-products'] }),
+          queryOptions: () => ({ queryKey: ['mobile-products'] }),
+        },
         getPurchasePresentation: { pathFilter: () => ({ queryKey: ['purchase-presentation'] }) },
         getState: { pathFilter: () => ({ queryKey: ['state'] }) },
       },
@@ -373,6 +387,7 @@ beforeEach(() => {
   mockedIap.handlers = null;
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
+  mockedReactQuery.backendProductsStaleTime = undefined;
   mockedReactQuery.completeAppStorePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedReactQuery.completeAppStorePurchaseIsPending = false;
   mockedReactQuery.fetchQuery.mockResolvedValue({
@@ -383,6 +398,7 @@ beforeEach(() => {
   mockedReactQuery.lastQueryKey = null;
   mockedReactQuery.mobileStoreProductsData = undefined;
   mockedReactQuery.removeQueries.mockReturnValue(undefined);
+  mockedReactQuery.storeProductsData = undefined;
 });
 
 describe('createAppStoreKiloPassPurchaseActions', () => {
@@ -1313,14 +1329,34 @@ describe('KiloPassNativeIapOwner', () => {
     expect(mockedReactQuery.lastQueryKey).toEqual(['kilo-pass', 'app-store-products', 'user-42']);
   });
 
-  it('clears the product cache when the auth epoch changes', () => {
-    mockedAuth.authEpoch = 7;
+  it('keeps the product cache on the first mount so a re-entered screen hits it', () => {
     const owner = renderKiloPassNativeIapOwner();
 
     owner.render();
 
+    expect(mockedReactQuery.removeQueries).not.toHaveBeenCalled();
+  });
+
+  it('holds the backend product catalog for the store cache window so a re-entry does not refetch it', () => {
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+
+    expect(mockedReactQuery.backendProductsStaleTime).toBe(5 * 60 * 1000);
+  });
+
+  it('clears the product cache when the auth epoch changes', () => {
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+
+    mockedAuth.authEpoch = 7;
+    owner.render();
+
     expect(mockedReactQuery.removeQueries).toHaveBeenCalledWith({
       queryKey: ['kilo-pass', 'app-store-products'],
+    });
+    expect(mockedReactQuery.removeQueries).toHaveBeenCalledWith({
+      queryKey: ['mobile-products'],
     });
   });
 
@@ -1388,6 +1424,95 @@ describe('KiloPassNativeIapOwner', () => {
     expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
   });
 
+  it('recovers an owned purchase for a tier the store could not resolve', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    // The store resolved tier 19 only: tier 49 failed to query, so it is absent
+    // from the paywall's product list but still owned on this Play account.
+    mockedReactQuery.storeProductsData = [product];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [
+        { appleProductId: product.appleProductId, googleProductId: 'kilopass_tier19' },
+        { appleProductId: 'com.kilo.pass.tier49.monthly', googleProductId: 'kilopass_tier49' },
+      ],
+    };
+    const unresolvedTierPurchase = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier49',
+      purchaseToken: 'tier49-token',
+      transactionId: 'tier49-order',
+    });
+    mockedIap.availablePurchases = [unresolvedTierPurchase];
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
+      purchaseToken: 'tier49-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: unresolvedTierPurchase,
+      isConsumable: false,
+    });
+  });
+
+  // The owner mounts for every presentation variant, including web_management
+  // and unavailable, where KiloPassNativeIapContent (the inline error surface)
+  // is not rendered. Recovery is the only error path that can run there, and it
+  // must stay silent rather than pop a bare toast behind a screen with no
+  // purchase UI.
+  it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
+    mockedIap.availablePurchases = [createPurchase()];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId }],
+    };
+    mockedReactQuery.completeAppStorePurchase.mockRejectedValue({
+      message: 'Server rejected the completion',
+    });
+    const owner = renderKiloPassNativeIapOwner();
+
+    owner.render();
+    await flushPromises();
+
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it('restores an owned purchase for a tier the store could not resolve', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    mockedReactQuery.storeProductsData = [product];
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [
+        { appleProductId: product.appleProductId, googleProductId: 'kilopass_tier19' },
+        { appleProductId: 'com.kilo.pass.tier49.monthly', googleProductId: 'kilopass_tier49' },
+      ],
+    };
+    mockedIap.getAvailablePurchases.mockResolvedValue([
+      createPurchase({
+        store: 'google',
+        productId: 'kilopass_tier49',
+        purchaseToken: 'tier49-token',
+        transactionId: 'tier49-order',
+      }),
+    ]);
+    const owner = renderKiloPassNativeIapOwner();
+
+    const result = await owner.render().restorePurchases();
+
+    expect(result).toBe('restored');
+    expect(mockedReactQuery.completeAppStorePurchase).toHaveBeenCalledWith({
+      purchaseToken: 'tier49-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+  });
+
   it('invalidates the full Kilo Pass state set including getPurchasePresentation after completion', async () => {
     mockedIap.availablePurchases = [createPurchase()];
     mockedReactQuery.mobileStoreProductsData = {
@@ -1407,5 +1532,114 @@ describe('KiloPassNativeIapOwner', () => {
     expect(mockedReactQuery.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['purchase-presentation'],
     });
+  });
+
+  it('clears the store-connection error once the ownership lookup succeeds', async () => {
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+    await flushPromises();
+
+    const failed = owner.render();
+    // Let that render's ownership effect settle before the retry, so no pending
+    // failure lands after it.
+    await flushPromises();
+    expect(failed.errorMessage).toBe(i18n.t('kiloPass.couldNotConnectToAppStore'));
+    expect(failed.storeConnectionError).toBe(true);
+    expect(failed.ownershipCheckFailed).toBe(true);
+
+    // The store answers now, and the retry runs with no render in between: the
+    // fake dispatcher re-runs effects only on a render, so only the retry's own
+    // state change can clear the failure before its lookup settles. Without this
+    // the assertions below pass even if `retryOwnershipCheck` were a no-op.
+    mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
+    failed.retryOwnershipCheck();
+    const retrying = owner.render();
+    expect(retrying.ownershipCheckFailed).toBe(false);
+    await flushPromises();
+
+    const recovered = owner.render();
+    expect(recovered.errorMessage).toBeNull();
+    expect(recovered.storeConnectionError).toBe(false);
+    expect(recovered.ownershipCheckFailed).toBe(false);
+    expect(recovered.ownershipChecked).toBe(true);
+  });
+
+  it('drops the store-connection identity when a purchase error replaces the message', async () => {
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+    await flushPromises();
+
+    expect(owner.render().storeConnectionError).toBe(true);
+
+    // Park the ownership effect: a purchase failure is a different error, and
+    // the screen must keep rendering it inline even while its card is up.
+    mockedIap.connected = false;
+    mockedIap.handlers?.onPurchaseError(new Error('StoreKit failed'));
+    const replaced = owner.render();
+
+    expect(replaced.errorMessage).toBe('StoreKit failed');
+    expect(replaced.storeConnectionError).toBe(false);
+  });
+
+  it('clears the ownership failure once a restore proves the store answered', async () => {
+    // The fake dispatcher re-runs effects on every render, so the ownership
+    // effect would re-derive the failure from a later successful lookup. Park
+    // it once the failure is established so the assertion observes the
+    // restore's own state change.
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+    await flushPromises();
+
+    const failedValue = owner.render();
+    expect(failedValue.ownershipCheckFailed).toBe(true);
+    // Let that render's ownership effect settle before parking it, so no
+    // pending failure lands after the restore clears the message.
+    await flushPromises();
+
+    mockedIap.connected = false;
+    mockedIap.getAvailablePurchases.mockResolvedValue([]);
+    const result = await failedValue.restorePurchases();
+    await flushPromises();
+
+    expect(result).toBe('empty');
+    const restored = owner.render();
+    expect(restored.ownershipCheckFailed).toBe(false);
+    expect(restored.ownershipChecked).toBe(true);
+    // The store just answered, so its connection message cannot survive.
+    expect(restored.errorMessage).toBeNull();
+  });
+
+  it('keeps the ownership failure when the restore itself failed', async () => {
+    mockedIap.connected = true;
+    mockedIap.getAvailablePurchases.mockRejectedValue(
+      new Error('Play Store service is not connected')
+    );
+    const owner = renderKiloPassNativeIapOwner();
+    owner.render();
+    await flushPromises();
+
+    const failedValue = owner.render();
+    expect(failedValue.ownershipCheckFailed).toBe(true);
+
+    // Park the ownership effect: a restore that never reached the store must
+    // not clear the failure the screen is reporting.
+    mockedIap.connected = false;
+    const result = await failedValue.restorePurchases();
+    await flushPromises();
+
+    expect(result).toBe('failed');
+    expect(owner.render().ownershipCheckFailed).toBe(true);
   });
 });

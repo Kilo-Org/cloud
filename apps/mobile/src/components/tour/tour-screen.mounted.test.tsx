@@ -7,6 +7,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TourScreen } from './tour-screen';
+import { TourStepHeader } from './tour-step-header';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -120,17 +121,13 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Cloud: 'Cloud',
   Monitor: 'Monitor',
   Sparkles: 'Sparkles',
 }));
-
-// The computer instructions page is replaced with a controllable stub that
-// exposes `onChooseComputer`, so the shell's hand-off contract is tested
-// without the step's network behavior.
-vi.mock('./tour-remote-step', () => ({ TourRemoteStep: 'TourRemoteStep' }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -162,22 +159,6 @@ function pressControl(renderer: Renderer, type: string, label: string): void {
   const control = requireControl(renderer, type, label);
   act(() => {
     (control.props as { onPress?: () => void }).onPress?.();
-  });
-}
-
-/** Opening a step or going back is not a decision: never record or navigate. */
-function expectNoTourDecision(): void {
-  expect(recordCompleted).not.toHaveBeenCalled();
-  expect(stackSafeReplace).not.toHaveBeenCalled();
-  expect(routerReplace).not.toHaveBeenCalled();
-  expect(routerBack).not.toHaveBeenCalled();
-}
-
-/** Drive the computer step's hand-off the way a row tap does. */
-function chooseComputer(renderer: Renderer, connectionId: string): void {
-  const step = renderer.root.findByType('TourRemoteStep' as ElementType);
-  act(() => {
-    (step.props as { onChooseComputer: (value: string) => void }).onChooseComputer(connectionId);
   });
 }
 
@@ -219,7 +200,12 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkSubtitle')).toBe(true);
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
+
+    // The screen header keeps only the native modal spacing. The eyebrow sits
+    // in the centered step header, directly above the heading it names.
+    const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
+    expect(screenHeader.props).not.toHaveProperty('eyebrow');
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });
@@ -240,31 +226,13 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('returns to the fork from the computer step without recording, by the header control and by hardware Back', async () => {
+  it('keeps modal spacing without moving the eyebrow out of the step header', async () => {
     const { renderer, unmount } = await mountTour();
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
 
-    // The computer step carries the app's own back control, wired to the fork.
-    const header = renderer.root.findByProps({ showBackButton: true });
-    act(() => {
-      (header.props as { onBack: () => void }).onBack();
-    });
-    // The fork is back, with no decision recorded and no navigation.
-    expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
-    expectNoTourDecision();
-
-    // Android hardware Back agrees with the visible control instead of
-    // dismissing the whole tour.
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
-    let handled = false;
-    act(() => {
-      handled = backHandler.press();
-    });
-    expect(handled).toBe(true);
-    expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
-    expectNoTourDecision();
+    const header = renderer.root.findByProps({ modal: true });
+    expect(header.props.showBackButton).toBe(false);
+    expect(header.props.eyebrow).toBeUndefined();
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });
@@ -283,34 +251,21 @@ describe('TourScreen', () => {
     expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=cloud');
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(0);
 
     unmount();
   });
 
-  it('opens the computer instructions page when the computer card is chosen', async () => {
+  it('hands off to the new-session page with no preselect when the computer card is chosen', async () => {
     const { renderer, unmount } = await mountTour();
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
 
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
-    expect(hasText(renderer, 'tour.forkTitle')).toBe(false);
-    // Opening the page is not a decision: nothing is recorded until a
-    // computer is tapped or the person skips.
-    expectNoTourDecision();
-
-    unmount();
-  });
-
-  it('hands off the chosen computer to the new-session page', async () => {
-    const { renderer, unmount } = await mountTour();
-
-    pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
-    chooseComputer(renderer, 'conn-1');
-
+    // The computer card records the decision and hands straight to the form
+    // too. It passes no run-on param, so the form restores the stored run-on
+    // preference and the person picks their computer there.
     expect(recordCompleted).toHaveBeenCalledTimes(1);
     expect(stackSafeReplace).toHaveBeenCalledTimes(1);
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
     expect(routerReplace).not.toHaveBeenCalled();
     expect(routerBack).not.toHaveBeenCalled();
 
@@ -410,10 +365,8 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.forkTitle')).toBe(true);
 
     pressControl(renderer, 'ChoiceRow', 'tour.remoteOptionTitle');
-    expect(renderer.root.findAllByType('TourRemoteStep' as ElementType)).toHaveLength(1);
-
-    chooseComputer(renderer, 'conn-1');
-    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new?preselectRunOn=conn-1');
+    expect(recordCompleted).toHaveBeenCalledTimes(1);
+    expect(stackSafeReplace).toHaveBeenCalledWith('/(app)/agent-chat/new');
 
     unmount();
   });

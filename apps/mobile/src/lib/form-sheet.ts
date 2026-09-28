@@ -13,3 +13,27 @@ export function useFormSheetDetents() {
 
   return { fullSheetDetent };
 }
+
+/**
+ * The options every formSheet route in the app registers.
+ *
+ * `sheetShouldOverflowTopInset` makes Android measure `sheetAllowedDetents`
+ * against the full stack height, the way iOS does, and stops the sheet being
+ * lifted by the bottom system gesture inset. Without it Android subtracts the
+ * top inset a second time at the bottom — the sheet surface ends above the
+ * window bottom and the screen behind it shows through the strip under the
+ * sheet (the new-session screen's olive "Start session" button under the repo
+ * picker). `fullSheetDetent` keeps the top edge below the status bar in that
+ * full-height measure.
+ */
+export function useFormSheetScreenOptions() {
+  const { fullSheetDetent } = useFormSheetDetents();
+
+  return {
+    presentation: 'formSheet' as const,
+    sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
+    sheetGrabberVisible: true,
+    headerShown: false,
+    sheetShouldOverflowTopInset: true,
+  };
+}

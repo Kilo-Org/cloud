@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { Organization } from '@kilocode/db/schema';
-import type { OrgTrialStatus } from '@/lib/organizations/organization-types';
-import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
+import {
+  classifyOrganizationEntitlement,
+  type OrganizationTrialDisplayStatus,
+} from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
@@ -731,7 +733,7 @@ export function useOrganizationAIAdoptionTimeseries(
 
 export function useOrganizationTrialStatus(
   organizationId: string
-): OrgTrialStatus | 'loading' | 'error' {
+): OrganizationTrialDisplayStatus | 'loading' | 'error' {
   const sub = useOrganizationLatestSeatPurchaseStatus(organizationId);
   const org = useOrganizationWithMembers(organizationId);
 

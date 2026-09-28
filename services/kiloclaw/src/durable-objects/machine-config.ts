@@ -4,10 +4,8 @@ import { OPENCLAW_PORT, DEFAULT_MACHINE_GUEST } from '../config';
 import type { RuntimeSpec } from '../providers/types';
 import type { FlyMachineConfig } from '../fly/types';
 
-// ============================================================================
 // Metadata keys set on every Fly Machine for recovery/orphan detection.
 // Avoid fly_* keys — those are reserved by Fly.
-// ============================================================================
 
 export const METADATA_KEY_USER_ID = 'kiloclaw_user_id';
 export const METADATA_KEY_SANDBOX_ID = 'kiloclaw_sandbox_id';
@@ -16,9 +14,7 @@ export const METADATA_KEY_OPENCLAW_VERSION = 'kiloclaw_openclaw_version';
 export const METADATA_KEY_IMAGE_VARIANT = 'kiloclaw_image_variant';
 export const METADATA_KEY_DEV_CREATOR = 'kiloclaw_dev_creator';
 
-// ============================================================================
 // Neutral runtime spec builder
-// ============================================================================
 
 export type MachineIdentity = {
   userId: string;
@@ -111,9 +107,7 @@ export function effectiveMachineSize(state: {
   return state.adminMachineSizeOverride ?? state.machineSize;
 }
 
-// ============================================================================
 // Volume name helper
-// ============================================================================
 
 export function volumeNameFromSandboxId(sandboxId: string): string {
   return `kiloclaw_${sandboxId}`

@@ -5,7 +5,8 @@ import {
   type WorktreeReviewResult,
 } from './worktree-review';
 
-const rowSelector = '[data-code][data-unified] > [data-content] > [data-line]';
+const rowSelector =
+  '[data-code][data-unified] > [data-content] > [data-line], [data-code][data-deletions] > [data-content] > [data-line], [data-code][data-additions] > [data-content] > [data-line]';
 const controlSelector =
   'button, input, textarea, select, a, [contenteditable], [data-line-annotation], [data-gutter-utility-slot], [data-separator]';
 
@@ -22,7 +23,12 @@ function codeRows(root: ShadowRoot): HTMLElement[] {
 }
 
 function rowSide(row: HTMLElement) {
-  return row.getAttribute('data-line-type') === 'change-deletion' ? 'deletions' : 'additions';
+  const lineType = row.getAttribute('data-line-type');
+  if (lineType === 'change-deletion') return 'deletions';
+  if (lineType === 'change-addition') return 'additions';
+  return row.closest('[data-code]')?.getAttribute('data-deletions') != null
+    ? 'deletions'
+    : 'additions';
 }
 
 function codeRow(root: ShadowRoot, node: Node): HTMLElement | null {

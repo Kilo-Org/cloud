@@ -14,6 +14,7 @@ export type FindInstallationParams = {
   userId: string;
   orgId?: string;
   expectedIntegrationId?: string;
+  accessPurpose?: 'workflow' | 'agent';
 };
 
 const InstallationLookupResultSchema = z.object({
@@ -190,6 +191,14 @@ function buildAuthorizedInstallationsQuery(
     .where(
       and(
         eq(platform_integrations.platform, 'github'),
+        authorizationMode === 'managed' &&
+          params.accessPurpose === 'agent' &&
+          params.expectedIntegrationId !== undefined
+          ? or(
+              eq(platform_integrations.github_connection_role, 'workflow'),
+              eq(platform_integrations.github_connection_role, 'agent_only')
+            )
+          : eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
         isNull(platform_integrations.suspended_at),
@@ -218,12 +227,17 @@ function buildAuthorizedInstallationsQuery(
           ),
           and(
             eq(github_app_installations.lifecycle_state, 'active'),
+            eq(
+              github_app_installations.installation_id,
+              platform_integrations.platform_installation_id
+            ),
+            eq(
+              github_app_installations.github_app_type,
+              sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+            ),
             isNull(github_app_installations.suspended_at),
             isNull(github_app_installations.deleted_at),
-            isNull(github_app_installations.auth_invalid_at),
-            authorizationMode === 'generic' || params.expectedIntegrationId === undefined
-              ? eq(github_app_installations.sharing_mode, 'exclusive')
-              : undefined
+            isNull(github_app_installations.auth_invalid_at)
           )
         ),
         or(
@@ -257,9 +271,10 @@ export function buildInstallationLookupQuery(db: WorkerDb, params: FindInstallat
 
 export function buildInstallationRefreshCandidatesQuery(
   db: WorkerDb,
-  params: FindInstallationParams
+  params: FindInstallationParams,
+  authorizationMode: 'generic' | 'managed' = 'generic'
 ) {
-  return buildAuthorizedInstallationsQuery(db, params, undefined, 'generic').limit(
+  return buildAuthorizedInstallationsQuery(db, params, undefined, authorizationMode).limit(
     MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES
   );
 }
@@ -364,14 +379,19 @@ export class InstallationLookupService {
   }
 
   async findRefreshCandidates(
-    params: FindInstallationParams
+    params: FindInstallationParams,
+    authorizationMode: 'generic' | 'managed' = 'generic'
   ): Promise<InstallationRefreshCandidatesResult> {
     const validationFailure = this.validateParams(params);
     if (validationFailure) {
       return validationFailure;
     }
 
-    const rows = await buildInstallationRefreshCandidatesQuery(this.getDb(), params);
+    const rows = await buildInstallationRefreshCandidatesQuery(
+      this.getDb(),
+      params,
+      authorizationMode
+    );
     return {
       success: true,
       candidates: rows.map(row => {
@@ -448,6 +468,7 @@ export class InstallationLookupService {
       .where(
         and(
           eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.github_connection_role, 'workflow'),
           eq(platform_integrations.integration_type, 'app'),
           eq(platform_integrations.integration_status, 'active'),
           isNull(platform_integrations.suspended_at),
@@ -480,7 +501,6 @@ export class InstallationLookupService {
               eq(github_app_installations.installation_id, installationId),
               eq(github_app_installations.github_app_type, appType),
               eq(github_app_installations.lifecycle_state, 'active'),
-              eq(github_app_installations.sharing_mode, 'exclusive'),
               isNull(github_app_installations.suspended_at),
               isNull(github_app_installations.deleted_at),
               allowAuthenticationRecovery
@@ -539,6 +559,7 @@ export class InstallationLookupService {
       .where(
         and(
           eq(platform_integrations.id, integrationId),
+          eq(platform_integrations.github_connection_role, 'workflow'),
           eq(platform_integrations.platform, 'github'),
           eq(platform_integrations.integration_type, 'app'),
           eq(platform_integrations.integration_status, 'active'),
@@ -569,7 +590,14 @@ export class InstallationLookupService {
             ),
             and(
               eq(github_app_installations.lifecycle_state, 'active'),
-              eq(github_app_installations.sharing_mode, 'exclusive'),
+              eq(
+                github_app_installations.installation_id,
+                platform_integrations.platform_installation_id
+              ),
+              eq(
+                github_app_installations.github_app_type,
+                sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+              ),
               isNull(github_app_installations.suspended_at),
               isNull(github_app_installations.deleted_at),
               isNull(github_app_installations.auth_invalid_at)

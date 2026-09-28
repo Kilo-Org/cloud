@@ -4,6 +4,7 @@ import { type ComponentProps, createElement, type ReactElement } from 'react';
 import type * as ReactI18next from 'react-i18next';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -17,6 +18,8 @@ const holder = vi.hoisted(() => ({
   isPending: false,
   copied: [] as string[],
   copyResult: true as boolean | Promise<boolean>,
+  copiedLinks: [] as { sessionId: string; anchorMessageId: string | null }[],
+  linkCopyResult: true as boolean | Promise<boolean>,
 }));
 
 vi.mock('@tanstack/react-query', () => ({
@@ -32,6 +35,11 @@ vi.mock('./session-row-actions', () => ({
     await Promise.resolve();
     holder.copied.push(id);
     return holder.copyResult;
+  },
+  copySessionLink: async (sessionId: string, anchorMessageId: string | null) => {
+    await Promise.resolve();
+    holder.copiedLinks.push({ sessionId, anchorMessageId });
+    return holder.linkCopyResult;
   },
 }));
 vi.mock('react-i18next', async importOriginal => {
@@ -101,6 +109,7 @@ function renderSheet(
         visible: true,
         info: INFO,
         sessionId: 'ses-123',
+        anchorMessageId: null,
         sessionTitle: 'Greeting',
         activeSessionType: null,
         ownerConnectionId: null,
@@ -280,6 +289,7 @@ function sheetElement(
     visible: true,
     info: INFO,
     sessionId: 'ses-123',
+    anchorMessageId: null,
     sessionTitle: 'Greeting',
     activeSessionType: null,
     ownerConnectionId: null,
@@ -340,6 +350,8 @@ beforeEach(() => {
   holder.isPending = false;
   holder.copied = [];
   holder.copyResult = true;
+  holder.copiedLinks = [];
+  holder.linkCopyResult = true;
 });
 
 describe('SessionContextSheet session id and running on', () => {
@@ -504,6 +516,93 @@ describe('SessionContextSheet session id and running on', () => {
       ownerConnectionId: 'conn-missing',
     });
     expect(textValues(renderer)).not.toContain(i18n.t('agentChat.instancePicker.runOn'));
+    await unmount(renderer);
+  });
+});
+
+describe('SessionContextSheet copy link row', () => {
+  it('shows the resume URL as the row value and copies it from the call to action', async () => {
+    const renderer = await mountSheet();
+    const expected = sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: null });
+    expect(textValues(renderer)).toContain(i18n.t('common.copyLink'));
+    expect(textValues(renderer)).toContain(expected);
+
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+
+    expect(holder.copiedLinks).toEqual([{ sessionId: 'ses-123', anchorMessageId: null }]);
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    // The row keeps its call-to-action name beside the outcome, so the sheet
+    // still names the row after the copy completes.
+    expect(values).toContain(i18n.t('common.copyLink'));
+    await unmount(renderer);
+  });
+
+  it('copies the row value anchored at the position the sheet was given', async () => {
+    const renderer = await mountSheet({ anchorMessageId: 'msg-42' });
+    const expected = sessionResumeUrl({ sessionId: 'ses-123', anchorMessageId: 'msg-42' });
+    expect(textValues(renderer)).toContain(expected);
+
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+
+    expect(holder.copiedLinks).toEqual([{ sessionId: 'ses-123', anchorMessageId: 'msg-42' }]);
+    await unmount(renderer);
+  });
+
+  it('shows the could-not-copy outcome and retries from the same row', async () => {
+    holder.linkCopyResult = false;
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.couldNotCopyLink'));
+    expect(values).not.toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(values).toContain(i18n.t('common.copyLink'));
+
+    holder.linkCopyResult = true;
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    expect(holder.copiedLinks).toHaveLength(2);
+    expect(textValues(renderer)).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(textValues(renderer)).not.toContain(i18n.t('agentChat.chatLink.couldNotCopyLink'));
+    await unmount(renderer);
+  });
+
+  it('resets the link feedback to the call to action when the sheet closes', async () => {
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    expect(textValues(renderer)).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    await act(async () => {
+      renderer.update(sheetElement({ visible: false }));
+      await Promise.resolve();
+    });
+    expect(textValues(renderer)).toContain(i18n.t('common.copyLink'));
+    expect(textValues(renderer)).not.toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    await unmount(renderer);
+  });
+
+  it('keeps the link feedback independent of the session id feedback', async () => {
+    const renderer = await mountSheet();
+    await act(async () => {
+      pressByTestID(renderer, 'session-context-sheet-copy-link');
+      await Promise.resolve();
+    });
+    const values = textValues(renderer);
+    expect(values).toContain(i18n.t('agentChat.chatLink.linkCopied'));
+    expect(values).not.toContain(i18n.t('agents.sessionRow.idCopied'));
     await unmount(renderer);
   });
 });

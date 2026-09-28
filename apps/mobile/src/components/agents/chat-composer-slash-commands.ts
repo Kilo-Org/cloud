@@ -1,7 +1,19 @@
-import { type ActiveSessionType, type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
+import {
+  type ActiveSessionType,
+  type SlashCommandCatalogStatus,
+  type SlashCommandInfo,
+} from '@kilocode/cloud-agent-sdk';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 
 import { i18n } from '@/i18n';
+
+/**
+ * A slash command the mobile composer may show. `catalogueDescription` marks a
+ * description that already comes from the app's i18n catalogue (the reserved
+ * local commands), so the suggestion row never sends it to the translation
+ * gateway; the CLI-reported commands leave it unset and translate.
+ */
+export type MobileSlashCommandInfo = SlashCommandInfo & { catalogueDescription?: boolean };
 
 /**
  * A slash command this client registers itself — the mobile-local reserved
@@ -13,7 +25,7 @@ import { i18n } from '@/i18n';
  * entry named `review` is the built-in command or an external command (a
  * repository command file, an MCP prompt) that reuses the name.
  */
-export type BuiltInSlashCommandInfo = SlashCommandInfo & { readonly builtIn: true };
+export type BuiltInSlashCommandInfo = MobileSlashCommandInfo & { readonly builtIn: true };
 
 /**
  * Local reserved /new command — surfaced only for remote sessions, never
@@ -26,6 +38,7 @@ export function getLocalNewSlashCommand(): BuiltInSlashCommandInfo {
     name: 'new',
     description: i18n.t('agentChat.slashCommands.startNewSession'),
     hints: [],
+    catalogueDescription: true,
     builtIn: true,
   };
 }
@@ -35,11 +48,13 @@ export function getLocalExitSlashCommand(): BuiltInSlashCommandInfo {
     name: 'exit',
     description: i18n.t('agentChat.slashCommands.exitSession'),
     hints: [],
+    catalogueDescription: true,
     builtIn: true,
   };
 }
 
 function getLocalQuitSlashCommand(): BuiltInSlashCommandInfo {
+  // Inherits `catalogueDescription: true` and `builtIn: true` by spread.
   return { ...getLocalExitSlashCommand(), name: QUIT_COMMAND_NAME };
 }
 
@@ -54,6 +69,7 @@ export function getLocalClearSlashCommand(): BuiltInSlashCommandInfo {
     name: 'clear',
     description: i18n.t('agentChat.slashCommands.clearSession'),
     hints: [],
+    catalogueDescription: true,
     builtIn: true,
   };
 }
@@ -112,26 +128,49 @@ function isBuiltInSlashCommand(command: SlashCommandInfo): boolean {
 }
 
 /**
- * Resolve a command's description from the active catalog so it follows the
- * app language.
+ * True when the catalogue resolves this command's name to its own description.
  *
  * A name alone is not proof that a row is the built-in command: the worker
  * catalog, a repository command file, and an MCP prompt can all report a
  * built-in name with their own description, and the CLI replaces the built-in
  * entry with that command. Only a command this client registered, or a catalog
- * entry that reports the built-in English source string, is localized; every
- * other entry keeps the description it reports, and a command the catalogue
- * does not know keeps it too.
+ * entry that reports the built-in English source string, is accounted for.
+ */
+function hasCatalogueDescription(command: SlashCommandInfo): boolean {
+  const key = lookup(SLASH_COMMAND_DESCRIPTION_KEYS, command.name);
+  if (key === undefined) {
+    return false;
+  }
+  return isBuiltInSlashCommand(command) || command.description === i18n.t(key, { lng: 'en' });
+}
+
+/**
+ * True when the app catalogue accounts for this command's description, i.e.
+ * when `getSlashCommandDescription` resolves it from the catalogue instead of
+ * returning the reported text. The `catalogueDescription` marker covers the
+ * commands this client registered; see `hasCatalogueDescription` for a catalog
+ * entry.
+ *
+ * A catalogue-accounted row is already in the app language, so the slash menu
+ * must not send it to the translation gateway — including when the app language
+ * is English, where the resolved string equals the reported English source.
+ */
+export function isCatalogueSlashCommand(command: SlashCommandInfo): boolean {
+  return (
+    (command as Partial<MobileSlashCommandInfo>).catalogueDescription === true ||
+    hasCatalogueDescription(command)
+  );
+}
+
+/**
+ * Resolve a command's description from the active catalog so it follows the
+ * app language. A command the catalogue does not account for keeps the
+ * description it reports; a command it does account for resolves to its
+ * catalogue entry.
  */
 export function getSlashCommandDescription(command: SlashCommandInfo): string | undefined {
   const key = lookup(SLASH_COMMAND_DESCRIPTION_KEYS, command.name);
-  if (key === undefined) {
-    return command.description;
-  }
-  if (!isBuiltInSlashCommand(command) && command.description !== i18n.t(key, { lng: 'en' })) {
-    return command.description;
-  }
-  return i18n.t(key);
+  return key !== undefined && hasCatalogueDescription(command) ? i18n.t(key) : command.description;
 }
 
 const SLASH_PREFIX_PATTERN = /^\/[\w.-]*$/;
@@ -200,7 +239,7 @@ export function createMobileSlashCommandList(
   sessionType: ActiveSessionType | null,
   availableCommands: SlashCommandInfo[],
   remoteCommandState: RemoteCommandState | null
-): SlashCommandInfo[] {
+): MobileSlashCommandInfo[] {
   if (sessionType === 'cloud-agent') {
     return availableCommands;
   }
@@ -218,6 +257,29 @@ export function createMobileSlashCommandList(
       ? [getLocalExitSlashCommand(), getLocalQuitSlashCommand(), getLocalClearSlashCommand()]
       : []),
   ];
+}
+
+/**
+ * The notice the open slash menu shows for the catalog the wrapper sent, or
+ * `null` when there is nothing to say.
+ *
+ * The wrapper bounds the catalog to the shared 256-command / 512 KiB limits and
+ * never truncates a skill row, so two different things need saying: rows were
+ * dropped (`dropped`), or the rows kept are still over a bound because the
+ * skill rows alone are over it (`dropped === 0` with `overLimit`). An
+ * over-limit catalog that dropped nothing is complete, so it must not claim
+ * that commands are hidden.
+ */
+export function getSlashCommandCatalogNotice(
+  status: SlashCommandCatalogStatus | null | undefined
+): string | null {
+  if (!status) {
+    return null;
+  }
+  if (status.dropped > 0) {
+    return i18n.t('agentChat.slashCommands.catalogFull');
+  }
+  return status.overLimit ? i18n.t('agentChat.slashCommands.catalogOverLimit') : null;
 }
 
 /**
@@ -245,8 +307,8 @@ export function isGoalCommandDraft(input: string): boolean {
  */
 export function getSlashCommandSuggestions(
   input: string,
-  commands: SlashCommandInfo[]
-): SlashCommandInfo[] {
+  commands: MobileSlashCommandInfo[]
+): MobileSlashCommandInfo[] {
   const match = /^\/([\w.-]*)$/.exec(input);
   if (!match) {
     return [];

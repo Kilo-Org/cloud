@@ -37,6 +37,12 @@ export type AgentNotificationSessionPushContent = {
   idempotencyKey: string;
   title: string;
   body: string;
+  /**
+   * The session's organization, so a tap can land the app in the context the
+   * session belongs to. Absent for a Personal session (the session row has no
+   * organization_id), which leaves the app on Personal.
+   */
+  organizationId?: string;
 };
 
 export function buildAgentSessionNotificationContent(
@@ -48,6 +54,7 @@ export function buildAgentSessionNotificationContent(
     idempotencyKey: `agent-notification:${params.cliSessionId}:${params.notificationId}`,
     title: sanitizeTitle(session.title) ?? 'Agent session',
     body: params.message,
+    ...(session.organizationId != null && { organizationId: session.organizationId }),
   };
 }
 
@@ -98,6 +105,9 @@ export function buildAgentSessionNotificationDispatchInput(
         type: 'cloud_agent_session',
         cliSessionId: params.cliSessionId,
         category: 'attention',
+        // The session's organization rides on the push so a tap can switch the
+        // app before it opens the session. Absent for a Personal session.
+        ...(content.organizationId != null && { organizationId: content.organizationId }),
       },
       sound: 'default',
       priority: 'high',

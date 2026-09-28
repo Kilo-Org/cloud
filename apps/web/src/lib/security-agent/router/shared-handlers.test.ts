@@ -62,7 +62,12 @@ const mockSaveSecurityAgentConfigWithRevision = jest.fn<
 const mockSetSecurityAgentEnabled = jest.fn();
 const mockCheckDependabotAlertsAvailability =
   jest.fn<
-    (installationId: string, appType: string, repositories: unknown[]) => Promise<unknown[]>
+    (
+      installationId: string,
+      appType: string,
+      repositories: unknown[],
+      expectedIntegrationId: string
+    ) => Promise<unknown[]>
   >();
 const mockAutoDismissEligibleFindings =
   jest.fn<
@@ -379,7 +384,8 @@ describe('getRepositories', () => {
           name: 'repo',
           private: true,
         },
-      ]
+      ],
+      'integration-123'
     );
   });
 

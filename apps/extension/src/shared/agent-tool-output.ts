@@ -3,12 +3,12 @@ import type { AgentToolName } from './agent-conversation';
 
 interface ViewportScreenshotResult {
   readonly dataUrl: string;
-  readonly mediaType: 'image/png';
+  readonly mediaType: 'image/jpeg' | 'image/png' | 'image/webp';
 }
 
 const viewportScreenshotResultSchema = z.object({
-  dataUrl: z.string().refine(value => value.startsWith('data:image/png;base64,')),
-  mediaType: z.literal('image/png'),
+  dataUrl: z.string().refine(value => /^data:image\/(?:jpeg|png|webp);base64,/u.test(value)),
+  mediaType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
 });
 
 const isViewportScreenshotResult = (value: unknown): value is ViewportScreenshotResult =>
@@ -18,6 +18,6 @@ export const getViewportScreenshotDataUrl = (
   toolName: AgentToolName,
   value: unknown
 ): string | undefined =>
-  toolName === 'get_viewport_screenshot' && isViewportScreenshotResult(value)
+  toolName === 'kilo_browser_take_screenshot' && isViewportScreenshotResult(value)
     ? value.dataUrl
     : undefined;

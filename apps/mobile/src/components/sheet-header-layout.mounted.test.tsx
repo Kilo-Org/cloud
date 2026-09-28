@@ -70,4 +70,31 @@ describe('SheetHeader layout', () => {
 
     renderer.unmount();
   });
+
+  it('draws the trailing Done as the same rounded control as Cancel, not a filled circle', async () => {
+    const renderer = await mount({
+      title: 'Language',
+      onDone: () => undefined,
+      onCancel: () => undefined,
+    });
+    const done = pressablesByLabel(renderer.root, 'Done')[0];
+    const cancel = pressablesByLabel(renderer.root, 'Cancel')[0];
+    const doneClasses = String(done?.props.className);
+    const cancelClasses = String(cancel?.props.className);
+
+    for (const control of [doneClasses, cancelClasses]) {
+      // Both are the same unfilled rounded rectangle: the identical shape
+      // classes and no surface behind either label, so the trailing control
+      // carries no more weight than the plain-text one beside it.
+      expect(control).toContain('rounded-md');
+      expect(control).toContain('min-h-11 min-w-11');
+      expect(control).not.toMatch(/rounded-full|bg-/);
+    }
+    // Done differs from Cancel only by where it sits and how it animates.
+    expect(doneClasses.replace('ms-auto ', '').replace(' will-change-pressable', '')).toBe(
+      cancelClasses
+    );
+
+    renderer.unmount();
+  });
 });

@@ -11,10 +11,11 @@ import { parseTimestamp, timeAgo } from '@/lib/utils';
  * `timeAgo` (`@/lib/utils`) now returns `Intl.RelativeTimeFormat` words
  * like `"5 minutes ago"`, `"yesterday"`, or `"just now"`, which VoiceOver
  * already reads as words. This helper is a pass-through wrapper that keeps
- * the screen-reader call site explicit.
+ * the screen-reader call site explicit. `nowMs` is the caller's sampled clock
+ * so the spoken label ages with the visible one inside a memoized row.
  */
-export function formatSpokenTimeAgo(timestamp: string): string {
-  return timeAgo(parseTimestamp(timestamp));
+export function formatSpokenTimeAgo(timestamp: string, nowMs?: number): string {
+  return timeAgo(parseTimestamp(timestamp), undefined, nowMs);
 }
 
 /**

@@ -79,59 +79,9 @@ const mockCreateInstallState =
 const mockObserveGitHubInstallationLifecycle = jest.fn();
 const mockBindGitHubIntegrationToCanonicalInstallation = jest.fn();
 
-const mockGetRepositoryCustomizations = jest.fn<
-  (
-    owner: Owner,
-    integrationId: string
-  ) => Promise<{
-    id: string;
-    account: string | null;
-    access: string | null;
-    defaultModel: string;
-    defaultPrReviews: 'on' | 'off';
-    repositories: Array<{
-      id: number;
-      name: string;
-      private: boolean;
-      model: string | null;
-      prReviews: 'on' | 'off' | null;
-    }>;
-  }>
->();
-const mockUpdateInstallationSettings =
-  jest.fn<
-    (
-      owner: Owner,
-      integrationId: string,
-      settings: { modelSlug?: string; prReviewMode?: 'on' | 'off' }
-    ) => Promise<{ success: boolean; error?: string }>
-  >();
-const mockUpdateRepositorySettings =
-  jest.fn<
-    (
-      owner: Owner,
-      integrationId: string,
-      repositoryId: number,
-      settings: { modelSlug?: string | null; prReviewMode?: 'on' | 'off' | null }
-    ) => Promise<{ success: boolean; error?: string }>
-  >();
-
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
   uninstallApp: () => mockUninstallApp(),
-  getRepositoryCustomizations: (owner: Owner, integrationId: string) =>
-    mockGetRepositoryCustomizations(owner, integrationId),
-  updateInstallationSettings: (
-    owner: Owner,
-    integrationId: string,
-    settings: Parameters<typeof mockUpdateInstallationSettings>[2]
-  ) => mockUpdateInstallationSettings(owner, integrationId, settings),
-  updateRepositorySettings: (
-    owner: Owner,
-    integrationId: string,
-    repositoryId: number,
-    settings: Parameters<typeof mockUpdateRepositorySettings>[3]
-  ) => mockUpdateRepositorySettings(owner, integrationId, repositoryId, settings),
 }));
 
 jest.mock('@/routers/organizations/utils', () => ({
@@ -171,6 +121,9 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockSyncIntegrationInstallationDetails(integrationId, details),
 }));
 jest.mock('@/lib/integrations/db/github-installations', () => ({
+  canUninstallGitHubInstallation: jest.fn(
+    async (integration: PlatformIntegration) => integration.github_connection_role === 'workflow'
+  ),
   disconnectGitHubInstallation: jest.fn(),
   bindGitHubIntegrationToCanonicalInstallation: (input: unknown) =>
     mockBindGitHubIntegrationToCanonicalInstallation(input),
@@ -236,34 +189,6 @@ let createCaller: (ctx: { user: User }) => {
     organizationId: string;
     integrationId: string;
   }) => Promise<{ success: boolean }>;
-  getRepositoryCustomizations: (input: {
-    organizationId?: string;
-    integrationId: string;
-  }) => Promise<{
-    id: string;
-    account: string | null;
-    access: string | null;
-    defaultModel: string;
-    defaultPrReviews: 'on' | 'off';
-    repositories: Array<{
-      id: number;
-      name: string;
-      private: boolean;
-      model: string | null;
-      prReviews: 'on' | 'off' | null;
-    }>;
-  }>;
-  updateInstallationSettings: (input: {
-    organizationId?: string;
-    integrationId: string;
-    settings: { modelSlug?: string; prReviewMode?: 'on' | 'off' };
-  }) => Promise<{ success: boolean; error?: string }>;
-  updateRepositorySettings: (input: {
-    organizationId?: string;
-    integrationId: string;
-    repositoryId: number;
-    settings: { modelSlug?: string | null; prReviewMode?: 'on' | 'off' | null };
-  }) => Promise<{ success: boolean; error?: string }>;
 };
 
 beforeAll(async () => {
@@ -310,6 +235,7 @@ function organizationIntegration(): PlatformIntegration {
     github_app_type: 'standard',
     github_installation_id: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_authorized_by_user_id: null,
     github_authorized_user_id: null,
     github_authorized_at: null,
@@ -400,6 +326,33 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(listed.canAdd).toBe(false);
     expect(listed.installations).toHaveLength(1);
+  });
+
+  it('exposes local disconnect independently from upstream uninstall for an agent connection', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: 'agent_only' },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+    expect(listed.installations[0]).toMatchObject({
+      connectionRole: 'agent_only',
+      canDisconnect: true,
+      canUninstall: false,
+      canManageModel: true,
+    });
+  });
+
+  it('does not offer refresh for an unassigned connection role', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([
+      { ...organizationIntegration(), github_connection_role: null },
+    ]);
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    await expect(caller.listOrganizationInstallations({ organizationId })).resolves.toMatchObject({
+      installations: [{ status: 'connected', connectionRole: null, canRefresh: false }],
+    });
   });
 
   it('does not let a locally disconnected connection block adding another installation', async () => {
@@ -762,169 +715,5 @@ describe('githubAppsRouter.devAddInstallation', () => {
     const [, details] = mockUpsertPlatformIntegrationForOwner.mock.calls[0] ?? [];
     expect(details).not.toHaveProperty('kiloUserId');
     expect(details).not.toHaveProperty('githubUserId');
-  });
-});
-
-describe('githubAppsRouter.getRepositoryCustomizations', () => {
-  const customizations = {
-    id: integrationId,
-    account: 'acme',
-    access: 'all',
-    defaultModel: 'model-a',
-    defaultPrReviews: 'on' as const,
-    repositories: [{ id: 1, name: 'acme/repo', private: false, model: null, prReviews: null }],
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockGetRepositoryCustomizations.mockResolvedValue(customizations);
-  });
-
-  it('forwards the resolved personal owner and integrationId to the service', async () => {
-    const caller = createCaller({ user: { id: 'user-1' } as User });
-
-    const result = await caller.getRepositoryCustomizations({ integrationId });
-
-    expect(result).toEqual(customizations);
-    expect(mockGetRepositoryCustomizations).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-1' },
-      integrationId
-    );
-  });
-
-  it('checks organization access before forwarding the organization owner', async () => {
-    mockEnsureOrganizationAccess.mockResolvedValue('member');
-    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-
-    await caller.getRepositoryCustomizations({ organizationId, integrationId });
-
-    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
-      expect.objectContaining({ user: expect.objectContaining({ id: 'user-1' }) }),
-      organizationId,
-      undefined
-    );
-    expect(mockGetRepositoryCustomizations).toHaveBeenCalledWith(
-      { type: 'org', id: organizationId },
-      integrationId
-    );
-  });
-
-  it('denies organization access before contacting the service', async () => {
-    mockEnsureOrganizationAccess.mockRejectedValue(
-      new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization access required' })
-    );
-    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-
-    await expect(
-      caller.getRepositoryCustomizations({ organizationId, integrationId })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    expect(mockGetRepositoryCustomizations).not.toHaveBeenCalled();
-  });
-});
-
-describe('githubAppsRouter.updateInstallationSettings', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUpdateInstallationSettings.mockResolvedValue({ success: true });
-  });
-
-  it('forwards the resolved personal owner and settings to the service', async () => {
-    const caller = createCaller({ user: { id: 'user-1' } as User });
-
-    const result = await caller.updateInstallationSettings({
-      integrationId,
-      settings: { prReviewMode: 'off' },
-    });
-
-    expect(result).toEqual({ success: true });
-    expect(mockUpdateInstallationSettings).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-1' },
-      integrationId,
-      { prReviewMode: 'off' }
-    );
-  });
-
-  it.each(['owner', 'admin', 'billing_manager'] satisfies OrganizationRole[])(
-    'allows organization %s roles to update installation settings',
-    async role => {
-      mockEnsureOrganizationAccess.mockResolvedValue(role);
-      const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-
-      await caller.updateInstallationSettings({
-        organizationId,
-        integrationId,
-        settings: { modelSlug: 'model-b' },
-      });
-
-      expect(mockUpdateInstallationSettings).toHaveBeenCalledWith(
-        { type: 'org', id: organizationId },
-        integrationId,
-        { modelSlug: 'model-b' }
-      );
-    }
-  );
-
-  it('denies organization member role before contacting the service', async () => {
-    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) => {
-      if (roles && !roles.includes('member')) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization role required' });
-      }
-      return 'member';
-    });
-    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-
-    await expect(
-      caller.updateInstallationSettings({
-        organizationId,
-        integrationId,
-        settings: { modelSlug: 'model-b' },
-      })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    expect(mockUpdateInstallationSettings).not.toHaveBeenCalled();
-  });
-});
-
-describe('githubAppsRouter.updateRepositorySettings', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    mockUpdateRepositorySettings.mockResolvedValue({ success: true });
-  });
-
-  it('forwards the resolved personal owner, integrationId, repositoryId, and settings', async () => {
-    const caller = createCaller({ user: { id: 'user-1' } as User });
-
-    const result = await caller.updateRepositorySettings({
-      integrationId,
-      repositoryId: 1,
-      settings: { modelSlug: null, prReviewMode: 'off' },
-    });
-
-    expect(result).toEqual({ success: true });
-    expect(mockUpdateRepositorySettings).toHaveBeenCalledWith(
-      { type: 'user', id: 'user-1' },
-      integrationId,
-      1,
-      { modelSlug: null, prReviewMode: 'off' }
-    );
-  });
-
-  it('denies organization member role before contacting the service', async () => {
-    mockEnsureOrganizationAccess.mockImplementation(async (_ctx, _organizationId, roles) => {
-      if (roles && !roles.includes('member')) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization role required' });
-      }
-      return 'member';
-    });
-    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
-
-    await expect(
-      caller.updateRepositorySettings({
-        organizationId,
-        integrationId,
-        repositoryId: 1,
-        settings: { prReviewMode: 'off' },
-      })
-    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    expect(mockUpdateRepositorySettings).not.toHaveBeenCalled();
   });
 });

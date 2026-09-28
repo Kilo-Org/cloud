@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 
 // The adoption hands an update token straight to the delivery, and it runs from
 // the root layout's import. The route group that would otherwise install the
@@ -8,7 +8,7 @@ import '@/lib/glanceable/delivery-registration';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
-import { adoptNativeActivity } from './ios-sink';
+import { adoptNativeActivity, sweepStrayActivities } from './ios-sink';
 
 async function readKey(key: string): Promise<string | null> {
   try {
@@ -29,11 +29,17 @@ async function readKey(key: string): Promise<string | null> {
  * and the Lock Screen collects frozen duplicates.
  *
  * Runs at import, ahead of any React tree or session query, in the foreground
- * process and in the headless push process alike. The native read inside also
- * retires every instance except the adopted one.
+ * process and in the headless push process alike. It sweeps native truth before
+ * naming an owner, so a launch with nothing to adopt still retires the cards a
+ * previous process left behind.
  */
 export async function adoptPushStartedActivity(): Promise<void> {
   await restorePersistedGlanceable();
+  // Retire what this launch cannot own before anything else reads the surface.
+  // It must run even when no snapshot or user is available: that is exactly the
+  // state a stray from a killed or replaced process is left in, and the early
+  // return below would otherwise leave it on the Lock Screen forever.
+  sweepStrayActivities();
   const snapshot = getLastGlanceableSnapshot();
   const userId = await readKey(ACTIVE_USER_ID_KEY);
   if (snapshot === null || userId === null) {

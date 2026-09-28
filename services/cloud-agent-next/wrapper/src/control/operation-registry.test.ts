@@ -10,6 +10,7 @@ import {
   SANDBOX_CONTROL_OPERATION_LIMIT,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   sessionOperationLookupResultSchema,
+  type SessionPromptPayload,
 } from '../../../src/shared/sandbox-control-protocol';
 import {
   createControlHandlerDeps,
@@ -29,6 +30,7 @@ import {
   type Completion,
 } from './control-test-fixtures';
 import { operationIntent } from './operation-intent';
+import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import {
   rememberAttachedRoot,
   rememberChildSession,
@@ -38,6 +40,12 @@ import { createOperationRegistry } from './operation-registry';
 import { resetDirectoryOperationState } from './worktree-operations';
 
 let homeRoot: string;
+
+/** Root idle plus the 3s stable-idle window: the only real seal. */
+async function sealRootIdle(handlerDeps: HandlerDeps, kiloSessionId: string): Promise<void> {
+  handlerDeps.operations.observeRootEvent({ type: 'session.idle', sessionID: kiloSessionId });
+  await Bun.sleep(STABLE_ROOT_IDLE_MS + 50);
+}
 
 beforeEach(() => {
   resetSessionDirectoryState();
@@ -955,7 +963,7 @@ describe('operation admission and lookup', () => {
       nativeRuntimeId: runtime.runtimeId,
       target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
       reason: 'repeated publication cleanup',
-      deadlineAt: base + 5_000,
+      deadlineAt: base + 120_000,
     };
     const start = async (index: number) => {
       const messageId = `message_a${index}`;
@@ -973,6 +981,7 @@ describe('operation admission and lookup', () => {
         authorization
       );
       await run.started.promise;
+      await sealRootIdle(handlerDeps, sessionA.kiloSessionId);
       await run.finalizerStarted.promise;
       expect(await request).toMatchObject({ ok: true, result: { status: 'accepted' } });
       const operation = integratedDeps.operations.active(sessionA.kiloSessionId);
@@ -1052,7 +1061,7 @@ describe('operation admission and lookup', () => {
         integratedDeps.operations.activeOperations().map(operation => operation.done)
       );
     }
-  });
+  }, 60_000);
 
   it('does not let a retained A1 Stop reselect fresh active A2 after root invalidation', async () => {
     const runningA1 = Promise.withResolvers<Completion>();
@@ -1431,6 +1440,103 @@ describe('operation admission and lookup', () => {
     expect(handlerDeps.operations.counts().active).toBe(0);
   });
 
+  it('rejects a follow-up receipt at the retention limit instead of exceeding it', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    for (let index = 0; index < 10 && !prompt.nativeTarget(); index += 1) await Promise.resolve();
+    const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    try {
+      for (let index = 1; index < SANDBOX_CONTROL_OPERATION_LIMIT; index += 1) {
+        const messageId = `follow_${index}`;
+        expect(
+          handlerDeps.operations.admitFollowUp(
+            session,
+            operationAuthorization('session.prompt', messageId),
+            { ...promptPayload, messageId } as SessionPromptPayload,
+            runtime
+          )
+        ).toMatchObject({ ok: true });
+      }
+      expect(handlerDeps.operations.counts().retained).toBe(SANDBOX_CONTROL_OPERATION_LIMIT);
+      expect(
+        handlerDeps.operations.admitFollowUp(
+          session,
+          operationAuthorization('session.prompt', 'overflow'),
+          { ...promptPayload, messageId: 'overflow' } as SessionPromptPayload,
+          runtime
+        )
+      ).toMatchObject({ ok: false, error: { code: 'session_busy' } });
+      expect(handlerDeps.operations.counts().retained).toBe(SANDBOX_CONTROL_OPERATION_LIMIT);
+    } finally {
+      running.resolve(completion());
+      prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+      await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+      await prompt.done;
+    }
+  });
+
+  it('prunes a retained follow-up when the operation had no primary authorization', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    // The primary operation starts without an authorization, so it is not retained.
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = operationAuthorization('session.prompt', 'next');
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true });
+    expect(handlerDeps.operations.counts().retained).toBe(1);
+
+    running.resolve(completion());
+    prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await prompt.done;
+    await prompt.waitForDelivery();
+    const delivery = prompt.deliveryResult(followUp);
+    if (!delivery) throw new Error('Missing follow-up delivery');
+    expect(
+      await handleControlRequest(
+        'session.operation.ack',
+        session,
+        await acknowledgeOperation(delivery),
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { acknowledged: true } });
+
+    setSystemTime(followUp.dispatchDeadlineAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS + 1);
+    pruneControlOperations(handlerDeps);
+    expect(handlerDeps.operations.counts().retained).toBe(0);
+  });
+
   it('aborts a retained prompt instead of a same-message attach', async () => {
     const handlerDeps = deps({
       sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
@@ -1450,6 +1556,87 @@ describe('operation admission and lookup', () => {
     await prompt.done;
     await prompt.waitForDelivery();
     expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
+  });
+
+  it('finds the operation by an admitted follow-up message id', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps,
+      operationAuthorization('session.prompt', 'next')
+    );
+    expect(followUp).toMatchObject({ ok: true });
+
+    expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
+    expect(handlerDeps.operations.abortTarget(session, 'next')).toBe(prompt);
+
+    running.resolve(completion());
+    prompt.observeRootEvent({ type: 'session.idle', sessionID: session.kiloSessionId });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await prompt.done;
+  });
+
+  it('resolves a follow-up authorization lookup and replay to the running operation', async () => {
+    const running = Promise.withResolvers<ReturnType<typeof completion>>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        sendPromptAsync: async () => {},
+      }),
+    });
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const prompt = handlerDeps.operations.active(session.kiloSessionId);
+    if (!prompt) throw new Error('Missing prompt');
+    const followUp = operationAuthorization('session.prompt', 'next');
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true });
+
+    expect(
+      await handleControlRequest('session.operation.get', session, followUp, handlerDeps)
+    ).toMatchObject({ ok: true, result: { state: 'running' } });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        { ...promptPayload, messageId: 'next' },
+        handlerDeps,
+        followUp
+      )
+    ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'existing' } });
+
+    running.resolve(completion());
+    await sealRootIdle(handlerDeps, session.kiloSessionId);
+    await prompt.done;
   });
 
   it('includes working branch mode in attach idempotency intent', () => {

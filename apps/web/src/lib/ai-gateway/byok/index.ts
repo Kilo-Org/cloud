@@ -14,7 +14,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -24,7 +24,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   }
   const providers: UserByokProviderId[] = [
     ...new Set(
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+      vercelModelMetadata[await mapModelIdToVercel(modelId)]?.endpoints
         .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
         .filter(providerId => providerId !== undefined) ?? []
     ),

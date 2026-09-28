@@ -246,6 +246,10 @@ describe('AuditReportScreen states', () => {
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('Audit report unavailable');
     expect(findByType(root.root, 'QueryError')).toHaveLength(0);
+    // The screen owns the scroll container and asks EmptyState for its plain
+    // content, so the denial message paints instead of a lone icon (finding 3).
+    expect(empty[0]?.props.placement).toBe('static');
+    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(1);
   });
 
   it('treats a personal UNAUTHORIZED as a retryable session error', () => {
@@ -259,6 +263,10 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
   });
 
+  // Explorer security-audit finding 3: CenteredState's measured path painted
+  // the icon bubble but collapsed the copy, so the audit report's empty states
+  // own a TabScreenScrollView (`grow justify-center`) and reach EmptyState with
+  // `placement="static"`, which renders the title and description directly.
   it('renders EmptyState for an empty period', () => {
     setQueryState({
       data: {
@@ -271,8 +279,8 @@ describe('AuditReportScreen states', () => {
     const empty = findByType(root.root, 'EmptyState');
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('No recorded activity');
-    expect(empty[0]?.props.placement).not.toBe('top');
-    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(0);
+    expect(empty[0]?.props.placement).toBe('static');
+    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(1);
   });
 
   it('retains a cached report with an inline retry after a transient failure', () => {
@@ -306,7 +314,7 @@ describe('AuditReportScreen states', () => {
       data: { status: 'ok', report: makeReport() },
     });
     const tree = renderScreen('org-123');
-    expect(findByType(tree.root, 'TabScreenScrollView')).toHaveLength(0);
+    expect(findByType(tree.root, 'CollapsibleSection')).toHaveLength(0);
     expect(findByType(tree.root, 'EmptyState')).toHaveLength(1);
   });
 

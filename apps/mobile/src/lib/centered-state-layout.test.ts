@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getBottomReservation,
+  getCenteredStateBand,
   getCenteredStateLayout,
   getStateSurfaceInsets,
   intersectStateFrames,
+  isShortViewport,
 } from './centered-state-layout';
 
 describe('getCenteredStateLayout', () => {
@@ -209,6 +212,69 @@ describe('native keyboard clipping', () => {
   });
 });
 
+describe('isShortViewport', () => {
+  it('reads a phone in landscape as short and the same phone in portrait as tall', () => {
+    expect(isShortViewport(914, 411)).toBe(true);
+    expect(isShortViewport(411, 914)).toBe(false);
+  });
+
+  it('reads a tablet in landscape as tall, so the state keeps its full stack', () => {
+    // Wide but not short: the band there is taller than the whole stack.
+    expect(isShortViewport(1024, 768)).toBe(false);
+    // A 600dp-short-edge tablet is Android's smallest (the `sw600dp`
+    // qualifier, the 1024x600 emulator). It is wide but still a tablet: its
+    // band is ~384dp against the ~167dp stack, so it keeps the full stack too.
+    expect(isShortViewport(1024, 600)).toBe(false);
+  });
+
+  it('reads a square window as tall, so the state keeps its full stack', () => {
+    expect(isShortViewport(500, 500)).toBe(false);
+  });
+
+  it('reads an unavailable dimension as tall', () => {
+    // A partial platform mock (the mounted-test harnesses) omits a dimension;
+    // treating it as short would silently change every state's layout there.
+    expect(isShortViewport(undefined as unknown as number, 844)).toBe(false);
+    expect(isShortViewport(390, Number.NaN)).toBe(false);
+  });
+});
+
+describe('getCenteredStateBand', () => {
+  it('ends the band at the reserved bottom inset, above the tab bar', () => {
+    // The e8 geometry: a 540pt-tall landscape window, the Agents body starting
+    // below its header at 277pt, and a 117pt tab bar band. The empty state has
+    // 146pt to be centered in — not the 263pt of the viewport.
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 540 },
+        viewport: { top: 277, bottom: 540 },
+        bottomInset: 117,
+      })
+    ).toEqual({ top: 277, bottom: 423, band: 146 });
+  });
+
+  it('clips the band to the visible viewport', () => {
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 540 },
+        viewport: { top: 277, bottom: 400 },
+        bottomInset: 117,
+      })
+    ).toEqual({ top: 277, bottom: 400, band: 123 });
+  });
+
+  it('reserves the top inset as well', () => {
+    expect(
+      getCenteredStateBand({
+        surface: { top: 0, bottom: 800 },
+        viewport: { top: 0, bottom: 800 },
+        topInset: 60,
+        bottomInset: 100,
+      })
+    ).toEqual({ top: 60, bottom: 700, band: 640 });
+  });
+});
+
 describe('getStateSurfaceInsets', () => {
   it('does not reserve a tab bar that is behind the keyboard', () => {
     expect(
@@ -241,6 +307,13 @@ describe('getStateSurfaceInsets', () => {
         bottom: 40,
       })
     ).toEqual({ topInset: 0, bottomInset: 0 });
+  });
+});
+
+describe('getBottomReservation', () => {
+  it('raises an inherited reserve with the passed inset, never shrinking it', () => {
+    expect(getBottomReservation({ inherited: 97, bottomInset: 81 })).toBe(97);
+    expect(getBottomReservation({ inherited: 60, bottomInset: 81 })).toBe(81);
   });
 });
 

@@ -87,7 +87,7 @@ export function worktreeReviewRangeHighlightCSS(
       selectors.push(
         line.kind === 'deletion'
           ? `[data-line-type="change-deletion"][data-line="${line.lineNumber}"]`
-          : `[data-line="${line.lineNumber}"]:not([data-line-type="change-deletion"])`
+          : `[data-code][data-unified] [data-line="${line.lineNumber}"]:not([data-line-type="change-deletion"]), [data-code][data-additions] [data-line="${line.lineNumber}"]:not([data-line-type="change-deletion"])`
       );
     }
   }

@@ -148,7 +148,11 @@ async function listOrganizationGitHubBranches(
   organizationId: string,
   repositoryFullName: string
 ): Promise<ProviderBranchListing> {
-  const integrations = await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB);
+  const integrations = await getIntegrationsByOrganization(
+    organizationId,
+    PLATFORM.GITHUB,
+    'agent'
+  );
   const healthy = integrations.filter(isPlatformIntegrationHealthy);
   if (healthy.length === 0) {
     throw new TRPCError({
@@ -169,7 +173,8 @@ async function listOrganizationGitHubBranches(
       const { branches } = await githubAppsService.listBranches(
         owner,
         integration.id,
-        repositoryFullName
+        repositoryFullName,
+        'agent'
       );
       return toListing(branches);
     } catch (error) {

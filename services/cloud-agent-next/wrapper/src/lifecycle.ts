@@ -5,7 +5,7 @@ import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
 
 const DRAIN_DELAY_MS = 250;
-const STABLE_ROOT_IDLE_MS = 3_000;
+export const STABLE_ROOT_IDLE_MS = 3_000;
 const SSE_TRANSPORT_TIMEOUT_MS = 15_000;
 const AUTO_COMMIT_TIMEOUT_MS = 120_000;
 

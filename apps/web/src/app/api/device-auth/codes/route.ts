@@ -9,8 +9,9 @@ import {
   buildDeviceAuthVerificationUrl,
   getDeviceAuthAppModeFromRequestUrl,
 } from '@/app/device-auth/device-auth-url';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
-export async function POST(request: Request) {
+export const POST = withRestTiming('/api/device-auth/codes', async (request: Request) => {
   const headersList = await headers();
   const userAgent = headersList.get('user-agent') || undefined;
   const ipAddress = headersList.get('x-forwarded-for') || undefined;
@@ -38,4 +39,4 @@ export async function POST(request: Request) {
     }
     throw error;
   }
-}
+});

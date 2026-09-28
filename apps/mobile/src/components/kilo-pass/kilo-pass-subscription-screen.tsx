@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- The Kilo Pass screen composes the presentation gate, loading, error, unavailable, and native-IAP surfaces; each is a small rendered surface that mirrors the shared header/scroll pattern. */
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -61,6 +61,17 @@ function formatTier(product: AppStoreKiloPassProduct): string {
 
 function formatStorePrice(product: AppStoreKiloPassProduct): string {
   return i18n.t('kiloPass.perMonth', { price: product.displayPrice });
+}
+
+/**
+ * The owner's warning for a failed ownership lookup. The products-unavailable
+ * card states the same store failure, so only this message is hidden inline
+ * while the card is shown; a failed restore or a purchase error still renders.
+ */
+function getStoreConnectionErrorMessage(isAndroid: boolean): string {
+  return i18n.t(
+    isAndroid ? 'kiloPass.couldNotConnectToPlay' : 'kiloPass.couldNotConnectToAppStore'
+  );
 }
 
 function KiloPassLoadingScreen() {
@@ -167,6 +178,7 @@ function KiloPassNativeIapContent() {
   const {
     clearError,
     errorMessage,
+    storeConnectionError,
     isPending,
     products,
     productsError,
@@ -183,6 +195,11 @@ function KiloPassNativeIapContent() {
     ownershipCheckFailed,
     retryOwnershipCheck,
   } = useKiloPassNativeIap();
+  // Registered here, not on the owner: the owner mounts for every presentation
+  // variant, but only this content renders `errorMessage` inline and only this
+  // content can start a purchase or a restore. The owner's recovery path, the
+  // only one that can run without this content, passes `notifyErrors: false`,
+  // so it never reaches the toast this suppresses.
   useInlinePurchaseErrorOwnership();
   const queryClient = useQueryClient();
   const preflightPurchase = useMutation(trpc.kiloPass.preflightPurchase.mutationOptions());
@@ -195,14 +212,32 @@ function KiloPassNativeIapContent() {
   };
   const [restoreFeedback, setRestoreFeedback] = useState<SubscriptionScreenFeedback | null>(null);
   const [preflightFailure, setPreflightFailure] = useState<PreflightFailure | null>(null);
+  // A store failure leaves the catalog empty and may also surface `errorMessage`.
+  // The products-unavailable card is the single surface for that failure, so only
+  // the store connection message stays hidden while the card is shown; every
+  // other failure (a failed restore, a purchase error) still renders inline. The
+  // owner reports the message's identity, never the translated copy: the app
+  // language can change while the message is on screen and an equality check
+  // would then fail and duplicate the card's failure inline.
+  const productsUnavailable = !productsIsLoading && products.length === 0;
+  const storeErrorMessageHidden = productsUnavailable && storeConnectionError;
+  // The ownership retry below renders from `ownershipCheckFailed` alone, so its
+  // explanation must come from the same flag: when the screen has already cleared
+  // the message (its unmount clears it), a retry must not stand there with no
+  // error beside it.
+  const inlineErrorMessage =
+    errorMessage ??
+    (ownershipCheckFailed && !productsUnavailable
+      ? getStoreConnectionErrorMessage(isAndroid)
+      : null);
   let feedback: SubscriptionScreenFeedback | null = restoreFeedback;
   if (ownedByAnotherAccount) {
     feedback = {
       type: 'error',
       text: t(isAndroid ? 'kiloPass.otherAccountCopyPlay' : 'kiloPass.otherAccountCopy'),
     };
-  } else if (errorMessage) {
-    feedback = { type: 'error', text: errorMessage };
+  } else if (inlineErrorMessage && !storeErrorMessageHidden) {
+    feedback = { type: 'error', text: inlineErrorMessage };
   } else if (preflightFailure) {
     feedback = { type: 'error', text: preflightFailure.message };
   }
@@ -348,7 +383,7 @@ function KiloPassNativeIapContent() {
             </Text>
           )}
 
-          {ownershipCheckFailed && (
+          {ownershipCheckFailed && !productsUnavailable && (
             <Button
               accessibilityLabel={t('kiloPass.retryLoading')}
               className="self-start"
@@ -377,7 +412,7 @@ function KiloPassNativeIapContent() {
               <Skeleton key={index} className="h-[112px] w-full rounded-xl" />
             ))}
 
-          {!productsIsLoading && products.length === 0 && (
+          {productsUnavailable && (
             <View className="gap-3 rounded-xl border border-border bg-card p-5">
               <Text className="font-semibold text-foreground">
                 {t(isAndroid ? 'kiloPass.productsUnavailablePlay' : 'kiloPass.productsUnavailable')}
@@ -398,7 +433,11 @@ function KiloPassNativeIapContent() {
                 }}
                 className="self-start"
                 disabled={isRetryDisabled}
+                loading={productsIsRefetching}
                 onPress={() => {
+                  if (ownershipCheckFailed) {
+                    retryOwnershipCheck();
+                  }
                   void productsRefetch();
                 }}
                 variant="outline"
@@ -535,28 +574,27 @@ export function KiloPassSubscriptionScreen() {
     })
   );
 
+  // The owner is the route entry, not a branch behind the presentation query:
+  // it must mount while the presentation is still loading so the native store
+  // connection and the store-product query overlap that request instead of
+  // queuing behind it. Only the purchasable content is gated on `native_iap`;
+  // the loading, error, and non-native variants render as its children so the
+  // owner never unmounts and remounts as the query settles.
+  const presentation = presentationQuery.data;
+  let variant: ReactNode = <KiloPassNativeIapContent />;
   if (presentationQuery.isPending) {
-    return <KiloPassLoadingScreen />;
-  }
-
-  if (!presentationQuery.data) {
-    return (
+    variant = <KiloPassLoadingScreen />;
+  } else if (!presentation) {
+    variant = (
       <KiloPassPresentationErrorScreen
         onRetry={() => {
           void presentationQuery.refetch();
         }}
       />
     );
+  } else if (presentation.kind !== 'native_iap' || !isIapPlatform) {
+    variant = <KiloPassUnavailableScreen presentation={presentation} />;
   }
 
-  const presentation = presentationQuery.data;
-  if (presentation.kind !== 'native_iap' || !isIapPlatform) {
-    return <KiloPassUnavailableScreen presentation={presentation} />;
-  }
-
-  return (
-    <KiloPassNativeIapOwner>
-      <KiloPassNativeIapContent />
-    </KiloPassNativeIapOwner>
-  );
+  return <KiloPassNativeIapOwner>{variant}</KiloPassNativeIapOwner>;
 }

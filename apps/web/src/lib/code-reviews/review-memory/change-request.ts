@@ -104,7 +104,8 @@ export async function approveAndOpenReviewMemoryChangeRequest(input: {
 
     const tokenData = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      integration.github_app_type ?? 'standard'
+      integration.github_app_type ?? 'standard',
+      integration.id
     );
     const token = tokenData.token;
     const defaultBranch = await fetchGitHubRepositoryDefaultBranch({
@@ -207,6 +208,7 @@ async function findGitHubIntegrationForProposal(
   const integration = integrations.find(
     integration =>
       integration.platform === PLATFORM.GITHUB &&
+      integration.github_connection_role === 'workflow' &&
       integration.integration_status === INTEGRATION_STATUS.ACTIVE &&
       !integration.suspended_at &&
       integration.platform_installation_id &&

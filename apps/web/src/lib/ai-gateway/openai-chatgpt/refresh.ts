@@ -37,6 +37,13 @@ export const OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS = 3;
 /** Base delay for the exponential backoff between retryable attempts. */
 export const OPENAI_CHATGPT_REFRESH_INITIAL_BACKOFF_MS = 250;
 
+/**
+ * Upper bound on a single retry delay. OpenAI may send `Retry-After` on a
+ * throttling response; the delay honors it but stays inside the gateway request
+ * budget instead of sleeping for however long the header names.
+ */
+export const OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS = 10_000;
+
 /** Shown when the connection can no longer be refreshed and must be reconnected. */
 export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
   'Your ChatGPT connection has expired. Reconnect to continue.';
@@ -79,9 +86,10 @@ type RefreshDecision =
 
 /**
  * One locked refresh attempt. `retry` is a retryable failure that the caller
- * backs off from after the lock is released.
+ * backs off from after the lock is released. `retryAfterMs` carries the
+ * server's own `Retry-After` delay when the response provided one.
  */
-type RefreshAttempt = RefreshDecision | { kind: 'retry' };
+type RefreshAttempt = RefreshDecision | { kind: 'retry'; retryAfterMs?: number };
 
 /**
  * Single-flight per owner within one process: concurrent callers share the same
@@ -162,6 +170,59 @@ function readExpiresIn(body: unknown): number | undefined {
 }
 
 /**
+ * Epoch seconds before which OpenAI asks that the token not be refreshed
+ * again. The token response is not typed by the spec, so both an epoch-seconds
+ * number and an ISO-8601 string are accepted; an unreadable value is ignored
+ * rather than guessed.
+ */
+function readEarliestRefreshAt(body: unknown): number | undefined {
+  if (typeof body !== 'object' || body === null) return undefined;
+  const value = (body as Record<string, unknown>).earliest_refresh_at;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Date.parse(value);
+    return Number.isNaN(parsed) ? undefined : Math.floor(parsed / 1000);
+  }
+  return undefined;
+}
+
+/**
+ * `Retry-After` as a delay in milliseconds. Both the delta-seconds and the
+ * HTTP-date forms are accepted; a missing or unreadable header is undefined so
+ * the caller falls back to its own backoff.
+ */
+function readRetryAfterMs(response: Response): number | undefined {
+  const header = response.headers.get('retry-after');
+  if (!header) return undefined;
+  const trimmed = header.trim();
+  if (/^\d+$/.test(trimmed)) return Number.parseInt(trimmed, 10) * 1000;
+  const date = Date.parse(trimmed);
+  return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
+}
+
+/**
+ * True when the stored token can serve a request without refreshing. A token
+ * with time left is served while it is fresh, and also while OpenAI's
+ * `earliest_refresh_at` says the refresh window has not opened yet. An expired
+ * token is never served: it must refresh, whatever `earliest_refresh_at` says.
+ */
+function isUsableWithoutRefresh(connection: OpenAiChatGptConnection, now: number): boolean {
+  if (!connection.access_token || connection.expires_at <= now) return false;
+  if (connection.expires_at - now > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS) return true;
+  return connection.earliest_refresh_at !== undefined && now < connection.earliest_refresh_at;
+}
+
+/**
+ * The delay before the next retry: the exponential backoff, raised to the
+ * server's `Retry-After` when it asked for longer, capped so one attempt never
+ * sleeps past the gateway request budget.
+ */
+function retryDelayMs(attempt: number, retryAfterMs: number | undefined): number {
+  const honored = Math.min(retryAfterMs ?? 0, OPENAI_CHATGPT_REFRESH_MAX_BACKOFF_MS);
+  return Math.max(backoffDelayMs(attempt), honored);
+}
+
+/**
  * Logs only the OAuth error code and the owner. The message names no credential
  * and prints no value: a log line is written once and read forever.
  */
@@ -210,6 +271,9 @@ async function attemptRefresh(
         access_token: accessToken,
         refresh_token: readStringField(body, 'refresh_token') ?? refreshToken,
         expires_at: nowSeconds() + expiresIn,
+        // Always overwrite: a response that omits the field lifts the previous
+        // token's restriction instead of carrying it onto the rotated token.
+        earliest_refresh_at: readEarliestRefreshAt(body),
         scope: readStringField(body, 'scope') ?? connection.scope,
         token_type: readStringField(body, 'token_type') ?? connection.token_type,
         status: 'connected',
@@ -236,7 +300,12 @@ async function attemptRefresh(
     return { kind: 'terminal' };
   }
 
-  return isRetryableRefreshFailure(response, errorCode) ? { kind: 'retry' } : { kind: 'failed' };
+  if (!isRetryableRefreshFailure(response, errorCode)) {
+    return { kind: 'failed' };
+  }
+
+  const retryAfterMs = readRetryAfterMs(response);
+  return retryAfterMs === undefined ? { kind: 'retry' } : { kind: 'retry', retryAfterMs };
 }
 
 /**
@@ -260,7 +329,7 @@ async function resolveInsideLock(
   const connection = decryptOpenAiChatGptConnection(row.encrypted_connection);
   if (!connection) return { kind: 'no_connection' };
 
-  if (connection.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS) {
+  if (isUsableWithoutRefresh(connection, nowSeconds())) {
     return { kind: 'access_token', accessToken: connection.access_token };
   }
 
@@ -288,16 +357,12 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       return { kind: 'failed' };
     }
 
-    // Fast path: no lock, no network call while the stored token is fresh. A
-    // disabled row is skipped so it can never serve a request.
+    // Fast path: no lock, no network call while the stored token can still
+    // serve a request. A disabled row is skipped so it can never serve one.
     const row = await readOpenAiChatGptConnectionRow(db, owner);
     const current =
       row?.is_enabled === true ? decryptOpenAiChatGptConnection(row.encrypted_connection) : null;
-    if (
-      current &&
-      current.expires_at - nowSeconds() > OPENAI_CHATGPT_REFRESH_WINDOW_SECONDS &&
-      current.access_token
-    ) {
+    if (current && isUsableWithoutRefresh(current, nowSeconds())) {
       return { kind: 'access_token', accessToken: current.access_token };
     }
 
@@ -312,7 +377,7 @@ async function resolveOpenAiChatGptAccessTokenUncached(
       if (decision.kind !== 'retry') return decision;
 
       if (attempt < OPENAI_CHATGPT_REFRESH_MAX_ATTEMPTS) {
-        await sleep(backoffDelayMs(attempt));
+        await sleep(retryDelayMs(attempt, decision.retryAfterMs));
       }
     }
 

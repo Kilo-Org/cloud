@@ -1,5 +1,6 @@
 import { getUserFromSession, nextAuthHttpHandler } from '@/lib/user/server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
+import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
@@ -32,11 +33,14 @@ const NEXT_AUTH_CALLBACK_CONTEXT = {
 };
 
 /**
- * The two locations NextAuth's callback action uses to surface an internal
- * failure: the `/api/auth/error` hop, which always carries the failure code in
- * its `error` query parameter, and the bare `/api/auth/signin` hop it returns
- * when the token exchange produced no usable profile or account
- * (`next-auth/core/routes/callback.js`).
+ * The locations a failed callback redirect can land on. NextAuth's callback
+ * action surfaces an internal failure at `/api/auth/error`, which always
+ * carries the failure code in its `error` query parameter, and at the bare
+ * `/api/auth/signin` hop it returns when the token exchange produced no usable
+ * profile or account (`next-auth/core/routes/callback.js`). The app's own
+ * sign-in route (`SSO_SIGNIN_PATH`) is the third: the callback's `signIn`
+ * callback returns it with a failure code when it refuses an authorization
+ * (`authFailureRedirectUrl` in `@/lib/auth/redirect-urls`).
  */
 const NEXT_AUTH_ERROR_PATH = '/api/auth/error';
 const NEXT_AUTH_SIGNIN_PATH = '/api/auth/signin';
@@ -64,16 +68,18 @@ async function redirectToByok(request: NextRequest, errorCode: string): Promise<
 /**
  * NextAuth reports a callback-stage failure (a rejected or expired code, a
  * wrong client secret, a network error during the token exchange) with a 3xx to
- * `/api/auth/error`, and a callback whose exchange yields no usable profile
- * with a 3xx to `/api/auth/signin` carrying no error code. A person who started
- * the connect from the BYOK card would land on the sign-in page with no way
- * back and no card message, so this turns either redirect into the card's
- * readable failure. The browser follows the error hop itself, so the first
+ * `/api/auth/error`, a callback whose exchange yields no usable profile with a
+ * 3xx to `/api/auth/signin` carrying no error code, and a refusal from the
+ * callback's `signIn` callback with a 3xx to the app's own sign-in route
+ * carrying the refusal code. A person who started the connect from the BYOK card
+ * would land on the sign-in page with no way back and no card message, so this
+ * turns any of those redirects into the card's readable failure. The browser
+ * follows the error hop itself, so the first
  * response is the only chance to catch it here.
  *
  * Returns null - leaving NextAuth's response untouched - unless this is a real
  * authorization-code callback (a sign-in start or a providers fetch must not be
- * touched), the failure location is one of NextAuth's two hops, a failure code
+ * touched), the failure location is one of the known failure hops, a failure
  * is available (the hop's own, or the default for the bare sign-in hop), and
  * the request still has a session. Without a session this is a failed sign-up,
  * which must keep landing on the sign-in page with NextAuth's existing readable
@@ -97,10 +103,18 @@ async function redirectCallbackFailureToByok(
   const failureUrl = new URL(location, request.url);
   const isErrorHop = failureUrl.pathname === NEXT_AUTH_ERROR_PATH;
   const isSignInHop = failureUrl.pathname === NEXT_AUTH_SIGNIN_PATH;
-  if (!isErrorHop && !isSignInHop) {
+  // When the linking session expired, the callback's `signIn` callback refuses
+  // the link and redirects to the app's sign-in route with a failure code
+  // (`TURNSTILE_REQUIRED` among others), so that hop is the connect's failure
+  // and must reach the card like the two NextAuth hops above.
+  const isAppSignInHop = failureUrl.pathname === SSO_SIGNIN_PATH;
+  if (!isErrorHop && !isSignInHop && !isAppSignInHop) {
     return null;
   }
   const carriedCode = failureUrl.searchParams.get('error');
+  // Only the bare NextAuth sign-in hop may fail without a code. The app's sign-in
+  // route is shared with the plain sign-in flow, so a code-free redirect there
+  // stays on the sign-in page.
   const errorCode = carriedCode || (isSignInHop ? DEFAULT_CALLBACK_FAILURE_CODE : null);
   if (!errorCode) {
     return null;

@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import { persistQueryClientSubscribe } from '@tanstack/react-query-persist-client';
 import { useEffect, useRef } from 'react';
 
@@ -13,6 +13,8 @@ import {
   shouldPersistReadCacheQuery,
   takeOverColdStartRestore,
 } from '@/lib/persist/read-cache';
+import { clearToolSummaryTranslationsForSignOut } from '@/lib/persist/tool-summary-translation-cache';
+import { clearToolSummaryTranslationMemoryForSignOut } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
 import { queryClient } from '@/lib/query-client';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
@@ -41,14 +43,31 @@ export function CachePersistenceMount() {
       return undefined;
     }
 
-    // Account change: drop the previous account's read-cache scope. The
-    // sign-out path already clears the scope, so this only fires on a direct
-    // switch where the sign-out cleanup never ran. Best effort: the helper
-    // swallows a storage failure, and a redundant clear only costs a future
-    // warm start.
+    // Account change: drop the previous account's read-cache scope and offline
+    // translation cache. The sign-out path clears both, so this only fires on a
+    // direct switch where the sign-out cleanup never ran. The translation cache
+    // holds the previous account's tool text, so it must go too — the runtime's
+    // in-memory retry memory and cache hold the same text because a
+    // `retryUnresolvedTranslations` call re-sends it under the new account's
+    // token, so the runtime reset runs with the disk scope clear and settles
+    // the writes it already dispatched before the scope is dropped. Best
+    // effort: both helpers swallow a storage failure, and a redundant clear
+    // only costs a future warm start.
     const previousUserId = previousUserIdRef.current;
     if (previousUserId !== null && previousUserId !== userId) {
       void clearCacheScopeForSignOut(previousUserId);
+      void (async () => {
+        try {
+          await clearToolSummaryTranslationMemoryForSignOut();
+        } catch {
+          // A failed runtime reset must not skip the independent privacy clear.
+        }
+        try {
+          await clearToolSummaryTranslationsForSignOut();
+        } catch {
+          // Best effort: cleanup must not escape as an unhandled rejection.
+        }
+      })();
     }
     previousUserIdRef.current = userId;
 

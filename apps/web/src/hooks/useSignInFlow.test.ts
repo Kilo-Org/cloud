@@ -582,6 +582,23 @@ describe('useSignInFlow discovery cancellation', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('keeps an explicit ?email= prefill when a returning-user hint loads later', () => {
+    mounted = mountFlow({ searchParams: { sso: 'true', email: 'requested@example.com' } });
+
+    // The localStorage hint resolves after the first render. A remembered
+    // session must not refill the form over the address the request named —
+    // this is the Enterprise SSO device-auth flow after "Sign out and continue".
+    mockHint = {
+      lastEmail: 'remembered@example.com',
+      lastAuthMethod: 'google',
+      lastLogin: '2026-08-26T00:00:00.000Z',
+    };
+    mounted.render({ searchParams: { sso: 'true', email: 'requested@example.com' } });
+
+    expect(mounted.container.querySelector('#tier')?.textContent).toBe('returning');
+    expect(mounted.container.querySelector('#email')?.textContent).toBe('requested@example.com');
+  });
+
   it('holds the automatic email flow pending through delivery and recovers after failure', async () => {
     const delivery = deferred<{ success: true }>();
     fetchMock

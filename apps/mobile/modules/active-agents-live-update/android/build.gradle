@@ -1,3 +1,8 @@
+// Android-only by capability: this library owns Android's Live Update
+// notification surface and has no iOS counterpart to share. iOS renders the
+// same feature as an ActivityKit Live Activity through `expo-widgets`
+// (src/glanceable-ios/); both drive the shared pipeline in
+// src/lib/glanceable/, whose one answer body is approve-ask.ts.
 apply plugin: 'com.android.library'
 
 group = 'com.kilocode.activeagentsliveupdate'
@@ -22,9 +27,18 @@ android {
 }
 
 dependencies {
-  // HeadlessJsTaskService and HeadlessJsTaskConfig are React Native classes.
-  // expo-modules-core depends on react-android with `implementation`, so its
-  // consumers get it at runtime only; the Kotlin compile classpath needs its
-  // own declaration, the same one expo-asset's build.gradle carries.
+  // The Approve action answers in headless JS, which Android 8+ only allows
+  // through WorkManager. concurrent-futures supplies the ListenableFuture
+  // adapter the worker completes from the task listener; it is the same 1.1.0
+  // the widget library already puts on the runtime classpath.
+  implementation 'androidx.work:work-runtime:2.8.1'
+  implementation 'androidx.concurrent:concurrent-futures:1.1.0'
+  // The headless worker and the headless task service beside it name
+  // com.facebook.react.** classes. The app's React Gradle plugin puts
+  // react-android on the runtime classpath, so the library only needs it on its
+  // own Kotlin compile classpath — the declaration expo-asset's build.gradle
+  // carries. Both declarations name the one coordinate, which Gradle resolves to
+  // that single copy rather than repackaging it.
+  compileOnly 'com.facebook.react:react-android'
   implementation 'com.facebook.react:react-android'
 }

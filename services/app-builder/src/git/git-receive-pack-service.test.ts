@@ -25,13 +25,10 @@ function buildPushRequest(
     chunks.push(encoder.encode(lengthHex + line));
   }
 
-  // Flush packet
   chunks.push(encoder.encode('0000'));
 
-  // Append packfile bytes
   chunks.push(packfileBytes);
 
-  // Concatenate
   const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
   const result = new Uint8Array(totalLength);
   let offset = 0;
@@ -75,10 +72,8 @@ function buildValidPackfile(blobContent: string): { packBytes: Uint8Array; blobO
     throw new Error('buildValidPackfile: content too long for simple header');
   const objHeader = Buffer.from([(3 << 4) | content.length]);
 
-  // Zlib-deflate the content
   const deflated = deflateSync(content);
 
-  // Assemble pack body (everything before the checksum)
   const packBody = Buffer.concat([header, objHeader, deflated]);
 
   // 20-byte SHA-1 checksum of the body
@@ -244,7 +239,6 @@ describe('GitReceivePackService', () => {
       const fs = new MemFS();
       const { packBytes, blobOid: _blobOid } = buildValidPackfile('hello');
 
-      // Push with a ref pointing to an OID that does NOT exist in the pack
       const bogusOid = 'dead'.repeat(10);
       const requestData = buildPushRequest(
         [{ oldOid: zeroOid, newOid: bogusOid, refName: 'refs/heads/main' }],
@@ -269,7 +263,6 @@ describe('GitReceivePackService', () => {
 
       await GitReceivePackService.handleReceivePack(fs, requestData);
 
-      // The ref should NOT exist — writing it would corrupt the repo
       await expect(fs.readFile('.git/refs/heads/main')).rejects.toThrow('ENOENT');
     });
 
@@ -303,21 +296,17 @@ describe('GitReceivePackService', () => {
 
       const { result } = await GitReceivePackService.handleReceivePack(fs, requestData);
 
-      // The good ref should have been written
       const goodRef = await fs.readFile('.git/refs/heads/good', { encoding: 'utf8' });
       expect(String(goodRef)).toContain(blobOid);
 
-      // The bad ref should NOT exist
       await expect(fs.readFile('.git/refs/heads/bad')).rejects.toThrow('ENOENT');
 
-      // Should report an error for the bad ref
       expect(result.errors.some(e => e.includes('refs/heads/bad'))).toBe(true);
     });
 
     it('allows ref update pointing to object from a previous push', async () => {
       const fs = new MemFS();
 
-      // First push: index a valid packfile so its blob OID exists in the repo
       const { packBytes: firstPack, blobOid: existingOid } = buildValidPackfile('first');
       const firstRequest = buildPushRequest(
         [{ oldOid: zeroOid, newOid: existingOid, refName: 'refs/heads/main' }],
@@ -329,7 +318,6 @@ describe('GitReceivePackService', () => {
       );
       expect(firstResult.success).toBe(true);
 
-      // Second push: a NEW packfile with a different blob, but one ref targets the old OID
       const { packBytes: secondPack, blobOid: newOid } = buildValidPackfile('second');
       const secondRequest = buildPushRequest(
         [
@@ -354,7 +342,6 @@ describe('GitReceivePackService', () => {
     it('still rejects ref pointing to truly nonexistent object across pushes', async () => {
       const fs = new MemFS();
 
-      // First push: seed the repo with one valid object
       const { packBytes, blobOid } = buildValidPackfile('seed');
       const firstRequest = buildPushRequest(
         [{ oldOid: zeroOid, newOid: blobOid, refName: 'refs/heads/main' }],
@@ -362,7 +349,6 @@ describe('GitReceivePackService', () => {
       );
       await GitReceivePackService.handleReceivePack(fs, firstRequest);
 
-      // Second push: ref targets an OID that has never existed anywhere
       const { packBytes: secondPack } = buildValidPackfile('other');
       const bogusOid = 'dead'.repeat(10);
       const secondRequest = buildPushRequest(
@@ -466,11 +452,9 @@ describe('GitReceivePackService', () => {
       const { result } = await GitReceivePackService.handleReceivePack(fs, requestData);
       expect(result.success).toBe(true);
 
-      // HEAD should be a symbolic ref, not a detached OID
       const headContent = String(await fs.readFile('.git/HEAD', { encoding: 'utf8' })).trim();
       expect(headContent).toBe('ref: refs/heads/main');
 
-      // resolveRef should follow the symref to the branch OID
       const resolved = await git.resolveRef({ fs, dir: '/', ref: 'HEAD' });
       expect(resolved).toBe(blobOid);
     });
@@ -479,7 +463,6 @@ describe('GitReceivePackService', () => {
       const fs = new MemFS();
       const { packBytes: firstPack, blobOid: firstOid } = buildValidPackfile('first');
 
-      // First push — sets HEAD
       const firstRequest = buildPushRequest(
         [{ oldOid: zeroOid, newOid: firstOid, refName: 'refs/heads/main' }],
         firstPack
@@ -489,7 +472,6 @@ describe('GitReceivePackService', () => {
       const headAfterFirst = String(await fs.readFile('.git/HEAD', { encoding: 'utf8' })).trim();
       expect(headAfterFirst).toBe('ref: refs/heads/main');
 
-      // Second push — HEAD should remain symbolic, not be rewritten
       const { packBytes: secondPack, blobOid: secondOid } = buildValidPackfile('second');
       const secondRequest = buildPushRequest(
         [{ oldOid: firstOid, newOid: secondOid, refName: 'refs/heads/main' }],
@@ -500,7 +482,6 @@ describe('GitReceivePackService', () => {
       const headAfterSecond = String(await fs.readFile('.git/HEAD', { encoding: 'utf8' })).trim();
       expect(headAfterSecond).toBe('ref: refs/heads/main');
 
-      // HEAD should resolve to the new OID via the symref
       const resolved = await git.resolveRef({ fs, dir: '/', ref: 'HEAD' });
       expect(resolved).toBe(secondOid);
     });
@@ -531,7 +512,6 @@ describe('GitReceivePackService', () => {
 
       await GitReceivePackService.handleReceivePack(fs, requestData);
 
-      // HEAD should not exist — no main/master was pushed
       await expect(fs.readFile('.git/HEAD')).rejects.toThrow('ENOENT');
     });
   });
@@ -600,7 +580,6 @@ describe('GitReceivePackService', () => {
       const status = parseReportStatus(response);
 
       expect(status.unpack).toBe('error');
-      // Global error should apply to all refs
       expect(status.refs).toEqual([
         { status: 'ng', refName: 'refs/heads/main', message: 'index failed' },
       ]);
@@ -636,13 +615,11 @@ describe('GitReceivePackService', () => {
       const response = GitReceivePackService.generateReportStatus(commands, errors);
       const status = parseReportStatus(response);
 
-      // Newlines should be collapsed to spaces
       expect(status.refs[0].status).toBe('ng');
       expect(status.refs[0]).toHaveProperty(
         'message',
         'Packfile too large: 100KB exceeds 50KB limit. Try:   1. Push fewer files'
       );
-      // The message must not contain newlines
       expect(status.refs[0]).toHaveProperty('message', expect.not.stringContaining('\n'));
     });
 
@@ -672,26 +649,21 @@ function parseReportStatus(data: Uint8Array): { unpack: string; refs: RefStatus[
   let offset = 0;
   const lines: string[] = [];
 
-  // Read sideband packets until we hit the final flush (0000)
   while (offset < data.length) {
     const hexLen = decoder.decode(data.subarray(offset, offset + 4));
     if (hexLen === '0000') {
       offset += 4;
-      // Could be the inner flush (inside sideband) or the outer flush.
-      // If we've already collected lines and the next 4 bytes are also 0000, that's the outer flush.
       continue;
     }
     const pktLen = parseInt(hexLen, 16);
     if (pktLen === 0 || isNaN(pktLen)) break;
 
-    // byte at offset+4 is the sideband band number
     const band = data[offset + 4];
     const payload = data.subarray(offset + 5, offset + pktLen);
 
     if (band === 1) {
       // The payload is itself a pkt-line (or flush)
       const payloadStr = decoder.decode(payload);
-      // Could be a pkt-line "XXXX<content>" or "0000" (inner flush)
       if (payloadStr === '0000') {
         offset += pktLen;
         continue;
@@ -706,7 +678,6 @@ function parseReportStatus(data: Uint8Array): { unpack: string; refs: RefStatus[
     offset += pktLen;
   }
 
-  // First line should be "unpack ok" or "unpack error"
   let unpack = 'unknown';
   const refs: RefStatus[] = [];
 

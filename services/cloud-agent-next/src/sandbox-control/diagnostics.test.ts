@@ -9,10 +9,12 @@ import { logger } from '../logger.js';
 describe('logControlDiagnostic', () => {
   const withFields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
   const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
 
   afterEach(() => {
     withFields.mockClear();
     info.mockClear();
+    warn.mockClear();
   });
 
   it('keeps safe preparation fields and coalesces identical rejection results', () => {
@@ -72,10 +74,16 @@ describe('logControlDiagnostic', () => {
     expect(withFields).toHaveBeenCalledTimes(1);
   });
 
-  it('suppresses applied delta progress but logs a rejected delta session event', () => {
+  it('suppresses applied delta progress but logs other delta outcomes', () => {
     logControlDiagnostic(
       'session_event_result',
       { eventType: 'message.part.delta', applied: true },
+      'info'
+    );
+    logControlDiagnostic('socket_frame_received', { eventType: 'message.part.delta' }, 'info');
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'message.part.delta', result: 'delivered', applied: true },
       'info'
     );
     expect(withFields).not.toHaveBeenCalled();
@@ -91,6 +99,34 @@ describe('logControlDiagnostic', () => {
       eventType: 'message.part.delta',
       applied: false,
     });
+
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'message.part.delta', result: 'delivered_late', applied: true },
+      'info'
+    );
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'message.part.delta', result: 'delivered', applied: false },
+      'info'
+    );
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'message.part.delta', result: 'skipped' },
+      'info'
+    );
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'message.part.delta', result: 'failed' },
+      'warn'
+    );
+    logControlDiagnostic(
+      'forward_run',
+      { eventType: 'session.updated', result: 'delivered', applied: true },
+      'info'
+    );
+    expect(withFields).toHaveBeenCalledTimes(6);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });
 

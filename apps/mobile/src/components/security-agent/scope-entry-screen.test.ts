@@ -228,8 +228,8 @@ describe.each([
       onlineManager.setOnline(false);
       const root = await mount('personal', Screen);
       await retry(root);
-      expect(host(root, 'CenteredState')).toHaveLength(1);
-      expect(host(root, 'TabScreenScrollView')).toHaveLength(0);
+      expect(host(root, 'CenteredState')).toHaveLength(0);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(1);
       expect(host(root, 'Switch')[0]?.props.value).toBe(false);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(expected.disabled);
       expect(

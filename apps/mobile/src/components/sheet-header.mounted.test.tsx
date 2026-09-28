@@ -226,6 +226,61 @@ describe('SheetHeader', () => {
     renderer.unmount();
   });
 
+  it.each([
+    { title: 'Language', doneLabel: 'Done', cancelLabel: 'Cancel' },
+    { title: 'اللغة', doneLabel: 'تم', cancelLabel: 'إلغاء' },
+  ])('gives $doneLabel and $cancelLabel matching neutral rounded controls', async labels => {
+    const onDone = vi.fn<() => void>();
+    const onCancel = vi.fn<() => void>();
+    const renderer = await mountElement(
+      createElement(PickerSheet, { ...labels, onDone, onCancel, scrollable: false })
+    );
+    const done = pressablesByLabel(renderer.root, labels.doneLabel)[0];
+    const cancel = pressablesByLabel(renderer.root, labels.cancelLabel)[0];
+
+    for (const action of [done, cancel]) {
+      expect(action?.props.className).toContain('rounded-md');
+      expect(action?.props.className).not.toContain('rounded-full');
+      expect(action?.props.className).not.toMatch(/(?:^|\s)bg-/);
+      expect(action?.props.className).toContain('px-2 py-2');
+      expect(action?.props.className).toContain('active:opacity-70');
+      expect(action?.props.accessibilityRole).toBe('button');
+    }
+    expect(done?.props.onPress).toBe(onDone);
+    expect(cancel?.props.onPress).toBe(onCancel);
+    expect(renderer.root.findByProps({ children: labels.doneLabel }).props.className).toBe(
+      renderer.root.findByProps({ children: labels.cancelLabel }).props.className
+    );
+
+    renderer.unmount();
+  });
+
+  it('keeps Retry neutral and unchanged in size while the retry is pending', async () => {
+    const props = {
+      title: 'Could not restart',
+      doneLabel: 'Retry',
+      onDone: vi.fn<() => void>(),
+    };
+    const renderer = await mountElement(createElement(PickerSheet, props));
+    const retry = pressablesByLabel(renderer.root, 'Retry')[0];
+    const actionClasses = retry?.props.className;
+    expect(actionClasses).toContain('rounded-md');
+    expect(actionClasses).not.toMatch(/(?:^|\s)bg-/);
+    expect(pressablesByLabel(renderer.root, 'Cancel')).toHaveLength(0);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(createElement(PickerSheet, { ...props, disabled: true }));
+    });
+
+    const pendingRetry = pressablesByLabel(renderer.root, 'Retry')[0];
+    expect(pendingRetry?.props.className).toBe(actionClasses);
+    expect(pendingRetry?.props.disabled).toBe(true);
+    expect(pendingRetry?.props.onPress).toBe(props.onDone);
+
+    renderer.unmount();
+  });
+
   it('labels the leading control with cancelLabel so Back is not announced as Cancel', async () => {
     const renderer = await mount({
       title: 'report.pdf',
@@ -470,7 +525,7 @@ describe('SheetHeader', () => {
       });
 
       // The frame a freshly presented sheet lays out can report top: 0; the
-      // synchronous status-bar height keeps the Done pill below the icons.
+      // synchronous status-bar height keeps the Done control below the icons.
       const wrapper = findSafeAreaWrapper(renderer.root);
       expect(wrapper.props.style).toEqual({ paddingTop: 48 });
 

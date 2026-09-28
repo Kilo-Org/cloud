@@ -1,12 +1,26 @@
 import { describe, expect, it } from '@jest/globals';
+import { getAutoRoutingSettings } from '@/lib/ai-gateway/auto-routing-admin-client';
+import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
+import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import type { EffectiveOrganizationModelPolicy } from '@/lib/organizations/effective-model-access.server';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import {
   candidateModelIdsFromSources,
+  collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
 } from './auto-routing-denied-models';
+
+jest.mock('@/lib/ai-gateway/auto-routing-admin-client', () => ({
+  getAutoRoutingSettings: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
+  getCachedRoutingTable: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getDataCollectionRequiredModelIds: jest.fn(),
+}));
 
 function policy(
   overrides: Partial<EffectiveOrganizationModelPolicy> = {}
@@ -66,6 +80,30 @@ describe('policyNeedsCandidateEvaluation', () => {
 describe('collectDeniedAutoRoutingModelIds', () => {
   it('returns no denials without loading when the policy cannot deny anything', async () => {
     await expect(collectDeniedAutoRoutingModelIds(policy(), owner)).resolves.toEqual([]);
+  });
+});
+
+describe('collectDataCollectionRequiredAutoRoutingModelIds', () => {
+  it('returns routing candidates that cannot be served without data collection', async () => {
+    jest.mocked(getAutoRoutingSettings).mockResolvedValue({ status: 404, body: {} } as never);
+    jest.mocked(getCachedRoutingTable).mockResolvedValue({
+      routes: {
+        'implementation/code_generation': [
+          { model: 'meta/muse-spark-1.3-contributor' },
+          { model: 'meta/muse-spark-1.3' },
+          { model: 'stepfun/step-3.7-flash:free' },
+          { model: 'kilo-auto/balanced' },
+        ],
+      },
+    } as never);
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValue(new Set(['meta/muse-spark-1.3-contributor', 'unrelated/model']));
+
+    await expect(collectDataCollectionRequiredAutoRoutingModelIds(owner)).resolves.toEqual([
+      'meta/muse-spark-1.3-contributor',
+      'stepfun/step-3.7-flash:free',
+    ]);
   });
 });
 

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { postAuth } from '@/lib/auth/auth-fetch';
+import { AUTH_REQUEST_TIMEOUT_MS, postAuth } from '@/lib/auth/auth-fetch';
+import { resetAuthTerminalReports } from '@/lib/auth/auth-response-class';
 
 // Mock @/lib/config to avoid pulling in react-native at module import time.
 vi.mock('@/lib/config', () => ({
@@ -24,7 +25,10 @@ vi.mock('expo-application', () => ({
 
 describe('postAuth', () => {
   afterEach(() => {
+    vi.clearAllMocks();
     vi.restoreAllMocks();
+    vi.useRealTimers();
+    resetAuthTerminalReports();
   });
 
   it('forwards ssoOrganizationId on a non-ok SSO_ERROR response', async () => {
@@ -38,6 +42,8 @@ describe('postAuth', () => {
       ok: false,
       errorCode: 'SSO_ERROR',
       ssoOrganizationId: 'org_1',
+      httpStatus: 400,
+      terminal: true,
     });
   });
 
@@ -52,6 +58,114 @@ describe('postAuth', () => {
       ok: false,
       errorCode: 'BLOCKED',
       ssoOrganizationId: undefined,
+      httpStatus: 400,
+      terminal: true,
+    });
+  });
+
+  it('classifies a 401 on a credential route as terminal', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json({ error: 'INVALID_CODE' }, { status: 401 })
+    );
+
+    const result = await postAuth('/api/auth/native/token', { provider: 'email' });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'INVALID_CODE',
+      ssoOrganizationId: undefined,
+      httpStatus: 401,
+      terminal: true,
+    });
+  });
+
+  it('keeps a 429 retryable and carries the server Retry-After', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce(
+      Response.json(
+        { error: 'TOO_MANY_ATTEMPTS' },
+        { status: 429, headers: { 'retry-after': '7' } }
+      )
+    );
+
+    const result = await postAuth('/api/auth/native/otp', { email: 'user@example.com' });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'TOO_MANY_ATTEMPTS',
+      ssoOrganizationId: undefined,
+      httpStatus: 429,
+      terminal: false,
+      retryAfterMs: 7000,
+    });
+  });
+
+  it('aborts a hung POST at AUTH_REQUEST_TIMEOUT_MS and names it TIMEOUT', async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const signal = init?.signal ?? undefined;
+      if (signal) {
+        signals.push(signal);
+      }
+      await new Promise<void>(resolve => {
+        signal?.addEventListener('abort', () => {
+          resolve();
+        });
+      });
+      throw new Error('aborted');
+    });
+
+    const promise = postAuth('/api/auth/native/otp', { email: 'user@example.com' });
+    await vi.advanceTimersByTimeAsync(AUTH_REQUEST_TIMEOUT_MS);
+    const result = await promise;
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'TIMEOUT',
+      ssoOrganizationId: undefined,
+      terminal: false,
+    });
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it('names TIMEOUT when the abort lands after the headers arrive but the body stalls', async () => {
+    vi.useFakeTimers();
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url, init) => {
+      const signal = await Promise.resolve(init?.signal ?? undefined);
+      const response = new Response(null);
+      vi.spyOn(response, 'json').mockReturnValue(
+        new Promise<never>((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        })
+      );
+      return response;
+    });
+
+    const promise = postAuth('/api/auth/native/otp', { email: 'user@example.com' });
+    await vi.advanceTimersByTimeAsync(AUTH_REQUEST_TIMEOUT_MS);
+    const result = await promise;
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: 'TIMEOUT',
+      ssoOrganizationId: undefined,
+      terminal: false,
+    });
+  });
+
+  it('leaves a genuine network failure unnamed', async () => {
+    vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new TypeError('Network request failed'));
+
+    const result = await postAuth('/api/auth/native/otp', { email: 'user@example.com' });
+
+    expect(result).toEqual({
+      ok: false,
+      errorCode: undefined,
+      ssoOrganizationId: undefined,
+      terminal: false,
     });
   });
 });

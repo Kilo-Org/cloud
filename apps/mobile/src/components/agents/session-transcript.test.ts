@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  collectTranscriptItemKeysByPart,
   condenseTranscriptToolRuns,
   getSessionTranscriptItemKey,
   getSessionTranscriptItemMessageId,
@@ -290,6 +291,25 @@ function assistantTextThenToolsMessageAt(id: string, created: number, partIds: s
   };
 }
 
+/** A mixed assistant message whose visible text sits between its tool parts. */
+function assistantToolTextToolMessageAt(id: string, created: number, partIds: string[]) {
+  const base = assistantToolOnlyMessageAt(id, created, partIds);
+  return {
+    info: base.info,
+    parts: [
+      ...base.parts.slice(0, 1),
+      {
+        id: `${id}:text`,
+        sessionID: 'ses_12345678901234567890123456',
+        messageID: id,
+        type: 'text' as const,
+        text: 'visible',
+      },
+      ...base.parts.slice(1),
+    ],
+  };
+}
+
 function toolPartCount(items: ReturnType<typeof mergeSessionTranscript>): number {
   let total = 0;
   for (const item of items) {
@@ -309,16 +329,27 @@ function keysOf(items: ReturnType<typeof mergeSessionTranscript>): string[] {
   return items.map(item => getSessionTranscriptItemKey(item));
 }
 
+/** Whether `original` still appears as one unbroken run at the end of `next`. */
+function isContiguousSuffix(original: string[], next: string[]): boolean {
+  if (original.length > next.length) {
+    return false;
+  }
+  const offset = next.length - original.length;
+  return original.every((key, index) => next[offset + index] === key);
+}
+
 function messageIdsOf(items: ReturnType<typeof mergeSessionTranscript>): (string | null)[] {
   return items.map(item => getSessionTranscriptItemMessageId(item));
 }
 
 describe('getSessionTranscriptItemMessageId', () => {
-  it('maps message and time rows to their message id', () => {
+  it('maps a message row to its message id', () => {
     const transcript = mergeSessionTranscript([message('msg_001')], []);
 
-    expect(keysOf(transcript)).toEqual(['time:msg_001', 'msg_001']);
-    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001']);
+    // The burst marker rides on the message item, so the row count is one per
+    // message and the marker adds no row of its own.
+    expect(keysOf(transcript)).toEqual(['msg_001']);
+    expect(messageIdsOf(transcript)).toEqual(['msg_001']);
   });
 
   it('maps a preparation row to null — it renders no message row of its own', () => {
@@ -327,7 +358,7 @@ describe('getSessionTranscriptItemMessageId', () => {
       [attempt('attempt_001', 'msg_001')]
     );
 
-    expect(messageIdsOf(transcript)).toEqual(['msg_001', 'msg_001', null]);
+    expect(messageIdsOf(transcript)).toEqual(['msg_001', null]);
   });
 
   it("maps a condensed tool run to its first part's message id", () => {
@@ -342,8 +373,8 @@ describe('getSessionTranscriptItemMessageId', () => {
       )
     );
 
-    expect(keysOf(condensed)).toEqual(['time:msg_tool_a', 'tool-run:ta1']);
-    expect(messageIdsOf(condensed)).toEqual(['msg_tool_a', 'msg_tool_a']);
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1']);
+    expect(messageIdsOf(condensed)).toEqual(['msg_tool_a']);
   });
 });
 
@@ -354,12 +385,7 @@ describe('session transcript', () => {
 
     const transcript = mergeSessionTranscript(messages, attempts);
 
-    expect(keysOf(transcript)).toEqual([
-      'time:msg_001',
-      'msg_001',
-      'preparation:attempt_001',
-      'msg_002',
-    ]);
+    expect(keysOf(transcript)).toEqual(['msg_001', 'preparation:attempt_001', 'msg_002']);
   });
 
   it('keeps orphaned preparation attempts visible after paginated prepends', () => {
@@ -368,7 +394,7 @@ describe('session transcript', () => {
       [attempt('attempt_older', 'msg_001')]
     );
 
-    expect(keysOf(transcript)).toEqual(['time:msg_011', 'msg_011', 'preparation:attempt_older']);
+    expect(keysOf(transcript)).toEqual(['msg_011', 'preparation:attempt_older']);
   });
 
   it('hides warm-reuse completed attempts that only ran synthetic sandbox markers', () => {
@@ -377,7 +403,7 @@ describe('session transcript', () => {
       [warmReuseAttempt('attempt_warm', 'msg_001')]
     );
 
-    expect(keysOf(transcript)).toEqual(['time:msg_001', 'msg_001']);
+    expect(keysOf(transcript)).toEqual(['msg_001']);
   });
 
   it('keeps a running attempt even if it only has synthetic markers so far', () => {
@@ -388,19 +414,22 @@ describe('session transcript', () => {
     };
     const transcript = mergeSessionTranscript([message('msg_001')], [running]);
 
-    expect(keysOf(transcript)).toEqual(['time:msg_001', 'msg_001', 'preparation:attempt_running']);
+    expect(keysOf(transcript)).toEqual(['msg_001', 'preparation:attempt_running']);
   });
 
-  it('opens a burst of ten visible messages inside one minute with exactly one marker, the first item', () => {
+  it('opens a burst of ten visible messages inside one minute with exactly one marker, on the first message', () => {
     const messages = Array.from({ length: 10 }, (_, i) =>
       userMessageAt(`msg_burst_${i}`, 1_000_000_000 + i * 1000)
     );
 
     const transcript = mergeSessionTranscript(messages, []);
 
-    expect(keysOf(transcript)).toEqual(['time:msg_burst_0', ...messages.map(m => m.info.id)]);
-    expect(transcript.filter(item => item.type === 'time')).toHaveLength(1);
-    expect(transcript[0]).toMatchObject({ type: 'time', messageId: 'msg_burst_0' });
+    expect(keysOf(transcript)).toEqual(messages.map(m => m.info.id));
+    const marked = transcript.filter(
+      item => item.type === 'message' && item.timeMarker !== undefined
+    );
+    expect(marked).toHaveLength(1);
+    expect(marked[0]).toMatchObject({ message: { info: { id: 'msg_burst_0' } } });
   });
 
   it('marks a resumption when the gap reaches the threshold, and not one millisecond below it', () => {
@@ -413,7 +442,11 @@ describe('session transcript', () => {
       ],
       []
     );
-    expect(keysOf(atGap)).toEqual(['time:msg_gap_a', 'msg_gap_a', 'time:msg_gap_b', 'msg_gap_b']);
+    expect(keysOf(atGap)).toEqual(['msg_gap_a', 'msg_gap_b']);
+    expect(atGap.map(item => (item.type === 'message' ? item.timeMarker : undefined))).toEqual([
+      { created: base, dayChanged: false },
+      { created: base + TRANSCRIPT_TIME_MARKER_GAP_MS, dayChanged: false },
+    ]);
 
     const belowGap = mergeSessionTranscript(
       [
@@ -422,7 +455,59 @@ describe('session transcript', () => {
       ],
       []
     );
-    expect(keysOf(belowGap)).toEqual(['time:msg_gap_c', 'msg_gap_c', 'msg_gap_d']);
+    expect(keysOf(belowGap)).toEqual(['msg_gap_c', 'msg_gap_d']);
+    expect(belowGap[1]).toMatchObject({ type: 'message' });
+    expect(belowGap[1]?.type === 'message' ? belowGap[1].timeMarker : undefined).toBeUndefined();
+  });
+
+  it('keeps the page-2 key sequence a contiguous suffix after an older message is prepended', () => {
+    const minute = 60_000;
+    const base = 100 * minute;
+    // Page 2 as the reader first sees it: two user messages a minute apart.
+    const page2 = [userMessageAt('m2', base), userMessageAt('m3', base + minute)];
+    const before = keysOf(mergeSessionTranscript(page2, []));
+    expect(before).toEqual(['m2', 'm3']);
+
+    // Loading older messages prepends `m1` a minute before the page's first row.
+    const merged = mergeSessionTranscript([userMessageAt('m1', base - minute), ...page2], []);
+    const after = keysOf(merged);
+
+    // FlashList anchors on row keys: the keys that were on screen must still be
+    // present, unchanged and contiguous. The burst marker now rides on the
+    // message item, so it moving from `m2` to `m1` changes no key.
+    expect(isContiguousSuffix(before, after)).toBe(true);
+    expect(after).toEqual(['m1', 'm2', 'm3']);
+    expect(merged[0]).toMatchObject({ type: 'message', timeMarker: { created: base - minute } });
+    expect(merged[1]).toMatchObject({ type: 'message' });
+    expect(merged[1]?.type === 'message' ? merged[1].timeMarker : undefined).toBeUndefined();
+  });
+
+  it('keeps a condensed tool run key when an older tool-only page is prepended', () => {
+    const base = 1_000_000_000;
+    // Page 2 as the reader first sees it: a lone tool-only message condenses to
+    // its message row, because a run of one falls back to the message.
+    const page2 = [assistantToolOnlyMessageAt('m2', base, ['t2'])];
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript(page2, []));
+    expect(keysOf(before)).toEqual(['m2']);
+
+    // Loading older messages prepends an older tool-only message in the same
+    // burst: its part joins t2 into one run. The carried map pins the run to the
+    // key the row was already on screen under, so FlashList holds the viewport.
+    const merged = mergeSessionTranscript(
+      [assistantToolOnlyMessageAt('m1', base - 1000, ['t1']), ...page2],
+      []
+    );
+    const after = keysOf(
+      condenseTranscriptToolRuns(merged, collectTranscriptItemKeysByPart(before))
+    );
+
+    expect(after).toEqual(['m2']);
+    expect(isContiguousSuffix(keysOf(before), after)).toBe(true);
+
+    // With no carried map the output is byte-identical to before this change:
+    // the run still names itself after its first part. The component is what
+    // threads the map; the pure contract stays the same.
+    expect(keysOf(condenseTranscriptToolRuns(merged))).toEqual(['tool-run:t1']);
   });
 
   it('marks a day change even when the gap is small, carrying dayChanged on the marker', () => {
@@ -434,14 +519,9 @@ describe('session transcript', () => {
       []
     );
 
-    expect(keysOf(transcript)).toEqual([
-      'time:msg_day_a',
-      'msg_day_a',
-      'time:msg_day_b',
-      'msg_day_b',
-    ]);
-    expect(transcript[0]).toMatchObject({ type: 'time', dayChanged: false });
-    expect(transcript[2]).toMatchObject({ type: 'time', dayChanged: true });
+    expect(keysOf(transcript)).toEqual(['msg_day_a', 'msg_day_b']);
+    expect(transcript[0]).toMatchObject({ type: 'message', timeMarker: { dayChanged: false } });
+    expect(transcript[1]).toMatchObject({ type: 'message', timeMarker: { dayChanged: true } });
   });
 
   it('carries dayChanged false on every marker except a true day change', () => {
@@ -458,7 +538,9 @@ describe('session transcript', () => {
       []
     );
 
-    const markers = transcript.filter(item => item.type === 'time');
+    const markers = transcript.flatMap(item =>
+      item.type === 'message' && item.timeMarker ? [item.timeMarker] : []
+    );
     expect(markers.map(marker => marker.dayChanged)).toEqual([false, true]);
   });
 
@@ -480,12 +562,7 @@ describe('session transcript', () => {
       []
     );
 
-    expect(keysOf(withInvisible)).toEqual([
-      'time:msg_vis_a',
-      'msg_vis_a',
-      'time:msg_vis_b',
-      'msg_vis_b',
-    ]);
+    expect(keysOf(withInvisible)).toEqual(['msg_vis_a', 'msg_vis_b']);
     expect(keysOf(withInvisible)).toEqual(keysOf(withoutInvisible));
   });
 
@@ -498,7 +575,7 @@ describe('session transcript', () => {
       new Map([[failedMessage.info.id, { status: 'failed', error: 'nope', reason: 'exhausted' }]])
     );
 
-    expect(keysOf(transcript)).toEqual(['time:msg_failed', 'msg_failed']);
+    expect(keysOf(transcript)).toEqual(['msg_failed']);
   });
 
   it('keeps an invalid-timestamp message visible without a marker and without resetting the run', () => {
@@ -512,12 +589,7 @@ describe('session transcript', () => {
       []
     );
 
-    expect(keysOf(transcript)).toEqual([
-      'time:msg_time_a',
-      'msg_time_a',
-      'msg_time_b',
-      'msg_time_c',
-    ]);
+    expect(keysOf(transcript)).toEqual(['msg_time_a', 'msg_time_b', 'msg_time_c']);
 
     const maxValueTranscript = mergeSessionTranscript(
       [
@@ -527,62 +599,38 @@ describe('session transcript', () => {
       ],
       []
     );
-    expect(keysOf(maxValueTranscript)).toEqual([
-      'time:msg_max_a',
-      'msg_max_a',
-      'msg_max_b',
-      'msg_max_c',
-    ]);
+    expect(keysOf(maxValueTranscript)).toEqual(['msg_max_a', 'msg_max_b', 'msg_max_c']);
   });
 
-  it('keeps every fixture free of a trailing marker and of adjacent markers', () => {
+  it('assigns each marker to the message that opens its burst and to no other', () => {
     const base = 1_000_000_000;
     const beforeMidnight = new Date(2026, 0, 1, 23, 59, 30).getTime();
     const afterMidnight = new Date(2026, 0, 2, 0, 0, 10).getTime();
 
-    const transcripts = [
-      mergeSessionTranscript(
-        [message('msg_001'), message('msg_002')],
-        [attempt('attempt_001', 'msg_001')]
-      ),
-      mergeSessionTranscript([message('msg_011')], [attempt('attempt_older', 'msg_001')]),
-      mergeSessionTranscript([message('msg_001')], [warmReuseAttempt('attempt_warm', 'msg_001')]),
-      mergeSessionTranscript(
-        [
-          userMessageAt('msg_gap_a', base),
-          userMessageAt('msg_gap_b', base + TRANSCRIPT_TIME_MARKER_GAP_MS),
-        ],
-        []
-      ),
-      mergeSessionTranscript(
-        [userMessageAt('msg_day_a', beforeMidnight), userMessageAt('msg_day_b', afterMidnight)],
-        []
-      ),
-      mergeSessionTranscript(
-        [
-          userMessageAt('msg_vis_a', base),
-          assistantMessageWithStepStartOnly('msg_hidden', base + 10_000),
-          userMessageAt('msg_vis_b', base + TRANSCRIPT_TIME_MARKER_GAP_MS),
-        ],
-        []
-      ),
-      mergeSessionTranscript(
-        [
-          userMessageAt('msg_time_a', base),
-          userMessageWithCreatedAt('msg_time_b', undefined),
-          userMessageAt('msg_time_c', base + 2000),
-        ],
-        []
-      ),
-    ];
+    const transcript = mergeSessionTranscript(
+      [
+        userMessageAt('msg_open_a', base),
+        userMessageAt('msg_burst_b', base + 1000),
+        userMessageAt('msg_gap_c', base + 1000 + TRANSCRIPT_TIME_MARKER_GAP_MS),
+        userMessageAt('msg_day_d', beforeMidnight),
+        userMessageAt('msg_day_e', afterMidnight),
+      ],
+      []
+    );
 
-    for (const transcript of transcripts) {
-      const keys = keysOf(transcript);
-      expect(keys.at(-1)?.startsWith('time:')).toBe(false);
-      for (let i = 1; i < keys.length; i += 1) {
-        expect(keys[i - 1]?.startsWith('time:') && keys[i]?.startsWith('time:')).toBe(false);
-      }
-    }
+    // The burst opener, the resumption after the gap, and the first message of
+    // the new day carry a marker; the message inside each burst does not.
+    const markedIds = transcript.flatMap(item =>
+      item.type === 'message' && item.timeMarker ? [item.message.info.id] : []
+    );
+    expect(markedIds).toEqual(['msg_open_a', 'msg_gap_c', 'msg_day_d', 'msg_day_e']);
+    expect(keysOf(transcript)).toEqual([
+      'msg_open_a',
+      'msg_burst_b',
+      'msg_gap_c',
+      'msg_day_d',
+      'msg_day_e',
+    ]);
   });
 
   it('renders visible assistant messages and markers alongside user messages', () => {
@@ -594,7 +642,7 @@ describe('session transcript', () => {
       []
     );
 
-    expect(keysOf(transcript)).toEqual(['time:msg_user', 'msg_user', 'msg_asst']);
+    expect(keysOf(transcript)).toEqual(['msg_user', 'msg_asst']);
   });
 
   it('renders one unconfirmed submission as one message item', () => {
@@ -608,7 +656,7 @@ describe('session transcript', () => {
 
     const transcript = mergeSessionTranscript([optimistic], []);
     expect(transcript.filter(item => item.type === 'message')).toHaveLength(1);
-    expect(keysOf(transcript)).toEqual(['time:msg_opt', 'msg_opt']);
+    expect(keysOf(transcript)).toEqual(['msg_opt']);
 
     // The recorded failed run keeps that one row, so the typed failure footer
     // stays attached to the submission that failed.
@@ -619,7 +667,7 @@ describe('session transcript', () => {
         ['msg_opt', { status: 'failed', error: 'Unauthorized: Unauthorized', reason: 'exhausted' }],
       ])
     );
-    expect(keysOf(failed)).toEqual(['time:msg_opt', 'msg_opt']);
+    expect(keysOf(failed)).toEqual(['msg_opt']);
   });
 
   it('keeps two submissions that carry the same prompt as two rows', () => {
@@ -660,11 +708,11 @@ describe('session transcript', () => {
       [],
       new Map([['msg_stub', { status: 'failed', error: 'boom', reason: 'execution' }]])
     );
-    expect(keysOf(failed)).toEqual(['time:msg_stub', 'msg_stub']);
+    expect(keysOf(failed)).toEqual(['msg_stub']);
 
     // A confirmed zero-part row keeps the transient rendering.
     const transient = mergeSessionTranscript([message('msg_transient')], []);
-    expect(keysOf(transient)).toEqual(['time:msg_transient', 'msg_transient']);
+    expect(keysOf(transient)).toEqual(['msg_transient']);
   });
 });
 
@@ -678,9 +726,129 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
-    expect(keysOf(condensed)).toEqual(['time:msg_tool_a', 'tool-run:ta1']);
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1']);
     const run = condensed.find(item => item.type === 'tool-run');
     expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2', 'tb1']);
+  });
+
+  it('keeps a run key when a lone tool row becomes a run while streaming', () => {
+    const base = 1_000_000_000;
+    // A lone tool-only message first renders as its message row (a run of one).
+    const page1 = [assistantToolOnlyMessageAt('m1', base, ['t1'])];
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript(page1, []));
+    expect(keysOf(before)).toEqual(['m1']);
+
+    // A later assistant message's leading tool part streams in and joins the run.
+    // The carried map pins the run to the key the row already had.
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('m1', base, ['t1']),
+          assistantToolOnlyMessageAt('m2', base + 1000, ['t2']),
+        ],
+        []
+      ),
+      collectTranscriptItemKeysByPart(before)
+    );
+
+    expect(keysOf(after)).toEqual(['m1']);
+  });
+
+  it('falls back to the first part id when a carried key is already taken', () => {
+    const base = 1_000_000_000;
+    // One run holds four parts and keys every one of them `tool-run:t1`.
+    const before = condenseTranscriptToolRuns(
+      mergeSessionTranscript([assistantToolOnlyMessageAt('m1', base, ['t1', 't2', 't3', 't4'])], [])
+    );
+    expect(keysOf(before)).toEqual(['tool-run:t1']);
+
+    // The run now splits at a user message. The first half reuses the carried
+    // key; the second half can no longer take it and falls back to its own
+    // first part's id, so one carried key is never emitted twice.
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [
+          assistantToolOnlyMessageAt('m1', base, ['t1', 't2']),
+          userMessageWithTextAt('u', base + 500, 'between'),
+          assistantToolOnlyMessageAt('m2', base + 1000, ['t3', 't4']),
+        ],
+        []
+      ),
+      collectTranscriptItemKeysByPart(before)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1', 'u', 'tool-run:t3']);
+  });
+
+  it.each([true, false])(
+    'reserves a later failed message key after a run adopted it (retryable: %s)',
+    isRetryable => {
+      const base = 1_000_000_000;
+      const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2']);
+      const lone = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+      const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+      const joined = condenseTranscriptToolRuns(
+        mergeSessionTranscript([older, owner], []),
+        collectTranscriptItemKeysByPart(lone)
+      );
+      expect(keysOf(joined)).toEqual(['m2']);
+
+      const failed = {
+        ...owner,
+        info: {
+          ...owner.info,
+          error: { name: 'APIError' as const, data: { message: 'boom', isRetryable } },
+        },
+      };
+      const after = condenseTranscriptToolRuns(
+        mergeSessionTranscript([older, failed], []),
+        collectTranscriptItemKeysByPart(joined)
+      );
+
+      expect(keysOf(after)).toEqual(['tool-run:t1a', 'm2']);
+      expect(after[1]).toMatchObject({ type: 'message', message: failed });
+      expect(toolPartCount(after)).toBe(3);
+    }
+  );
+
+  it('reserves a later plain fragment key after a run adopted it', () => {
+    const base = 1_000_000_000;
+    const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2']);
+    const lone = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+    const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+    const joined = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, owner], []),
+      collectTranscriptItemKeysByPart(lone)
+    );
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript(
+        [older, assistantTextThenToolsMessageAt('m2', base + 1000, ['t2'])],
+        []
+      ),
+      collectTranscriptItemKeysByPart(joined)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1a', 'm2']);
+    expect(toolPartCount(after)).toBe(3);
+  });
+
+  it('reserves the default key of a later run when an adopted run splits again', () => {
+    const base = 1_000_000_000;
+    const owner = assistantToolOnlyMessageAt('m2', base + 1000, ['t2a', 't2b']);
+    const before = condenseTranscriptToolRuns(mergeSessionTranscript([owner], []));
+    const older = assistantToolOnlyMessageAt('m1', base, ['t1a', 't1b']);
+    const joined = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, owner], []),
+      collectTranscriptItemKeysByPart(before)
+    );
+    expect(keysOf(joined)).toEqual(['tool-run:t2a']);
+    const after = condenseTranscriptToolRuns(
+      mergeSessionTranscript([older, userMessageWithTextAt('u', base + 500, 'between'), owner], []),
+      collectTranscriptItemKeysByPart(joined)
+    );
+
+    expect(keysOf(after)).toEqual(['tool-run:t1a', 'u', 'tool-run:t2a']);
+    expect(toolPartCount(after)).toBe(4);
   });
 
   it('splits the run around a user message', () => {
@@ -693,15 +861,10 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
-    expect(keysOf(condensed)).toEqual([
-      'time:msg_tool_a',
-      'tool-run:ta1',
-      'msg_user',
-      'tool-run:tb1',
-    ]);
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1', 'msg_user', 'tool-run:tb1']);
   });
 
-  it('splits the run around a time marker', () => {
+  it('splits the run at every message that carries a time marker, keeping the markers', () => {
     const base = 1_000_000_000;
     const messages = [
       assistantToolOnlyMessageAt('msg_tool_a', base, ['ta1', 'ta2']),
@@ -713,12 +876,15 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
-    expect(keysOf(condensed)).toEqual([
-      'time:msg_tool_a',
-      'tool-run:ta1',
-      'time:msg_tool_b',
-      'tool-run:tb1',
-    ]);
+    // A marked message is a burst boundary exactly as the standalone marker item
+    // was, and each marker rides on the run that opens its burst.
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1', 'tool-run:tb1']);
+    expect(condensed.map(item => (item.type === 'tool-run' ? item.timeMarker : undefined))).toEqual(
+      [
+        { created: base, dayChanged: false },
+        { created: base + TRANSCRIPT_TIME_MARKER_GAP_MS, dayChanged: false },
+      ]
+    );
   });
 
   it('carries a mixed message trailing tool run into the following message', () => {
@@ -732,11 +898,7 @@ describe('condenseTranscriptToolRuns', () => {
 
     // The text fragment precedes the run: text, read, bash reads as text then a
     // single "<2> items" row instead of two expanded cards.
-    expect(keysOf(condensed)).toEqual([
-      'time:msg_mixed',
-      'message-parts:msg_mixed:msg_mixed:text',
-      'tool-run:tm1',
-    ]);
+    expect(keysOf(condensed)).toEqual(['message-parts:msg_mixed:msg_mixed:text', 'tool-run:tm1']);
     const run = condensed.find(item => item.type === 'tool-run');
     expect(run?.parts.map(part => part.id)).toEqual(['tm1', 'tb1']);
     const fragment = condensed.find(item => item.type === 'message');
@@ -755,11 +917,7 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
-    expect(keysOf(condensed)).toEqual([
-      'time:msg_tool_a',
-      'tool-run:ta1',
-      'message-parts:msg_mixed:msg_mixed:text',
-    ]);
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1', 'message-parts:msg_mixed:msg_mixed:text']);
     const run = condensed.find(item => item.type === 'tool-run');
     expect(run?.parts.map(part => part.id)).toEqual(['ta1', 'ta2', 'tm1']);
   });
@@ -775,7 +933,6 @@ describe('condenseTranscriptToolRuns', () => {
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
     expect(keysOf(condensed)).toEqual([
-      'time:msg_tool_a',
       'tool-run:ta1',
       'message-parts:msg_mixed:msg_mixed:text',
       'tool-run:tb1',
@@ -800,7 +957,48 @@ describe('condenseTranscriptToolRuns', () => {
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
     // A run of one is not condensed, so the message item is unchanged.
-    expect(keysOf(condensed)).toEqual(['time:msg_mixed', 'msg_mixed']);
+    expect(keysOf(condensed)).toEqual(['msg_mixed']);
+    const lone = condensed.find(item => item.type === 'message');
+    expect(lone?.type === 'message' ? lone.parts : undefined).toBeUndefined();
+  });
+
+  it('emits the run-of-one fallback fragment with `parts` when the message holds more visible parts', () => {
+    const base = 1_000_000_000;
+    // The message's first visible part is a lone condensable tool call, then a
+    // text part, then a run of two tools. The lone tool's run of one falls back
+    // to the message's plain rendering and starts a fragment; the text part joins
+    // it and the trailing run flushes it. The fragment holds two of the message's
+    // four visible parts, so it must carry `parts` — the count travels with the
+    // run entry, and the fallback reads it rather than re-filtering the message.
+    const messages = [assistantToolTextToolMessageAt('msg_fallback', base, ['fa1', 'fb1', 'fb2'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['message-parts:msg_fallback:fa1', 'tool-run:fb1']);
+    const fragment = condensed.find(item => item.type === 'message');
+    expect(fragment?.type === 'message' ? fragment.parts?.map(part => part.id) : []).toEqual([
+      'fa1',
+      'msg_fallback:text',
+    ]);
+    const run = condensed.find(item => item.type === 'tool-run');
+    expect(run?.parts.map(part => part.id)).toEqual(['fb1', 'fb2']);
+  });
+
+  it('emits the run-of-one fallback fragment without `parts` when it is the message’s only visible part', () => {
+    const base = 1_000_000_000;
+    // A hidden `plan_enter` part renders nothing, so the message's visible count
+    // is one: the run of one is the whole message, and the fallback re-emits the
+    // unchanged item with no `parts`, exactly as it rendered before condensing.
+    const messages = [
+      {
+        ...assistantToolOnlyMessageAt('msg_hidden_lone', base, []),
+        parts: [toolPart('hp1', 'plan_enter'), toolPart('hr1')],
+      },
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['msg_hidden_lone']);
     const lone = condensed.find(item => item.type === 'message');
     expect(lone?.type === 'message' ? lone.parts : undefined).toBeUndefined();
   });
@@ -811,8 +1009,45 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
 
-    expect(keysOf(condensed)).toEqual(['time:msg_lone', 'msg_lone']);
+    expect(keysOf(condensed)).toEqual(['msg_lone']);
     expect(condensed.some(item => item.type === 'tool-run')).toBe(false);
+  });
+
+  it('keeps the burst marker when a marked message opens a run of one', () => {
+    const base = 1_000_000_000;
+    // The first message of the page opens a burst, and its only visible part is
+    // a lone tool call: the run collapses back to the message fragment, which
+    // must still carry the marker or the reader loses the timestamp.
+    const messages = [assistantToolOnlyMessageAt('msg_lone_marked', base, ['t1'])];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    expect(keysOf(condensed)).toEqual(['msg_lone_marked']);
+    const lone = condensed.find(item => item.type === 'message');
+    expect(lone?.type === 'message' ? lone.timeMarker : undefined).toEqual({
+      created: base,
+      dayChanged: false,
+    });
+  });
+
+  it('keeps the burst marker when a lone tool run follows a hidden message', () => {
+    const base = 1_000_000_000;
+    // A marked resumption whose only visible part is a lone tool call: the run
+    // of one falls back to the message fragment and keeps its marker.
+    const messages = [
+      userMessageAt('msg_open', base),
+      assistantToolOnlyMessageAt('msg_resume', base + TRANSCRIPT_TIME_MARKER_GAP_MS, ['t1']),
+    ];
+
+    const condensed = condenseTranscriptToolRuns(mergeSessionTranscript(messages, []));
+
+    const resumed = condensed.find(
+      item => item.type === 'message' && item.message.info.id === 'msg_resume'
+    );
+    expect(resumed?.type === 'message' ? resumed.timeMarker : undefined).toEqual({
+      created: base + TRANSCRIPT_TIME_MARKER_GAP_MS,
+      dayChanged: false,
+    });
   });
 
   it('keeps a failed last tool call in the run so the row can show its status', () => {
@@ -869,7 +1104,7 @@ describe('condenseTranscriptToolRuns', () => {
 
     const condensed = condenseTranscriptToolRuns(mergeSessionTranscript([planThenRead], []));
 
-    expect(keysOf(condensed)).toEqual(['time:msg_plan_lone', 'msg_plan_lone']);
+    expect(keysOf(condensed)).toEqual(['msg_plan_lone']);
     expect(condensed.some(item => item.type === 'tool-run')).toBe(false);
   });
 
@@ -911,12 +1146,7 @@ describe('condenseTranscriptToolRuns', () => {
     const transcript = mergeSessionTranscript(messages, []);
     const condensed = condenseTranscriptToolRuns(transcript);
 
-    expect(keysOf(condensed)).toEqual([
-      'time:msg_tool_a',
-      'tool-run:ta1',
-      'msg_failed',
-      'tool-run:tc1',
-    ]);
+    expect(keysOf(condensed)).toEqual(['tool-run:ta1', 'msg_failed', 'tool-run:tc1']);
     const failedItem = condensed.find(item => keysOf([item])[0] === 'msg_failed');
     expect(failedItem?.type).toBe('message');
     for (const item of condensed) {

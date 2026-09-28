@@ -52,9 +52,6 @@ async function runTests() {
   });
 
   try {
-    // ===========================================
-    // Step 1: Initialize Project
-    // ===========================================
     log('\n=== Step 1: Initialize Project ===');
     const initResult = await initProject(testId);
     log('Project initialized', initResult);
@@ -62,9 +59,6 @@ async function runTests() {
 
     const gitUrl = initResult.git_url;
 
-    // ===========================================
-    // Step 2: Generate Tokens
-    // ===========================================
     log('\n=== Step 2: Generate Tokens ===');
 
     const fullTokenResult = await generateGitToken(testId, 'full');
@@ -83,9 +77,6 @@ async function runTests() {
     });
     logSuccess('Read-only token generated');
 
-    // ===========================================
-    // Step 3: Clone with Full Token
-    // ===========================================
     log('\n=== Step 3: Clone with Full Token ===');
 
     const cloneDir1 = join(tempDir, 'clone1');
@@ -102,9 +93,6 @@ async function runTests() {
     }
     logSuccess(`Clone with full token succeeded, ${files1.length} files`);
 
-    // ===========================================
-    // Step 4: Make Changes and Push with Full Token
-    // ===========================================
     log('\n=== Step 4: Push Changes with Full Token ===');
 
     const testFileName = 'test-file.txt';
@@ -119,12 +107,8 @@ async function runTests() {
 
     logSuccess('Push with full token succeeded');
 
-    // ===========================================
-    // Step 5: Clone Again to Verify Push
-    // ===========================================
     log('\n=== Step 5: Clone Again to Verify Push ===');
 
-    // Generate a fresh token for the second clone
     const fullTokenResult2 = await generateGitToken(testId, 'full');
     const fullTokenUrl2 = buildGitUrlWithToken(gitUrl, fullTokenResult2.token);
 
@@ -147,12 +131,8 @@ async function runTests() {
 
     logSuccess('Second clone verified - push was persisted');
 
-    // ===========================================
-    // Step 6: Clone with Read-Only Token
-    // ===========================================
     log('\n=== Step 6: Clone with Read-Only Token ===');
 
-    // Generate fresh read-only token
     const roTokenResult2 = await generateGitToken(testId, 'ro');
     const roTokenUrl = buildGitUrlWithToken(gitUrl, roTokenResult2.token);
 
@@ -165,9 +145,6 @@ async function runTests() {
     log('Read-only clone contents', { files: files3 });
     logSuccess('Clone with read-only token succeeded');
 
-    // ===========================================
-    // Step 7: Attempt Push with Read-Only Token (Should Fail)
-    // ===========================================
     log('\n=== Step 7: Attempt Push with Read-Only Token (Should Fail) ===');
 
     const testFileName2 = 'should-not-exist.txt';
@@ -178,14 +155,12 @@ async function runTests() {
     runGitCommand(cloneDir3, `git add "${testFileName2}"`);
     runGitCommand(cloneDir3, `git commit -m "Should fail push"`);
 
-    // This should fail - read-only token cannot push
     const pushError = runGitCommand(
       cloneDir3,
       'git push origin main 2>&1 || true',
       false // We handle the error ourselves with || true
     );
 
-    // Check if push actually failed
     if (
       pushError.includes('Forbidden') ||
       pushError.includes('403') ||
@@ -194,7 +169,6 @@ async function runTests() {
     ) {
       logSuccess('Push with read-only token correctly rejected');
     } else {
-      // Try another verification: clone again and check if file exists
       const fullTokenResult3 = await generateGitToken(testId, 'full');
       const fullTokenUrl3 = buildGitUrlWithToken(gitUrl, fullTokenResult3.token);
 
@@ -212,9 +186,6 @@ async function runTests() {
       }
     }
 
-    // ===========================================
-    // All Tests Passed
-    // ===========================================
     console.log('\n' + '='.repeat(50));
     console.log('ALL TESTS PASSED');
     console.log('='.repeat(50));
@@ -239,7 +210,6 @@ async function runTests() {
   }
 }
 
-// Run tests
 runTests().catch(error => {
   logError('Unhandled error', error);
   process.exit(1);

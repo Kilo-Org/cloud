@@ -29,9 +29,16 @@ const RELATIVE_TIME_UNITS: readonly { unit: Intl.RelativeTimeFormatUnit; seconds
  * loads the Hermes polyfill and active locale on demand. Sub-minute ages use
  * the catalog's `common.justNow` because RelativeTimeFormat has no sub-minute
  * bucket.
+ *
+ * `nowMs` is the caller's clock. A relative label must be derived from a value
+ * the render traces (the ticker's `now`), never from a live `Date.now()` read:
+ * React Compiler is enabled for this app and memoizes render expressions
+ * against their traced inputs, so a label computed from an untracked clock is
+ * cached with the row's unchanged props and the on-screen text freezes
+ * (conversation list, 2026-09-16). Callers that pass `nowMs` own the tick.
  */
-function timeAgo(date: Date, locale?: string): string {
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+function timeAgo(date: Date, locale?: string, nowMs: number = Date.now()): string {
+  const seconds = Math.floor((nowMs - date.getTime()) / 1000);
   if (seconds < 60) {
     return i18n.t('common.justNow');
   }

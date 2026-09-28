@@ -81,17 +81,12 @@ export function diagnosticCause(value: string): string {
     : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, CONTROL_DIAGNOSTIC_STRING_MAX_LENGTH);
 }
 
-const DELTA_PROGRESS_EVENTS = new Set([
-  'socket_frame_received',
-  'forward_enqueued',
-  'forward_started',
-  'forward_settled',
-]);
+const DELTA_PROGRESS_EVENTS = new Set(['socket_frame_received']);
 
 export function logControlDiagnostic(
   event: string,
   fields: ControlDiagnosticFields,
-  level: 'info' | 'warn' = 'info',
+  level: 'info' | 'warn' | 'error' = 'info',
   options?: ControlDiagnosticOptions
 ): void {
   try {
@@ -99,7 +94,7 @@ export function logControlDiagnostic(
       level === 'info' &&
       fields.eventType === 'message.part.delta' &&
       (DELTA_PROGRESS_EVENTS.has(event) ||
-        (event === 'forward_result' && fields.result === 'delivered' && fields.applied === true) ||
+        (event === 'forward_run' && fields.result === 'delivered' && fields.applied === true) ||
         (event === 'session_event_result' && fields.applied === true))
     ) {
       return;

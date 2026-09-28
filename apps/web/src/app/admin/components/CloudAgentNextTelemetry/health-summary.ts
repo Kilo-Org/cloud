@@ -13,6 +13,7 @@ type OperationalHealthSummary = {
 
 type ObservedHealthSummary = OperationalHealthSummary & {
   platformFailures: number;
+  providerFailures: number;
   userFailures: number;
   unknownFailures: number;
 };
@@ -39,6 +40,8 @@ const FAILURE_REASON_LABELS = {
   managed_provider_authentication: 'Managed provider authentication',
   managed_model_configuration: 'Managed model configuration',
   provider_unavailable: 'Provider unavailable',
+  provider_disconnect: 'Provider connection lost',
+  gateway_unavailable: 'Gateway temporarily unavailable',
   request_timeout: 'Request timed out',
   assistant_invalid_request: 'Assistant invalid request',
   assistant_context_limit: 'Assistant context limit',
@@ -89,6 +92,7 @@ export type ObservedHealthOutcomeKind =
   | 'interrupted'
   | 'user'
   | 'platform'
+  | 'provider'
   | 'unknown';
 
 export function getObservedHealthStats(summary: ObservedHealthSummary) {
@@ -98,6 +102,7 @@ export function getObservedHealthStats(summary: ObservedHealthSummary) {
     { kind: 'interrupted', count: summary.interruptedRuns },
     { kind: 'user', count: summary.userFailures },
     { kind: 'platform', count: summary.platformFailures },
+    { kind: 'provider', count: summary.providerFailures },
     { kind: 'unknown', count: summary.unknownFailures },
   ] satisfies Array<{ kind: ObservedHealthOutcomeKind; count: number }>;
   const observedOutcomes = outcomes.reduce((total, outcome) => total + outcome.count, 0);

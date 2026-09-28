@@ -321,13 +321,13 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     return (root.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
   }
 
-  it('pads the bar by 24 points at a zero inset', () => {
-    expect(rootPaddingBottom()).toBe(24);
+  it('floors the bar padding at 8 points at a zero inset', () => {
+    expect(rootPaddingBottom()).toBe(8);
   });
 
-  it('adds the system inset to the 24-point base padding', () => {
+  it('clears the system inset when it exceeds the 8-point floor', () => {
     insets.bottom = 34;
-    expect(rootPaddingBottom()).toBe(58);
+    expect(rootPaddingBottom()).toBe(34);
   });
 
   it('renders in-flow, not as an overlay over the list', () => {
@@ -369,7 +369,7 @@ describe('PrDiffFloatingActions side insets (landscape)', () => {
     // portrait untouched (inline style wins over className).
     expect(style.paddingLeft).toBeUndefined();
     expect(style.paddingRight).toBeUndefined();
-    expect(style.paddingBottom).toBe(24);
+    expect(style.paddingBottom).toBe(8);
   });
 
   it('clears the sensor housing with the landscape side insets', () => {
@@ -381,6 +381,6 @@ describe('PrDiffFloatingActions side insets (landscape)', () => {
     expect(style.paddingRight).toBe(59);
     // The card shrink is horizontal-only: the paddingBottom that feeds the
     // measured onLayout height (and `prDiffListBottomPadding`) is unchanged.
-    expect(style.paddingBottom).toBe(24);
+    expect(style.paddingBottom).toBe(8);
   });
 });

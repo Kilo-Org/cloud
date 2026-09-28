@@ -4,21 +4,35 @@ import {
   TRANSITION_LOG_MAX_ROWS,
   appendTransition,
   emptyTransitionLog,
-  physicalTransition,
   sessionStateTransition,
   trimTransitionLog,
+  type TransitionRow,
 } from './transition-log.js';
 
 describe('transition log', () => {
   it('appends rows in order', () => {
-    const row = physicalTransition(10, 'stopped', 'creating', 'demand', null);
+    const row = {
+      at: 10,
+      kind: 'physical',
+      from: 'stopped',
+      to: 'creating',
+      cause: 'demand',
+      providerRef: null,
+    } satisfies TransitionRow;
     expect(appendTransition(emptyTransitionLog(), row)).toEqual([row]);
   });
 
   it('trims by row cap as a ring buffer', () => {
     let log = emptyTransitionLog();
     for (let i = 0; i < TRANSITION_LOG_MAX_ROWS + 5; i++) {
-      log = appendTransition(log, physicalTransition(i, 'stopped', 'creating', 'demand', null));
+      log = appendTransition(log, {
+        at: i,
+        kind: 'physical',
+        from: 'stopped',
+        to: 'creating',
+        cause: 'demand',
+        providerRef: null,
+      } satisfies TransitionRow);
     }
     expect(log).toHaveLength(TRANSITION_LOG_MAX_ROWS);
     expect(log[0]?.at).toBe(5);
@@ -29,8 +43,22 @@ describe('transition log', () => {
     const now = TRANSITION_LOG_MAX_AGE_MS + 50;
     const log = trimTransitionLog(
       [
-        physicalTransition(0, 'stopped', 'creating', 'demand', null),
-        physicalTransition(now, 'creating', 'running', 'confirmed', 'ref_1'),
+        {
+          at: 0,
+          kind: 'physical',
+          from: 'stopped',
+          to: 'creating',
+          cause: 'demand',
+          providerRef: null,
+        } satisfies TransitionRow,
+        {
+          at: now,
+          kind: 'physical',
+          from: 'creating',
+          to: 'running',
+          cause: 'confirmed',
+          providerRef: 'ref_1',
+        } satisfies TransitionRow,
       ],
       now
     );

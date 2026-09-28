@@ -7,6 +7,7 @@
       "instanceLifecycle": "La teva instància té una actualització",
       "scheduledAction": "Una acció programada té una actualització",
       "lowBalance": "El teu saldo necessita atenció",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Una troballa de seguretat necessita atenció",
       "activeAgentsGlanceable": "Els agents actius tenen una actualització"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Avís de saldo baix",
       "body": "El saldo de {{organizationName}} ha baixat per sota de ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nova troballa de seguretat ({{severity}})",

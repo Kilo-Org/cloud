@@ -3,9 +3,9 @@ import { type Href, useRouter } from 'expo-router';
 import { useCallback } from 'react';
 import { type GestureResponderEvent } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { openExternalUrl } from '@/lib/external-link';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
@@ -38,7 +38,7 @@ function buildPrReviewHref(href: string): Href | null {
 
 export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
   const { showActionSheetWithOptions } = useActionSheet();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const router = useRouter();
   const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
@@ -55,11 +55,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       const sheet = buildPrLinkTapActionSheet();
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.prLinkActions'),
           message: sheetMessage(href),
-          containerStyle: { paddingBottom: bottom },
         },
         index => {
           const action = getSelectedChatLinkAction(sheet, index);
@@ -81,7 +81,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       );
       return true;
     },
-    [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
+    [prReviewEnabled, router, showActionSheetWithOptions, t, themedSheet]
   );
 
   const handleLongPressLink = useCallback(
@@ -91,11 +91,11 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
       const sheet = buildChatLinkActionSheet({ isPrLink });
       showActionSheetWithOptions(
         {
+          ...themedSheet,
           options: sheet.options,
           cancelButtonIndex: sheet.cancelButtonIndex,
           title: t('agentChat.chatLink.linkActions'),
           message: sheetMessage(href),
-          containerStyle: { paddingBottom: bottom },
         },
         index => {
           const action = getSelectedChatLinkAction(sheet, index);
@@ -112,7 +112,7 @@ export function ChatMarkdownText(props: Readonly<ChatMarkdownTextProps>) {
         }
       );
     },
-    [bottom, prReviewEnabled, router, showActionSheetWithOptions, t]
+    [prReviewEnabled, router, showActionSheetWithOptions, t, themedSheet]
   );
 
   // Code fences in the transcript copy through the shared clipboard helper, so

@@ -44,6 +44,21 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+// The picker list renders through FlashList, whose rows/header/empty content
+// come through this mock exactly as the real list renders them (the real
+// module is not loadable under the react-native mock above).
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: <T,>(props: ListProps<T>) =>
+    createElement(
+      'FlashList',
+      props,
+      props.ListHeaderComponent,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      ),
+      props.data.length > 0 ? null : props.ListEmptyComponent
+    ),
+}));
 vi.mock('expo-router', () => ({
   useRouter: () => ({
     back: () => {

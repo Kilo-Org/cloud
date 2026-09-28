@@ -22,6 +22,53 @@ function stripQuery(url: unknown): string {
   return idx === -1 ? url : url.slice(0, idx);
 }
 
+/** A `scheme://host[:port]` origin. */
+const URL_ORIGIN_PATTERN = /\b[a-z][\da-z+.-]*:\/\/[^\s/]+/giu;
+
+/** An absolute path of two or more segments, optionally with `:line:col`. */
+const ABSOLUTE_PATH_PATTERN = /(?:[A-Za-z]:)?(?:\/[\w.@+-]+){2,}(?::\d+){0,2}\/?/gu;
+
+/**
+ * A `host:port` run: an IPv4 literal, `localhost`, or the Java-style
+ * `/host:port` form a JVM connect failure prints.
+ *
+ * A bare `word:digits` run is deliberately not a host:port. It is also how a
+ * source position reads (`Bar.java:12`) and how a clock reads (`12:30`), and
+ * folding either into `<host>` erases the one value that separates two native
+ * defects, so their fallback fingerprints merge — the merge this policy exists
+ * to prevent. Only a token that can only be an address is normalized, so a bare
+ * dotted name (`example.com:443`) is left alone rather than mistaken for a
+ * `file.ext:line`.
+ *
+ * The leading group consumes the character before the run (or matches the start
+ * of the string), so the engine only begins a host scan at a token boundary and
+ * never inside a word run. The old unanchored `\/?(?:[\w-]+\.)*[\w-]+:\d` form
+ * restarted a full host scan at every character of a long word run, which is
+ * quadratic: a 32k-character exception message spent seconds on the JS thread
+ * inside `beforeSend`. Each host alternative is one character class with no
+ * nested quantifier, and the leading character is kept by the replacement
+ * (`$1`).
+ */
+const HOST_PORT_PATTERN = /(^|[^\w.-])(?:\/[\w.-]+|localhost|(?:\d{1,3}\.){3}\d{1,3}):\d{1,5}\b/gu;
+
+/** A `?query` run: a `?` followed by non-space key/value text. */
+const QUERY_FRAGMENT_PATTERN = /\?[^\s]+/gu;
+
+/**
+ * Remove the values that identify the machine or the build rather than the
+ * defect: a URL's scheme and host, an absolute build/worktree path, a
+ * `host:port` pair, and a query string. Used only to build a fingerprint
+ * fallback, never as the message the issue shows: the goal is that two events
+ * of one defect produce one group key even though their paths and ports differ.
+ */
+function stripVolatileValues(message: string): string {
+  return message
+    .replace(URL_ORIGIN_PATTERN, '<host>')
+    .replace(ABSOLUTE_PATH_PATTERN, '<path>')
+    .replace(HOST_PORT_PATTERN, '$1<host>')
+    .replace(QUERY_FRAGMENT_PATTERN, '');
+}
+
 /** One run of 20+ consecutive base64url characters (A-Z a-z 0-9 - _). */
 const TOKEN_RUN_PATTERN = /[A-Za-z0-9_-]{20,}/g;
 
@@ -138,6 +185,19 @@ function redactTokens(
 }
 
 /**
+ * The context key the network reporter stores a parsed tRPC error body under
+ * (see `network-errors.ts`). The value is free-form payload, so
+ * {@link scrubEvent} token-scrubs it like extra error data. It must not be the
+ * synthesized exception's class name: `extraErrorDataIntegration` writes a
+ * thrown error's own properties under `contexts[error.name]`, so a payload
+ * under `NetworkError` is replaced with `{}` before `beforeSend` ever runs.
+ */
+export const NETWORK_BODY_CONTEXT = 'network.body';
+
+/** Context names whose value is app-attached payload and must be token-scrubbed. */
+const PAYLOAD_CONTEXT_NAMES: readonly string[] = [NETWORK_BODY_CONTEXT];
+
+/**
  * Names of the thrown errors in an event, i.e. the context keys that
  * `extraErrorDataIntegration` writes a thrown error's own properties under
  * (see lib/sentry-init.ts). Its data is free-form and must be token-scrubbed;
@@ -165,17 +225,92 @@ function exceptionContextNames(event: Record<string, unknown>): string[] {
 }
 
 /**
+ * Every context name whose value must be token-scrubbed: the app's payload
+ * contexts ({@link PAYLOAD_CONTEXT_NAMES}) plus the thrown-error names
+ * {@link exceptionContextNames} finds. Structured contexts stay out.
+ */
+function redactedContextNames(event: Record<string, unknown>): string[] {
+  return [...PAYLOAD_CONTEXT_NAMES, ...exceptionContextNames(event)];
+}
+
+/** The string at `key`, or undefined when it is absent or not a string. */
+function stringField(value: Record<string, unknown>, key: string): string | undefined {
+  const field = value[key];
+  return typeof field === 'string' ? field : undefined;
+}
+
+/** The first `exception.values` entry, or undefined when there is none. */
+function firstExceptionValue(event: Record<string, unknown>): Record<string, unknown> | undefined {
+  const exception = event.exception;
+  if (exception == null || typeof exception !== 'object') {
+    return undefined;
+  }
+  const values = (exception as Record<string, unknown>).values;
+  if (!Array.isArray(values) || values.length === 0) {
+    return undefined;
+  }
+  const [first] = values;
+  return first != null && typeof first === 'object'
+    ? (first as Record<string, unknown>)
+    : undefined;
+}
+
+/** True when the event already carries an app-set fingerprint. */
+function hasFingerprint(event: Record<string, unknown>): boolean {
+  const fingerprint = event.fingerprint;
+  return Array.isArray(fingerprint) && fingerprint.length > 0;
+}
+
+/**
+ * The longest exception message {@link fallbackFingerprint} reads.
+ *
+ * `beforeSend` runs on the JS thread, and an exception message is unbounded (a
+ * server error body can be megabytes). A fingerprint only needs enough of the
+ * message to name the defect, so the volatile-value patterns are applied to
+ * this prefix rather than to the whole message; that bounds the work
+ * regardless of the patterns' cost and keeps `beforeSend` off the critical
+ * path.
+ */
+export const FINGERPRINT_MESSAGE_LIMIT = 512;
+
+/**
+ * The fallback fingerprint for an event that sets none: the exception class
+ * plus its message with the volatile values removed and token-shaped runs
+ * redacted. Sentry's default groups by the stack, whose absolute build path
+ * differs per worktree, so one defect became one issue per worktree; this keeps
+ * it one, while the class and message still separate different defects.
+ */
+function fallbackFingerprint(event: Record<string, unknown>): string[] | undefined {
+  const exception = firstExceptionValue(event);
+  if (exception === undefined) {
+    return undefined;
+  }
+  const message = stringField(exception, 'value') ?? stringField(event, 'message');
+  if (message === undefined || message.length === 0) {
+    return undefined;
+  }
+  return [
+    stringField(exception, 'type') ?? 'Error',
+    redactString(stripVolatileValues(message.slice(0, FINGERPRINT_MESSAGE_LIMIT)), false),
+  ];
+}
+
+/**
  * Scrub a Sentry event before it is sent.
  *
  * - Strips query strings from request URL and contexts.response URL.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
- *   any depth in `event.extra`, `event.tags`, and the exception-name context
+ *   any depth in `event.extra`, `event.tags`, the app's payload context
+ *   ({@link NETWORK_BODY_CONTEXT}), and the exception-name context
  *   `extraErrorDataIntegration` attaches. A word-chain run stays only at an
  *   app-set identifier path (see {@link IDENTIFIER_PATHS}); anywhere else a
  *   word-chain secret is redacted on shape alone. Sentry's structured contexts
  *   are left intact: their identifiers trip the token heuristic without holding
  *   secrets.
+ * - Gives an event with no fingerprint the fallback {@link fallbackFingerprint},
+ *   so a volatile build path, host, or port inside the message or the stack
+ *   cannot split one defect into many issues.
  */
 export function scrubEvent<T>(event: T): T {
   try {
@@ -202,7 +337,7 @@ export function scrubEvent<T>(event: T): T {
           resp.url = stripQuery(resp.url);
         }
       }
-      for (const name of exceptionContextNames(e)) {
+      for (const name of redactedContextNames(e)) {
         if (name in ctx) {
           ctx[name] = redactValue(ctx[name], new WeakMap(), []);
         }
@@ -223,6 +358,14 @@ export function scrubEvent<T>(event: T): T {
     }
     if ('tags' in e) {
       e.tags = redactTokens(e.tags as Record<string, unknown> | undefined, 'tags');
+    }
+
+    // Fingerprint fallback. Only fills a gap: an app-set fingerprint is kept.
+    if (!hasFingerprint(e)) {
+      const fallback = fallbackFingerprint(e);
+      if (fallback !== undefined) {
+        e.fingerprint = fallback;
+      }
     }
 
     return event;

@@ -7,13 +7,22 @@ jest.mock('@/lib/tokens', () => ({ validateAuthorizationHeader: jest.fn() }));
 import { checkRateLimit } from '@vercel/firewall';
 import { captureMessage } from '@sentry/nextjs';
 import { validateAuthorizationHeader } from '@/lib/tokens';
-import type { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { gatewayRateLimitKey, isGatewayAccountRateLimited } from './gateway-account-rate-limit';
 
 const mockCheckRateLimit = jest.mocked(checkRateLimit);
 const mockCaptureMessage = jest.mocked(captureMessage);
 const mockValidateAuthorizationHeader = jest.mocked(validateAuthorizationHeader);
-const request = {} as NextRequest;
+const request = new NextRequest('https://gateway.example.com/api/gateway/chat/completions', {
+  headers: {
+    authorization: 'Bearer token',
+    cookie: 'session=value',
+    host: 'gateway.example.com',
+    'x-forwarded-for': '192.0.2.1',
+    'x-real-ip': '192.0.2.1',
+    'x-unrelated-header': 'value',
+  },
+});
 
 const authed = (token: string) => new Headers({ authorization: `Bearer ${token}` });
 
@@ -71,9 +80,50 @@ describe('isGatewayAccountRateLimited', () => {
 
     await isGatewayAccountRateLimited(request, 'user-123');
 
+    expect(mockCheckRateLimit).toHaveBeenCalledWith('gateway-inference', {
+      headers: {
+        host: 'gateway.example.com',
+        'x-forwarded-for': '192.0.2.1',
+        'x-real-ip': '192.0.2.1',
+      },
+      rateLimitKey: 'gateway-inference:user-123',
+    });
+  });
+
+  it('uses empty IP headers when Vercel does not provide them', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    const requestWithoutIp = new NextRequest(
+      'https://gateway.example.com/api/gateway/chat/completions',
+      { headers: { host: 'gateway.example.com' } }
+    );
+
+    await isGatewayAccountRateLimited(requestWithoutIp, 'user-123');
+
     expect(mockCheckRateLimit).toHaveBeenCalledWith(
       'gateway-inference',
-      expect.objectContaining({ rateLimitKey: 'gateway-inference:user-123' })
+      expect.objectContaining({
+        headers: {
+          host: 'gateway.example.com',
+          'x-forwarded-for': '',
+          'x-real-ip': '',
+        },
+      })
+    );
+  });
+
+  it('uses the request URL when no host header is present', async () => {
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    const requestWithoutHost = new NextRequest(
+      'https://gateway.example.com/api/gateway/chat/completions'
+    );
+
+    await isGatewayAccountRateLimited(requestWithoutHost, 'user-123');
+
+    expect(mockCheckRateLimit).toHaveBeenCalledWith(
+      'gateway-inference',
+      expect.objectContaining({
+        headers: expect.objectContaining({ host: 'gateway.example.com' }),
+      })
     );
   });
 

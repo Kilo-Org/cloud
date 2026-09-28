@@ -62,7 +62,7 @@ import {
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import { WorktreeChangesDrawer } from './WorktreeChanges';
+import { WorktreeChangesView } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { WorktreeReviewDialog } from './WorktreeReviewDialog';
@@ -223,9 +223,15 @@ export default function CloudChatPage({
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
   const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
   const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
-  const [changesDrawerSessionId, setChangesDrawerSessionId] = useState<string | null>(null);
-  const changesDrawerFocusTargetRef = useRef<HTMLElement | 'workspace-tab' | null>(null);
+  const [changesViewSessionId, setChangesViewSessionId] = useState<string | null>(null);
+  const changesViewFocusTargetRef = useRef<HTMLElement | null>(null);
+  const changesViewOpenedTabRef = useRef<WorkspaceTabId | null>(null);
   const activeWorkspaceTabRef = useRef<HTMLButtonElement | null>(null);
+  const closeChangesView = useCallback(() => {
+    changesViewOpenedTabRef.current = null;
+    changesViewFocusTargetRef.current = null;
+    setChangesViewSessionId(null);
+  }, []);
 
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
@@ -235,14 +241,13 @@ export default function CloudChatPage({
     setChildSessionStack([]);
     preparationDrawerFocusTargetRef.current = null;
     setPreparationDrawerAttemptId(null);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
+    closeChangesView();
     if (sessionIdFromParams) {
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     } else {
       manager.destroy();
     }
-  }, [sessionIdFromParams, manager]);
+  }, [sessionIdFromParams, manager, closeChangesView]);
 
   // -- Manager atoms --------------------------------------------------------
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
@@ -324,7 +329,7 @@ export default function CloudChatPage({
     isCurrentSession &&
     canOpenWorktreeChanges(sessionId, isReadOnly) &&
     fetchedSessionData?.organizationId === (organizationId ?? null);
-  const changesDrawerOpen = canOpenChanges && changesDrawerSessionId === sessionId;
+  const changesViewOpen = canOpenChanges && changesViewSessionId === sessionId;
   const fileScope = JSON.stringify([currentUserId, organizationId, sessionIdFromParams, sessionId]);
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
@@ -374,9 +379,24 @@ export default function CloudChatPage({
   }, [sessionIdFromParams]);
 
   useEffect(() => {
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-  }, [sessionId, currentUserId, organizationId, canOpenChanges]);
+    closeChangesView();
+  }, [sessionId, currentUserId, organizationId, canOpenChanges, closeChangesView]);
+
+  useEffect(() => {
+    const openedTab = changesViewOpenedTabRef.current;
+    if (!changesViewOpen || openedTab === null || activeWorkspaceTabId === openedTab) return;
+    closeChangesView();
+  }, [activeWorkspaceTabId, changesViewOpen, closeChangesView]);
+
+  const previousChangesViewOpenRef = useRef(false);
+  useEffect(() => {
+    const wasOpen = previousChangesViewOpenRef.current;
+    previousChangesViewOpenRef.current = changesViewOpen;
+    if (!wasOpen || changesViewOpen) return;
+    const target = changesViewFocusTargetRef.current;
+    changesViewFocusTargetRef.current = null;
+    if (target?.isConnected) target.focus({ preventScroll: true });
+  }, [changesViewOpen]);
 
   // -- Session models -------------------------------------------------------
   const sessionModels = useSessionModels({
@@ -794,22 +814,13 @@ export default function CloudChatPage({
     }
   };
 
-  const handleSelectWorktreeFile = useCallback(
-    (path: string) => {
-      if (!canOpenChanges) return;
-      changesDrawerFocusTargetRef.current = 'workspace-tab';
-      setWorkspaceTabs(state => openFileTab(state, path));
-      setChangesDrawerSessionId(null);
-    },
-    [canOpenChanges]
-  );
-
   const handleReviewAccepted = useCallback(
     (destinationKiloSessionId: string) => {
+      closeChangesView();
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
       openSession(destinationKiloSessionId);
     },
-    [openSession]
+    [closeChangesView, openSession]
   );
   const review = useWorktreeReview({
     userId: currentUserId,
@@ -862,6 +873,7 @@ export default function CloudChatPage({
     if (!source) return;
     review.setOpen(false);
     if (source.sessionId === sessionIdFromParams && canOpenChanges) {
+      closeChangesView();
       setWorkspaceTabs(state =>
         setFileTabMode(openFileTab(state, comment.anchor.path), comment.anchor.path, 'diff')
       );
@@ -983,16 +995,18 @@ export default function CloudChatPage({
     [manager]
   );
 
-  const handleOpenTopLevelChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
-    const activeElement = document.activeElement;
-    childSessionDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    preparationDrawerFocusTargetRef.current = null;
-    setPreparationDrawerAttemptId(null);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-    setChildSessionStack([entry]);
-  }, []);
+  const handleOpenTopLevelChildSession = useCallback(
+    (entry: ChildSessionDrawerEntry) => {
+      const activeElement = document.activeElement;
+      childSessionDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      closeChangesView();
+      setChildSessionStack([entry]);
+    },
+    [closeChangesView]
+  );
 
   const handleOpenNestedChildSession = useCallback((entry: ChildSessionDrawerEntry) => {
     setChildSessionStack(currentStack => [...currentStack, entry]);
@@ -1014,16 +1028,18 @@ export default function CloudChatPage({
     focusTarget.focus();
   }, []);
 
-  const handleOpenPreparationDetails = useCallback((attemptId: string) => {
-    const activeElement = document.activeElement;
-    preparationDrawerFocusTargetRef.current =
-      activeElement instanceof HTMLElement ? activeElement : null;
-    childSessionDrawerFocusTargetRef.current = null;
-    setChildSessionStack([]);
-    changesDrawerFocusTargetRef.current = null;
-    setChangesDrawerSessionId(null);
-    setPreparationDrawerAttemptId(attemptId);
-  }, []);
+  const handleOpenPreparationDetails = useCallback(
+    (attemptId: string) => {
+      const activeElement = document.activeElement;
+      preparationDrawerFocusTargetRef.current =
+        activeElement instanceof HTMLElement ? activeElement : null;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      closeChangesView();
+      setPreparationDrawerAttemptId(attemptId);
+    },
+    [closeChangesView]
+  );
 
   const handlePreparationDrawerOpenChange = useCallback((open: boolean) => {
     if (!open) setPreparationDrawerAttemptId(null);
@@ -1039,28 +1055,21 @@ export default function CloudChatPage({
 
   const handleToggleChanges = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      changesDrawerFocusTargetRef.current = event.currentTarget;
+      changesViewFocusTargetRef.current = event.currentTarget;
       childSessionDrawerFocusTargetRef.current = null;
       setChildSessionStack([]);
       preparationDrawerFocusTargetRef.current = null;
       setPreparationDrawerAttemptId(null);
-      setChangesDrawerSessionId(current => (current === sessionId ? null : sessionId));
+      if (changesViewOpen) {
+        changesViewOpenedTabRef.current = null;
+        setChangesViewSessionId(null);
+      } else {
+        changesViewOpenedTabRef.current = activeWorkspaceTabId;
+        setChangesViewSessionId(sessionId);
+      }
     },
-    [sessionId]
+    [activeWorkspaceTabId, changesViewOpen, sessionId]
   );
-
-  const handleChangesDrawerOpenChange = useCallback((open: boolean) => {
-    if (!open) setChangesDrawerSessionId(null);
-  }, []);
-
-  const handleChangesDrawerCloseAutoFocus = useCallback((event: Event) => {
-    const target = changesDrawerFocusTargetRef.current;
-    const focusTarget = target === 'workspace-tab' ? activeWorkspaceTabRef.current : target;
-    changesDrawerFocusTargetRef.current = null;
-    if (!focusTarget?.isConnected) return;
-    event.preventDefault();
-    focusTarget.focus();
-  }, []);
 
   // Surface the session's custom agents plus the current visible profile
   // agents to the chat picker. `runtimeAgents` are the agents active when the
@@ -1381,7 +1390,7 @@ export default function CloudChatPage({
       sessionInfoTriggerRef={sessionInfoTriggerRef}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
-      changesOpen={changesDrawerOpen}
+      changesOpen={changesViewOpen}
       onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
       canForkToCloud={!isReadOnly && Boolean(fetchedSessionData?.cloudAgentSessionId)}
@@ -1482,6 +1491,8 @@ export default function CloudChatPage({
                         onSelectTab={handleSelectWorkspaceTab}
                         onCreateTerminal={handleCreateTerminalTab}
                         onCloseTerminal={handleCloseTerminalTab}
+                        onActivateTab={closeChangesView}
+                        selectionSuppressed={changesViewOpen}
                       />
                     )}
                   </div>
@@ -1494,12 +1505,8 @@ export default function CloudChatPage({
                   className="relative flex min-h-0 flex-1 flex-col"
                 >
                   <div
-                    inert={
-                      childSessionStack.length > 0 ||
-                      preparationDrawerAttemptId !== null ||
-                      changesDrawerOpen
-                    }
-                    className="flex min-h-0 flex-1 flex-col"
+                    inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                    className={changesViewOpen ? 'hidden' : 'flex min-h-0 flex-1 flex-col'}
                   >
                     <TabsContent
                       value={chatTabValue}
@@ -1741,7 +1748,7 @@ export default function CloudChatPage({
                         const active = activeWorkspaceTabId === tabId;
                         return (
                           <TabsContent key={tabId} value={tabId} className="m-0 min-h-0 flex-1">
-                            {active && (
+                            {active && !changesViewOpen && (
                               <WorktreeFilePane
                                 cloudAgentSessionId={sessionId}
                                 organizationId={organizationId}
@@ -1758,6 +1765,17 @@ export default function CloudChatPage({
                         );
                       })}
                   </div>
+                  {canOpenChanges && sessionId && (
+                    <WorktreeChangesView
+                      key={`${currentUserId}:${organizationId ?? 'personal'}:${sessionId}`}
+                      cloudAgentSessionId={sessionId}
+                      organizationId={organizationId}
+                      open={changesViewOpen}
+                      commentCounts={reviewCommentCounts}
+                      review={review.scope ? review.bindings : undefined}
+                      reviewScope={review.scope ?? undefined}
+                    />
+                  )}
                 </div>
               </Tabs>
             ) : (
@@ -1781,19 +1799,6 @@ export default function CloudChatPage({
               onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
               portalContainer={childSessionDrawerContainer}
             />
-            {canOpenChanges && sessionId && (
-              <WorktreeChangesDrawer
-                key={`${organizationId ?? 'personal'}:${sessionId}`}
-                cloudAgentSessionId={sessionId}
-                organizationId={organizationId}
-                open={changesDrawerOpen}
-                onOpenChange={handleChangesDrawerOpenChange}
-                onCloseAutoFocus={handleChangesDrawerCloseAutoFocus}
-                onSelectFile={handleSelectWorktreeFile}
-                portalContainer={childSessionDrawerContainer}
-                commentCounts={reviewCommentCounts}
-              />
-            )}
           </div>
         </SuggestionContextProvider>
       </PermissionContextProvider>

@@ -39,7 +39,7 @@ export interface BenchTaskScenario {
    */
   readonly minAnswerCheckPasses?: number;
   readonly mode: 'dangerous' | 'safe';
-  /** True when the scenario needs at least one ok eval exchange (an action, not a lookup). */
+  /** True when the scenario needs at least one ok action exchange (a state-changing browser call, not a lookup). */
   readonly requiresAction: boolean;
   readonly startUrl: string;
   /** Matches the target-tab option label for this scenario's tab. */

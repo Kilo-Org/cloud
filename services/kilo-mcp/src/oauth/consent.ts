@@ -488,6 +488,16 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
     }
     let redirectTo: string;
     try {
+      // The DCR client record's TTL is anchored at registration, but the grant
+      // this authorization is about to mint can start much later. Re-put the
+      // record here so `client:<id>` is anchored to the grant it serves and its
+      // session+margin lifetime (session-lifetime.ts) always outlives the
+      // session: without this a sign-in that starts more than the margin after
+      // registration would outlive its own record and be refused as
+      // `401 invalid_client`, which no MCP client re-authorizes on. Renewing
+      // before the code is minted keeps a renewal failure retryable, exactly
+      // like a failed completion.
+      await env.OAUTH_PROVIDER.updateClient(record.authRequest.clientId, {});
       ({ redirectTo } = await env.OAUTH_PROVIDER.completeAuthorization({
         request: record.authRequest,
         userId: record.kiloUserId,
@@ -510,11 +520,12 @@ async function handleOrgPicker(request: Request, env: Env, deps: ConsentDeps): P
         },
       }));
     } catch {
-      // The library could not mint the code. The record is 'approved' and would
-      // reject every future picker submit, so release it back to retryable
-      // 'pending' (keeping the paired identity) and let the same user retry.
-      // A concurrent completion/denial/expiry wins the guard: then the request
-      // really is over and the terminal error page is correct.
+      // The library could not mint the code, or the client record could not be
+      // renewed. The record is 'approved' and would reject every future picker
+      // submit, so release it back to retryable 'pending' (keeping the paired
+      // identity) and let the same user retry. A concurrent
+      // completion/denial/expiry wins the guard: then the request really is
+      // over and the terminal error page is correct.
       const released = await deps.store.releasePendingAuthorization(id, nowIso);
       return released
         ? renderRetry(

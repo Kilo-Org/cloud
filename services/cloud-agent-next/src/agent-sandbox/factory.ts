@@ -27,6 +27,12 @@ export function createAgentSandbox(
     }
     return new VercelAgentSandbox(metadata, config, runtimeContext);
   }
+  if (getSandboxProvider(metadata) === 'cloudflare-containers') {
+    throw new AgentSandboxUnavailableError(
+      'Cloudflare containers are not available on the legacy agent plane',
+      'capability_unavailable'
+    );
+  }
   return new CloudflareAgentSandbox(env, metadata);
 }
 

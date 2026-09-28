@@ -5,7 +5,11 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
-import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type {
+  GetWorktreeFileOutput,
+  WorktreeChangesSnapshot,
+  WorktreeFileRecord,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { FileDiffMetadata, SelectedLineRange } from '@pierre/diffs';
 import type {
   WorktreeReviewAnchor,
@@ -20,6 +24,9 @@ const { parsePatchFiles }: typeof import('@pierre/diffs') = require('@pierre/dif
 const {
   getWorktreeDiffExpansion,
 }: typeof import('./worktree-file-diff') = require('./worktree-file-diff');
+const {
+  verifyWorktreeReviewComment,
+}: typeof import('./worktree-review-verify') = require('./worktree-review-verify');
 const {
   MAX_WORKTREE_REVIEW_COMMENTS,
   MAX_WORKTREE_REVIEW_COMMENT_LENGTH,
@@ -833,6 +840,186 @@ describe('worktree review rebase', () => {
     assert.equal(next.length, 1);
     assert.equal(next[0]?.id, reviewed.id);
     assert.deepEqual(next[0]?.anchor.capture, reviewed.anchor.capture);
+  });
+});
+
+describe('worktree review verification', () => {
+  const reviewScope = {
+    userId: capture.userId,
+    organizationId: capture.organizationId,
+    workspaceScope: capture.workspaceScope,
+  };
+  const verificationHeader =
+    'diff --git a/file.txt b/file.txt\nindex 1234567..abcdef0 100644\n--- a/file.txt\n+++ b/file.txt\n';
+  const verificationPatch = `${verificationHeader}@@ -3 +3 @@\n-gamma\n+delta\n`;
+
+  function verificationFixture(current: string) {
+    const file: WorktreeFileRecord = {
+      schemaVersion: 1,
+      revision: 4,
+      path: 'file.txt',
+      diff: { status: 'available', patch: verificationPatch },
+      content: { status: 'available', source: 'current', text: current },
+    };
+    const snapshot: WorktreeChangesSnapshot = {
+      schemaVersion: 2,
+      capturedAt: '2026-09-01T11:00:00.000Z',
+      revision: 4,
+      comparison: capture.comparison,
+      files: [
+        {
+          path: 'file.txt',
+          revision: 4,
+          status: 'modified',
+          additions: 1,
+          deletions: 1,
+          tracked: true,
+          binary: false,
+          countsComplete: true,
+        },
+      ],
+      truncated: false,
+    };
+    return { file, snapshot };
+  }
+
+  function latestCapture(snapshot: WorktreeChangesSnapshot): WorktreeReviewCapture {
+    return {
+      ...reviewScope,
+      sourceCloudAgentSessionId: capture.sourceCloudAgentSessionId,
+      revision: snapshot.revision,
+      capturedAt: snapshot.capturedAt,
+      comparison: snapshot.comparison,
+    };
+  }
+
+  function staleVerificationComment(path = 'file.txt'): WorktreeReviewComment {
+    return {
+      id: 'stale',
+      anchor: {
+        capture,
+        path,
+        range: { side: 'additions', startLine: 1, endLine: 1 },
+        quote: {
+          source: 'validated-expanded-diff',
+          lines: [{ lineNumber: 1, kind: 'context', text: 'alpha\n' }],
+        },
+      },
+      text: 'Keep this line.',
+    };
+  }
+
+  function fileOutput(
+    file: WorktreeFileRecord,
+    snapshot: WorktreeChangesSnapshot
+  ): GetWorktreeFileOutput {
+    return {
+      status: 'available',
+      file,
+      capturedAt: snapshot.capturedAt,
+      comparison: snapshot.comparison,
+    };
+  }
+
+  it('applies a quote on an unchanged line outside the patch hunks where a patch-only search fails', async () => {
+    const { file, snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const reviewed = staleVerificationComment();
+    const parsed = parsePatchFiles(verificationPatch, undefined, true)[0]?.files[0];
+    assert.ok(parsed);
+    assert.equal(
+      rebaseWorktreeReviewComment(reviewed, latestCapture(snapshot), file, {
+        ...parsed,
+        name: file.path,
+        prevName: undefined,
+      }),
+      null
+    );
+    const result = await verifyWorktreeReviewComment({
+      comment: reviewed,
+      scope: reviewScope,
+      snapshot,
+      fetchFile: async () => fileOutput(file, snapshot),
+    });
+    assert.equal(result.status, 'applied');
+    if (result.status !== 'applied') assert.fail('Expected applied');
+    assert.deepEqual(result.comment.anchor.quote.lines, [
+      { lineNumber: 1, kind: 'context', text: 'alpha\n' },
+    ]);
+    assert.equal(result.comment.anchor.capture.revision, snapshot.revision);
+  });
+
+  it('reports unapplied when the quoted text changed', async () => {
+    const { file, snapshot } = verificationFixture('alpha2\nbeta\ndelta\n');
+    const result = await verifyWorktreeReviewComment({
+      comment: staleVerificationComment(),
+      scope: reviewScope,
+      snapshot,
+      fetchFile: async () => fileOutput(file, snapshot),
+    });
+    assert.equal(result.status, 'unapplied');
+  });
+
+  it('reports unapplied when the quoted text has multiple matches', async () => {
+    const { file, snapshot } = verificationFixture('alpha\nbeta\nalpha\ndelta\n');
+    file.diff = {
+      status: 'available',
+      patch: `${verificationHeader}@@ -3 +3 @@\n-gamma\n+alpha\n`,
+    };
+    const result = await verifyWorktreeReviewComment({
+      comment: staleVerificationComment(),
+      scope: reviewScope,
+      snapshot,
+      fetchFile: async () => fileOutput(file, snapshot),
+    });
+    assert.equal(result.status, 'unapplied');
+  });
+
+  it('reports unverified and keeps the comment when the file fetch fails', async () => {
+    const { snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const result = await verifyWorktreeReviewComment({
+      comment: staleVerificationComment(),
+      scope: reviewScope,
+      snapshot,
+      fetchFile: async () => {
+        throw new Error('Unavailable');
+      },
+    });
+    assert.equal(result.status, 'unverified');
+  });
+
+  it('reports unverified without fetching when the path is not listed', async () => {
+    const { file, snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const missing: WorktreeChangesSnapshot = { ...snapshot, files: [] };
+    let fetched = false;
+    const result = await verifyWorktreeReviewComment({
+      comment: staleVerificationComment(),
+      scope: reviewScope,
+      snapshot: missing,
+      fetchFile: async () => {
+        fetched = true;
+        return fileOutput(file, snapshot);
+      },
+    });
+    assert.equal(result.status, 'unverified');
+    assert.equal(fetched, false);
+  });
+
+  it('applies an identity match without fetching the file', async () => {
+    const { snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const reviewed = staleVerificationComment();
+    reviewed.anchor.capture = latestCapture(snapshot);
+    let fetched = false;
+    const result = await verifyWorktreeReviewComment({
+      comment: reviewed,
+      scope: reviewScope,
+      snapshot,
+      fetchFile: async () => {
+        fetched = true;
+        throw new Error('must not fetch');
+      },
+    });
+    assert.equal(result.status, 'applied');
+    assert.equal(fetched, false);
   });
 });
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "latency-ingest",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8816,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  // Cloudflare logpush ships the structured client_latency lines to Axiom.
+  "logpush": true,
+  "routes": [
+    {
+      "pattern": "latency.kiloapps.io",
+      "zone_name": "kiloapps.io",
+      "custom_domain": true,
+    },
+  ],
+  "vars": {
+    // Must never exceed the `version` in apps/mobile/app.config.ts, so the
+    // first release that carries the latency sampler is accepted; bump it in
+    // lockstep with the app version. A client without the sampler never POSTs,
+    // so this floor still rejects 1.0.10 and below.
+    "MIN_APP_VERSION": "1.0.11",
+  },
+  "ratelimits": [
+    {
+      "name": "LATENCY_RATE_LIMITER",
+      "namespace_id": "1004",
+      "simple": { "limit": 120, "period": 60 },
+    },
+  ],
+}

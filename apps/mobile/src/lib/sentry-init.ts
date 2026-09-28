@@ -5,8 +5,9 @@ import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { applySentryContext } from '@/lib/sentry-context';
-import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
+import { beforeSendScrubbedEvent } from '@/lib/telemetry/sentry-before-send';
+import { scrubBreadcrumb } from '@/lib/telemetry/sentry-scrub';
 
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -113,7 +114,9 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     ],
     enableNativeFramesTracking: false,
 
-    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
+    beforeSend: beforeSendScrubbedEvent as NonNullable<
+      Parameters<typeof Sentry.init>[0]
+    >['beforeSend'],
     beforeBreadcrumb: scrubBreadcrumb as NonNullable<
       Parameters<typeof Sentry.init>[0]
     >['beforeBreadcrumb'],

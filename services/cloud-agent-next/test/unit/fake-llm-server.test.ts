@@ -13,26 +13,27 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { streamEventSchema } from '../e2e/client.js';
 import {
   buildRealisticReasoning,
+  buildSeedFixture,
   extractLastUserMessageText,
   extractMultipartField,
+  isToolError,
   MAX_REALISTIC_CHARS,
   MAX_REALISTIC_PIECES,
   MAX_TOOL_STREAM_BYTES,
   parseDirective,
+  parseFileDirective,
   startFakeLlmServer,
   splitRealisticContent,
   stripKiloPromptWrapping,
+  toolCallId,
   type FakeLlmServerHandle,
 } from '../e2e/fake-llm-server.js';
+import { LOCAL_FAKE_LLM_ADMIN_TOKEN, resolveFakeAdminToken } from '../e2e/fake-llm-admin.js';
 import {
   findControlPlaneKiloRuntime,
   stopOwnedControlPlaneSandbox,
   type DockerCommandExecutor,
 } from '../e2e/sandbox-control.js';
-
-// ---------------------------------------------------------------------------
-// Pure-helper tests
-// ---------------------------------------------------------------------------
 
 describe('parseDirective', () => {
   it('returns null when the prefix is absent', () => {
@@ -165,9 +166,136 @@ describe('extractMultipartField', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// End-to-end HTTP tests against an ephemeral server
-// ---------------------------------------------------------------------------
+describe('parseFileDirective', () => {
+  it('parses write with literal contents, including colons', () => {
+    expect(parseFileDirective('write:turn-1:shared-checkout.txt:nonce:with:colons')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-1',
+        path: 'shared-checkout.txt',
+        contents: 'nonce:with:colons',
+      },
+    });
+  });
+
+  it('parses seed with a byte count and nonce', () => {
+    expect(parseFileDirective('seed:turn-2:big.txt:65536:nonce-abc')).toEqual({
+      ok: true,
+      directive: { op: 'seed', opTag: 'turn-2', path: 'big.txt', bytes: 65536, nonce: 'nonce-abc' },
+    });
+  });
+
+  it('parses read with a single colon-free path', () => {
+    expect(parseFileDirective('read:turn-3:shared-checkout.txt')).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-3', path: 'shared-checkout.txt' },
+    });
+  });
+
+  it('rejects an unknown op', () => {
+    const parsed = parseFileDirective('delete:turn-4:shared.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a read directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('read:turn-5:dir:file.txt');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('rejects a seed directive whose path contains a colon', () => {
+    const parsed = parseFileDirective('seed:turn-6:dir:file.txt:10:nonce');
+    expect(parsed.ok).toBe(false);
+  });
+
+  it('normalizes away trailing prompt lines before parsing', () => {
+    expect(
+      parseFileDirective(
+        'read:turn-normalized:shared.txt\n\n<environment_details>noise</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'read', opTag: 'turn-normalized', path: 'shared.txt' },
+    });
+  });
+
+  it('treats a colon after the write path as literal contents, not a path', () => {
+    expect(parseFileDirective('write:turn-colon:a:b:c')).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-colon', path: 'a', contents: 'b:c' },
+    });
+  });
+
+  it('preserves literal newlines in write contents', () => {
+    expect(parseFileDirective('write:turn-multiline:a.txt:first\nsecond')).toEqual({
+      ok: true,
+      directive: {
+        op: 'write',
+        opTag: 'turn-multiline',
+        path: 'a.txt',
+        contents: 'first\nsecond',
+      },
+    });
+  });
+
+  it('strips only the appended prompt-context block from write contents', () => {
+    expect(
+      parseFileDirective(
+        'write:turn-context:a.txt:first\nsecond\n\n<environment_details>\nnoise\n</environment_details>'
+      )
+    ).toEqual({
+      ok: true,
+      directive: { op: 'write', opTag: 'turn-context', path: 'a.txt', contents: 'first\nsecond' },
+    });
+  });
+
+  it('rejects a write path that contains a newline', () => {
+    expect(parseFileDirective('write:turn-nl:a\nb:contents').ok).toBe(false);
+  });
+
+  it('rejects a seed byte count too small for the nonce prefix', () => {
+    expect(parseFileDirective('seed:turn-small:big.txt:4:nonce').ok).toBe(false);
+  });
+
+  it('rejects a seed nonce longer than the bound', () => {
+    expect(parseFileDirective(`seed:turn-long:big.txt:200:${'x'.repeat(65)}`).ok).toBe(false);
+  });
+
+  it('rejects missing arguments and an out-of-range seed size', () => {
+    expect(parseFileDirective('read:turn-7').ok).toBe(false);
+    expect(parseFileDirective('seed:turn-8:big.txt:999999999999:nonce').ok).toBe(false);
+  });
+});
+
+describe('isToolError', () => {
+  it('recognizes an is_error JSON marker and conservative error prefixes', () => {
+    expect(isToolError('{"is_error":true,"message":"nope"}')).toBe(true);
+    expect(isToolError('Error: file not found')).toBe(true);
+    expect(isToolError('error: ENOENT')).toBe(true);
+    expect(isToolError('failed to read file')).toBe(true);
+  });
+
+  it('does not treat ordinary file contents as an error', () => {
+    expect(isToolError('nonce-value')).toBe(false);
+    expect(isToolError('Errorless text')).toBe(false);
+    expect(isToolError('')).toBe(false);
+  });
+});
+
+describe('buildSeedFixture', () => {
+  it('produces exactly the requested UTF-8 byte count including the nonce prefix', () => {
+    const fixture = buildSeedFixture(200, 'nonce');
+    expect(Buffer.byteLength(fixture, 'utf8')).toBe(200);
+    expect(fixture.startsWith('nonce\n')).toBe(true);
+    const body = fixture.slice('nonce\n'.length);
+    const lines = body.split('\n').slice(0, -1);
+    for (const line of lines) expect(line).toHaveLength(99);
+  });
+
+  it('throws when the byte count is too small for the nonce prefix', () => {
+    expect(() => buildSeedFixture(3, 'nonce')).toThrow(/smaller than/);
+  });
+});
 
 let handle: FakeLlmServerHandle | null = null;
 
@@ -323,6 +451,14 @@ function extractToolCall(chunks: Array<Record<string, unknown>>): {
   };
 }
 
+/** The first streamed assistant content, if the response is a plain completion. */
+function assistantContent(chunks: Array<Record<string, unknown>>): string | undefined {
+  const choices = chunks[0]?.choices;
+  if (!Array.isArray(choices)) return undefined;
+  const delta = (choices[0] as { delta?: { content?: string } } | undefined)?.delta;
+  return delta?.content;
+}
+
 async function postModelValidation(
   url: string,
   modelId: string,
@@ -370,14 +506,49 @@ describe('fake-llm-server HTTP', () => {
 
   it('reports chat completion and transcription request counts for fail-fast assertions', async () => {
     const h = await start();
-    const before = await fetch(`${h.url}/test/requests`);
+    const before = await h.adminFetch(`/test/requests`);
     await expect(before.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
 
     const response = await postChat(h.url, '__fake__:echo:hello');
     expect(response.status).toBe(200);
 
-    const after = await fetch(`${h.url}/test/requests`);
+    const after = await h.adminFetch(`/test/requests`);
     await expect(after.json()).resolves.toEqual({ chatCompletions: 1, transcriptions: 0 });
+  });
+
+  it('attributes completions to a prompt scope while keeping the global total', async () => {
+    const h = await start();
+    await postChat(h.url, '__e2e_scope__:shardA\n__fake__:echo:hello');
+    await postChat(h.url, '__e2e_scope__:shardB\n__fake__:echo:hello');
+
+    const global = await h.adminFetch(`/test/requests`);
+    await expect(global.json()).resolves.toEqual({ chatCompletions: 2, transcriptions: 0 });
+
+    const a = await h.adminFetch(`/test/requests?scope=shardA`);
+    await expect(a.json()).resolves.toEqual({
+      chatCompletions: 1,
+      transcriptions: 0,
+      scope: 'shardA',
+    });
+
+    const missing = await h.adminFetch(`/test/requests?scope=shardC`);
+    await expect(missing.json()).resolves.toEqual({
+      chatCompletions: 0,
+      transcriptions: 0,
+      scope: 'shardC',
+    });
+
+    const invalid = await h.adminFetch(`/test/requests?scope=bad%20scope`);
+    expect(invalid.status).toBe(400);
+  });
+
+  it('strips the scope marker from a default echo response', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__e2e_scope__:shardD\njust a plain prompt');
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain('just a plain prompt');
+    expect(text).not.toContain('__e2e_scope__');
   });
 
   it('serves the transcription catalogue when output_modalities=transcription', async () => {
@@ -418,7 +589,7 @@ describe('fake-llm-server HTTP', () => {
     const res = await postMultipartTranscription(h.url, 'fake-transcribe');
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toEqual({ text: 'Gateway transcription online' });
-    const counts = await fetch(`${h.url}/test/requests`);
+    const counts = await h.adminFetch(`/test/requests`);
     await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 1 });
   });
 
@@ -686,7 +857,7 @@ describe('fake-llm-server HTTP', () => {
     // time fetch() resolves with a response the gate is registered.
     await new Promise(r => setTimeout(r, 50));
 
-    const releaseRes = await fetch(`${h.url}/test/release?tag=t1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=t1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const chunks = await chatPromise;
@@ -705,7 +876,7 @@ describe('fake-llm-server HTTP', () => {
       '__fake__:gate:attributed:root_a_complete<environment_details>private context</environment_details>'
     );
     expect(response.status).toBe(200);
-    const release = await fetch(`${h.url}/test/release?tag=attributed`, { method: 'POST' });
+    const release = await h.adminFetch(`/test/release?tag=attributed`, { method: 'POST' });
     expect(release.status).toBe(204);
     const chunks = await parseSse(response);
     expect(chunks[0]?.choices).toEqual([
@@ -722,21 +893,21 @@ describe('fake-llm-server HTTP', () => {
       postChat(h.url, '__fake__:gate:root_b:only_root_b'),
     ]);
     const [statusA, statusB] = await Promise.all([
-      fetch(`${h.url}/test/gate-status?tag=root_a`),
-      fetch(`${h.url}/test/gate-status?tag=root_b`),
+      h.adminFetch(`/test/gate-status?tag=root_a`),
+      h.adminFetch(`/test/gate-status?tag=root_b`),
     ]);
     await expect(statusA.json()).resolves.toMatchObject({ engaged: true });
     await expect(statusB.json()).resolves.toMatchObject({ engaged: true });
 
-    expect((await fetch(`${h.url}/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=root_b`, { method: 'POST' })).status).toBe(204);
     const completedB = await parseSse(rootB);
     expect(completedB[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_b' } }),
     ]);
-    const stillGatedA = await fetch(`${h.url}/test/gate-status?tag=root_a`);
+    const stillGatedA = await h.adminFetch(`/test/gate-status?tag=root_a`);
     await expect(stillGatedA.json()).resolves.toMatchObject({ engaged: true });
 
-    expect((await fetch(`${h.url}/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=root_a`, { method: 'POST' })).status).toBe(204);
     const completedA = await parseSse(rootA);
     expect(completedA[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'only_root_a' } }),
@@ -759,7 +930,7 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: call.id }] },
       { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
     ]);
-    const statusResponse = await fetch(`${h.url}/test/scenario-status?tag=writer`);
+    const statusResponse = await h.adminFetch(`/test/scenario-status?tag=writer`);
     const status = await statusResponse.json();
     expect(status).toEqual({
       tag: 'writer',
@@ -770,9 +941,9 @@ describe('fake-llm-server HTTP', () => {
     });
     expect(JSON.stringify(status)).not.toContain('private-content');
 
-    const gate = await fetch(`${h.url}/test/gate-status?tag=writer`);
+    const gate = await h.adminFetch(`/test/gate-status?tag=writer`);
     await expect(gate.json()).resolves.toEqual({ tag: 'writer', engaged: true });
-    expect((await fetch(`${h.url}/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=writer`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(followup);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-writer' } }),
@@ -837,12 +1008,12 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: editCall.id }] },
       { role: 'tool', tool_call_id: editCall.id, content: 'Edited successfully' },
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=reader`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=reader`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 1, edit: 1, question: 0 },
       toolResults: { write: 0, read: 1, edit: 1, question: 0 },
     });
-    expect((await fetch(`${h.url}/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=reader`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(gated);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-reader' } }),
@@ -877,7 +1048,7 @@ describe('fake-llm-server HTTP', () => {
       { role: 'assistant', tool_calls: [{ id: writeCall.id }] },
       { role: 'tool', tool_call_id: writeCall.id, content: 'File written successfully' },
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=carrier`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=carrier`);
     await expect(status.json()).resolves.toEqual({
       tag: 'carrier',
       requests: 3,
@@ -885,9 +1056,9 @@ describe('fake-llm-server HTTP', () => {
       toolResults: { write: 1, read: 1, edit: 0, question: 0 },
       unsupportedToolSchema: false,
     });
-    const gate = await fetch(`${h.url}/test/gate-status?tag=carrier`);
+    const gate = await h.adminFetch(`/test/gate-status?tag=carrier`);
     await expect(gate.json()).resolves.toEqual({ tag: 'carrier', engaged: true });
-    expect((await fetch(`${h.url}/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
+    expect((await h.adminFetch(`/test/release?tag=carrier`, { method: 'POST' })).status).toBe(204);
     const completed = await parseSse(gated);
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-carrier' } }),
@@ -965,7 +1136,7 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
       toolResults: { write: 0, read: 0, edit: 0, question: 0 },
@@ -1003,7 +1174,7 @@ describe('fake-llm-server HTTP', () => {
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-streamer' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=streamer`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=streamer`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 1, edit: 0, question: 0 },
       toolResults: { write: 0, read: 1, edit: 0, question: 0 },
@@ -1060,7 +1231,7 @@ describe('fake-llm-server HTTP', () => {
     expect(completed[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-asker' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=asker`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=asker`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 1 },
       toolResults: { write: 0, read: 0, edit: 0, question: 1 },
@@ -1076,7 +1247,7 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[0]?.choices).toEqual([
       expect.objectContaining({ delta: { role: 'assistant', content: 'done-title' } }),
     ]);
-    const status = await fetch(`${h.url}/test/scenario-status?tag=title`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=title`);
     await expect(status.json()).resolves.toMatchObject({
       toolCalls: { write: 0, read: 0, edit: 0, question: 0 },
       unsupportedToolSchema: false,
@@ -1107,8 +1278,322 @@ describe('fake-llm-server HTTP', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: { message: 'unsupported write tool schema', type: 'unsupported_tool_schema' },
     });
-    const status = await fetch(`${h.url}/test/scenario-status?tag=unsupported`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=unsupported`);
     await expect(status.json()).resolves.toMatchObject({ unsupportedToolSchema: true });
+  });
+
+  it('echoes a real read result for a fresh file opTag and counts one call and result', async () => {
+    const h = await start();
+    const opTag = 'file-read-positive';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({ name: 'read', arguments: { filePath: 'shared-checkout.txt' } });
+    expect(call.id).toBe(toolCallId(opTag, 'read'));
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        {
+          role: 'tool',
+          tool_call_id: call.id,
+          content:
+            '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+        },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-read:shared-checkout.txt\nnonce-value');
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      requests: 2,
+      toolCalls: { read: 1 },
+      toolResults: { read: 1 },
+    });
+  });
+
+  it('ignores a previous opTag tool result and emits a fresh read call', async () => {
+    const h = await start();
+    const opTag = 'file-read-fresh';
+    const staleTag = 'file-read-stale';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const staleId = toolCallId(staleTag, 'read');
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: staleId }] },
+        { role: 'tool', tool_call_id: staleId, content: 'stale-body' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({
+      name: 'read',
+      arguments: { filePath: 'shared-checkout.txt' },
+    });
+    expect(assistantContent(followup)).toBeUndefined();
+
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 2 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('treats a mismatched tool-call id as no result and emits a fresh call', async () => {
+    const h = await start();
+    const opTag = 'file-read-wrongid';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    await parseSse(await postToolChat(h.url, prompt));
+
+    const followup = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: 'call_deadbeef_read' }] },
+        { role: 'tool', tool_call_id: 'call_deadbeef_read', content: 'nonce-value' },
+      ])
+    );
+    expect(extractToolCall(followup)).toMatchObject({ name: 'read' });
+    expect(assistantContent(followup)).toBeUndefined();
+  });
+
+  it('accepts a relative request matching a same-basename result in another directory', async () => {
+    // Contract: a relative requested path is bound by an absolute result that
+    // ends with `/<requested>`. The shared-checkout proof is the nonce body, not
+    // path exactness, so the reader's own working directory may differ.
+    const h = await start();
+    const opTag = 'file-read-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n\n(End of file - total 1 lines)\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(200);
+    expect(assistantContent(await parseSse(response))).toBe('file-read:requested.txt\nother-value');
+  });
+
+  it('rejects a same-basename result for an absolute request', async () => {
+    const h = await start();
+    const opTag = 'file-read-abs-wrongdir';
+    const prompt = `__fake__:file:read:${opTag}:/workspace/requested.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content:
+          '<path>/workspace/other/requested.txt</path>\n<content>\n1: other-value\n</content>',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a read result whose envelope and inner path metadata conflict', async () => {
+    const h = await start();
+    const opTag = 'file-read-conflict';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output:
+            '<path>/workspace/other/shared-checkout.txt</path>\n<content>\n1: nonce-value\n</content>',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a doubly nested tool-result envelope instead of echoing it', async () => {
+    const h = await start();
+    const opTag = 'file-read-nested';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: JSON.stringify({ output: 'Error: file not found' }),
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is an envelope-wrapped error', async () => {
+    const h = await start();
+    const opTag = 'file-read-envelope-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: JSON.stringify({
+          path: '/workspace/shared-checkout.txt',
+          output: 'Error: file not found',
+        }),
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_tool_result' },
+    });
+  });
+
+  it('rejects a reused file opTag after it completed', async () => {
+    const h = await start();
+    const opTag = 'file-read-reuse';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const resultMessage = {
+      role: 'tool',
+      tool_call_id: call.id,
+      content:
+        '<path>/workspace/shared-checkout.txt</path>\n<content>\n1: nonce-value\n\n(End of file - total 1 lines)\n</content>',
+    };
+    await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        resultMessage,
+      ])
+    );
+
+    const reuse = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      resultMessage,
+    ]);
+    expect(reuse.status).toBe(409);
+    await expect(reuse.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('fails closed with 422 when the read result is a nonempty tool error', async () => {
+    const h = await start();
+    const opTag = 'file-read-error';
+    const prompt = `__fake__:file:read:${opTag}:shared-checkout.txt`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    const response = await postToolChat(h.url, prompt, [
+      { role: 'assistant', tool_calls: [{ id: call.id }] },
+      {
+        role: 'tool',
+        tool_call_id: call.id,
+        content: '<path>/workspace/shared-checkout.txt</path>\nError: file not found',
+      },
+    ]);
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({
+      error: {
+        message: 'read tool did not return file contents for the requested path',
+        type: 'invalid_tool_result',
+      },
+    });
+  });
+
+  it('rejects a file directive with a colon path', async () => {
+    const h = await start();
+    const response = await postChat(h.url, '__fake__:file:read:colon:dir:file.txt');
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({
+      error: { type: 'invalid_request' },
+    });
+  });
+
+  it('streams one write call for file:write and finishes with the write marker', async () => {
+    const h = await start();
+    const opTag = 'file-write';
+    const prompt = `__fake__:file:write:${opTag}:shared-checkout.txt:nonce-value`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call).toMatchObject({
+      name: 'write',
+      arguments: { filePath: 'shared-checkout.txt', content: 'nonce-value' },
+    });
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:shared-checkout.txt\n');
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { write: 1 },
+      toolResults: { write: 1 },
+    });
+  });
+
+  it('streams one write call carrying the generated fixture for file:seed', async () => {
+    const h = await start();
+    const opTag = 'file-seed';
+    const prompt = `__fake__:file:seed:${opTag}:big.txt:200:nonce-seed`;
+    const call = extractToolCall(await parseSse(await postToolChat(h.url, prompt)));
+    expect(call.name).toBe('write');
+    expect(call.arguments.filePath).toBe('big.txt');
+    const contents = call.arguments.content as string;
+    expect(contents.startsWith('nonce-seed\n')).toBe(true);
+    expect(Buffer.byteLength(contents, 'utf8')).toBe(200);
+
+    const completed = await parseSse(
+      await postToolChat(h.url, prompt, [
+        { role: 'assistant', tool_calls: [{ id: call.id }] },
+        { role: 'tool', tool_call_id: call.id, content: 'File written successfully' },
+      ])
+    );
+    expect(assistantContent(completed)).toBe('file-write:big.txt\n');
+  });
+
+  it('finishes a file title request without tools as a benign terminal', async () => {
+    const h = await start();
+    const opTag = 'file-title';
+    const chunks = await parseSse(
+      await postChat(h.url, `__fake__:file:read:${opTag}:shared-checkout.txt`)
+    );
+    expect(assistantContent(chunks)).toBe(`done-${opTag}`);
+    const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+    await expect(status.json()).resolves.toMatchObject({
+      toolCalls: { read: 0 },
+      toolResults: { read: 0 },
+    });
+  });
+
+  it('attributes a file directive to its opTag, never the op, for all three ops', async () => {
+    const h = await start();
+    const cases = [
+      { op: 'write', prompt: '__fake__:file:write:attr-write:shared.txt:body' },
+      { op: 'seed', prompt: '__fake__:file:seed:attr-seed:big.txt:100:nonce' },
+      { op: 'read', prompt: '__fake__:file:read:attr-read:shared.txt' },
+    ];
+    for (const { op, prompt } of cases) {
+      const opTag = prompt.split(':')[3];
+      await parseSse(await postToolChat(h.url, prompt));
+      const status = await h.adminFetch(`/test/scenario-status?tag=${opTag}`);
+      await expect(status.json()).resolves.toMatchObject({ requests: 1 });
+      const opStatus = await h.adminFetch(`/test/scenario-status?tag=${op}`);
+      await expect(opStatus.json()).resolves.toMatchObject({ requests: 0 });
+    }
   });
 
   it('never logs directive contents, raw request bodies, or authorization headers', async () => {
@@ -1176,7 +1661,7 @@ describe('fake-llm-server HTTP', () => {
     let waiterCount = 0;
     for (let i = 0; i < 40; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'shared');
       waiterCount = entry?.count ?? 0;
@@ -1185,7 +1670,7 @@ describe('fake-llm-server HTTP', () => {
     expect(waiterCount).toBe(2);
 
     // One release drains both.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=shared`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=shared`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     const drain = async (p: Promise<Response>): Promise<void> => {
@@ -1198,7 +1683,7 @@ describe('fake-llm-server HTTP', () => {
     };
     await Promise.all([drain(bareChatP), drain(contaminatedChatP)]);
 
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'shared')).toBeUndefined();
@@ -1214,7 +1699,7 @@ describe('fake-llm-server HTTP', () => {
     });
 
     await new Promise(r => setTimeout(r, 50));
-    const releaseRes = await fetch(`${h.url}/test/release?tag=sequential`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=sequential`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
     await firstGate;
 
@@ -1230,7 +1715,7 @@ describe('fake-llm-server HTTP', () => {
     ]);
 
     expect(lateChunks[lateChunks.length - 1].data).toBe('[DONE]');
-    const after = (await (await fetch(`${h.url}/test/waiters`)).json()) as {
+    const after = (await (await h.adminFetch(`/test/waiters`)).json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
     expect(after.tags.find(t => t.tag === 'sequential')).toBeUndefined();
@@ -1238,7 +1723,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release without a tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release`, { method: 'POST' });
     expect(res.status).toBe(400);
     const body = (await res.json()) as { error: string };
     expect(body.error).toBe('tag query param required');
@@ -1246,7 +1731,7 @@ describe('fake-llm-server HTTP', () => {
 
   it('POST /test/release with unknown tag returns 404', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/release?tag=nope`, { method: 'POST' });
+    const res = await h.adminFetch(`/test/release?tag=nope`, { method: 'POST' });
     expect(res.status).toBe(404);
   });
 
@@ -1254,7 +1739,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // Before any gate request: not engaged.
-    const beforeRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const beforeRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     expect(beforeRes.status).toBe(200);
     const beforeBody = (await beforeRes.json()) as { tag: string; engaged: boolean };
     expect(beforeBody).toEqual({ tag: 'status1', engaged: false });
@@ -1269,7 +1754,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const statusRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+      const statusRes = await h.adminFetch(`/test/gate-status?tag=status1`);
       const statusBody = (await statusRes.json()) as { engaged: boolean };
       if (statusBody.engaged) {
         engaged = true;
@@ -1279,19 +1764,19 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release it and confirm the status flips back.
-    const releaseRes = await fetch(`${h.url}/test/release?tag=status1`, { method: 'POST' });
+    const releaseRes = await h.adminFetch(`/test/release?tag=status1`, { method: 'POST' });
     expect(releaseRes.status).toBe(204);
 
     await chatPromise;
 
-    const afterRes = await fetch(`${h.url}/test/gate-status?tag=status1`);
+    const afterRes = await h.adminFetch(`/test/gate-status?tag=status1`);
     const afterBody = (await afterRes.json()) as { engaged: boolean };
     expect(afterBody.engaged).toBe(false);
   });
 
   it('GET /test/gate-status without tag returns 400', async () => {
     const h = await start();
-    const res = await fetch(`${h.url}/test/gate-status`);
+    const res = await h.adminFetch(`/test/gate-status`);
     expect(res.status).toBe(400);
   });
 
@@ -1326,7 +1811,7 @@ describe('fake-llm-server HTTP', () => {
     const h = await start();
 
     // No activity: empty snapshot.
-    const before = await fetch(`${h.url}/test/waiters`);
+    const before = await h.adminFetch(`/test/waiters`);
     expect(before.status).toBe(200);
     const beforeBody = (await before.json()) as {
       tags: Array<{ tag: string; count: number }>;
@@ -1352,7 +1837,7 @@ describe('fake-llm-server HTTP', () => {
     let engaged = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { tags: Array<{ tag: string; count: number }> };
       const entry = body.tags.find(t => t.tag === 'waiters-test');
       if (entry && entry.count === 1) {
@@ -1363,10 +1848,10 @@ describe('fake-llm-server HTTP', () => {
     expect(engaged).toBe(true);
 
     // Release and confirm snapshot drains.
-    await fetch(`${h.url}/test/release?tag=waiters-test`, { method: 'POST' });
+    await h.adminFetch(`/test/release?tag=waiters-test`, { method: 'POST' });
     await gatePromise.then(r => r.body?.cancel()).catch(() => undefined);
 
-    const after = await fetch(`${h.url}/test/waiters`);
+    const after = await h.adminFetch(`/test/waiters`);
     const afterBody = (await after.json()) as {
       tags: Array<{ tag: string; count: number }>;
     };
@@ -1432,7 +1917,7 @@ describe('fake-llm-server HTTP', () => {
     let parked = false;
     for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 25));
-      const snap = await fetch(`${h.url}/test/waiters`);
+      const snap = await h.adminFetch(`/test/waiters`);
       const body = (await snap.json()) as { liveResponses: number };
       if (body.liveResponses === 1) {
         parked = true;
@@ -1822,5 +2307,115 @@ describe('strict harness stream events', () => {
     { ...event, data: [] },
   ])('rejects malformed stream envelopes', invalid => {
     expect(streamEventSchema.safeParse(invalid).success).toBe(false);
+  });
+});
+
+const CONTROL_ROUTES: Array<{ label: string; path: string; init?: RequestInit }> = [
+  { label: 'POST /test/release', path: '/test/release?tag=guard', init: { method: 'POST' } },
+  { label: 'GET /test/gate-status', path: '/test/gate-status?tag=guard' },
+  { label: 'GET /test/waiters', path: '/test/waiters' },
+  { label: 'GET /test/requests', path: '/test/requests' },
+  { label: 'GET /test/scenario-status', path: '/test/scenario-status?tag=guard' },
+];
+
+const MODEL_CREDENTIAL = 'eyJhbGciOiJIUzI1NiJ9.eyJ2ZXJzaW9uIjozfQ.signature';
+
+describe('fake-llm-server /test/* admin guard', () => {
+  it('resolves the admin token the driver and the server share', async () => {
+    // The development-default assertion is only meaningful with
+    // FAKE_LLM_ADMIN_TOKEN absent, so make the test independent of the
+    // operator's ambient environment.
+    const previous = process.env.FAKE_LLM_ADMIN_TOKEN;
+    delete process.env.FAKE_LLM_ADMIN_TOKEN;
+    try {
+      const h = await start();
+      expect(h.adminToken).toBe(resolveFakeAdminToken());
+      expect(h.adminToken).toBe(LOCAL_FAKE_LLM_ADMIN_TOKEN);
+    } finally {
+      if (previous === undefined) delete process.env.FAKE_LLM_ADMIN_TOKEN;
+      else process.env.FAKE_LLM_ADMIN_TOKEN = previous;
+    }
+  });
+
+  it('accepts the resolved admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await h.adminFetch(route.path, route.init);
+      expect(res.status, `${route.label} with the admin bearer`).not.toBe(401);
+    }
+    const counts = await h.adminFetch('/test/requests');
+    await expect(counts.json()).resolves.toEqual({ chatCompletions: 0, transcriptions: 0 });
+  });
+
+  it('rejects a missing admin bearer on every /test/* route', async () => {
+    const h = await start();
+    for (const route of CONTROL_ROUTES) {
+      const res = await fetch(`${h.url}${route.path}`, route.init);
+      expect(res.status, `${route.label} without a bearer`).toBe(401);
+      await expect(res.json()).resolves.toEqual({ error: 'admin authorization required' });
+    }
+  });
+
+  it('rejects a wrong bearer, a malformed bearer and the model credential', async () => {
+    const h = await start();
+    const credentials = [
+      'Bearer not-the-admin-token',
+      `Bearer ${MODEL_CREDENTIAL}`,
+      'Bearer ',
+      'Basic dXNlcjpwYXNz',
+      LOCAL_FAKE_LLM_ADMIN_TOKEN,
+    ];
+    for (const route of CONTROL_ROUTES) {
+      for (const Authorization of credentials) {
+        const res = await fetch(`${h.url}${route.path}`, {
+          ...route.init,
+          headers: { Authorization },
+        });
+        expect(res.status, `${route.label} with "${Authorization}"`).toBe(401);
+      }
+    }
+  });
+
+  it('guards unsupported methods on /test/* before method dispatch', async () => {
+    const h = await start();
+    const unauthenticated = await fetch(`${h.url}/test/requests`, { method: 'DELETE' });
+    expect(unauthenticated.status).toBe(401);
+
+    const authenticated = await h.adminFetch('/test/requests', { method: 'DELETE' });
+    expect(authenticated.status).toBe(404);
+    await expect(authenticated.json()).resolves.toEqual({
+      error: 'not found: DELETE /test/requests',
+    });
+  });
+
+  it('keeps the local model routes open while /test/* stays guarded', async () => {
+    const h = await start();
+
+    const models = await fetch(`${h.url}/api/openrouter/models`);
+    expect(models.status).toBe(200);
+
+    // The Next.js gateway dials the model routes with the static local
+    // credential; the local adapter deliberately does not verify it.
+    const chat = await fetch(`${h.url}/api/openrouter/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${MODEL_CREDENTIAL}` },
+      body: JSON.stringify({
+        model: 'kilo/fake-deterministic',
+        messages: [{ role: 'user', content: '__fake__:echo:open' }],
+        stream: true,
+      }),
+    });
+    expect(chat.status).toBe(200);
+    await parseSse(chat);
+
+    const control = await fetch(`${h.url}/test/requests`);
+    expect(control.status).toBe(401);
+  });
+
+  it('answers the public health route without a credential', async () => {
+    const h = await start();
+    const res = await fetch(`${h.url}/health`);
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
   });
 });

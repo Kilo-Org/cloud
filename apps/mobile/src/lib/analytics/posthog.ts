@@ -11,7 +11,6 @@ import { useCallback, useSyncExternalStore } from 'react';
 import { POSTHOG_API_KEY } from '@/lib/config';
 import {
   currentAppVersion,
-  FEATURE_FLAG_DEFINITIONS,
   getFeatureFlagDefinition,
   isAppVersionAtLeast,
 } from '@/lib/feature-flags';
@@ -210,7 +209,6 @@ export function initPostHog(): void {
     customStorage: posthogCustomStorage,
   });
   clientGeneration = currentGeneration();
-  statusRevision += 1;
   notifyPostHogReady();
   // Super property on every event so dashboards can filter mobile vs web
   // without relying on $lib.
@@ -219,8 +217,6 @@ export function initPostHog(): void {
   // even before (or without) an identified user. Triggers a flag reload.
   client.setPersonPropertiesForFlags(appVersionProperties());
   client.onFeatureFlags(() => {
-    // Remote values changed: the statuses snapshot is stale.
-    statusRevision += 1;
     for (const listener of flagListeners) {
       listener();
     }
@@ -354,7 +350,6 @@ export async function discardPostHog(): Promise<void> {
     // oxlint-disable-next-line anti-slop/no-runtime-typeof -- see comment above: guards against a client that violates its own type's contract
     if (typeof c?.setPersistedProperty !== 'function') {
       client = null;
-      statusRevision += 1;
       notifyPostHogReady();
       return;
     }
@@ -371,7 +366,6 @@ export async function discardPostHog(): Promise<void> {
     // Ready listeners persist — they must observe both the false transition
     // now and a true transition from a later initPostHog.
     client = null;
-    statusRevision += 1;
     notifyPostHogReady();
 
     try {
@@ -428,62 +422,6 @@ function isFeatureEnabled(key: string, defaultValue: boolean): boolean {
   return value === undefined ? defaultValue : value === true;
 }
 
-/** How the version gate resolved for one flag (see `FeatureFlagStatus`). */
-export type FeatureFlagStatusReason = 'applied' | 'build-too-old';
-
-/** One registry flag's resolved state for this build, for the debug surface. */
-export type FeatureFlagStatus = Readonly<{
-  key: string;
-  minAppVersion: string;
-  defaultValue: boolean;
-  /** This build's version; null when the platform does not report one. */
-  appVersion: string | null;
-  /** True when the remote value is trusted and used. */
-  applied: boolean;
-  /** The value the UI acts on. */
-  value: boolean;
-  reason: FeatureFlagStatusReason;
-  /** True when the client had a remote value for the key. */
-  loaded: boolean;
-}>;
-
-// `useFeatureFlagStatuses` returns a stable snapshot between flag updates, so
-// `useSyncExternalStore` does not loop on a fresh array each read.
-let statusRevision = 0;
-let statusCache: { revision: number; statuses: FeatureFlagStatus[] } | null = null;
-
-function buildStatuses(): FeatureFlagStatus[] {
-  // Registry order is the row order on the debug surface.
-  return FEATURE_FLAG_DEFINITIONS.map(definition => {
-    const appVersion = currentAppVersion();
-    const remote = client?.getFeatureFlag(definition.key);
-    const loaded = remote !== undefined;
-    const tooOld = !isAppVersionAtLeast(appVersion, definition.minAppVersion);
-    if (tooOld) {
-      return {
-        key: definition.key,
-        minAppVersion: definition.minAppVersion,
-        defaultValue: definition.defaultValue,
-        appVersion,
-        applied: false,
-        value: definition.defaultValue,
-        reason: 'build-too-old',
-        loaded,
-      };
-    }
-    return {
-      key: definition.key,
-      minAppVersion: definition.minAppVersion,
-      defaultValue: definition.defaultValue,
-      appVersion,
-      applied: loaded,
-      value: loaded ? remote === true : definition.defaultValue,
-      reason: 'applied',
-      loaded,
-    };
-  });
-}
-
 /**
  * Reactively read a boolean feature flag. Fails open: while the client is
  * disabled (dev builds), uninitialized, or flags have not loaded yet, returns
@@ -502,30 +440,4 @@ export function useFeatureFlag(key: string, defaultValue = false): boolean {
   }, []);
   const getSnapshot = useCallback(() => isFeatureEnabled(key, defaultValue), [key, defaultValue]);
   return useSyncExternalStore(subscribe, getSnapshot);
-}
-
-/**
- * All registry flags' resolved state for this build (see `FeatureFlagStatus`),
- * for the debug surface in Preferences. Stable reference between flag
- * updates, so it is safe as a `useSyncExternalStore` snapshot.
- */
-export function getFeatureFlagStatuses(): FeatureFlagStatus[] {
-  if (statusCache?.revision !== statusRevision) {
-    statusCache = { revision: statusRevision, statuses: buildStatuses() };
-  }
-  return statusCache.statuses;
-}
-
-/**
- * Reactively read every registry flag's status. Updates with the same flag
- * lifecycle as `useFeatureFlag`: on client creation, discard, and flag loads.
- */
-export function useFeatureFlagStatuses(): FeatureFlagStatus[] {
-  const subscribe = useCallback((onChange: () => void) => {
-    flagListeners.add(onChange);
-    return () => {
-      flagListeners.delete(onChange);
-    };
-  }, []);
-  return useSyncExternalStore(subscribe, getFeatureFlagStatuses);
 }

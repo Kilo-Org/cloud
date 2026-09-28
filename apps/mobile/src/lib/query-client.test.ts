@@ -3,11 +3,13 @@ import { CancelledError, QueryObserver } from '@tanstack/react-query';
 
 import {
   deferred,
+  flushQueryUpdates,
   makeTestQueryClient as makeClient,
   QUERY_KEY,
 } from './active-sessions-live-sync.test-helpers';
 import {
   createKiloAppQueryClient,
+  DEFAULT_QUERY_STALE_TIME_MS,
   getActiveSessionsQueryMetadata,
   subscribeActiveSessionsQueryMetadata,
 } from './query-client';
@@ -39,6 +41,33 @@ describe('createKiloAppQueryClient', () => {
   });
 });
 
+describe('query retry policy', () => {
+  it.each([
+    { code: 'UNPROCESSABLE_CONTENT', expectedAttempts: 1 },
+    { code: 'INTERNAL_SERVER_ERROR', expectedAttempts: 3 },
+  ])(
+    'invokes the query function $expectedAttempts time(s) for $code',
+    async ({ code, expectedAttempts }) => {
+      const queryClient = createKiloAppQueryClient();
+      const error = Object.assign(new Error(code), { data: { code } });
+      let attempts = 0;
+
+      await expect(
+        queryClient.fetchQuery({
+          queryKey: ['session', 'retry-policy', code],
+          retryDelay: 0,
+          queryFn: () => {
+            attempts += 1;
+            throw error;
+          },
+        })
+      ).rejects.toBe(error);
+
+      expect(attempts).toBe(expectedAttempts);
+    }
+  );
+});
+
 describe('permission-denied query removal', () => {
   it('removes an org-scoped query on FORBIDDEN and keeps the user signed in', async () => {
     const signOut = vi.fn();
@@ -63,6 +92,7 @@ describe('permission-denied query removal', () => {
     await expect(
       queryClient.fetchQuery({
         queryKey: org1Key,
+        staleTime: 0,
         queryFn: () => {
           throw error;
         },
@@ -95,6 +125,7 @@ describe('permission-denied query removal', () => {
     await expect(
       queryClient.fetchQuery({
         queryKey: key,
+        staleTime: 0,
         queryFn: () => {
           throw error;
         },
@@ -159,6 +190,7 @@ describe('permission-denied query removal', () => {
     await expect(
       queryClient.fetchQuery({
         queryKey: key,
+        staleTime: 0,
         queryFn: () => {
           throw error;
         },
@@ -408,5 +440,82 @@ describe('app error reporting', () => {
       error,
       tags: { 'error.subsystem': 'app', 'error.source': 'mutation' },
     });
+  });
+});
+
+describe('default query stale time', () => {
+  // Deliberately one microtask deep so a refetch is observable, mirroring the
+  // shared makeQueryFn helper.
+  const makeResolvingQueryFn = () =>
+    vi.fn(async () => {
+      const result = await Promise.resolve({ ok: true });
+      return result;
+    });
+
+  it('defaults new queries to the shared stale time', () => {
+    const client = createKiloAppQueryClient();
+    expect(client.getDefaultOptions().queries?.staleTime).toBe(DEFAULT_QUERY_STALE_TIME_MS);
+  });
+
+  it('serves a fresh query from cache on remount without calling the query function again', async () => {
+    const client = createKiloAppQueryClient();
+    const queryKey = ['session', 'stale-time-default'];
+    const queryFn = makeResolvingQueryFn();
+
+    const first = new QueryObserver(client, { queryKey, queryFn });
+    const unsubscribeFirst = first.subscribe(() => undefined);
+    await vi.waitFor(() => {
+      expect(first.getCurrentResult().data).toEqual({ ok: true });
+    });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    unsubscribeFirst();
+
+    const second = new QueryObserver(client, { queryKey, queryFn });
+    const unsubscribeSecond = second.subscribe(() => undefined);
+    await flushQueryUpdates();
+    // The cached payload is still fresh, so remounting must not refetch it.
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(second.getCurrentResult().data).toEqual({ ok: true });
+    unsubscribeSecond();
+  });
+
+  it('still refetches on remount when the query overrides staleTime with 0', async () => {
+    const client = createKiloAppQueryClient();
+    const queryKey = ['session', 'stale-time-zero'];
+    const queryFn = makeResolvingQueryFn();
+
+    const first = new QueryObserver(client, { queryKey, queryFn, staleTime: 0 });
+    const unsubscribeFirst = first.subscribe(() => undefined);
+    await vi.waitFor(() => {
+      expect(first.getCurrentResult().data).toEqual({ ok: true });
+    });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    unsubscribeFirst();
+
+    const second = new QueryObserver(client, { queryKey, queryFn, staleTime: 0 });
+    const unsubscribeSecond = second.subscribe(() => undefined);
+    await vi.waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(2);
+    });
+    unsubscribeSecond();
+  });
+
+  it('still refetches a fresh query when it is invalidated', async () => {
+    const client = createKiloAppQueryClient();
+    const queryKey = ['session', 'stale-time-invalidate'];
+    const queryFn = makeResolvingQueryFn();
+
+    const observer = new QueryObserver(client, { queryKey, queryFn });
+    const unsubscribe = observer.subscribe(() => undefined);
+    await vi.waitFor(() => {
+      expect(observer.getCurrentResult().data).toEqual({ ok: true });
+    });
+    expect(queryFn).toHaveBeenCalledTimes(1);
+
+    await client.invalidateQueries({ queryKey });
+    await vi.waitFor(() => {
+      expect(queryFn).toHaveBeenCalledTimes(2);
+    });
+    unsubscribe();
   });
 });

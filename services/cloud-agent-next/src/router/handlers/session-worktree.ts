@@ -451,6 +451,11 @@ function assertRegisteredMetadata(
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||
     canonicalRepositoryUrl(metadata.repository) !== canonicalRepositoryUrl(source.repository) ||
+    (source.repository.type === 'github' &&
+      (metadata.repository.type !== 'github' ||
+        metadata.repository.githubIntegrationId !== source.repository.githubIntegrationId ||
+        (metadata.repository.githubAccessPurpose ?? 'workflow') !==
+          (source.repository.githubAccessPurpose ?? 'workflow'))) ||
     metadata.repository.upstreamBranch !== source.repository.upstreamBranch
   ) {
     throw operationConflict();

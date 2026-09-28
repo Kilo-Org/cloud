@@ -10,6 +10,27 @@ export function prepareMonoScrollContent(content: string, maxLength?: number) {
 }
 
 /**
+ * Default display window for a mono block, in characters.
+ *
+ * A completed tool output can be multiple megabytes (fixture
+ * `prtVerifyHugeOut0001` carries a 2 182 790-character JSON document). One
+ * `Text`/`TextInput` laying that string out hangs the detail sheet and, on
+ * Android, takes the app process down with it, so a block without an explicit
+ * budget displays this prefix and the "Truncated" marker instead of the whole
+ * payload. The read/write code cards pass their own `maxLength` to override it.
+ */
+export const DEFAULT_MONO_SCROLL_MAX_LENGTH = 20_000;
+
+/**
+ * The cap a block actually applies: the caller's when given, the default
+ * otherwise. Kept out of `prepareMonoScrollContent` so that function stays a
+ * pure slice and callers can still ask for an uncapped string.
+ */
+export function resolveMonoScrollMaxLength(maxLength?: number): number {
+  return maxLength ?? DEFAULT_MONO_SCROLL_MAX_LENGTH;
+}
+
+/**
  * How a mono block displays inside the tool detail sheet: wrapped text or a
  * horizontal scroller. Blocks outside the sheet keep today's `'scroll'`
  * behavior via the context fallback.

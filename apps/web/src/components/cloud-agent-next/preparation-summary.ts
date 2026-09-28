@@ -9,14 +9,25 @@ export type PreparationRowSummary =
   | { kind: 'phase'; text: string }
   | { kind: 'command'; command: string; commandIndex?: number; commandCount?: number }
   | { kind: 'completed'; duration?: string }
-  | { kind: 'failed'; error?: string };
+  | { kind: 'failed'; error?: string }
+  | { kind: 'incomplete'; text: string };
 
 export function summarizePreparationAttempt(attempt: PreparationAttempt): PreparationRowSummary {
-  if (attempt.status === 'completed') {
-    return { kind: 'completed', duration: formatAttemptDuration(attempt) };
-  }
+  // A terminal failure outranks the incomplete-restore step: a skipped diff
+  // keeps the attempt alive while the wrapper continues, so the same attempt
+  // can be `failed` AND carry `restore_incomplete`. The step's own text stays
+  // readable in the details drawer, but the row must not mask the failure.
   if (attempt.status === 'failed') {
     return { kind: 'failed', error: attempt.safeError ?? lastFailedStepError(attempt.steps) };
+  }
+  // A completed (or still-running) attempt can carry the named incomplete-restore
+  // step; surface it before the completion collapse so the fact stays visible.
+  const incomplete = attempt.steps.find(step => step.key === 'restore_incomplete');
+  if (incomplete) {
+    return { kind: 'incomplete', text: incomplete.safeError ?? incomplete.label };
+  }
+  if (attempt.status === 'completed') {
+    return { kind: 'completed', duration: formatAttemptDuration(attempt) };
   }
 
   const command = findRunningSetupCommand(attempt);
@@ -35,6 +46,25 @@ export function summarizePreparationAttempt(attempt: PreparationAttempt): Prepar
   }
 
   return { kind: 'starting' };
+}
+
+/**
+ * The one line the details drawer shows for an attempt. It is built from the
+ * same {@link summarizePreparationAttempt} the chat row uses, so the row and
+ * the panel it opens cannot describe the same attempt differently — an
+ * incomplete restore reads as "Session restore incomplete…" in both.
+ */
+export function preparationSummaryLine(attempt: PreparationAttempt): string {
+  const title = preparationSummaryTitle(summarizePreparationAttempt(attempt));
+  const duration = formatAttemptDuration(attempt);
+  return duration ? `${title} · ${duration}` : title;
+}
+
+function preparationSummaryTitle(summary: PreparationRowSummary): string {
+  if (summary.kind === 'incomplete') return summary.text;
+  if (summary.kind === 'failed') return 'Preparation failed';
+  if (summary.kind === 'completed') return 'Environment prepared';
+  return 'Preparing environment';
 }
 
 /**

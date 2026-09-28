@@ -12,7 +12,11 @@
 import { CancelledError } from '@tanstack/react-query';
 import { z } from 'zod';
 
-import { captureTelemetry } from '@/lib/telemetry/error-sink';
+import {
+  captureTelemetry,
+  TELEMETRY_DESCRIPTION_KEY,
+  type TelemetryDescription,
+} from '@/lib/telemetry/error-sink';
 
 type AppErrorSource = 'query' | 'mutation';
 
@@ -27,6 +31,19 @@ const REQUEST_DEADLINE_ERROR_NAME = 'RequestDeadlineError';
 const NamedErrorSchema = z.looseObject({ name: z.string() });
 const StringValueSchema = z.string();
 const JsonTextSchema = z.string();
+
+// The self-description a typed domain error carries. Validated before use so a
+// hostile or half-built value can never reach the Sentry options.
+const TelemetryDescriptionSchema = z.looseObject({
+  fingerprint: z.array(z.string()).min(1),
+  tags: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional(),
+  contexts: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
+  extra: z.record(z.string(), z.unknown()).optional(),
+});
+
+const DeclaredTelemetrySchema = z.looseObject({
+  [TELEMETRY_DESCRIPTION_KEY]: TelemetryDescriptionSchema,
+});
 
 // A tRPC error carries its code inside a `data` envelope (`data.code` for a
 // v11 client error, `shape.data.code` for a server-shaped one). A bare
@@ -137,24 +154,48 @@ function queryKeyString(queryKey: unknown): string {
 }
 
 /**
+ * The telemetry a typed error declares for itself, or undefined when it carries
+ * none. Total: an unrecognized value yields undefined and never throws.
+ */
+function declaredTelemetryDescription(error: unknown): TelemetryDescription | undefined {
+  try {
+    const parsed = DeclaredTelemetrySchema.safeParse(error);
+    return parsed.success ? parsed.data[TELEMETRY_DESCRIPTION_KEY] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Report an error observed by a React Query cache at error level, unless the
- * network layer already reported it. The query key rides in `extra` (not tags,
- * which are indexed and can carry ids). Never throws.
+ * network layer already reported it. A typed error that declares its own
+ * telemetry (see `TELEMETRY_DESCRIPTION_KEY`) is filed under that stable
+ * fingerprint and tags; every other error keeps the catch-all `app-error` one.
+ * The query key rides in `extra` (not tags, which are indexed and can carry
+ * ids). Never throws.
  */
 export function reportAppError(error: unknown, context: AppErrorContext): void {
   try {
     if (isAlreadyReportedNetworkError(error)) {
       return;
     }
+    const declared = declaredTelemetryDescription(error);
     captureTelemetry({
       error,
       level: 'error',
       tags: {
         'error.subsystem': 'app',
         'error.source': context.source,
+        ...declared?.tags,
       },
-      extra: { queryKey: queryKeyString(context.queryKey) },
-      fingerprint: ['app-error', context.source, errorName(error), errorMessage(error)],
+      ...(declared?.contexts === undefined ? {} : { contexts: declared.contexts }),
+      extra: { queryKey: queryKeyString(context.queryKey), ...declared?.extra },
+      fingerprint: declared?.fingerprint ?? [
+        'app-error',
+        context.source,
+        errorName(error),
+        errorMessage(error),
+      ],
     });
   } catch {
     // Telemetry must never throw into app code.

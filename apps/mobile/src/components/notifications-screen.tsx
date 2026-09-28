@@ -1,9 +1,10 @@
 /* eslint-disable max-lines -- The dedicated Notifications screen composes the master
- * OS-permission gate, the push-token registration flow, and 7 per-category toggles
+ * OS-permission gate, the push-token registration flow, and 8 per-category toggles
  * with their optimistic-mutation + retry + loading patterns. CATEGORY_META still
- * has seven keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
+ * has eight keys; the KiloClaw row is hidden when useKiloClawTabVisible is false.
  * Extracting subcomponents would re-encode the same hooks. The screen stays a
  * single rendered surface. */
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import * as Notifications from 'expo-notifications';
@@ -110,6 +111,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   );
 }
 
+/** One row per notification category. */
 const CATEGORY_META = [
   {
     key: 'chatMessages',
@@ -148,6 +150,16 @@ const CATEGORY_META = [
     icon: Wallet,
   },
   {
+    key: 'spendAlerts',
+    titleKey: 'notifications.channel.spend',
+    subtitleKey: 'notifications.category.spendAlertsSubtitle',
+    icon: Wallet,
+    // A dedicated label for the device scene: the spend view owns a switch with
+    // the same visible wording, so this row's control must be addressable on
+    // its own. The low-balance sheet uses the same `*A11y` pattern.
+    accessibilityLabelKey: 'notifications.category.spendAlertsToggle',
+  },
+  {
     key: 'securityFindings',
     titleKey: 'notifications.channel.security',
     subtitleKey: 'notifications.category.securityFindingsSubtitle',
@@ -155,13 +167,53 @@ const CATEGORY_META = [
   },
 ] as const;
 
+/**
+ * The reason each gated category shows while the server marks it unavailable.
+ * The response's old `unavailableReason` was an English sentence, so the row
+ * renders mobile copy instead: the reason must read in the user's language.
+ * Only these three categories can be unavailable
+ * (`apps/web/src/routers/user-router.ts:494-505`; the other four are
+ * `ALWAYS_AVAILABLE_CAPABILITY`, `:450`).
+ *
+ * This is the fallback for a response that carries no reason code at all — a
+ * server predating the code sent the very sentence this copy translates — so
+ * such a row keeps the same meaning in the reader's language.
+ */
+const CATEGORY_UNAVAILABLE_SUBTITLE_KEYS: ReadonlyMap<NotificationCategoryKey, string> = new Map([
+  ['kiloclawActivity', 'notifications.category.kiloclawActivityUnavailable'],
+  ['balanceAlerts', 'notifications.category.balanceAlertsUnavailable'],
+  ['securityFindings', 'notifications.category.securityFindingsUnavailable'],
+]);
+
 type CategoryMeta = (typeof CATEGORY_META)[number];
 
 /** Per-category availability from the preferences response `capabilities` map. */
-type NotificationCategoryCapability = Readonly<{
-  available: boolean;
-  unavailableReason: string | null;
-}>;
+type NotificationPreferencesResponse =
+  inferRouterOutputs<MobileRouter>['user']['getNotificationPreferences'];
+type NotificationCategoryCapability =
+  NotificationPreferencesResponse['capabilities'][NotificationCategoryKey];
+type UnavailableReasonCode = NonNullable<NotificationCategoryCapability['unavailableReasonCode']>;
+
+/**
+ * The server sends a machine-readable reason code, never a sentence: each code
+ * maps to a catalog key so the row reads in the reader's language. Literal
+ * values, never a template, so the catalog check can see the keys.
+ */
+const UNAVAILABLE_REASON_KEY = {
+  organizationRequired: 'notifications.category.balanceAlertsUnavailable',
+  securityAgentRequired: 'notifications.category.securityFindingsUnavailable',
+  kiloclawInstanceRequired: 'notifications.category.kiloclawActivityUnavailable',
+} satisfies Record<UnavailableReasonCode, string>;
+
+/** A code from a newer server must fall back, never render raw. */
+function unavailableReasonKey(code: string | null | undefined): string | undefined {
+  // Object.hasOwn (not `in`) so an inherited member like 'constructor' falls
+  // back to the subtitle instead of handing a prototype member to `t()`.
+  if (code == null || !Object.hasOwn(UNAVAILABLE_REASON_KEY, code)) {
+    return undefined;
+  }
+  return UNAVAILABLE_REASON_KEY[code as UnavailableReasonCode];
+}
 
 type CategoryRowProps = Readonly<{
   meta: CategoryMeta;
@@ -195,14 +247,32 @@ function CategoryRow({
     : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
   const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
-  // disabled and the server reason replaces the subtitle. A missing entry (the
-  // `noUncheckedIndexedAccess` widening) defaults to available.
+  // disabled and the row explains itself in the reader's language. The server's
+  // old `unavailableReason` sentence is English prose and must never render — it
+  // cannot be translated — so the reason comes from the code map, or from
+  // `CATEGORY_UNAVAILABLE_SUBTITLE_KEYS` when the response carries no code. A
+  // missing entry (the `noUncheckedIndexedAccess` widening) defaults to
+  // available.
   const unavailable = capability?.available === false;
+  const unavailableReasonCode = capability?.unavailableReasonCode;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);
-  const subtitle = unavailable
-    ? (capability.unavailableReason ?? t(meta.subtitleKey))
-    : t(meta.subtitleKey);
+  // The server names the reason with a code, never a sentence: a known code
+  // resolves to catalog copy, and an unknown one falls back to the category's
+  // own localized subtitle.
+  const reasonKey = unavailable ? unavailableReasonKey(unavailableReasonCode) : undefined;
+  // A response with no code at all comes from a server that predates the code
+  // contract, which sent the sentence the category's catalog reason translates:
+  // the row keeps that meaning in the reader's language.
+  const noCodeFallbackKey =
+    unavailable && unavailableReasonCode == null
+      ? (CATEGORY_UNAVAILABLE_SUBTITLE_KEYS.get(meta.key) ?? meta.subtitleKey)
+      : meta.subtitleKey;
+  const subtitle = t(reasonKey ?? noCodeFallbackKey);
+  // Most rows take the visible title as their control label; the spend row
+  // carries its own so the device scene can address it unambiguously.
+  const accessibilityLabel =
+    'accessibilityLabelKey' in meta ? t(meta.accessibilityLabelKey) : t(meta.titleKey);
   return (
     <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
       <Icon size={18} color={colors.secondaryForeground} />
@@ -221,7 +291,7 @@ function CategoryRow({
       <Switch
         value={displayedValue}
         disabled={isDisabled}
-        accessibilityLabel={title}
+        accessibilityLabel={accessibilityLabel}
         accessibilityState={{ disabled: isDisabled, busy: isPending }}
         onValueChange={value => {
           if (isDisabled) {
@@ -245,8 +315,8 @@ export function NotificationsScreen() {
 
   const [isTogglingPermission, setIsTogglingPermission] = useState(false);
   const [isRegisteringToken, setIsRegisteringToken] = useState(false);
-  // The `setNotificationPreferences` mutation object is shared across all five
-  // rows, and its `isPending` is a single flag for the whole procedure. Two
+  // The `setNotificationPreferences` mutation object is shared across every
+  // category row, and its `isPending` is a single flag for the whole procedure. Two
   // category flips can therefore be in flight at once, so we track the set of
   // in-flight categories explicitly and scope each row's busy state to its own
   // key. Each mutation callback resolves its own category from `variables`
@@ -584,7 +654,7 @@ export function NotificationsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* The glanceable surface. First on the screen because it is what the
-            user sees without opening the app, and it must not sit below seven
+            user sees without opening the app, and it must not sit below eight
             category rows. Each platform names it the way its own OS does:
             a Live Activity on iOS, a Live Update on Android. */}
         <View className="gap-3">
@@ -776,7 +846,7 @@ export function NotificationsScreen() {
                     // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
                     preferences.capabilities?.[meta.key] ?? {
                       available: true,
-                      unavailableReason: null,
+                      unavailableReasonCode: null,
                     }
                   }
                   disabled={!notificationsEnabled}

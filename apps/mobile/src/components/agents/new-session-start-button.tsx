@@ -1,9 +1,7 @@
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type NewSessionStartButtonProps = {
   isCloneEntry: boolean;
@@ -14,9 +12,11 @@ type NewSessionStartButtonProps = {
 };
 
 /**
- * The new-session Start submit button. The Continue form shows a busy label
- * (import for a live CLI, clone for Cloud Agent) and keeps the visible child;
- * the ordinary form swaps in a spinner.
+ * The new-session Start submit button. Every branch keeps a visible busy label
+ * while starting: import for a live CLI, clone for Cloud Agent, and
+ * `common.starting` for the ordinary form. All branches pass `loading` so the
+ * busy state keeps the brand fill instead of the muted disabled fill, and the
+ * Button's inline spinner sits beside the label.
  */
 export function NewSessionStartButton({
   isCloneEntry,
@@ -25,7 +25,6 @@ export function NewSessionStartButton({
   isStarting,
   onStartSession,
 }: Readonly<NewSessionStartButtonProps>) {
-  const colors = useThemeColors();
   const { t } = useTranslation();
 
   if (isCloneEntry) {
@@ -49,12 +48,14 @@ export function NewSessionStartButton({
   }
 
   return (
-    <Button size="lg" className="mt-6" disabled={isStartDisabled} onPress={onStartSession}>
-      {isStarting ? (
-        <ActivityIndicator size="small" color={colors.primaryForeground} />
-      ) : (
-        <Text>{t('agentChat.newSession.startSession')}</Text>
-      )}
+    <Button
+      size="lg"
+      className="mt-6"
+      disabled={isStartDisabled}
+      loading={isStarting}
+      onPress={onStartSession}
+    >
+      <Text>{isStarting ? t('common.starting') : t('agentChat.newSession.startSession')}</Text>
     </Button>
   );
 }

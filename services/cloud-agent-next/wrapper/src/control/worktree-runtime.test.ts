@@ -657,6 +657,7 @@ describe('worktree Kilo environments', () => {
     expect(JSON.parse(env.KILO_AUTH_CONTENT)).toEqual({ kilo: { type: 'api', key: auth.token } });
     expect(JSON.parse(env.KILO_CONFIG_CONTENT)).toMatchObject({
       autoupdate: false,
+      snapshot: false,
       provider: {
         kilo: {
           options: {

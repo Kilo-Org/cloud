@@ -153,10 +153,12 @@ export type {
   SessionPhase,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
@@ -195,3 +197,9 @@ export type {
   QuestionInfo,
   SendMessagePayload,
 } from './types';
+
+// Canonical default-title contract from the ingest package, surfaced for app
+// clients: a session created before auto-titling carries a
+// `New session - <ISO>` placeholder that no display surface should show as
+// the session's title.
+export { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';

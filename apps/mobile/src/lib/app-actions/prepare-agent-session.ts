@@ -42,6 +42,10 @@ export type PrepareAgentSessionInput =
       model: string;
       variant?: string;
       profileId?: string | null;
+      /** Manual env vars layered over the profile; omitted from the body when empty. */
+      envVars?: Record<string, string>;
+      /** Manual setup commands layered over the profile; omitted from the body when empty. */
+      setupCommands?: string[];
       /** Commit and push the agent's changes (true) or leave them uncommitted. */
       autoCommit?: boolean;
       attachments?: AgentAttachmentWire;
@@ -81,6 +85,17 @@ export type PrepareAgentSessionDeps = {
   whenLoaded: () => Promise<boolean>;
   /** Post-success cache invalidation; the in-app callers own their query client. */
   invalidate?: () => Promise<void>;
+  /**
+   * Re-checked after the safe-retry row is persisted and immediately before
+   * the `prepareSession` mutate, while the request is still unsent. `true`
+   * abandons the intent: the caller's editable draft changed after the
+   * snapshot was taken, so the request must not create a session from stale
+   * text. The row and key stay as a retryable refusal leaves them. Only the
+   * new-session form supplies this — its composer stays editable while a
+   * create is in flight; the OS action path and the Continue clone cannot
+   * change under the call and omit it.
+   */
+  shouldAbort?: () => boolean;
 };
 
 /**
@@ -88,12 +103,16 @@ export type PrepareAgentSessionDeps = {
  * rejection) because the callers' failure feedback differs: the in-app form
  * toasts its own "could not read pending sessions" and never offers the
  * server's message, while the action path reports a retryable start failure.
+ * `aborted` is not a failure at all: the caller's `shouldAbort` predicate
+ * cancelled the intent before any request was sent, so there is no rejection
+ * to report and `message` is empty — the caller stays silent and keeps the
+ * draft. Only a caller that supplied `shouldAbort` can receive it.
  */
 export type PrepareAgentSessionOutcome =
   | { ok: true; sessionId: string }
   | {
       ok: false;
-      reason: 'outbox-unreadable' | 'prepare-failed';
+      reason: 'outbox-unreadable' | 'prepare-failed' | 'aborted';
       retryable: boolean;
       message: string;
       /**
@@ -160,6 +179,20 @@ export async function prepareAgentSession(
       await deps.removeOutboxRow(legacyRowToDrop);
     }
 
+    // The in-app form's composer keeps taking edits while a create is in
+    // flight (locking a focused Android input would drop the IME and collapse
+    // the pinned footer), so the draft can change after the snapshot the
+    // caller took. Re-check the caller's predicate here, with the request
+    // still unsent: an edit is a request for different text, so abandon the
+    // intent without dispatching. The caller keeps the edited draft for the
+    // next Start. The safe-retry row and key are left exactly as a retryable
+    // refusal leaves them — nothing reached the server, and a relaunch that
+    // still holds a row from an earlier same-intent attempt must keep its
+    // dedupe key.
+    if (deps.shouldAbort?.() === true) {
+      return { ok: false, reason: 'aborted', retryable: false, message: '' };
+    }
+
     const result = input.organizationId
       ? await trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
           ...body,
@@ -216,6 +249,8 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
   operationKey: string;
   upstreamBranch?: string;
   profileId?: string;
+  envVars?: Record<string, string>;
+  setupCommands?: string[];
   attachments?: AgentAttachmentWire;
 };
 
@@ -267,6 +302,17 @@ function newIntentFingerprint(
   input: Extract<PrepareAgentSessionInput, { kind: 'new' }>,
   repo: ReturnType<typeof resolveRepoFingerprint> | string
 ): string {
+  // The inline overrides are part of the intent only when present, so a session
+  // with no manual config keeps the exact fingerprint the deployed app stored
+  // (a relaunch reuses its safe-retry key instead of minting a duplicate).
+  const inlineOverrides =
+    input.envVars !== undefined && Object.keys(input.envVars).length > 0
+      ? { envVars: input.envVars }
+      : {};
+  const setupCommands =
+    input.setupCommands !== undefined && input.setupCommands.length > 0
+      ? { setupCommands: input.setupCommands }
+      : {};
   return JSON.stringify({
     prompt: input.prompt,
     mode: input.mode,
@@ -277,6 +323,8 @@ function newIntentFingerprint(
     organizationId: input.organizationId ?? null,
     profileId: input.profileId ?? null,
     attachments: input.attachments ?? null,
+    ...inlineOverrides,
+    ...setupCommands,
   });
 }
 
@@ -327,6 +375,15 @@ function prepareSessionBody(
   }
   if (input.profileId) {
     body.profileId = input.profileId;
+  }
+  // Inline overrides the server layers over the resolved profile. Omitted when
+  // empty so the body is byte-identical to what the deployed app sent before
+  // the advanced config carried manual values.
+  if (input.envVars !== undefined && Object.keys(input.envVars).length > 0) {
+    body.envVars = input.envVars;
+  }
+  if (input.setupCommands !== undefined && input.setupCommands.length > 0) {
+    body.setupCommands = input.setupCommands;
   }
   if (input.attachments) {
     body.attachments = input.attachments;

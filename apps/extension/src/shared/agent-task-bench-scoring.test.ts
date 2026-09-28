@@ -9,6 +9,8 @@ import {
   TASK_SPEED_LIMIT_SECONDS,
 } from './agent-task-bench-scoring';
 
+/* eslint-disable max-lines -- cohesive suite for the task benchmark scorer's content, evidence, and action predicates */
+
 const actionLogin = TASK_BENCH_SCENARIOS['action-login'];
 const actionCart = TASK_BENCH_SCENARIOS['action-cart'];
 if (actionLogin === undefined || actionCart === undefined) {
@@ -62,7 +64,7 @@ describe('final answer selection', () => {
 describe('task correctness scoring', () => {
   it('passes when the answer and tool evidence carry the pinned fact', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('find_in_page', { excerpt: 'died in room 3327 of the hotel' }),
+      ...toolExchange('kilo_browser_find', { excerpt: 'died in room 3327 of the hotel' }),
       answerEvent('He died in room 3327 of the Hotel New Yorker.'),
     ];
     const result = scoreTaskCorrectness({ events, scenario: scenario() });
@@ -79,7 +81,7 @@ describe('task correctness scoring', () => {
   it('ignores harness metadata strings as evidence', () => {
     // A paging note like "characters 16000-24000 of 233274" contains "3327"; only page-derived strings count.
     const events: BenchEvent[] = [
-      ...toolExchange('get_page_snapshot', {
+      ...toolExchange('kilo_browser_snapshot', {
         note: 'Page text shows characters 16000-24000 of 233274.',
         snapshotId: 'snapshot-room 3327',
         text: 'unrelated page text',
@@ -93,7 +95,7 @@ describe('task correctness scoring', () => {
 
   it('ignores evidence from failed tool results', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('find_in_page', { excerpt: 'room 3327' }, false),
+      ...toolExchange('kilo_browser_find', { excerpt: 'room 3327' }, false),
       answerEvent('He died in room 3327 of the Hotel New Yorker.'),
     ];
     expect(scoreTaskCorrectness({ events, scenario: scenario() }).passed).toBe(false);
@@ -101,7 +103,7 @@ describe('task correctness scoring', () => {
 
   it('fails a short answer', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('find_in_page', { excerpt: 'room 3327' }),
+      ...toolExchange('kilo_browser_find', { excerpt: 'room 3327' }),
       answerEvent('room 3327'),
     ];
     const result = scoreTaskCorrectness({
@@ -114,7 +116,7 @@ describe('task correctness scoring', () => {
 
   it('fails when a content check misses the answer', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('find_in_page', { excerpt: 'room 3327' }),
+      ...toolExchange('kilo_browser_find', { excerpt: 'room 3327' }),
       answerEvent('He died in a New York hotel.'),
     ];
     const result = scoreTaskCorrectness({ events, scenario: scenario() });
@@ -162,7 +164,7 @@ describe('task correctness scoring', () => {
     // The action ran, but no ok tool result ever carried the count.
     const memoryOnlyLogin = scoreTaskCorrectness({
       events: [
-        ...toolExchange('eval', { log: 'clicked the login button' }),
+        ...toolExchange('kilo_browser_click', { log: 'clicked the login button' }),
         answerEvent('Swag Labs lists 6 products on the inventory page.'),
       ],
       scenario: actionLogin,
@@ -172,7 +174,7 @@ describe('task correctness scoring', () => {
 
     const memoryOnlyCart = scoreTaskCorrectness({
       events: [
-        ...toolExchange('eval', { log: 'added the backpack to the cart' }),
+        ...toolExchange('kilo_browser_click', { log: 'added the backpack to the cart' }),
         answerEvent('The cart badge shows 1 item: the Sauce Labs Backpack.'),
       ],
       scenario: actionCart,
@@ -183,7 +185,7 @@ describe('task correctness scoring', () => {
     // The same attempt passes once an ok tool result carries the count.
     const evidenced = scoreTaskCorrectness({
       events: [
-        ...toolExchange('eval', { text: 'Products (6 items shown)' }),
+        ...toolExchange('kilo_browser_click', { text: 'Products (6 items shown)' }),
         answerEvent('Swag Labs lists 6 products on the inventory page.'),
       ],
       scenario: actionLogin,
@@ -191,11 +193,11 @@ describe('task correctness scoring', () => {
     expect(evidenced.passed).toBe(true);
   });
 
-  it('accepts a numeric eval result as tool evidence', () => {
-    // The natural honest eval returns querySelectorAll(...).length: the number 6, not '6'.
+  it('accepts a numeric evaluate result as tool evidence', () => {
+    // The natural honest kilo_browser_evaluate returns querySelectorAll(...).length: the number 6, not '6'.
     const numericEvidence = scoreTaskCorrectness({
       events: [
-        ...toolExchange('eval', { ok: true, value: 6 }),
+        ...toolExchange('kilo_browser_evaluate', { ok: true, value: 6 }),
         answerEvent('Swag Labs lists 6 products on the inventory page.'),
       ],
       scenario: actionLogin,
@@ -203,7 +205,7 @@ describe('task correctness scoring', () => {
     expect(numericEvidence.passed).toBe(true);
   });
 
-  it('requires an ok eval exchange for action scenarios', () => {
+  it('requires an ok action exchange for action scenarios', () => {
     const actionScenario = scenario({
       answerChecks: [{ key: 'count', re: /6/u }],
       requiresAction: true,
@@ -216,10 +218,52 @@ describe('task correctness scoring', () => {
     expect(withoutAction.predicates['actionPerformed']?.pass).toBe(false);
 
     const withAction = scoreTaskCorrectness({
-      events: [...toolExchange('eval', { count: 6 }), answerEvent('There are 6 products listed.')],
+      events: [
+        ...toolExchange('kilo_browser_click', { count: 6 }),
+        answerEvent('There are 6 products listed.'),
+      ],
       scenario: actionScenario,
     });
     expect(withAction.passed).toBe(true);
+  });
+
+  it('counts a state-changing browser tool as the action but not a read-only one', () => {
+    const actionScenario = scenario({
+      answerChecks: [{ key: 'count', re: /6/u }],
+      requiresAction: true,
+    });
+
+    // The kilo_browser_evaluate tool is not read-only upstream, so it is a real action.
+    const viaEvaluate = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('kilo_browser_evaluate', { count: 6 }),
+        answerEvent('There are 6 products listed.'),
+      ],
+      scenario: actionScenario,
+    });
+    expect(viaEvaluate.passed).toBe(true);
+    expect(viaEvaluate.predicates['actionPerformed']?.pass).toBe(true);
+
+    // A read-only browser call never satisfies an action scenario.
+    const viaReadOnly = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('kilo_browser_find', { count: 6 }),
+        answerEvent('There are 6 products listed.'),
+      ],
+      scenario: actionScenario,
+    });
+    expect(viaReadOnly.predicates['actionPerformed']?.pass).toBe(false);
+    expect(viaReadOnly.passed).toBe(false);
+
+    // A failed state-changing call does not count either.
+    const viaFailedAction = scoreTaskCorrectness({
+      events: [
+        ...toolExchange('kilo_browser_click', { count: 6 }, false),
+        answerEvent('There are 6 products listed.'),
+      ],
+      scenario: actionScenario,
+    });
+    expect(viaFailedAction.predicates['actionPerformed']?.pass).toBe(false);
   });
 });
 
@@ -246,7 +290,7 @@ describe('answer check quorum', () => {
 
   it('passes when the quorum is met and evidence gates hold', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('get_page_snapshot', { text: 'page mentions beta deep down' }),
+      ...toolExchange('kilo_browser_snapshot', { text: 'page mentions beta deep down' }),
       answerEvent('The piece covers alpha and beta at length.'),
     ];
     expect(scoreTaskCorrectness({ events, scenario: quorumScenario }).passed).toBe(true);
@@ -255,7 +299,7 @@ describe('answer check quorum', () => {
   it('never relaxes tool evidence through the quorum', () => {
     // The answer meets the quorum via alpha and gamma, but beta has no tool evidence.
     const events: BenchEvent[] = [
-      ...toolExchange('get_page_snapshot', { text: 'unrelated page text' }),
+      ...toolExchange('kilo_browser_snapshot', { text: 'unrelated page text' }),
       answerEvent('The piece covers alpha and gamma at length.'),
     ];
     const result = scoreTaskCorrectness({ events, scenario: quorumScenario });
@@ -265,7 +309,7 @@ describe('answer check quorum', () => {
 
   it('fails below the quorum', () => {
     const events: BenchEvent[] = [
-      ...toolExchange('get_page_snapshot', { text: 'page mentions beta deep down' }),
+      ...toolExchange('kilo_browser_snapshot', { text: 'page mentions beta deep down' }),
       answerEvent('The piece covers beta only.'),
     ];
     expect(scoreTaskCorrectness({ events, scenario: quorumScenario }).passed).toBe(false);

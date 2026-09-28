@@ -5,7 +5,7 @@ import { modelsByProvider, organizations } from '@kilocode/db/schema';
 import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
-import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';

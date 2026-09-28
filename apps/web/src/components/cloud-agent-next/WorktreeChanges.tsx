@@ -1,9 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useRef, type MouseEvent, type RefObject } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+  type RefObject,
+} from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import {
+  ArrowLeft,
   ChevronRight,
   FileDiff,
   GitBranch,
@@ -15,11 +24,15 @@ import {
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
-import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { useResizableSidebar } from '@/hooks/useResizableSidebar';
+import { useRawTRPCClient } from '@/lib/trpc/utils';
 import { useManager } from './CloudAgentProvider';
+import { WorktreeFilePane } from './WorktreeFilePane';
+import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
+import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
+import type { WorktreeFileViewMode } from './workspace-tabs';
 import {
   buildWorktreeChangesTree,
   createWorktreeChangesRefresher,
@@ -28,6 +41,7 @@ import {
   getWorktreeChangesTotals,
   groupWorktreeChangesByDirectory,
   preserveNewerWorktreeChanges,
+  resolveWorktreeChangesSelection,
   worktreeChangesMessages,
   type WorktreeChangesFile,
   type WorktreeChangesTreeNode,
@@ -43,48 +57,6 @@ const compactCountFormatter = new Intl.NumberFormat('en', {
   notation: 'compact',
   maximumFractionDigits: 0,
 });
-
-export function useSavedWorktreeChanges({
-  cloudAgentSessionId,
-  organizationId,
-  enabled,
-}: {
-  cloudAgentSessionId: string;
-  organizationId?: string;
-  enabled: boolean;
-}) {
-  const trpc = useTRPC();
-  const queryOptions = useMemo(
-    () =>
-      organizationId
-        ? trpc.organizations.cloudAgentNext.getWorktreeChanges.queryOptions(
-            { organizationId, cloudAgentSessionId },
-            { trpc: { abortOnUnmount: true, context: { skipBatch: true } } }
-          )
-        : trpc.cloudAgentNext.getWorktreeChanges.queryOptions(
-            { cloudAgentSessionId },
-            { trpc: { abortOnUnmount: true, context: { skipBatch: true } } }
-          ),
-    [trpc, organizationId, cloudAgentSessionId]
-  );
-  const saved = useQuery({
-    ...queryOptions,
-    enabled,
-    staleTime: 0,
-    refetchOnMount: 'always',
-    refetchOnWindowFocus: true,
-    refetchOnReconnect: true,
-    retry: (failureCount, error) => {
-      const status = error.data?.httpStatus;
-      return (
-        failureCount < 2 &&
-        (status === undefined || status === 408 || status === 429 || status >= 500)
-      );
-    },
-    structuralSharing: preserveNewerWorktreeChanges,
-  });
-  return { saved, queryKey: queryOptions.queryKey };
-}
 
 function ChangeLineCounts({
   additions,
@@ -184,7 +156,6 @@ export function WorktreeChangesButton({
       aria-label="Changes"
       aria-description={totals ? summary : undefined}
       title={totals ? `Saved changes: ${summary}` : 'Changes'}
-      aria-haspopup="dialog"
       aria-expanded={open}
       aria-controls={open ? 'worktree-changes-panel' : undefined}
       onClick={onToggle}
@@ -200,24 +171,20 @@ export function WorktreeChangesButton({
   );
 }
 
-export function WorktreeChangesDrawer({
+export function WorktreeChangesView({
   cloudAgentSessionId,
   organizationId,
   open,
-  onOpenChange,
-  onSelectFile,
-  onCloseAutoFocus,
-  portalContainer,
   commentCounts,
+  review,
+  reviewScope,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
   open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onSelectFile: (path: string) => void;
-  onCloseAutoFocus: (event: Event) => void;
-  portalContainer: HTMLElement | null;
   commentCounts?: ReadonlyMap<string, number>;
+  review?: WorktreeFileReviewBindings;
+  reviewScope?: { userId: string; organizationId?: string; workspaceScope: string };
 }) {
   const [viewMode, setViewMode] = useLocalStorage<WorktreeChangesViewMode>(
     'cloud-agent:worktree-changes-view-mode',
@@ -225,44 +192,102 @@ export function WorktreeChangesDrawer({
     { initializeWithValue: false, deserializer: deserializeWorktreeChangesViewMode }
   );
   const activeTabRef = useRef<HTMLButtonElement>(null);
+  const { saved } = useSavedWorktreeChanges({
+    cloudAgentSessionId,
+    organizationId,
+    enabled: open,
+  });
+  const files = saved.data?.snapshot?.files ?? [];
+  const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const selected = resolveWorktreeChangesSelection(selectedPath, files);
+  if (selected !== selectedPath) setSelectedPath(selected);
+  const [mode, setMode] = useState<WorktreeFileViewMode>('diff');
+  const [mobilePane, setMobilePane] = useState<'list' | 'diff'>('list');
+  const { width: listWidth, startDrag } = useResizableSidebar(
+    448,
+    200,
+    640,
+    'cloud-agent:worktree-changes-list-width'
+  );
+
+  useEffect(() => {
+    setMode('diff');
+  }, [selected]);
+
+  useEffect(() => {
+    if (!open) setMobilePane('list');
+  }, [open]);
 
   useEffect(() => {
     if (open) activeTabRef.current?.focus({ preventScroll: true });
   }, [open]);
 
+  if (!open) return null;
+
+  const showDiff = mobilePane === 'diff' && selected !== null;
+
   return (
-    <Sheet modal={false} open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        id="worktree-changes-panel"
-        side="right"
-        portalContainer={portalContainer}
-        overlayClassName="absolute"
-        dismissibleOverlay
-        showCloseButton={false}
-        className="absolute inset-y-0 right-0 h-full w-full gap-0 border-l p-0 motion-reduce:animate-none! motion-reduce:transition-none sm:max-w-md"
-        onOpenAutoFocus={event => {
-          event.preventDefault();
-          activeTabRef.current?.focus({ preventScroll: true });
-        }}
-        onCloseAutoFocus={onCloseAutoFocus}
-        onInteractOutside={event => event.preventDefault()}
+    <div
+      id="worktree-changes-panel"
+      className="bg-background text-foreground flex min-h-0 min-w-0 flex-1"
+    >
+      <div
+        className={`${showDiff ? 'hidden' : 'flex'} w-full min-h-0 flex-col sm:flex sm:w-(--worktree-list-width) sm:shrink-0`}
+        style={{ '--worktree-list-width': `${listWidth}px` } as CSSProperties}
       >
-        <SheetTitle className="sr-only">Changes</SheetTitle>
-        <SheetDescription className="sr-only">
-          Changed files in the session worktree.
-        </SheetDescription>
         <WorktreeChanges
           cloudAgentSessionId={cloudAgentSessionId}
           organizationId={organizationId}
           open={open}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
-          onSelectFile={onSelectFile}
+          activePath={selected ?? undefined}
+          onSelectFile={path => {
+            setSelectedPath(path);
+            setMobilePane('diff');
+          }}
           activeTabRef={activeTabRef}
           commentCounts={commentCounts}
         />
-      </SheetContent>
-    </Sheet>
+      </div>
+      <div
+        className="before:bg-border hover:before:bg-border relative hidden w-3 shrink-0 cursor-col-resize before:absolute before:inset-y-0 before:left-1/2 before:w-px before:-translate-x-1/2 before:content-[''] sm:block"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize file list"
+        onMouseDown={startDrag}
+      />
+      <div className={`${showDiff ? 'flex' : 'hidden'} min-h-0 min-w-0 flex-1 flex-col sm:flex`}>
+        <div className="shrink-0 border-b p-1 sm:hidden">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Back to changed files"
+            className="h-11 gap-1.5 px-2 text-xs"
+            onClick={() => setMobilePane('list')}
+          >
+            <ArrowLeft aria-hidden="true" className="size-3.5" />
+            Back
+          </Button>
+        </div>
+        <div className="min-h-0 flex-1">
+          {selected ? (
+            <WorktreeFilePane
+              cloudAgentSessionId={cloudAgentSessionId}
+              organizationId={organizationId}
+              path={selected}
+              mode={mode}
+              onModeChange={setMode}
+              review={review}
+              reviewScope={reviewScope}
+            />
+          ) : (
+            <p className="text-muted-foreground p-3 text-xs">No changed files.</p>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -270,10 +295,12 @@ function ChangedFile({
   file,
   onSelectFile,
   commentCount = 0,
+  active = false,
 }: {
   file: WorktreeChangesFile;
   onSelectFile: (path: string) => void;
   commentCount?: number;
+  active?: boolean;
 }) {
   const status = fileStatusStyles[file.status];
   const name = file.path.slice(file.path.lastIndexOf('/') + 1);
@@ -284,8 +311,9 @@ function ChangedFile({
         type="button"
         variant="ghost"
         size="sm"
-        className="h-11 w-full min-w-0 justify-start gap-2 rounded-sm px-2 py-0 text-xs font-normal sm:h-7"
+        className={`h-11 w-full min-w-0 justify-start gap-2 rounded-sm px-2 py-0 text-xs font-normal sm:h-7 ${active ? 'bg-secondary' : ''}`}
         title={file.path}
+        aria-current={active ? 'true' : undefined}
         onClick={() => onSelectFile(file.path)}
       >
         <span
@@ -323,10 +351,12 @@ function ChangedFile({
 function ChangedFileTree({
   nodes,
   onSelectFile,
+  activePath,
   commentCounts,
 }: {
   nodes: WorktreeChangesTreeNode[];
   onSelectFile: (path: string) => void;
+  activePath?: string;
   commentCounts?: ReadonlyMap<string, number>;
 }) {
   return nodes.map(node =>
@@ -335,6 +365,7 @@ function ChangedFileTree({
         key={`file:${node.path}`}
         file={node.file}
         onSelectFile={onSelectFile}
+        active={node.path === activePath}
         commentCount={commentCounts?.get(node.path) ?? 0}
       />
     ) : (
@@ -360,6 +391,7 @@ function ChangedFileTree({
               <ChangedFileTree
                 nodes={node.children}
                 onSelectFile={onSelectFile}
+                activePath={activePath}
                 commentCounts={commentCounts}
               />
             </ul>
@@ -377,6 +409,7 @@ function WorktreeChanges({
   viewMode,
   onViewModeChange,
   onSelectFile,
+  activePath,
   activeTabRef,
   commentCounts,
 }: {
@@ -386,6 +419,7 @@ function WorktreeChanges({
   viewMode: WorktreeChangesViewMode;
   onViewModeChange: (value: WorktreeChangesViewMode) => void;
   onSelectFile: (path: string) => void;
+  activePath?: string;
   activeTabRef: RefObject<HTMLButtonElement | null>;
   commentCounts?: ReadonlyMap<string, number>;
 }) {
@@ -506,6 +540,7 @@ function WorktreeChanges({
                         key={file.path}
                         file={file}
                         onSelectFile={onSelectFile}
+                        active={file.path === activePath}
                         commentCount={commentCounts?.get(file.path) ?? 0}
                       />
                     ))}
@@ -521,6 +556,7 @@ function WorktreeChanges({
               <ChangedFileTree
                 nodes={tree}
                 onSelectFile={onSelectFile}
+                activePath={activePath}
                 commentCounts={commentCounts}
               />
             </ul>

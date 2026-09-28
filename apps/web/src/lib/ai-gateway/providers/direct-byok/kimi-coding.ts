@@ -3,7 +3,6 @@ import {
   type DirectByokProvider,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import { isReasoningExplicitlyDisabled } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { isRooCodeBasedClient } from '@/lib/utils';
 
 export default {
   id: 'kimi-coding',
@@ -12,9 +11,7 @@ export default {
   supported_chat_apis: ['chat_completions'],
   default_ai_sdk_provider: 'openai-compatible',
   transformRequest(context) {
-    const reasoningDisabled =
-      isRooCodeBasedClient(context.originalHeaders) ||
-      isReasoningExplicitlyDisabled(context.request);
+    const reasoningDisabled = isReasoningExplicitlyDisabled(context.request);
     context.request.body.thinking = {
       type: reasoningDisabled ? 'disabled' : 'enabled',
     };

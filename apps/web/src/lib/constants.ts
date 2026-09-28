@@ -56,8 +56,6 @@ export const APP_URL = resolveAppUrl({
 export const TRIAL_DURATION_DAYS = 14;
 
 export const AUTOCOMPLETE_MODEL = 'codestral-2508';
-export const INCEPTION_PROMO_MODEL = 'inception/mercury-edit-2';
-export const INCEPTION_PROMO_RUNNING = false;
 
 export const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 

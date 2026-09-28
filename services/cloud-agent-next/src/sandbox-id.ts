@@ -1,10 +1,12 @@
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
   getSandboxAllocationProvider,
   getSandboxAllocationRequest,
   sandboxAllocationRequiresControlPlane,
   type SandboxAllocation,
   type SandboxDestination,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { providerUsesOutboundCredentialProxy } from './agent-sandbox/capabilities.js';
 import type { AgentSandboxProvider, SandboxId, Env } from './types.js';
 import {
   sessionPlaneForNewOwner,
@@ -19,6 +21,12 @@ import {
   type VercelSandboxEnrollmentEnv,
   type VercelSandboxRuntimeConfigEnv,
 } from './agent-sandbox/vercel/vercel-runtime-config.js';
+import {
+  isCloudflareContainersEnrolled,
+  type CloudflareContainersEnrollmentEnv,
+} from './agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
+import { isCloudAgentContainerBillingEnabled } from './container-billing-rollout.js';
+import { providerSupportsEnforcedBilling } from './sandbox-provider-eligibility.js';
 
 export const MANAGED_SCM_OUTBOUND_HANDLER = 'managedScm';
 
@@ -67,6 +75,8 @@ const SANDBOX_ALLOCATION_ID_PREFIX: Record<SandboxAllocation, 'istd' | 'ses' | u
   'isolated-standard': 'istd',
   'cloudflare-single': 'ses',
   'cloudflare-shared': undefined,
+  'cloudflare-containers-standard-3': 'ses',
+  'cloudflare-containers-standard-4': 'ses',
   'vercel-small': 'ses',
   'vercel-large': 'ses',
 };
@@ -174,6 +184,18 @@ export function getSandboxNamespace(
   return options.managedScmContainment === true ? env.SandboxContainment : env.Sandbox;
 }
 
+export function getManagedOutboundContainerId(
+  provider: AgentSandboxProvider,
+  env: SandboxNamespaceEnv & Pick<Env, 'SANDBOX_CONTAINERS'>,
+  ids: { logicalSandboxId: string; physicalSandboxId: string }
+): string | undefined {
+  if (!providerUsesOutboundCredentialProxy(provider)) return undefined;
+  if (provider === 'cloudflare-containers') {
+    return env.SANDBOX_CONTAINERS.idFromName(ids.logicalSandboxId).toString();
+  }
+  return getOutboundContainerId(env, ids.physicalSandboxId, { managedScmContainment: true });
+}
+
 export function getOutboundContainerId(
   env: SandboxNamespaceEnv,
   sandboxId: string,
@@ -221,7 +243,14 @@ export type SandboxSelection = {
 export type SandboxSelectionEnv = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
 } & VercelSandboxEnrollmentEnv &
-  VercelSandboxRuntimeConfigEnv;
+  VercelSandboxRuntimeConfigEnv &
+  CloudflareContainersEnrollmentEnv &
+  Pick<
+    Env,
+    | 'CLOUD_AGENT_CONTAINER_BILLING_ENABLED'
+    | 'CLOUD_AGENT_CONTAINER_BILLING_USER_IDS'
+    | 'CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS'
+  >;
 
 type SelectSandboxForNewSessionInput = {
   env: SandboxSelectionEnv;
@@ -242,6 +271,7 @@ type SelectSandboxForNewSessionInput = {
 export function selectSandboxProvider(input: {
   env: SandboxSelectionEnv;
   orgId?: string;
+  userId: string;
   sandboxId: SandboxId;
   sessionId: string;
   devcontainer?: boolean;
@@ -256,7 +286,7 @@ export function selectSandboxProvider(input: {
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(input.sessionId) !== 'control'
     ) {
-      throw new Error('Vercel sandbox allocations require a control-plane session');
+      throw new Error('Sandbox allocations for this provider require a control-plane session');
     }
     if (!sandboxIdMatchesAllocation(input.sandboxId, allocation)) {
       throw new Error('Sandbox allocation does not match the sandbox identity');
@@ -266,6 +296,7 @@ export function selectSandboxProvider(input: {
   return selectDefaultSandboxProvider({
     env: input.env,
     orgId: input.orgId,
+    userId: input.userId,
     plane: sessionPlaneFromId(input.sessionId),
     isolated: input.sandboxId.startsWith('ses-'),
     devcontainer: input.devcontainer,
@@ -275,10 +306,18 @@ export function selectSandboxProvider(input: {
 function selectDefaultSandboxProvider(input: {
   env: SandboxSelectionEnv;
   orgId?: string;
+  userId: string;
   plane: SessionPlane;
   isolated: boolean;
   devcontainer?: boolean;
 }): AgentSandboxProvider {
+  const enforced = isCloudAgentContainerBillingEnabled(input.env, {
+    userId: input.userId,
+    ...(input.orgId !== undefined ? { orgId: input.orgId } : {}),
+  });
+  const eligible = (provider: AgentSandboxProvider): boolean =>
+    !enforced || providerSupportsEnforcedBilling(provider);
+
   const enrollment = parseVercelSandboxEnrollment(input.env);
   const runtimeConfig = parseVercelSandboxRuntimeConfig(input.env);
   const enrolled =
@@ -286,6 +325,7 @@ function selectDefaultSandboxProvider(input: {
       ? enrollment.orgIds.has('*') || enrollment.orgIds.has(input.orgId)
       : enrollment.allowPersonal;
   const useVercel =
+    eligible('vercel') &&
     input.plane === 'control' &&
     !input.devcontainer &&
     input.isolated &&
@@ -293,7 +333,16 @@ function selectDefaultSandboxProvider(input: {
     enrolled &&
     runtimeConfig !== undefined;
 
-  return useVercel ? 'vercel' : 'cloudflare';
+  if (useVercel) return 'vercel';
+
+  const useContainers =
+    eligible('cloudflare-containers') &&
+    input.plane === 'control' &&
+    !input.devcontainer &&
+    input.isolated &&
+    isCloudflareContainersEnrolled(input.env, { orgId: input.orgId });
+
+  return useContainers ? 'cloudflare-containers' : 'cloudflare';
 }
 
 export function getDefaultSandboxDestination(
@@ -311,11 +360,15 @@ export function getDefaultSandboxDestination(
   const provider = selectDefaultSandboxProvider({
     env,
     orgId: owner.orgId,
+    userId: owner.userId,
     plane: sessionPlaneForNewOwner(env, owner, { createdOnPlatform: 'cloud-agent-web' }),
     isolated,
   });
   if (provider === 'vercel') {
     return { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' };
+  }
+  if (provider === 'cloudflare-containers') {
+    return getSandboxAllocationRequest(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION);
   }
   return getSandboxAllocationRequest(isolated ? 'cloudflare-single' : 'cloudflare-shared');
 }
@@ -334,6 +387,7 @@ export async function selectSandboxForNewSession(
   const provider = selectSandboxProvider({
     env: input.env,
     orgId: input.orgId,
+    userId: input.userId,
     sandboxId,
     sessionId: input.sessionId,
     devcontainer: input.devcontainer,
@@ -378,7 +432,7 @@ export async function generateSandboxRoutingTarget(
       sandboxAllocationRequiresControlPlane(allocation) &&
       sessionPlaneFromId(sessionId) !== 'control'
     ) {
-      throw new Error('Vercel sandbox allocations require a control-plane session');
+      throw new Error('Sandbox allocations for this provider require a control-plane session');
     }
     const prefix = SANDBOX_ALLOCATION_ID_PREFIX[allocation];
     // `cloudflare-shared` has no isolated prefix: it falls through to the shared route.

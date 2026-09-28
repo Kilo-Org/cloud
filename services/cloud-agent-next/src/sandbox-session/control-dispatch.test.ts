@@ -12,6 +12,7 @@ import {
   isRetryableDeliveryError,
   observeControlAfterStopping,
   reconstructControlRequestError,
+  safeErrorFromQueueReason,
   SESSION_DELIVERY_TIMEOUT_MS,
   withDeliveryDeadline,
 } from './control-dispatch.js';
@@ -42,6 +43,22 @@ describe('controlDispatchDisposition', () => {
     expect(controlDispatchDisposition({ physical: 'failed', connection: 'ready' })).toEqual({
       action: 'wait',
     });
+  });
+
+  it('fails a terminal launch failure instead of waiting for a replacement', () => {
+    expect(
+      controlDispatchDisposition({
+        physical: 'failed',
+        connection: 'disconnected',
+        launchFailed: true,
+      })
+    ).toEqual({ action: 'fail', reason: 'launch_failed' });
+  });
+});
+
+describe('safeErrorFromQueueReason', () => {
+  it('names a terminal launch failure', () => {
+    expect(safeErrorFromQueueReason('launch_failed')).toBe('Sandbox launch failed');
   });
 });
 

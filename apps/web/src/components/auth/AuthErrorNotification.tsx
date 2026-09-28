@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { BlockedNotification } from '@/components/auth/BlockedNotification';
+import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 
 export function AuthErrorNotification({ error }: { error: string }) {
   if (error === 'BLOCKED') return <BlockedNotification />;
@@ -84,7 +85,10 @@ export function AuthErrorNotification({ error }: { error: string }) {
       <div data-error-notification role="alert" aria-live="assertive" aria-atomic="true">
         <ErrorNotificationBox title="Signup Blocked">
           Automated account creation was detected and blocked. If this was a mistake, please{' '}
-          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
+          <a
+            href="https://kilo.ai/support"
+            className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+          >
             contact support
           </a>{' '}
           and we&apos;ll get you sorted out.
@@ -98,7 +102,10 @@ export function AuthErrorNotification({ error }: { error: string }) {
         <ErrorNotificationBox title="Account Already Exists">
           An account already exists for this email address. Try signing in with the original login
           method, or{' '}
-          <a href="https://kilo.ai/support" className="underline hover:text-red-100">
+          <a
+            href="https://kilo.ai/support"
+            className={`underline hover:text-red-100 ${INLINE_LINK_TOUCH_TARGET}`}
+          >
             contact support
           </a>{' '}
           if you need help accessing it.
@@ -148,7 +155,7 @@ function ErrorNotificationBox({ title, children }: { title: string; children: Re
       </div>
       <p className="mt-2 text-red-300">{children}</p>
       <button
-        className="absolute top-2 right-2 rounded-md p-1 text-red-600 hover:bg-red-900/50 hover:text-red-200"
+        className="absolute top-2 right-2 rounded-md p-1 text-red-600 hover:bg-red-900/50 hover:text-red-200 pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:min-w-11 pointer-coarse:items-center pointer-coarse:justify-center"
         onClick={() => {
           // Close the notification by hiding it
           const element = document.querySelector('[data-error-notification]') as HTMLElement;

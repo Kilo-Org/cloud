@@ -59,6 +59,7 @@ type RuntimeAssociation = {
     auth_invalid_at: string | null;
     github_disconnected_at: string | null;
     github_installation_id: string | null;
+    github_connection_role: 'workflow' | 'agent_only' | null;
   };
   installation: {
     lifecycle_state: 'unknown' | 'active' | 'suspended' | 'deleted';
@@ -75,12 +76,7 @@ type RuntimeAssociation = {
 export function getGitHubRuntimeAssociationRejectionReason(
   association: RuntimeAssociation | null | undefined,
   options?: {
-    /**
-     * Allow a shared (`web_cloud_agent`) canonical installation. Only valid when the caller
-     * resolved one exact tenant association; the generic, installation-wide path must stay
-     * exclusive-only.
-     */
-    allowShared?: boolean;
+    purpose?: 'workflow' | 'agent' | 'management';
   }
 ): GitHubRuntimeAuthorizationRejectionReason | null {
   if (!association) return 'missing_association';
@@ -97,17 +93,19 @@ export function getGitHubRuntimeAssociationRejectionReason(
     return 'deleted_organization';
   }
 
-  // Preserve the legacy health contract; canonical installation data remains shadow state.
   if (integration.integration_status !== INTEGRATION_STATUS.ACTIVE) return 'integration_status';
   if (integration.suspended_at !== null) return 'suspended';
   if (integration.auth_invalid_at !== null) return 'auth_invalid';
   if (integration.github_disconnected_at != null) return 'disconnected';
 
-  // An association bound to a canonical installation must have that installation active, not
-  // suspended/deleted/auth-invalid, and exclusively owned UNLESS the caller resolved one exact
-  // tenant association and explicitly opted into the shared (web_cloud_agent) carve-out. An
-  // association with no canonical binding yet (github_installation_id is null) has nothing
-  // further to check here.
+  if (
+    integration.github_connection_role !== 'workflow' &&
+    !(
+      integration.github_connection_role === 'agent_only' &&
+      (options?.purpose === 'agent' || options?.purpose === 'management')
+    )
+  )
+    return 'sharing_not_allowed';
   if (integration.github_installation_id !== null) {
     if (
       installation === null ||
@@ -118,12 +116,6 @@ export function getGitHubRuntimeAssociationRejectionReason(
     ) {
       return 'installation_unavailable';
     }
-    if (
-      installation.sharing_mode !== 'exclusive' &&
-      !(options?.allowShared === true && installation.sharing_mode === 'web_cloud_agent')
-    ) {
-      return 'sharing_not_allowed';
-    }
   }
 
   return null;
@@ -131,7 +123,7 @@ export function getGitHubRuntimeAssociationRejectionReason(
 
 export function isGitHubRuntimeAssociationAuthorized(
   association: RuntimeAssociation | null | undefined,
-  options?: { allowShared?: boolean }
+  options?: { purpose?: 'workflow' | 'agent' | 'management' }
 ): boolean {
   return getGitHubRuntimeAssociationRejectionReason(association, options) === null;
 }
@@ -139,20 +131,12 @@ export function isGitHubRuntimeAssociationAuthorized(
 export async function assertGitHubInstallationRuntimeAuthorized(
   installationId: string,
   appType: GitHubAppType,
-  expectedIntegrationId?: string
+  expectedIntegrationId?: string,
+  purpose: 'workflow' | 'agent' | 'management' = 'workflow'
 ): Promise<void> {
-  // A non-empty expectedIntegrationId means the caller already resolved the tenant association
-  // it is about to act as. That association still has to pass ownership (org membership / user
-  // ownership) and local + canonical health below; only the sharing-mode requirement relaxes so
-  // a legitimately attached shared association can read its own inventory. Without one (the
-  // generic, installation-wide path) shared installations stay rejected.
-  //
-  // This single normalized value drives the id predicate, the row limit, and the sharing-mode
-  // carve-out so they can never diverge: an empty-string id is the generic path, not an exact
-  // association.
   const exactAssociationId =
     expectedIntegrationId && expectedIntegrationId.length > 0 ? expectedIntegrationId : undefined;
-  const allowShared = exactAssociationId !== undefined;
+  const allowAgentOnly = exactAssociationId !== undefined && purpose !== 'workflow';
   const associations = await db
     .select({
       integration: platform_integrations,
@@ -171,6 +155,12 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
+        allowAgentOnly
+          ? or(
+              eq(platform_integrations.github_connection_role, 'workflow'),
+              eq(platform_integrations.github_connection_role, 'agent_only')
+            )
+          : eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.github_disconnected_at),
         isNull(platform_integrations.suspended_at),
@@ -208,12 +198,6 @@ export async function assertGitHubInstallationRuntimeAuthorized(
             eq(github_app_installations.github_app_type, appType),
             eq(github_app_installations.installation_id, installationId),
             eq(github_app_installations.lifecycle_state, 'active'),
-            allowShared
-              ? or(
-                  eq(github_app_installations.sharing_mode, 'exclusive'),
-                  eq(github_app_installations.sharing_mode, 'web_cloud_agent')
-                )
-              : eq(github_app_installations.sharing_mode, 'exclusive'),
             isNull(github_app_installations.suspended_at),
             isNull(github_app_installations.deleted_at),
             isNull(github_app_installations.auth_invalid_at)
@@ -226,7 +210,9 @@ export async function assertGitHubInstallationRuntimeAuthorized(
   const reason =
     associations.length > 1
       ? 'ambiguous_association'
-      : getGitHubRuntimeAssociationRejectionReason(associations[0], { allowShared });
+      : getGitHubRuntimeAssociationRejectionReason(associations[0], {
+          purpose: allowAgentOnly ? purpose : 'workflow',
+        });
   if (reason) {
     throw new GitHubRuntimeAuthorizationError(reason, {
       installationId,

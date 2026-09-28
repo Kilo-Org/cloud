@@ -11,14 +11,23 @@ import { FixedPartRow } from './fixed-part-row';
 import { ToolRunSheet } from './tool-run-sheet';
 
 /** One gateway request, so the assertions can read the summaries it carried. */
-type TranslationRequest = { text: string; targetLanguage: string; model: string };
+type TranslationRequest = { texts: readonly string[]; targetLanguage: string; model: string };
 
-const { requestMock } = vi.hoisted(() => ({
-  requestMock: vi.fn<(request: TranslationRequest) => Promise<string | null>>(),
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn<(request: TranslationRequest) => Promise<(string | null)[]>>(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
 }));
 
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
-  requestToolSummaryTranslation: requestMock,
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so the suite stays native-free and
+// hydration settles before the batch window closes.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
@@ -143,13 +152,13 @@ function textsOf(root: TestRenderer.ReactTestInstance): unknown[] {
 
 const MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
 
-/** Long enough for the mocked client's dynamic import and request to settle. */
+/** Longer than the runtime's 40 ms batch window plus the mocked import/request. */
 async function settleTranslation(): Promise<void> {
   await act(async () => {
     for (let i = 0; i < 5; i += 1) {
-      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the dynamic import and request
+      // eslint-disable-next-line no-await-in-loop -- sequential macrotask flushes settle the batch window, the dynamic import and the request
       await new Promise<void>(resolve => {
-        setImmediate(resolve);
+        setTimeout(resolve, 20);
       });
     }
   });
@@ -158,6 +167,10 @@ async function settleTranslation(): Promise<void> {
 describe('ToolRunSheet mounted', () => {
   beforeEach(() => {
     requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
   });
 
@@ -231,14 +244,14 @@ describe('ToolRunSheet mounted', () => {
   });
 
   it('translates the row own summary, exactly as the session page shows it', async () => {
-    requestMock.mockResolvedValue('Dateien auflisten');
+    requestMock.mockResolvedValue(['Dateien auflisten']);
     setConfig({ enabled: true, model: MODEL });
     const renderer = await mountSheet([makePart('t1', 'bash', { description: 'List files' })]);
     await settleTranslation();
 
     expect(textsOf(renderer.root)).toContain('Dateien auflisten');
     expect(requestMock).toHaveBeenCalledWith({
-      text: 'List files',
+      texts: ['List files'],
       targetLanguage: 'en',
       model: MODEL.id,
     });

@@ -1,4 +1,3 @@
-import type { baseProcedure } from '@/lib/trpc/init';
 import type { TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
@@ -533,31 +532,5 @@ export function createAutoTriageRouter({
         }
       },
     },
-  };
-}
-
-export function wrapSharedHandlersInRouter(
-  handlers: ReturnType<typeof createAutoTriageRouter>,
-  procedure: typeof baseProcedure
-) {
-  return {
-    getGitHubStatus: procedure.query(handlers.getGitHubStatus),
-    listGitHubRepositories: procedure.query(handlers.listGitHubRepositories),
-    getAutoTriageConfig: procedure.query(handlers.getAutoTriageConfig),
-    saveAutoTriageConfig: procedure
-      .input(handlers.saveAutoTriageConfig.inputSchema)
-      .mutation(handlers.saveAutoTriageConfig.handler),
-    toggleAutoTriageAgent: procedure
-      .input(handlers.toggleAutoTriageAgent.inputSchema)
-      .mutation(handlers.toggleAutoTriageAgent.handler),
-    retryTicket: procedure
-      .input(handlers.retryTicket.inputSchema)
-      .mutation(handlers.retryTicket.handler),
-    interruptTicket: procedure
-      .input(handlers.interruptTicket.inputSchema)
-      .mutation(handlers.interruptTicket.handler),
-    listTickets: procedure
-      .input(handlers.listTickets.inputSchema)
-      .query(handlers.listTickets.handler),
   };
 }

@@ -3,7 +3,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
-import { RTL_WRITING_DIRECTION } from '@/lib/rtl-text';
+import {
+  containsJoinedScript,
+  hasRtlScript,
+  NATURAL_LETTER_SPACING,
+  RTL_WRITING_DIRECTION,
+  withoutMonoFamily,
+} from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 const textVariants = cva('text-foreground text-base font-medium', {
@@ -22,7 +28,7 @@ const textVariants = cva('text-foreground text-base font-medium', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-muted-foreground text-sm',
       mono: 'font-mono-medium text-sm',
-      eyebrow: 'font-mono-medium text-[10px] uppercase tracking-[1.5px] text-muted-foreground',
+      eyebrow: 'font-mono-medium text-[10px] text-muted-foreground',
     },
   },
   defaultVariants: {
@@ -48,6 +54,22 @@ const ARIA_LEVEL = {
   h4: '4',
 } satisfies Partial<Record<TextVariant, string>>;
 
+/**
+ * The eyebrow's Latin display treatment: full capitals, letterspaced. It is
+ * dropped for RTL-script copy in an RTL interface (`hasRtlScript`: the app
+ * ships Arabic-script languages and Hebrew): `letter-spacing` pulls a
+ * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
+ * — and that copy also drops the mono family (see `withoutMonoFamily`).
+ * Latin copy keeps the treatment in either direction, and in an LTR interface
+ * the class stays on a joined-script label while the letter-spacing reset
+ * draws it inert (`NATURAL_LETTER_SPACING`, `text.mounted.test.tsx`).
+ *
+ * Exported so the eyebrow-scale labels rendered outside the variant — the
+ * `SectionHeader` action link — carry the identical treatment instead of a
+ * second copy of the class string that can drift.
+ */
+export const EYEBROW_LATIN_DISPLAY = 'uppercase tracking-[1.5px]';
+
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
@@ -62,13 +84,38 @@ function Text({
   }) {
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
+  const isRTL = I18nManager.isRTL;
+  // The font family is the script's, not the interface's: JetBrains Mono ships
+  // no Arabic or Hebrew glyphs, so the copy that uses either drops the family
+  // in both directions (`withoutMonoFamily`).
+  const isRtlScript = hasRtlScript(props.children);
+  // Letter-spacing is the script's too. A joined script cannot take it in
+  // either direction: an Arabic label on an LTR screen keeps its joins. An RTL
+  // interface resets its RTL-script copy as well — a Hebrew label there would
+  // take a spacing no Hebrew reader asked for — while Latin copy, in either
+  // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
+  const resetsTracking = containsJoinedScript(props.children) || (isRTL && isRtlScript);
+  const classes = cn(
+    textVariants({ variant }),
+    variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
+    textClass,
+    className
+  );
   return (
     <Component
-      className={cn(textVariants({ variant }), textClass, className)}
+      className={isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={I18nManager.isRTL ? [RTL_WRITING_DIRECTION, props.style] : props.style}
+      style={
+        isRTL || resetsTracking
+          ? [
+              isRTL ? RTL_WRITING_DIRECTION : undefined,
+              resetsTracking ? NATURAL_LETTER_SPACING : undefined,
+              props.style,
+            ]
+          : props.style
+      }
     />
   );
 }

@@ -41,6 +41,7 @@ import {
   sessionGitSnapshotResultSchema,
 } from '../../../src/shared/worktree-changes-wire.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
+import { gateResultFromProperties } from '../../../src/shared/kilo-event-properties.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import type { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { runAutoCommit } from '../auto-commit.js';
@@ -101,6 +102,7 @@ type SessionActivity = {
   state: 'idle' | 'active' | 'finalizing';
   lastActivityAt: number;
   waitingOn?: 'model' | 'tool' | 'finalizing';
+  gateResult?: 'pass' | 'fail';
 };
 
 type KiloSessionStatuses = Awaited<ReturnType<WrapperKiloClient['getSessionStatuses']>>;
@@ -117,6 +119,7 @@ export type SessionActivityRegistry = {
   ): void;
   reconcile(statuses: KiloSessionStatuses, roots?: readonly string[]): void;
   revision(rootKiloSessionId: string): symbol | undefined;
+  consumeGateResult(rootKiloSessionId: string): 'pass' | 'fail' | undefined;
   snapshots(): NonNullable<SandboxHeartbeatPayload['sessions']>;
   state(): 'idle' | 'active';
 };
@@ -174,6 +177,11 @@ export function createSessionActivityRegistry(
       update(rootKiloSessionId, 'active', 'model', true);
     },
     observeEvent(type, kiloSessionId, rootKiloSessionId, properties) {
+      const gateResult = gateResultFromProperties(properties);
+      if (gateResult !== undefined && rootKiloSessionId) {
+        const session = sessions.get(rootKiloSessionId);
+        if (session) session.gateResult = gateResult;
+      }
       if (!rootKiloSessionId || kiloSessionId !== rootKiloSessionId) return;
       if (type === 'session.turn.open') {
         update(rootKiloSessionId, 'active', 'model', true);
@@ -202,6 +210,13 @@ export function createSessionActivityRegistry(
     },
     revision(rootKiloSessionId) {
       return sessions.get(rootKiloSessionId)?.revision;
+    },
+    consumeGateResult(rootKiloSessionId) {
+      const session = sessions.get(rootKiloSessionId);
+      if (!session) return undefined;
+      const gateResult = session.gateResult;
+      delete session.gateResult;
+      return gateResult;
     },
     snapshots() {
       const observedAt = now();
@@ -313,6 +328,7 @@ function kiloFailure(error: unknown): ControlHandlerResult {
 
 function operationEffects(session: SessionRequestIdentity, deps: HandlerDeps) {
   const send = deps.sendOperationResult;
+  const activity = deps.activity;
   return {
     signal: deps.signal,
     onDiagnostic: deps.onDiagnostic,
@@ -323,6 +339,9 @@ function operationEffects(session: SessionRequestIdentity, deps: HandlerDeps) {
     sendOperationResult: send
       ? (delivery: SessionOperationDelivery, signal: AbortSignal, deadlineAt: number) =>
           send(session, delivery, signal, deadlineAt)
+      : undefined,
+    consumeGateResult: activity
+      ? () => activity.consumeGateResult(session.kiloSessionId)
       : undefined,
   };
 }
@@ -1082,6 +1101,13 @@ function handlePrompt(
         ...(authorization ? { executionDeadlineAt: existing.executionDeadlineAt } : {}),
       });
     }
+    if (
+      existing.kind !== 'preparation' &&
+      !existing.signal.aborted &&
+      request.turn.type === 'prompt'
+    ) {
+      return deps.operations.admitFollowUp(session, authorization, request, runtime);
+    }
     return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
   const operation = deps.operations.start(
@@ -1174,10 +1200,15 @@ async function handleAbort(
           : { status: 'already_idle' }
       );
     }
+    task.markMessageScopedAbort();
     if (!parsed.data.operationId) {
       task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
       const result = await task.done;
-      if (task.cleanup === 'unconfirmed')
+      // An execution batch must show positive cleanup evidence; for a cancelled
+      // preparation there is no owned work to confirm, so keep the prior rule.
+      if (
+        task.kind === 'preparation' ? task.cleanup === 'unconfirmed' : task.cleanup !== 'confirmed'
+      )
         return fail('not_ready', 'Kilo cancellation was not confirmed', false);
       if (ownsCurrentTask) {
         const terminalError = await detachAbortedTerminal(session, deps);
@@ -1230,7 +1261,7 @@ async function handleAbort(
         disposition,
         target?.runtimeId ?? '',
         scopedCleanupResultGranted,
-        task.deliveryResult()
+        task.deliveryResultForMessage(parsed.data.messageId)
       );
     };
 
@@ -1271,7 +1302,7 @@ async function handleAbort(
           currentDisposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       const disposition = await escalation.physical;
@@ -1288,7 +1319,7 @@ async function handleAbort(
           disposition,
           target?.runtimeId ?? '',
           scopedCleanupResultGranted,
-          task.deliveryResult()
+          task.deliveryResultForMessage(parsed.data.messageId)
         );
       }
       if (!result.ok && task.kind !== 'preparation') return result;
@@ -1305,7 +1336,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent: false,
@@ -1314,7 +1345,13 @@ async function handleAbort(
       });
     }
 
-    if (!quiescent && !publicationScope && target && Date.now() < deadlineAt) {
+    if (
+      !task.messageScopedAbort &&
+      !quiescent &&
+      !publicationScope &&
+      target &&
+      Date.now() < deadlineAt
+    ) {
       const retirementReason = 'Native cancellation did not settle';
       const retirement = await deps.operations.retireDirectory(
         session.directory,
@@ -1327,7 +1364,7 @@ async function handleAbort(
       if (runtimeRetired) nativeRuntimeId = target.runtimeId;
       quiescent = task.confirmCleanup(nativeRetirement !== 'unconfirmed', deadlineAt);
       if (retirement === 'operation_process_stop_unconfirmed') deps.retireRuntime(retirementReason);
-    } else if (!quiescent) {
+    } else if (!quiescent && !task.messageScopedAbort) {
       task.requestRetirement('Kilo cancellation failed', deadlineAt);
     }
     const result = await task.done;
@@ -1339,7 +1376,7 @@ async function handleAbort(
         const terminalError = await detachAbortedTerminal(session, deps);
         if (terminalError) return terminalError;
       }
-      const delivery = task.deliveryResult();
+      const delivery = task.deliveryResultForMessage(parsed.data.messageId);
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',
         quiescent,

@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import {
@@ -43,6 +42,7 @@ import {
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const posthogClient = PostHogClient();
 
@@ -149,7 +149,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   400 invalid request body
  *   500 provider infrastructure error
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/token', async (request: Request) => {
   const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
@@ -673,4 +673,4 @@ export async function POST(request: NextRequest) {
   captureMessage('native_token_legacy_long_lived_count: 1');
   const token = generateApiToken(result.user);
   return NextResponse.json({ token, created: result.isNew }, { status: 200 });
-}
+});

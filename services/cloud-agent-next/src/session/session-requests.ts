@@ -22,6 +22,7 @@ export type SessionRepositoryRequest =
       type: 'github';
       repo: string;
       githubIntegrationId?: string;
+      githubAccessPurpose?: 'workflow' | 'agent';
       branch?: string;
     }
   | {
@@ -62,6 +63,13 @@ export type SessionCreateRequest = {
     id?: string;
     overrides?: ProfileOverrides;
     resolved?: SessionProfileBundle;
+    /**
+     * The active profile id after server-side resolution, set by
+     * `applyProfileResolution`. Distinguished from `id` (the client's
+     * requested pick) because a repository binding or the effective default
+     * can decide the session's profile. Persisted on `cli_sessions_v2`.
+     */
+    resolvedProfileId?: string;
   };
   finalization?: SessionFinalization;
   options?: {

@@ -9,6 +9,7 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
 import {
   claimGitHubInstallationDelivery,
@@ -92,6 +93,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       .values({
         owned_by_user_id: testUserId,
         platform: 'github',
+        github_connection_role: 'workflow',
         integration_type: 'app',
         platform_installation_id: INSTALLATION_ID,
         github_app_type: 'standard',
@@ -128,6 +130,87 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
       );
     return rows;
   }
+
+  it('dispatches a shared installation delivery once to its workflow owner, never the secondary', async () => {
+    const organization = await createTestOrganization('Secondary webhook tenant', testUserId, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        installation_id: INSTALLATION_ID,
+        github_app_type: 'standard',
+        lifecycle_state: 'active',
+      })
+      .onConflictDoUpdate({
+        target: [
+          github_app_installations.github_app_type,
+          github_app_installations.installation_id,
+        ],
+        set: { lifecycle_state: 'active' },
+      })
+      .returning();
+    await db
+      .update(platform_integrations)
+      .set({ github_installation_id: canonical.id })
+      .where(eq(platform_integrations.id, integrationId));
+    const [secondary] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: INSTALLATION_ID,
+        github_installation_id: canonical.id,
+        github_app_type: 'standard',
+        github_connection_role: 'agent_only',
+        integration_status: 'active',
+      })
+      .returning();
+    const branch = 'feature/workflow-only';
+    await seedSession(branch);
+    const sessionId = `ses_secondary_${Date.now()}`;
+    await db.insert(cli_sessions_v2).values({
+      session_id: sessionId,
+      kilo_user_id: testUserId,
+      organization_id: organization.id,
+      git_url: NORMALIZED_GIT_URL,
+      git_branch: branch,
+      created_on_platform: 'cloud-agent-web',
+    });
+    sessionIdsToCleanup.push(sessionId);
+    const event = {
+      action: 'closed' as const,
+      prNumber: 333,
+      headRef: branch,
+      headSha: 'sha',
+      state: 'closed' as const,
+      merged: true,
+      deliveryId: 'workflow-secondary-delivery',
+    };
+    try {
+      expect((await handleGitHubWebhook(buildPullRequestWebhook(event), 'standard')).status).toBe(
+        200
+      );
+      await flushAfter();
+      const duplicate = await handleGitHubWebhook(buildPullRequestWebhook(event), 'standard');
+      expect(await duplicate.json()).toMatchObject({ message: 'Duplicate event' });
+      const rows = await db
+        .select()
+        .from(github_branch_pull_requests)
+        .where(
+          and(
+            eq(github_branch_pull_requests.git_url, NORMALIZED_GIT_URL),
+            eq(github_branch_pull_requests.git_branch, branch)
+          )
+        );
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({
+        owned_by_user_id: testUserId,
+        owned_by_organization_id: null,
+      });
+    } finally {
+      await db.delete(platform_integrations).where(eq(platform_integrations.id, secondary.id));
+    }
+  });
 
   function buildPullRequestWebhook(opts: {
     action: 'opened' | 'closed' | 'synchronize';
@@ -398,6 +481,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
       .values({
         owned_by_user_id: testUserId,
         platform: 'github',
+        github_connection_role: 'workflow',
         integration_type: 'app',
         platform_installation_id: INSTALLATION_ID,
         github_app_type: 'standard',

@@ -1,7 +1,7 @@
 /**
- * Pure core for internal dispatch of low-balance, security-finding, and
- * security-lifecycle pushes. IO is injected via deps so unit tests can
- * substitute in-memory fakes.
+ * Pure core for internal dispatch of low-balance, spend-alert,
+ * security-finding, and security-lifecycle pushes. IO is injected via deps so
+ * unit tests can substitute in-memory fakes.
  */
 
 import type {
@@ -81,6 +81,36 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
           priority: 'high',
         },
       } satisfies DispatchPushInput;
+    case 'spend_alert':
+      // One alert per firing episode, even with several recipients: the owner's
+      // contacts must not get a second push for the same crossing, but a
+      // condition that clears and crosses again inside the DO's idempotency
+      // window must still send. The outbox row's `dedupeKey` carries the
+      // episode, so the key differs between two crossings; the amount is not
+      // part of the identity so a re-evaluated sweep with a slightly different
+      // total still dedupes.
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `spend-alert:${input.scope}:${input.organizationId ?? 'personal'}:${input.alertKind}:${input.thresholdUsd}:${input.dedupeKey}`,
+        badge: null,
+        push: {
+          title: 'Spend alert',
+          body: `${input.scopeName} spend crossed $${input.amountUsd}`,
+          i18nKey: 'internal.spendAlert',
+          i18nParams: {
+            scopeName: input.scopeName,
+            amountUsd: String(input.amountUsd),
+          },
+          data: {
+            type: 'spend_alert',
+            scope: input.scope,
+            ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
+          },
+          sound: 'default',
+          priority: 'high',
+        },
+      } satisfies DispatchPushInput;
     case 'security_finding': {
       const title = securityFindingTitle(input.notificationKind, input.severity);
       return {
@@ -147,6 +177,8 @@ function categoryEnabled(
   switch (kind) {
     case 'low_balance':
       return prefs.balanceAlertsEnabled;
+    case 'spend_alert':
+      return prefs.spendAlertsEnabled;
     case 'security_finding':
     case 'security_lifecycle':
       return prefs.securityFindingsEnabled;
@@ -162,9 +194,9 @@ function mapOutcome(kind: DispatchPushOutcome['kind']): PerRecipientResult['outc
 }
 
 /**
- * Dispatch a low-balance or security-finding push to one or more recipients.
- * Per-recipient preference gate runs before any DO call; preference-read
- * throws fail closed without calling dispatchPush.
+ * Dispatch a low-balance, spend-alert, or security push to one or more
+ * recipients. Per-recipient preference gate runs before any DO call;
+ * preference-read throws fail closed without calling dispatchPush.
  */
 export async function dispatchInternalPushCore(
   input: InternalDispatchRequest,
@@ -173,7 +205,11 @@ export async function dispatchInternalPushCore(
   const recipients: string[] = [];
   const seen = new Set<string>();
 
-  if (input.kind === 'low_balance' || input.kind === 'security_lifecycle') {
+  if (
+    input.kind === 'low_balance' ||
+    input.kind === 'spend_alert' ||
+    input.kind === 'security_lifecycle'
+  ) {
     for (const id of input.recipientUserIds) {
       if (seen.has(id)) continue;
       seen.add(id);

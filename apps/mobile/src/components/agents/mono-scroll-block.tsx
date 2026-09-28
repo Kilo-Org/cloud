@@ -14,12 +14,17 @@ import {
   type MonoScrollTextMode,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
+  resolveMonoScrollMaxLength,
   resolveMonoScrollPinnedHeight,
 } from './mono-scroll-block-model';
 
 type MonoScrollBlockProps = {
   content: string;
-  /** When set, content longer than this is sliced and a "Truncated" marker is shown. */
+  /**
+   * Display budget in characters. Defaults to
+   * `DEFAULT_MONO_SCROLL_MAX_LENGTH`; the read/write code cards pass their own.
+   * Content longer than the budget is sliced and a "Truncated" marker is shown.
+   */
   maxLength?: number;
   /** Merged onto the mono Text (colors, leading). Base mono sizing is applied. */
   textClassName?: string;
@@ -78,6 +83,12 @@ export function useMonoScrollSheet(): MonoScrollSheetContextValue | null {
  * RN 0.83 Fabric cannot inflate a horizontal ScrollView inside a width-
  * constrained parent (~10× spurious height). The pin is keyed to displayText
  * so a taller payload remeasures instead of clipping into a stale height.
+ *
+ * Display budget: a block never lays out more than its cap (the caller's
+ * `maxLength`, or `DEFAULT_MONO_SCROLL_MAX_LENGTH`). Tool output can be
+ * multiple megabytes, and one `Text`/`TextInput` with that string hangs the
+ * sheet and kills the Android app process, so the visible text is the capped
+ * prefix plus the "Truncated" marker.
  */
 export function MonoScrollBlock({
   content,
@@ -91,7 +102,10 @@ export function MonoScrollBlock({
   const { t } = useTranslation();
   const textMode = sheet?.mode ?? 'scroll';
   const track = sheet?.track;
-  const { displayText, isTruncated } = prepareMonoScrollContent(content, maxLength);
+  const { displayText, isTruncated } = prepareMonoScrollContent(
+    content,
+    resolveMonoScrollMaxLength(maxLength)
+  );
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   const contentHeight = resolveMonoScrollPinnedHeight(heightPin, displayText);
 

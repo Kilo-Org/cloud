@@ -127,7 +127,7 @@ vi.mock('./session-service.js', () => ({
 }));
 
 import { appRouter } from './router.js';
-import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
+import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-creation-preflight.js';
 import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
@@ -230,6 +230,8 @@ function createInternalApiContext(options: {
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
+        authorizeCloudAgentGitHubRepo:
+          options.getTokenForRepo ?? vi.fn().mockResolvedValue({ success: true }),
         getTokenForRepo:
           options.getTokenForRepo ??
           vi.fn().mockResolvedValue({
@@ -774,6 +776,7 @@ describe('prepareSession endpoint', () => {
       'test-user-123',
       expect.any(Object),
       'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      undefined,
       'code-review',
       expect.stringMatching(/^New session - /),
       'https://github.com/acme/repo',
@@ -812,6 +815,7 @@ describe('prepareSession endpoint', () => {
           type: 'github',
           repo: 'acme/repo',
           branch: 'feature/test-branch',
+          githubAccessPurpose: 'workflow',
         },
         profile: {
           envVars: { API_KEY: 'secret' },
@@ -839,6 +843,34 @@ describe('prepareSession endpoint', () => {
       })
     );
     expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('persists the resolved profile id on the created session, not the requested one', async () => {
+    mergeProfileConfigurationMock.mockResolvedValue({ resolvedProfileId: 'profile-abc123' });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      profileId: 'a1111111-1111-4111-8111-111111111111',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'test-user-123',
+      expect.any(Object),
+      undefined,
+      'profile-abc123',
+      'cloud-agent-web',
+      expect.stringMatching(/^New session - /),
+      'https://github.com/acme/repo',
+      undefined
+    );
   });
 
   it('rejects organization attribution when the internal caller user is not a member', async () => {
@@ -1296,6 +1328,7 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('devcontainer sessions must use autoInitiate');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('auto-initiates command-valued initialPayload through grouped canonical admission', async () => {
@@ -1365,6 +1398,7 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('returns a prepared session when post-registration fact persistence fails', async () => {
@@ -1652,16 +1686,51 @@ describe('start endpoint', () => {
     });
 
     expect(getTokenForRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
       githubRepo: 'acme/repo',
       userId: 'test-user-123',
       expectedIntegrationId: githubIntegrationId,
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+          githubAccessPurpose: 'workflow',
+        },
       })
     );
   });
+
+  it.each(['slack', 'cloud-agent-web'])(
+    'does not grant agent access from public origin %s',
+    async createdOnPlatform => {
+      const doStub = createMockDOStub();
+      const authorize = vi
+        .fn()
+        .mockResolvedValue({ success: false, reason: 'integration_mismatch' });
+      const caller = appRouter.createCaller(
+        createInternalApiContext({ doStub, getTokenForRepo: authorize })
+      );
+      await expect(
+        caller.start({
+          message: { prompt: 'Access secondary repository' },
+          agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+          options: { createdOnPlatform },
+          repository: {
+            type: 'github',
+            repo: 'acme/repo',
+            githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({ accessPurpose: 'workflow' })
+      );
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
 
   it('persists default containment for standard GitLab grouped starts', async () => {
     const doStub = createMockDOStub();
@@ -1745,6 +1814,38 @@ describe('start endpoint', () => {
       );
     }
   );
+
+  it('passes resolved profile output into grouped start registration', async () => {
+    const runtimeAgent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { prompt: 'Review the diff', mode: 'subagent' as const },
+    };
+    mergeProfileConfigurationMock.mockResolvedValueOnce({
+      envVars: { PROFILE_VALUE: 'resolved' },
+      agents: [runtimeAgent],
+    });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Use the resolved profile' },
+      agent: { mode: 'reviewer', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: '123e4567-e89b-12d3-a456-426614174011' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ mode: 'reviewer' }),
+        profile: expect.objectContaining({
+          envVars: { PROFILE_VALUE: 'resolved' },
+          runtimeAgents: [runtimeAgent],
+        }),
+      })
+    );
+  });
 
   it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));

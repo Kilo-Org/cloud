@@ -277,6 +277,26 @@ describe('handlePosthog', () => {
     });
   });
 
+  it('accepts an async bulk-delete that queues every person for background removal', async () => {
+    const { request, step, context, email } = await setupLookupRequest();
+    mockPosthogFetch({
+      email,
+      persons: [{ uuid: PERSON_A, emails: [email] }],
+      acceptance: {
+        persons_found: 1,
+        persons_deleted: 0,
+        persons_queued_for_deletion: 1,
+        events_queued_for_deletion: true,
+        recordings_queued_for_deletion: true,
+        deletion_errors: [],
+      },
+    });
+
+    await expect(handlePosthog({ request, step, context })).resolves.toMatchObject({
+      kind: 'succeeded',
+    });
+  });
+
   it('returns needs_attention when bulk-delete acceptance is incomplete', async () => {
     const { request, step, context, email } = await setupLookupRequest();
     mockPosthogFetch({
@@ -449,6 +469,7 @@ type MockPerson = {
 type AcceptanceBody = {
   persons_found: number;
   persons_deleted: number;
+  persons_queued_for_deletion?: number;
   events_queued_for_deletion: boolean;
   recordings_queued_for_deletion: boolean;
   deletion_errors: unknown[];

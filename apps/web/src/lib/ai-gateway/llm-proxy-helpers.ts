@@ -7,12 +7,7 @@ import {
   processTokenData,
 } from '@/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import {
-  APP_URL,
-  FIRST_TOPUP_BONUS_AMOUNT,
-  INCEPTION_PROMO_MODEL,
-  INCEPTION_PROMO_RUNNING,
-} from '@/lib/constants';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
@@ -33,9 +28,13 @@ import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import { findKiloExclusiveModel, shouldRedactErrorResponse } from '@/lib/ai-gateway/models';
+import {
+  findKiloExclusiveModel,
+  shouldRedactErrorResponse,
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -45,7 +44,6 @@ import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
-import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -85,6 +83,39 @@ export function malformedJsonResponse(parseError: unknown) {
       message: `Request body is not valid JSON: ${detail}`,
     },
     { status: 400 }
+  );
+}
+
+/**
+ * Error code a client matches on to detect a credential it has to replace.
+ *
+ * It is carried in `error.code` rather than inferred from the status, because
+ * the same status also carries the sign-in prompts served to anonymous callers.
+ */
+export const INVALID_TOKEN_CODE = 'INVALID_TOKEN';
+
+/**
+ * Response for a request that presented a credential which failed verification.
+ *
+ * Such a request must not be answered as an anonymous caller. The caller
+ * believes it is authenticated, so downgrading it silently drops the account,
+ * its organization, its BYOK keys and its credits, and hides the broken
+ * credential from the client that sent it. Fail loudly so the client can
+ * re-authenticate.
+ */
+export function invalidTokenResponse() {
+  return NextResponse.json(
+    {
+      error: {
+        code: INVALID_TOKEN_CODE,
+        message: 'Your authentication token is invalid. Please sign in again.',
+      },
+      error_type: ProxyErrorType.authentication_required,
+    },
+    {
+      status: 401,
+      headers: { 'WWW-Authenticate': 'Bearer error="invalid_token"' },
+    }
   );
 }
 
@@ -505,31 +536,7 @@ export function accountForMicrodollarUsage(
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  after(
-    countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan).then(
-      async usageIdentity => {
-        // Chain the experiment-attribution write after the microdollar
-        // write. This is best-effort analytics: failures here MUST NOT
-        // roll back the billing write, which has already succeeded by
-        // the time we reach here. `persistExperimentAttribution`
-        // swallows errors internally.
-        if (
-          usageIdentity &&
-          usageContext.modelExperimentVariantVersionId &&
-          usageContext.modelExperimentAllocationSubject
-        ) {
-          await persistExperimentAttribution({
-            usageId: usageIdentity.usageId,
-            createdAt: usageIdentity.createdAt,
-            variantVersionId: usageContext.modelExperimentVariantVersionId,
-            allocationSubject: usageContext.modelExperimentAllocationSubject,
-            clientRequestId: usageContext.clientRequestId ?? null,
-            capture: usageContext.experimentPromptCapture ?? null,
-          });
-        }
-      }
-    )
-  );
+  after(countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan));
 }
 
 export async function captureProxyError(params: {
@@ -611,19 +618,16 @@ export function checkOrganizationModelRestrictions(params: {
   }
 
   const providerAllowList = params.settings.provider_allow_list;
-  const dataCollection = params.settings.data_collection;
 
-  const providerConfig: OpenRouterProviderConfig = {};
+  const providerConfig: OpenRouterProviderConfig = getEffectiveProviderPrivacy(
+    undefined,
+    params.settings.data_collection
+  );
 
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
       providerConfig.only = providerAllowList;
     }
-  }
-
-  // Setting this only if it's set as an override on the organization settings
-  if (dataCollection) {
-    providerConfig.data_collection = dataCollection;
   }
 
   return {
@@ -882,10 +886,7 @@ export function countAndStoreFimUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }
@@ -1022,15 +1023,7 @@ export function countAndStoreEditUsage(
 
       usageStats.market_cost = usageStats.cost_mUsd;
 
-      // Mirror the canonical chat path in `processOpenRouterUsage`: when the
-      // promotion is running or the request is BYOK we don't bill the user, so
-      // the cache discount we would otherwise have given them must be zeroed
-      // too. Otherwise the usage row would claim a discount on spend that never
-      // happened and distort "money saved by caching" reporting.
-      const isInceptionPromoRequest =
-        INCEPTION_PROMO_RUNNING && usageContext.requested_model === INCEPTION_PROMO_MODEL;
-
-      if (isInceptionPromoRequest || usageContext.user_byok) {
+      if (usageContext.user_byok) {
         usageStats.cost_mUsd = 0;
         usageStats.cacheDiscount_mUsd = 0;
       }

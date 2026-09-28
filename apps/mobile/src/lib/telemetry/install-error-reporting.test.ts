@@ -7,6 +7,19 @@ const sentryMock = vi.hoisted(() => ({
 
 vi.mock('@sentry/react-native', () => sentryMock);
 
+// The latency sink host is derived from the resolved config, so the mock keeps
+// the module binding live: a test can swap in an override without a second
+// module registry.
+const configMock = vi.hoisted(() => ({
+  latencyIngestUrl: 'https://latency.kiloapps.io' as string | undefined,
+}));
+
+vi.mock('@/lib/config', () => ({
+  get LATENCY_INGEST_URL() {
+    return configMock.latencyIngestUrl;
+  },
+}));
+
 type InstallFn = () => void;
 
 // Fast Refresh can re-evaluate the module, so each test loads a fresh module
@@ -26,6 +39,7 @@ const INSTALLED_FLAG = '__kiloErrorReportingInstalled__';
 beforeEach(() => {
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
+  configMock.latencyIngestUrl = 'https://latency.kiloapps.io';
   baseFetch.mockReset();
   vi.stubGlobal('fetch', baseFetch);
   vi.stubGlobal(INSTALLED_FLAG, undefined);
@@ -145,6 +159,82 @@ describe('installErrorReporting', () => {
     await expect(globalThis.fetch('https://u.expo.dev/manifest')).rejects.toBe(sdkFailure);
 
     expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  // KILO-APP-293: the app's own fire-and-forget latency POST answered 504 and
+  // was reported as a user-facing network error, although `postLatencyBatch`
+  // swallows every outcome and the user never waits on it.
+  it("skips the app's own latency sink so a 504 from it is not a user-facing error", async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValue(new Response('gateway timeout', { status: 504 }));
+
+    const response = await globalThis.fetch('https://latency.kiloapps.io/v1/latency', {
+      method: 'POST',
+    });
+
+    expect(response.status).toBe(504);
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('excludes an overridden latency ingest host too', async () => {
+    configMock.latencyIngestUrl = 'https://latency-staging.example.com';
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValue(new Response('gateway timeout', { status: 504 }));
+
+    await globalThis.fetch('https://latency-staging.example.com/v1/latency', { method: 'POST' });
+
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  // The exclusion is scoped to the app's own sink: the control plane still
+  // reports. The global wrapper skips `/api/trpc` (the tRPC links own those),
+  // so the reporter that owns a control-plane call is the one lib/trpc.ts
+  // builds at `observedFetch` (lib/trpc.ts:108). It is rebuilt here with the
+  // same options so the assertion runs against the sink `install()` wired.
+  it('still reports a control-plane 504 through the tRPC reporter', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    const { createNetworkErrorFetch, readTrpcResponseError } =
+      await import('@/lib/telemetry/network-errors');
+    // A resolving fake fetch via `vi.fn`, the shape the sibling suite uses:
+    // an inline `async () => new Response(...)` trips both `require-await`
+    // (no await) and `promise-function-async` once the async is dropped.
+    const gatewayTimeoutFetch = vi.fn();
+    gatewayTimeoutFetch.mockResolvedValue(new Response('gateway timeout', { status: 504 }));
+    const observedFetch = createNetworkErrorFetch(gatewayTimeoutFetch as unknown as typeof fetch, {
+      source: 'trpc',
+      isResponseError: status => status >= 400 || status === 207,
+      readResponseError: readTrpcResponseError,
+    });
+
+    await observedFetch('https://api.kilo.ai/api/trpc/activeSessions.list?batch=1', {
+      method: 'POST',
+    });
+
+    expect(sentryMock.captureException).toHaveBeenCalledTimes(1);
+    expect(sentryMock.captureException).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        level: 'warning',
+        tags: expect.objectContaining({
+          'error.subsystem': 'network',
+          'error.source': 'trpc',
+          'network.outcome': 'http_error',
+        }),
+        contexts: expect.objectContaining({
+          network: expect.objectContaining({
+            url: 'https://api.kilo.ai/api/trpc/activeSessions.list',
+            status: 504,
+          }),
+        }),
+      })
+    );
   });
 
   it('does not wrap twice when called again', async () => {

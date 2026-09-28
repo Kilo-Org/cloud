@@ -1,6 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { describe, expect, it, vi } from 'vitest';
+import { waitFor } from './wait-for.js';
 import {
   cloudAgentEventSchema,
   type CloudAgentEvent,
@@ -11,6 +12,9 @@ import type { SandboxSession } from '../../src/sandbox-session/SandboxSession';
 import type { ResponseFrame, SessionSyncResult } from '../../src/shared/sandbox-control-protocol';
 import { events } from '../../src/db/sqlite-schema';
 
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
+import { acceptedState } from '../../src/sandbox-session/session-state.test-helpers.js';
 const root = 'ses_00000000000000000000000001';
 const question = {
   id: 'question_repaired',
@@ -50,11 +54,14 @@ async function seed(instance: SandboxSession, state: DurableObjectState, initial
   const wrapperInstanceId = crypto.randomUUID();
   const message = {
     messageId: 'msg_projection',
-    state: 'accepted',
-    acceptedAt: Date.now(),
-    wrapperInstanceId,
+    state: acceptedState({
+      acceptedAt: Date.now(),
+      lastActivityAt: Date.now(),
+      executionDeadlineAt: Date.now() + 60_000,
+      wrapperInstanceId,
+    }),
   };
-  state.storage.kv.put('session_messages', [message]);
+  writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [message]);
   state.storage.kv.put('session_pending_interactions', {
     revision: 1,
     questions: initial.questions,
@@ -106,7 +113,7 @@ async function observe(result: Response) {
     if (normalized && !isChatEvent(normalized)) view.process(normalized);
   });
   socket.accept();
-  await vi.waitFor(() =>
+  await waitFor(() =>
     expect(frames.some(frame => frame.streamEventType === 'connected')).toBe(true)
   );
   return { socket, view, frames };
@@ -140,11 +147,11 @@ describe('Session pending-input projection', () => {
       };
       const updated = { ...empty, questions: [updatedQuestion], permissions: [updatedPermission] };
       try {
-        await vi.waitFor(() => expect(client.view.getPermission()?.requestId).toBe(permission.id));
+        await waitFor(() => expect(client.view.getPermission()?.requestId).toBe(permission.id));
         expect(client.view.getQuestion()?.questions).toEqual(question.questions);
         f.pending.resolve(response(updated));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()?.questions).toEqual(updatedQuestion.questions);
           expect(client.view.getPermission()?.patterns).toEqual(updatedPermission.patterns);
         });
@@ -166,7 +173,7 @@ describe('Session pending-input projection', () => {
         expect(inputFrames(client.frames)).toEqual(beforeUnchanged);
         f.request.mockResolvedValue(response(empty));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()).toBeNull();
           expect(client.view.getPermission()).toBeNull();
         });
@@ -201,7 +208,7 @@ describe('Session pending-input projection', () => {
           questions: [],
           permissions: [],
         });
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         expect(client.frames.filter(frame => frame.streamEventType === 'connected')).toHaveLength(
           1
         );
@@ -261,7 +268,7 @@ describe('Session pending-input projection', () => {
             initial.permissions.length ? permission.id : null
           );
           expect(f.storedEvents()).toEqual([]);
-          expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+          expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
         } finally {
           client.socket.close();
           await f.cleanup();
@@ -356,7 +363,7 @@ describe('Session pending-input projection', () => {
         expect(client.view.getPermission()).toBeNull();
         f.pending.resolve(response(asks));
         await f.refresh();
-        await vi.waitFor(() => {
+        await waitFor(() => {
           expect(client.view.getQuestion()).toEqual({
             requestId: question.id,
             questions: question.questions,
@@ -383,7 +390,7 @@ describe('Session pending-input projection', () => {
           questions: [question],
           permissions: [permission],
         });
-        expect(state.storage.kv.get('session_messages')).toEqual([f.message]);
+        expect(readRawSessionMessages(state.storage.kv)).toEqual([f.message]);
       } finally {
         filtered.socket.close();
         client.socket.close();

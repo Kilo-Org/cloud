@@ -1,9 +1,8 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Globe, Mic, SlidersHorizontal, WandSparkles } from '@/components/ui/icons';
+import { Bell, Globe, Mic, SlidersHorizontal, Wallet, WandSparkles } from '@/components/ui/icons';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -80,8 +79,6 @@ export function PreferencesScreen() {
           />
         </View>
 
-        {__DEV__ ? <FeatureFlagsSection /> : null}
-
         <ConfigureRow
           icon={Globe}
           title={t('preferences.account')}
@@ -100,6 +97,15 @@ export function PreferencesScreen() {
           last
           onPress={() => {
             router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={Wallet}
+          title={t('notifications.channel.spend')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/spend-alerts' as Href);
           }}
         />
       </TabScreenScrollView>

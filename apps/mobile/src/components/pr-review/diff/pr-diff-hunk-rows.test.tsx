@@ -4,7 +4,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
-import { EmptyFilesView, PaginationRow, TabStateMessage } from './pr-diff-hunk-rows';
+import { EmptyFilesView, HunkHeaderRow, PaginationRow, TabStateMessage } from './pr-diff-hunk-rows';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -87,6 +87,24 @@ describe('Files pane full-body states', () => {
       (cta.props.onPress as () => void)();
     });
     expect(onRequestOverview).toHaveBeenCalledOnce();
+  });
+});
+
+describe('HunkHeaderRow code direction', () => {
+  // The header is a code literal ("@@ -0,0 +1,82 @@"). Under the interface's
+  // RTL base direction its runs reorder — the "+"/"-" land on the wrong side of
+  // their numbers and the ranges swap ends — so the header names its own
+  // left-to-right direction, like the diff lines below it.
+  it('names the left-to-right base direction on the header text', () => {
+    const renderer = mountNode(createElement(HunkHeaderRow, { header: '@@ -0,0 +1,82 @@' }));
+
+    const [headerText] = renderer.root.findAll(node => String(node.type) === 'Text');
+    if (headerText === undefined) {
+      throw new Error('expected the hunk header text');
+    }
+    const style = headerText.props.style as { direction?: string; writingDirection?: string };
+    expect(style.direction).toBe('ltr');
+    expect(style.writingDirection).toBe('ltr');
   });
 });
 

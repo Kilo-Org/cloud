@@ -66,10 +66,6 @@ const assistantMessagePartRemovedPayloadSchema = z
   })
   .passthrough();
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type InsertEventParams = {
   executionId: string;
   sessionId: string;
@@ -97,10 +93,6 @@ export type EventQueryFilters = {
   limit?: number;
   materialized?: 'updates' | 'removals';
 };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function buildConditions(filters: Omit<EventQueryFilters, 'limit'>): SQL[] {
   const conditions: SQL[] = [];
@@ -242,10 +234,6 @@ export function prefixUpperBound(prefix: string): string | null {
   }
   return null;
 }
-
-// ---------------------------------------------------------------------------
-// Factory Function
-// ---------------------------------------------------------------------------
 
 export function createEventQueries(db: DrizzleSqliteDODatabase, rawSql: SqlStorage) {
   return {

@@ -413,6 +413,7 @@ export async function getOwnerConfig(
       and(
         integrationOwnerFilter(owner),
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.github_connection_role, 'workflow'),
         eq(platform_integrations.integration_type, 'app'),
         eq(platform_integrations.integration_status, 'active'),
         isNull(platform_integrations.suspended_at),

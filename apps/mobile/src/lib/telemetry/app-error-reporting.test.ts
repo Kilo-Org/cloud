@@ -2,7 +2,11 @@ import { CancelledError } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isAlreadyReportedNetworkError, reportAppError } from '@/lib/telemetry/app-error-reporting';
-import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+import {
+  setTelemetrySink,
+  TELEMETRY_DESCRIPTION_KEY,
+  type TelemetryEvent,
+} from '@/lib/telemetry/error-sink';
 
 let events: TelemetryEvent[] = [];
 
@@ -98,6 +102,46 @@ describe('reportAppError', () => {
     reportAppError(Object.assign(new Error('fs'), { code: 'ENOENT' }), { source: 'query' });
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ level: 'error' });
+  });
+
+  it('files a typed error under its declared fingerprint and tags', () => {
+    const error = Object.assign(new Error('typed failure'), {
+      [TELEMETRY_DESCRIPTION_KEY]: {
+        fingerprint: ['kilo-pass-product-query', 'store-unavailable', 'android', 'play', 'unknown'],
+        tags: { 'error.subsystem': 'kilo-pass', 'kilo_pass.platform': 'android' },
+        contexts: { kiloPassProductQuery: { productIds: ['kilopass_tier19'] } },
+        extra: { storefront: 'play' },
+      },
+    });
+
+    reportAppError(error, { source: 'query' });
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      level: 'error',
+      error,
+      tags: {
+        'error.subsystem': 'kilo-pass',
+        'error.source': 'query',
+        'kilo_pass.platform': 'android',
+      },
+      contexts: { kiloPassProductQuery: { productIds: ['kilopass_tier19'] } },
+      extra: { storefront: 'play' },
+      fingerprint: ['kilo-pass-product-query', 'store-unavailable', 'android', 'play', 'unknown'],
+    });
+  });
+
+  it('ignores a malformed declared telemetry and keeps the generic fingerprint', () => {
+    reportAppError(
+      Object.assign(new Error('boom'), { [TELEMETRY_DESCRIPTION_KEY]: { fingerprint: [] } }),
+      { source: 'query' }
+    );
+
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      tags: { 'error.subsystem': 'app', 'error.source': 'query' },
+      fingerprint: ['app-error', 'query', 'Error', 'boom'],
+    });
   });
 
   it('does not report a CancelledError', () => {

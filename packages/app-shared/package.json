@@ -21,7 +21,8 @@
     "./provider-review": "./src/provider-review/index.ts",
     "./commerce": "./src/commerce/index.ts",
     "./moderation": "./src/moderation/index.ts",
-    "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts"
+    "./glanceable-agents-snapshot": "./src/glanceable-agents-snapshot.ts",
+    "./tool-detail": "./src/tool-detail/index.ts"
   },
   "scripts": {
     "typecheck": "tsgo --noEmit",

@@ -1,5 +1,5 @@
-/* eslint-disable max-lines -- the landscape-inset suite and the resume-anchor suite share this file's mocked FlashList and auto-scroll harness. */
-import { createElement } from 'react';
+/* eslint-disable max-lines -- the older-page, landscape-inset, resume-anchor and anchor-reporting suites share this file's real FlashList and auto-scroll harness. */
+import { createElement, type ReactElement, type Ref, useImperativeHandle } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -9,19 +9,21 @@ import { MAX_RESUME_OLDER_LOADS } from '@/lib/session-resume';
 import { stubTextPart, stubUserMessage } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 const flashListProps = vi.hoisted(() => ({ current: null as Record<string, unknown> | null }));
-const controls = vi.hoisted(() => ({
-  isAtBottom: true,
-  leftInset: 0,
-  rightInset: 0,
-  scrollToIndex: vi.fn(),
-  autoScrollParams: null as Record<string, unknown> | null,
-}));
+const scrollMock = vi.hoisted(() => ({ scrollToEnd: vi.fn(), scrollToIndex: vi.fn() }));
+const insets = vi.hoisted(() => ({ left: 0, right: 0 }));
 
+// The real `useSessionListAutoScroll` hook is exercised here (not a stub), so
+// the ref it hands FlashList must expose `scrollToEnd` for the auto-scroll
+// assertions to observe. `useImperativeHandle` wires that ref.
 vi.mock('@shopify/flash-list', () => ({
   FlashList: (props: Record<string, unknown>) => {
     flashListProps.current = props;
+    useImperativeHandle(props.ref as Ref<typeof scrollMock>, () => scrollMock, []);
     return null;
   },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
 }));
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
@@ -34,8 +36,8 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({
     top: 0,
     bottom: 0,
-    left: controls.leftInset,
-    right: controls.rightInset,
+    left: insets.left,
+    right: insets.right,
   }),
 }));
 vi.mock('react-native-reanimated', () => ({
@@ -47,122 +49,199 @@ vi.mock('@/components/ui/icons', () => ({ ChevronDown: 'ChevronDown' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: 'black' }),
 }));
-vi.mock('@/components/agents/use-session-list-auto-scroll', () => ({
-  useSessionListAutoScroll: (params: Record<string, unknown>) => {
-    controls.autoScrollParams = params;
-    return {
-      isAtBottom: controls.isAtBottom,
-      listRef: { current: { scrollToIndex: controls.scrollToIndex } },
-      scrollToLatestAnimated: vi.fn(),
-      suppressAutoFollow: vi.fn(),
-      followTailFromSend: vi.fn(),
-      isUserScrollingRef: { current: false },
-      userInteractedRef: { current: false },
-      sendTakeoverRef: { current: false },
-      handleContentSizeChange: vi.fn(),
-      handleKeyboardShow: vi.fn(),
-      handleListLayout: vi.fn(),
-      handleScroll: vi.fn(),
-      handleScrollBeginDrag: vi.fn(),
-      handleScrollEndDrag: vi.fn(),
-      handleMomentumScrollBegin: vi.fn(),
-      handleMomentumScrollEnd: vi.fn(),
-    };
-  },
-}));
 vi.mock('@/components/agents/session-pagination-header', () => ({
   SessionPaginationHeader: () => null,
 }));
 
-describe('SessionMessageList', () => {
-  it('disables clipped subviews to avoid Android Fabric reattachment races', () => {
-    act(() => {
-      TestRenderer.create(
-        createElement(SessionMessageList<string>, {
-          sessionId: 'session-1',
-          items: ['message-1'],
-          keyExtractor: item => item,
-          hasOlderMessages: false,
-          isLoadingOlderMessages: false,
-          olderMessagesError: null,
-          olderMessagesOmittedItemCount: 0,
-          onLoadOlderMessages: () => undefined,
-          renderItem: () => null,
-        })
-      );
-    });
+const baseProps = {
+  sessionId: 'session-1',
+  items: ['message-1'],
+  keyExtractor: (item: string) => item,
+  hasOlderMessages: false,
+  isLoadingOlderMessages: false,
+  olderMessagesError: null,
+  olderMessagesOmittedItemCount: 0,
+  onLoadOlderMessages: () => undefined,
+  renderItem: () => null,
+};
 
-    expect(flashListProps.current?.removeClippedSubviews).toBe(false);
+const mounted: TestRenderer.ReactTestRenderer[] = [];
+
+function mountList(
+  overrides: Partial<Parameters<typeof SessionMessageList<string>>[0]> = {}
+): TestRenderer.ReactTestRenderer {
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    ref.current = TestRenderer.create(
+      createElement(SessionMessageList<string>, { ...baseProps, ...overrides })
+    );
   });
-});
+  const renderer = ref.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  mounted.push(renderer);
+  return renderer;
+}
+
+function rerenderList(
+  renderer: TestRenderer.ReactTestRenderer,
+  overrides: Partial<Parameters<typeof SessionMessageList<string>>[0]> = {}
+): void {
+  act(() => {
+    renderer.update(createElement(SessionMessageList<string>, { ...baseProps, ...overrides }));
+  });
+}
 
 // `Object.is` keeps the host-string comparison off the ElementType union.
 function scrollButton(renderer: TestRenderer.ReactTestRenderer) {
   return renderer.root.find(node => Object.is(node.type, 'AnimatedView'));
 }
 
-describe('SessionMessageList landscape side insets', () => {
-  const baseProps = {
-    sessionId: 'session-1',
-    items: ['message-1'],
-    keyExtractor: (item: string) => item,
-    hasOlderMessages: false,
-    isLoadingOlderMessages: false,
-    olderMessagesError: null,
-    olderMessagesOmittedItemCount: 0,
-    onLoadOlderMessages: () => undefined,
-    renderItem: () => null,
-  };
+type ScrollHandler = ((event?: unknown) => void) | undefined;
 
-  function mountList(
-    overrides: Partial<Parameters<typeof SessionMessageList<string>>[0]> = {}
-  ): TestRenderer.ReactTestRenderer {
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
-    act(() => {
-      ref.current = TestRenderer.create(
-        createElement(SessionMessageList<string>, { ...baseProps, ...overrides })
-      );
-    });
-    const renderer = ref.current;
-    if (!renderer) {
-      throw new Error('renderer was not created');
-    }
-    return renderer;
+function fire(name: string, event?: unknown): void {
+  const props = (flashListProps.current ?? {}) as Record<string, ScrollHandler>;
+  const handler = props[name];
+  act(() => {
+    handler?.(event);
+  });
+}
+
+const AT_BOTTOM_EVENT = {
+  nativeEvent: {
+    contentOffset: { y: 950 },
+    contentSize: { height: 1500, width: 0 },
+    layoutMeasurement: { height: 500, width: 0 },
+  },
+};
+
+const AWAY_FROM_BOTTOM_EVENT = {
+  nativeEvent: {
+    contentOffset: { y: 0 },
+    contentSize: { height: 5000, width: 0 },
+    layoutMeasurement: { height: 500, width: 0 },
+  },
+};
+
+// Ends the mount-time programmatic-scroll window and lands the hook in the
+// "user is at the bottom" state, as a real transcript does a beat after open.
+function settleAtBottom(): void {
+  fire('onScrollBeginDrag');
+  fire('onScrollEndDrag', AT_BOTTOM_EVENT);
+  fire('onMomentumScrollEnd', AT_BOTTOM_EVENT);
+}
+
+// Mimics the user's upward drag: clears the auto-scroll latch and moves the
+// viewport away from the bottom so the "scroll to bottom" control renders.
+function scrollAwayFromBottom(): void {
+  fire('onScrollBeginDrag');
+  fire('onScroll', AWAY_FROM_BOTTOM_EVENT);
+}
+
+afterEach(() => {
+  for (const renderer of mounted.splice(0)) {
+    renderer.unmount();
   }
+  scrollMock.scrollToEnd.mockClear();
+  scrollMock.scrollToIndex.mockClear();
+  flashListProps.current = null;
+  insets.left = 0;
+  insets.right = 0;
+  vi.useRealTimers();
+});
 
-  afterEach(() => {
-    controls.isAtBottom = true;
-    controls.leftInset = 0;
-    controls.rightInset = 0;
-    controls.scrollToIndex.mockClear();
+describe('SessionMessageList', () => {
+  it('disables clipped subviews to avoid Android Fabric reattachment races', () => {
+    mountList();
+    expect(flashListProps.current?.removeClippedSubviews).toBe(false);
   });
 
-  it('keeps the module style reference and a 16pt control offset in portrait', () => {
-    controls.isAtBottom = false;
+  it('mounts rows well ahead of the viewport during a fast fling', () => {
+    mountList();
+    expect(flashListProps.current?.drawDistance).toBe(2000);
+  });
+});
+
+describe('SessionMessageList older-page auto-scroll', () => {
+  it('does not yank the viewport when an older page is prepended', () => {
+    const renderer = mountList({ items: ['m1', 'm2'], hasOlderMessages: true });
+    settleAtBottom();
+    scrollMock.scrollToEnd.mockClear();
+
+    rerenderList(renderer, { items: ['m0', 'm1', 'm2'], hasOlderMessages: true });
+
+    expect(scrollMock.scrollToEnd).not.toHaveBeenCalled();
+  });
+
+  it('still follows a new newest message appended at the bottom', () => {
+    const renderer = mountList({ items: ['m1', 'm2'], hasOlderMessages: true });
+    settleAtBottom();
+    scrollMock.scrollToEnd.mockClear();
+
+    rerenderList(renderer, { items: ['m1', 'm2', 'm3'], hasOlderMessages: true });
+
+    expect(scrollMock.scrollToEnd).toHaveBeenCalled();
+  });
+});
+
+describe('SessionMessageList pagination header', () => {
+  it('keeps the header element when only the load-handler identity changes', () => {
     const renderer = mountList();
+    const header = flashListProps.current?.ListHeaderComponent;
+    expect(header).toBeTruthy();
+
+    // The host passes a fresh inline arrow on every render; that alone must not
+    // hand FlashList a new header element (which would remount/reflow it).
+    rerenderList(renderer, { onLoadOlderMessages: () => undefined });
+
+    expect(flashListProps.current?.ListHeaderComponent).toBe(header);
+  });
+
+  it('retries through the newest load handler after the host re-renders', () => {
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    const renderer = mountList({ onLoadOlderMessages: first });
+    const header = flashListProps.current?.ListHeaderComponent as ReactElement<{
+      onRetry: () => void;
+    }>;
+
+    rerenderList(renderer, { onLoadOlderMessages: second });
+    act(() => {
+      header.props.onRetry();
+    });
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SessionMessageList landscape side insets', () => {
+  it('keeps the module style reference and a 16pt control offset in portrait', () => {
+    const renderer = mountList();
+    scrollAwayFromBottom();
     const style = flashListProps.current?.contentContainerStyle;
     expect(style).toEqual({ paddingVertical: 8 });
     expect(scrollButton(renderer).props.style).toEqual({ right: 16 });
 
     // Unchanged inputs keep the same style reference so FlashList's portrait
     // behavior (including `maintainVisibleContentPosition`) is untouched.
-    act(() => {
-      renderer.update(createElement(SessionMessageList<string>, { ...baseProps }));
-    });
+    rerenderList(renderer);
     expect(flashListProps.current?.contentContainerStyle).toBe(style);
 
     // A fresh mount shares the reference too: it is the module-level constant,
     // not a per-mount allocation.
     const remounted = mountList();
     expect(flashListProps.current?.contentContainerStyle).toBe(style);
+    scrollAwayFromBottom();
     expect(scrollButton(remounted).props.style).toEqual({ right: 16 });
   });
 
   it('pads the transcript and offsets the control by the landscape side insets', () => {
-    controls.isAtBottom = false;
-    controls.leftInset = 47;
-    controls.rightInset = 59;
+    insets.left = 47;
+    insets.right = 59;
     const renderer = mountList();
+    scrollAwayFromBottom();
     expect(flashListProps.current?.contentContainerStyle).toEqual({
       paddingTop: 8,
       paddingBottom: 8,
@@ -194,7 +273,7 @@ function resumeItem(id: string): SessionTranscriptItem {
 }
 
 describe('SessionMessageList resume anchor', () => {
-  const baseProps = {
+  const resumeBaseProps = {
     sessionId: 'session-1',
     keyExtractor: (item: SessionTranscriptItem) => getSessionTranscriptItemKey(item),
     hasOlderMessages: false,
@@ -209,7 +288,7 @@ describe('SessionMessageList resume anchor', () => {
 
   function resumeElement(overrides: Partial<ResumeProps>) {
     return createElement(SessionMessageList<SessionTranscriptItem>, {
-      ...baseProps,
+      ...resumeBaseProps,
       ...overrides,
       // Restated so the required `items` prop keeps its non-optional type
       // through the partial spread.
@@ -226,13 +305,9 @@ describe('SessionMessageList resume anchor', () => {
     if (!renderer) {
       throw new Error('renderer was not created');
     }
+    mounted.push(renderer);
     return renderer;
   }
-
-  afterEach(() => {
-    controls.scrollToIndex.mockClear();
-    controls.autoScrollParams = null;
-  });
 
   it('opens without tail auto-follow so the resume scroll is not overridden', () => {
     mountResumeList({
@@ -242,15 +317,16 @@ describe('SessionMessageList resume anchor', () => {
 
     // The mount-time scroll to the newest message (and its 80ms retry) would
     // otherwise discard the resume position before the user sees it.
-    expect(controls.autoScrollParams?.initialAutoScroll).toBe(false);
+    expect(scrollMock.scrollToEnd).not.toHaveBeenCalled();
   });
 
   it('keeps tail auto-follow for a session opened without an anchor', () => {
     mountResumeList({ items: [resumeItem('msg-1')] });
-    expect(controls.autoScrollParams?.initialAutoScroll).toBe(true);
+    expect(scrollMock.scrollToEnd).toHaveBeenCalled();
+    scrollMock.scrollToEnd.mockClear();
 
     mountResumeList({ items: [resumeItem('msg-1')], resumeAt: '' });
-    expect(controls.autoScrollParams?.initialAutoScroll).toBe(true);
+    expect(scrollMock.scrollToEnd).toHaveBeenCalled();
   });
 
   it('scrolls to the anchor row index once the rows are present', () => {
@@ -264,11 +340,11 @@ describe('SessionMessageList resume anchor', () => {
     // the cold-open race to FlashList's own bottom-start initial scroll and
     // the estimate settle (device-proven), so the retries perform the scroll
     // once the rows are measured.
-    expect(controls.scrollToIndex).not.toHaveBeenCalled();
+    expect(scrollMock.scrollToIndex).not.toHaveBeenCalled();
     act(() => {
       vi.advanceTimersByTime(250);
     });
-    expect(controls.scrollToIndex).toHaveBeenCalledWith({
+    expect(scrollMock.scrollToIndex).toHaveBeenCalledWith({
       index: 1,
       viewPosition: 0,
       viewOffset: 1,
@@ -285,7 +361,7 @@ describe('SessionMessageList resume anchor', () => {
       onLoadOlderMessages: onLoad,
     });
 
-    expect(controls.scrollToIndex).not.toHaveBeenCalled();
+    expect(scrollMock.scrollToIndex).not.toHaveBeenCalled();
     expect(onLoad).not.toHaveBeenCalled();
   });
 
@@ -314,7 +390,7 @@ describe('SessionMessageList resume anchor', () => {
     }
 
     expect(onLoad).toHaveBeenCalledTimes(MAX_RESUME_OLDER_LOADS);
-    expect(controls.scrollToIndex).not.toHaveBeenCalled();
+    expect(scrollMock.scrollToIndex).not.toHaveBeenCalled();
   });
 
   it('spends the page budget on requests, not on re-runs while a page is in flight', () => {
@@ -358,7 +434,7 @@ describe('SessionMessageList resume anchor', () => {
       );
     });
 
-    expect(controls.scrollToIndex).toHaveBeenCalledWith({
+    expect(scrollMock.scrollToIndex).toHaveBeenCalledWith({
       index: 0,
       viewPosition: 0,
       viewOffset: 1,
@@ -388,7 +464,7 @@ describe('SessionMessageList resume anchor', () => {
       );
     });
 
-    expect(controls.scrollToIndex).toHaveBeenCalledWith({
+    expect(scrollMock.scrollToIndex).toHaveBeenCalledWith({
       index: 0,
       viewPosition: 0,
       viewOffset: 1,
@@ -403,7 +479,7 @@ describe('SessionMessageList resume anchor', () => {
 type AnchorViewToken = { item: SessionTranscriptItem; index: number };
 
 describe('SessionMessageList anchor reporting', () => {
-  const baseProps = {
+  const anchorBaseProps = {
     sessionId: 'session-1',
     keyExtractor: (item: SessionTranscriptItem) => getSessionTranscriptItemKey(item),
     hasOlderMessages: false,
@@ -417,15 +493,21 @@ describe('SessionMessageList anchor reporting', () => {
   type AnchorProps = Parameters<typeof SessionMessageList<SessionTranscriptItem>>[0];
 
   function mountAnchorList(overrides: Partial<AnchorProps>): void {
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
     act(() => {
-      TestRenderer.create(
+      ref.current = TestRenderer.create(
         createElement(SessionMessageList<SessionTranscriptItem>, {
-          ...baseProps,
+          ...anchorBaseProps,
           ...overrides,
           items: overrides.items ?? [],
         })
       );
     });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    mounted.push(renderer);
   }
 
   function fireViewability(tokens: readonly AnchorViewToken[]): void {

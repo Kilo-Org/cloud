@@ -80,10 +80,6 @@ function batchRows<T>(rows: readonly T[]): T[][] {
   return batches;
 }
 
-// ---------------------------------------------------------------------------
-// Row mapping helpers
-// ---------------------------------------------------------------------------
-
 export function mapSummaryRow(row: ModelSummaryRow): BenchmarkModelSummary {
   return {
     model: row.model,
@@ -125,10 +121,6 @@ export function mapRunRow(row: RunRow, summaries: BenchmarkModelSummary[]): Benc
     summaries,
   };
 }
-
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
 
 export async function getConfigRows(db: D1Database): Promise<{
   config: typeof benchmarkConfig.$inferSelect | null;
@@ -215,10 +207,6 @@ export async function replaceAutoDeciderModels(
   }
   await orm.batch(stmts);
 }
-
-// ---------------------------------------------------------------------------
-// Runs
-// ---------------------------------------------------------------------------
 
 /** Which registry queue a run drains: the platform decider list, or owner pools. */
 export type { BenchmarkRunPurpose };
@@ -313,10 +301,6 @@ export async function getRunWithModels(
   return { run, models };
 }
 
-// ---------------------------------------------------------------------------
-// Case results
-// ---------------------------------------------------------------------------
-
 export async function upsertCaseResult(db: D1Database, row: CaseResultRow): Promise<void> {
   await drizzle(db)
     .insert(caseResults)
@@ -397,10 +381,6 @@ export async function getExistingCaseResultIds(
     );
   return new Set(rows.map(row => row.case_id));
 }
-
-// ---------------------------------------------------------------------------
-// Model summaries
-// ---------------------------------------------------------------------------
 
 export async function replaceModelSummaries(
   db: D1Database,
@@ -755,10 +735,6 @@ export async function markProfilesFailedForEntries(
     );
   }
 }
-
-// ---------------------------------------------------------------------------
-// Lane failures (dead-lettered queue messages)
-// ---------------------------------------------------------------------------
 
 export type RunLaneFailureRow = typeof runLaneFailures.$inferSelect;
 
@@ -1174,10 +1150,6 @@ export async function listStaleRunningDeciderRuns(
   return rows.map(r => ({ id: r.id, purpose: r.purpose === 'user' ? 'user' : 'platform' }));
 }
 
-// ---------------------------------------------------------------------------
-// Latest summaries per model (for skip logic and classifier winner)
-// ---------------------------------------------------------------------------
-
 // What the most recent completed run measured for an exact Pool entry, plus
 // the benchmark identity it was measured under. startRun carries these
 // summaries into a new run only when the identity (engine + repetitions +
@@ -1269,10 +1241,6 @@ export async function getLatestSummariesByModel(
   }
   return byPair;
 }
-
-// ---------------------------------------------------------------------------
-// Routing table — pure helpers for explode/reassemble
-// ---------------------------------------------------------------------------
 
 type RoutingTableRow = typeof routingTables.$inferSelect;
 type RoutingTableCandidateRow = typeof routingTableCandidates.$inferSelect;
@@ -1422,10 +1390,6 @@ export async function getLatestRoutingTable(
 
   return { table: parsed.data, publishedAt: tableRow.published_at };
 }
-
-// ---------------------------------------------------------------------------
-// Classifier winner
-// ---------------------------------------------------------------------------
 
 export async function getClassifierWinner(db: D1Database): Promise<ClassifierWinner | null> {
   const orm = drizzle(db);

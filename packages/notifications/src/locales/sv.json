@@ -7,6 +7,7 @@
       "instanceLifecycle": "Din instans har en uppdatering",
       "scheduledAction": "En schemalagd åtgärd har en uppdatering",
       "lowBalance": "Ditt saldo kräver uppmärksamhet",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "En säkerhetsupptäckt kräver uppmärksamhet",
       "activeAgentsGlanceable": "Aktiva agenter har en uppdatering"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Lågbalansvarning",
       "body": "{{organizationName}} saldo föll under ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Ny säkerhetsupptäckt ({{severity}})",

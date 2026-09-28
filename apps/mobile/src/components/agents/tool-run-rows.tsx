@@ -33,7 +33,7 @@ export function ToolOneLineRow({
     : undefined;
 
   return (
-    <ToolSummaryTranslationScope>
+    <ToolSummaryTranslationScope itemId={part.id}>
       <FixedPartRow
         icon={getToolRowIcon(part.tool)}
         label={label}

@@ -1,22 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import {
   eraseSandboxRecord,
-  loadDeadlines,
-  loadPhysicalRecord,
+  loadAllocation,
   initialRuntimeMetadata,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
-  readSandboxControlState,
   loadRouteTable,
   loadSessionCredentialGrants,
   loadSessionReferences,
   loadTransitionLog,
-  saveDeadlines,
-  savePhysicalRecord,
   saveRouteTable,
   saveSessionCredentialGrants,
   saveSessionReferences,
   saveTransitionLog,
+  storeAllocation,
   SESSION_REFERENCES_KEY,
 } from './durable-state.js';
 import {
@@ -28,12 +25,9 @@ import {
   serializedReferenceBytes,
 } from './session-references.js';
 import { createControlPlaneCredential } from './managed-credential.js';
-import {
-  claimCreate,
-  confirmRunning,
-  initialPhysicalRecord,
-  WORKTREE_CREDENTIAL_CONTAINMENT,
-} from './physical-lifecycle.js';
+import { CONTROL_ALARM_ANCHORS_KEY, LEGACY_CONTROL_DEADLINES_KEY } from './control-alarm.js';
+import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import { WORKTREE_CREDENTIAL_CONTAINMENT } from '../sandbox-state/model/allocation.js';
 import type { SessionCredentialGrant } from './session-credentials.js';
 import { attachRoute, emptyRouteTable, resolveSessionEventRoute } from './session-routes.js';
 
@@ -113,6 +107,19 @@ describe('sandbox control durable state', () => {
     }
   );
 
+  it.each([
+    ['standard-3', 'containers-standard-3'],
+    ['standard-4', 'containers-standard-4'],
+  ] as const)('projects the containers instance %s as sandbox type %s', (instance, sandboxType) => {
+    expect(initialRuntimeMetadata('ses-abcd', instance)).toEqual({
+      sandboxType,
+      kiloCliVersion: null,
+      wrapperVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    });
+  });
+
   it('round-trips metadata independently of physical lifecycle writes and erases it on deletion', async () => {
     const storage = memoryStorage();
     expect(await loadRuntimeMetadata(storage)).toBeUndefined();
@@ -122,16 +129,16 @@ describe('sandbox control durable state', () => {
       kiloCliVersion: '7.4.20',
     };
     await saveRuntimeMetadata(storage, runtime);
-    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    await storeAllocation(storage, allocationFixture({ state: 'stopped' })!);
     expect(await loadRuntimeMetadata(storage)).toEqual(runtime);
-    expect((await readSandboxControlState(storage)).runtime).toEqual(runtime);
+    expect((await loadAllocation(storage)).state.kind).toBe('stopped');
     await eraseSandboxRecord(storage);
     expect(await loadRuntimeMetadata(storage)).toBeUndefined();
   });
 
   it('does not backfill or reflect malformed stored runtime metadata', async () => {
     const storage = memoryStorage();
-    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    await storeAllocation(storage, allocationFixture({ state: 'stopped' })!);
     for (const runtime of [
       undefined,
       {},
@@ -139,8 +146,7 @@ describe('sandbox control durable state', () => {
     ]) {
       await storage.put('runtime_metadata', runtime);
       expect(await loadRuntimeMetadata(storage)).toBeUndefined();
-      expect((await readSandboxControlState(storage)).physical?.state).toBe('stopped');
-      expect((await readSandboxControlState(storage)).runtime).toBeUndefined();
+      expect((await loadAllocation(storage)).state.kind).toBe('stopped');
       expect(await storage.get('runtime_metadata')).toEqual(runtime);
     }
   });
@@ -261,19 +267,18 @@ describe('sandbox control durable state', () => {
     const storage = memoryStorage();
     const grant = credentialGrant();
     await saveSessionCredentialGrants(storage, [grant]);
-    await savePhysicalRecord(
+    await storeAllocation(
       storage,
-      confirmRunning(
-        claimCreate(
-          initialPhysicalRecord(false),
-          'intent_1',
-          1000,
-          undefined,
-          WORKTREE_CREDENTIAL_CONTAINMENT
-        ),
-        'ref_1',
-        1001
-      )
+      allocationFixture({
+        state: 'running',
+        providerRef: 'ref_1',
+        createIntent: {
+          intentId: 'intent_1',
+          createdAt: 1000,
+          containment: WORKTREE_CREDENTIAL_CONTAINMENT,
+        },
+        containment: { providerRef: 'ref_1', ...WORKTREE_CREDENTIAL_CONTAINMENT },
+      })!
     );
     const { table } = attachRoute(
       emptyRouteTable(),
@@ -298,19 +303,34 @@ describe('sandbox control durable state', () => {
         }).state
       )
     );
-    await saveDeadlines(storage, { heartbeatExpiry: 3000 });
     await saveTransitionLog(storage, [{ at: 1001, kind: 'physical', to: 'running' }]);
     await storage.put('owner', grant.userId);
 
     await eraseSandboxRecord(storage);
 
     expect(await loadSessionCredentialGrants(storage)).toEqual([]);
-    expect(await loadPhysicalRecord(storage)).toStrictEqual(initialPhysicalRecord(false));
+    expect((await loadAllocation(storage)).state.kind).toBe('stopped');
     expect(await loadRouteTable(storage)).toEqual(emptyRouteTable());
     expect(await loadSessionReferences(storage)).toEqual(emptySessionReferenceState());
-    expect(await loadDeadlines(storage)).toEqual({});
     expect(await loadTransitionLog(storage)).toEqual([]);
     expect(await storage.get('owner')).toBe(grant.userId);
+  });
+
+  it('erases infrastructure alarm anchors so a deleted runtime cannot re-arm them', async () => {
+    const storage = memoryStorage();
+    await storage.put(CONTROL_ALARM_ANCHORS_KEY, {
+      credentialExpiryAt: 5_000,
+      socketHandshakeAt: 6_000,
+    });
+    await storage.put(LEGACY_CONTROL_DEADLINES_KEY, {
+      credentialExpiry: 5_000,
+      socketHandshake: 6_000,
+    });
+
+    await eraseSandboxRecord(storage);
+
+    expect(await storage.get(CONTROL_ALARM_ANCHORS_KEY)).toBeUndefined();
+    expect(await storage.get(LEGACY_CONTROL_DEADLINES_KEY)).toBeUndefined();
   });
 
   it('defaults absent session references to the empty state and round-trips a reconciled index', async () => {

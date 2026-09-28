@@ -19,6 +19,20 @@ export type TelemetryEvent = {
   fingerprint?: readonly string[];
 };
 
+/**
+ * Property a domain error uses to declare its own telemetry. The React Query
+ * reporters read it so a typed error is filed under its subsystem's stable
+ * fingerprint and tags instead of the catch-all `app-error` one.
+ */
+export const TELEMETRY_DESCRIPTION_KEY = 'kiloTelemetry';
+
+export type TelemetryDescription = {
+  fingerprint: readonly string[];
+  tags?: Record<string, string | number | boolean>;
+  contexts?: Record<string, Record<string, unknown>>;
+  extra?: Record<string, unknown>;
+};
+
 export type TelemetrySink = (event: TelemetryEvent) => void;
 
 let sink: TelemetrySink | null = null;

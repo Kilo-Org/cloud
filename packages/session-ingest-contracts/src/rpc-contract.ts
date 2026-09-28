@@ -8,7 +8,7 @@ export type CloudAgentWorktreeId = z.infer<typeof cloudAgentWorktreeIdSchema>;
 export const cloudAgentWorktreeLocationSchema = z
   .object({
     sandboxId: z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),
-    provider: z.enum(['cloudflare', 'vercel']),
+    provider: z.enum(['cloudflare', 'vercel', 'cloudflare-containers']),
   })
   .strict();
 export type CloudAgentWorktreeLocation = z.infer<typeof cloudAgentWorktreeLocationSchema>;
@@ -48,6 +48,24 @@ export const cloudAgentWorktreeDeletionStateSchema = z
   })
   .strict();
 export type CloudAgentWorktreeDeletionState = z.infer<typeof cloudAgentWorktreeDeletionStateSchema>;
+
+export const retireCloudAgentWorktreeIfSoleMemberSchema = cloudAgentWorktreeDeletionSchema
+  .extend({
+    cloudAgentSessionId: z.templateLiteral(['workspace_', z.uuid()]),
+  })
+  .strict();
+export type RetireCloudAgentWorktreeIfSoleMemberParams = z.infer<
+  typeof retireCloudAgentWorktreeIfSoleMemberSchema
+>;
+
+export const retireCloudAgentWorktreeIfSoleMemberResultSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('exclusive') }).strict(),
+  z.object({ kind: z.literal('shared') }).strict(),
+  z.object({ kind: z.literal('unresolved') }).strict(),
+]);
+export type RetireCloudAgentWorktreeIfSoleMemberResult = z.infer<
+  typeof retireCloudAgentWorktreeIfSoleMemberResultSchema
+>;
 
 export const recordCloudAgentWorktreeCleanupSchema = cloudAgentWorktreeDeletionSchema
   .extend({
@@ -137,6 +155,11 @@ export const createSessionForCloudAgentSchema = z.object({
   title: z.string().optional(),
   // Compatibility: old Cloud Agent workers omit gitUrl; remove after all deployed workers send it.
   gitUrl: z.string().optional(),
+  // The profile the session was prepared with, as resolved by the caller
+  // (explicit pick, effective default, or repository binding). Optional and
+  // nullable so a caller that predates profile recording still creates the
+  // session; that row then carries no profile.
+  profileId: z.string().min(1).nullable().optional(),
   // Compatibility: old callers omit this field and create empty destination
   // storage. Remove that path only when all deployed callers require cloning.
   cloneFromKiloSessionId: sessionIdSchema.optional(),
@@ -902,6 +925,9 @@ export type SessionIngestRpcMethods = {
   beginCloudAgentWorktreeDeletion: (
     params: CloudAgentWorktreeDeletionParams
   ) => Promise<CloudAgentWorktreeDeletionState>;
+  retireCloudAgentWorktreeIfSoleMember: (
+    params: RetireCloudAgentWorktreeIfSoleMemberParams
+  ) => Promise<RetireCloudAgentWorktreeIfSoleMemberResult>;
   recordCloudAgentWorktreeCleanup: (
     params: RecordCloudAgentWorktreeCleanupParams
   ) => Promise<CloudAgentWorktreeDeletionState>;

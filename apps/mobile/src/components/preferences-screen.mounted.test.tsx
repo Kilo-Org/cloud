@@ -1,7 +1,7 @@
 import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { PreferencesScreen } from '@/components/preferences-screen';
 import { renderWithProviders } from '@/test/render-with-providers';
 
@@ -9,11 +9,6 @@ vi.hoisted(() => {
   vi.stubGlobal('__DEV__', false);
 });
 const push = vi.hoisted(() => vi.fn());
-// The screen tree imports the development-only feature-flag section; that
-// surface is covered in preferences-screen.feature-flags.mounted.test.tsx.
-vi.mock('@/lib/analytics/posthog', () => ({
-  useFeatureFlagStatuses: () => [],
-}));
 vi.mock('react-native', () => ({
   View: 'View',
 }));
@@ -25,6 +20,7 @@ vi.mock('@/components/ui/icons', () => ({
   Globe: 'Globe',
   Mic: 'Mic',
   SlidersHorizontal: 'SlidersHorizontal',
+  Wallet: 'Wallet',
   WandSparkles: 'WandSparkles',
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
@@ -72,7 +68,7 @@ describe('PreferencesScreen hub', () => {
   it('renders one navigation row per settings group with its title and subtitle', async () => {
     const renderer = await mountPreferences();
 
-    expect(hubRows(renderer)).toHaveLength(5);
+    expect(hubRows(renderer)).toHaveLength(6);
     expect(row(renderer, 'General').props).toMatchObject({ icon: 'SlidersHorizontal', last: true });
     expect(row(renderer, 'Voice input').props).toMatchObject({
       icon: 'Mic',
@@ -96,6 +92,10 @@ describe('PreferencesScreen hub', () => {
       subtitle: 'Push preferences',
       last: true,
     });
+    expect(row(renderer, i18n.t('notifications.channel.spend')).props).toMatchObject({
+      icon: 'Wallet',
+      last: true,
+    });
   });
 
   it.each([
@@ -104,6 +104,7 @@ describe('PreferencesScreen hub', () => {
     ['Translate tool summaries', '/(app)/(tabs)/(3_profile)/tool-summary-translation'],
     ['Account', '/(app)/(tabs)/(3_profile)/account'],
     ['Notifications', '/(app)/(tabs)/(3_profile)/notifications'],
+    [i18n.t('notifications.channel.spend'), '/(app)/(tabs)/(3_profile)/spend-alerts'],
   ])('pushes the %s subpage from its row', async (title, route) => {
     const renderer = await mountPreferences();
 
@@ -127,5 +128,27 @@ describe('PreferencesScreen hub', () => {
       { value: 'dark', label: 'Dark' },
     ]);
     expect(control[0]?.props.value).toBe('system');
+  });
+
+  it('renders no developer feature-flag rows in a development build', async () => {
+    // Every device round runs a dev client pointed at Metro, so `__DEV__` is
+    // true there; the product screen must carry only the navigation rows.
+    vi.stubGlobal('__DEV__', true);
+    const renderer = await mountPreferences();
+
+    const lines = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => [node.props.children].flat().join(''));
+    expect(lines).not.toContain('Feature flags');
+    expect(lines).not.toContain('mobile-pr-review');
+    expect(lines).not.toContain('Enabled · default · not loaded');
+
+    // The product rows still render.
+    expect(row(renderer, i18n.t('preferences.general')).props.title).toBe(
+      i18n.t('preferences.general')
+    );
+    expect(row(renderer, i18n.t('preferences.account')).props.title).toBe(
+      i18n.t('preferences.account')
+    );
   });
 });

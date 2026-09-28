@@ -24,7 +24,7 @@ const fakeUser = { id: 'user-1' };
 
 beforeEach(() => {
   jest.resetAllMocks();
-  mockIsFreeModel.mockResolvedValue(false);
+  mockIsFreeModel.mockReturnValue(false);
   mockGetModelUserByokProviders.mockResolvedValue([]);
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
@@ -32,7 +32,7 @@ beforeEach(() => {
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
   it('returns isFree and skips BYOK when the model is free', async () => {
-    mockIsFreeModel.mockResolvedValueOnce(true);
+    mockIsFreeModel.mockReturnValueOnce(true);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
       fromDb: fakeDb,

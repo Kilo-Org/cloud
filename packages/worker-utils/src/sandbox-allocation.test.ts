@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION,
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  getSandboxAllocationInstance,
   getSandboxAllocationProvider,
   getSandboxAllocationResources,
   getSandboxAllocationRequest,
@@ -48,6 +51,9 @@ describe('sandbox allocation contract', () => {
     { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'small', vcpus: 2 },
     { provider: { id: 'vercel', account: 'kilo' }, instanceType: 'default' },
     { provider: { id: 'cloudflare', account: 'kilo' }, instanceType: 'devcontainer' },
+    { provider: { id: 'cloudflare-containers', account: 'byoc' }, instanceType: 'standard-3' },
+    { provider: { id: 'cloudflare-containers', account: 'kilo' }, instanceType: 'small' },
+    { provider: { id: 'cloudflare-containers', account: 'kilo' }, instanceType: 'standard-2' },
   ])('rejects unsupported provider metadata and instance combinations %j', request => {
     expect(sandboxAllocationInputSchema.safeParse(request).success).toBe(false);
   });
@@ -88,6 +94,8 @@ describe('sandbox allocation contract', () => {
     ['vercel-large', { vcpus: 4, memory: 8192 }],
     ['cloudflare-single', undefined],
     ['cloudflare-shared', undefined],
+    ['cloudflare-containers-standard-3', undefined],
+    ['cloudflare-containers-standard-4', undefined],
     ['isolated-standard', undefined],
     [undefined, undefined],
   ] as const)('maps %s to fixed provider resources', (preset, resources) => {
@@ -109,6 +117,8 @@ describe('sandbox allocation contract', () => {
     ['isolated-standard', 'cloudflare', false],
     ['cloudflare-single', 'cloudflare', false],
     ['cloudflare-shared', 'cloudflare', false],
+    ['cloudflare-containers-standard-3', 'cloudflare-containers', true],
+    ['cloudflare-containers-standard-4', 'cloudflare-containers', true],
     ['vercel-small', 'vercel', true],
     ['vercel-large', 'vercel', true],
   ] as const)(
@@ -121,6 +131,25 @@ describe('sandbox allocation contract', () => {
 
   it('leaves an omitted selection to the existing plane decision', () => {
     expect(sandboxAllocationRequiresControlPlane(undefined)).toBe(false);
+  });
+
+  it.each([
+    ['cloudflare-containers-standard-3', 'standard-3'],
+    ['cloudflare-containers-standard-4', 'standard-4'],
+    ['cloudflare-single', undefined],
+    ['vercel-small', undefined],
+    ['isolated-standard', undefined],
+    [undefined, undefined],
+  ] as const)('maps %s to container instance %s', (preset, instance) => {
+    expect(getSandboxAllocationInstance(preset)).toBe(instance);
+  });
+
+  it('derives the default container instance from the default allocation', () => {
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION).toBe('cloudflare-containers-standard-4');
+    expect(getSandboxAllocationInstance(CLOUDFLARE_CONTAINERS_DEFAULT_ALLOCATION)).toBe(
+      CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+    );
+    expect(CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE).toBe('standard-4');
   });
 
   it('rejects arbitrary allocations and capability options', () => {

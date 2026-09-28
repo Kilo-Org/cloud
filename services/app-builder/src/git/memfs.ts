@@ -78,7 +78,6 @@ export class MemFS {
   }> {
     const normalized = path.startsWith('/') ? path.slice(1) : path;
 
-    // Check if it's a file
     const data = this.files.get(normalized);
     if (data) {
       return {
@@ -99,7 +98,6 @@ export class MemFS {
       };
     }
 
-    // Check if it's a directory (has children)
     const prefix = normalized ? normalized + '/' : '';
     for (const filePath of this.files.keys()) {
       if (filePath.startsWith(prefix)) {

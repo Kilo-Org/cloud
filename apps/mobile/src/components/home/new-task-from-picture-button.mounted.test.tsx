@@ -12,12 +12,22 @@ const state = vi.hoisted(() => ({
   pickAgentPicture: vi.fn(),
   stagePictureForNewSession: vi.fn(),
   recovery: vi.fn(),
+  themedSheet: {
+    containerStyle: { backgroundColor: '#17171A', paddingBottom: 18 },
+    textStyle: { color: '#F2F0EB' },
+    titleTextStyle: { color: '#8A8680' },
+    messageTextStyle: { color: '#8A8680' },
+    destructiveColor: '#F28B7A',
+  },
 }));
 
 vi.mock('react-native', () => ({ View: 'View' }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: state.push }) }));
 vi.mock('@expo/react-native-action-sheet', () => ({
   useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+}));
+vi.mock('@/lib/hooks/use-themed-action-sheet', () => ({
+  useThemedActionSheetOptions: () => state.themedSheet,
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -144,11 +154,15 @@ describe('NewTaskFromPictureButton', () => {
 
     await press();
 
-    expect(state.pickAgentPicture).toHaveBeenCalledExactlyOnceWith(expect.any(Function), {
-      userId: 'user-1',
-      surface: 'agent-picture',
-      sessionId: null,
-    });
+    expect(state.pickAgentPicture).toHaveBeenCalledExactlyOnceWith(
+      expect.any(Function),
+      {
+        userId: 'user-1',
+        surface: 'agent-picture',
+        sessionId: null,
+      },
+      state.themedSheet
+    );
   });
 
   it('mounts Android pending-picker recovery for the agent-picture surface and delivers the recovered picture', async () => {

@@ -7,6 +7,10 @@ import { OrganizationContextProvider } from './OrganizationContext';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { BYOKKeysManager } from './byok/BYOKKeysManager';
 import { OpenAiChatGptCard, OpenAiChatGptCardView } from './byok/OpenAiChatGptCard';
+import {
+  canManageSharedServices,
+  ChatGptSharedServicesCard,
+} from '@/components/chatgpt/ChatGptSharedServicesCard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
@@ -31,7 +35,12 @@ export function BYOKContent({
 
   const chatGptCard =
     chatGptEnabled === true ? (
-      <OpenAiChatGptCard organizationId={organizationId} />
+      <>
+        <OpenAiChatGptCard organizationId={organizationId} />
+        {canManageSharedServices(currentRole) ? (
+          <ChatGptSharedServicesCard organizationId={organizationId} />
+        ) : null}
+      </>
     ) : chatGptEnabled === undefined ? (
       <OpenAiChatGptCardView status={undefined} isOrganization />
     ) : null;

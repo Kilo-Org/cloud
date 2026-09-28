@@ -2,7 +2,7 @@
 import { FlashList, type FlashListRef, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -34,7 +34,7 @@ import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getRevisionSnapshot } from '@/lib/session-attention';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
@@ -114,8 +114,10 @@ export function AgentSessionListContent({
 
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom, left, right } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
+  const { left, right } = useSafeAreaInsets();
+  // The tabs layout's width-aware label decision rides along, so the list
+  // clearance tracks the bar height the layout actually renders.
+  const tabBarHeight = useEffectiveTabBarHeight();
   const { deleteSession, renameSession } = useSessionMutations();
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
@@ -145,16 +147,7 @@ export function AgentSessionListContent({
   // must clear it or the last rows are stuck underneath it. The history list
   // owns no FAB, so a bottom-only TabBar clearance is the only inset the
   // content container needs.
-  const tabBarOnlyClearanceStyle = useMemo(
-    () => ({
-      paddingBottom: getEffectiveTabBarHeight({
-        bottomInset: bottom,
-        platform: Platform.OS,
-        fontScale,
-      }),
-    }),
-    [bottom, fontScale]
-  );
+  const tabBarOnlyClearanceStyle = useMemo(() => ({ paddingBottom: tabBarHeight }), [tabBarHeight]);
 
   // The landscape side insets keep row text clear of the sensor housing
   // (portrait insets are 0, keeping the geometry unchanged). They live on a
@@ -240,6 +233,53 @@ export function AgentSessionListContent({
         : flattenSessionSections(sections),
     [showLoadingSkeletons, sections]
   );
+
+  // Pagination is user-driven. A programmatic page-one reset (the foreground,
+  // focus and pull reconciles) empties the retained pages, so the list shrinks
+  // under the viewport once the new page one lands, and FlashList reports that
+  // shrink as an end-reach. Honoring it re-fetched one page per retained page
+  // around a foreground transition instead of the single page the reconcile
+  // re-issued (device defect e2). A shrink therefore parks pagination until the
+  // next user drag; a query change that resets the list parks it too, and the
+  // drag the user makes to browse resumes it.
+  const paginationParkedRef = useRef(false);
+  const previousRowCountRef = useRef(rows.length);
+  useEffect(() => {
+    if (rows.length < previousRowCountRef.current) {
+      paginationParkedRef.current = true;
+    }
+    previousRowCountRef.current = rows.length;
+  }, [rows.length]);
+  // FlashList reports the end once per data change, so the end-reach the shrink
+  // produces is not followed by another one on its own. Hold it while parked and
+  // replay it when the user's movement lifts the park: a list whose rows fit the
+  // viewport never reaches the end again, so without the replay it would stay
+  // parked for good and never load older sessions.
+  const parkedEndReachRef = useRef(false);
+  const handleEndReached = useCallback(() => {
+    if (paginationParkedRef.current) {
+      parkedEndReachRef.current = true;
+      return;
+    }
+    onEndReached();
+  }, [onEndReached]);
+  // The park must be released by the user's own movement, and `onScrollBeginDrag`
+  // only fires when the list can scroll: a shrink that leaves fewer rows than
+  // fill the viewport (a filter or search change, or a reconcile collapsing the
+  // list to page one) has nothing to scroll, so a drag never opened the park and
+  // `hasNextPage` stayed true behind it. `onTouchMove` is the finger's own
+  // movement, which a viewport-fitting list still reports; the PR-review diff
+  // file list wires the same two events for the same reason.
+  const releasePaginationPark = useCallback(() => {
+    if (!paginationParkedRef.current) {
+      return;
+    }
+    paginationParkedRef.current = false;
+    if (parkedEndReachRef.current) {
+      parkedEndReachRef.current = false;
+      onEndReached();
+    }
+  }, [onEndReached]);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
@@ -357,8 +397,17 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
+  //
+  // `gap-2` is the clearance between the status band and the rows — the same
+  // gap the live surface leaves below its band (`mx-4 gap-2` in
+  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
+  // band, and a row resting across that edge is cut mid-text directly under
+  // "Couldn't refresh", so the two read as colliding (device defect p5). The
+  // gap lives on the container rather than as the band's padding on purpose:
+  // the clearance must not depend on whether the status line renders, or the
+  // failure line would push the rows down by the gap as it appears.
   return (
-    <Animated.View className="flex-1">
+    <Animated.View className="flex-1 gap-2">
       {/* The band's height is allocated whenever the rows show, so the
           in-flight spinner and the failure line replace empty space instead of
           pushing the rows down (device defect uxs1). */}
@@ -386,8 +435,10 @@ export function AgentSessionListContent({
           }
           contentContainerStyle={tabBarOnlyClearanceStyle}
           keyboardDismissMode="on-drag"
-          onEndReached={onEndReached}
+          onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
+          onScrollBeginDrag={releasePaginationPark}
+          onTouchMove={releasePaginationPark}
           refreshControl={rowsControl}
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />

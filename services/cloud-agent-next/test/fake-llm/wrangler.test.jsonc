@@ -1,0 +1,15 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "fake-llm-miniflare-test",
+  "main": "../e2e/fake-llm-worker.ts",
+  "compatibility_date": "2026-06-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "NEXTAUTH_SECRET": "fake-llm-miniflare-secret",
+    "FAKE_LLM_ADMIN_TOKEN": "fake-llm-miniflare-admin-token",
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "FAKE_LLM", "class_name": "FakeLlmState" }],
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["FakeLlmState"] }],
+}

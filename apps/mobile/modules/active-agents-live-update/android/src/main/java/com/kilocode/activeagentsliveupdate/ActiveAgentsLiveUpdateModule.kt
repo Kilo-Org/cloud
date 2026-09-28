@@ -8,19 +8,25 @@ import android.content.Intent
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import expo.modules.kotlin.exception.Exceptions
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.asCoroutineDispatcher
 
 /**
  * Local Expo module for the Android aggregate ongoing notification.
  *
- * The JS side owns the translated copy, the notification kind's channel (and
+ * The JS side owns the translated copy, the deep link, the kind's channel (and
  * its creation), the alert decision, and the revision guard; this module owns
  * the fixed notification id, the posted-channel mirror, the API 36.1+ promotion
- * gate, and the content intent plus named actions: one that opens the Agents tab
- * via a deep link, and one that runs the headless approval when a permission
- * waits.
+ * gate, and the content intent plus named actions: Open deep-links into the
+ * recorded session (the Agents tab when nothing waits), and Approve runs the
+ * headless approval when a cloud-agent permission waits. Both platforms answer
+ * through `src/lib/glanceable/approve-ask.ts`.
  *
  * This is the Android mechanism for the one shared kind model, not a second
  * behaviour: `@kilocode/notifications` maps each agent surface to `needs-input`
@@ -52,29 +58,65 @@ class ActiveAgentsLiveUpdateModule : Module() {
       notificationManager.isNotificationPolicyAccessGranted
     }
 
-    Function("start") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
-      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, promotion, 0)
-    }
+    // Group the Open label and URL so both entry points fit Expo's eight-argument
+    // Function limit while preserving the action and notification-kind fields.
+    //
+    // `start`, `update` and `end` are the durable writes whose state the JS side
+    // never reads back in the same turn: their bodies commit to SharedPreferences
+    // (a synchronous fsync), arm or cancel the OS alarm, and post the
+    // notification, so they run on the module queue rather than the JavaScript
+    // thread. The JS bridge (`src/glanceable-android/live-update.ts`) declares
+    // them `void` and never consumes the promise, which is why `durable` logs a
+    // failure instead of letting it become an unhandled rejection.
+    AsyncFunction("start") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, promotion: Boolean ->
+      durable {
+        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, promotion, 0)
+      }
+    }.runOnQueue(moduleQueue)
 
     // Expo's `Function` builder has one overload per arity and stops at eight
     // arguments (expo-modules-core `ObjectDefinitionBuilder`), so `update`
     // cannot carry `start`'s `promotion` flag on top of the terminal
     // `timeoutMs`. The flag is redundant on this path: `post` gates promotion
     // on `isPromotionCapable()` itself, which is the value the JS side passed.
-    Function("update") { title: String, text: String, openAgentsLabel: String, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
-      post(title, text, openAgentsLabel, approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
-    }
+    AsyncFunction("update") { title: String, text: String, openAction: Map<String, String>, approveLabel: String?, compactText: String?, channelId: String, alerting: Boolean, timeoutMs: Double ->
+      durable {
+        post(title, text, openAction.getValue("label"), openAction.getValue("url"), approveLabel, compactText, channelId, alerting, isPromotionCapable(), timeoutMs.toLong())
+      }
+    }.runOnQueue(moduleQueue)
 
-    Function("end") {
-      dismiss()
-    }
+    AsyncFunction("end") {
+      durable {
+        dismiss()
+      }
+    }.runOnQueue(moduleQueue)
 
+    // `setWidgetSnapshot` is the one durable write the JS side reads back in the
+    // same turn: an in-place widget action republishes the snapshot through the
+    // sink and `register.ts`'s `handleWidgetAction` redraws immediately, whose
+    // `currentProps()` re-reads native storage (`register.ts:176-189`). The read
+    // must see this write, so the entry point stays a synchronous `Function`: it
+    // records the snapshot on the JS thread and hands only the durable body —
+    // the prefs fsync and the `AlarmManager` round-trip — to the module queue.
     Function("setWidgetSnapshot") { snapshot: String, expiresAt: Double ->
-      ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+      widgetSnapshot = snapshot
+      durableQueue.execute {
+        durable {
+          ActiveAgentsDeadlineReceiver.setWidgetSnapshot(context, snapshot, expiresAt.toLong())
+        }
+      }
     }
 
+    // This read stays a synchronous `Function` too: its Promise form would change
+    // the JS bridge and its consumers (`live-update.ts`, `register.ts`,
+    // `android-sink.ts`), which this module does not own. It answers with the
+    // snapshot this runtime last handed to `setWidgetSnapshot` — so the redraw
+    // after a successful in-place action never reads the pre-action snapshot the
+    // still-queued commit has not replaced — and falls back to the persisted
+    // snapshot only for a runtime that has written none (a fresh process), which
+    // is exactly what the old synchronous body returned.
     Function("getWidgetSnapshot") {
-      ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
+      widgetSnapshot ?: ActiveAgentsDeadlineReceiver.getWidgetSnapshot(context)
     }
 
     // The channel the posted card carries, or null when the module has posted
@@ -82,6 +124,39 @@ class ActiveAgentsLiveUpdateModule : Module() {
     // still in the shade from a widget snapshot that was stored without a post.
     Function("getPostedChannel") {
       postedChannelOrNull()
+    }
+  }
+
+  /**
+   * The module's one serial queue for the durable write path, shared by every
+   * module instance in the process (see `durableQueue`).
+   */
+  private val moduleQueue = CoroutineScope(durableQueue.asCoroutineDispatcher())
+
+  /**
+   * The snapshot this JS runtime most recently handed to `setWidgetSnapshot`, or
+   * null when it has written none. The durable commit runs on the module queue,
+   * so a read in the same turn as the write would otherwise see the previous
+   * snapshot; this record is what lets `getWidgetSnapshot` answer with the value
+   * the JS side just issued. A fresh runtime starts null and falls back to the
+   * persisted snapshot. Both the assignment and the read happen on the JS
+   * thread, so no synchronization is needed.
+   */
+  private var widgetSnapshot: String? = null
+
+  /**
+   * Run one durable write on the module queue and log a failure instead of
+   * throwing it. The JS bridge declares these entry points `void` and never
+   * consumes the promise an `AsyncFunction` returns, so a thrown error would
+   * surface only as an unhandled promise rejection nobody can catch. The
+   * durable bodies keep their `check(...)` guards and their exact order; this
+   * only decides where the failure is reported.
+   */
+  private fun durable(block: () -> Unit) {
+    try {
+      block()
+    } catch (error: Throwable) {
+      Log.e(TAG, "Active agents live update failed", error)
     }
   }
 
@@ -129,27 +204,73 @@ class ActiveAgentsLiveUpdateModule : Module() {
   @Suppress("DEPRECATION")
   private fun legacyBuilder(): Notification.Builder = Notification.Builder(context)
 
-  /** A PendingIntent that deep-links the app to the Open agents route. */
-  private fun openAgentsPendingIntent(): PendingIntent {
-    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(OPEN_AGENTS_DEEP_LINK)).apply {
+  /**
+   * A PendingIntent that deep-links the app to the URL the JS side named: the
+   * waiting session's route when one is recorded, the Agents tab otherwise.
+   *
+   * `PendingIntent.getActivity` matches on `Intent.filterEquals`, which includes
+   * the data URI, so a per-session URL would leave the previous session's record
+   * behind under the fixed request code instead of updating it, and the OS would
+   * accumulate one Open record per session. `commitOpenUrl` retires the
+   * superseded record once the post that carries this one lands, so the app
+   * holds one Open record at a time and a post that throws leaves the card still
+   * in the shade with the record it already carries.
+   */
+  private fun openPendingIntent(openUrl: String): PendingIntent {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
       setPackage(context.packageName)
     }
     return PendingIntent.getActivity(
       context,
-      OPEN_AGENTS_REQUEST_CODE,
+      OPEN_REQUEST_CODE,
       intent,
       PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
   }
 
   /**
-   * A PendingIntent that hands the tap to the headless approve task. A
-   * broadcast, not an Activity: the phone can be locked when the Wear OS
-   * surface answers, and the approval needs no screen.
+   * Drop the PendingIntent record a superseded Open URL created. `FLAG_NO_CREATE`
+   * returns the existing record only, so a URL whose record is already gone is a
+   * no-op rather than a new record.
+   */
+  private fun cancelOpenIntent(openUrl: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(openUrl)).apply {
+      setPackage(context.packageName)
+    }
+    PendingIntent.getActivity(
+      context,
+      OPEN_REQUEST_CODE,
+      intent,
+      PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    )?.cancel()
+  }
+
+  /**
+   * Retire the Open record the superseded URL created and remember the URL now
+   * in the shade. Called only after the post lands: the card still on screen
+   * after a failed post carries the previous record, so cancelling it before the
+   * post succeeds would leave that card unservable.
+   */
+  private fun commitOpenUrl(previousUrl: String?, openUrl: String) {
+    if (previousUrl == openUrl) {
+      return
+    }
+    if (previousUrl != null) {
+      cancelOpenIntent(previousUrl)
+    }
+    check(notificationState.edit().putString(OPEN_URL, openUrl).commit()) {
+      "Cannot persist the active agents open URL"
+    }
+  }
+
+  /**
+   * The Approve action: one broadcast the receiver turns into a unique answer,
+   * with no Activity. The phone can be locked when the surface answers, and the
+   * approval needs no screen.
    */
   private fun approvePendingIntent(): PendingIntent {
-    val intent = Intent(context, ActiveAgentsApproveReceiver::class.java)
-      .setAction(ACTION_APPROVE)
+    val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
+      .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
     return PendingIntent.getBroadcast(
       context,
       APPROVE_REQUEST_CODE,
@@ -183,7 +304,8 @@ class ActiveAgentsLiveUpdateModule : Module() {
   private fun post(
     title: String,
     text: String,
-    openAgentsLabel: String,
+    openLabel: String,
+    openUrl: String,
     approveLabel: String?,
     compactText: String?,
     channelId: String,
@@ -191,7 +313,10 @@ class ActiveAgentsLiveUpdateModule : Module() {
     promotion: Boolean,
     timeoutMs: Long
   ) {
-    val contentIntent = openAgentsPendingIntent()
+    // Read the URL the shade card carries before this call can change it: a
+    // failed post must leave `OPEN_URL` naming the previous card's record.
+    val previousOpenUrl = notificationState.getString(OPEN_URL, null)
+    val contentIntent = openPendingIntent(openUrl)
     // The two OS paths a notification can interrupt Do Not Disturb with are the
     // channel's DND override (user-granted, requested by the app) and the
     // message category, which is what a notification that expects an answer
@@ -208,14 +333,13 @@ class ActiveAgentsLiveUpdateModule : Module() {
       .addAction(
         Notification.Action.Builder(
           Icon.createWithResource(context, smallIconId()),
-          openAgentsLabel,
+          openLabel,
           contentIntent
         ).build()
       )
 
-    // The second action is the wrist control: it appears exactly while a
-    // session waits on a permission, and the JS side drops the label when the
-    // wait is answered.
+    // No recorded approvable ask: the action is omitted, not disabled. The JS
+    // side drops the label once the wait is answered elsewhere.
     if (approveLabel != null) {
       builder.addAction(
         Notification.Action.Builder(
@@ -284,12 +408,19 @@ class ActiveAgentsLiveUpdateModule : Module() {
     try {
       notificationManager.notify(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID, builder.build())
     } catch (error: Throwable) {
-      // The post did not land. When this call removed the previous card the
-      // shade holds nothing, so drop the marker before rethrowing a later start
-      // does not adopt a kind from a card that is not there. A same-channel
-      // update removed nothing: its previous card is still posted, so clearing
-      // the marker would strand it on the next channel switch and hide it from a
-      // JS restart's adoption. Restore the timeout flag with the marker.
+      // The post did not land. The Open record this call created is
+      // unreferenced: any card still in the shade carries the previous record,
+      // which `openPendingIntent` left intact, so drop the new record and keep
+      // `OPEN_URL` naming the previous card's.
+      if (previousOpenUrl != openUrl) {
+        cancelOpenIntent(openUrl)
+      }
+      // When this call removed the previous card the shade holds nothing, so
+      // drop the marker before rethrowing a later start does not adopt a kind
+      // from a card that is not there. A same-channel update removed nothing:
+      // its previous card is still posted, so clearing the marker would strand
+      // it on the next channel switch and hide it from a JS restart's adoption.
+      // Restore the timeout flag with the marker.
       if (previousChannelId != channelId || clearsOnTimeoutChange) {
         notificationState.edit().remove(POSTED_CHANNEL).remove(HAS_TIMEOUT).apply()
       } else {
@@ -297,6 +428,9 @@ class ActiveAgentsLiveUpdateModule : Module() {
       }
       throw error
     }
+    // The post landed: retire the superseded Open record and remember the new
+    // URL, so the card in the shade and `OPEN_URL` describe the same record.
+    commitOpenUrl(previousOpenUrl, openUrl)
     // Mirror the posted channel so the next post can tell whether the card moves.
     // Commit, like the timeout flag: the shade card survives a process exit, so
     // the mirror that describes it must too.
@@ -312,18 +446,48 @@ class ActiveAgentsLiveUpdateModule : Module() {
       ActiveAgentsDeadlineReceiver.setLegacyNotificationTimeout(context, 0)
     }
     notificationManager.cancel(ActiveAgentsDeadlineReceiver.NOTIFICATION_ID)
-    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).apply()
+    // The card's Open record outlives the notification unless it is cancelled
+    // here; the fixed id stays, so the next post creates a new one.
+    notificationState.getString(OPEN_URL, null)?.let { cancelOpenIntent(it) }
+    notificationState.edit().remove(HAS_TIMEOUT).remove(POSTED_CHANNEL).remove(OPEN_URL).apply()
   }
 
   private companion object {
+    const val TAG = "ActiveAgentsLiveUpdate"
     const val HAS_TIMEOUT = "has_timeout"
+    const val OPEN_REQUEST_CODE = 1002
+    const val OPEN_URL = "open_url"
     const val POSTED_CHANNEL = "posted_channel"
 
     /** The kind marker in the channel id the JS side creates for needs-input. */
     const val NEEDS_INPUT_CHANNEL_ID = "needs-input"
-    const val OPEN_AGENTS_DEEP_LINK = "kiloapp:///cloud/sessions"
-    const val OPEN_AGENTS_REQUEST_CODE = 1002
-    const val ACTION_APPROVE = "com.kilocode.activeagentsliveupdate.action.APPROVE"
     const val APPROVE_REQUEST_CODE = 1003
+
+    /**
+     * The module's one serial queue for the durable write path, shared by every
+     * module instance in the process.
+     *
+     * The JS thread must not pay the prefs fsync and binder round-trips these
+     * writes make, and neither default queue fits: `Queues.DEFAULT` is a thread
+     * pool (the writes would race each other and the order `post` depends on
+     * would not hold) and `Queues.MAIN` would put the fsync on the UI thread. A
+     * single-thread executor wrapped as a scope is what `runOnQueue` accepts for
+     * a custom queue.
+     *
+     * It is a process-wide singleton rather than a per-instance executor:
+     * `OnDestroy` cannot drain a queue, so a replaced module's already-queued
+     * write would otherwise land after the replacement's newer write and
+     * persist a stale snapshot or deadline. One queue keeps every durable write
+     * in submission order across instances, and one thread for the process
+     * replaces the per-instance thread a shutdown used to guard against.
+     *
+     * The queue is Android's alone, like the SharedPreferences fsync and the
+     * `AlarmManager` round-trip it carries: iOS's counterpart card is the
+     * ActivityKit Live Activity driven from `src/glanceable-ios/ios-sink.ts`,
+     * whose snapshot is persisted in JS, so that side has no synchronous native
+     * write to move off the JS thread.
+     */
+    val durableQueue: ExecutorService =
+      Executors.newSingleThreadExecutor { Thread(it, "active-agents-live-update") }
   }
 }

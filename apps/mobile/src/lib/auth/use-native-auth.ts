@@ -47,6 +47,8 @@ type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | u
 
 type NativeAuthResult = {
   busy: BusyAction;
+  emailError: string | undefined;
+  clearEmailError: () => void;
   googleConfigured: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -61,9 +63,14 @@ type NativeAuthResult = {
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
   const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
+
+  const clearEmailError = useCallback(() => {
+    setEmailError(undefined);
+  }, []);
 
   const startAction = useCallback(
     (action: Exclude<BusyAction, undefined>) => {
@@ -72,10 +79,11 @@ export function useNativeAuth(): NativeAuthResult {
       }
       busyRef.current = action;
       setBusy(action);
+      clearEmailError();
       clearSsoRecovery();
       return true;
     },
-    [clearSsoRecovery]
+    [clearEmailError, clearSsoRecovery]
   );
 
   const finishAction = useCallback((action: Exclude<BusyAction, undefined>) => {
@@ -270,11 +278,14 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        toast.error(i18n.t('login.pleaseEnterEmail'));
+        setEmailError(i18n.t('login.pleaseEnterEmail'));
         return false;
       }
 
       if (!startAction('otp-send')) {
+        // Refused because another auth action is in flight. Tell the user why
+        // instead of returning a silent false that leaves the button dead.
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -282,6 +293,11 @@ export function useNativeAuth(): NativeAuthResult {
         if (!result.ok) {
           if (result.errorCode === 'SSO_ERROR') {
             handleSsoError(email, result.ssoOrganizationId);
+          } else if (
+            result.errorCode === 'INVALID_REQUEST' ||
+            result.errorCode === 'INVALID_EMAIL'
+          ) {
+            setEmailError(mapError(result.errorCode));
           } else {
             toast.error(mapError(result.errorCode));
           }
@@ -309,6 +325,7 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string, code: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!startAction('otp-verify')) {
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -367,6 +384,8 @@ export function useNativeAuth(): NativeAuthResult {
 
   return {
     busy,
+    emailError,
+    clearEmailError,
     googleConfigured,
     signInWithApple,
     signInWithGoogle,

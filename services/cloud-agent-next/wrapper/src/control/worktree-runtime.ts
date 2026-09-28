@@ -32,6 +32,7 @@ import {
   type DirectProcessObserver,
   type OwnedProcessScope,
 } from './owned-processes.js';
+import { admitControlWorkload, type ControlWorkload } from './workload-cgroup.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import {
   retireWorktreeRuntime,
@@ -110,24 +111,12 @@ export type RootRuntimeDisappearance = {
 };
 export type RootRetirementScope = 'shared' | 'sole' | 'stale';
 
-export type WorktreeKiloRuntimes = {
-  readonly kiloCliVersion?: string | null;
-  attach(
-    identity: SessionRequestIdentity,
-    kilo: WorktreeKiloAuth,
-    env?: Record<string, string>,
-    canRefreshCredentials?: () => boolean,
-    runtimeIsolation?: RuntimeIsolation,
-    beforeMutation?: () => void,
-    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
-  ): WorktreeKiloAttachment;
-  detach(identity: SessionRequestIdentity): boolean;
-  retireForRecovery(
-    identity: SessionRequestIdentity,
-    recoveryId: string,
-    assertIdle: () => void
-  ): Promise<RecoveryRetirement>;
-  deleteDirectory(directory: string): Promise<void>;
+/**
+ * Native-runtime retirement surface shared by the runtime registry and the
+ * operation-registry dependency boundary. Optional members are capability
+ * probes; callers must treat an absent member as unsupported.
+ */
+export type NativeRuntimeControl = {
   retireRuntime?(
     directory: string,
     deadlineAt: number,
@@ -157,6 +146,26 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
+};
+
+export type WorktreeKiloRuntimes = NativeRuntimeControl & {
+  readonly kiloCliVersion?: string | null;
+  attach(
+    identity: SessionRequestIdentity,
+    kilo: WorktreeKiloAuth,
+    env?: Record<string, string>,
+    canRefreshCredentials?: () => boolean,
+    runtimeIsolation?: RuntimeIsolation,
+    beforeMutation?: () => void,
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
+  ): WorktreeKiloAttachment;
+  detach(identity: SessionRequestIdentity): boolean;
+  retireForRecovery(
+    identity: SessionRequestIdentity,
+    recoveryId: string,
+    assertIdle: () => void
+  ): Promise<RecoveryRetirement>;
+  deleteDirectory(directory: string): Promise<void>;
   getRetained?(
     identity: SessionRequestIdentity | string,
     runtimeId?: string
@@ -183,6 +192,7 @@ type ServerOptions = {
   env: Record<string, string>;
   signal: AbortSignal;
   timeoutMs?: number;
+  workload?: ControlWorkload;
   onProcessScope?: (scope: OwnedProcessScope) => void;
   onProcessObserver?: (observer: DirectProcessObserver) => void;
   claimCleanupDeadline?: (deadlineAt?: number) => number;
@@ -311,6 +321,7 @@ export function buildWorktreeKiloEnvironment(
 
   const config = JSON.stringify({
     autoupdate: false,
+    snapshot: false,
     permission: CONTROL_PLANE_SANDBOX_PERMISSION,
     provider: {
       kilo: {
@@ -352,7 +363,8 @@ export async function startWorktreeKiloServer(
   options: ServerOptions
 ): Promise<WorktreeKiloServerHandle & { stopped: Promise<void> }> {
   options.signal.throwIfAborted();
-  const processes = createOwnedProcessScope();
+  const placement = admitControlWorkload(options.workload);
+  const processes = createOwnedProcessScope(placement);
   options.onProcessScope?.(processes);
   const proc = processes.spawn('kilo', ['serve', '--hostname=127.0.0.1', '--port=0'], {
     cwd: options.directory,
@@ -557,6 +569,7 @@ function emitWorktreeRuntimeAllocation(
 export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
+  workload?: ControlWorkload;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
   onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => unknown;
   onRootRetirementStarted?: (retirement: RootRuntimeRetirementStarted) => void;
@@ -1210,6 +1223,7 @@ export function createWorktreeKiloRuntimes(options: {
         directory: entry.directory,
         env: entry.env,
         signal: abort.signal,
+        ...(options.workload ? { workload: options.workload } : {}),
         onProcessScope: processes => {
           entry.processes = processes;
           entry.processIssued = true;

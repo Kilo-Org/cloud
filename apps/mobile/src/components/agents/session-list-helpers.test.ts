@@ -14,6 +14,10 @@ import {
   composeSessionProvenanceSubtitle,
   expandPlatformFilter,
   formatMeta,
+  knownPlatformBucket,
+  normalisePlatformSelection,
+  PLATFORM_FILTERS,
+  projectOptionKey,
   remoteAgentLabel,
   remoteMeta,
   remoteSessionEyebrowLabel,
@@ -132,6 +136,24 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
   });
 
+  it('formats the relative time from the caller\u2019s sampled clock', () => {
+    // A memoized row cannot read the wall clock behind the memo, so the caller
+    // passes the tick that re-rendered it. The same timestamp therefore reads
+    // differently for two sampled clocks, and each matches `timeAgo`.
+    const updatedAt = '2026-01-01T00:00:00.000Z';
+    const base = parseTimestamp(updatedAt).getTime();
+    const firstTick = base + 5 * 60_000;
+    const laterTick = base + 20 * 60_000;
+
+    expect(remoteMeta({ updatedAt }, firstTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, firstTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, laterTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).not.toBe(remoteMeta({ updatedAt }, firstTick));
+  });
+
   it('falls back to updatedAt when lastActivityAt is absent', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
     expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
@@ -183,6 +205,70 @@ describe('expandPlatformFilter (regression guard for filter expansion)', () => {
 
   it('passes through unknown concrete values unchanged', () => {
     expect(expandPlatformFilter(['cli', 'other'])).toEqual(['cli', 'other']);
+  });
+});
+
+describe('knownPlatformBucket (inverse of expandPlatformFilter)', () => {
+  it('folds a platform variant into its filter bucket', () => {
+    expect(knownPlatformBucket('cloud-agent-web')).toBe('cloud-agent');
+    expect(knownPlatformBucket('vscode')).toBe('extension');
+    expect(knownPlatformBucket('agent-manager')).toBe('extension');
+  });
+
+  it('returns the bucket itself for a bucket', () => {
+    for (const bucket of PLATFORM_FILTERS) {
+      expect(knownPlatformBucket(bucket)).toBe(bucket);
+    }
+  });
+
+  it('returns null for an unknown platform', () => {
+    expect(knownPlatformBucket('future-platform')).toBeNull();
+    expect(knownPlatformBucket('')).toBeNull();
+  });
+
+  it('inverts expandPlatformFilter on every bucket', () => {
+    for (const bucket of PLATFORM_FILTERS) {
+      for (const platform of expandPlatformFilter([bucket])) {
+        expect(knownPlatformBucket(platform)).toBe(bucket);
+      }
+    }
+  });
+});
+
+describe('normalisePlatformSelection (persisted selection → sheet rows)', () => {
+  it('collapses a stored variant into its bucket and keeps an unknown platform', () => {
+    expect(normalisePlatformSelection(['cloud-agent-web', 'vscode'])).toEqual([
+      'cloud-agent',
+      'extension',
+    ]);
+    expect(normalisePlatformSelection(['jetbrains'])).toEqual(['jetbrains']);
+  });
+
+  it('dedupes a bucket saved alongside one of its variants', () => {
+    expect(normalisePlatformSelection(['cloud-agent', 'cloud-agent-web'])).toEqual(['cloud-agent']);
+    expect(normalisePlatformSelection(['extension', 'vscode', 'agent-manager'])).toEqual([
+      'extension',
+    ]);
+  });
+
+  it('expands to every raw platform of the checked row, so the history query covers the bucket', () => {
+    expect(
+      expandPlatformFilter(normalisePlatformSelection(['cloud-agent-web'])).toSorted()
+    ).toEqual(['cloud-agent', 'cloud-agent-web'].toSorted());
+  });
+});
+
+describe('projectOptionKey (visible-label identity)', () => {
+  it('folds https, ssh, and a .git suffix into one key', () => {
+    const key = projectOptionKey('https://github.com/org/repo.git');
+    expect(key).toBe('org/repo');
+    expect(projectOptionKey('https://github.com/org/repo')).toBe(key);
+    expect(projectOptionKey('git@github.com:org/repo.git')).toBe(key);
+    expect(projectOptionKey('git@github.com:org/repo')).toBe(key);
+  });
+
+  it('trims and lowercases the formatted label', () => {
+    expect(projectOptionKey('https://github.com/Kilo-Org/KiloCode.git')).toBe('kilo-org/kilocode');
   });
 });
 

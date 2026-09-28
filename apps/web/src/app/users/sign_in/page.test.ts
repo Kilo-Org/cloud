@@ -3,10 +3,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import SignInPage from './page';
 
 jest.mock('@/lib/auth/auth-page-wrapper', () => ({
-  getAuthPageProps: jest.fn(async (searchParams: Promise<Record<string, string>>) => ({
-    params: await searchParams,
-    error: undefined,
-  })),
+  getAuthPageProps: jest.fn(async (searchParams: Promise<Record<string, string>>) => {
+    const params = await searchParams;
+    return {
+      params,
+      error: undefined,
+      accountMismatch:
+        params.sso === 'true' && params.email === 'a@example.com'
+          ? { expectedEmail: 'a@example.com', signedInEmail: 'b@example.com' }
+          : undefined,
+    };
+  }),
 }));
 
 jest.mock('@/components/auth/AuthPageLayout', () => ({
@@ -15,7 +22,23 @@ jest.mock('@/components/auth/AuthPageLayout', () => ({
 }));
 
 jest.mock('@/components/auth/SignInForm', () => ({
-  SignInForm: ({ title }: { title: string }) => React.createElement('h1', null, title),
+  SignInForm: ({
+    title,
+    accountMismatch,
+  }: {
+    title: string;
+    accountMismatch?: { expectedEmail: string; signedInEmail: string };
+  }) =>
+    React.createElement(
+      React.Fragment,
+      null,
+      React.createElement('h1', null, title),
+      accountMismatch
+        ? React.createElement('span', {
+            'data-account-mismatch': `${accountMismatch.signedInEmail},${accountMismatch.expectedEmail}`,
+          })
+        : null
+    ),
 }));
 
 describe('SignInPage titles', () => {
@@ -31,5 +54,23 @@ describe('SignInPage titles', () => {
     );
 
     expect(html).toContain(`<h1>${expectedTitle}</h1>`);
+  });
+
+  it('forwards an SSO account mismatch to the sign-in form', async () => {
+    const html = renderToStaticMarkup(
+      await SignInPage({ searchParams: Promise.resolve({ sso: 'true', email: 'a@example.com' }) })
+    );
+
+    expect(html).toContain('data-account-mismatch="b@example.com,a@example.com"');
+  });
+
+  it('forwards no mismatch for a matching SSO request', async () => {
+    const html = renderToStaticMarkup(
+      await SignInPage({
+        searchParams: Promise.resolve({ sso: 'true', email: 'b@example.com' }),
+      })
+    );
+
+    expect(html).not.toContain('data-account-mismatch');
   });
 });

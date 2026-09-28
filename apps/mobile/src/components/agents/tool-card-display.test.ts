@@ -314,11 +314,37 @@ describe('getToolDisplay mapping', () => {
     ).toEqual({ title: 'mcp', subtitle: 'filesystem/read_file' });
   });
 
+  it('falls back to the tool name for an incomplete MCP envelope', () => {
+    expect(getDisplay(makeToolPart('mcp', completed({ server_name: 'github' })))).toEqual({
+      title: 'mcp',
+      subtitle: 'mcp',
+    });
+  });
+
   it('falls back to the tool name for unknown tools', () => {
     expect(getDisplay(makeToolPart('unknown-tool', completed()))).toEqual({
       title: 'unknown-tool',
       subtitle: 'unknown-tool',
     });
+  });
+
+  it('summarizes a generic tool from its arguments', () => {
+    expect(
+      getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+    ).toEqual({ title: 'lookup', subtitle: 'Find matching records' });
+  });
+
+  it('summarizes a question row from its first question text', () => {
+    expect(
+      getDisplay(
+        makeToolPart(
+          'question',
+          completed({
+            questions: [{ header: 'E2E', question: 'Which fields should the sheet show?' }],
+          })
+        )
+      )
+    ).toEqual({ title: 'question', subtitle: 'Which fields should the sheet show?' });
   });
 
   it('uses the running/completed state title for the generic subtitle', () => {
@@ -539,6 +565,63 @@ describe('getToolDisplay translatable provenance', () => {
       getToolDisplay(makeToolPart('apply_patch', completed({ patchText: multi }))).translatable
     ).toBe(false);
     expect(getToolDisplay(makeToolPart('unknown-tool', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the projected argument summary that becomes the subtitle', () => {
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+        .translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('question', completed({ question: 'Pick a color' }))).translatable
+    ).toBe(true);
+  });
+
+  it('keeps a projected name out of translation even when a summary exists', () => {
+    // `mcp` resolves to `server/tool`, an identifier, so the summary is not the
+    // shown subtitle and neither is agent prose to translate.
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({
+            server_name: 'filesystem',
+            tool_name: 'read_file',
+            arguments: { path: '/a' },
+          })
+        )
+      ).translatable
+    ).toBe(false);
+    // A summary-less generic tool falls back to its raw id.
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ nested: { a: 1 } }))).translatable
+    ).toBe(false);
+    // An incomplete envelope has no summary, so its raw fields never reach the
+    // translation gateway.
+    expect(
+      getToolDisplay(makeToolPart('mcp', completed({ server_name: 'github' }))).translatable
+    ).toBe(false);
+  });
+
+  it('translates a known-tool label even though it is a projected name', () => {
+    // `Publish Image` is raw English app copy with no catalog, so it must reach
+    // the gateway; the surrounding identifiers must not.
+    expect(
+      getToolDisplay(makeToolPart('app-builder-images_transfer_image', completed())).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({ server_name: 'app-builder-images', tool_name: 'transfer_image' })
+        )
+      ).translatable
+    ).toBe(true);
     expect(
       getToolDisplay(
         makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))

@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { useFeedbackPromptRequest } from '@/components/use-feedback-prompt';
 import { cn } from '@/lib/utils';
 
 import {
@@ -53,7 +54,10 @@ import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/re
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import {
+  mutationErrorDisplay,
+  type MutationErrorDisplayKind,
+} from '@/lib/pr-review/mutation-error-display';
 import {
   buildProviderSubmitInput,
   type ProviderReviewEventOption,
@@ -181,14 +185,23 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const { t } = useTranslation();
   const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
   const { userId } = useCurrentUserId();
+  // The post-submit prompt's surface is platform-specific
+  // (`feedback-prompt-platform.ts`): the claim below presents through it.
+  // The request goes to the FeedbackPromptProvider host mounted by the
+  // PR-review layout, not to a dialog hosted in this sheet's tree: the
+  // deferred claim runs after `onDismiss()` has dismissed this sheet
+  // (`router.back`), and a host inside the sheet would unmount before the
+  // claim presents — the Android in-app dialog would never render. The
+  // layout outlives the dismissal, so its host presents over the overview.
+  const requestFeedbackPrompt = useFeedbackPromptRequest();
   const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
   const [event, setEvent] = useState<ReviewEvent>('COMMENT');
   const [hasSummary, setHasSummary] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
-  const [inlineErrorKind, setInlineErrorKind] = useState<
-    'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
-  >(null);
+  // Same union the display helper returns, so a new display kind can never
+  // silently drift from this surface's state.
+  const [inlineErrorKind, setInlineErrorKind] = useState<MutationErrorDisplayKind | null>(null);
   const [partialResult, setPartialResult] = useState<string | null>(null);
 
   const bodyRef = useRef<string>('');
@@ -327,7 +340,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         onDismiss();
         // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
         InteractionManager.runAfterInteractions(() => {
-          void maybeAskAfterSuccessfulOutcome(userId);
+          void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
         });
       }
     } catch {

@@ -7,6 +7,7 @@
       "instanceLifecycle": "L-instance tiegħek għandha aġġornament",
       "scheduledAction": "Azzjoni skedata għandha aġġornament",
       "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
       "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Allert ta' bilanċ baxx",
       "body": "Il-bilanċ ta' {{organizationName}} waqa' taħt ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Seba ta' sigurtà ġdid ({{severity}})",

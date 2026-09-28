@@ -69,8 +69,17 @@ export async function isGatewayAccountRateLimited(
   request: NextRequest,
   accountKey: string
 ): Promise<boolean> {
+  const host = request.headers.get('host') ?? new URL(request.url).host;
+  if (!host) {
+    throw new Error('Cannot check the gateway rate limit without a host header');
+  }
+
   const { rateLimited, error } = await checkRateLimit(GATEWAY_INFERENCE_RATE_LIMIT_ID, {
-    request,
+    headers: {
+      host,
+      'x-real-ip': request.headers.get('x-real-ip') ?? '',
+      'x-forwarded-for': request.headers.get('x-forwarded-for') ?? '',
+    },
     rateLimitKey: `${GATEWAY_INFERENCE_RATE_LIMIT_ID}:${accountKey}`,
   });
 

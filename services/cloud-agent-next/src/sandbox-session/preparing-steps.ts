@@ -1,5 +1,4 @@
-import type { PhysicalState } from '../sandbox-control/physical-lifecycle.js';
-import type { ConnectionState } from '../sandbox-control/status-projection.js';
+import type { ConnectionState, PhysicalState } from '../shared/sandbox-status.js';
 import type { PreparingStep } from '../shared/protocol.js';
 
 export type PreparingHint = { step: PreparingStep; message: string };

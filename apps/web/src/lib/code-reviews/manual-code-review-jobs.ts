@@ -352,28 +352,100 @@ async function resolveLocalPublicSource(
   platform: CodeReviewPlatform,
   url: string
 ): Promise<ResolvedManualReviewSource> {
-  if (platform === PLATFORM.GITHUB) {
-    const parsed = parseGitHubPullRequestUrl(url);
-    const pullRequest = await fetchPublicGitHubPullRequest(parsed);
-    validateOpenGitHubPullRequest(pullRequest);
-    return buildGitHubSource(pullRequest, undefined);
-  }
+  try {
+    if (platform === PLATFORM.GITHUB) {
+      const parsed = parseGitHubPullRequestUrl(url);
+      const pullRequest = await fetchPublicGitHubPullRequest(parsed);
+      validateOpenGitHubPullRequest(pullRequest);
+      return buildGitHubSource(pullRequest, undefined);
+    }
 
-  const parsed = parseGitLabMergeRequestUrl(url);
-  if (new URL(parsed.origin).hostname !== 'gitlab.com') {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Local Code Reviewer jobs only support public gitlab.com merge requests.',
+    const parsed = parseGitLabMergeRequestUrl(url);
+    if (new URL(parsed.origin).hostname !== 'gitlab.com') {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Local Code Reviewer jobs only support public gitlab.com merge requests.',
+      });
+    }
+
+    const mergeRequest = await fetchPublicGitLabMergeRequest(parsed);
+    validateOpenGitLabMergeRequest(mergeRequest);
+    return buildGitLabSource({
+      mergeRequest,
+      projectPath: parsed.projectPath,
+      integrationId: undefined,
+      platformProjectId: mergeRequest.target_project_id ?? mergeRequest.project_id,
+    });
+  } catch (error) {
+    // The local (DEBUG_SHOW_DEV_UI) path reads the pull request from the provider's
+    // public API instead of a connected integration. A provider failure there used
+    // to escape as a raw Error, so tRPC answered 500 and the client showed a generic
+    // failure. Translate it into an actionable client error; the connected path
+    // already returns typed TRPCErrors. Existing TRPCErrors (invalid URL, closed or
+    // draft pull request) pass through unchanged.
+    throw toLocalSourceError(platform, error);
+  }
+}
+
+// `Response.json()` rejects with a SyntaxError built outside this realm, so
+// `instanceof SyntaxError` misses it; match the error name instead. A ZodError
+// from the response schema is built in this realm and matches directly.
+function isProviderResponseParseError(error: unknown): boolean {
+  if (error instanceof z.ZodError) return true;
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    Reflect.get(error, 'name') === 'SyntaxError'
+  );
+}
+
+function toLocalSourceError(platform: CodeReviewPlatform, error: unknown): TRPCError {
+  if (error instanceof TRPCError) return error;
+
+  const provider = platform === PLATFORM.GITHUB ? 'GitHub' : 'GitLab';
+  // GitHub calls these pull requests; GitLab calls them merge requests.
+  const requestNoun = platform === PLATFORM.GITHUB ? 'pull request' : 'merge request';
+  if (error instanceof ProviderFetchError) {
+    if (error.status === 404) {
+      return new TRPCError({
+        code: 'NOT_FOUND',
+        message: `${provider} could not find that ${requestNoun}. Check the URL, or make sure the repository is public.`,
+        cause: error,
+      });
+    }
+    // GitHub signals primary and secondary rate limits with 403; GitLab uses 429.
+    // A GitLab 403 is a permission error, not a rate limit, so it falls through.
+    if (error.status === 429 || (error.status === 403 && platform === PLATFORM.GITHUB)) {
+      return new TRPCError({
+        code: 'TOO_MANY_REQUESTS',
+        message: `${provider} rate-limited the request. Try again in a few minutes.`,
+        cause: error,
+      });
+    }
+    return new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: `${provider} returned an unexpected response for that ${requestNoun}.`,
+      cause: error,
     });
   }
 
-  const mergeRequest = await fetchPublicGitLabMergeRequest(parsed);
-  validateOpenGitLabMergeRequest(mergeRequest);
-  return buildGitLabSource({
-    mergeRequest,
-    projectPath: parsed.projectPath,
-    integrationId: undefined,
-    platformProjectId: mergeRequest.target_project_id ?? mergeRequest.project_id,
+  // The provider answered, but with a body that is not valid JSON or does not
+  // match its documented shape. We reached it, so "could not reach" would
+  // misdescribe what happened.
+  if (isProviderResponseParseError(error)) {
+    return new TRPCError({
+      code: 'BAD_GATEWAY',
+      message: `${provider} returned an unexpected response for that ${requestNoun}.`,
+      cause: error,
+    });
+  }
+
+  // Network failure, timeout, or redirect.
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: `Could not reach ${provider} to read that ${requestNoun}. Try again.`,
+    cause: error,
   });
 }
 
@@ -384,7 +456,9 @@ async function resolveConnectedGitHubSource(
   const parsed = parseGitHubPullRequestUrl(url);
   const integrations = (await getAllIntegrationsForOwner(owner)).filter(
     integration =>
-      integration.platform === PLATFORM.GITHUB && integration.integration_status === 'active'
+      integration.platform === PLATFORM.GITHUB &&
+      integration.integration_status === 'active' &&
+      integration.github_connection_role === 'workflow'
   );
 
   if (integrations.length === 0) {
@@ -406,7 +480,8 @@ async function resolveConnectedGitHubSource(
     const appType = integration.github_app_type ?? 'standard';
     const tokenData = await generateGitHubInstallationToken(
       integration.platform_installation_id,
-      appType
+      appType,
+      integration.id
     );
     const result = await fetchGitHubPullRequest(parsed, tokenData.token);
     if (result.status === 'ok') {

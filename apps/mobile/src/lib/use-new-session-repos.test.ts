@@ -23,7 +23,7 @@ const mocks = vi.hoisted(() => ({
     })
   ),
   /** Every `useQuery` call in mount order, so a test can read the branch query's options. */
-  queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean }[],
+  queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean; staleTime?: number }[],
   /** Result the branch query (the one with a `queryFn`) reports. */
   branchQueryResult: emptyQueryResult(),
 }));
@@ -40,7 +40,12 @@ vi.mock('@tanstack/react-query', () => ({
   // Records every call so the branch query's key and `enabled` can be asserted.
   // The provider queries have no `queryFn`; the branch query does, and only it
   // reads `branchQueryResult`.
-  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; queryFn?: unknown }) => {
+  useQuery: (options: {
+    queryKey?: unknown[];
+    enabled?: boolean;
+    staleTime?: number;
+    queryFn?: unknown;
+  }) => {
     mocks.queryCalls.push(options);
     const base = {
       data: undefined,
@@ -69,11 +74,7 @@ vi.mock('@/lib/integration-urls', () => ({
 }));
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
-  openAuthorizationAndWaitForReturn: vi.fn(async () => 'sheet-close'),
-}));
-
-vi.mock('@/lib/external-auth/use-external-auth-return', () => ({
-  useExternalAuthReturn: () => ({ markLaunched: vi.fn(), clearLaunch: vi.fn() }),
+  openAuthorizationAndWaitForReturn: vi.fn(async () => undefined),
 }));
 
 vi.mock('@/lib/use-github-repos-refresh', () => ({
@@ -93,12 +94,19 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     cloudAgentNext: {
       listGitHubRepositories: {
-        queryOptions: () => ({ queryKey: ['github'] }),
+        queryOptions: (_input: unknown, opts?: Record<string, unknown>) => ({
+          queryKey: ['github'],
+          ...opts,
+        }),
         queryKey: () => ['github'],
       },
       listGitLabRepositories: {
-        queryOptions: ({ forceRefresh }: { forceRefresh: boolean }) => ({
+        queryOptions: (
+          { forceRefresh }: { forceRefresh: boolean },
+          opts?: Record<string, unknown>
+        ) => ({
           queryKey: ['gitlab', forceRefresh],
+          ...opts,
         }),
         queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['gitlab', forceRefresh],
       },
@@ -109,18 +117,29 @@ vi.mock('@/lib/trpc', () => ({
     organizations: {
       cloudAgentNext: {
         listGitHubRepositories: {
-          queryOptions: () => ({ queryKey: ['github'] }),
+          queryOptions: (_input: unknown, opts?: Record<string, unknown>) => ({
+            queryKey: ['github'],
+            ...opts,
+          }),
           queryKey: () => ['github'],
         },
         listGitLabRepositories: {
-          queryOptions: ({ forceRefresh }: { forceRefresh: boolean }) => ({
+          queryOptions: (
+            { forceRefresh }: { forceRefresh: boolean },
+            opts?: Record<string, unknown>
+          ) => ({
             queryKey: ['gitlab', forceRefresh],
+            ...opts,
           }),
           queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['gitlab', forceRefresh],
         },
         listBitbucketRepositories: {
-          queryOptions: ({ forceRefresh }: { forceRefresh: boolean }) => ({
+          queryOptions: (
+            { forceRefresh }: { forceRefresh: boolean },
+            opts?: Record<string, unknown>
+          ) => ({
             queryKey: ['bitbucket', forceRefresh],
+            ...opts,
           }),
           queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['bitbucket', forceRefresh],
         },
@@ -217,6 +236,34 @@ describe('useNewSessionRepos force-fresh Bitbucket cache write', () => {
 
     expect(mocks.setQueryData).toHaveBeenCalledWith(['bitbucket', false], available);
     expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+});
+
+describe('useNewSessionRepos provider staleTime', () => {
+  // The three provider list queries are expensive, so they must not refetch on
+  // every mount of the new-session form. The force-fresh flows above write
+  // fresh results into these same keys.
+  function expectProviderStaleTime() {
+    expect(mocks.queryCalls.map(options => options.queryKey?.[0])).toEqual([
+      'github',
+      'gitlab',
+      'bitbucket',
+    ]);
+    for (const options of mocks.queryCalls) {
+      expect(options.staleTime).toBe(300_000);
+    }
+  }
+
+  it('gives every provider repository query a five-minute staleTime (personal)', () => {
+    mountRepos(undefined);
+
+    expectProviderStaleTime();
+  });
+
+  it('gives every provider repository query a five-minute staleTime (organization)', () => {
+    mountRepos('org-1');
+
+    expectProviderStaleTime();
   });
 });
 

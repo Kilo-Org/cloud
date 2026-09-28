@@ -253,7 +253,11 @@ describe('session state transitions', () => {
 
     const lastState = states[states.length - 1];
     expect(lastState.activity).toEqual({ type: 'idle' });
-    expect(lastState.status).toEqual({ type: 'error', message: 'Session terminated' });
+    expect(lastState.status).toEqual({
+      type: 'error',
+      message: 'Session terminated',
+      code: 'session-terminated',
+    });
     expect(errors).toContain('Session terminated');
 
     session.destroy();

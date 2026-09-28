@@ -3,15 +3,8 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
-import {
-  github_app_installations,
-  kilocode_users,
-  organizations,
-  platform_integrations,
-  provider_oauth_attempts,
-} from '@kilocode/db/schema';
+import { kilocode_users, organizations, provider_oauth_attempts } from '@kilocode/db/schema';
 import { and, eq, gt, lt, or, sql } from 'drizzle-orm';
-import { PLATFORM } from './core/constants';
 
 export type ReservedOAuthProvider = 'slack' | 'linear' | 'discord';
 const ATTEMPT_TTL_MS = 10 * 60_000;
@@ -50,27 +43,6 @@ export async function pruneProviderOAuthAttempts(tx: DrizzleTransaction): Promis
   );
 }
 
-async function assertOwnerHasNoSharedGitHubInstallation(tx: DrizzleTransaction, owner: Owner) {
-  const [shared] = await tx
-    .select({ id: platform_integrations.id })
-    .from(platform_integrations)
-    .innerJoin(
-      github_app_installations,
-      eq(platform_integrations.github_installation_id, github_app_installations.id)
-    )
-    .where(
-      and(
-        owner.type === 'org'
-          ? eq(platform_integrations.owned_by_organization_id, owner.id)
-          : eq(platform_integrations.owned_by_user_id, owner.id),
-        eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(github_app_installations.sharing_mode, 'web_cloud_agent')
-      )
-    )
-    .limit(1);
-  if (shared) throw new Error('This workflow is not available for shared GitHub installations yet');
-}
-
 export async function beginProviderOAuthAttempt(input: {
   actorUserId: string;
   owner: Owner;
@@ -81,7 +53,6 @@ export async function beginProviderOAuthAttempt(input: {
   await db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, input.owner);
     await pruneProviderOAuthAttempts(tx);
-    await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     // A new attempt supersedes any existing pending attempt for this owner+provider,
     // even if it hasn't expired yet. Without this, an abandoned-but-unexpired pending
@@ -127,7 +98,6 @@ export async function consumeProviderOAuthAttempt(input: {
   return db.transaction(async tx => {
     await lockProviderOAuthOwnerRow(tx, input.owner);
     await pruneProviderOAuthAttempts(tx);
-    await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     await tx
       .update(provider_oauth_attempts)

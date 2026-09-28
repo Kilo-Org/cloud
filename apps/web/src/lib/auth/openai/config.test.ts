@@ -50,7 +50,7 @@ describe('OpenAI OAuth config', () => {
       'email',
       'offline_access',
       'resource.invoke',
-      'chatpass.enable.request',
+      'chatgpt.tokens.use.obo',
     ]);
     expect(OPENAI_RESOURCE).toBe('https://api.openai.com/v1');
   });
@@ -64,6 +64,14 @@ describe('OpenAI OAuth config', () => {
     expect(isOpenAiTokenSharingGrant({ scope: 'openid profile email resource.invoke' })).toBe(
       false
     );
+    // A grant that can call the resource and refresh, but that declined the
+    // ChatGPT allowance consent, must stay an identity sign-in: token sharing
+    // cannot spend the allowance without `chatgpt.tokens.use.obo`.
+    expect(
+      isOpenAiTokenSharingGrant({
+        scope: 'openid profile email resource.invoke offline_access',
+      })
+    ).toBe(false);
     // RFC 6749 §5.1 lets the response omit `scope`; the refresh token is then the
     // marker that offline_access, and so the delegated flow, was granted.
     expect(isOpenAiTokenSharingGrant({ refresh_token: 'refresh-token' })).toBe(true);

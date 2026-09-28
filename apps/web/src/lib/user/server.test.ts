@@ -857,6 +857,51 @@ describe('getUserFromAuth', () => {
     expect(mockGetServerSession).not.toHaveBeenCalled();
   });
 
+  test('flags a rejected credential so the caller does not answer as anonymous', async () => {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from('{').toString('base64url');
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer ${header}.${payload}.signature` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('does not flag a request that presented no credential', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue(null);
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(false);
+  });
+
+  test('flags an operation-scoped token presented to another endpoint', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    // The token verified, but not for this endpoint. It is still a credential
+    // that was presented and refused, so it must not become anonymous access.
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
   test('enforces the requested audience without falling through to a valid session', async () => {
     const user = await insertTestUser({
       api_token_pepper: 'audience-transition-pepper',

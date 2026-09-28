@@ -2,6 +2,7 @@ import type { PreparationAttempt, PreparationStepSnapshot } from '@kilocode/clou
 import {
   extractTickerLines,
   findRunningSetupCommand,
+  preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
 
@@ -91,6 +92,66 @@ describe('summarizePreparationAttempt', () => {
     expect(summarizePreparationAttempt(completed)).toEqual({ kind: 'completed', duration: '12s' });
   });
 
+  it('surfaces an incomplete restore from a completed attempt', () => {
+    const completed = attempt({
+      status: 'completed',
+      completedAt: 13_400,
+      steps: [
+        step({ id: 'restore', status: 'completed' }),
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError:
+            'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts',
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(completed)).toEqual({
+      kind: 'incomplete',
+      text: 'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts',
+    });
+  });
+
+  it('surfaces an incomplete restore while the attempt is still running', () => {
+    const running = attempt({
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError:
+            'Session restore incomplete: 1 of 3 files were not restored (timeout). Missing: c.ts',
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(running)).toEqual({
+      kind: 'incomplete',
+      text: 'Session restore incomplete: 1 of 3 files were not restored (timeout). Missing: c.ts',
+    });
+  });
+
+  it('falls back to the incomplete step label when it carries no safe error', () => {
+    const completed = attempt({
+      status: 'completed',
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError: undefined,
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(completed)).toEqual({
+      kind: 'incomplete',
+      text: 'Session restore incomplete',
+    });
+  });
+
   it('reports no duration for a completed attempt without completedAt', () => {
     const completed = attempt({ status: 'completed' });
     expect(summarizePreparationAttempt(completed)).toEqual({
@@ -117,6 +178,120 @@ describe('summarizePreparationAttempt', () => {
       kind: 'failed',
       error: undefined,
     });
+  });
+
+  it('reports a terminal failure ahead of the incomplete restore step', () => {
+    const failed = attempt({
+      status: 'failed',
+      safeError: 'Setup command failed',
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError: 'Session restore incomplete: 2 of 5 files were not restored (binary file)',
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(failed)).toEqual({
+      kind: 'failed',
+      error: 'Setup command failed',
+    });
+  });
+
+  it('falls back to the incomplete step error when a failed attempt carries no safe error', () => {
+    const failed = attempt({
+      status: 'failed',
+      safeError: undefined,
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError:
+            'Session restore incomplete: 2 of 5 files were not restored (outside_workspace)',
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(failed)).toEqual({
+      kind: 'failed',
+      error: 'Session restore incomplete: 2 of 5 files were not restored (outside_workspace)',
+    });
+  });
+
+  it('reports a failed attempt with no safe error and no step error', () => {
+    const failed = attempt({
+      status: 'failed',
+      safeError: undefined,
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError: undefined,
+        }),
+      ],
+    });
+    expect(summarizePreparationAttempt(failed)).toEqual({ kind: 'failed' });
+  });
+});
+
+describe('preparationSummaryLine', () => {
+  it('shows the incomplete-restore text instead of "Environment prepared"', () => {
+    const completed = attempt({
+      status: 'completed',
+      completedAt: 13_400,
+      steps: [
+        step({ id: 'restore', status: 'completed' }),
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError:
+            'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts',
+        }),
+      ],
+    });
+    expect(preparationSummaryLine(completed)).toBe(
+      'Session restore incomplete: 2 of 5 files were not restored (binary file). Missing: a.ts, b.ts · 12s'
+    );
+  });
+
+  it('shows the incomplete text for a still-running attempt without a duration', () => {
+    const running = attempt({
+      steps: [
+        step({
+          id: 'incomplete',
+          key: 'restore_incomplete',
+          label: 'Session restore incomplete',
+          status: 'failed',
+          safeError: 'Session restore incomplete: 1 of 3 files were not restored (timeout)',
+        }),
+      ],
+    });
+    expect(preparationSummaryLine(running)).toBe(
+      'Session restore incomplete: 1 of 3 files were not restored (timeout)'
+    );
+  });
+
+  it('reports the completed summary for an attempt without an incomplete step', () => {
+    expect(preparationSummaryLine(attempt({ status: 'completed', completedAt: 13_400 }))).toBe(
+      'Environment prepared · 12s'
+    );
+  });
+
+  it('reports a preparing summary while the attempt runs', () => {
+    expect(preparationSummaryLine(attempt({}))).toBe('Preparing environment');
+  });
+
+  it('reports a failed summary for a failed attempt', () => {
+    expect(
+      preparationSummaryLine(attempt({ status: 'failed', completedAt: 13_400, safeError: 'boom' }))
+    ).toBe('Preparation failed · 12s');
   });
 });
 

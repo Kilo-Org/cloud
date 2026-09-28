@@ -4,7 +4,12 @@ import { describe, it } from 'node:test';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { parsePatchFiles, type SelectedLineRange } from '@pierre/diffs';
+import {
+  DiffHunksRenderer,
+  parsePatchFiles,
+  preloadHighlighter,
+  type SelectedLineRange,
+} from '@pierre/diffs';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { WorktreeReviewCapture, WorktreeReviewComment } from './worktree-review';
 import type { WorktreeReviewDiffProps } from './WorktreeReviewEditor';
@@ -249,6 +254,37 @@ function renderedRows(
   return { root, rows, content, select };
 }
 
+type SplitRowSpec = [number, string, string];
+
+function splitColumn(tag: 'deletions' | 'additions', lines: readonly SplitRowSpec[]) {
+  const code = new TestElement('code', { 'data-code': '', [`data-${tag}`]: '' });
+  const content = new TestElement('div', { 'data-content': '' });
+  code.append(content);
+  for (const [line, type, lineIndex] of lines) {
+    const row = new TestElement('div', {
+      'data-line': String(line),
+      'data-line-type': type,
+      'data-line-index': lineIndex,
+    });
+    row.append(new TestNode('source\n'));
+    content.append(row);
+  }
+  return code;
+}
+
+function splitRoot({
+  deletions,
+  additions,
+}: {
+  deletions?: readonly SplitRowSpec[];
+  additions?: readonly SplitRowSpec[];
+}) {
+  const root = new TestRoot();
+  if (deletions) root.append(splitColumn('deletions', deletions));
+  if (additions) root.append(splitColumn('additions', additions));
+  return root;
+}
+
 const capture: WorktreeReviewCapture = {
   userId: 'user-one',
   organizationId: undefined,
@@ -427,6 +463,146 @@ describe('worktree review renderer annotations', () => {
   });
 });
 
+describe('worktree review DOM range highlight', () => {
+  const splitPatch =
+    'diff --git a/src/example.ts b/src/example.ts\nindex 1234567..abcdef0 100644\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,4 +1,4 @@\n+X\n A\n B\n C\n-D\n';
+  const unifiedPatch =
+    'diff --git a/src/example.ts b/src/example.ts\nindex 1234567..abcdef0 100644\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,4 +1,4 @@\n+X\n A\n-B\n C\n D\n';
+
+  async function renderContainer(source: string, diffStyle: 'unified' | 'split') {
+    await preloadHighlighter({ langs: ['text'], themes: ['pierre-dark'] });
+    const diff = parsePatchFiles(source, undefined, true)[0]?.files[0];
+    assert.ok(diff);
+    const renderer = new DiffHunksRenderer({
+      theme: 'pierre-dark',
+      diffStyle,
+      disableFileHeader: true,
+      overflow: 'wrap',
+    });
+    const result = renderer.renderDiff(diff);
+    assert.ok(result);
+    const html = renderer.renderFullHTML(result);
+    renderer.cleanUp();
+    const dom = installDom();
+    dom.container.innerHTML = html;
+    return dom;
+  }
+
+  function selectorsOf(css: string) {
+    const brace = css.indexOf('{');
+    assert.ok(brace > 0);
+    return css
+      .slice(0, brace)
+      .split(',')
+      .map(selector => selector.trim());
+  }
+
+  function quoteComment(
+    id: string,
+    lineNumber: number,
+    kind: 'context' | 'deletion' | 'addition'
+  ): WorktreeReviewComment {
+    return {
+      id,
+      anchor: {
+        capture,
+        path: 'src/example.ts',
+        range: {
+          side: kind === 'deletion' ? 'deletions' : 'additions',
+          startLine: lineNumber,
+          endLine: lineNumber,
+        },
+        quote: {
+          source: 'saved-patch',
+          lines: [{ lineNumber, kind, text: 'saved source\n' }],
+        },
+      },
+      text: 'Please review.',
+    };
+  }
+
+  it('scopes a split context quote to the additions column at the new-side number', async () => {
+    const dom = await renderContainer(splitPatch, 'split');
+    try {
+      const deletionsContext = dom.container.querySelector(
+        '[data-code][data-deletions] [data-line="3"]'
+      );
+      assert.ok(deletionsContext);
+      assert.equal(deletionsContext.getAttribute('data-line-type'), 'context');
+      const css = worktreeReviewRangeHighlightCSS(
+        [quoteComment('context-three', 3, 'context')],
+        capture,
+        'src/example.ts'
+      );
+      const matched = [...dom.container.querySelectorAll(selectorsOf(css).join(','))];
+      assert.equal(matched.length, 1);
+      const [row] = matched;
+      assert.equal(row?.getAttribute('data-line'), '3');
+      assert.equal(row?.closest('[data-code]')?.getAttribute('data-deletions'), null);
+      assert.notEqual(row?.closest('[data-code]')?.getAttribute('data-additions'), null);
+      assert.notEqual(row, deletionsContext);
+    } finally {
+      dom.cleanup();
+    }
+  });
+
+  it('keeps a split deletion quote on the change-deletion row', async () => {
+    const dom = await renderContainer(splitPatch, 'split');
+    try {
+      const css = worktreeReviewRangeHighlightCSS(
+        [quoteComment('deletion-four', 4, 'deletion')],
+        capture,
+        'src/example.ts'
+      );
+      const matched = [...dom.container.querySelectorAll(selectorsOf(css).join(','))];
+      assert.equal(matched.length, 1);
+      assert.equal(matched[0]?.getAttribute('data-line-type'), 'change-deletion');
+      assert.equal(matched[0]?.getAttribute('data-line'), '4');
+    } finally {
+      dom.cleanup();
+    }
+  });
+
+  it('applies the unified arm to the real DOM without matching the colliding change-deletion row', async () => {
+    const dom = await renderContainer(unifiedPatch, 'unified');
+    try {
+      const changeDeletion = dom.container.querySelector(
+        '[data-code][data-unified] [data-line-type="change-deletion"][data-line="2"]'
+      );
+      assert.ok(changeDeletion);
+      const contextCss = worktreeReviewRangeHighlightCSS(
+        [quoteComment('unified-context-two', 2, 'context')],
+        capture,
+        'src/example.ts'
+      );
+      const contextRows = [...dom.container.querySelectorAll(selectorsOf(contextCss).join(','))];
+      assert.equal(contextRows.length, 1);
+      assert.equal(contextRows[0]?.getAttribute('data-line'), '2');
+      assert.equal(contextRows[0]?.getAttribute('data-line-type'), 'context');
+      assert.notEqual(contextRows[0], changeDeletion);
+      const additionCss = worktreeReviewRangeHighlightCSS(
+        [quoteComment('unified-addition-one', 1, 'addition')],
+        capture,
+        'src/example.ts'
+      );
+      const additionRows = [...dom.container.querySelectorAll(selectorsOf(additionCss).join(','))];
+      assert.equal(additionRows.length, 1);
+      assert.equal(additionRows[0]?.getAttribute('data-line-type'), 'change-addition');
+      const deletionCss = worktreeReviewRangeHighlightCSS(
+        [quoteComment('unified-deletion-two', 2, 'deletion')],
+        capture,
+        'src/example.ts'
+      );
+      const deletionRows = [...dom.container.querySelectorAll(selectorsOf(deletionCss).join(','))];
+      assert.equal(deletionRows.length, 1);
+      assert.equal(deletionRows[0]?.getAttribute('data-line-type'), 'change-deletion');
+      assert.equal(deletionRows[0]?.getAttribute('data-line'), '2');
+    } finally {
+      dom.cleanup();
+    }
+  });
+});
+
 describe('worktree review rendered selection', () => {
   it('uses composed ranges and file coordinates, including unified context and nested tokens', () => {
     const { root, rows, select } = renderedRows();
@@ -508,6 +684,70 @@ describe('worktree review rendered selection', () => {
         ok: true,
         value: { side: 'deletions', start: 2, end: 2 },
       }
+    );
+  });
+
+  it('resolves each split side to its own column, including colliding line numbers', () => {
+    const root = splitRoot({
+      deletions: [
+        [1, 'context', '1,1'],
+        [2, 'context', '2,2'],
+        [3, 'context', '3,3'],
+        [4, 'change-deletion', '4,4'],
+      ],
+      additions: [
+        [1, 'change-addition', '0,0'],
+        [2, 'context', '1,1'],
+        [3, 'context', '2,2'],
+        [4, 'context', '3,3'],
+      ],
+    });
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'deletions', start: 4, end: 4 }),
+      { ok: true, value: { side: 'deletions', start: 4, end: 4 } }
+    );
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 1, end: 1 }),
+      { ok: true, value: { side: 'additions', start: 1, end: 1 } }
+    );
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'deletions', start: 3, end: 3 }),
+      { ok: true, value: { side: 'deletions', start: 3, end: 3 } }
+    );
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 3, end: 3 }),
+      { ok: true, value: { side: 'additions', start: 3, end: 3 } }
+    );
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'additions', start: 4, end: 4 }),
+      { ok: true, value: { side: 'additions', start: 4, end: 4 } }
+    );
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(root.dom, { side: 'deletions', start: 1, end: 1 }),
+      { ok: true, value: { side: 'deletions', start: 1, end: 1 } }
+    );
+  });
+
+  it('resolves single-column split halves without requiring the other column', () => {
+    const deletedOnly = splitRoot({ deletions: [[1, 'change-deletion', '0,0']] });
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(deletedOnly.dom, { side: 'deletions', start: 1, end: 1 }),
+      { ok: true, value: { side: 'deletions', start: 1, end: 1 } }
+    );
+    assert.equal(
+      validateWorktreeReviewRenderedRange(deletedOnly.dom, { side: 'additions', start: 1, end: 1 })
+        .ok,
+      false
+    );
+    const addedOnly = splitRoot({ additions: [[1, 'change-addition', '0,0']] });
+    assert.deepEqual(
+      validateWorktreeReviewRenderedRange(addedOnly.dom, { side: 'additions', start: 1, end: 1 }),
+      { ok: true, value: { side: 'additions', start: 1, end: 1 } }
+    );
+    assert.equal(
+      validateWorktreeReviewRenderedRange(addedOnly.dom, { side: 'deletions', start: 1, end: 1 })
+        .ok,
+      false
     );
   });
 

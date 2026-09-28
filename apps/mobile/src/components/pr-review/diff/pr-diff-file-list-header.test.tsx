@@ -120,3 +120,26 @@ describe('PrDiffFileListHeader side insets (landscape)', () => {
     expect(routerPush).toHaveBeenCalledWith('/(app)/pr-review/octocat/hello/7/file-navigator');
   });
 });
+
+describe('PrDiffFileListHeader container padding', () => {
+  beforeEach(() => {
+    insets.top = 0;
+    insets.bottom = 0;
+    insets.left = 0;
+    insets.right = 0;
+  });
+
+  it('pads the summary row above and below the file list', () => {
+    const renderer = mountHeader();
+    const pressable = findNavigatorPressable(renderer.root);
+    const container = pressable.parent?.parent;
+
+    // The owner reported the row sitting flush against the tab bar above and
+    // the first file path below; `py-4` gives 16pt on both edges while the
+    // `px-4` gutter, background and hairline are unchanged.
+    expect(container?.props.className).toContain('px-4');
+    expect(container?.props.className).toContain('py-4');
+    expect(container?.props.className).toContain('bg-background');
+    expect(container?.props.className).toContain('border-b');
+  });
+});

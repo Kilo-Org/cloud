@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- every size bucket and every surface composition shares this one widget layout module */
 /* eslint-disable react-native/no-inline-styles -- react-native-android-widget primitives take style objects; NativeWind className is unavailable in the widget host */
 
 'use no memo';
@@ -42,6 +43,16 @@ const ROW_LABEL_MIN_WIDTH_DP = 300;
  * stacked layout and clip its last row.
  */
 const ROW_MAX_HEIGHT_DP = 130;
+/**
+ * At or above this height (dp) the cell is the nightstand card: the mark, the
+ * three counts, and the newest-result footer.
+ *
+ * A four-cell-tall widget reports roughly 240–300 dp, and the tallest three-cell
+ * layout stays under 220 dp, so the split sits between them. The widget config's
+ * preferred cell is four tall, and `maxResizeHeight` has to reach past this
+ * bound or a four-cell height would clamp and the bucket would never render.
+ */
+const LARGE_MIN_HEIGHT_DP = 220;
 
 type Palette = {
   background: HexColor;
@@ -76,7 +87,7 @@ const DARK: Palette = {
 // the source. Translated copy arrives through `props`; the English fallbacks
 // below only render while the gallery placeholder has no snapshot props.
 
-type Size = 'compact' | 'row' | 'stack';
+type Size = 'compact' | 'row' | 'stack' | 'large';
 
 /**
  * The size bucket, whether a `row` cell is wide enough for its labels, and the
@@ -86,8 +97,13 @@ type Size = 'compact' | 'row' | 'stack';
 type Shape = { size: Size; rowLabels: boolean; rtl: boolean };
 
 function shapeOf(info: WidgetInfo, rtl: boolean): Shape {
-  // Height first: a narrow cell that is tall enough still stacks, because the
-  // rows then own the full width. Beside the mark they truncated their labels.
+  // Height first: a cell tall enough for the nightstand card takes it whatever
+  // its width, and the three counts then own a column of their own.
+  if (info.height >= LARGE_MIN_HEIGHT_DP) {
+    return { size: 'large', rowLabels: true, rtl };
+  }
+  // A narrow cell that is tall enough still stacks, because the rows then own
+  // the full width. Beside the mark they truncated their labels.
   if (info.height >= ROW_MAX_HEIGHT_DP) {
     return { size: 'stack', rowLabels: true, rtl };
   }
@@ -199,20 +215,110 @@ function statusText(props: AndroidWidgetProps, palette: Palette) {
   );
 }
 
+/** The newest result itself: the state marker, the kind label, and the age. */
+function newestResultRow(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
+  if (
+    props.newestResultKind === null ||
+    props.newestResultLabel === null ||
+    props.newestResultAgo === null
+  ) {
+    return null;
+  }
+  return (
+    <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', flexGap: 6 }}>
+      {inReadingOrder(
+        [
+          stateDot(props.newestResultKind, palette, 9),
+          <TextWidget
+            key="newest-label"
+            text={props.newestResultLabel}
+            maxLines={1}
+            truncate="END"
+            style={{ color: palette.foreground, fontSize: 13 }}
+          />,
+          <TextWidget
+            key="newest-ago"
+            text={props.newestResultAgo}
+            maxLines={1}
+            truncate="END"
+            style={{ color: palette.muted, fontSize: 13 }}
+          />,
+        ],
+        rtl
+      )}
+    </FlexWidget>
+  );
+}
+
+/**
+ * The large cell's third fact, at the bottom of the column.
+ *
+ * The rows stay whatever happens, so the footer only ever moves itself. Happy
+ * shows the caption and the newest result; stale keeps the caption and swaps
+ * the result for its own copy, because the counts are the last known ones and
+ * only the third fact is in doubt — the same composition the iOS large card
+ * draws. A cell with nothing to put under the caption has no footer at all.
+ */
+function newestResultFooter(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
+  if (props.countLines.length === 0) {
+    return null;
+  }
+  const body =
+    props.statusLine === null ? (
+      newestResultRow(props, palette, rtl)
+    ) : (
+      <TextWidget
+        text={props.statusLine}
+        maxLines={2}
+        truncate="END"
+        style={{ color: palette.muted, fontSize: 12 }}
+      />
+    );
+  if (body === null) {
+    return null;
+  }
+  return (
+    <FlexWidget style={{ flexDirection: 'column', alignItems: startEdge(rtl), flexGap: 4 }}>
+      {props.newestResultTitle === null ? null : (
+        <TextWidget
+          text={props.newestResultTitle}
+          maxLines={1}
+          truncate="END"
+          style={{ color: palette.muted, fontSize: 11 }}
+        />
+      )}
+      {body}
+    </FlexWidget>
+  );
+}
+
 // The mark alone, never a status line beside it: stale is the one status that
 // carries both, and the iOS card drops the warning while counts show too. A
 // line under the mark cost the rows their width and read as a fourth state.
-const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26 } satisfies Record<Size, number>;
+// The large bucket is the one exception: it has a footer to put the copy in.
+const MARK_SIZE_DP = { compact: 22, row: 28, stack: 26, large: 30 } satisfies Record<Size, number>;
 /** A short cell runs its counts in a row, so the gap separates states, not lines. */
-const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6 } satisfies Record<Size, number>;
+const COUNT_GAP_DP = { compact: 3, row: 14, stack: 6, large: 8 } satisfies Record<Size, number>;
 /**
  * The newest-session line's reserved height, in every size bucket. The slot is
  * laid out whether or not it carries text, so work arriving (or an action's
- * progress line replacing the session line) never moves the count rows.
+ * progress line replacing the session line) never moves the count rows. The
+ * large bucket composes its own newest-result footer instead of the slot, so
+ * its entry is unused but keeps the lookup total over every size.
  */
-const NEWEST_LINE_DP = { compact: 15, row: 16, stack: 18 } satisfies Record<Size, number>;
+const NEWEST_LINE_DP = {
+  compact: 15,
+  row: 16,
+  stack: 18,
+  large: 18,
+} satisfies Record<Size, number>;
 /** Smaller than the count labels above it: it is context, not a fourth state. */
-const NEWEST_FONT_DP = { compact: 11, row: 12, stack: 12 } satisfies Record<Size, number>;
+const NEWEST_FONT_DP = {
+  compact: 11,
+  row: 12,
+  stack: 12,
+  large: 12,
+} satisfies Record<Size, number>;
 /** One action-row size in every bucket, so the rows themselves never reflow. */
 const ACTION_FONT_DP = 12;
 /**
@@ -235,7 +341,7 @@ function renderCounts(props: AndroidWidgetProps, palette: Palette, shape: Shape)
     const isPrimary = line.label === primaryLabel;
     return countRow(line, isPrimary, {
       palette,
-      fontSize: size === 'stack' ? 15 : 13,
+      fontSize: size === 'compact' || size === 'row' ? 13 : 15,
       showLabel: size !== 'row' || rowLabels || isPrimary,
       rtl,
     });
@@ -339,6 +445,37 @@ function actionRows(props: AndroidWidgetProps, palette: Palette, rtl: boolean) {
 
 function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape) {
   const { size, rtl } = shape;
+  // The nightstand cell: the mark on top, the counts in the middle of the
+  // column, and the third fact on the bottom edge. With no footer the mark and
+  // the status text centre the way the stack bucket composes, so the extra
+  // height never draws a hole. The large cell mirrors the iOS `systemLarge`
+  // card: it carries the counts and the footer, not the reserved newest-session
+  // slot or the action row the shorter buckets draw.
+  if (size === 'large') {
+    const body = renderCounts(props, palette, shape);
+    const footer = newestResultFooter(props, palette, rtl);
+    return (
+      <FlexWidget
+        clickAction="OPEN_URI"
+        clickActionData={{ uri: 'kiloapp:///cloud/sessions' }}
+        accessibilityLabel={props.accessibilityLabel}
+        style={{
+          backgroundColor: palette.background,
+          flexDirection: 'column',
+          alignItems: startEdge(rtl),
+          justifyContent: footer === null ? 'center' : 'space-between',
+          flexGap: 12,
+          height: 'match_parent',
+          width: 'match_parent',
+          padding: 14,
+        }}
+      >
+        {logo(MARK_SIZE_DP[size])}
+        {body}
+        {footer}
+      </FlexWidget>
+    );
+  }
   const body = (
     <FlexWidget
       key="body"
@@ -406,9 +543,11 @@ function renderSurface(props: AndroidWidgetProps, palette: Palette, shape: Shape
 }
 
 /**
- * Distinct light and dark layouts through the library's theme callback. A tall
- * cell stacks the three states under the mark; a short wide cell runs them
- * beside it in a row; a short narrow cell stacks them beside it.
+ * Distinct light and dark layouts through the library's theme callback. A
+ * nightstand-tall cell tops the mark, hangs the counts in the middle and pins
+ * the newest result to the bottom; a tall short cell stacks the three states
+ * under the mark; a short wide cell runs them beside it in a row; a short
+ * narrow cell stacks them beside it.
  */
 export function renderActiveAgentsWidget(
   props: AndroidWidgetProps,

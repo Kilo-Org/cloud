@@ -20,6 +20,7 @@ test('lists the healthy sibling while excluding unhealthy GitHub associations', 
     {
       id: 'association-suspended',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'suspended',
       github_disconnected_at: '2026-09-07T00:00:00.000Z',
       suspended_at: '2026-09-07T00:00:00.000Z',
@@ -32,6 +33,7 @@ test('lists the healthy sibling while excluding unhealthy GitHub associations', 
     {
       id: 'association-auth-invalid',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -41,6 +43,7 @@ test('lists the healthy sibling while excluding unhealthy GitHub associations', 
     {
       id: 'association-disconnected',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: '2026-09-07T00:00:00.000Z',
       suspended_at: null,
@@ -50,6 +53,7 @@ test('lists the healthy sibling while excluding unhealthy GitHub associations', 
     {
       id: 'association-healthy',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -78,6 +82,7 @@ test('retains association provenance across repository choices', async () => {
     {
       id: 'association-a',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_app_type: 'standard',
       github_disconnected_at: null,
@@ -88,6 +93,7 @@ test('retains association provenance across repository choices', async () => {
     {
       id: 'association-b',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_app_type: 'lite',
       github_disconnected_at: null,
@@ -115,6 +121,7 @@ test('rejects a repository exposed by multiple associations', async () => {
     {
       id: 'association-a',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -124,6 +131,7 @@ test('rejects a repository exposed by multiple associations', async () => {
     {
       id: 'association-b',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -142,6 +150,7 @@ test('matches GitHub repository names case-insensitively', async () => {
     {
       id: 'association-a',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -160,6 +169,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-string-id',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -169,6 +179,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-non-array',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -178,6 +189,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-null-entry',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -187,6 +199,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-malformed-fields',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -196,6 +209,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-missing-id',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -205,6 +219,7 @@ test('isolates malformed repository caches from healthy sibling associations', a
     {
       id: 'association-healthy',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_disconnected_at: null,
       suspended_at: null,
@@ -229,6 +244,7 @@ test('retains the real adapter-written repository cache shape', async () => {
     {
       id: 'association-adapter',
       platform: 'github',
+      github_connection_role: 'workflow',
       integration_status: 'active',
       github_app_type: 'standard',
       github_disconnected_at: null,
@@ -278,6 +294,7 @@ test('keeps the same canonical repository associated to each Kilo owner separate
       {
         id: 'association-owner-a',
         platform: 'github',
+        github_connection_role: 'workflow',
         integration_status: 'active',
         github_disconnected_at: null,
         suspended_at: null,
@@ -289,6 +306,7 @@ test('keeps the same canonical repository associated to each Kilo owner separate
       {
         id: 'association-owner-b',
         platform: 'github',
+        github_connection_role: 'agent_only',
         integration_status: 'active',
         github_disconnected_at: null,
         suspended_at: null,
@@ -301,6 +319,6 @@ test('keeps the same canonical repository associated to each Kilo owner separate
     resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-a' }, repository.full_name)
   ).resolves.toMatchObject({ githubIntegrationId: 'association-owner-a' });
   await expect(
-    resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-b' }, repository.full_name)
+    resolveGitHubRepositoryForOwner({ type: 'org', id: 'owner-b' }, repository.full_name, 'agent')
   ).resolves.toMatchObject({ githubIntegrationId: 'association-owner-b' });
 });

@@ -1,8 +1,8 @@
 import type { SessionSyncResult } from '../shared/sandbox-control-protocol.js';
-import type { SessionMessageRecord } from './session-message-queue.js';
+import { activeWrapperInstanceId, type SessionMessage } from './session-message-queue.js';
 
 export type InteractionRefreshScope = {
-  message: SessionMessageRecord;
+  message: SessionMessage;
   epoch: number;
   interactionRevision: number | undefined;
   sessionId: string | undefined;
@@ -24,7 +24,7 @@ type RefreshDeps = {
 function scopeMatches(a: InteractionRefreshScope, b: InteractionRefreshScope): boolean {
   return (
     a.message.messageId === b.message.messageId &&
-    a.message.wrapperInstanceId === b.message.wrapperInstanceId &&
+    activeWrapperInstanceId(a.message) === activeWrapperInstanceId(b.message) &&
     a.epoch === b.epoch &&
     a.interactionRevision === b.interactionRevision &&
     a.sessionId === b.sessionId &&

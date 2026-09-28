@@ -28,6 +28,43 @@ export type { StoredAgentConversation } from '@/src/shared/agent-conversation-ta
 const legacyConversationStorageKey = 'local:kiloAgentConversation';
 const conversationStorageKey = 'local:kiloAgentConversations';
 const conversationStoreQueryKey = ['side-panel', 'agent-conversations'] as const;
+
+// The retired page tools, mapped to the Playwright MCP tool that replaced each.
+const LEGACY_PAGE_TOOL_NAMES = {
+  find_in_page: 'kilo_browser_find',
+  get_element_details: 'kilo_browser_snapshot',
+  get_page_snapshot: 'kilo_browser_snapshot',
+  get_viewport_screenshot: 'kilo_browser_take_screenshot',
+} as const;
+type LegacyPageToolName = keyof typeof LEGACY_PAGE_TOOL_NAMES;
+const isLegacyPageToolName = (name: string): name is LegacyPageToolName =>
+  Object.hasOwn(LEGACY_PAGE_TOOL_NAMES, name);
+
+// The retired call's fields are renamed to the replacement tool's arguments, so the migrated call carries names the replacement accepts.
+const toMigratedBrowserArguments = (
+  legacyName: LegacyPageToolName,
+  event: {
+    readonly elementId?: string | undefined;
+    readonly query?: string | undefined;
+  }
+) => {
+  switch (legacyName) {
+    case 'find_in_page': {
+      return event.query === undefined ? {} : { text: event.query };
+    }
+    case 'get_element_details': {
+      return event.elementId === undefined ? {} : { target: event.elementId };
+    }
+    case 'get_page_snapshot': {
+      return {};
+    }
+    case 'get_viewport_screenshot': {
+      // `scale` is required by the vendored browser_take_screenshot contract; the retired viewport screenshot was CSS-scaled.
+      return { scale: 'css' };
+    }
+  }
+};
+
 const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] | undefined => {
   const parsed = conversationEventsSchema.safeParse(value);
   if (!parsed.success) {
@@ -64,7 +101,7 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
         break;
       }
       case 'tool-call': {
-        // WebMCP events carry a webMcpOrigin field; must precede the eval branch.
+        // WebMCP events carry a webMcpOrigin field; must precede the call-shape branches.
         if ('webMcpOrigin' in event) {
           events.push({
             arguments: event.arguments,
@@ -75,20 +112,27 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
             webMcpOrigin: event.webMcpOrigin,
           });
           break;
         }
-        if (event.name === 'eval') {
+        // A persisted eval call predates the Playwright tools; load it as the evaluate tool.
+        if ('code' in event) {
           events.push({
-            code: event.code,
+            arguments: { function: event.code },
             id: event.id,
-            name: event.name,
+            name: 'kilo_browser_evaluate',
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
           });
@@ -103,6 +147,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             remoteToolName: event.remoteToolName,
             serverId: event.serverId,
             serverName: event.serverName,
@@ -110,15 +157,28 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
           });
           break;
         }
-        // Workflow events have arguments but no remoteToolName; must precede the safe fallback.
+        // Browser and workflow calls share one shape, so the parsed event is already the event to keep; the optional fields are normalized for the union's exact optional type.
         if ('arguments' in event) {
+          const { providerToolCallId, reasoningDetails, ...call } = event;
           events.push({
-            arguments: event.arguments,
+            ...call,
+            ...(providerToolCallId === undefined ? {} : { providerToolCallId }),
+            ...(reasoningDetails === undefined ? {} : { reasoningDetails }),
+          });
+          break;
+        }
+        // A persisted retired page tool predates the Playwright tools; load it as its replacement.
+        if (isLegacyPageToolName(event.name)) {
+          events.push({
+            arguments: toMigratedBrowserArguments(event.name, event),
             id: event.id,
-            name: event.name,
+            name: LEGACY_PAGE_TOOL_NAMES[event.name],
             ...(event.providerToolCallId === undefined
               ? {}
               : { providerToolCallId: event.providerToolCallId }),
+            ...(event.reasoningDetails === undefined
+              ? {}
+              : { reasoningDetails: event.reasoningDetails }),
             tabId: event.tabId,
             type: event.type,
           });
@@ -133,6 +193,9 @@ const normalizeConversationEvents = (value: unknown): AgentConversationEvent[] |
             ? {}
             : { providerToolCallId: event.providerToolCallId }),
           ...(event.query === undefined ? {} : { query: event.query }),
+          ...(event.reasoningDetails === undefined
+            ? {}
+            : { reasoningDetails: event.reasoningDetails }),
           ...(event.snapshotId === undefined ? {} : { snapshotId: event.snapshotId }),
           tabId: event.tabId,
           type: event.type,

@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_MONO_SCROLL_MAX_LENGTH,
   MONO_SCROLL_GESTURE_OFFSETS,
   MONO_SCROLL_TEXT_MODE_OPTIONS,
   MONO_SCROLL_VIEW_PROPS,
   nextMonoScrollHeightPin,
   prepareMonoScrollContent,
+  resolveMonoScrollMaxLength,
   resolveMonoScrollPinnedHeight,
 } from './mono-scroll-block-model';
 
@@ -43,6 +45,19 @@ describe('prepareMonoScrollContent', () => {
     const result = prepareMonoScrollContent('hello world', 5);
     expect(result.displayText).toBe('hello');
     expect(result.displayText.endsWith('\u2026')).toBe(false);
+  });
+});
+
+describe('resolveMonoScrollMaxLength — a block is never unbounded', () => {
+  it('keeps a caller budget below the default', () => {
+    expect(resolveMonoScrollMaxLength(500)).toBe(500);
+  });
+
+  it('falls back to the default so a multi-megabyte output cannot be laid out', () => {
+    // The default is the whole point: `undefined` used to mean "render it all",
+    // and a 2 182 790-character output crashed the sheet and the app.
+    expect(resolveMonoScrollMaxLength(undefined)).toBe(DEFAULT_MONO_SCROLL_MAX_LENGTH);
+    expect(DEFAULT_MONO_SCROLL_MAX_LENGTH).toBeGreaterThan(0);
   });
 });
 

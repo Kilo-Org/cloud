@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/react-native';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import { useCallback, useSyncExternalStore } from 'react';
 
 import { setAccountMetadata } from '@/lib/auth/account-metadata-write';

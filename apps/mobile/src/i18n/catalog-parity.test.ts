@@ -17,6 +17,27 @@ import { SUPPORTED_LANGUAGES } from './languages';
  */
 const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
 
+/**
+ * Keys `en.json` defines that the translation slice still has to land in every
+ * catalog. English copy is written first, and only the translation slice may
+ * write another catalog (apps/mobile/AGENTS.md; every other slice's catalog
+ * edit is reverted), so copy a slice adds sits in `en.json` alone until that
+ * slice runs. Only these keys may be absent; `pnpm check:i18n` still fails
+ * every one of them, as does the section's `i18n-missing.py` gate, so the gap
+ * cannot ship. Delete an entry the translation slice has landed in every
+ * catalog.
+ *
+ * Empty: the `notifications.category.*Unavailable` reasons, the accepted-empty
+ * Agents history label, the `prReview.discussion.*` / `prReview.announce.*`
+ * comment-CRUD keys (the mobile comment edit/delete copy), the profile-editor
+ * validation copy (the duplicate-key refusal and the MCP bound messages), and
+ * the `/` suggestion list's skill-row keys (`agentChat.slashCommands.skillBadge` and
+ * `agentChat.slashCommands.useSkillCommand`, added by
+ * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
+ * missing-key assertion is strict again.
+ */
+const PENDING_TRANSLATION_KEYS = new Set<string>();
+
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
     const path = prefix ? `${prefix}.${key}` : key;
@@ -32,6 +53,12 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
 
 describe('catalog keys', () => {
+  it('names only pending keys en.json defines', () => {
+    for (const key of PENDING_TRANSLATION_KEYS) {
+      expect(ENGLISH_FAMILIES.has(key), `${key} is not an English key family`).toBe(true);
+    }
+  });
+
   it('retires launcher.newAgent from every catalog', () => {
     for (const tag of SUPPORTED_LANGUAGES) {
       expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
@@ -47,7 +74,9 @@ describe('catalog keys', () => {
         `${tag} defines keys en.json does not`
       ).toEqual([]);
       expect(
-        [...ENGLISH_FAMILIES].filter(key => !families.has(key)),
+        [...ENGLISH_FAMILIES].filter(
+          key => !families.has(key) && !PENDING_TRANSLATION_KEYS.has(key)
+        ),
         `${tag} is missing keys en.json defines`
       ).toEqual([]);
     }

@@ -39,19 +39,11 @@ export type UserId = string;
 /** Auto-incrementing event ID in SQLite storage */
 export type EventId = number;
 
-// ---------------------------------------------------------------------------
-// ID Generators
-// ---------------------------------------------------------------------------
-
 /** Generate a new unique execution ID (exc_<ulid> format for execution tracking) */
 export const createExecutionId = (): ExecutionId => `exc_${ulid()}`;
 
 /** Generate a new unique lease ID */
 export const createLeaseId = (): LeaseId => `lease_${crypto.randomUUID()}`;
-
-// ---------------------------------------------------------------------------
-// Type Guards
-// ---------------------------------------------------------------------------
 
 /** Check if a string is a valid ExecutionId (exc_<ulid> format) */
 export const isExecutionId = (s: string): s is ExecutionId => s.startsWith('exc_');

@@ -62,36 +62,6 @@ export type SandboxContainer = {
   isProxy: boolean;
 };
 
-/**
- * Immutable identity of an exclusively owned control-plane primary, captured
- * while it is still reachable. `unpauseOwnedPrimary` never rediscoveries the
- * runtime from Kilo: a paused container may reject `docker exec`, so it acts on
- * this exact captured identity only.
- */
-export type OwnedPrimaryHandle = {
-  containerId: string;
-  name: string;
-  kiloSessionId: string;
-  image: string;
-};
-
-export type PauseOwnedPrimaryOptions = {
-  /**
-   * Runs as soon as exclusive ownership is proven and the immutable handle is
-   * captured, BEFORE `docker pause` is issued. Callers must retain this handle
-   * so a hung or uncertain pause can still be cleaned up in `finally`.
-   */
-  onCaptured?: (handle: OwnedPrimaryHandle) => void;
-  /**
-   * Runs after exclusive ownership is proven and before `docker pause`. Use it
-   * to capture state that must be read while the container is still runnable
-   * (for example the wrapper's last heartbeat send line).
-   */
-  beforePause?: (handle: OwnedPrimaryHandle) => Promise<void>;
-  /** Docker executor override for tests. */
-  executeDocker?: DockerCommandExecutor;
-};
-
 export type ControlPlaneKiloRuntime = {
   container: SandboxContainer;
   kiloSessionId: string;
@@ -100,19 +70,6 @@ export type ControlPlaneKiloRuntime = {
   home: string;
   processId: number;
   logPath?: string;
-};
-
-export type ControlPlaneKiloRoot = {
-  id: string;
-  directory: string;
-  home: string;
-  processId: number;
-};
-
-export type ControlPlaneKiloCompletion = {
-  sessionId: string;
-  messageId: string;
-  assistantMessageId: string;
 };
 
 /**
@@ -124,44 +81,24 @@ export type ControlPlaneWorkspaceFile =
   | { unavailable: true; reason: string }
   | { unavailable?: false; exists: boolean; contents?: string; dirty: boolean; head: string };
 
-export type ControlPlaneQuestionVisibility = {
-  unscoped: { status: number; count: number; matchingQuestion: boolean };
-  scoped: { status: number; count: number; matchingQuestion: boolean };
-};
-
 type ControlPlaneKiloOperation = {
-  action:
-    | 'discover'
-    | 'inspect'
-    | 'exists'
-    | 'import'
-    | 'prompt'
-    | 'completion'
-    | 'file'
-    | 'stage-file'
-    | 'questions'
-    | 'exclusive';
+  action: 'discover' | 'completion' | 'file' | 'exclusive';
   kiloSessionId: string;
   serverUrl?: string;
   directory?: string;
   home?: string;
   processId?: number;
   ownerKiloSessionId?: string;
-  sourceKiloSessionId?: string;
   messageId?: string;
-  gateTag?: string;
-  model?: string;
   expectedText?: string;
   userMessageId?: string;
   filePath?: string;
-  bytes?: number;
   /**
    * Additional worktree directories the harness itself created for this root
    * across prior incarnations. Exclusivity still rejects any directory or
    * listener outside this exact set.
    */
   allowedDirectories?: string[];
-  questionId?: string;
 };
 
 type ExclusiveLayoutFs = {
@@ -328,14 +265,6 @@ async function getRoot(serverUrl, kiloSessionId, directory = request.directory) 
   return { id: root.id, directory: root.directory, parentID: null };
 }
 
-function rootResult(root, serverUrl) {
-  const matches = kiloListeners().filter(listener => sameListener(listener, request));
-  if (matches.length !== 1 || serverUrl !== request.serverUrl || root.directory !== request.directory) {
-    return { ok: false, reason: 'Kilo listener identity changed' };
-  }
-  return { ok: true, id: root.id, directory: root.directory, home: request.home, processId: request.processId };
-}
-
 async function run() {
   if (request.action === 'discover') {
     const matches = [];
@@ -392,114 +321,9 @@ async function run() {
     return { ok: true, exclusive: verdict.exclusive, directories: verdict.directories };
   }
 
-  if (request.action === 'inspect') {
-    const root = await getRoot(request.serverUrl, request.kiloSessionId);
-    return root ? rootResult(root, request.serverUrl) : { ok: false, reason: 'Kilo root was not found' };
-  }
-
-  if (request.action === 'exists') {
-    const root = await getRoot(request.serverUrl, request.kiloSessionId);
-    return { ok: true, exists: root !== null && root.parentID === null };
-  }
-
-  if (request.action === 'import') {
-    const source = await getRoot(request.serverUrl, request.sourceKiloSessionId);
-    if (!source || source.parentID !== null) {
-      return { ok: false, reason: 'source Kilo root was not found' };
-    }
-    if (await getRoot(request.serverUrl, request.kiloSessionId)) {
-      return { ok: false, reason: 'new Kilo root already exists' };
-    }
-    // Production ensureSession imports under the live current project id, not a
-    // hardcoded one. A non-2xx here is reported with its HTTP status only; the
-    // response body is never dumped.
-    const projectEndpoint = new URL('/project/current', request.serverUrl);
-    projectEndpoint.searchParams.set('directory', source.directory);
-    const projectResponse = await fetch(projectEndpoint, { signal: AbortSignal.timeout(5_000) });
-    if (!projectResponse.ok) {
-      return { ok: false, reason: 'Kilo project lookup returned HTTP ' + projectResponse.status };
-    }
-    const project = await projectResponse.json();
-    const projectId =
-      project && typeof project === 'object' && typeof project.id === 'string' && project.id.length > 0
-        ? project.id
-        : null;
-    if (!projectId) {
-      return {
-        ok: false,
-        reason: 'Kilo project lookup returned no project id (HTTP ' + projectResponse.status + ')',
-      };
-    }
-    const now = Date.now();
-    const endpoint = new URL('/kilocode/session-import/session', request.serverUrl);
-    endpoint.searchParams.set('directory', source.directory);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(8_000),
-      body: JSON.stringify({
-        id: request.kiloSessionId,
-        projectID: projectId,
-        slug: request.kiloSessionId.slice(0, 24),
-        directory: source.directory,
-        title: 'Cloud Agent Gate 0',
-        version: '7.6.2',
-        timeCreated: now,
-        timeUpdated: now,
-      }),
-    });
-    if (!response.ok) {
-      // Keep the failure diagnostic bounded: an HTTP status plus an optional
-      // short diagnostic ref token. Never dump the response body.
-      let ref;
-      try {
-        const body = await response.json();
-        const record = body && typeof body === 'object' ? body : undefined;
-        const data =
-          record && record.data && typeof record.data === 'object'
-            ? record.data
-            : undefined;
-        const candidate =
-          typeof record?.ref === 'string' ? record.ref : typeof data?.ref === 'string' ? data.ref : undefined;
-        if (candidate !== undefined && /^[A-Za-z0-9_-]{1,64}$/.test(candidate)) ref = candidate;
-      } catch {}
-      return {
-        ok: false,
-        reason: 'Kilo session import returned HTTP ' + response.status + (ref ? ' ref=' + ref : ''),
-      };
-    }
-    const root = await getRoot(request.serverUrl, request.kiloSessionId);
-    if (!root || root.directory !== source.directory) {
-      return { ok: false, reason: 'imported Kilo root did not preserve the source directory' };
-    }
-    return rootResult(root, request.serverUrl);
-  }
-
   const root = await getRoot(request.serverUrl, request.kiloSessionId);
   if (!root || root.parentID !== null) {
     return { ok: false, reason: 'Kilo root was not found' };
-  }
-
-  if (request.action === 'questions') {
-    const inspectQuestions = async scoped => {
-      const endpoint = new URL('/question', request.serverUrl);
-      if (scoped) endpoint.searchParams.set('directory', root.directory);
-      const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
-      if (!response.ok) return { status: response.status, count: 0, matchingQuestion: false };
-      const questions = await response.json();
-      if (!Array.isArray(questions)) {
-        return { status: response.status, count: 0, matchingQuestion: false };
-      }
-      return {
-        status: response.status,
-        count: questions.length,
-        matchingQuestion: questions.some(
-          question => question?.id === request.questionId && question.sessionID === root.id
-        ),
-      };
-    };
-    const [unscoped, scoped] = await Promise.all([inspectQuestions(false), inspectQuestions(true)]);
-    return { ok: true, unscoped, scoped };
   }
 
   if (request.action === 'file') {
@@ -525,59 +349,6 @@ async function run() {
       dirty: status.trim().length > 0,
       head,
     };
-  }
-
-  if (request.action === 'stage-file') {
-    if (
-      typeof request.filePath !== 'string' ||
-      path.isAbsolute(request.filePath) ||
-      !Number.isSafeInteger(request.bytes) ||
-      request.bytes < 0
-    ) {
-      return { ok: false, reason: 'workspace file path and byte count are required' };
-    }
-    const absolutePath = path.resolve(root.directory, request.filePath);
-    if (!absolutePath.startsWith(root.directory + path.sep)) {
-      return { ok: false, reason: 'workspace file path escaped the checkout' };
-    }
-    // Generate the bytes inside the container: the harness only sends the path
-    // and count, so the large payload crosses Kilo -> wrapper -> client on the
-    // read result instead of the (huge) tool-argument request path. Use short
-    // lines so the read tool's per-line handling does not truncate the single
-    // line; the file is still exactly request.bytes bytes.
-    const lineWidth = 99;
-    const line = 'x'.repeat(lineWidth) + '\n';
-    const fullLines = Math.floor(request.bytes / (lineWidth + 1));
-    const remainder = request.bytes - fullLines * (lineWidth + 1);
-    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
-    fs.writeFileSync(absolutePath, line.repeat(fullLines) + 'x'.repeat(remainder));
-    return { ok: true, byteCount: fs.statSync(absolutePath).size };
-  }
-
-  if (request.action === 'prompt') {
-    const source = await getRoot(request.serverUrl, request.sourceKiloSessionId);
-    if (!source || source.directory !== root.directory) {
-      return { ok: false, reason: 'Kilo roots do not share one directory' };
-    }
-    const endpoint = new URL(
-      '/session/' + encodeURIComponent(root.id) + '/prompt_async',
-      request.serverUrl
-    );
-    endpoint.searchParams.set('directory', root.directory);
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      signal: AbortSignal.timeout(8_000),
-      body: JSON.stringify({
-        messageID: request.messageId,
-        agent: 'code',
-        model: { providerID: 'kilo', modelID: request.model },
-        parts: [{ type: 'text', text: '__fake__:gate:' + request.gateTag }],
-      }),
-    });
-    return response.ok
-      ? { ok: true, accepted: true, status: response.status }
-      : { ok: false, reason: 'Kilo prompt returned HTTP ' + response.status };
   }
 
   if (request.action === 'completion') {
@@ -664,28 +435,19 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  *   in the same container and retrying with the fresh identity observes the
  *   same session+directory, so it cannot mask a real ownership divergence.
  *
- * Mutating actions (`prompt`, `import`) are never retried, because a timed-out
- * submission may already have landed; `exclusive` is never re-anchored, because
- * its callers already discover a fresh runtime before the destructive proof.
+ * `exclusive` is retried on a transient timeout but never re-anchored: its
+ * callers already discover a fresh runtime before the destructive proof.
  */
 const RETRYABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
   'discover',
-  'inspect',
-  'exists',
   'completion',
   'file',
-  'stage-file',
-  'questions',
   'exclusive',
 ]);
 
 const REANCHORABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
-  'inspect',
-  'exists',
   'completion',
   'file',
-  'stage-file',
-  'questions',
 ]);
 
 const PROBE_RETRY_DELAY_MS = 250;
@@ -807,28 +569,6 @@ async function runControlPlaneKiloOperationOnce(
     throw new Error(`Kilo ${operation.action} failed: ${reason}`);
   }
   return result;
-}
-
-function requireControlPlaneKiloRoot(
-  result: Record<string, unknown>,
-  kiloSessionId: string
-): ControlPlaneKiloRoot {
-  if (
-    result.id !== kiloSessionId ||
-    typeof result.directory !== 'string' ||
-    typeof result.home !== 'string' ||
-    typeof result.processId !== 'number' ||
-    !Number.isSafeInteger(result.processId) ||
-    result.processId <= 0
-  ) {
-    throw new Error(`Kilo root ${kiloSessionId} returned invalid runtime identity`);
-  }
-  return {
-    id: result.id,
-    directory: result.directory,
-    home: result.home,
-    processId: result.processId,
-  };
 }
 
 export async function findControlPlaneKiloRuntime(
@@ -1001,96 +741,6 @@ export async function stopOwnedControlPlaneSandbox(
 }
 
 /**
- * Prove exclusive ownership of `kiloSessionId`'s control-plane primary, then
- * freeze it with `docker pause`. Returns the captured identity that
- * `unpauseOwnedPrimary` must use; never unpause by re-discovering the Kilo
- * runtime, because a paused container may reject `docker exec`.
- *
- * The optional `beforePause` hook runs after the ownership proof and before the
- * freeze, so callers can capture live container state (wrapper heartbeat send
- * line) that is unavailable once the container is paused.
- */
-export async function pauseOwnedPrimary(
-  kiloSessionId: string,
-  options: PauseOwnedPrimaryOptions = {}
-): Promise<OwnedPrimaryHandle> {
-  const executeDocker = options.executeDocker ?? executeDockerCommand;
-  const runtime = await findControlPlaneKiloRuntime(kiloSessionId, executeDocker);
-  if (!runtime) {
-    throw new Error(`Cannot prove an exclusively owned control-plane primary for ${kiloSessionId}`);
-  }
-  if (runtime.container.isProxy || runtime.container.name.endsWith('-proxy')) {
-    throw new Error('Refusing to pause a sandbox proxy container');
-  }
-  await assertExclusiveControlPlaneRuntime(runtime, kiloSessionId, executeDocker);
-  const handle: OwnedPrimaryHandle = {
-    containerId: runtime.container.id,
-    name: runtime.container.name,
-    kiloSessionId,
-    image: runtime.container.image,
-  };
-  // Retain the identity before the freeze. A hung pause ack must not be able to
-  // strand a frozen container that the caller cannot name.
-  options.onCaptured?.(handle);
-  await options.beforePause?.(handle);
-  try {
-    await executeDocker(['pause', handle.containerId]);
-  } catch (error) {
-    // A failed or timed-out pause ack must not leave a frozen container behind.
-    let cleanupFailure: string | undefined;
-    try {
-      await unpauseOwnedPrimary(handle, executeDocker);
-    } catch (cleanupError) {
-      cleanupFailure = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
-    }
-    if (cleanupFailure !== undefined) {
-      throw new Error(
-        `docker pause ${handle.name} failed (${error instanceof Error ? error.message : String(error)}); identity cleanup also failed (${cleanupFailure}); container ${handle.containerId} may be frozen`
-      );
-    }
-    throw error;
-  }
-  return handle;
-}
-
-/**
- * Unfreeze the exact container captured by `pauseOwnedPrimary`.
- *
- * Acts only on the captured identity, verified with Docker metadata rather than
- * a live Kilo runtime lookup. Idempotent: an already-unpaused or already-gone
- * container is a no-op, so callers can put this in `finally` without masking
- * the original failure.
- */
-export async function unpauseOwnedPrimary(
-  handle: OwnedPrimaryHandle,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
-): Promise<void> {
-  if (handle.name.endsWith('-proxy')) {
-    throw new Error('Refusing to unpause a sandbox proxy container');
-  }
-  let stdout: string;
-  try {
-    ({ stdout } = await executeDocker([
-      'inspect',
-      '--format',
-      '{{.Id}}\t{{.Name}}\t{{.State.Paused}}',
-      handle.containerId,
-    ]));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes('No such container')) return;
-    throw error;
-  }
-  const [id, rawName, paused] = stdout.trim().split('\t');
-  if (!id || !id.startsWith(handle.containerId) || rawName?.replace(/^\//, '') !== handle.name) {
-    throw new Error(`Refusing to unpause: container identity no longer matches ${handle.name}`);
-  }
-  if (paused === 'false') return;
-  if (paused !== 'true') throw new Error(`Refusing to unpause ${handle.name}: unknown pause state`);
-  await executeDocker(['unpause', handle.containerId]);
-}
-
-/**
  * Identity of one in-container Kilo server process, captured while the runtime
  * was discoverable. `feed-stale-recovery` freezes ONLY this process so the
  * control wrapper and the container stay alive and the inbound `/global/event`
@@ -1116,6 +766,20 @@ export async function signalKiloServerProcess(
   executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<void> {
   await executeDocker(['exec', handle.containerId, 'kill', `-${signal}`, String(handle.processId)]);
+}
+
+/**
+ * Send `SIGUSR1` to the exact captured control-wrapper process so its control
+ * socket is dropped and the production reconnect owner establishes a fresh one.
+ * Like `signalKiloServerProcess`, never rediscover the process: the captured
+ * identity is the only safe handle. A delivered signal (zero exit) is not proof
+ * of a reconnect; callers correlate the resulting worker-log sequence.
+ */
+export async function recycleControlConnection(
+  handle: KiloServerProcessHandle,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<void> {
+  await executeDocker(['exec', handle.containerId, 'kill', '-USR1', String(handle.processId)]);
 }
 
 /**
@@ -1191,59 +855,6 @@ export async function captureControlWrapperProcess(
   return { containerId, processId };
 }
 
-export async function waitForControlPlaneKiloRuntime(
-  kiloSessionId: string,
-  timeoutMs: number,
-  onOwnedSandbox?: (sandbox: SandboxContainer) => void
-): Promise<ControlPlaneKiloRuntime | null> {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    const runtime = await findControlPlaneKiloRuntime(
-      kiloSessionId,
-      executeDockerCommand,
-      onOwnedSandbox
-    );
-    if (runtime) return runtime;
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  return null;
-}
-
-export async function inspectControlPlaneKiloRoot(
-  runtime: ControlPlaneKiloRuntime,
-  kiloSessionId: string
-): Promise<ControlPlaneKiloRoot> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'inspect',
-    kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-  });
-  return requireControlPlaneKiloRoot(result, kiloSessionId);
-}
-
-export async function controlPlaneKiloRootExists(
-  runtime: ControlPlaneKiloRuntime,
-  kiloSessionId: string
-): Promise<boolean> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'exists',
-    kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-  });
-  if (typeof result.exists !== 'boolean') {
-    throw new Error(`Kilo root ${kiloSessionId} returned invalid existence status`);
-  }
-  return result.exists;
-}
-
 export async function inspectControlPlaneWorkspaceFile(
   runtime: ControlPlaneKiloRuntime,
   input: { kiloSessionId: string; filePath: string },
@@ -1293,175 +904,6 @@ export async function inspectControlPlaneWorkspaceFile(
   };
 }
 
-/**
- * Stage a file of exactly `bytes` bytes (x-filled short lines) inside the owned
- * worktree so a fake `read` directive has a real payload to stream back. The
- * content is generated inside the container, so the large payload crosses
- * Kilo -> wrapper -> client on the read RESULT instead of the tool-argument
- * request that stalls.
- */
-export async function stageControlPlaneWorkspaceFile(
-  runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; filePath: string; bytes: number },
-  executeDocker: DockerCommandExecutor = executeDockerCommand
-): Promise<{ byteCount: number }> {
-  const result = await runControlPlaneKiloOperation(
-    runtime.container.id,
-    {
-      action: 'stage-file',
-      kiloSessionId: input.kiloSessionId,
-      serverUrl: runtime.serverUrl,
-      directory: runtime.directory,
-      processId: runtime.processId,
-      ownerKiloSessionId: runtime.kiloSessionId,
-      filePath: input.filePath,
-      bytes: input.bytes,
-    },
-    executeDocker
-  );
-  if (result.byteCount !== input.bytes) {
-    throw new Error(
-      `staged file ${input.filePath} reported ${String(result.byteCount)} bytes, expected ${input.bytes}`
-    );
-  }
-  return { byteCount: input.bytes };
-}
-
-export async function inspectControlPlaneQuestions(
-  runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; questionId: string }
-): Promise<ControlPlaneQuestionVisibility> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'questions',
-    kiloSessionId: input.kiloSessionId,
-    questionId: input.questionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-  });
-  const { unscoped, scoped } = result;
-  if (
-    !isRecord(unscoped) ||
-    !isRecord(scoped) ||
-    typeof unscoped.status !== 'number' ||
-    typeof unscoped.count !== 'number' ||
-    typeof unscoped.matchingQuestion !== 'boolean' ||
-    typeof scoped.status !== 'number' ||
-    typeof scoped.count !== 'number' ||
-    typeof scoped.matchingQuestion !== 'boolean'
-  ) {
-    throw new Error('Kilo question inspection returned invalid sanitized visibility');
-  }
-  return {
-    unscoped: {
-      status: unscoped.status,
-      count: unscoped.count,
-      matchingQuestion: unscoped.matchingQuestion,
-    },
-    scoped: {
-      status: scoped.status,
-      count: scoped.count,
-      matchingQuestion: scoped.matchingQuestion,
-    },
-  };
-}
-
-export async function importControlPlaneKiloRoot(
-  runtime: ControlPlaneKiloRuntime,
-  kiloSessionId: string
-): Promise<ControlPlaneKiloRoot> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'import',
-    kiloSessionId,
-    sourceKiloSessionId: runtime.kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-  });
-  return requireControlPlaneKiloRoot(result, kiloSessionId);
-}
-
-export async function promptControlPlaneKiloRoot(
-  runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; messageId: string; gateTag: string; model: string }
-): Promise<void> {
-  const result = await runControlPlaneKiloOperation(runtime.container.id, {
-    action: 'prompt',
-    kiloSessionId: input.kiloSessionId,
-    sourceKiloSessionId: runtime.kiloSessionId,
-    serverUrl: runtime.serverUrl,
-    directory: runtime.directory,
-    home: runtime.home,
-    processId: runtime.processId,
-    ownerKiloSessionId: runtime.kiloSessionId,
-    messageId: input.messageId,
-    gateTag: input.gateTag,
-    model: input.model,
-  });
-  if (result.accepted !== true) {
-    throw new Error(`Kilo root ${input.kiloSessionId} did not accept its prompt`);
-  }
-}
-
-export async function waitForControlPlaneKiloCompletion(
-  runtime: ControlPlaneKiloRuntime,
-  input: { kiloSessionId: string; messageId: string; timeoutMs: number; expectedText?: string }
-): Promise<ControlPlaneKiloCompletion> {
-  const deadline = Date.now() + input.timeoutMs;
-  while (Date.now() < deadline) {
-    let result: Record<string, unknown>;
-    try {
-      result = await runControlPlaneKiloOperation(runtime.container.id, {
-        action: 'completion',
-        kiloSessionId: input.kiloSessionId,
-        serverUrl: runtime.serverUrl,
-        directory: runtime.directory,
-        home: runtime.home,
-        processId: runtime.processId,
-        ownerKiloSessionId: runtime.kiloSessionId,
-        messageId: input.messageId,
-        ...(input.expectedText ? { expectedText: input.expectedText } : {}),
-      });
-    } catch (error) {
-      // One slow in-container `/message` fetch surfaces as a `TimeoutError`
-      // from the 5s `AbortSignal.timeout`. That is a transient poll failure,
-      // not a terminal completion verdict, so keep polling until the deadline.
-      // Every other failure (HTTP status, assistant error, identity mismatch,
-      // gone container) stays terminal.
-      if (error instanceof Error && error.message.includes('completion failed (TimeoutError)')) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        continue;
-      }
-      throw error;
-    }
-    if (result.found === true) {
-      if (result.failed === true) {
-        throw new Error(`Kilo root ${input.kiloSessionId} finished with an assistant error`);
-      }
-      if (result.completed === true && result.expectedText === true) {
-        if (
-          result.sessionId !== input.kiloSessionId ||
-          result.messageId !== input.messageId ||
-          typeof result.assistantMessageId !== 'string'
-        ) {
-          throw new Error(`Kilo root ${input.kiloSessionId} returned an invalid completion`);
-        }
-        return {
-          sessionId: result.sessionId,
-          messageId: result.messageId,
-          assistantMessageId: result.assistantMessageId,
-        };
-      }
-    }
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  throw new Error(`Kilo root ${input.kiloSessionId} did not complete within ${input.timeoutMs}ms`);
-}
-
 export type ControlPlaneHistoryInspection =
   | { unavailable: true; reason: string }
   | {
@@ -1474,9 +916,9 @@ export type ControlPlaneHistoryInspection =
 
 /**
  * Inspect both sides of a completed user turn in the live Kilo history. The
- * completion operation retains the existing assistant lookup used by
- * waitForControlPlaneKiloCompletion and additionally reports exact user-entry
- * and completed-assistant matches for this test-only oracle.
+ * `completion` operation looks up the assistant entry by the parent user
+ * message and additionally reports exact user-entry and completed-assistant
+ * matches for this test-only oracle.
  */
 export async function inspectControlPlaneHistory(
   runtime: ControlPlaneKiloRuntime,
@@ -1606,10 +1048,13 @@ export async function killContainer(
 /** Block until a primary sandbox appears that was not present in `knownIds`. */
 export async function waitForNewSandboxPresent(
   knownIds: Set<string>,
-  timeoutMs: number
+  timeoutMs: number,
+  signal?: AbortSignal
 ): Promise<SandboxContainer | null> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    // Docker listing is not abortable mid-exec; honour the signal between polls.
+    if (signal?.aborted) return null;
     const containers = await listSandboxContainers();
     const primary = containers.find(c => !c.isProxy && !knownIds.has(c.id));
     if (primary) return primary;
@@ -1747,87 +1192,4 @@ export async function waitForSandboxPrimaryGone(
     await new Promise(r => setTimeout(r, 500));
   }
   return false;
-}
-
-/** Run a shell command inside a container and read its stdout; null when absent. */
-async function readContainerFile(
-  containerId: string,
-  shellCommand: string
-): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      'docker',
-      ['exec', containerId, 'sh', '-c', shellCommand],
-      { timeout: DOCKER_COMMAND_TIMEOUT_MS, killSignal: 'SIGKILL' }
-    );
-    return stdout || null;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('No such container') || msg.includes('is not running')) return null;
-    throw err;
-  }
-}
-
-/**
- * Read the wrapper log file inside a running sandbox container. Used for
- * smoke tests to assert "using fake kilo client" is present after boot.
- *
- * Returns null if the wrapper log isn't findable — the wrapper writes to
- * `/tmp/kilocode-wrapper-*.log`, so we glob for the newest file.
- */
-export async function readWrapperLog(containerId: string): Promise<string | null> {
-  return readContainerFile(
-    containerId,
-    'ls -t /tmp/kilocode-wrapper-*.log 2>/dev/null | head -n 1 | xargs -r cat'
-  );
-}
-
-/**
- * Read the control wrapper log file inside a running sandbox container.
- *
- * The control wrapper (`kilocode-control-wrapper.js`) writes to the fixed
- * `/tmp/kilocode-control-wrapper.log` path (`src/sandbox-control/cloudflare-provider.ts`),
- * unlike the per-worktree agent wrapper's `/tmp/kilocode-wrapper-*.log`. It
- * carries the control-plane `control heartbeat` send lines.
- */
-export async function readControlWrapperLog(containerId: string): Promise<string | null> {
-  return readContainerFile(containerId, 'cat /tmp/kilocode-control-wrapper.log 2>/dev/null');
-}
-
-/**
- * Read the newest kilo CLI log file inside a running sandbox container.
- *
- * The wrapper writes CLI logs under `/home/${agentSessionId}/.local/share/kilo/log/*.log`
- * (see `services/cloud-agent-next/wrapper/src/server.ts:249`). This helper
- * avoids waiting on the 30s log-uploader cycle.
- */
-export async function readKiloCliLog(containerId: string): Promise<string | null> {
-  try {
-    const { stdout } = await execFileAsync(
-      'docker',
-      [
-        'exec',
-        containerId,
-        'sh',
-        '-c',
-        'ls -t /home/agent_*/.local/share/kilo/log/*.log 2>/dev/null | head -n 1 | xargs -r cat',
-      ],
-      { timeout: DOCKER_COMMAND_TIMEOUT_MS, killSignal: 'SIGKILL' }
-    );
-    return stdout || null;
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes('No such container') || msg.includes('is not running')) return null;
-    throw err;
-  }
-}
-
-/**
- * Tail the last `maxLines` lines of a (potentially large) log blob. Keeps
- * failure output readable in the harness.
- */
-export function tailLines(log: string | null, maxLines = 200): string {
-  if (!log) return '<empty>';
-  const lines = log.split('\n');
-  return lines.slice(Math.max(0, lines.length - maxLines)).join('\n');
 }

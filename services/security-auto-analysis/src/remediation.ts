@@ -396,6 +396,10 @@ async function getRuntimeConfig(db: WorkerDb, owner: QueueOwner): Promise<Runtim
       and(
         ownerWhereIntegration(owner),
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.github_connection_role, 'workflow'),
+        isNull(platform_integrations.suspended_at),
+        isNull(platform_integrations.auth_invalid_at),
+        isNull(platform_integrations.github_disconnected_at),
         eq(platform_integrations.integration_status, 'active')
       )
     )

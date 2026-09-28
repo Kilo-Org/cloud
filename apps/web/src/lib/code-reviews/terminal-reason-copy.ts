@@ -13,6 +13,12 @@
  * with our own abuse rules throttling the request. Those mean different things
  * to a customer, so until they can be told apart it keeps the generic message
  * rather than getting a sentence that would be wrong half the time.
+ *
+ * The model-limitation reasons (output limit, context limit, content filter,
+ * structured output) are included: the cause is exact, none of it is our
+ * infrastructure, and each has a clear customer remedy (change the model or
+ * settings and re-run). Without copy these fail with a generic check title and
+ * no notice on the pull request.
  */
 
 import type { CodeReviewTerminalReason } from '@kilocode/db/schema-types';
@@ -52,6 +58,73 @@ const KILO_REVIEW_MARKER = '<!-- kilo-review -->';
  * have no prototype chain.
  */
 const COPY_BY_TERMINAL_REASON = new Map<CodeReviewTerminalReason, CodeReviewTerminalReasonCopy>([
+  [
+    'assistant_output_limit',
+    {
+      label: 'Output limit reached',
+      message: 'The model reached its output limit before finishing the review.',
+      checkTitle: 'Kilo Code Review hit the output limit',
+      checkSummary:
+        'The model reached its output limit before finishing the review, so no complete review was produced.',
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not finish.** The model reached its output limit before it
+could write the review — a reasoning model can spend the whole budget thinking.
+Re-run the review, or lower the model's thinking effort, and it should get
+further. Any inline comments below are from an earlier review.`,
+    },
+  ],
+  [
+    'assistant_context_limit',
+    {
+      label: 'Context limit reached',
+      message: "The review exceeded the model's context window.",
+      checkTitle: 'Kilo Code Review exceeded the context window',
+      checkSummary:
+        "The review needed more context than the model's context window allows, so the model could not finish reading the change.",
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not finish.** The review needed more context than the model's
+context window allows, so the model could not finish reading the change. Try a
+model with a larger context window, or split the change into smaller pull
+requests. Any inline comments below are from an earlier review.`,
+    },
+  ],
+  [
+    'assistant_content_filter',
+    {
+      label: 'Blocked by content filter',
+      message: "The model provider's content filter blocked the review.",
+      checkTitle: 'Kilo Code Review blocked by content filter',
+      checkSummary:
+        "The model provider's content filter blocked the review before it could finish.",
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not run.** The model provider's content filter blocked the
+response, so no review was produced. Check the change for content the provider
+may reject, or choose a different model, then re-run the review. Any inline
+comments below are from an earlier review.`,
+    },
+  ],
+  [
+    'assistant_structured_output',
+    {
+      label: 'Unexpected model output',
+      message: 'The model returned output in an unexpected format, so the review did not finish.',
+      checkTitle: 'Kilo Code Review produced unusable output',
+      checkSummary:
+        'The model returned output in an unexpected format, so the review did not finish.',
+      summaryBody: `${KILO_REVIEW_MARKER}
+## Code Review Summary
+
+**This review did not finish.** The model returned output in a format the
+reviewer could not use. Re-run the review, or try a different model, and it
+should complete. Any inline comments below are from an earlier review.`,
+    },
+  ],
   [
     'assistant_rate_limited_byok',
     {

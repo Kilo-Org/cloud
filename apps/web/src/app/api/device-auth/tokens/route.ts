@@ -3,12 +3,13 @@ import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
 import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
 import { APP_URL } from '@/lib/constants';
 import * as z from 'zod';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const TokensSchema = z.object({
   code: z.string().min(1),
 });
 
-export async function POST(request: Request) {
+export const POST = withRestTiming('/api/device-auth/tokens', async (request: Request) => {
   const origin = request.headers.get('origin');
   if (origin !== new URL(APP_URL).origin) {
     return NextResponse.json({ error: 'Invalid origin' }, { status: 403 });
@@ -52,4 +53,4 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({ success: true });
-}
+});

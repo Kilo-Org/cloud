@@ -14,11 +14,16 @@ export type GitHubRepositoryChoice = PlatformRepository & {
   githubAppType: 'standard' | 'lite';
 };
 
-export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRepositoryContext> {
+export async function getGitHubRepositoryContext(
+  owner: Owner,
+  purpose: 'workflow' | 'agent' = 'workflow'
+): Promise<GitHubRepositoryContext> {
   const integrations = await getAllIntegrationsForOwner(owner);
   const repositories = integrations.flatMap(integration => {
     if (
       integration.platform !== PLATFORM.GITHUB ||
+      (integration.github_connection_role !== 'workflow' &&
+        !(purpose === 'agent' && integration.github_connection_role === 'agent_only')) ||
       integration.integration_status !== 'active' ||
       !isPlatformIntegrationHealthy(integration)
     ) {
@@ -48,9 +53,10 @@ export async function getGitHubRepositoryContext(owner: Owner): Promise<GitHubRe
 
 export async function resolveGitHubRepositoryForOwner(
   owner: Owner,
-  fullName: string
+  fullName: string,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<GitHubRepositoryChoice | null> {
-  const context = await getGitHubRepositoryContext(owner);
+  const context = await getGitHubRepositoryContext(owner, purpose);
   const normalizedFullName = fullName.toLowerCase();
   const matches =
     context.repositories?.filter(

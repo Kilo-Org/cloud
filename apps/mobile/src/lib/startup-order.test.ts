@@ -41,6 +41,18 @@ describe('root layout startup order (text contract)', () => {
     ).toBe(true);
   });
 
+  it('excludes the held restore-error surface from bootstrap loading', () => {
+    // A successful retry clears restoreFailed before the hidden gate settles.
+    // The held error screen still owns feedback, including its inline spinner.
+    const excludesHeldError =
+      /\{showBootstrapLoading\s*&&\s*!showRestoreError\s*\?\s*<BootstrapLoadingSurface\s*\/>\s*:\s*null\}/.test(
+        stripComments(layoutSource)
+      );
+    expect(excludesHeldError, 'the held restore error must exclude BootstrapLoadingSurface').toBe(
+      true
+    );
+  });
+
   // The persisted deep-link record is account-bound. Auth bootstrap publishes
   // the signed-in user id before it clears `authLoading`, so a restore that
   // runs on an empty dependency array reads a null user id and deletes the

@@ -17,6 +17,7 @@ const association = {
     suspended_at: null,
     auth_invalid_at: null,
     github_disconnected_at: null,
+    github_connection_role: 'workflow',
     github_installation_id: '00000000-0000-4000-8000-000000000001',
   },
   installation: {
@@ -36,45 +37,47 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     expect(isGitHubRuntimeAssociationAuthorized(association)).toBe(true);
   });
 
-  it('rejects a shared canonical installation on generic runtime paths', () => {
+  it('preserves workflow authority regardless of legacy sharing mode', () => {
     expect(
       isGitHubRuntimeAssociationAuthorized({
         ...association,
         installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' },
       })
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('rejects a shared canonical installation even with allowShared unset or false', () => {
+  it('rejects agent-only associations for workflow consumers', () => {
     const shared = {
       ...association,
+      integration: { ...association.integration, github_connection_role: 'agent_only' as const },
       installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
     };
     expect(isGitHubRuntimeAssociationAuthorized(shared)).toBe(false);
-    expect(isGitHubRuntimeAssociationAuthorized(shared, { allowShared: false })).toBe(false);
+    expect(isGitHubRuntimeAssociationAuthorized(shared, { purpose: 'workflow' })).toBe(false);
     expect(getGitHubRuntimeAssociationRejectionReason(shared)).toBe('sharing_not_allowed');
   });
 
-  it('allows a shared canonical installation only when allowShared is explicitly true', () => {
+  it('allows agent-only associations for trusted agent and management purposes', () => {
     const shared = {
       ...association,
+      integration: { ...association.integration, github_connection_role: 'agent_only' as const },
       installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
     };
-    expect(isGitHubRuntimeAssociationAuthorized(shared, { allowShared: true })).toBe(true);
-    expect(getGitHubRuntimeAssociationRejectionReason(shared, { allowShared: true })).toBeNull();
+    expect(isGitHubRuntimeAssociationAuthorized(shared, { purpose: 'agent' })).toBe(true);
+    expect(
+      getGitHubRuntimeAssociationRejectionReason(shared, { purpose: 'management' })
+    ).toBeNull();
   });
 
-  it('still enforces exclusive-mode installations even when allowShared is true', () => {
-    // allowShared only widens the accepted sharing_mode set; it never loosens the
-    // exclusive-mode requirements (lifecycle_state/suspended_at/deleted_at/auth_invalid_at).
-    expect(isGitHubRuntimeAssociationAuthorized(association, { allowShared: true })).toBe(true);
+  it('still enforces lifecycle health for agent consumers', () => {
+    expect(isGitHubRuntimeAssociationAuthorized(association, { purpose: 'agent' })).toBe(true);
     expect(
       isGitHubRuntimeAssociationAuthorized(
         {
           ...association,
           installation: { ...association.installation!, suspended_at: '2026-09-04' },
         },
-        { allowShared: true }
+        { purpose: 'agent' }
       )
     ).toBe(false);
   });
@@ -203,7 +206,7 @@ const rejectionCases = [
     'sharing_not_allowed',
     {
       ...association,
-      installation: { ...association.installation, sharing_mode: 'web_cloud_agent' },
+      integration: { ...association.integration, github_connection_role: 'agent_only' },
     },
   ],
 ] as const;
@@ -344,9 +347,10 @@ describe('runtime rejection diagnostics', () => {
     expect(limit).toHaveBeenCalledWith(2);
   });
 
-  it('authorizes a shared canonical installation only through the exact-id path', async () => {
+  it('requires both an exact association and trusted purpose for secondary runtime access', async () => {
     const sharedAssociation = {
       ...association,
+      integration: { ...association.integration, github_connection_role: 'agent_only' as const },
       installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
     };
     const query = {
@@ -361,13 +365,20 @@ describe('runtime rejection diagnostics', () => {
       .mockReturnValue(query as never);
 
     await expect(
-      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', 'integration-1')
+      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', 'integration-1', 'agent')
     ).resolves.toBeUndefined();
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', 'integration-1')
+    ).rejects.toMatchObject({ reason: 'sharing_not_allowed' });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('installation-1', 'lite', undefined, 'agent')
+    ).rejects.toMatchObject({ reason: 'sharing_not_allowed' });
   });
 
   it('rejects a shared canonical installation on the generic (no exact id) path', async () => {
     const sharedAssociation = {
       ...association,
+      integration: { ...association.integration, github_connection_role: 'agent_only' as const },
       installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' as const },
     };
     const query = {

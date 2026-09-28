@@ -34,6 +34,7 @@ function fullRow(overrides: Partial<NotificationPreferences> = {}): Notification
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
     kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,
@@ -69,6 +70,7 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
       sessionStatus: false,
       kiloclawActivity: true,
       balanceAlerts: true,
+      spendAlerts: true,
       securityFindings: true,
       agentPushEnabled: true,
     } as const satisfies NotificationPreferences;
@@ -88,6 +90,7 @@ describe('applyAgentPushOptimistic + rollbackAgentPushOptimistic (per-category)'
     expect(after.agentUpdates).toBe(true);
     expect(after.kiloclawActivity).toBe(true);
     expect(after.balanceAlerts).toBe(true);
+    expect(after.spendAlerts).toBe(true);
     expect(after.securityFindings).toBe(true);
     expect(after.agentPushEnabled).toBe(true);
 
@@ -200,6 +203,7 @@ describe('per-category flip flow (each category in turn)', () => {
     { category: 'sessionStatus', next: true },
     { category: 'kiloclawActivity', next: false },
     { category: 'balanceAlerts', next: false },
+    { category: 'spendAlerts', next: false },
     { category: 'securityFindings', next: true },
   ];
 

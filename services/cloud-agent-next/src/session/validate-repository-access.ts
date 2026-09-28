@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import type { PersistenceEnv } from '../persistence/types.js';
 import {
   isTemporaryManagedBitbucketTokenFailure,
-  resolveGitHubTokenForRepo,
+  authorizeCloudAgentGitHubRepo,
   resolveManagedBitbucketToken,
 } from '../services/git-token-service-client.js';
 import type { SessionRepositoryRequest } from './session-requests.js';
@@ -14,11 +14,12 @@ export async function assertRepositoryAccessBeforeSessionCreation(input: {
   repository: SessionRepositoryRequest;
 }): Promise<void> {
   if (input.repository.type === 'github' && input.repository.githubIntegrationId) {
-    const result = await resolveGitHubTokenForRepo(input.env, {
+    const result = await authorizeCloudAgentGitHubRepo(input.env, {
       githubRepo: input.repository.repo,
       userId: input.userId,
       ...(input.orgId ? { orgId: input.orgId } : {}),
       expectedIntegrationId: input.repository.githubIntegrationId,
+      accessPurpose: input.repository.githubAccessPurpose ?? 'workflow',
     });
     if (!result.success) {
       throw new TRPCError({

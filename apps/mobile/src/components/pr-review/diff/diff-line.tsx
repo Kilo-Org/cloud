@@ -7,6 +7,11 @@
 // 56-point gutter; honouring the raw a11y scale (1.8x at AX5) would
 // overflow the gutter and break the side-by-side grid.
 //
+// The code `Text` names its own LTR base direction (`LTR_TEXT_DIRECTION`):
+// code reads left to right in every interface language, and inheriting an RTL
+// interface's direction would right-align it, so a wrapped line's continuation
+// would start mid-row instead of under the first line's start.
+//
 // S7a adds two opt-in behaviours, both passed from the diff list:
 //   - `onTap` makes the line tappable; the diff list runs the
 //     selection reducer and updates the bridge / floating action.
@@ -49,6 +54,7 @@ import {
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
 import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 import {
   DIFF_MAX_FONT_SCALE,
@@ -138,6 +144,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
+    ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
     fontSize: metrics.codeFontSize,
     lineHeight: metrics.lineHeight,

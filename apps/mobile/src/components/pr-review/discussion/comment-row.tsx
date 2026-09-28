@@ -15,25 +15,31 @@
 // User actions are hidden when the author is null (deleted account)
 // and disabled when the author is the viewer (self-target).
 //
+// The viewer's OWN comment (s4) additionally offers Edit comment and
+// Delete comment, wired by the Discussion tab through the optional
+// `onEditComment` / `onDeleteComment` callbacks. When those are present
+// the self-target moderation trio is dropped instead of rendered
+// disabled — the row can never use it on itself. A read-only provider
+// row passes neither callback and keeps today's menu exactly, so no
+// author/scope combination ever shows a dead affordance.
+//
 // The trailing group beside that menu is the "Fix with Kilo" CTA
 // (`PrCommentFixWithKilo`): it opens the new-session composer prefilled
 // with this comment's link, scoped to the provider surface the row is on,
 // and renders nothing when the comment has no addressable URL.
 
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
+import { useCommentModerationActions } from '@/components/pr-review/discussion/comment-moderation';
+import { PrCommentFixWithKilo } from '@/components/pr-review/discussion/pr-comment-fix-with-kilo';
+import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
-import { PrCommentFixWithKilo } from '@/components/pr-review/discussion/pr-comment-fix-with-kilo';
-import { ReactionsRow } from '@/components/pr-review/discussion/reactions-row';
-import { i18n } from '@/i18n';
-import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
@@ -41,10 +47,8 @@ import {
   type ReviewReactionContent,
   selectCommentAuthorName,
 } from '@/lib/pr-review/discussion/review-discussion-types';
-import { useTRPC } from '@/lib/trpc';
-import { isTerminalTrpcCode, readTrpcErrorField } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 type CommentRowProps = {
   readonly comment: ReviewComment;
@@ -66,51 +70,14 @@ type CommentRowProps = {
   readonly reactionsSupported?: boolean;
   /** The viewer's GitHub login, used to disable self-target moderation. */
   readonly viewerLogin?: string | null;
+  /**
+   * Edit this comment (s4). Wired only for the viewer's own comment on the
+   * GitHub write surface; absent on a read-only provider scope.
+   */
+  readonly onEditComment?: () => void;
+  /** Delete this comment (s4). Same wiring and gating as `onEditComment`. */
+  readonly onDeleteComment?: () => void;
 };
-
-const REPORT_PLATFORM = 'mobile';
-
-type ModerationAction = 'report-content' | 'report-user' | 'mute' | 'block';
-
-type ModerationFailure =
-  | { kind: 'terminal'; message: string }
-  | { kind: 'retryable'; message: string };
-
-const TERMINAL_KEYS = {
-  'report-content': 'prReview.discussion.moderation.reportContent.terminal',
-  'report-user': 'prReview.discussion.moderation.reportUser.terminal',
-  mute: 'prReview.discussion.moderation.mute.terminal',
-  block: 'prReview.discussion.moderation.block.terminal',
-} as const satisfies Record<ModerationAction, string>;
-
-const RETRYABLE_KEYS = {
-  'report-content': 'prReview.discussion.moderation.reportContent.retryable',
-  'report-user': 'prReview.discussion.moderation.reportUser.retryable',
-  mute: 'prReview.discussion.moderation.mute.retryable',
-  block: 'prReview.discussion.moderation.block.retryable',
-} as const satisfies Record<ModerationAction, string>;
-
-/** Terminal moderation failures must not be retried; everything else is retryable. */
-export function moderationFailure(action: ModerationAction, error: unknown): ModerationFailure {
-  const code = readTrpcErrorField(error, 'code');
-  if (isTerminalTrpcCode(code)) {
-    return { kind: 'terminal', message: i18n.t(TERMINAL_KEYS[action]) };
-  }
-  return { kind: 'retryable', message: i18n.t(RETRYABLE_KEYS[action]) };
-}
-
-/** Terminal failures toast once; retryable failures offer a Retry CTA. */
-function showModerationFailure(action: ModerationAction, error: unknown, retry: () => void): void {
-  const failure = moderationFailure(action, error);
-  if (failure.kind === 'terminal') {
-    announcingToast.error(failure.message);
-    return;
-  }
-  Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.retry'), onPress: retry },
-  ]);
-}
 
 export function CommentRow({
   comment,
@@ -123,73 +90,17 @@ export function CommentRow({
   readOnly,
   reactionsSupported = true,
   viewerLogin = null,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
   const timestamp = parseTimestamp(comment.createdAt);
   const relative = timeAgo(timestamp);
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  const invalidateHiddenUsers = () => {
-    void queryClient.invalidateQueries({ queryKey: trpc.moderation.listHiddenUsers.queryKey() });
-  };
-
-  const reportContent = useMutation(
-    trpc.moderation.reportContent.mutationOptions({
-      onSuccess: result =>
-        announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
-        ),
-      onError: (error, variables) => {
-        showModerationFailure('report-content', error, () => {
-          reportContent.mutate(variables);
-        });
-      },
-    })
-  );
-  const reportUser = useMutation(
-    trpc.moderation.reportUser.mutationOptions({
-      onSuccess: result =>
-        announcingToast.success(
-          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
-        ),
-      onError: (error, variables) => {
-        showModerationFailure('report-user', error, () => {
-          reportUser.mutate(variables);
-        });
-      },
-    })
-  );
-  const blockUser = useMutation(
-    trpc.moderation.blockUser.mutationOptions({
-      onSuccess: (_result, input) => {
-        invalidateHiddenUsers();
-        announcingToast.success(t('prReview.discussion.blockedUser', { login: input.githubLogin }));
-      },
-      onError: (error, variables) => {
-        showModerationFailure('block', error, () => {
-          blockUser.mutate(variables);
-        });
-      },
-    })
-  );
-  const muteUser = useMutation(
-    trpc.moderation.muteUser.mutationOptions({
-      onSuccess: (_result, input) => {
-        invalidateHiddenUsers();
-        announcingToast.success(t('prReview.discussion.mutedUser', { login: input.githubLogin }));
-      },
-      onError: (error, variables) => {
-        showModerationFailure('mute', error, () => {
-          muteUser.mutate(variables);
-        });
-      },
-    })
-  );
+  const moderation = useCommentModerationActions();
 
   function openOverflow() {
     const author = comment.author;
@@ -199,55 +110,70 @@ export function CommentRow({
       viewerLogin !== null &&
       author.login.toLowerCase() === viewerLogin.toLowerCase();
     // oxlint-enable typescript-eslint/prefer-optional-chain
+    // The viewer's own comment: Edit / Delete lead the menu and the
+    // self-target moderation trio is dropped — it can never be used on
+    // yourself, so three disabled entries would be a dead affordance. Without
+    // both callbacks (a read-only provider row) nothing is replaced and the
+    // menu keeps today's shape, disabled trio included.
+    const ownActions: { label: string; run: () => void }[] = [];
+    if (isSelf && onEditComment !== undefined && onDeleteComment !== undefined) {
+      ownActions.push({ label: t('prReview.composer.editTitle'), run: onEditComment });
+      ownActions.push({ label: t('prReview.discussion.deleteComment'), run: onDeleteComment });
+    }
     const userActions: { label: string; run: () => void }[] = [];
-    if (author !== null) {
+    if (author !== null && ownActions.length === 0) {
       userActions.push({
         label: t('prReview.discussion.reportUser'),
         run: () => {
-          reportUser.mutate({ targetId: author.login, reason: 'other' });
+          moderation.report({ action: 'report-user', githubLogin: author.login });
         },
       });
       userActions.push({
         label: t('prReview.discussion.mute'),
         run: () => {
-          muteUser.mutate({ githubLogin: author.login });
+          moderation.report({ action: 'mute', githubLogin: author.login });
         },
       });
       userActions.push({
         label: t('prReview.discussion.block'),
         run: () => {
-          blockUser.mutate({ githubLogin: author.login });
+          moderation.report({ action: 'block', githubLogin: author.login });
         },
       });
     }
+    // Explicit index arithmetic: own actions occupy [0, ownActions.length),
+    // report content sits at `reportContentIndex`, the user actions follow.
+    const reportContentIndex = ownActions.length;
     const options = [
+      ...ownActions.map(action => action.label),
       t('prReview.discussion.reportContent'),
       ...userActions.map(action => action.label),
       t('common.cancel'),
     ];
-    const disabledButtonIndices = isSelf ? userActions.map((_, index) => 1 + index) : [];
+    const disabledButtonIndices = isSelf
+      ? userActions.map((_, index) => reportContentIndex + 1 + index)
+      : [];
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
         disabledButtonIndices,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         if (index === undefined) {
           return;
         }
-        if (index === 0) {
-          reportContent.mutate({
-            surface: 'pr_discussion_content',
-            targetKind: 'comment',
-            targetId: String(comment.commentId),
-            reason: 'other',
-            context: { platform: REPORT_PLATFORM },
-          });
+        const own = ownActions[index];
+        if (own !== undefined) {
+          own.run();
           return;
         }
-        userActions[index - 1]?.run();
+        if (index === reportContentIndex) {
+          moderation.report({ action: 'report-content', commentId: comment.commentId });
+          return;
+        }
+        userActions[index - reportContentIndex - 1]?.run();
       }
     );
   }
@@ -273,11 +199,12 @@ export function CommentRow({
         <Text variant="muted" className="text-xs">
           {relative}
         </Text>
-        {/* `gap-3` (12pt) >= the pill's 2pt right hitSlop + the overflow's
-            8pt left bleed, leaving commentTrailingControlsClearanceDp() dp
-            between the two tap areas, so a tap anywhere on the pill —
-            including its right edge — opens the session and never the
-            moderation sheet (vr1). See comment-trailing-controls.ts. */}
+        {/* `gap-3` (10.5pt at NativeWind's 14pt rem) exceeds the pill's 2pt
+            right hitSlop plus the overflow's 3pt left slop, leaving
+            commentTrailingControlsClearanceDp() dp between the two tap areas,
+            so a tap anywhere on the pill — including its right edge — opens the
+            session and never the moderation sheet (vr1). See
+            comment-trailing-controls.ts. */}
         <View className="ml-auto flex-row items-center gap-3">
           <PrCommentFixWithKilo
             owner={owner}
@@ -291,9 +218,16 @@ export function CommentRow({
             accessibilityRole="button"
             accessibilityLabel={t('prReview.discussion.commentActions')}
             hitSlop={COMMENT_ACTIONS_HIT_SLOP}
-            className="h-7 w-7 items-center justify-center rounded-full active:bg-muted"
+            // The frame, not the 16pt glyph, is what the size audit measures.
+            // The author row holds the whole frame (no negative margin: RN
+            // stops delivering touches outside the parent, so a shrunk layout
+            // box would leave part of the target dead). The visible circle
+            // stays compact at 28pt.
+            className="h-11 w-11 items-center justify-center rounded-full active:bg-muted"
           >
-            <MoreHorizontal size={16} color={colors.mutedForeground} />
+            <View className="h-[28px] w-[28px] items-center justify-center">
+              <MoreHorizontal size={16} color={colors.mutedForeground} />
+            </View>
           </Pressable>
         </View>
       </View>

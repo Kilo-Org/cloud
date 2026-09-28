@@ -9,7 +9,7 @@ import {
   assistantFailureMessage,
   workspaceFailureMessage,
 } from '../session/safe-failure-projection.js';
-import { admittedAgentModel, type SessionMessageState } from '../session/session-message-state.js';
+import { type SessionMessageState } from '../session/session-message-state.js';
 import {
   classifyCloudAgentFailure,
   isWorkspaceFailureSubtype,
@@ -55,11 +55,6 @@ export const FAILED_RUN_DIAGNOSTIC_MESSAGES: Partial<
 
 function timestamp(value: number): string {
   return new Date(value).toISOString();
-}
-
-function usedManagedModelSelection(state: SessionMessageState): boolean {
-  const model = admittedAgentModel(state);
-  return model === undefined ? false : /^(?:kilo\/)?kilo-auto\//.test(model);
 }
 
 function isKnownInsufficientCreditFailure(state: SessionMessageState): boolean {
@@ -186,9 +181,6 @@ export async function emitRunStateReport(params: {
           ...(state.providerOwnership === undefined
             ? {}
             : { providerOwnership: state.providerOwnership }),
-          ...(failureCode === 'model_missing'
-            ? { managedModelSelection: usedManagedModelSelection(state) }
-            : {}),
         })
       : undefined;
   const run: CloudAgentRunStateReport['run'] = {

@@ -3,8 +3,11 @@
 // pr-review-discussion-tab.test-helpers. That import MUST stay first: the
 // helpers register the module mocks while they are evaluated.
 import {
+  alertCalls,
   BASE_PROPS,
   bottomPaddedViews,
+  connectivity,
+  deleteMutate,
   discussionState,
   expectCtaPresence,
   focusState,
@@ -12,7 +15,9 @@ import {
   mountTab,
   pushMock,
   replyScrollFns,
+  rerenderTab,
   resetState,
+  toastError,
 } from './pr-review-discussion-tab.test-helpers';
 import { act, type ReactTestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -132,6 +137,31 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
 
+  it.each(['load-more', 'loading', 'retry'] as const)(
+    'keeps the %s footer reachable when normalization leaves no discussion rows',
+    state => {
+      discussionState.query.hasNextPage = state !== 'retry';
+      discussionState.query.isFetchingNextPage = state === 'loading';
+      discussionState.laterPageError = state === 'retry';
+      const renderer = mountTab();
+      const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+      expect(list.props.listItems).toEqual([]);
+      expect(list.props.hasNextPage).toBe(state !== 'retry');
+      expect(list.props.isFetchingNextPage).toBe(state === 'loading');
+      expect(list.props.laterPageError).toBe(state === 'retry');
+      expectCtaPresence(renderer, true);
+      if (state !== 'loading') {
+        act(() => {
+          (list.props[state === 'retry' ? 'onRetryLoadMore' : 'onLoadMore'] as () => void)();
+        });
+        expect(
+          state === 'retry' ? discussionState.query.refetch : discussionState.query.fetchNextPage
+        ).toHaveBeenCalledOnce();
+      }
+      renderer.unmount();
+    }
+  );
+
   it('keeps permission denial ahead of retained comments', () => {
     discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
     discussionState.firstPageErrorState = { kind: 'permission' };
@@ -175,6 +205,16 @@ describe('PrReviewDiscussionTab full-body states', () => {
       renderer.root.findAll(node => String(node.type) === 'PrReviewDiscussionList')
     ).toHaveLength(1);
     expectCtaPresence(renderer, true);
+  });
+
+  it('hands the list the empty state a fully hidden discussion falls back to', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const list = mountTab().root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    // The list's blocked / muted filter can remove every row the page
+    // returned; the tab hands it the empty state so the body never renders
+    // blank, and the copy stays on one surface.
+    expect(list.props.emptyState).toBeDefined();
   });
 
   it('renders the comment CTA bar on the empty view and opens the composer', () => {
@@ -307,5 +347,169 @@ describe('PrReviewDiscussionTab keyboard-lift gating and reply-scroll wiring', (
     // content-position settle, the pre-existing behavior).
     listProps.onScrollBeginDrag?.();
     expect(replyScrollFns.invalidate).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Fix 11: the merge is memoized on its two identity-stable inputs, so a
+// re-render with unchanged data hands FlashList the same array instead of a
+// freshly merged and sorted one (which would re-diff the whole list).
+describe('PrReviewDiscussionTab merged list memoization (Fix 11)', () => {
+  it('reuses the same listItems array across a re-render with unchanged inputs', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('reuses the same listItems array when the hook hands back a fresh empty conversation each render', () => {
+    // The real hook returns a brand-new `[]` for a PR whose first page carries
+    // no conversation comments: `retainConversationAcrossMounts` falls back to
+    // a fresh literal per call. A memo keyed on that raw array never hits, so
+    // the tab substitutes a stable empty reference.
+    discussionState.threads = [{ threadId: 'T1', isResolved: false, comments: [] }];
+    discussionState.conversation = [];
+    const renderer = mountTab();
+
+    const first = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    const firstItems = first.props.listItems;
+
+    // A NEW empty array, exactly like the hook's next call.
+    discussionState.conversation = [];
+    rerenderTab(renderer);
+
+    const second = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    expect(second.props.listItems).toBe(firstItems);
+
+    renderer.unmount();
+  });
+
+  it('mounts the happy list inside the shared comment-moderation provider', () => {
+    discussionState.conversation = [{ nodeId: 'c1', createdAt: null }];
+    const renderer = mountTab();
+
+    const provider = renderer.root.find(node => String(node.type) === 'CommentModerationProvider');
+    expect(provider.find(node => String(node.type) === 'PrReviewDiscussionList')).toBeDefined();
+
+    renderer.unmount();
+  });
+});
+
+// s4: the tab owns the own-comment writes. Edit pushes the `comment-edit`
+// formSheet with the posted body; delete asks exactly one confirmation and
+// only its destructive button runs the optimistic mutation. On a GitLab /
+// Bitbucket scope both callbacks are withheld, so every row keeps today's
+// read-only affordances.
+describe('PrReviewDiscussionTab own-comment actions (s4)', () => {
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  const comment = {
+    commentId: 42,
+    nodeId: 'c42',
+    author: { login: 'octocat', avatarUrl: null },
+    bodyMarkdown: 'the body',
+    createdAt: '2026-01-01T00:00:00Z',
+    reactions: [],
+  };
+
+  function happyList(scopeRef?: ProviderPrRef): ReactTestRenderer {
+    discussionState.conversation = [comment];
+    return mountTab(scopeRef);
+  }
+
+  beforeEach(() => {
+    alertCalls.length = 0;
+  });
+
+  it('pushes the comment-edit route with the posted body and the kind', () => {
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onEditComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(pushMock).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/[owner]/[repo]/[number]/comment-edit',
+      params: {
+        owner: 'octocat',
+        repo: 'hello-world',
+        number: 7,
+        commentId: '42',
+        kind: 'review',
+        body: 'the body',
+      },
+    });
+
+    renderer.unmount();
+  });
+
+  it('asks exactly one confirmation and the destructive button runs the delete mutation', () => {
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(alertCalls).toHaveLength(1);
+    expect(alertCalls[0]?.title).toBe('Delete comment?');
+    expect(alertCalls[0]?.message).toBe('This comment will be deleted from the pull request.');
+    expect(alertCalls[0]?.buttons.map(button => button.text)).toEqual(['Cancel', 'Delete']);
+    // The confirmation itself writes nothing.
+    expect(deleteMutate).not.toHaveBeenCalled();
+
+    const deleteButton = alertCalls[0]?.buttons.find(button => button.text === 'Delete');
+    deleteButton?.onPress?.();
+
+    expect(deleteMutate).toHaveBeenCalledTimes(1);
+    expect(deleteMutate).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello-world',
+      number: 7,
+      commentId: 42,
+      kind: 'review',
+    });
+
+    renderer.unmount();
+  });
+
+  it('does not start the delete while CONFIRMED offline — the row stays and the retryable failure is shown', () => {
+    // ux2 spot check: with the offline banner up, confirming Delete used to
+    // start a write React Query pauses — the row was optimistically removed
+    // (a false success, lost if the app was killed before reconnect) with no
+    // failure feedback. The gate rejects locally instead: the mutation never
+    // runs, so the row is never removed, and the same retryable copy the
+    // server-failure path uses is shown.
+    connectivity.value = 'offline';
+    const renderer = happyList();
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+    (list.props.onDeleteComment as (comment: unknown, kind: unknown) => void)(comment, 'review');
+
+    expect(alertCalls).toHaveLength(1);
+    const deleteButton = alertCalls[0]?.buttons.find(button => button.text === 'Delete');
+    deleteButton?.onPress?.();
+
+    expect(deleteMutate).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenCalledWith(
+      "Couldn't delete your comment. Check your connection and try again."
+    );
+
+    renderer.unmount();
+  });
+
+  it('withholds both callbacks from the rows on a provider scope', () => {
+    const renderer = happyList(GITLAB_REF);
+    const list = renderer.root.find(node => String(node.type) === 'PrReviewDiscussionList');
+
+    expect(list.props.onEditComment).toBeUndefined();
+    expect(list.props.onDeleteComment).toBeUndefined();
+
+    renderer.unmount();
   });
 });

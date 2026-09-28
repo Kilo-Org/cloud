@@ -15,6 +15,21 @@ import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 const hoisted = vi.hoisted(() => ({
   insetsState: { top: 0, bottom: 0, left: 0, right: 0 },
   pushMock: vi.fn(),
+  // The tab's own-comment delete confirmation (s4). Plain array so a test can
+  // read the exact Alert.alert(title, message, buttons) triple.
+  alertCalls: [] as {
+    title: string;
+    message: string;
+    buttons: { text?: string; onPress?: () => void }[];
+  }[],
+  deleteMutate: vi.fn(),
+  // The delete confirmation's submit gate reads the committed connectivity
+  // (ux2): 'online' by default, flipped per test. The real module pulls in
+  // NetInfo + the probe store, which the node environment cannot resolve.
+  connectivity: { value: 'online' as 'online' | 'offline' | 'unknown' },
+  // The delete gate's visible failure feedback (ux2). The real adapter wraps
+  // sonner-native, which the node environment cannot resolve.
+  toastError: vi.fn(),
   // The tab's screen focus drives the CTA bar's keyboard lift (a foreign
   // surface's keyboard must not lift the bar behind it — uxs3, e4-confirm-
   // discard). Flippable so the suite can mount the tab unfocused.
@@ -43,6 +58,10 @@ const hoisted = vi.hoisted(() => ({
 
 export const insetsState = hoisted.insetsState;
 export const pushMock = hoisted.pushMock;
+export const alertCalls = hoisted.alertCalls;
+export const deleteMutate = hoisted.deleteMutate;
+export const connectivity = hoisted.connectivity;
+export const toastError = hoisted.toastError;
 export const focusState = hoisted.focusState;
 export const replyScrollFns = hoisted.replyScrollFns;
 export const discussionState = hoisted.discussionState;
@@ -50,6 +69,11 @@ export const discussionState = hoisted.discussionState;
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: { OS: 'ios' },
+  Alert: {
+    alert: (title: string, message: string, buttons: { text?: string; onPress?: () => void }[]) => {
+      hoisted.alertCalls.push({ title, message, buttons });
+    },
+  },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: pushMock }),
@@ -82,8 +106,32 @@ vi.mock('@/components/ui/icons', () => ({ MessageSquarePlus: 'MessageSquarePlus'
 vi.mock('@/components/pr-review/discussion/pr-review-discussion-list', () => ({
   PrReviewDiscussionList: 'PrReviewDiscussionList',
 }));
+// The tab mounts the shared moderation provider around the list; here it is a
+// plain host node so the tab suite can assert the nesting (the provider's own
+// behaviour is covered by comment-row.test.tsx, which mounts the real one).
+vi.mock('@/components/pr-review/discussion/comment-moderation', () => ({
+  CommentModerationProvider: 'CommentModerationProvider',
+}));
 vi.mock('@/components/pr-review/discussion/pr-comment-cta', () => ({
   PrCommentCta: 'PrCommentCta',
+}));
+// s4: the tab owns the delete write; the hook's optimistic/rollback behaviour
+// is covered by use-pr-comment-crud-mutations.test.ts and the list mounted
+// suite, so here it is a captured `mutate`.
+vi.mock('@/lib/pr-review/discussion/use-pr-comment-crud-mutations', () => ({
+  useDeletePrCommentMutation: () => ({ mutate: hoisted.deleteMutate }),
+}));
+// ux2: the delete confirmation's offline gate. The real modules reach NetInfo /
+// sonner-native, neither of which this node-environment suite can resolve.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => hoisted.connectivity.value,
+}));
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: {
+    success: vi.fn(),
+    error: hoisted.toastError,
+    warning: vi.fn(),
+  },
 }));
 
 export const BASE_PROPS = {
@@ -114,6 +162,14 @@ export function mountTab(scopeRef?: ProviderPrRef): TestRenderer.ReactTestRender
   return renderer;
 }
 
+/** Re-renders the mounted tab in place with the same props, so a test can
+ * compare a prop's identity across two renders of one component instance. */
+export function rerenderTab(renderer: TestRenderer.ReactTestRenderer): void {
+  act(() => {
+    renderer.update(createElement(PrReviewDiscussionTab, BASE_PROPS));
+  });
+}
+
 export function bottomPaddedViews(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
@@ -137,6 +193,7 @@ export function resetState(): void {
   discussionState.conversation = [];
   discussionState.firstPageErrorState = null;
   discussionState.laterPageError = false;
+  hoisted.connectivity.value = 'online';
 }
 
 export function expectCtaPresence(

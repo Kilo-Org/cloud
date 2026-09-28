@@ -1,4 +1,5 @@
 import { type RepoPlatform } from '@/lib/picker-bridge';
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
 
 export type RepositoryPlatform = RepoPlatform;
 
@@ -59,10 +60,18 @@ export function resolveProviderStatus({
   if (isError && repositoryCount === 0) {
     return 'error';
   }
-  if (integrationInstalled === false) {
+  // `undefined` means the query has produced no data at all, not "not
+  // installed": a paused query (iOS boot / the NetInfo probe not settled yet)
+  // reports `isLoading === false` and leaves `data` undefined, so the flag is
+  // undefined too. A provider whose list is not known yet must never read as
+  // settled, or the section renders its heading with no control under it.
+  if (integrationInstalled === undefined) {
+    return 'loading';
+  }
+  if (!integrationInstalled) {
     return 'connect';
   }
-  if (integrationInstalled === true && repositoryCount === 0) {
+  if (repositoryCount === 0) {
     return 'connected-empty';
   }
   return 'repos';
@@ -120,16 +129,7 @@ const repositoryKey = (repository: NewSessionRepository): string =>
 export function dedupeRepositoriesByPlatformAndFullName(
   repositories: readonly NewSessionRepository[]
 ): NewSessionRepository[] {
-  const seen = new Set<string>();
-  const result: NewSessionRepository[] = [];
-  for (const repository of repositories) {
-    const key = repositoryKey(repository);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(repository);
-    }
-  }
-  return result;
+  return dedupeBy(repositories, repositoryKey);
 }
 
 /**

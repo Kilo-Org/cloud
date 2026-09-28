@@ -12,14 +12,10 @@ import { useSessionAttentionRevision } from '@/lib/session-attention';
 import { useTRPC } from '@/lib/trpc';
 
 import { resolveAnsweredRaises } from './attention-rows';
-import {
-  getLastGlanceableSnapshot,
-  persistGlanceableSink,
-  restorePersistedGlanceable,
-} from './persist';
-import { getTerminalBlankEpoch, isGlanceableOrgLost } from './cleanup';
-import { GlanceablePublisher } from './publisher';
-import { getGlanceableSinks, registerGlanceableSink } from './sink-registry';
+import { createGlanceablePublisher } from './create-publisher';
+import { persistGlanceableSink, restorePersistedGlanceable } from './persist';
+import { type GlanceablePublisher } from './publisher';
+import { registerGlanceableSink } from './sink-registry';
 
 // Register only the persist sink here; platform sinks register themselves from
 // files their slices own.
@@ -78,12 +74,7 @@ export function GlanceablePublisherMount(): null {
       return undefined;
     }
 
-    const publisher = new GlanceablePublisher({
-      sinks: getGlanceableSinks(),
-      initial: getLastGlanceableSnapshot(),
-      terminalBlankEpoch: getTerminalBlankEpoch,
-      orgLost: isGlanceableOrgLost,
-    });
+    const publisher = createGlanceablePublisher();
     const ctx = { userId, organizationId };
     live.current = { publisher, ctx };
     const derive = (sessions: CachedActiveSessionsData['sessions']) => {

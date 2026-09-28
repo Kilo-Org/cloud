@@ -1,5 +1,8 @@
 export const GITHUB_RATE_LIMIT_DIAGNOSTIC_MAX_BODY_BYTES = 2 * 1024;
 export const GITHUB_RATE_LIMIT_DIAGNOSTIC_BODY_DEADLINE_MS = 100;
+export const GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS = 30_000;
+export const GITHUB_RATE_LIMIT_MAX_RETRY_TOTAL_WAIT_MS = 60_000;
+export const GITHUB_RATE_LIMIT_MAX_RETRY_ATTEMPTS = 3;
 const MAX_NUMERIC_HEADER_LENGTH = 16;
 const MAX_RESOURCE_HEADER_LENGTH = 32;
 const MAX_RETRY_AFTER_HEADER_LENGTH = 64;
@@ -8,6 +11,8 @@ const BODY_READ_TIMED_OUT = Symbol('github body read timed out');
 
 const HTTP_DATE_RE =
   /^(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun), \d{2} (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) \d{4} \d{2}:\d{2}:\d{2} GMT$/;
+
+const RETRY_AFTER_DELTA_SECONDS_RE = /^(?:0|[1-9]\d{0,9})$/;
 
 export type GitHubRateLimitBodySignal =
   | 'primary_limit'
@@ -45,13 +50,18 @@ function readHeader(headers: Headers, name: string): string | undefined {
   return value || undefined;
 }
 
-function readNonNegativeIntegerHeader(headers: Headers, name: string): string | undefined {
-  const value = readHeader(headers, name);
+function parseNonNegativeInteger(value: string | undefined): number | undefined {
   if (!value || value.length > MAX_NUMERIC_HEADER_LENGTH) return undefined;
   if (!new RegExp(`^(?:0|[1-9]\\d{0,${MAX_NUMERIC_HEADER_LENGTH - 1}})$`).test(value)) {
     return undefined;
   }
-  return Number.isSafeInteger(Number(value)) ? value : undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+function readNonNegativeIntegerHeader(headers: Headers, name: string): string | undefined {
+  const value = readHeader(headers, name);
+  return parseNonNegativeInteger(value) === undefined ? undefined : value;
 }
 
 function readResourceHeader(headers: Headers): string | undefined {
@@ -69,7 +79,7 @@ function readResourceHeader(headers: Headers): string | undefined {
 function readRetryAfterHeader(headers: Headers): string | undefined {
   const value = readHeader(headers, 'retry-after');
   if (!value || value.length > MAX_RETRY_AFTER_HEADER_LENGTH) return undefined;
-  if (/^(?:0|[1-9]\d{0,9})$/.test(value) || HTTP_DATE_RE.test(value)) return value;
+  if (RETRY_AFTER_DELTA_SECONDS_RE.test(value) || HTTP_DATE_RE.test(value)) return value;
   return undefined;
 }
 
@@ -89,6 +99,40 @@ function readRateLimitHeaders(headers: Headers): RateLimitHeaderValues {
   if (resource !== undefined) values.githubRateLimitResource = resource;
   if (retryAfter !== undefined) values.githubRetryAfter = retryAfter;
   return values;
+}
+
+function clampGitHubRetryDelayMs(delayMs: number): number {
+  if (delayMs < 0) return 0;
+  if (delayMs > GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS) return GITHUB_RATE_LIMIT_MAX_RETRY_DELAY_MS;
+  return delayMs;
+}
+
+/**
+ * Resolves the server-stated retry delay from the already-validated diagnostic
+ * headers. `retry-after` wins (delta-seconds or strict HTTP-date), then
+ * `x-ratelimit-reset` epoch seconds. Only the validated forms are accepted and
+ * the result is clamped so a hostile value cannot hold the request indefinitely.
+ */
+export function resolveGitHubRateLimitRetryDelayMs(
+  diagnostic: Pick<GitHubRateLimitDiagnostic, 'githubRetryAfter' | 'githubRateLimitReset'>,
+  now: number
+): number | undefined {
+  const retryAfter = diagnostic.githubRetryAfter;
+  if (retryAfter !== undefined) {
+    if (RETRY_AFTER_DELTA_SECONDS_RE.test(retryAfter)) {
+      return clampGitHubRetryDelayMs(Number(retryAfter) * 1000);
+    }
+    if (HTTP_DATE_RE.test(retryAfter)) {
+      const retryAt = Date.parse(retryAfter);
+      if (!Number.isNaN(retryAt)) return clampGitHubRetryDelayMs(retryAt - now);
+    }
+  }
+
+  const resetSeconds = parseNonNegativeInteger(diagnostic.githubRateLimitReset);
+  if (resetSeconds !== undefined) {
+    return clampGitHubRetryDelayMs(resetSeconds * 1000 - now);
+  }
+  return undefined;
 }
 
 /** Classifies known provider phrases without retaining or returning the body. */

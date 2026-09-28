@@ -23,10 +23,6 @@ export const DRIVER_USER_EMAIL_SUFFIX = '@cloud-agent-next-e2e.example.com';
 export const FUNDED_DRIVER_BALANCE_MICRODOLLARS = 10_000_000;
 const JWT_TOKEN_VERSION = 3;
 
-// ---------------------------------------------------------------------------
-// .dev.vars loader
-// ---------------------------------------------------------------------------
-
 /**
  * Parse a `.dev.vars` file — same format as `.env`, with `KEY=value` pairs.
  * Trims surrounding quotes and ignores comments/blank lines.
@@ -84,10 +80,6 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
     }
   }
 }
-
-// ---------------------------------------------------------------------------
-// User ensure
-// ---------------------------------------------------------------------------
 
 export type TestUser = {
   id: string;
@@ -196,10 +188,6 @@ export async function loadExistingUserByEmail(
   }
 }
 
-// ---------------------------------------------------------------------------
-// JWT minting
-// ---------------------------------------------------------------------------
-
 export type MintedTokens = {
   apiToken: string;
 };
@@ -209,7 +197,13 @@ export type MintedTokens = {
  * `apps/web/src/lib/tokens.ts:generateApiToken` but with a short expiry
  * since the driver is ephemeral.
  */
-export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
+export function mintApiToken(
+  user: { id: string; api_token_pepper?: string },
+  nextAuthSecret: string | undefined
+): string {
+  if (!nextAuthSecret) {
+    throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
+  }
   return jwt.sign(
     {
       env: 'development',
@@ -228,7 +222,7 @@ export function mintApiToken(user: TestUser, nextAuthSecret: string): string {
  * `apps/web/src/lib/cloud-agent/stream-ticket.ts:signStreamTicket`.
  */
 export function mintStreamTicket(
-  user: TestUser,
+  user: { id: string },
   cloudAgentSessionId: string,
   nextAuthSecret: string,
   expiresInSeconds = 120

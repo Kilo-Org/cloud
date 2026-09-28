@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as SecureStore from 'expo-secure-store';
 import * as Sentry from '@sentry/react-native';
 
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 import {
   _resetPendingExternalAuthForTests,
   clearPendingExternalAuth,
@@ -53,6 +54,35 @@ describe('pending-external-auth', () => {
     vi.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
     await expect(readPendingExternalAuth()).resolves.toEqual({ kind: 'none' });
     expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+  });
+
+  it('treats a rejected read as absent instead of rejecting into the caller', async () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+    try {
+      vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(
+        new Error("Calling the 'getValueWithKeyAsync' function has failed")
+      );
+
+      // The mount effect `void`s this read: a rejection would be an unhandled
+      // error, so an unreadable record must read as absent.
+      await expect(readPendingExternalAuth()).resolves.toEqual({ kind: 'none' });
+      expect(SecureStore.deleteItemAsync).not.toHaveBeenCalled();
+
+      // The guarded store reports the failure once, at warning level, under the
+      // stable operation fingerprint — not the raw native message.
+      expect(events).toHaveLength(1);
+      expect(events[0]?.level).toBe('warning');
+      expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+      expect(events[0]?.tags).toEqual({
+        'error.subsystem': 'secure_store',
+        'error.operation': 'read',
+      });
+    } finally {
+      setTelemetrySink(null);
+    }
   });
 
   it('returns stale for a record past the TTL without deleting', async () => {

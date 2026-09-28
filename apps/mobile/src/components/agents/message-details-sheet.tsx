@@ -14,10 +14,10 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { formatExactTokens } from './context-usage-display';
 import { handleMessageDetailsCopy } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
+import { Row, TokenRow } from './session-detail-rows';
 import { SessionPageSheet } from './session-page-sheet';
 import {
   buildReportAiResponseErrorToast,
@@ -217,13 +217,13 @@ export function MessageDetailsSheet({
                     disabled: !canCancelQueued || isCancelingQueued,
                     busy: isCancelingQueued,
                   }}
-                  className="mb-6 min-h-12 flex-row items-center justify-center gap-2 rounded-md border border-border px-4 py-3 active:opacity-70 disabled:opacity-50"
+                  className="mb-6 min-h-12 flex-row items-center justify-center gap-2 rounded-md border border-destructive px-4 py-3 active:opacity-70 disabled:opacity-50"
                   testID="message-details-cancel-queued"
                 >
                   {isCancelingQueued ? (
                     <ActivityIndicator size="small" color={colors.mutedForeground} />
                   ) : null}
-                  <Text className="text-center text-base font-medium text-foreground">
+                  <Text className="text-center text-base font-medium text-destructive">
                     {t('agentChat.messageBubble.cancelQueued')}
                   </Text>
                 </Pressable>
@@ -289,25 +289,5 @@ export function MessageDetailsSheet({
         </>
       )}
     </SessionPageSheet>
-  );
-}
-
-function Row({ label, children }: Readonly<{ label: string; children: React.ReactNode }>) {
-  return (
-    <View className="gap-1">
-      <Text className="text-xs uppercase tracking-wide text-muted-foreground">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function TokenRow({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="flex-row items-center justify-between">
-      <Text className="text-sm text-muted-foreground">{label}</Text>
-      <Text className="text-sm font-medium text-foreground tabular-nums">
-        {formatExactTokens(value)}
-      </Text>
-    </View>
   );
 }

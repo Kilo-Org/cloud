@@ -65,6 +65,11 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_rules,
+  spend_alert_rule_state,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   user_data_export_object_deletions,
   security_advisor_scans,
   credit_campaigns,
@@ -95,10 +100,6 @@ import {
   microdollar_usage,
   microdollar_usage_metadata,
   system_prompt_prefix,
-  model_experiment,
-  model_experiment_variant,
-  model_experiment_variant_version,
-  model_experiment_request,
   stripe_dispute_actions,
   stripe_dispute_cases,
   stripe_early_fraud_warning_cases,
@@ -202,7 +203,6 @@ jest.mock('@/lib/r2/client', () => ({
   r2Client: { send: (command: { input: { Key?: string } }) => mockR2Send(command) },
   r2CliSessionsBucketName: 'cli-sessions-bucket',
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
-  r2ExperimentPromptsBucketName: 'experiment-prompts-bucket',
 }));
 
 const mockRecordAffiliateAttributionAndQueueParentEvent = jest.mocked(
@@ -274,10 +274,6 @@ describe('User', () => {
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
     await db.delete(free_model_usage);
-    await db.delete(model_experiment_request);
-    await db.delete(model_experiment_variant_version);
-    await db.delete(model_experiment_variant);
-    await db.delete(model_experiment);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -1590,6 +1586,44 @@ describe('User', () => {
           .from(openai_chatgpt_connections)
           .where(eq(openai_chatgpt_connections.kilo_user_id, user.id))
       ).toHaveLength(0);
+    });
+
+    it("keeps the organization's shared-services row when the connector is deleted", async () => {
+      const connector = await insertTestUser({
+        google_user_email: `chatgpt-shared-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `ChatGPT shared cleanup ${randomUUID()}`,
+        connector.id,
+        0
+      );
+      const { encryptApiKey } = await import('@/lib/ai-gateway/byok/encryption');
+      const { BYOK_ENCRYPTION_KEY } = await import('@/lib/config.server');
+      await db.insert(openai_chatgpt_connections).values({
+        kilo_user_id: connector.id,
+        organization_id: organization.id,
+        is_shared_services: true,
+        encrypted_connection: encryptApiKey('{"access_token":"token"}', BYOK_ENCRYPTION_KEY),
+        created_by: connector.id,
+      });
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, connector.id));
+
+      // The organization's connection belongs to the organization, so the
+      // deletion keeps it: only the reference to the deleted connector is
+      // cleared, and `created_by` keeps the record of who connected it.
+      const rows = await db
+        .select()
+        .from(openai_chatgpt_connections)
+        .where(
+          and(
+            eq(openai_chatgpt_connections.organization_id, organization.id),
+            eq(openai_chatgpt_connections.is_shared_services, true)
+          )
+        );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].kilo_user_id).toBeNull();
+      expect(rows[0].created_by).toBe(connector.id);
     });
   });
 
@@ -5059,6 +5093,90 @@ describe('User', () => {
       expect(rows).toHaveLength(0);
     });
 
+    it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
+      const user = await insertTestUser();
+      const scopeKey = `user:${user.id}`;
+      const [settings] = await db
+        .insert(spend_alert_settings)
+        .values({ scope_key: scopeKey, kilo_user_id: user.id, enabled: true })
+        .returning();
+      const [rule] = await db
+        .insert(spend_alert_rules)
+        .values({
+          settings_id: settings.id,
+          kind: 'threshold',
+          threshold_microdollars: 5_000_000,
+        })
+        .returning();
+      await db.insert(spend_alert_rule_state).values({ rule_id: rule.id, firing: true });
+      await db.insert(spend_alert_hourly).values({
+        scope_key: scopeKey,
+        hour_start: new Date().toISOString(),
+        cost_microdollars: 4_200_000,
+      });
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: `spend-alert-test-${crypto.randomUUID()}`,
+        scope_key: scopeKey,
+        channel: 'email',
+        recipients: [{ email: 'billing-contact@example.com' }],
+      });
+
+      await softDeleteUser(user.id);
+
+      const settingsRows = await db
+        .select()
+        .from(spend_alert_settings)
+        .where(eq(spend_alert_settings.kilo_user_id, user.id));
+      expect(settingsRows).toHaveLength(0);
+      // Deleting the settings row cascades to its rules and per-rule state.
+      const ruleRows = await db
+        .select()
+        .from(spend_alert_rules)
+        .where(eq(spend_alert_rules.settings_id, settings.id));
+      expect(ruleRows).toHaveLength(0);
+      const ruleStateRows = await db
+        .select()
+        .from(spend_alert_rule_state)
+        .where(eq(spend_alert_rule_state.rule_id, rule.id));
+      expect(ruleStateRows).toHaveLength(0);
+      const hourlyRows = await db
+        .select()
+        .from(spend_alert_hourly)
+        .where(eq(spend_alert_hourly.scope_key, scopeKey));
+      expect(hourlyRows).toHaveLength(0);
+      const deliveryRows = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.scope_key, scopeKey));
+      expect(deliveryRows).toHaveLength(0);
+    });
+
+    it('should strip a deleted billing contact from organization scope delivery recipients', async () => {
+      const user = await insertTestUser();
+      const otherUserId = `test-other-${crypto.randomUUID()}`;
+      const otherEmail = 'other-billing@example.com';
+      const dedupeKey = `spend-alert-org-test-${crypto.randomUUID()}`;
+      await db.insert(spend_alert_deliveries).values({
+        dedupe_key: dedupeKey,
+        scope_key: `org:${crypto.randomUUID()}`,
+        channel: 'email',
+        recipients: {
+          userIds: [user.id, otherUserId],
+          emails: [user.google_user_email, otherEmail],
+        },
+      });
+
+      await softDeleteUser(user.id);
+
+      // Organization-scoped rows belong to the organization and stay, but the
+      // deleted member's id and address are their PII and must be removed.
+      const [row] = await db
+        .select()
+        .from(spend_alert_deliveries)
+        .where(eq(spend_alert_deliveries.dedupe_key, dedupeKey));
+      expect(row?.recipients).toEqual({ userIds: [otherUserId], emails: [otherEmail] });
+    });
+
     it('should delete Coding Plan availability notification intents', async () => {
       const user = await insertTestUser();
       await db.insert(coding_plan_availability_intents).values({
@@ -5334,91 +5452,6 @@ describe('User', () => {
       expect(softDeletedCreator?.google_user_name).toBe('Deleted User');
       expect(softDeletedCreator?.is_admin).toBe(false);
       expect(softDeletedCreator?.can_manage_credits).toBe(false);
-    });
-
-    it('should preserve model experiment attribution and prompt hashes', async () => {
-      const user = await insertTestUser();
-      const usageId = randomUUID();
-      const createdAt = '2026-05-25T12:00:00.000Z';
-      const requestBodySha256 = 'a'.repeat(64);
-
-      await db.insert(microdollar_usage).values({
-        id: usageId,
-        kilo_user_id: user.id,
-        cost: 0,
-        input_tokens: 100,
-        output_tokens: 50,
-        cache_write_tokens: 0,
-        cache_hit_tokens: 0,
-        created_at: createdAt,
-        provider: 'custom',
-        model: 'partner/checkpoint-rc1',
-        requested_model: 'kilo/preview-experiment-test',
-        has_error: false,
-      });
-
-      const [experiment] = await db
-        .insert(model_experiment)
-        .values({
-          public_model_id: 'kilo/preview-experiment-test',
-          name: 'Soft-delete retention test',
-          status: 'active',
-          created_by_user_id: user.id,
-        })
-        .returning({ id: model_experiment.id });
-      if (!experiment) throw new Error('Failed to insert model experiment');
-
-      const [variant] = await db
-        .insert(model_experiment_variant)
-        .values({
-          experiment_id: experiment.id,
-          label: 'A',
-          weight: 1,
-        })
-        .returning({ id: model_experiment_variant.id });
-      if (!variant) throw new Error('Failed to insert model experiment variant');
-
-      const [variantVersion] = await db
-        .insert(model_experiment_variant_version)
-        .values({
-          variant_id: variant.id,
-          upstream: {
-            internal_id: 'partner/checkpoint-rc1',
-            base_url: 'https://partner.example.com/v1',
-          },
-          encrypted_api_key: { iv: 'iv', data: 'data', authTag: 'authTag' },
-          created_by: user.id,
-        })
-        .returning({ id: model_experiment_variant_version.id });
-      if (!variantVersion) throw new Error('Failed to insert model experiment variant version');
-
-      await db.insert(model_experiment_request).values({
-        usage_id: usageId,
-        variant_version_id: variantVersion.id,
-        allocation_subject: 'user',
-        client_request_id: 'client-message-id',
-        request_kind: 'chat_completions',
-        request_body_sha256: requestBodySha256,
-        was_truncated: false,
-        created_at: createdAt,
-      });
-
-      await softDeleteUser(user.id);
-
-      const [usage] = await db
-        .select()
-        .from(microdollar_usage)
-        .where(eq(microdollar_usage.id, usageId));
-      expect(usage?.kilo_user_id).toBe(user.id);
-
-      const [attribution] = await db
-        .select()
-        .from(model_experiment_request)
-        .where(eq(model_experiment_request.usage_id, usageId));
-      if (!attribution) throw new Error('Expected model experiment attribution to be retained');
-      expect(attribution.request_body_sha256).toBe(requestBodySha256);
-      expect(attribution.client_request_id).toBe('client-message-id');
-      expect(new Date(attribution.created_at).toISOString()).toBe(createdAt);
     });
 
     it('should preserve Kilo Pass subscriptions and issuance chain', async () => {

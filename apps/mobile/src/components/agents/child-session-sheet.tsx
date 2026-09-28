@@ -8,10 +8,13 @@ import {
   type StoredMessage,
 } from '@kilocode/cloud-agent-sdk';
 
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { SheetHeader } from '@/components/sheet-header';
+import { Button } from '@/components/ui/button';
 import { Bot } from '@/components/ui/icons';
+import { Text } from '@/components/ui/text';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import {
@@ -28,6 +31,12 @@ import { getChildSessionSheetState } from './child-session-sheet-state';
 import { SessionMessageList } from './session-message-list';
 import { SessionPageSheet } from './session-page-sheet';
 import { SessionStatusIndicator } from './session-status-indicator';
+import {
+  buildTerminalErrorCopyText,
+  describeSessionRuntimeFailure,
+  describeTerminalFailure,
+} from './session-terminal-error';
+import { performCopy } from './use-message-copy';
 import { WorkingIndicator } from './working-indicator';
 
 type ChildSessionSheetProps = {
@@ -145,6 +154,34 @@ export function ChildSessionSheet({
   if (lastHydrationError.sessionId !== sessionId || lastHydrationError.message !== hydrationError) {
     setLastHydrationError({ sessionId, message: hydrationError });
   }
+  // The hydration and runtime errors are raw SDK strings. Describe each one so
+  // the reader sees catalog copy, and offer Retry only where one can help. A
+  // blank message stays undefined so `QueryError` falls back to its variant copy.
+  const describedHydrationError =
+    hydrationError === null || hydrationError === ''
+      ? null
+      : describeTerminalFailure(hydrationError);
+  // The runtime error is a failed agent run, not a failed first-page load, so
+  // it resolves through the same copy the transcript's error banner shows
+  // rather than the hydration classifier's page-load fallback.
+  const describedSessionError =
+    sessionError === null || sessionError === ''
+      ? null
+      : describeSessionRuntimeFailure(sessionError);
+  // Copy carries the untranslated original, as the parent terminal error does.
+  const copySessionErrorDetails = () => {
+    if (describedSessionError === null) {
+      return;
+    }
+    void performCopy(
+      buildTerminalErrorCopyText({
+        sessionId,
+        title: t('agentChat.childSessionSheet.failed'),
+        message: describedSessionError.message,
+        detail: describedSessionError.detail,
+      })
+    );
+  };
   // Safe-area context can return 0 inside a RN `Modal` (pageSheet doesn't
   // always propagate the home-indicator inset), so we floor the value with
   // a comfortable constant to keep the last row / working indicator clear
@@ -168,8 +205,8 @@ export function ChildSessionSheet({
           // event; this guard covers the gap before that event arrives.
           <QueryError
             title={t('agentChat.childSessionSheet.couldNotLoad')}
-            message={hydrationError}
-            onRetry={onRetry}
+            message={describedHydrationError?.message}
+            onRetry={describedHydrationError?.retryable ? onRetry : undefined}
             isRetrying={hydrationState.status === 'loading'}
             placement="top"
             className="gap-3 border-b border-border py-3"
@@ -213,14 +250,31 @@ export function ChildSessionSheet({
       hydrationState.status === 'error' ? (
         <QueryError
           title={t('agentChat.childSessionSheet.couldNotLoad')}
-          message={hydrationState.message}
-          onRetry={onRetry}
+          message={describedHydrationError?.message}
+          onRetry={describedHydrationError?.retryable ? onRetry : undefined}
         />
       ) : (
-        <QueryError
-          title={t('agentChat.childSessionSheet.failed')}
-          message={sessionError ?? undefined}
-        />
+        // The child's runtime error is not a failed first-page load, so a
+        // hydration Retry cannot recover it (the manager clears this error only
+        // when the session switches). Mirror the parent terminal error: the
+        // runtime copy with its untranslated original behind Copy, and no CTA.
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <QueryError
+              placement="top"
+              className="px-0 pt-0"
+              title={t('agentChat.childSessionSheet.failed')}
+              message={describedSessionError?.message}
+            />
+            <Button
+              variant="ghost"
+              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
+              onPress={copySessionErrorDetails}
+            >
+              <Text>{t('common.copy')}</Text>
+            </Button>
+          </View>
+        </CenteredState>
       );
   } else if (state === 'empty') {
     content = (

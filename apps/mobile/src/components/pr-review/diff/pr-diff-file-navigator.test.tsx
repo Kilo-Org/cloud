@@ -80,6 +80,9 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platformState,
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -194,8 +197,17 @@ async function mountNavigator() {
   return result;
 }
 
+// The navigator's field is `@/components/ui/input`: the accessibility label
+// sits on the composite and on the host TextInput it renders. Match the host so
+// the lookup stays single (`findByProps` throws on two matches).
+function isSearchInput(node: { type: unknown; props: { accessibilityLabel?: string } }) {
+  return (
+    String(node.type) === 'TextInput' && node.props.accessibilityLabel === 'Filter files by path'
+  );
+}
+
 function findSearchInput(renderer: Awaited<ReturnType<typeof mountNavigator>>['renderer']) {
-  return renderer.root.findByProps({ accessibilityLabel: 'Filter files by path' });
+  return renderer.root.find(node => isSearchInput(node));
 }
 
 function typeSearch(
@@ -308,7 +320,7 @@ describe('PrDiffFileNavigator stable row callbacks (finding 2)', () => {
     const centered = renderer.root.find(node => String(node.type) === 'CenteredState');
     expect(centered.findByProps({ children: 'No files match "missing"' })).toBeDefined();
     const header = renderer.root.findByProps({ collapsable: false });
-    expect(header.findByProps({ accessibilityLabel: 'Filter files by path' })).toBe(input);
+    expect(header.find(node => isSearchInput(node))).toBe(input);
     expect(header.parent).toBe(centered.parent);
     typeSearch(renderer, 'src');
     expect(findSearchInput(renderer)).toBe(input);

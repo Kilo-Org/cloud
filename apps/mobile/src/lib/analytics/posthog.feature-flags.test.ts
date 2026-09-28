@@ -2,8 +2,6 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type FeatureFlagStatus } from './posthog';
-
 const hoisted = vi.hoisted(() => {
   const client = {
     register: vi.fn(),
@@ -166,98 +164,5 @@ describe('version-aware feature flags', () => {
     initPostHog();
 
     expect(await readFlag('mobile-not-in-registry', false)).toBe(true);
-  });
-});
-
-describe('feature flag statuses (debug surface)', () => {
-  it('reports which flags the build applies and which it skips, with reasons', async () => {
-    hoisted.application.nativeApplicationVersion = '1.0.5';
-    hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-pr-review' ? false : undefined) as never
-    );
-    const { initPostHog, getFeatureFlagStatuses } = await import('./posthog');
-    initPostHog();
-
-    expect(getFeatureFlagStatuses()).toEqual([
-      {
-        key: 'mobile-pr-review',
-        minAppVersion: '1.0.4',
-        defaultValue: true,
-        appVersion: '1.0.5',
-        applied: true,
-        value: false,
-        reason: 'applied',
-        loaded: true,
-      },
-      {
-        key: 'mobile-quick-chat',
-        minAppVersion: '1.0.6',
-        defaultValue: false,
-        appVersion: '1.0.5',
-        applied: false,
-        value: false,
-        reason: 'build-too-old',
-        loaded: false,
-      },
-    ]);
-  });
-
-  it('reports defaults in use while the client has no flag values', async () => {
-    const { initPostHog, getFeatureFlagStatuses } = await import('./posthog');
-    initPostHog();
-
-    const statuses = getFeatureFlagStatuses();
-    expect(statuses.every(status => !status.loaded)).toBe(true);
-    expect(statuses.every(status => !status.applied)).toBe(true);
-    expect(statuses.map(status => status.value)).toEqual(
-      statuses.map(status => status.defaultValue)
-    );
-  });
-
-  it('reports a skipped flag even when a remote value exists', async () => {
-    hoisted.application.nativeApplicationVersion = '1.0.5';
-    hoisted.client.getFeatureFlag.mockImplementation(() => true as never);
-    const { initPostHog, getFeatureFlagStatuses } = await import('./posthog');
-    initPostHog();
-
-    const quickChat = getFeatureFlagStatuses().find(status => status.key === 'mobile-quick-chat');
-    expect(quickChat).toMatchObject({
-      applied: false,
-      reason: 'build-too-old',
-      value: false,
-      loaded: true,
-    });
-  });
-
-  it('updates reactively when the client re-emits flags', async () => {
-    hoisted.client.getFeatureFlag.mockImplementation(() => undefined as never);
-    const posthog = await import('./posthog');
-    posthog.initPostHog();
-
-    const statuses: FeatureFlagStatus[][] = [];
-    function Probe() {
-      statuses.push(posthog.useFeatureFlagStatuses());
-      return null;
-    }
-    let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-    act(() => {
-      renderer = TestRenderer.create(createElement(Probe));
-    });
-
-    // Remote value arrives for the current build: statuses flip to applied.
-    hoisted.client.getFeatureFlag.mockImplementation(
-      (key: string) => (key === 'mobile-quick-chat' ? true : undefined) as never
-    );
-    const onChange = hoisted.client.onFeatureFlags.mock.calls[0]?.[0] as () => void;
-    act(() => {
-      onChange();
-    });
-
-    const latest = statuses.at(-1) ?? [];
-    const quickChat = latest.find(status => status.key === 'mobile-quick-chat');
-    expect(quickChat).toMatchObject({ applied: true, value: true, reason: 'applied' });
-    act(() => {
-      renderer?.unmount();
-    });
   });
 });

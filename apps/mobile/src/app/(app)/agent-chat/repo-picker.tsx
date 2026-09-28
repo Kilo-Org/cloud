@@ -2,11 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
@@ -107,18 +108,38 @@ export default function RepoPickerScreen() {
       headerContent={
         <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
           <Search size={18} color={colors.mutedForeground} />
-          <TextInput
-            accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
-            placeholder={t('agentChat.repoPicker.searchPlaceholder')}
-            placeholderTextColor={colors.mutedForeground}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-            returnKeyType="search"
-            className="h-8 flex-1 p-0 text-base text-foreground"
-            style={{ color: colors.foreground }}
-            onChangeText={setSearch}
-          />
+          {/* The placeholder is a single-line Text overlay, not the input's own
+              placeholder: Android lays the native hint out at the field's width
+              with no line cap, so copy wider than a narrow field wraps onto a
+              second line. A tail-ellipsized Text truncates the copy at any width
+              instead. The shared box draws the value on one line box and centres
+              it, and both texts share `px-0` so the overlay sits exactly where
+              the typed text will. */}
+          <View className="relative flex-1">
+            <Input
+              accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
+              autoCapitalize="none"
+              autoCorrect={false}
+              clearButtonMode="while-editing"
+              returnKeyType="search"
+              textAlignVertical="center"
+              className="px-0 text-base text-foreground"
+              style={{ color: colors.foreground }}
+              onChangeText={setSearch}
+            />
+            {search.length === 0 ? (
+              <View className="absolute inset-0 justify-center" pointerEvents="none">
+                <Text
+                  accessible={false}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                  className="text-base leading-[normal] font-normal text-muted-foreground"
+                >
+                  {t('agentChat.repoPicker.searchPlaceholder')}
+                </Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       }
     >

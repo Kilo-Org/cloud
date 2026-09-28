@@ -1,17 +1,10 @@
 import { Stack } from 'expo-router';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 
 export default function OrganizationLayout() {
-  const { fullSheetDetent } = useFormSheetDetents();
-
-  const sheetOptions = {
-    presentation: 'formSheet' as const,
-    sheetAllowedDetents: [0.5, fullSheetDetent] as [number, number],
-    sheetGrabberVisible: true,
-    headerShown: false,
-  };
+  const sheetOptions = useFormSheetScreenOptions();
 
   return (
     <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>

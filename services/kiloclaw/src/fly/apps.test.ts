@@ -9,10 +9,6 @@ import {
 } from './apps';
 import { FlyApiError } from './client';
 
-// ============================================================================
-// appNameFromUserId (pure, no mocking needed)
-// ============================================================================
-
 describe('appNameFromUserId', () => {
   it('returns a deterministic app name', async () => {
     const name1 = await appNameFromUserId('user-123');
@@ -70,10 +66,6 @@ describe('appNameFromUserId', () => {
     expect(name).not.toContain('acct');
   });
 });
-
-// ============================================================================
-// REST API functions (fetch-mocked)
-// ============================================================================
 
 const TOKEN = 'test-token';
 const CONFIG = { apiToken: TOKEN };
@@ -325,10 +317,6 @@ describe('deleteApp', () => {
     await expect(deleteApp(CONFIG, 'acct-test')).rejects.toThrow(FlyApiError);
   });
 });
-
-// ============================================================================
-// IP allocation (REST)
-// ============================================================================
 
 describe('allocateIP', () => {
   it('returns IPAssignment on success', async () => {

@@ -15,6 +15,7 @@ import type { CallbackTarget } from '../callbacks/index.js';
 import type { ExecutionMode, SessionMessageIntent } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import { AttachmentsSchema } from '../persistence/schemas.js';
+import { resolveAssistantProviderOwnership } from '../shared/assistant-failure.js';
 import { MESSAGE_ID_FORMAT_DESCRIPTION, MESSAGE_ID_PATTERN } from './message-id.js';
 import {
   WRAPPER_READY_ERROR_DETAIL_MAX_LENGTH,
@@ -121,6 +122,12 @@ export type SessionMessageState = {
   error?: string;
   failureReason?: string;
   attempts?: number;
+  /**
+   * Number of automatic recoveries already spent on this accepted turn. It is
+   * the shared one-recovery budget for both no-output producers; a message whose
+   * `recoveryAttempts` reaches `NO_OUTPUT_RECOVERY_LIMIT` is terminalized.
+   */
+  recoveryAttempts?: number;
   gateResult?: 'pass' | 'fail';
   callbackRequired?: boolean;
   callbackTarget?: CallbackTarget;
@@ -141,6 +148,23 @@ export type SessionMessageState = {
   };
 };
 
+const SessionMessageTurnSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('prompt'),
+      messageId: z.string(),
+      prompt: z.string(),
+      attachments: AttachmentsSchema.optional(),
+    })
+    .strict(),
+  z.object({
+    type: z.literal('command'),
+    messageId: z.string(),
+    command: z.string(),
+    arguments: z.string(),
+  }),
+]);
+
 export const SessionMessageStateSchema = z
   .object({
     messageId: z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION),
@@ -148,22 +172,7 @@ export const SessionMessageStateSchema = z
     prompt: z.string(),
     admissionSnapshot: z
       .object({
-        turn: z.discriminatedUnion('type', [
-          z
-            .object({
-              type: z.literal('prompt'),
-              messageId: z.string(),
-              prompt: z.string(),
-              attachments: AttachmentsSchema.optional(),
-            })
-            .strict(),
-          z.object({
-            type: z.literal('command'),
-            messageId: z.string(),
-            command: z.string(),
-            arguments: z.string(),
-          }),
-        ]),
+        turn: SessionMessageTurnSchema,
         agent: z.object({ mode: z.string(), model: z.string(), variant: z.string().optional() }),
         finalization: z
           .object({
@@ -175,24 +184,7 @@ export const SessionMessageStateSchema = z
       .optional(),
     legacyAdmissionConstraints: z
       .object({
-        turn: z
-          .discriminatedUnion('type', [
-            z
-              .object({
-                type: z.literal('prompt'),
-                messageId: z.string(),
-                prompt: z.string(),
-                attachments: AttachmentsSchema.optional(),
-              })
-              .strict(),
-            z.object({
-              type: z.literal('command'),
-              messageId: z.string(),
-              command: z.string(),
-              arguments: z.string(),
-            }),
-          ])
-          .optional(),
+        turn: SessionMessageTurnSchema.optional(),
         agent: z
           .object({
             mode: z.string().optional(),
@@ -229,6 +221,7 @@ export const SessionMessageStateSchema = z
     error: z.string().optional(),
     failureReason: z.string().optional(),
     attempts: z.number().int().nonnegative().optional(),
+    recoveryAttempts: z.number().int().nonnegative().optional(),
     gateResult: z.enum(['pass', 'fail']).optional(),
     callbackRequired: z.boolean().optional(),
     callbackTarget: z
@@ -347,24 +340,7 @@ function normalizeParsedSessionMessageState(
       },
     };
   }
-  const parsedTurn = z
-    .discriminatedUnion('type', [
-      z
-        .object({
-          type: z.literal('prompt'),
-          messageId: z.string(),
-          prompt: z.string(),
-          attachments: AttachmentsSchema.optional(),
-        })
-        .strict(),
-      z.object({
-        type: z.literal('command'),
-        messageId: z.string(),
-        command: z.string(),
-        arguments: z.string(),
-      }),
-    ])
-    .safeParse(state.turn);
+  const parsedTurn = SessionMessageTurnSchema.safeParse(state.turn);
   const constraints: LegacyAdmissionConstraints = {
     turn: parsedTurn.success
       ? parsedTurn.data.type === 'prompt'
@@ -493,6 +469,64 @@ export async function markAgentActivityObserved(
     return null;
   }
   const updated: SessionMessageState = { ...state, agentActivityObservedAt: now };
+  await putSessionMessageState(storage, updated);
+  return updated;
+}
+
+/** One automatic re-dispatch per accepted turn, shared by both no-output producers. */
+const NO_OUTPUT_RECOVERY_LIMIT = 1;
+
+/**
+ * The one-recovery bound for the two producers that raise `wrapper_no_output`
+ * for an accepted turn that produced no execution progress:
+ *
+ * - the control plane's accepted-message inactivity deadline
+ *   (`SandboxSession.failOverdueAcceptedMessage`, per s1), and
+ * - the legacy wrapper-supervisor no-output watchdog
+ *   (`handleUnhealthyWrapper`, this producer).
+ *
+ * Both share the same `recoveryAttempts` counter on `SessionMessageState`, so a
+ * turn recovered by one producer is not recovered again by the other. The
+ * harness ends a silenced accepted turn as "Response failed" for the user; the
+ * first detection re-queues the turn onto a fresh runtime instead.
+ */
+export function noOutputRecoveryAllowed(recoveryAttempts: number): boolean {
+  return recoveryAttempts < NO_OUTPUT_RECOVERY_LIMIT;
+}
+
+/**
+ * Return an accepted message to `queued` so the pending drain re-dispatches it
+ * on a fresh runtime. The immutable `admissionSnapshot` (or the normalized
+ * `legacyAdmissionConstraints` predecessor shape) keeps the user's typed turn
+ * across the recovery; every terminal and dispatch field is cleared and the
+ * recovery attempt is recorded.
+ */
+export async function markMessageQueuedForRecovery(
+  storage: SessionMessageStorage,
+  messageId: string,
+  now = Date.now()
+): Promise<SessionMessageState | null> {
+  const state = await getSessionMessageState(storage, messageId);
+  if (!state || state.status !== 'accepted') return null;
+  const updated: SessionMessageState = {
+    ...state,
+    status: 'queued',
+    queuedAt: now,
+    recoveryAttempts: (state.recoveryAttempts ?? 0) + 1,
+  };
+  delete updated.acceptedAt;
+  delete updated.wrapperRunId;
+  delete updated.dispatchAcceptanceKind;
+  delete updated.agentActivityObservedAt;
+  delete updated.terminalAt;
+  delete updated.failureStage;
+  delete updated.failureCode;
+  delete updated.failureSubtype;
+  delete updated.assistantFailureReason;
+  delete updated.providerOwnership;
+  delete updated.safeFailureMessage;
+  delete updated.error;
+  delete updated.failureReason;
   await putSessionMessageState(storage, updated);
   return updated;
 }
@@ -765,10 +799,11 @@ function resolveTerminalProviderOwnership(
   params: Extract<TerminalizeParams, { kind: 'failed' }>,
   state: SessionMessageState
 ): CloudAgentProviderOwnership | undefined {
-  if (params.providerOwnership === 'byok' || params.assistantFailureReason === undefined) {
-    return params.providerOwnership;
-  }
-  return admittedAgentModel(state) === undefined ? params.providerOwnership : 'managed';
+  return resolveAssistantProviderOwnership(
+    params.providerOwnership,
+    params.assistantFailureReason,
+    admittedAgentModel(state)
+  );
 }
 
 export type TerminalizeParams =

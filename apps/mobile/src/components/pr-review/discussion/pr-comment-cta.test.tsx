@@ -23,6 +23,7 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 const insetsState = vi.hoisted(() => ({ bottom: 0 }));
+const platformState = vi.hoisted(() => ({ OS: 'ios' }));
 const keyboardSubscribers = vi.hoisted(() => ({
   show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
   hide: null as (() => void) | null,
@@ -30,15 +31,15 @@ const keyboardSubscribers = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
-  Platform: { OS: 'ios' },
+  Platform: platformState,
   Keyboard: {
     addListener: vi.fn((event: string, listener: (event?: unknown) => void) => {
-      if (event === 'keyboardWillShow') {
+      if (event === 'keyboardWillShow' || event === 'keyboardDidShow') {
         keyboardSubscribers.show = listener as (event: {
           endCoordinates: { height: number };
         }) => void;
       }
-      if (event === 'keyboardWillHide') {
+      if (event === 'keyboardWillHide' || event === 'keyboardDidHide') {
         keyboardSubscribers.hide = listener as () => void;
       }
       return { remove: vi.fn() };
@@ -110,6 +111,7 @@ function paddingValues(renderer: TestRenderer.ReactTestRenderer): number[] {
 
 describe('PrCommentCta', () => {
   beforeEach(() => {
+    platformState.OS = 'ios';
     insetsState.bottom = 0;
     keyboardSubscribers.show = null;
     keyboardSubscribers.hide = null;
@@ -154,6 +156,24 @@ describe('PrCommentCta', () => {
       keyboardSubscribers.show?.({ endCoordinates: { height: 336 } });
     });
     expect(paddingValues(renderer)).toContain(336);
+  });
+
+  it("lifts by the raw Android metric, which the bar's own inset padding completes", () => {
+    // The bar's inner padding already includes the platform's bottom inset
+    // (`useDetailScreenBottomPadding`), so the lift must not add it a second
+    // time and float the button a navigation-bar height above the keyboard
+    // (2026-09-21 review finding).
+    platformState.OS = 'android';
+    insetsState.bottom = 63;
+    const renderer = mountCta();
+    if (!keyboardSubscribers.show) {
+      throw new Error('keyboard show listener was not registered');
+    }
+    act(() => {
+      keyboardSubscribers.show?.({ endCoordinates: { height: 704 } });
+    });
+    expect(paddingValues(renderer)).toContain(704);
+    expect(paddingValues(renderer)).not.toContain(767);
   });
 
   it('does not react to keyboard events at all while the lift is gated off', () => {

@@ -25,7 +25,6 @@ import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
 import { getRuntimeGatewayRoutingConfig } from '@/lib/ai-gateway/providers/routing-config';
 import { passesRoutingPercentage } from '@/lib/ai-gateway/providers/routing-percentage';
-import { getEnvVariable } from '@/lib/dotenvx';
 
 export function hasCompatibleVercelInferenceProvider(
   openRouterInferenceProviders: string[],
@@ -83,7 +82,7 @@ export async function shouldRouteToVercel(
   }
 
   console.debug('[shouldRouteToVercel] randomizing user to either OpenRouter or Vercel');
-  const routingPercentage = (await isFreeModel(requestedModel))
+  const routingPercentage = isFreeModel(requestedModel)
     ? routingConfig.vercelFree
     : routingConfig.vercelPaid;
 
@@ -94,7 +93,7 @@ export async function shouldRouteToVercel(
   }
 
   const vercelModels = await getVercelModelsFromDatabase();
-  const vercelModelId = mapModelIdToVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);
     return false;
@@ -259,7 +258,7 @@ export async function applyVercelSettings(
   requestToMutate: GatewayRequest,
   userByok: BYOKResult[] | null
 ) {
-  const vercelModelId = mapModelIdToVercel(requestedModel);
+  const vercelModelId = await mapModelIdToVercel(requestedModel);
   requestToMutate.body.model = vercelModelId;
 
   if (userByok) {
@@ -309,20 +308,6 @@ export async function applyVercelSettings(
       requestToMutate,
       vercelInferenceProviders
     );
-
-    const gatewayOptions = requestToMutate.body.providerOptions.gateway;
-    const openAiApiKey = getEnvVariable('OPENAI_API_KEY');
-    if (
-      gatewayOptions &&
-      openAiApiKey &&
-      vercelInferenceProviders?.includes('openai') &&
-      (!gatewayOptions.only || gatewayOptions.only.includes('openai'))
-    ) {
-      gatewayOptions.byok = {
-        ...gatewayOptions.byok,
-        openai: [{ apiKey: openAiApiKey }],
-      };
-    }
   }
 
   if (requestToMutate.body.providerOptions) {

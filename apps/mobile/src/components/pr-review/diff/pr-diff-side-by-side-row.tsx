@@ -5,6 +5,11 @@
 // Either column may be empty (left blank with a placeholder) when the
 // pair is a pure add or pure del.
 //
+// Both column code `Text`s and the hunk header name their own LTR base
+// direction (`LTR_TEXT_DIRECTION`), like the unified `DiffLine`: code reads left
+// to right whatever the interface language, so a wrapped line's continuation
+// starts under the first line's start instead of mid-row.
+//
 // Side-by-side is read-only — commenting is unified-view only — so the
 // row does not accept tap/selection handlers.
 //
@@ -24,6 +29,7 @@ import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlig
 import { type ParsedDiffLine, type ParsedHunk } from '@/lib/pr-review/diff/parse-patch';
 import { type SideBySideRow as SideBySideRowData } from '@/lib/pr-review/diff/side-by-side';
 import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 import {
   type BoundedFontMetrics,
@@ -97,6 +103,7 @@ function SideColumnImpl({ line, side, language, isDark, foreground }: SideColumn
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
+    ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
     fontSize: metrics.codeFontSize,
     lineHeight: metrics.lineHeight,
@@ -263,8 +270,8 @@ export function HunkSideBySideHeader({ hunk }: Readonly<HunkSideBySideHeaderProp
     >
       <Text
         className="font-mono-medium text-[11px]"
-        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-        style={{ color: colors.mutedForeground }}
+        // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color + the header's code base direction
+        style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
         numberOfLines={1}
       >
         {hunk.header}

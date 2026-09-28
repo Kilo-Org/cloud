@@ -9,6 +9,7 @@ import {
   glanceableAgentsSnapshotSchema,
   glanceableStatusKind,
   isEligibleGlanceableWork,
+  newestGlanceableResult,
   oldestNeedsInputSince,
   shouldDiscardGlanceableRevision,
 } from './glanceable-agents-snapshot';
@@ -255,6 +256,28 @@ describe('buildGlanceableSnapshot', () => {
     expect(glanceableAgentsSnapshotSchema.safeParse(withoutCount).success).toBe(true);
   });
 
+  // The release before the newest-result fact wrote schema version 1 records
+  // without these two keys. A parse that rejects them would drop the last
+  // counts from a widget that survived the app upgrade, so the fact must parse
+  // as absent and default to null.
+  it('parses a version-1 record written before the newest-result fields existed', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'question', statusUpdatedAt: new Date(NOW - 60_000).toISOString() }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = snapshot;
+
+    const result = glanceableAgentsSnapshotSchema.safeParse(previousRelease);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.newestResultKind).toBeNull();
+      expect(result.data.newestResultAt).toBeNull();
+    }
+  });
+
   it('sets organizationBound only when organizationId is a string', () => {
     const personal = buildGlanceableSnapshot({
       sessions: [],
@@ -284,9 +307,44 @@ describe('buildGlanceableSnapshot', () => {
     expect('accountEpoch' in snapshot).toBe(false);
   });
 
+  it('carries exactly the newest row kind and ISO timestamp', () => {
+    const newestAt = new Date(NOW - 2000).toISOString();
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [
+        { status: 'idle', statusUpdatedAt: new Date(NOW - 900_000).toISOString() },
+        { status: 'question', statusUpdatedAt: newestAt },
+        { status: 'busy', statusUpdatedAt: new Date(NOW - 500_000).toISOString() },
+      ],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    // The newest change is the question, not the aggregate counts: the footer
+    // reads exactly this row's kind and timestamp.
+    expect(snapshot.newestResultKind).toBe('needsInput');
+    expect(snapshot.newestResultAt).toBe(newestAt);
+  });
+
+  it('nulls the newest fact when no row carries a timestamp', () => {
+    const snapshot = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }, { status: 'idle' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(snapshot.newestResultKind).toBeNull();
+    expect(snapshot.newestResultAt).toBeNull();
+  });
+
   it('serializes without any forbidden fixture', () => {
     const rows = [
-      { status: 'busy', title: 'Secret prompt', gitUrl: 'github.com/acme/repo', id: 'ses_raw_1' },
+      {
+        status: 'busy',
+        title: 'Secret prompt',
+        gitUrl: 'github.com/acme/repo',
+        id: 'ses_raw_1',
+        statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+      },
       { status: 'question', organizationName: 'Acme Org' },
     ];
     const snapshot = buildGlanceableSnapshot({
@@ -295,6 +353,9 @@ describe('buildGlanceableSnapshot', () => {
       organizationId: 'org-9',
       now: NOW,
     });
+    // The newest fact carries the kind and the timestamp, nothing else.
+    expect(snapshot.newestResultKind).toBe('running');
+    expect(snapshot.newestResultAt).toBe('2026-01-01T00:00:00.000Z');
     const json = JSON.stringify(snapshot);
     expect(json).not.toContain('Secret prompt');
     expect(json).not.toContain('Acme Org');
@@ -397,5 +458,70 @@ describe('oldestNeedsInputSince', () => {
   it('returns null when nothing needs input', () => {
     expect(oldestNeedsInputSince([{ status: 'busy', statusUpdatedAt: at(1000) }])).toBeNull();
     expect(oldestNeedsInputSince([])).toBeNull();
+  });
+});
+
+describe('newestGlanceableResult', () => {
+  const at = (ms: number) => new Date(NOW - ms).toISOString();
+
+  it('returns the newest status change across all rows', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: at(600_000) },
+        { status: 'question', statusUpdatedAt: at(1000) },
+        { status: 'idle', statusUpdatedAt: at(120_000) },
+      ])
+    ).toEqual({ kind: 'needsInput', at: at(1000) });
+  });
+
+  it('ignores a row with no timestamp, however new its status looks', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'question' },
+        { status: 'busy', statusUpdatedAt: at(900_000) },
+      ])
+    ).toEqual({ kind: 'running', at: at(900_000) });
+  });
+
+  it('maps the newest row through the shared status vocabulary', () => {
+    const cases = [
+      ['question', 'needsInput'],
+      ['permission', 'needsInput'],
+      ['retry', 'needsInput'],
+      ['busy', 'running'],
+      // Completed folds into running, the same fold the counts use, so the
+      // newest-result line can never disagree with the row above it.
+      ['completed', 'running'],
+      ['idle', 'idle'],
+    ] as const;
+    for (const [status, kind] of cases) {
+      expect(newestGlanceableResult([{ status, statusUpdatedAt: at(1000) }])).toEqual({
+        kind,
+        at: at(1000),
+      });
+    }
+  });
+
+  it('returns null when no row carries a usable timestamp', () => {
+    expect(newestGlanceableResult([{ status: 'busy' }, { status: 'question' }])).toBeNull();
+    expect(
+      newestGlanceableResult([
+        { status: 'busy', statusUpdatedAt: 'not a date' },
+        { status: 'idle', statusUpdatedAt: '' },
+      ])
+    ).toBeNull();
+  });
+
+  it('skips an unparseable timestamp while keeping a parseable one', () => {
+    expect(
+      newestGlanceableResult([
+        { status: 'question', statusUpdatedAt: 'not a date' },
+        { status: 'busy', statusUpdatedAt: at(300_000) },
+      ])
+    ).toEqual({ kind: 'running', at: at(300_000) });
+  });
+
+  it('returns null for an empty session list', () => {
+    expect(newestGlanceableResult([])).toBeNull();
   });
 });

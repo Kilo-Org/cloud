@@ -1,7 +1,7 @@
 import 'server-only';
 import { type db } from '@/lib/drizzle';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
@@ -42,7 +42,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = await isFreeModel(params.modelId);
+  const isFree = isFreeModel(params.modelId);
   if (isFree) {
     return { isFree: true, hasUserByokAvailable: false };
   }

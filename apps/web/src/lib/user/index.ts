@@ -89,6 +89,9 @@ import {
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  spend_alert_settings,
+  spend_alert_hourly,
+  spend_alert_deliveries,
   contributor_champion_events,
   contributor_champion_memberships,
   contributor_champion_contributors,
@@ -1030,8 +1033,6 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - stytch_fingerprints and provider safety identifiers (abuse detection)
  * - referral_code_usages (financial, references anonymized user)
  * - kiloclaw_subscriptions, kiloclaw_earlybird_purchases, kiloclaw_email_log (retained records)
- * - model_experiment_request (experiment attribution and prompt hashes retained
- *   under the dedicated experiment retention policy)
  * - kiloclaw_scheduled_action_targets (retained operational records;
  * - transactional_email_log (retained outbox marker, financial record;
  *   user_id FK references the anonymized kilocode_users row and optional
@@ -1074,7 +1075,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   platform_integrations cascade below. Organization-owned Slack credentials are
  *   intentionally retained, since they belong to the organization, not the user)
  * - Various user-owned resources (platform_integrations, byok_api_keys,
- *   openai_chatgpt_connections, agent_configs, webhook_events, code_indexing_*, source_embeddings,
+ *   the person's own openai_chatgpt_connections rows, agent_configs, webhook_events,
+ *   code_indexing_*, source_embeddings,
  *   cloud_agent_webhook_triggers, agent_environment_profiles,
  *   security_findings, security_analysis_owner_state, security_agent_commands,
  *   security_agent_repository_sync_state, security_remediations,
@@ -1087,6 +1089,13 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  *   user_github_app_tokens, kiloclaw_instances/inbound_email_aliases/access_codes,
  *   user_period_cache, kilo_pass_scheduled_changes, coding_plan_availability_intents,
  *   user_notification_preferences, quick_chat_threads, quick_chat_messages)
+ * - the organization's shared-services openai_chatgpt_connections row is kept
+ *   (it belongs to the organization): the deleted connector's reference is
+ *   cleared, and `created_by` keeps the record of who connected it
+ * - spend alert settings and their rules/state, the personal-scope hourly
+ *   counters, and the personal-scope deliveries (recipients contain billing
+ *   contact PII); organization-scoped alert rows are retained, with the deleted
+ *   member's id and address removed from their delivery recipients
  * - operation_ledgers (keyed by kilo_user_id)
  * - analytics_event_outbox (keyed by distinct_id: the user's email or, when the
  *   writer's email lookup failed, the user id)
@@ -1503,9 +1512,27 @@ export async function anonymizeCloudUserData(
     );
   await tx.delete(user_github_app_tokens).where(eq(user_github_app_tokens.kilo_user_id, userId));
   await tx.delete(byok_api_keys).where(eq(byok_api_keys.kilo_user_id, userId));
+  // Only the connections this person owns: the organization's shared-services
+  // row is the organization's connection, so it stays behind and only loses the
+  // reference to the connector who is being deleted. `created_by` keeps the
+  // record of who connected it, and the next reconnect names the new connector.
   await tx
     .delete(openai_chatgpt_connections)
-    .where(eq(openai_chatgpt_connections.kilo_user_id, userId));
+    .where(
+      and(
+        eq(openai_chatgpt_connections.kilo_user_id, userId),
+        eq(openai_chatgpt_connections.is_shared_services, false)
+      )
+    );
+  await tx
+    .update(openai_chatgpt_connections)
+    .set({ kilo_user_id: null })
+    .where(
+      and(
+        eq(openai_chatgpt_connections.kilo_user_id, userId),
+        eq(openai_chatgpt_connections.is_shared_services, true)
+      )
+    );
   await tx
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
@@ -1602,6 +1629,51 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
+  // Spend alerts are account-owned configuration, counters, and delivery
+  // payloads; delivery recipients carry billing contact PII. Personal scope
+  // keys use `user:<id>`, and deleting the settings row cascades to its rules
+  // and per-rule state. Organization-scoped alert rows belong to the
+  // organization, not the deleted member, but the member's own id and address
+  // are copied into those rows' recipients when they are a billing contact:
+  // strip both there so the deleted user's PII does not survive in the outbox.
+  const personalSpendAlertScopeKey = `user:${userId}`;
+  await tx.delete(spend_alert_settings).where(eq(spend_alert_settings.kilo_user_id, userId));
+  await tx
+    .delete(spend_alert_hourly)
+    .where(eq(spend_alert_hourly.scope_key, personalSpendAlertScopeKey));
+  await tx
+    .delete(spend_alert_deliveries)
+    .where(eq(spend_alert_deliveries.scope_key, personalSpendAlertScopeKey));
+  await tx.execute(sql`
+    UPDATE spend_alert_deliveries
+    SET
+      recipients = jsonb_build_object(
+        'userIds',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'userIds', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${userId}::text
+          ),
+          '[]'::jsonb
+        ),
+        'emails',
+        COALESCE(
+          (
+            SELECT jsonb_agg(entry.recipient)
+            FROM jsonb_array_elements_text(COALESCE(recipients->'emails', '[]'::jsonb)) AS entry(recipient)
+            WHERE entry.recipient <> ${originalEmail}::text
+          ),
+          '[]'::jsonb
+        )
+      ),
+      updated_at = CURRENT_TIMESTAMP
+    WHERE scope_key LIKE 'org:%'
+      AND (
+        recipients->'userIds' ? ${userId}::text
+        OR recipients->'emails' ? ${originalEmail}::text
+      )
+  `);
   await tx.delete(user_period_cache).where(eq(user_period_cache.kilo_user_id, userId));
   await tx
     .delete(kilo_pass_scheduled_changes)

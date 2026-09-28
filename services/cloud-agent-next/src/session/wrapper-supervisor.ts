@@ -10,6 +10,7 @@ import type {
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
+import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   assistantFailureMessage,
   classifyAssistantFailure,
@@ -17,10 +18,14 @@ import {
   isAssistantInterrupt,
 } from './safe-failure-projection.js';
 import { countPendingSessionMessages, type SessionQueueStorage } from './pending-messages.js';
-import type { SessionMessageQueue } from './session-message-queue.js';
+import {
+  requeueAcceptedMessageForRecovery,
+  type SessionMessageQueue,
+} from './session-message-queue.js';
 import {
   listMessagesForWrapperRun,
   listNonTerminalAcceptedMessages,
+  noOutputRecoveryAllowed,
   type SessionMessageState,
   type SessionMessageStorage,
   type TerminalizeParams,
@@ -281,34 +286,18 @@ function matchesDisconnectGraceFence(
   return true;
 }
 
-function getAssistantErrorMessage(error: unknown): string | undefined {
-  if (error === undefined || error === null) return undefined;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object') {
-    if ('data' in error && error.data && typeof error.data === 'object') {
-      if ('message' in error.data && typeof error.data.message === 'string') {
-        return error.data.message;
-      }
-    }
-    if ('message' in error && typeof error.message === 'string') {
-      return error.message;
-    }
-  }
-  return 'Assistant message failed';
-}
-
 function assistantErrorTerminalizeParams(info: LatestAssistantMessage['info']): TerminalizeParams {
   const assistantError = info.error;
   if (isAssistantInterrupt(assistantError)) {
     return {
       kind: 'interrupted',
-      error: getAssistantErrorMessage(assistantError) ?? 'The message was interrupted by the user',
+      error: assistantErrorDetail(assistantError) ?? 'The message was interrupted by the user',
       completionSource: 'interrupt',
       failureStage: 'interruption',
       failureCode: 'user_interrupt',
     };
   }
-  const errorMessage = getAssistantErrorMessage(assistantError) ?? 'Assistant request failed';
+  const errorMessage = assistantErrorDetail(assistantError) ?? 'Assistant request failed';
   const assistantFailure = classifyAssistantFailure(assistantError);
   return {
     kind: 'failed',
@@ -941,45 +930,64 @@ export function createWrapperSupervisor(
   }
 
   /**
-   * When the wrapper dies before its terminal report, the DO's event store
-   * still holds every kilocode event that arrived over the FIFO ingest
-   * channel — including, by ingest ordering, the completed assistant state
-   * whenever the wrapper had already started finalizing. Settle from that
-   * positive terminal evidence when present; otherwise fall back to
-   * wrapper-failure handling.
+   * Positive terminal evidence for accepted messages whose wrapper never
+   * reported a terminal state. The DO's event store still holds every kilocode
+   * event that arrived over the FIFO ingest channel — including, by ingest
+   * ordering, the completed assistant state whenever the wrapper had already
+   * started finalizing.
+   *
+   * Reconcile before any no-output recovery: a turn whose answer already
+   * arrived must be settled from that evidence, never re-dispatched, or it runs
+   * twice and duplicates the reply and its side effects. Messages with no
+   * terminal evidence are absent from the returned map.
+   */
+  async function reconcileAcceptedMessages(
+    acceptedMessages: SessionMessageState[]
+  ): Promise<Map<string, TerminalizeParams>> {
+    const metadata = await getMetadata();
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    const reconciledParams = new Map<string, TerminalizeParams>();
+    if (!metadata || !kiloSessionId) return reconciledParams;
+    const codeReviewSession = metadata.identity.createdOnPlatform === 'code-review';
+    for (const message of acceptedMessages) {
+      const reconciled = projectWrapperDeathReconciliation(
+        getAssistantMessageForUserMessage(
+          metadata.identity.sessionId,
+          kiloSessionId,
+          message.messageId
+        ),
+        codeReviewSession
+      );
+      if (reconciled) reconciledParams.set(message.messageId, reconciled);
+    }
+    return reconciledParams;
+  }
+
+  /**
+   * When the wrapper dies before its terminal report, settle accepted work from
+   * the DO's stored positive terminal evidence when present; otherwise fall
+   * back to wrapper-failure handling. A caller that already reconciled the same
+   * messages passes its map so the evidence is read once.
    */
   async function terminalizeAcceptedMessagesForDeadWrapper(
     acceptedMessages: SessionMessageState[],
-    fallbackParams: (message: SessionMessageState) => TerminalizeParams
+    fallbackParams: (message: SessionMessageState) => TerminalizeParams,
+    reconciledParams?: Map<string, TerminalizeParams>
   ): Promise<void> {
-    const metadata = await getMetadata();
-    const kiloSessionId = metadata?.auth.kiloSessionId;
-    const codeReviewSession = metadata?.identity.createdOnPlatform === 'code-review';
-    let reconciledCount = 0;
+    const reconciled = reconciledParams ?? (await reconcileAcceptedMessages(acceptedMessages));
     for (const message of acceptedMessages) {
-      const reconciled =
-        metadata && kiloSessionId
-          ? projectWrapperDeathReconciliation(
-              getAssistantMessageForUserMessage(
-                metadata.identity.sessionId,
-                kiloSessionId,
-                message.messageId
-              ),
-              codeReviewSession
-            )
-          : null;
-      if (reconciled) reconciledCount += 1;
       await messageSettlementOutbox.terminalizeSessionMessageOnce(
         message.messageId,
-        reconciled ?? fallbackParams(message)
+        reconciled.get(message.messageId) ?? fallbackParams(message)
       );
     }
-    if (reconciledCount > 0) {
+    if (reconciled.size > 0) {
       logger
         .withFields({
           sessionId: getSessionIdForLogs(),
-          reconciledCount,
-          fallbackCount: acceptedMessages.length - reconciledCount,
+          reconciledCount: reconciled.size,
+          fallbackCount: acceptedMessages.filter(message => !reconciled.has(message.messageId))
+            .length,
         })
         .warn('Settled accepted wrapper work from stored assistant events after wrapper death');
     }
@@ -1002,17 +1010,66 @@ export function createWrapperSupervisor(
     await requestPhysicalWrapperStop('unhealthy-wrapper');
 
     const acceptedMessages = await listNonTerminalAcceptedMessages(storage, state.wrapperRunId);
-    await terminalizeAcceptedMessagesForDeadWrapper(acceptedMessages, message => {
-      const activityObserved = message.agentActivityObservedAt !== undefined;
-      return {
-        kind: 'failed',
-        reason: 'wrapper_failure',
-        error,
-        completionSource: 'wrapper_failure',
-        failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
-        failureCode,
-      };
-    });
+    // Recovery is gated strictly on the no-output code: a wrapper that stopped
+    // answering pings is gone, and re-dispatching its in-flight turn would only
+    // duplicate work. A no-output silence is the harness stalling on an accepted
+    // turn, so re-dispatch it once on a fresh runtime before failing the user's
+    // message. See s1 for the matching control-plane producer.
+    const recoveredMessageIds = new Set<string>();
+    let reconciledParams: Map<string, TerminalizeParams> | undefined;
+    if (failureCode === 'wrapper_no_output') {
+      // A silent wrapper can still have delivered the answer over the ingest
+      // channel before it stopped reporting. Reconcile those turns against the
+      // DO's stored assistant events first and settle them from that evidence:
+      // recovering one would run the turn a second time.
+      reconciledParams = await reconcileAcceptedMessages(acceptedMessages);
+      for (const message of acceptedMessages) {
+        if (reconciledParams.has(message.messageId)) continue;
+        if (!noOutputRecoveryAllowed(message.recoveryAttempts ?? 0)) continue;
+        const recovered = await requeueAcceptedMessageForRecovery(storage, message);
+        if (!recovered) continue;
+        recoveredMessageIds.add(message.messageId);
+        logger
+          .withFields({
+            sessionId: getSessionIdForLogs(),
+            wrapperRunId: state.wrapperRunId,
+            messageId: message.messageId,
+            producer: 'wrapper_no_output_watchdog',
+            recoveryAttempts: (message.recoveryAttempts ?? 0) + 1,
+            logTag: 'wrapper_no_output_recovery',
+          })
+          .info('Wrapper liveness no-output recovery re-queued the accepted turn');
+      }
+    }
+    const terminalMessages =
+      recoveredMessageIds.size === 0
+        ? acceptedMessages
+        : acceptedMessages.filter(message => !recoveredMessageIds.has(message.messageId));
+    await terminalizeAcceptedMessagesForDeadWrapper(
+      terminalMessages,
+      message => {
+        const activityObserved = message.agentActivityObservedAt !== undefined;
+        return {
+          kind: 'failed',
+          reason: 'wrapper_failure',
+          error,
+          completionSource: 'wrapper_failure',
+          failureStage: activityObserved ? 'agent_activity' : 'post_dispatch_no_activity',
+          failureCode,
+          // Record the attempt count only once a recovery was actually spent on
+          // this turn. A first detection that could not be re-queued (no
+          // resolvable intent) spent nothing, and any non-null `attempts` maps
+          // to retry exhaustion on the client even though no retry ran.
+          ...(failureCode === 'wrapper_no_output' && message.recoveryAttempts !== undefined
+            ? { attempts: message.recoveryAttempts + 1 }
+            : {}),
+        };
+      },
+      reconciledParams
+    );
+    if (recoveredMessageIds.size > 0) {
+      await sessionMessageQueue.requestPendingDrainIfNeeded();
+    }
     await messageSettlementOutbox.releaseWrapperTerminalWaitForIdleBatch();
     if (isWrapperRunFinalizing(state) && state.wrapperRunId) {
       await messageSettlementOutbox.finalizeTerminalWrapperRunCallbackIfReady(state.wrapperRunId);

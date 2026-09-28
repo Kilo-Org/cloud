@@ -9,6 +9,7 @@ import {
   getAlwaysOnGroupIds,
   resolveGroups,
   resolveGroupTransitiveDeps,
+  planTunnelRestart,
 } from './services';
 import type { ServiceGroup } from './services';
 import {
@@ -443,12 +444,13 @@ function Dashboard({
         }
         const publicTunnelSnapshot = snapshotCloudAgentPublicTunnelEnv(repoRoot);
         const previousPublicTunnelSnapshot = lastPublicTunnelSnapshot.current;
+        const { reloadTarget } = planTunnelRestart([...runningServices]);
         if (
           previousPublicTunnelSnapshot?.values.WORKER_URL !== undefined &&
           publicTunnelSnapshot.values.WORKER_URL !== undefined &&
           publicTunnelSnapshot.values.WORKER_URL !==
             previousPublicTunnelSnapshot.values.WORKER_URL &&
-          runningServices.has('cloud-agent-next') &&
+          reloadTarget !== undefined &&
           !reloadingWorker.current
         ) {
           reloadingWorker.current = true;
@@ -459,7 +461,7 @@ function Dashboard({
             CAPTURE_TIMEOUT_MS
           )
             .then(captured =>
-              captured ? restartServiceInTmux(sessionName, 'cloud-agent-next') : undefined
+              captured ? restartServiceInTmux(sessionName, reloadTarget) : undefined
             )
             .finally(() => {
               reloadingWorker.current = false;
@@ -788,10 +790,15 @@ function Dashboard({
       }
       if (reloadingWorker.current) return;
       const previous = snapshotCloudAgentPublicTunnelEnv(repoRoot);
+      const { selection, reloadTarget } = planTunnelRestart([...runningServices]);
       reloadingWorker.current = true;
       void (async () => {
         try {
-          const outcome = await restartServiceInTmux(sessionName, item.name);
+          // The active selection must travel with the restart: without it a
+          // tunnels relaunch (or a recreate after the pane vanishes) falls back
+          // to the three-port form and the fake-LLM tunnel URL is never
+          // published.
+          const outcome = await restartServiceInTmux(sessionName, item.name, undefined, selection);
           if (outcome === 'gave-up') {
             setStackIssues(['tunnels: restart did not finish']);
             return;
@@ -806,13 +813,13 @@ function Dashboard({
             return;
           }
           if (
-            !runningServices.has('cloud-agent-next') &&
-            !findServicePane(sessionName, 'cloud-agent-next')
+            reloadTarget === undefined ||
+            (!runningServices.has(reloadTarget) && !findServicePane(sessionName, reloadTarget))
           ) {
             return;
           }
           setStackIssues(['reloading worker for new tunnel URL']);
-          await restartServiceInTmux(sessionName, 'cloud-agent-next');
+          await restartServiceInTmux(sessionName, reloadTarget);
         } finally {
           reloadingWorker.current = false;
         }

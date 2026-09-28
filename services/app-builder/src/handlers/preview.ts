@@ -57,21 +57,17 @@ function addNonceToCSP(csp: string, nonce: string): string {
     const current = directiveMap.get('script-src') ?? '';
     directiveMap.set('script-src', addNonceToDirective(current, nonceValue));
   } else if (directiveMap.has('default-src')) {
-    // Create script-src from default-src and add nonce
     const defaultSrc = directiveMap.get('default-src') ?? '';
     directiveMap.set('script-src', addNonceToDirective(defaultSrc, nonceValue));
   } else {
-    // No script-src or default-src, add script-src with nonce
     directiveMap.set('script-src', nonceValue);
   }
 
-  // Also update script-src-elem if present (takes precedence over script-src for <script> tags)
   if (directiveMap.has('script-src-elem')) {
     const current = directiveMap.get('script-src-elem') ?? '';
     directiveMap.set('script-src-elem', addNonceToDirective(current, nonceValue));
   }
 
-  // Reconstruct CSP string
   const result: string[] = [];
   for (const [name, value] of directiveMap) {
     result.push(value ? `${name} ${value}` : name);
@@ -134,7 +130,6 @@ export async function handleGetPreviewStatus(
   appId: string
 ): Promise<Response> {
   try {
-    // 1. Verify Bearer token authentication
     const authResult = verifyBearerToken(request, env);
     if (!authResult.isAuthenticated) {
       if (!authResult.errorResponse) {
@@ -186,7 +181,6 @@ export async function handleTriggerBuild(
   appId: string
 ): Promise<Response> {
   try {
-    // 1. Verify Bearer token authentication
     const authResult = verifyBearerToken(request, env);
     if (!authResult.isAuthenticated) {
       if (!authResult.errorResponse) {
@@ -222,7 +216,6 @@ export async function handleStreamBuildLogs(
   appId: string
 ): Promise<Response> {
   try {
-    // 1. Verify Bearer token authentication
     const authResult = verifyBearerToken(request, env);
     if (!authResult.isAuthenticated) {
       if (!authResult.errorResponse) {
@@ -247,7 +240,6 @@ export async function handleStreamBuildLogs(
       );
     }
 
-    // Return the stream as Server-Sent Events
     return new Response(logStream, {
       headers: {
         'Content-Type': 'text/event-stream',
@@ -278,7 +270,6 @@ export async function handlePreviewProxy(
   try {
     const sandbox = getSandbox(env.SANDBOX, appId);
 
-    // Detect WebSocket upgrade request
     const upgradeHeader = request.headers.get('Upgrade');
     const isWebSocket = upgradeHeader?.toLowerCase() === 'websocket';
 
@@ -291,7 +282,6 @@ export async function handlePreviewProxy(
     proxyUrl.protocol = 'http:';
 
     if (isWebSocket) {
-      // WebSocket: Use sandbox.fetch() with switchPort
       const wsRequest = new Request(proxyUrl, request);
       try {
         const response = await sandbox.fetch(switchPort(wsRequest, port));
@@ -311,7 +301,6 @@ export async function handlePreviewProxy(
       }
     }
 
-    // Regular HTTP: Use containerFetch
     const clonedRequest = request.clone();
     const proxyRequest = new Request(proxyUrl, {
       method: clonedRequest.method,
@@ -321,7 +310,6 @@ export async function handlePreviewProxy(
       duplex: 'half',
     });
 
-    // Add forwarding headers
     proxyRequest.headers.set('X-Original-URL', request.url);
     proxyRequest.headers.set('X-Forwarded-Host', url.hostname);
     proxyRequest.headers.set('X-Forwarded-Proto', url.protocol.replace(':', ''));
@@ -334,7 +322,6 @@ export async function handlePreviewProxy(
       // Uses HTMLRewriter for streaming transformation (avoids buffering entire response)
       const contentType = response.headers.get('content-type');
       if (contentType?.includes('text/html')) {
-        // Generate a base64 nonce for CSP-safe script injection
         const nonce = generateCSPNonce();
         const bridgeScript = getPreviewBridgeScript(nonce);
 
@@ -342,7 +329,6 @@ export async function handlePreviewProxy(
         newHeaders.delete('content-length');
         newHeaders.delete('content-encoding');
 
-        // Modify CSP headers to allow our nonced script
         const csp = response.headers.get('content-security-policy');
         if (csp) {
           newHeaders.set('content-security-policy', addNonceToCSP(csp, nonce));
@@ -355,7 +341,6 @@ export async function handlePreviewProxy(
           );
         }
 
-        // Track whether we've injected the script (only inject once)
         let injected = false;
 
         const rewriter = new HTMLRewriter()

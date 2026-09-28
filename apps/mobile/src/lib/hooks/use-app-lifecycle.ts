@@ -1,17 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
 
+import { createAppStateStore } from '@/lib/hooks/app-state-store';
+
+const store = createAppStateStore(AppState);
+
 export function useAppLifecycle() {
-  const [isActive, setIsActive] = useState(true);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', nextState => {
-      setIsActive(nextState === 'active');
-    });
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
-  return { isActive };
+  return { isActive: useSyncExternalStore(store.subscribe, store.isActive) };
 }

@@ -14,14 +14,12 @@ import {
 } from './cloudflare-provider.js';
 import { DEADLINE_MS } from './deadlines.js';
 import {
-  beginStop,
-  confirmStopped,
   getWorktreeCredentialContainment,
-  recordStopAttempt,
   WORKTREE_CREDENTIAL_CONTAINMENT,
-  type PhysicalRecord,
-} from './physical-lifecycle.js';
+} from '../sandbox-state/model/allocation.js';
 import { deriveSandboxAllocationId } from '../sandbox-id.js';
+import { allocationFixture } from '../sandbox-state/model/allocation-fixtures.js';
+import { writeCanonicalAllocationRecord } from '../sandbox-state/persist/access.js';
 
 const PROVIDER_REF = encodeCloudflareProviderRef({
   sandboxId: 'sbx_1',
@@ -62,6 +60,16 @@ const billing = parseSandboxBillingInput({
 afterEach(() => vi.useRealTimers());
 
 describe('cloudflare provider adapter', () => {
+  it('declares a non-persistent workspace that is destroyed on stop', () => {
+    const provider = createCloudflareProviderAdapter({
+      sandboxId: logicalId,
+      getSandbox: () => fakeSandbox(),
+      destroy: async () => undefined,
+    });
+    expect(provider.persistentWorkspace).toBe(false);
+    expect(provider.destroysOnStop).toBe(true);
+  });
+
   it.each([true, false, undefined])(
     'uses persisted containment %s for billing and launch regardless of launch environment',
     async enabled => {
@@ -140,21 +148,21 @@ describe('cloudflare provider adapter', () => {
         containment: true,
         instanceId: intent.intentId,
       });
-      let physical: PhysicalRecord = {
+      const contaminated = { ...WORKTREE_CREDENTIAL_CONTAINMENT, providerRef };
+      let record = allocationFixture({
         state: 'running',
         providerRef,
         createIntent: intent,
-        stopTombstone: null,
-        resumable: false,
-        containment: { ...WORKTREE_CREDENTIAL_CONTAINMENT, providerRef },
-      };
-      const values = new Map<string, unknown>([['physical_record', physical]]);
+        containment: contaminated,
+      })!;
+      const values = new Map<string, unknown>();
       const storage = {
         get: async (key: string) => values.get(key),
         put: async (key: string, value: unknown) => {
           values.set(key, value);
         },
       };
+      await writeCanonicalAllocationRecord(storage, record);
       const destroy = vi.fn(async () => {
         if (!confirmed) throw new Error('Native stop unavailable');
       });
@@ -167,12 +175,20 @@ describe('cloudflare provider adapter', () => {
       const create = vi.spyOn(provider, 'create');
       const launch = vi.spyOn(provider, 'launch');
       const stopRuntime = vi.fn(async () => {
-        physical = recordStopAttempt(beginStop(physical, 'worktree_deleted', 2_000));
-        await storage.put('physical_record', physical);
-        const result = await provider.stop(physical.providerRef, physical.createIntent);
-        if (result === 'terminal') physical = confirmStopped(physical);
-        await storage.put('physical_record', physical);
-        return physical;
+        record = allocationFixture({
+          state: 'stopping',
+          providerRef,
+          createIntent: intent,
+          stopTombstone: { reason: 'worktree_deleted', attempts: 1, createdAt: 2_000 },
+          containment: contaminated,
+        })!;
+        await writeCanonicalAllocationRecord(storage, record);
+        const result = await provider.stop(providerRef, intent);
+        if (result === 'terminal') {
+          record = allocationFixture({ state: 'stopped', providerRef })!;
+          await writeCanonicalAllocationRecord(storage, record);
+        }
+        return record;
       });
       const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
       const cleanup = cleanWorktreeRuntime({
@@ -194,13 +210,16 @@ describe('cloudflare provider adapter', () => {
       });
       if (confirmed) {
         await expect(cleanup).resolves.toMatchObject({ destroyed: true, resourcesCleaned: true });
-        expect(physical.state).toBe('stopped');
+        expect(record.state.kind).toBe('stopped');
       } else {
         await expect(cleanup).rejects.toThrow('Worktree provider stop is unconfirmed');
-        expect(physical).toMatchObject({
-          state: 'stopping',
-          providerRef,
-          stopTombstone: { attempts: 1, createdAt: 2_000 },
+        expect(record).toMatchObject({
+          state: {
+            kind: 'stopping',
+            target: { providerRef },
+            stopIntent: { createdAt: 2_000 },
+            attempts: 1,
+          },
         });
         expect(values.get(`worktree_deletion/${worktreeId}`)).toMatchObject({
           destroyed: false,

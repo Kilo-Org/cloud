@@ -35,8 +35,6 @@ import {
 } from './bootstrap';
 import type { BootstrapDeps, ToolsMdSectionConfig } from './bootstrap';
 
-// ---- Encryption helpers (mirrors kiloclaw/src/utils/env-encryption.ts) ----
-
 function generateTestKey(): string {
   return crypto.randomBytes(32).toString('base64');
 }
@@ -50,8 +48,6 @@ function encryptValue(keyBase64: string, plaintext: string): string {
   const combined = Buffer.concat([iv, encrypted, tag]);
   return 'enc:v1:' + combined.toString('base64');
 }
-
-// ---- Fake deps ----
 
 /**
  * Optional hook to make the fake `execFileSync` throw for specific calls.
@@ -146,8 +142,6 @@ function fakeDeps(): {
     },
   };
 }
-
-// ---- decryptEnvVars ----
 
 describe('decryptEnvVars', () => {
   it('decrypts encrypted vars and strips KILOCLAW_ENC_ prefix', () => {
@@ -289,8 +283,6 @@ describe('decryptEnvVars', () => {
   });
 });
 
-// ---- setupDirectories ----
-
 describe('setupDirectories', () => {
   it('creates required directories', () => {
     const { deps, mkdirCalls, chdirCalls } = fakeDeps();
@@ -357,8 +349,6 @@ describe('setupDirectories', () => {
     expect(env.KILO_API_URL).toBeUndefined();
   });
 });
-
-// ---- applyFeatureFlags ----
 
 describe('applyFeatureFlags', () => {
   it('sets up npm global prefix when flag is true', () => {
@@ -457,8 +447,6 @@ describe('applyFeatureFlags', () => {
   });
 });
 
-// ---- cleanNpmCache ----
-
 describe('cleanNpmCache', () => {
   it('runs npm cache clean with the runtime env', () => {
     const { deps, execCalls } = fakeDeps();
@@ -500,8 +488,6 @@ describe('cleanNpmCache', () => {
   });
 });
 
-// ---- generateHooksToken ----
-
 describe('generateHooksToken', () => {
   it('generates token for every boot', () => {
     const env: Record<string, string | undefined> = {};
@@ -521,8 +507,6 @@ describe('generateHooksToken', () => {
     expect(env.KILOCLAW_HOOKS_TOKEN).toHaveLength(64);
   });
 });
-
-// ---- configureGitHub ----
 
 describe('configureGitHub', () => {
   it('runs gh auth login when GITHUB_TOKEN is set', () => {
@@ -711,8 +695,6 @@ describe('configureGitHub', () => {
   });
 });
 
-// ---- configureLinear ----
-
 describe('configureLinear', () => {
   it('logs configured when LINEAR_API_KEY is set', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -751,8 +733,6 @@ describe('configureLinear', () => {
     logSpy.mockRestore();
   });
 });
-
-// ---- bot identity file ----
 
 describe('formatBotIdentityMarkdown', () => {
   it('renders the bot identity markdown with defaults', () => {
@@ -804,8 +784,6 @@ describe('writeBotIdentityFile', () => {
     ).toBe(false);
   });
 });
-
-// ---- user profile file ----
 
 describe('formatUserProfileMarkdown', () => {
   it('renders the user profile markdown with timezone', () => {
@@ -1015,8 +993,6 @@ describe('ensureWeatherSkillInstalled', () => {
     expect(harness.copyCalls.some(call => call.dest.includes('/skills/weather/'))).toBe(false);
   });
 });
-
-// ---- runOnboardOrDoctor ----
 
 describe('runOnboardOrDoctor', () => {
   it('runs writeBaseConfig when no config exists', () => {
@@ -1488,8 +1464,6 @@ describe('runOnboardOrDoctor', () => {
   });
 });
 
-// ---- gateway-client paired device remediation ----
-
 describe('remediateGatewayClientDeviceScopes', () => {
   it('updates gateway-client approved baseline and operator token scopes', () => {
     const harness = fakeDeps();
@@ -1863,8 +1837,6 @@ describe('remediateGatewayClientDeviceScopes', () => {
   });
 });
 
-// ---- updateToolsMdSection ----
-
 describe('updateToolsMdSection', () => {
   const testConfig: ToolsMdSectionConfig = {
     name: 'Test',
@@ -1946,8 +1918,6 @@ describe('updateToolsMdSection', () => {
     warnSpy.mockRestore();
   });
 });
-
-// ---- section config correctness ----
 
 describe('TOOLS.md section configs', () => {
   const configs: ToolsMdSectionConfig[] = [
@@ -2057,8 +2027,6 @@ describe('TOOLS.md section configs', () => {
   });
 });
 
-// ---- buildGatewayArgs ----
-
 describe('buildGatewayArgs', () => {
   it('includes --token when OPENCLAW_GATEWAY_TOKEN is set', () => {
     const args = buildGatewayArgs({ OPENCLAW_GATEWAY_TOKEN: 'tok-123' });
@@ -2093,8 +2061,6 @@ describe('buildGatewayArgs', () => {
     ]);
   });
 });
-
-// ---- bootstrapCritical ----
 
 describe('bootstrapCritical', () => {
   it('sets critical phases and gateway args', async () => {
@@ -2147,8 +2113,6 @@ describe('bootstrapCritical', () => {
     expect(harness.mkdirCalls).toHaveLength(0);
   });
 });
-
-// ---- bootstrapNonCritical ----
 
 describe('bootstrapNonCritical', () => {
   it('treats github CLI failures as best-effort and continues', async () => {
@@ -2276,8 +2240,6 @@ describe('bootstrapNonCritical', () => {
     expect(phases).toEqual(['github', 'linear', 'gateway-client-device-scopes', 'doctor']);
   });
 });
-
-// ---- bootstrap orchestrator ----
 
 describe('bootstrap', () => {
   it('calls setPhase with correct phase names in order', async () => {

@@ -161,7 +161,8 @@ const mockGetBalanceForOrganizationUser =
 const mockFetchGitHubRepositoriesForOrganization = jest.fn<
   (
     organizationId: string,
-    forceRefresh: boolean
+    forceRefresh: boolean,
+    purpose?: 'workflow' | 'agent'
   ) => Promise<{
     repositories: unknown[];
     integrationInstalled: boolean;
@@ -1272,7 +1273,8 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       } else {
         expect(mockFetchGitHubRepositoriesForOrganization).toHaveBeenCalledWith(
           ORGANIZATION_ID,
-          true
+          true,
+          'agent'
         );
       }
       expect(mockOrderRepositoriesByUsage).toHaveBeenCalledWith({

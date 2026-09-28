@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
-import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useRef } from 'react';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
@@ -10,6 +9,7 @@ import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
 import { useGlanceableOrgFence } from '@/lib/glanceable/org-fence';
@@ -17,76 +17,67 @@ import {
   attemptPushRegistrationReconciliation,
   subscribeToPushTokenRotation,
 } from '@/lib/auth/push-registration-reconciliation';
-import { useFormSheetDetents } from '@/lib/form-sheet';
+import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
 import { SystemSearchIndexMount } from '@/lib/system-search-index-mount';
+import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation/tool-summary-translation-retry-mount';
 import { useTRPC } from '@/lib/trpc';
 
 /**
- * Attempts failed logout cleanup on every "next authenticated opportunity":
- * once `user.getMe` has resolved on the authenticated mount, and on each
- * AppState return to `active` while authenticated. The attempt itself is
- * single-flight with 60 s spacing, so foreground flaps do not hammer the
- * server and a transient failure retries on the next foreground.
+ * The single owner of the app's authenticated foreground reconciliation work,
+ * replacing the two independent `AppState` listeners the logout and push
+ * mounts used to register. Every pass runs the same ordered queue: failed
+ * logout cleanup first, then push-token ownership.
+ *
+ * It fires on the same triggers as before — once `user.getMe` has resolved on
+ * the authenticated mount (plus the push-token rotation subscription), and on
+ * each return to the foreground — but the foreground path is the app's shared
+ * `useAppLifecycle()` store, so the whole tree keeps one `AppState` listener
+ * and the pair runs only on the background -> active edge. The store seeds
+ * `isActive` as `true`, so a mount while already active is not an edge and
+ * only the mount attempt runs.
+ *
+ * No minimum interval is added at this layer: both attempts are already
+ * single-flight with 60 s spacing, and
+ * `attemptPushRegistrationReconciliation` additionally skips when the stored
+ * token, locale and app version already match the device
+ * (`src/lib/auth/push-registration-reconciliation.ts`). Re-gating them here
+ * would duplicate that contract without adding a skip.
  */
-function LogoutReconciliationMount() {
+function ForegroundReconciliationMount() {
   const { userId, isLoading, isError } = useCurrentUserId();
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
 
+  // Mount attempt and push-token rotation subscription.
   useEffect(() => {
     if (!userId || isLoading || isError) {
       return undefined;
     }
 
     void attemptLogoutReconciliation(userId);
-
-    const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') {
-        void attemptLogoutReconciliation(userId);
-      }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  }, [userId, isLoading, isError]);
-
-  return null;
-}
-
-/**
- * Ensures the signed-in user owns the device's Expo push token on every
- * authenticated opportunity: once `user.getMe` has resolved on the
- * authenticated mount, on each AppState return to `active`, and on each push
- * token rotation. The attempt itself is single-flight with 60 s spacing, so
- * foreground flaps do not hammer the server and a transient failure retries
- * on the next foreground.
- */
-function PushRegistrationMount() {
-  const { userId, isLoading, isError } = useCurrentUserId();
-
-  useEffect(() => {
-    if (!userId || isLoading || isError) {
-      return undefined;
-    }
-
     void attemptPushRegistrationReconciliation(userId);
-
-    const appState = AppState.addEventListener('change', next => {
-      if (next === 'active') {
-        void attemptPushRegistrationReconciliation(userId);
-      }
-    });
     const unsubscribeRotation = subscribeToPushTokenRotation(userId);
 
     return () => {
-      appState.remove();
       unsubscribeRotation();
     };
   }, [userId, isLoading, isError]);
+
+  // Foreground regain: the false -> true edge only, so an active -> active
+  // echo (or a duplicate `active` from the OS) never re-runs the pair.
+  useEffect(() => {
+    if (!wasActiveRef.current && isActive && userId && !isLoading && !isError) {
+      void attemptLogoutReconciliation(userId);
+      void attemptPushRegistrationReconciliation(userId);
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive, userId, isLoading, isError]);
 
   return null;
 }
@@ -111,19 +102,20 @@ function AppWideFreshnessMount() {
 
 export default function AppLayout() {
   const colors = useThemeColors();
-  const { fullSheetDetent } = useFormSheetDetents();
+  const sheetOptions = useFormSheetScreenOptions();
   useSecurityLifecycleInvalidation();
   useGlanceableOrgFence();
 
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <ArtifactMirrorSyncMount />
       <SystemSearchIndexMount />
       <GlanceablePublisherMount />
       <LauncherSurfacesMount />
       <CachePersistenceMount />
-      <LogoutReconciliationMount />
-      <PushRegistrationMount />
+      <ToolSummaryTranslationRetryMount />
+      <ForegroundReconciliationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <TourAutoOpen />
@@ -146,96 +138,20 @@ export default function AppLayout() {
             />
             <Stack.Screen name="agent-chat/new" options={{ headerShown: false }} />
             <Stack.Screen name="agent-chat/[session-id]" />
-            <Stack.Screen
-              name="agent-chat/model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/repo-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/branch-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/model-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/repo-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/branch-picker" options={sheetOptions} />
             <Stack.Screen
               name="agent-chat/mode-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
+              options={{ ...sheetOptions, sheetAllowedDetents: [0.5] }}
             />
-            <Stack.Screen
-              name="agent-chat/instance-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="agent-chat/folder-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="share-gate"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="language-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="transcription-model-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
-            <Stack.Screen
-              name="voice-language-picker"
-              options={{
-                presentation: 'formSheet',
-                sheetAllowedDetents: [0.5, fullSheetDetent],
-                sheetGrabberVisible: true,
-                headerShown: false,
-              }}
-            />
+            <Stack.Screen name="agent-chat/instance-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/folder-picker" options={sheetOptions} />
+            <Stack.Screen name="agent-chat/profile-picker" options={sheetOptions} />
+            <Stack.Screen name="share-gate" options={sheetOptions} />
+            <Stack.Screen name="language-picker" options={sheetOptions} />
+            <Stack.Screen name="transcription-model-picker" options={sheetOptions} />
+            <Stack.Screen name="voice-language-picker" options={sheetOptions} />
             <Stack.Screen
               name="kilo-pass"
               options={{

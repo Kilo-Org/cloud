@@ -1,4 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+  ...jest.requireActual('@/lib/organizations/effective-model-access.server'),
+  isOrganizationModelUpdateAllowed: jest.fn(async () => true),
+}));
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
   agent_configs,
@@ -42,6 +49,9 @@ import { upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { getPlatformIntegration } from '../../bot/platform-helpers';
 import {
   findIntegrationByInstallationId,
+  getIntegrationForOwner,
+  getPrimaryGitHubIntegrationForOrganization,
+  getIntegrationsByOrganization,
   upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from './platform-integrations';
@@ -81,6 +91,22 @@ const legacyUnboundDisconnectedAssociation = (organizationId: string, installati
   repository_access: 'all',
 });
 
+async function applyConnectionRoleBackfill() {
+  const migration = readFileSync(
+    resolve(
+      process.cwd(),
+      '../../packages/db/src/migrations/0259_github_connection_role_indexes.sql'
+    ),
+    'utf8'
+  );
+  const backfill = migration
+    .split(/-->\s+statement-breakpoint/)
+    .map(statement => statement.trim())
+    .filter(statement => statement.startsWith('WITH eligible AS'));
+  expect(backfill).toHaveLength(1);
+  await db.execute(sql.raw(backfill[0]));
+}
+
 describe('GitHub installation persistence', () => {
   beforeEach(async () => {
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
@@ -105,6 +131,239 @@ describe('GitHub installation persistence', () => {
   });
 
   afterEach(cleanupDbForTest);
+
+  test.each([
+    'auth_invalid',
+    'suspended',
+    'disconnected',
+    'active_old_writer',
+    'bound_old_writer',
+  ] as const)('recovers an unambiguous verified legacy owner after %s', async state => {
+    const organization = await createTestOrganization('Legacy recovery', ownerId, 0);
+    const oldWriter = state === 'active_old_writer' || state === 'bound_old_writer';
+    if (oldWriter) await applyConnectionRoleBackfill();
+    const [canonical] =
+      state === 'bound_old_writer'
+        ? await db
+            .insert(github_app_installations)
+            .values({
+              installation_id: '996001',
+              github_app_type: 'standard',
+              lifecycle_state: 'active',
+            })
+            .returning()
+        : [];
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996001',
+        github_app_type: null,
+        github_installation_id: canonical?.id ?? null,
+        integration_status: state === 'suspended' ? 'suspended' : 'active',
+        suspended_at: state === 'suspended' ? new Date().toISOString() : null,
+        auth_invalid_at: state === 'auth_invalid' ? new Date().toISOString() : null,
+        github_disconnected_at: state === 'disconnected' ? new Date().toISOString() : null,
+      })
+      .returning();
+    if (!oldWriter) await applyConnectionRoleBackfill();
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({ github_connection_role: null });
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('996001'))
+    ).resolves.toEqual({ ok: true, integrationId: legacy.id });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+    ).resolves.toMatchObject({
+      github_connection_role: 'workflow',
+      github_installation_id: expect.any(String),
+      integration_status: 'active',
+      auth_invalid_at: null,
+      suspended_at: null,
+      github_disconnected_at: null,
+      github_authorized_by_user_id: ownerId,
+    });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('996001', 'standard', legacy.id)
+    ).resolves.toBeUndefined();
+  });
+
+  test('does not recover an unhealthy legacy shadow over a current canonical workflow owner', async () => {
+    const original = await createTestOrganization('Canonical incumbent', ownerId, 0);
+    const shadowOwner = await createTestOrganization('Legacy shadow', otherOwnerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: original.id },
+      data('996002')
+    );
+    if (!connected.ok) throw new Error('Expected incumbent');
+    const [shadow] = await db
+      .insert(platform_integrations)
+      .values({
+        ...legacyUnboundDisconnectedAssociation(shadowOwner.id, '996002'),
+        github_app_type: null,
+      })
+      .returning();
+    await applyConnectionRoleBackfill();
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: shadowOwner.id },
+        { ...data('996002'), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: original.id }, data('996002'))
+    ).resolves.toEqual({ ok: true, integrationId: connected.integrationId });
+    await expect(
+      db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, shadow.id) })
+    ).resolves.toMatchObject({
+      github_connection_role: null,
+      github_disconnected_at: expect.any(String),
+    });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('996002', 'standard', connected.integrationId)
+    ).resolves.toBeUndefined();
+  });
+
+  test.each(['github_dedup', 'pending_approval', 'completed_installation'] as const)(
+    'does not infer legacy authority from a sole row with %s history',
+    async history => {
+      const organization = await createTestOrganization('Unreconciled legacy history', ownerId, 0);
+      const [legacy] = await db
+        .insert(platform_integrations)
+        .values({
+          ...legacyUnboundDisconnectedAssociation(organization.id, '996003'),
+          metadata: { [history]: {} },
+        })
+        .returning();
+      await applyConnectionRoleBackfill();
+      await expect(
+        connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('996003'))
+      ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+      await expect(
+        db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
+      ).resolves.toMatchObject({ github_connection_role: null });
+    }
+  );
+
+  test('keeps inactive same-identity legacy owners unreconciled after verified reconnect', async () => {
+    const organizationA = await createTestOrganization('Inactive legacy A', ownerId, 0);
+    const organizationB = await createTestOrganization('Inactive legacy B', otherOwnerId, 0);
+    await db
+      .insert(platform_integrations)
+      .values([
+        legacyUnboundDisconnectedAssociation(organizationA.id, '996004'),
+        legacyUnboundDisconnectedAssociation(organizationB.id, '996004'),
+      ]);
+    await applyConnectionRoleBackfill();
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'org', id: organizationA.id }, data('996004'))
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+    const roles = await db
+      .select({ role: platform_integrations.github_connection_role })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '996004'));
+    expect(roles).toEqual([{ role: null }, { role: null }]);
+  });
+
+  test('rerunning the role backfill assigns late legacy writes without changing existing roles', async () => {
+    const organizationA = await createTestOrganization('Reconcile workflow', ownerId, 0);
+    const organizationB = await createTestOrganization('Reconcile secondary', otherOwnerId, 0);
+    const organizationC = await createTestOrganization('Reconcile late legacy', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = `${organizationB.id},${organizationC.id}`;
+    const workflow = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data('996005')
+    );
+    const secondary = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('996005'), kiloUserId: otherOwnerId }
+    );
+    if (!workflow.ok || !secondary.ok) throw new Error('Expected role-bearing associations');
+    const [lateLegacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organizationC.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996005',
+        github_app_type: 'standard',
+        github_installation_id: (
+          await db.query.platform_integrations.findFirst({
+            where: eq(platform_integrations.id, workflow.integrationId),
+          })
+        )?.github_installation_id,
+        integration_status: 'active',
+        created_at: new Date().toISOString(),
+      })
+      .returning();
+    await applyConnectionRoleBackfill();
+    const roles = await db
+      .select({ id: platform_integrations.id, role: platform_integrations.github_connection_role })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '996005'));
+    expect(roles).toEqual(
+      expect.arrayContaining([
+        { id: workflow.integrationId, role: 'workflow' },
+        { id: secondary.integrationId, role: 'agent_only' },
+        { id: lateLegacy.id, role: 'agent_only' },
+      ])
+    );
+  });
+
+  test('assigns a late legacy row as secondary beside an assigned workflow', async () => {
+    const workflowOwner = await createTestOrganization('Reconcile evidence workflow', ownerId, 0);
+    const lateOwner = await createTestOrganization(
+      'Reconcile evidence late owner',
+      otherOwnerId,
+      0
+    );
+    const workflow = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: workflowOwner.id },
+      data('996006')
+    );
+    if (!workflow.ok) throw new Error('Expected a workflow association');
+    const [lateLegacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: lateOwner.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '996006',
+        github_app_type: 'standard',
+        github_installation_id: (
+          await db.query.platform_integrations.findFirst({
+            where: eq(platform_integrations.id, workflow.integrationId),
+          })
+        )?.github_installation_id,
+        integration_status: 'active',
+        created_at: new Date().toISOString(),
+      })
+      .returning();
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: lateOwner.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      is_enabled: true,
+      config: {},
+      created_by: otherOwnerId,
+    });
+
+    await applyConnectionRoleBackfill();
+
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, workflow.integrationId),
+      })
+    ).resolves.toMatchObject({ github_connection_role: 'workflow' });
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, lateLegacy.id),
+      })
+    ).resolves.toMatchObject({ github_connection_role: 'agent_only' });
+  });
 
   test('connects two approved organizations to one canonical installation', async () => {
     const organizationA = await createTestOrganization('Shared GitHub A', ownerId, 0);
@@ -145,9 +404,15 @@ describe('GitHub installation persistence', () => {
       .from(github_app_installations)
       .where(eq(github_app_installations.id, associations[0]?.github_installation_id ?? ''));
     expect(canonical).toMatchObject({
-      sharing_mode: 'web_cloud_agent',
-      sharing_admission_checked_at: expect.any(String),
+      sharing_mode: 'exclusive',
+      sharing_admission_checked_at: null,
     });
+    expect(associations.find(row => row.id === first.integrationId)?.github_connection_role).toBe(
+      'workflow'
+    );
+    expect(associations.find(row => row.id !== first.integrationId)?.github_connection_role).toBe(
+      'agent_only'
+    );
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
@@ -203,6 +468,218 @@ describe('GitHub installation persistence', () => {
     await expect(claimGitHubInstallationDelivery(input)).resolves.toEqual({ status: 'completed' });
     await expect(getGitHubInstallationDeliveryStatus(delivered)).resolves.toBe('completed');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
+  });
+
+  test('enforces worker SQL purpose, exact identity, membership, repository and disconnect fences', async () => {
+    const {
+      buildInstallationLookupQuery,
+      buildManagedInstallationLookupQuery,
+      InstallationLookupService,
+    } = jest.requireActual(
+      '../../../../../../services/git-token-service/src/installation-lookup-service'
+    );
+    const organizationA = await createTestOrganization('Workflow SQL A', ownerId, 0);
+    const organizationB = await createTestOrganization('Agent SQL B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      { ...data(), repositoryAccess: 'selected' }
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId, repositoryAccess: 'selected' }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected both associations');
+    const params = {
+      githubRepo: 'acme/repo',
+      userId: otherOwnerId,
+      orgId: organizationB.id,
+      expectedIntegrationId: second.integrationId,
+      accessPurpose: 'agent',
+    };
+    await expect(buildInstallationLookupQuery(db, params)).resolves.toEqual([]);
+    await expect(
+      buildManagedInstallationLookupQuery(db, { ...params, accessPurpose: 'workflow' })
+    ).resolves.toEqual([]);
+    await expect(buildManagedInstallationLookupQuery(db, params)).resolves.toMatchObject([
+      { id: second.integrationId },
+    ]);
+    await expect(
+      buildManagedInstallationLookupQuery(db, {
+        ...params,
+        expectedIntegrationId: first.integrationId,
+      })
+    ).resolves.toEqual([]);
+    await expect(
+      buildManagedInstallationLookupQuery(db, { ...params, userId: ownerId })
+    ).resolves.toEqual([]);
+    await expect(
+      new InstallationLookupService(
+        { HYPERDRIVE: { connectionString: 'unused' } },
+        db
+      ).findManagedInstallationForRepo({ ...params, githubRepo: 'acme/other' })
+    ).resolves.toMatchObject({ success: false, reason: 'integration_mismatch' });
+    await expect(
+      buildManagedInstallationLookupQuery(db, { ...params, expectedIntegrationId: undefined })
+    ).resolves.toEqual([]);
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+    await expect(
+      findIntegrationByInstallationId('github', '123456', 'standard')
+    ).resolves.toMatchObject({ id: first.integrationId, github_connection_role: 'workflow' });
+    await expect(buildInstallationLookupQuery(db, params)).resolves.toEqual([]);
+    await expect(buildManagedInstallationLookupQuery(db, params)).resolves.toHaveLength(1);
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toMatchObject({ integrationId: second.integrationId });
+    await disconnectGitHubInstallation({ type: 'org', id: organizationB.id }, second.integrationId);
+    await expect(buildManagedInstallationLookupQuery(db, params)).resolves.toEqual([]);
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, second.integrationId),
+      })
+    ).resolves.toMatchObject({ github_connection_role: 'agent_only' });
+  });
+
+  test('keeps mixed-owner workflow selection independent of the oldest agent-only connection', async () => {
+    const organizationA = await createTestOrganization('Mixed workflow A', ownerId, 0);
+    const organizationB = await createTestOrganization('Mixed workflow B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    await connectVerifiedGitHubInstallation({ type: 'org', id: organizationA.id }, data());
+    const secondary = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    const workflow = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('777999'), kiloUserId: otherOwnerId }
+    );
+    if (!secondary.ok || !workflow.ok) throw new Error('Expected mixed connections');
+    await expect(
+      getIntegrationForOwner({ type: 'org', id: organizationB.id }, 'github')
+    ).resolves.toMatchObject({ id: workflow.integrationId });
+    await expect(
+      getPrimaryGitHubIntegrationForOrganization(organizationB.id)
+    ).resolves.toMatchObject({ id: workflow.integrationId });
+    await expect(getIntegrationsByOrganization(organizationB.id, 'github')).resolves.toHaveLength(
+      1
+    );
+    await expect(
+      getIntegrationsByOrganization(organizationB.id, 'github', 'agent')
+    ).resolves.toHaveLength(2);
+    await expect(
+      assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
+    ).resolves.toBeUndefined();
+    const { updateModel } = await import('@/lib/integrations/github-apps-service');
+    await expect(
+      updateModel({ type: 'org', id: organizationB.id }, 'model-a', secondary.integrationId)
+    ).resolves.toMatchObject({ success: true });
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, secondary.integrationId),
+      })
+    ).resolves.toMatchObject({ metadata: { model_slug: 'model-a' } });
+    await expect(
+      db.query.platform_integrations.findFirst({
+        where: eq(platform_integrations.id, workflow.integrationId),
+      })
+    ).resolves.toMatchObject({ metadata: null });
+  });
+
+  test.each([
+    'oldest',
+    'pending_history',
+    'workflow_binding',
+    'conflicting_bindings',
+    'stale_unbound',
+    'dedup_loser',
+  ] as const)('migrates association authority safely for %s', async scenario => {
+    const organizationA = await createTestOrganization('Migration A', ownerId, 0);
+    const organizationB = await createTestOrganization('Migration B', otherOwnerId, 0);
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({ installation_id: '999001', github_app_type: 'standard', lifecycle_state: 'active' })
+      .returning();
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organizationA.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: scenario === 'dedup_loser' ? null : '999001',
+          github_installation_id:
+            scenario === 'stale_unbound' || scenario === 'dedup_loser' ? null : canonical.id,
+          github_app_type: null,
+          integration_status:
+            scenario === 'stale_unbound' || scenario === 'dedup_loser' ? 'suspended' : 'active',
+          suspended_at: scenario === 'stale_unbound' ? '2026-01-01T00:00:00Z' : null,
+          metadata:
+            scenario === 'pending_history'
+              ? { pending_approval: {} }
+              : scenario === 'dedup_loser'
+                ? { github_dedup: { original_installation_id: '999001' } }
+                : {},
+          created_at: '2026-01-01T00:00:00Z',
+        },
+        {
+          owned_by_organization_id: organizationB.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '999001',
+          github_installation_id: canonical.id,
+          github_app_type: 'standard',
+          integration_status: 'active',
+          created_at: '2026-02-01T00:00:00Z',
+        },
+      ])
+      .returning();
+    if (scenario === 'workflow_binding' || scenario === 'conflicting_bindings') {
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organizationB.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        is_enabled: true,
+        config: {},
+        created_by: otherOwnerId,
+      });
+    }
+    if (scenario === 'conflicting_bindings') {
+      await db.insert(agent_configs).values({
+        owned_by_organization_id: organizationA.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        is_enabled: true,
+        config: {},
+        created_by: ownerId,
+      });
+    }
+    await applyConnectionRoleBackfill();
+    const updated = await db
+      .select()
+      .from(platform_integrations)
+      .orderBy(platform_integrations.created_at);
+    const expected =
+      scenario === 'oldest'
+        ? ['workflow', 'agent_only']
+        : scenario === 'workflow_binding'
+          ? ['agent_only', 'workflow']
+          : scenario === 'stale_unbound' || scenario === 'dedup_loser'
+            ? [null, 'workflow']
+            : [null, null];
+    expect(updated.map(row => row.github_connection_role)).toEqual(expected);
+    if (scenario === 'oldest') {
+      await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, rows[0].id);
+      await expect(
+        db
+          .update(platform_integrations)
+          .set({ github_connection_role: 'workflow' })
+          .where(eq(platform_integrations.id, rows[1].id))
+      ).rejects.toThrow();
+    }
   });
 
   test('keeps a fresh processing claim as a duplicate instead of reclaiming it', async () => {
@@ -487,7 +964,7 @@ describe('GitHub installation persistence', () => {
     await expect(enable).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
   });
 
-  test('rechecks compatibility after a concurrent agent enable commits before attach', async () => {
+  test('preserves an incumbent workflow enabled concurrently with secondary attachment', async () => {
     const organizationA = await createTestOrganization('Enable race GitHub A', ownerId, 0);
     const organizationB = await createTestOrganization('Enable race GitHub B', otherOwnerId, 0);
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
@@ -525,7 +1002,7 @@ describe('GitHub installation persistence', () => {
     releaseEnable?.();
 
     await expect(enable).resolves.toBeUndefined();
-    await expect(attach).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    await expect(attach).resolves.toMatchObject({ ok: true });
   });
 
   test('orders participant owner locks across inverse concurrent shared attaches', async () => {
@@ -582,7 +1059,7 @@ describe('GitHub installation persistence', () => {
     expect(associations[0]?.id).toBe(first.ok ? first.integrationId : undefined);
   });
 
-  test('refuses sharing without changing an incumbent automation workflow', async () => {
+  test('admits a secondary without changing an incumbent automation workflow', async () => {
     const organizationA = await createTestOrganization('Automated GitHub A', ownerId, 0);
     const organizationB = await createTestOrganization('Automated GitHub B', otherOwnerId, 0);
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
@@ -605,7 +1082,7 @@ describe('GitHub installation persistence', () => {
         { type: 'org', id: organizationB.id },
         { ...data(), kiloUserId: otherOwnerId }
       )
-    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    ).resolves.toMatchObject({ ok: true });
     const [incumbentConfig] = await db
       .select()
       .from(agent_configs)
@@ -626,9 +1103,9 @@ describe('GitHub installation persistence', () => {
       { ...data(), kiloUserId: otherOwnerId }
     );
     if (!first.ok || !second.ok) throw new Error('Expected shared connections');
-    await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
-      'GitHub installation is unavailable for runtime use'
-    );
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
+    ).resolves.toBeUndefined();
 
     await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
     await observeGitHubInstallationLifecycle({
@@ -656,6 +1133,7 @@ describe('GitHub installation persistence', () => {
         integration_status: 'active',
         suspended_by: null,
         github_disconnected_at: null,
+        github_connection_role: 'agent_only',
       }
     );
     const [canonical] = await db
@@ -666,9 +1144,9 @@ describe('GitHub installation persistence', () => {
       sharing_mode: 'exclusive',
       sharing_admission_checked_at: null,
     });
-    await expect(
-      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
-    ).resolves.toBeUndefined();
+    await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
     await expect(
       getGitHubInstallationDeliveryStatus({
         installationId: '123456',
@@ -684,7 +1162,7 @@ describe('GitHub installation persistence', () => {
     });
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
-    ).resolves.toBeUndefined();
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
     await db.insert(agent_configs).values({
       owned_by_organization_id: organizationB.id,
       agent_type: 'code_review',
@@ -702,10 +1180,10 @@ describe('GitHub installation persistence', () => {
         { type: 'org', id: organizationA.id },
         { ...data(), kiloUserId: ownerId }
       )
-    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    ).resolves.toMatchObject({ ok: true, integrationId: first.integrationId });
   });
 
-  test('allows an exact shared association for inventory reads but keeps the generic path exclusive-only', async () => {
+  test('keeps generic runtime workflow-only and requires purpose for exact secondary access', async () => {
     const organizationA = await createTestOrganization('Shared runtime A', ownerId, 0);
     const organizationB = await createTestOrganization('Shared runtime B', otherOwnerId, 0);
     process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
@@ -723,19 +1201,28 @@ describe('GitHub installation persistence', () => {
       .select({ sharingMode: github_app_installations.sharing_mode })
       .from(github_app_installations)
       .where(eq(github_app_installations.installation_id, '881881'));
-    expect(sharedCanonical?.sharingMode).toBe('web_cloud_agent');
+    expect(sharedCanonical?.sharingMode).toBe('exclusive');
 
-    // Generic, installation-wide authorization stays exclusive-only.
-    await expect(assertGitHubInstallationRuntimeAuthorized('881881', 'standard')).rejects.toThrow(
-      'GitHub installation is unavailable for runtime use'
-    );
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard')
+    ).resolves.toBeUndefined();
 
-    // An exact association is authorized for inventory reads even when shared.
     await expect(
       assertGitHubInstallationRuntimeAuthorized('881881', 'standard', first.integrationId)
     ).resolves.toBeUndefined();
     await expect(
       assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId)
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId, 'agent')
+    ).resolves.toBeUndefined();
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized(
+        '881881',
+        'standard',
+        second.integrationId,
+        'management'
+      )
     ).resolves.toBeUndefined();
 
     // An unknown association id is still rejected.
@@ -743,11 +1230,9 @@ describe('GitHub installation persistence', () => {
       assertGitHubInstallationRuntimeAuthorized('881881', 'standard', crypto.randomUUID())
     ).rejects.toThrow('GitHub installation is unavailable for runtime use');
 
-    // An empty-string id must behave exactly like the generic exclusive-only path (F3): it must
-    // not enable the shared carve-out just because it's technically "supplied".
     await expect(
       assertGitHubInstallationRuntimeAuthorized('881881', 'standard', '')
-    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+    ).resolves.toBeUndefined();
 
     // Local health is still enforced on the exact-id path.
     await db
@@ -755,7 +1240,7 @@ describe('GitHub installation persistence', () => {
       .set({ suspended_at: new Date().toISOString() })
       .where(eq(platform_integrations.id, second.integrationId));
     await expect(
-      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId)
+      assertGitHubInstallationRuntimeAuthorized('881881', 'standard', second.integrationId, 'agent')
     ).rejects.toThrow('GitHub installation is unavailable for runtime use');
 
     // Owner validity is still enforced on the exact-id path.
@@ -1165,7 +1650,7 @@ describe('GitHub installation persistence', () => {
       .select({ sharingMode: github_app_installations.sharing_mode })
       .from(github_app_installations)
       .where(eq(github_app_installations.installation_id, '990101'));
-    expect(canonical?.sharingMode).toBe('web_cloud_agent');
+    expect(canonical?.sharingMode).toBe('exclusive');
 
     // Regression: a tenant attaching afterwards must not lock the incumbent
     // personal owner out of their own installation.
@@ -1186,7 +1671,7 @@ describe('GitHub installation persistence', () => {
     ).resolves.toEqual({ ok: false, reason: 'claimed_by_other_owner' });
   });
 
-  test('lets a personal owner claim after the other owner fully disconnects', async () => {
+  test('does not transfer workflow authority to a new personal owner after disconnect', async () => {
     const first = await connectVerifiedGitHubInstallation(
       { type: 'user', id: ownerId },
       data('990104')
@@ -1201,9 +1686,7 @@ describe('GitHub installation persistence', () => {
       { type: 'user', id: otherOwnerId },
       { ...data('990104'), kiloUserId: otherOwnerId }
     );
-    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
-    if (!second.ok) throw new Error('Expected the second personal owner to claim');
-    expect(second.integrationId).not.toBe(first.integrationId);
+    expect(second).toEqual({ ok: false, reason: 'claimed_by_other_owner' });
   });
 
   test('still requires sharing admission for an organization attaching as a new second tenant', async () => {
@@ -1266,7 +1749,7 @@ describe('GitHub installation persistence', () => {
     });
   });
 
-  test('does not require sharing admission for a new, non-allowlisted first tenant after the prior owner disconnects', async () => {
+  test('still requires secondary admission after the workflow owner disconnects', async () => {
     const organizationA = await createTestOrganization('First tenant disconnect A', ownerId, 0);
     const organizationB = await createTestOrganization(
       'First tenant disconnect B',
@@ -1289,7 +1772,7 @@ describe('GitHub installation persistence', () => {
       { type: 'org', id: organizationB.id },
       { ...data('881010'), kiloUserId: otherOwnerId }
     );
-    expect(second).toEqual({ ok: true, integrationId: expect.any(String) });
+    expect(second).toEqual({ ok: false, reason: 'shared_installation_disabled' });
 
     const [canonical] = await db
       .select({ sharingMode: github_app_installations.sharing_mode })
@@ -1361,6 +1844,11 @@ describe('GitHub installation persistence', () => {
   test('refuses to uninstall an unbound legacy association while another tenant is actively connected', async () => {
     const organizationA = await createTestOrganization('Legacy unbound removal A', ownerId, 0);
     const organizationB = await createTestOrganization('Legacy unbound removal B', otherOwnerId, 0);
+    const sibling = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('993001'), kiloUserId: otherOwnerId }
+    );
+    if (!sibling.ok) throw new Error('Expected the sibling tenant to connect');
 
     const inserted = await db
       .insert(platform_integrations)
@@ -1368,12 +1856,6 @@ describe('GitHub installation persistence', () => {
       .returning();
     const legacy = inserted[0];
     if (!legacy) throw new Error('Expected legacy association');
-
-    const sibling = await connectVerifiedGitHubInstallation(
-      { type: 'org', id: organizationB.id },
-      { ...data('993001'), kiloUserId: otherOwnerId }
-    );
-    if (!sibling.ok) throw new Error('Expected the sibling tenant to connect');
 
     let deleteUpstreamCalled = false;
     await expect(
@@ -1396,11 +1878,14 @@ describe('GitHub installation persistence', () => {
     expect(siblingRow).toMatchObject({ integration_status: 'active', suspended_at: null });
   });
 
-  test('allows uninstalling an unbound legacy disconnected association with no connected sibling', async () => {
+  test('allows uninstalling a reconciled legacy workflow association with no connected sibling', async () => {
     const organization = await createTestOrganization('Legacy unbound sole removal', ownerId, 0);
     const inserted = await db
       .insert(platform_integrations)
-      .values(legacyUnboundDisconnectedAssociation(organization.id, '993002'))
+      .values({
+        ...legacyUnboundDisconnectedAssociation(organization.id, '993002'),
+        github_connection_role: 'workflow',
+      })
       .returning();
     const legacy = inserted[0];
     if (!legacy) throw new Error('Expected legacy association');
@@ -1422,6 +1907,11 @@ describe('GitHub installation persistence', () => {
   test('refuses to uninstall an unbound legacy association whose canonical installation is shared', async () => {
     const organizationA = await createTestOrganization('Legacy shared removal A', ownerId, 0);
     const organizationB = await createTestOrganization('Legacy shared removal B', otherOwnerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data('993003'), kiloUserId: otherOwnerId }
+    );
+    if (!connected.ok) throw new Error('Expected the sibling tenant to connect');
 
     const inserted = await db
       .insert(platform_integrations)
@@ -1430,11 +1920,6 @@ describe('GitHub installation persistence', () => {
     const legacy = inserted[0];
     if (!legacy) throw new Error('Expected legacy association');
 
-    const connected = await connectVerifiedGitHubInstallation(
-      { type: 'org', id: organizationB.id },
-      { ...data('993003'), kiloUserId: otherOwnerId }
-    );
-    if (!connected.ok) throw new Error('Expected the sibling tenant to connect');
     await disconnectGitHubInstallation(
       { type: 'org', id: organizationB.id },
       connected.integrationId
@@ -1745,6 +2230,7 @@ describe('GitHub installation persistence', () => {
         platform: 'github',
         integration_type: 'app',
         platform_installation_id: '654321',
+        github_connection_role: 'workflow',
         github_app_type: null,
         integration_status: 'active',
       })
@@ -1801,9 +2287,9 @@ describe('GitHub installation persistence', () => {
       .update(github_app_installations)
       .set({ sharing_mode: 'web_cloud_agent' })
       .where(eq(github_app_installations.installation_id, '654322'));
-    await expect(assertGitHubInstallationRuntimeAuthorized('654322', 'standard')).rejects.toThrow(
-      'GitHub installation is unavailable for runtime use'
-    );
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('654322', 'standard')
+    ).resolves.toBeUndefined();
   });
 
   test('treats an empty exact-association id as the generic exclusive-only path', async () => {
@@ -1836,7 +2322,7 @@ describe('GitHub installation persistence', () => {
 
     // The real exact id still resolves.
     await expect(
-      assertGitHubInstallationRuntimeAuthorized('883883', 'standard', second.integrationId)
+      assertGitHubInstallationRuntimeAuthorized('883883', 'standard', second.integrationId, 'agent')
     ).resolves.toBeUndefined();
   });
 
@@ -1847,6 +2333,7 @@ describe('GitHub installation persistence', () => {
         platform: 'github',
         integration_type: 'app',
         platform_installation_id: '777777',
+        github_connection_role: 'workflow',
         github_app_type: null,
         integration_status: 'active',
       },
@@ -1855,6 +2342,7 @@ describe('GitHub installation persistence', () => {
         platform: 'github',
         integration_type: 'app',
         platform_installation_id: '777777',
+        github_connection_role: 'workflow',
         github_app_type: 'lite',
         integration_status: 'active',
       },

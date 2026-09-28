@@ -65,7 +65,7 @@ const streamResponse = (chunks: string[]): Response => {
 };
 
 describe('kilo gateway chat stream client', () => {
-  it('streams chat completion content and eval tool call deltas', async () => {
+  it('streams chat completion content and browser tool call deltas', async () => {
     const seen: { body: unknown; headers: Headers }[] = [];
     const contentDeltas: string[] = [];
     const fetch: FetchLike = (_input, init) => {
@@ -77,8 +77,8 @@ describe('kilo gateway chat stream client', () => {
       return streamResponse([
         'data: {"choices":[{"delta":{"content":"I will "}}]}\n\n',
         'data: {"choices":[{"delta":{"content":"inspect."}}]}\n\n',
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_eval_1","type":"function","function":{"name":"eval","arguments":"{\\"code\\":\\"return "}}]}}]}\n\n',
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"document.title;\\"}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_eval_1","type":"function","function":{"name":"kilo_browser_evaluate","arguments":"{\\"function\\":\\"() => document."}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"title\\"}"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
     };
@@ -98,7 +98,7 @@ describe('kilo gateway chat stream client', () => {
           {
             function: {
               description: 'Run JavaScript',
-              name: 'eval',
+              name: 'kilo_browser_evaluate',
               parameters: { additionalProperties: false, type: 'object' },
             },
             type: 'function',
@@ -109,9 +109,9 @@ describe('kilo gateway chat stream client', () => {
       content: 'I will inspect.',
       toolCalls: [
         {
-          arguments: { code: 'return document.title;' },
+          arguments: { function: '() => document.title' },
           id: 'call_eval_1',
-          name: 'eval',
+          name: 'kilo_browser_evaluate',
         },
       ],
     });
@@ -121,10 +121,10 @@ describe('kilo gateway chat stream client', () => {
     expect(seen[0]?.body).toMatchObject({ stream: true });
   });
 
-  it('streams safe read tool call deltas', async () => {
+  it('streams browser tool call deltas', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"{}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"{}"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -136,14 +136,14 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
         {
           arguments: {},
           id: 'call_snapshot_1',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
         },
       ],
     });
@@ -225,6 +225,34 @@ describe('kilo gateway chat stream client', () => {
     ).rejects.toThrow('Gateway stream tool call did not include a supported tool name.');
   });
 
+  it('accepts an unoffered kilo_browser_ call so the runner can answer it with a refusal', async () => {
+    const fetch: FetchLike = () =>
+      streamResponse([
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_click_1","type":"function","function":{"name":"kilo_browser_click","arguments":"{\\"target\\":\\"#go\\"}"}}]}}]}\n\n',
+        'data: [DONE]\n\n',
+      ]);
+
+    await expect(
+      fetchKiloGatewayChatCompletionStream({
+        apiBaseUrl: 'https://app.kilo.ai',
+        fetch,
+        messages: [{ content: 'Click it', role: 'user' }],
+        model: 'anthropic/claude-sonnet-4',
+        onContentDelta: () => {},
+        token: 'token-1',
+        tools: [gatewayTool('kilo_browser_snapshot')],
+      })
+    ).resolves.toStrictEqual({
+      toolCalls: [
+        {
+          arguments: { target: '#go' },
+          id: 'call_click_1',
+          name: 'kilo_browser_click',
+        },
+      ],
+    });
+  });
+
   it('concatenates a fragmented offered page name across tool call deltas', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
@@ -254,10 +282,10 @@ describe('kilo gateway chat stream client', () => {
     });
   });
 
-  it('streams viewport screenshot tool call deltas', async () => {
+  it('streams browser screenshot tool call deltas', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_screenshot_1","type":"function","function":{"name":"get_viewport_screenshot","arguments":"{}"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_screenshot_1","type":"function","function":{"name":"kilo_browser_take_screenshot","arguments":"{}"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -269,14 +297,14 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_viewport_screenshot')],
+        tools: [gatewayTool('kilo_browser_take_screenshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
         {
           arguments: {},
           id: 'call_screenshot_1',
-          name: 'get_viewport_screenshot',
+          name: 'kilo_browser_take_screenshot',
         },
       ],
     });
@@ -289,7 +317,7 @@ describe('kilo gateway chat stream client', () => {
       streamResponse([
         'data: {"choices":[{"delta":{"content":"","reasoning":"Thinking"}}]}\n\n',
         'data: {"choices":[{"delta":{"content":"Calling the tool."}}]}\n\n',
-        'data: {"choices":[{"delta":{"content":null,"reasoning":null,"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":""}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"content":null,"reasoning":null,"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot","arguments":""}}]}}]}\n\n',
         'data: {"choices":[{"delta":{"content":null,"tool_calls":[{"index":0,"function":{"arguments":"{}"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
@@ -307,7 +335,7 @@ describe('kilo gateway chat stream client', () => {
           reasoningDeltas.push(delta);
         },
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).resolves.toStrictEqual({
       content: 'Calling the tool.',
@@ -316,7 +344,7 @@ describe('kilo gateway chat stream client', () => {
         {
           arguments: {},
           id: 'call_snapshot_1',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
         },
       ],
     });
@@ -327,7 +355,7 @@ describe('kilo gateway chat stream client', () => {
   it('treats a single empty-arguments tool call delta as an empty object', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":""}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot","arguments":""}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -339,14 +367,14 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
         {
           arguments: {},
           id: 'call_snapshot_1',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
         },
       ],
     });
@@ -355,7 +383,7 @@ describe('kilo gateway chat stream client', () => {
   it('treats tool call deltas that omit arguments as an empty object', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -367,14 +395,14 @@ describe('kilo gateway chat stream client', () => {
         model: 'kilo-auto/frontier',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).resolves.toStrictEqual({
       toolCalls: [
         {
           arguments: {},
           id: 'call_snapshot_1',
-          name: 'get_page_snapshot',
+          name: 'kilo_browser_snapshot',
         },
       ],
     });
@@ -383,7 +411,7 @@ describe('kilo gateway chat stream client', () => {
   it('rejects non-empty invalid tool call arguments from the gateway stream', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"not-json"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"not-json"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -395,7 +423,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).rejects.toThrow('Gateway tool call arguments were not valid JSON.');
   });
@@ -403,7 +431,7 @@ describe('kilo gateway chat stream client', () => {
   it('rejects non-object tool call arguments from the gateway stream', async () => {
     const fetch: FetchLike = () =>
       streamResponse([
-        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"get_page_snapshot","arguments":"[]"}}]}}]}\n\n',
+        'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_snapshot_1","type":"function","function":{"name":"kilo_browser_snapshot","arguments":"[]"}}]}}]}\n\n',
         'data: [DONE]\n\n',
       ]);
 
@@ -415,7 +443,7 @@ describe('kilo gateway chat stream client', () => {
         model: 'anthropic/claude-sonnet-4',
         onContentDelta: () => {},
         token: 'token-1',
-        tools: [gatewayTool('get_page_snapshot')],
+        tools: [gatewayTool('kilo_browser_snapshot')],
       })
     ).rejects.toThrow('Gateway tool call arguments were not an object.');
   });

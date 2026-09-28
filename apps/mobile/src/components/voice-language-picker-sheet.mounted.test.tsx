@@ -1,4 +1,5 @@
-import { act } from '@/test/renderer';
+import { createElement } from 'react';
+import { act, type TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -10,6 +11,18 @@ import {
   routerBack,
   useVoiceRecognitionLanguagesMock,
 } from '@/components/voice-language-picker-sheet.test-helpers';
+import { VoiceLanguagePickerSheet } from '@/components/voice-language-picker-sheet';
+
+// The mocked FlatList renders through its render props and does not forward
+// `data` to the host node, so the element carrying the render props is the one
+// whose `data` identity the list was handed.
+function listData(renderer: TestRenderer.ReactTestRenderer): unknown {
+  const list = renderer.root.findAll(node => typeof node.props.renderItem === 'function')[0];
+  if (!list) {
+    throw new Error('FlatList not found');
+  }
+  return list.props.data;
+}
 
 describe('VoiceLanguagePickerSheet', () => {
   beforeEach(resetVoiceLanguagePickerMocks);
@@ -241,6 +254,29 @@ describe('VoiceLanguagePickerSheet', () => {
 
     const rows = findByType(renderer.root, 'ChoiceRow');
     expect(rows[0]?.props).toMatchObject({ label: 'Automatic', description: 'Device language' });
+
+    renderer.unmount();
+  });
+
+  it('keeps the same list data identity when the sheet re-renders without a query change', async () => {
+    deviceState.current = {
+      languages: ['de-DE', 'nl-NL'],
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn<() => void>(),
+    };
+    const renderer = await mountSheet();
+    const data = listData(renderer);
+
+    await act(async () => {
+      renderer.update(createElement(VoiceLanguagePickerSheet));
+      await Promise.resolve();
+    });
+
+    // The device option array and the filtered list are memoized, so an
+    // unrelated re-render hands the list the same `data` identity and no
+    // mounted row re-renders.
+    expect(listData(renderer)).toBe(data);
 
     renderer.unmount();
   });

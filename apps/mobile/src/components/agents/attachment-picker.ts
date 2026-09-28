@@ -14,6 +14,7 @@ import {
   writePickerLaunchContext,
 } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
@@ -172,6 +173,8 @@ type AttachmentPickerContext = {
 type AttachmentSourceSheet = {
   sources: readonly AttachmentSource[];
   libraryMultipleSelection: boolean;
+  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread into the call. */
+  themedSheet: ThemedActionSheetOptions;
 };
 
 /**
@@ -186,7 +189,7 @@ function showAttachmentSourceSheet(
   context: AttachmentPickerContext,
   sheet: AttachmentSourceSheet
 ): Promise<AgentAttachmentCandidate[]> {
-  const { sources, libraryMultipleSelection } = sheet;
+  const { sources, libraryMultipleSelection, themedSheet } = sheet;
   return new Promise(resolve => {
     let settled = false;
     const settle = (value: AgentAttachmentCandidate[]) => {
@@ -244,6 +247,7 @@ function showAttachmentSourceSheet(
     const options = buildAttachmentSourceOptions(sources);
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
       },
@@ -268,11 +272,13 @@ function showAttachmentSourceSheet(
  */
 export function pickAgentAttachments(
   showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
-  context: AttachmentPickerContext
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
 ): Promise<AgentAttachmentCandidate[]> {
   return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
     sources: ['camera', 'library', 'files'],
     libraryMultipleSelection: true,
+    themedSheet,
   });
 }
 
@@ -283,10 +289,12 @@ export function pickAgentAttachments(
  */
 export function pickAgentPicture(
   showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
-  context: AttachmentPickerContext
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
 ): Promise<AgentAttachmentCandidate[]> {
   return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
     sources: ['camera', 'library'],
     libraryMultipleSelection: false,
+    themedSheet,
   });
 }

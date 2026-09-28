@@ -149,18 +149,20 @@ export function useSignInFlow({
   );
   const email = storybookInitialState?.email ?? emailState;
 
-  // Initialize email from hint or params
+  // Initialize email from params or hint
   useEffect(() => {
     if (storybookInitialState) return;
     if (isInviteCleared) return;
 
-    if (tier === 'returning' && hint?.lastEmail && emailState !== hint.lastEmail) {
+    // An explicit `?email=` names the address this page must use — an invite,
+    // a redirect carrying the address, or an Enterprise SSO request from the
+    // device-auth flow. It wins over a stored returning-user hint so a
+    // remembered session can never refill a different address over the one the
+    // request asked for. The hint only fills the form when no address is given.
+    if (params.email) {
+      if (emailState !== params.email) setEmailState(params.email);
+    } else if (tier === 'returning' && hint?.lastEmail && emailState !== hint.lastEmail) {
       setEmailState(hint.lastEmail);
-    } else if (tier === 'invite' && params.email && emailState !== params.email) {
-      setEmailState(params.email);
-    } else if (params.email && !emailState) {
-      // Prefill from query params (e.g., redirect with error)
-      setEmailState(params.email);
     }
   }, [tier, hint?.lastEmail, params.email, storybookInitialState, isInviteCleared]);
 

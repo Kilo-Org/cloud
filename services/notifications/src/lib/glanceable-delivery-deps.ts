@@ -2,7 +2,7 @@ import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snap
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
 import { pushDataSchema } from '@kilocode/notifications';
-import { and, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull } from 'drizzle-orm';
 
 import { sendLiveActivityApns, type ApnsCredentials } from './apns-live-activity';
 import { sendPushNotifications } from './expo-push';
@@ -75,6 +75,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
           kind: user_activity_tokens.kind,
           id: user_activity_tokens.id,
           updated_at: user_activity_tokens.updated_at,
+          superseded_at: user_activity_tokens.superseded_at,
         })
         .from(user_activity_tokens)
         .where(
@@ -83,13 +84,22 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
             orgPredicate,
             inArray(user_activity_tokens.kind, ['ios_activity', 'ios_push_to_start'])
           )
-        );
+        )
+        // Newest registration first, so `apnsSendsForTokens` can pick one live
+        // target deterministically and never thrash between two candidates.
+        .orderBy(desc(user_activity_tokens.updated_at), desc(user_activity_tokens.id));
       // Both kinds: an APNs 410 retires whichever registration it names, and a
       // dead push-to-start row would otherwise keep raising rejected starts.
       for (const row of rows) {
         iosTargets.set(row.token, row);
       }
-      return rows.map(row => ({ ...row, kind: row.kind as IosActivityToken['kind'] }));
+      return rows.map(row => ({
+        token: row.token,
+        kind: row.kind as IosActivityToken['kind'],
+        id: row.id,
+        updated_at: row.updated_at,
+        superseded: row.superseded_at !== null,
+      }));
     },
     sendIosLiveActivity: async (
       tokens,

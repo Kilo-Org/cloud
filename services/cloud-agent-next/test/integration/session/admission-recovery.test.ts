@@ -1,5 +1,6 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { waitFor } from '../wait-for.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
@@ -387,7 +388,7 @@ describe('forward-only clone reporting admission', () => {
           });
         })();
         try {
-          await vi.waitFor(() => expect(delivered).toEqual([firstMessageId]));
+          await waitFor(() => expect(delivered).toEqual([firstMessageId]));
           await progress;
           expect(reports).toEqual([]);
           expect(await listPendingSessionMessages(instance.ctx.storage)).toEqual([]);
@@ -399,7 +400,7 @@ describe('forward-only clone reporting admission', () => {
             })
           );
           release.resolve();
-          await vi.waitFor(() => expect(reports).toHaveLength(2));
+          await waitFor(() => expect(reports).toHaveLength(2));
           const state = await getSessionMessageState(instance.ctx.storage, firstMessageId);
           if (!state) throw new Error('Expected persisted first message');
           await instance['reportRunState'](state);

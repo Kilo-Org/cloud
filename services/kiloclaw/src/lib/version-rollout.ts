@@ -102,9 +102,7 @@ export async function selectImageVersionForInstance(
   return null;
 }
 
-// ---------------------------------------------------------------------------
 // Mutations
-// ---------------------------------------------------------------------------
 
 export interface SetRolloutPercentResult {
   imageTag: string;
@@ -286,9 +284,7 @@ export async function disableImageAndClearRollout(opts: {
   await refreshPointersForVariant(opts.kv, opts.hyperdriveConnectionString, row.variant);
 }
 
-// ---------------------------------------------------------------------------
 // Internal: KV mirroring
-// ---------------------------------------------------------------------------
 
 type CatalogRow = typeof kiloclaw_image_catalog.$inferSelect;
 

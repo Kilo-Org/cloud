@@ -14,20 +14,17 @@ export type PushNotificationParams = {
 export async function notifyBackendOfPush(env: Env, params: PushNotificationParams): Promise<void> {
   const { repoId, commitHash, branch } = params;
 
-  // Check if push notification URL is configured
   if (!env.BACKEND_PUSH_NOTIFICATION_URL) {
     logger.debug('Push notification skipped - BACKEND_PUSH_NOTIFICATION_URL not configured');
     return;
   }
 
-  // Construct gitUrl from repoId using BUILDER_HOSTNAME
   const gitUrl = `https://${env.BUILDER_HOSTNAME}/apps/${repoId}.git`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
 
-  // Add auth token if configured
   if (env.AUTH_TOKEN) {
     headers['Authorization'] = `Bearer ${env.AUTH_TOKEN}`;
   }

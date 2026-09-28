@@ -257,11 +257,12 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
       repository: { fullName: 'octocat/hello' },
     });
     expect(result).toEqual({ defaultBranch: 'main', branches: ['main', 'feature/x'] });
-    expect(mockGetIntegrationsByOrganization).toHaveBeenCalledWith(ORG_ID, 'github');
+    expect(mockGetIntegrationsByOrganization).toHaveBeenCalledWith(ORG_ID, 'github', 'agent');
     expect(mockListBranches).toHaveBeenCalledWith(
       { type: 'org', id: ORG_ID },
       'int-1',
-      'octocat/hello'
+      'octocat/hello',
+      'agent'
     );
   });
 
@@ -282,7 +283,8 @@ describe('organizationCloudAgentNextRouter.listRepositoryBranches', () => {
     expect(mockListBranches).toHaveBeenCalledWith(
       { type: 'org', id: ORG_ID },
       'int-owning',
-      'octocat/hello'
+      'octocat/hello',
+      'agent'
     );
   });
 

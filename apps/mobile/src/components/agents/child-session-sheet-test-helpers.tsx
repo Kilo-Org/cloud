@@ -168,7 +168,12 @@ export const readyState: ChildSessionHydrationState = {
   olderError: null,
   omittedItemCount: 0,
 };
-export const errorState: ChildSessionHydrationState = { status: 'error', message: 'Failed' };
+// A transient hydration failure: the SDK's `formatError` wording for a
+// connection drop, which the sheet classifies as retryable.
+export const errorState: ChildSessionHydrationState = {
+  status: 'error',
+  message: 'Connection lost. Please retry in a moment.',
+};
 
 export type SheetProps = ComponentProps<typeof ChildSessionSheet>;
 

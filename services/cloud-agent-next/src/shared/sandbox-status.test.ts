@@ -26,6 +26,7 @@ const lifecycleCases = [
   { status: 'stopping', detailCode: 'sandbox_stopping' },
   { status: 'error', detailCode: 'sandbox_failed' },
   { status: 'unreachable', detailCode: 'connection_unavailable' },
+  { status: 'unreachable', detailCode: 'check_needed' },
   { status: 'unknown', detailCode: 'insufficient_evidence' },
   { status: 'unknown', detailCode: 'status_unavailable' },
 ] satisfies Pick<SandboxStatusSnapshot, 'status' | 'detailCode'>[];
@@ -79,7 +80,7 @@ describe('sandbox status public contract', () => {
     expect(SandboxStatusSnapshotSchema.parse(input)).toEqual(input);
   });
 
-  it.each(['Cloudflare', 'Vercel', 'Unknown'])(
+  it.each(['Cloudflare', 'Cloudflare Containers', 'Vercel', 'Unknown'])(
     'accepts only a bounded provider label: %s',
     provider => {
       expect(SandboxStatusSnapshotSchema.parse({ ...snapshot, provider }).provider).toBe(provider);
@@ -129,6 +130,15 @@ describe('sandbox status public contract', () => {
     );
     expect(SANDBOX_STATUS_DETAIL_MESSAGES.sandbox_failed).toBe(
       'The sandbox encountered an error. Send a message to try again.'
+    );
+  });
+
+  it('gives the check-needed detail its own unreachable presentation', () => {
+    expect(SANDBOX_STATUS_DETAIL_MESSAGES.check_needed).toBe(
+      'The sandbox has not confirmed its health recently. Its current state is being checked.'
+    );
+    expect(SANDBOX_STATUS_DETAIL_MESSAGES.check_needed).not.toBe(
+      SANDBOX_STATUS_DETAIL_MESSAGES.connection_unavailable
     );
   });
 
@@ -244,6 +254,8 @@ describe('optional sandbox runtime metadata', () => {
     'isolated-standard',
     'code-review',
     'devcontainer',
+    'containers-standard-3',
+    'containers-standard-4',
     'unknown',
   ])('accepts bounded sandbox type %s', sandboxType => {
     expect(SandboxRuntimeMetadataSchema.parse({ ...runtime, sandboxType }).sandboxType).toBe(
@@ -316,6 +328,7 @@ describe('getSandboxProviderLabel', () => {
   it.each([
     ['cloudflare', 'Cloudflare'],
     ['vercel', 'Vercel'],
+    ['cloudflare-containers', 'Cloudflare Containers'],
   ])('maps the stored provider %s to %s', (provider, label) => {
     expect(getSandboxProviderLabel(provider)).toBe(label);
   });

@@ -139,7 +139,10 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
   View: 'View',
-  FlatList: (props: {
+}));
+
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
     data?: unknown[];
     renderItem?: (info: { item: unknown; index: number }) => ReactElement;
     ListEmptyComponent?: ReactElement;
@@ -147,10 +150,10 @@ vi.mock('react-native', () => ({
   }) => {
     const data = props.data ?? [];
     if (data.length === 0) {
-      return createElement('FlatList', null, props.ListEmptyComponent, props.ListFooterComponent);
+      return createElement('FlashList', null, props.ListEmptyComponent, props.ListFooterComponent);
     }
     return createElement(
-      'View',
+      'FlashList',
       null,
       data.map((item, index) =>
         createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
@@ -268,7 +271,7 @@ describe('OrganizationInvoicesScreen empty', () => {
     );
 
     expect(collectText(renderer.toJSON())).toContain('EMPTY_STATE:No invoices');
-    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     expect(
       (
         renderer.root.find(node => String(node.type) === 'EmptyState').props as {
@@ -282,6 +285,18 @@ describe('OrganizationInvoicesScreen empty', () => {
 });
 
 describe('OrganizationInvoicesScreen pagination', () => {
+  it('renders the loaded rows through the FlashList mock', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationInvoicesScreen));
+
+    const lists = renderer.root.findAll(node => String(node.type) === 'FlashList');
+    expect(lists).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('INV-0001');
+  });
+
   it('keeps pagination available when a loaded page has no visible entries', async () => {
     pageQuery.data = { pages: [{ entries: [], nextCursor: 'next', hasMore: true }] };
     pageHook.hasMore = true;
@@ -359,6 +374,18 @@ describe('OrganizationInvoicesScreen pagination', () => {
     const retry = buttons.rendered.find(button => button.accessibilityLabel === 'Retry');
     expect(retry).toBeDefined();
     expect(retry?.loading).toBe(true);
+  });
+
+  it('restores the 12px gap between the last row and the pagination footer', async () => {
+    pageQuery.data = { pages: [{ entries: [INVOICE], nextCursor: 'inv-1', hasMore: true }] };
+    pageHook.entries = [INVOICE];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationInvoicesScreen));
+
+    // FlashList's item separator only spans rows, so the footer carries the
+    // 12px the old content-container `gap-3` placed between it and the last row.
+    expect(renderer.root.findAll(node => node.props.className === 'pt-3')).toHaveLength(1);
   });
 
   it('keeps Load more when a background refetch fails after pages loaded', async () => {

@@ -3,6 +3,7 @@ import {
   cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
   parseCustomerBillingFailure,
+  remoteCommandCatalogV1Schema,
   sessionEventPayloadSchema,
   sessionEventV2RowSchema,
 } from './schemas';
@@ -186,5 +187,42 @@ describe('activeSessionSchema capabilities', () => {
       capabilities: { attachments: 'yes' },
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('remoteCommandCatalogV1Schema runtime-sourced commands', () => {
+  it('keeps a skill-sourced command beside an MCP-sourced one', () => {
+    const parsed = remoteCommandCatalogV1Schema.parse({
+      protocolVersion: 1,
+      commands: [
+        {
+          name: 'mcp-docs',
+          description: 'Search the docs MCP server',
+          source: 'mcp',
+          hints: [],
+        },
+        {
+          name: 'release-notes',
+          description: 'Write release notes from a skill',
+          source: 'skill',
+          hints: [],
+        },
+      ],
+    });
+
+    expect(parsed.commands).toEqual([
+      {
+        name: 'mcp-docs',
+        description: 'Search the docs MCP server',
+        source: 'mcp',
+        hints: [],
+      },
+      {
+        name: 'release-notes',
+        description: 'Write release notes from a skill',
+        source: 'skill',
+        hints: [],
+      },
+    ]);
   });
 });

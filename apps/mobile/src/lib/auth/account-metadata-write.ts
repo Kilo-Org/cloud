@@ -1,6 +1,5 @@
-import * as SecureStore from 'expo-secure-store';
-
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { deleteStoredValue, writeStoredValue } from '@/lib/auth/secure-store-value';
 import { chainSave } from '@/lib/hooks/save-chain';
 
 /**
@@ -19,10 +18,12 @@ export async function writeAccountMetadata(key: string, write: () => Promise<voi
   });
 }
 
-/** Epoch-fenced, per-key serialized write of one string value. */
+/** Epoch-fenced, per-key serialized write of one string value. A failed write
+ *  is reported at warning level with the stable write fingerprint and still
+ *  rejects, so a preference write can surface its own recoverable state. */
 export async function setAccountMetadata(key: string, value: string): Promise<void> {
   await writeAccountMetadata(key, async () => {
-    await SecureStore.setItemAsync(key, value);
+    await writeStoredValue(key, value);
   });
 }
 
@@ -34,6 +35,6 @@ export async function setAccountMetadata(key: string, value: string): Promise<vo
  */
 export async function deleteAccountMetadata(key: string): Promise<void> {
   await chainSave(key, async () => {
-    await SecureStore.deleteItemAsync(key);
+    await deleteStoredValue(key);
   });
 }

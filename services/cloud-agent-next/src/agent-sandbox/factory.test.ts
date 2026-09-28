@@ -1,14 +1,15 @@
 import { getSandbox } from '@cloudflare/sandbox';
 import { describe, expect, it, vi } from 'vitest';
-import type { Env } from '../types.js';
+import type { AgentSandboxProvider, Env } from '../types.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { createAgentSandbox } from './factory.js';
 import { CloudflareAgentSandbox } from './cloudflare/cloudflare-agent-sandbox.js';
 import { VercelAgentSandbox } from './vercel/vercel-agent-sandbox.js';
+import { AgentSandboxUnavailableError } from './protocol.js';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 
-function metadata(provider?: 'cloudflare' | 'vercel'): SessionMetadata {
+function metadata(provider?: AgentSandboxProvider): SessionMetadata {
   return {
     metadataSchemaVersion: 2,
     identity: { sessionId: 'agent_sandbox', userId: 'user_sandbox' },
@@ -87,6 +88,21 @@ describe('AgentSandbox provider factory', () => {
     );
     expect(createAgentSandbox({} as Env, metadata('cloudflare'))).toBeInstanceOf(
       CloudflareAgentSandbox
+    );
+  });
+
+  it('fails closed for cloudflare-containers metadata on the legacy agent plane', () => {
+    let thrown: unknown;
+    try {
+      createAgentSandbox({} as Env, metadata('cloudflare-containers'));
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(AgentSandboxUnavailableError);
+    expect((thrown as AgentSandboxUnavailableError).failure).toBe('capability_unavailable');
+    expect((thrown as Error).message).toBe(
+      'Cloudflare containers are not available on the legacy agent plane'
     );
   });
 });

@@ -1,6 +1,6 @@
 import { ShieldCheck } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
-import { Platform, View } from 'react-native';
+import { useState } from 'react';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
@@ -8,7 +8,6 @@ import { toast } from 'sonner-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { CenteredState } from '@/components/centered-state';
-import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
 
@@ -17,7 +16,7 @@ type SecurityAgentSetupProps<T> = {
   description: string;
   buttonLabel: string;
   url: string;
-  /** Awaited in `finally` so permission/config/repository queries refresh after the browser closes. */
+  /** Refreshes permission/config/repository queries after the browser closes. */
   onConnected: () => Promise<T>;
 };
 
@@ -32,25 +31,12 @@ export function SecurityAgentSetup<T>({
   const [connecting, setConnecting] = useState(false);
   const { t } = useTranslation();
 
-  const handleConnected = useCallback(() => {
-    void onConnected();
-  }, [onConnected]);
-  const { markLaunched, clearLaunch } = useExternalAuthReturn(handleConnected);
-
   const connect = async () => {
     setConnecting(true);
     try {
-      markLaunched();
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, url);
-      if (trigger === 'sheet-close') {
-        // iOS: the auth session resolves on sheet close — refresh right here.
-        clearLaunch();
-        await onConnected();
-      }
-      // Android: onConnected runs from the foreground handler once the app
-      // returns from the plain browser.
+      await openAuthorizationAndWaitForReturn(url);
+      await onConnected();
     } catch {
-      clearLaunch();
       toast.error(t('securityAgent.setup.couldNotOpenGithub'));
     } finally {
       setConnecting(false);

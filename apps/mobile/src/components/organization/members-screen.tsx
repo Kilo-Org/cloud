@@ -3,7 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 
 import { EmptyState } from '@/components/empty-state';
 import { InvitedMemberRow } from '@/components/organization/invited-member-row';
@@ -12,6 +12,7 @@ import { OrganizationBoundary } from '@/components/organization/organization-bou
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
@@ -201,17 +202,14 @@ export function OrganizationMembersScreen() {
         title={t('organization.members.title')}
         headerRight={
           canInvite ? (
-            <Pressable
+            <IconButton
               onPress={() => {
                 router.push('/(app)/(tabs)/(3_profile)/organization/invite-member' as Href);
               }}
-              hitSlop={12}
-              accessibilityRole="button"
               accessibilityLabel={t('organization.inviteMember.title')}
-              className="active:opacity-70"
             >
               <UserPlus size={22} color={colors.foreground} />
-            </Pressable>
+            </IconButton>
           ) : undefined
         }
       />

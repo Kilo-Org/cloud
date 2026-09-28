@@ -1,6 +1,11 @@
 import { describe, test, expect } from '@jest/globals';
 import jwt from 'jsonwebtoken';
-import { TOKEN_EXPIRY, validateAuthorizationHeader, JWT_TOKEN_VERSION } from './tokens';
+import {
+  TOKEN_EXPIRY,
+  validateAuthorizationHeader,
+  JWT_TOKEN_VERSION,
+  isRejectedCredentialReason,
+} from './tokens';
 import { getEnvVariable } from '@/lib/dotenvx';
 
 describe('TOKEN_EXPIRY', () => {
@@ -77,5 +82,41 @@ describe('validateAuthorizationHeader (C15 device-session compatibility)', () =>
 
     expect(result.error).toBeUndefined();
     expect(result.deviceSessionId).toBeUndefined();
+  });
+});
+
+describe('the anonymous bearer sentinel', () => {
+  test('means no credential, not a refused one', () => {
+    // The Kilo clients send `apiKey: "anonymous"` when nobody is signed in.
+    // Failing that request closed would take the free tier down with it.
+    const result = validateAuthorizationHeader(new Headers({ authorization: 'Bearer anonymous' }));
+
+    expect(result.reason).toBe('missing_credentials');
+    expect(isRejectedCredentialReason(result.reason)).toBe(false);
+  });
+
+  test('does not swallow a real token that merely starts the same way', () => {
+    const result = validateAuthorizationHeader(
+      new Headers({ authorization: 'Bearer anonymous-ish-token' })
+    );
+
+    expect(result.reason).toBe('invalid_token');
+    expect(isRejectedCredentialReason(result.reason)).toBe(true);
+  });
+});
+
+describe('isRejectedCredentialReason', () => {
+  test.each([
+    ['missing_credentials', false],
+    ['invalid_token', true],
+    ['token_version_outdated', true],
+    ['runtime_attestation_required', true],
+    ['audience_not_allowed', true],
+    ['a_reason_added_later', true],
+    [undefined, true],
+  ])('%s -> %s', (reason, expected) => {
+    // Only the absence of a credential may continue anonymously. Every other
+    // reason, including one this version does not know, fails the request.
+    expect(isRejectedCredentialReason(reason)).toBe(expected);
   });
 });

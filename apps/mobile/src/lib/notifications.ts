@@ -40,6 +40,7 @@ import {
   type GlanceableSink,
   registerGlanceableSink,
 } from '@/lib/glanceable/sink-registry';
+import { readWaitingAsk } from '@/lib/glanceable/waiting-ask';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { getDndAccessGranted } from '@/glanceable-android/live-update';
 import { i18n } from '@/i18n';
@@ -48,6 +49,7 @@ import { BACKGROUND_NOTIFICATION_TASK } from './notification-background-task';
 import {
   handleNeedsInputNotificationResponse,
   isNeedsInputActionIdentifier,
+  pendingDeepLinkOptionsForData,
 } from './notification-actions';
 import { isAgentProgressAllowedInActiveFocus } from './notification-focus-filter';
 import { notificationPathForData } from './notification-path';
@@ -430,6 +432,11 @@ async function handleBackgroundNotificationTask(
   // The headless process is fresh: restore the persisted snapshot and scope key
   // so the fence and revision discard below compare against durable state.
   await restorePersistedGlanceable();
+  // The recorded ask is part of that durable state, and the sinks read it
+  // synchronously to stamp `canApprove` on the content state. Hydrate the
+  // mirror before the apply, or the sink reports no approvable ask and the
+  // card hides an Approve that a tap still answers.
+  await readWaitingAsk();
   const applied = await applyGlanceablePushData(pushData);
   // A successful apply delivered new sink data: report NewData so iOS does not
   // throttle later content-available wakes (repeated NoData reduces them).
@@ -514,7 +521,14 @@ export function checkInitialNotification(): void {
   }
   const data = parseNotificationData(response.notification.request.content.data);
   if (data) {
-    setPendingDeepLink(notificationPathForData(data), 'notification');
+    // Stash the session's destination the same way the warm tap paths do
+    // (notification-actions.ts), so a session push that launches the app lands
+    // in the session's organization instead of the previously selected one.
+    setPendingDeepLink(
+      notificationPathForData(data),
+      'notification',
+      pendingDeepLinkOptionsForData(data)
+    );
   }
   Notifications.clearLastNotificationResponse();
 }

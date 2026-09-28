@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import type { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
 import type {
-  SessionMessageRecord,
+  SessionMessage,
   SessionMessageTerminalSource,
 } from '../../src/sandbox-session/session-message-queue.js';
 import { applyMessageOutcome } from '../../src/sandbox-session/session-message-queue.js';
@@ -23,6 +23,12 @@ import {
   readReportAnchor,
 } from '../../src/sandbox-session/report-outbox.js';
 
+import { writeSessionMessages } from '../../src/sandbox-state/persist/access.js';
+import { readRawSessionMessages } from '../../src/sandbox-state/persist/load.js';
+import {
+  terminalState,
+  acceptedState,
+} from '../../src/sandbox-session/session-state.test-helpers.js';
 const ownerId = 'report-owner';
 const kiloSessionId = 'ses_12345678901234567890123456';
 const agent = { mode: 'code' as const, model: 'anthropic/claude-sonnet-4' };
@@ -49,8 +55,22 @@ function suppressDispatch(instance: SandboxSession): void {
   (instance as unknown as Record<string, unknown>)['deliverQueuedMessage'] = async () => undefined;
 }
 
-function readMessages(state: DurableObjectState): SessionMessageRecord[] {
-  return state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+function readMessages(state: DurableObjectState): SessionMessage[] {
+  return readRawSessionMessages(state.storage.kv);
+}
+
+/** Project a queued row onto the canonical accepted union. */
+function acceptedRow(message: SessionMessage, acceptedAt: number) {
+  const state = message.state as Extract<SessionMessage['state'], { kind: 'queued' }>;
+  return acceptedState({
+    intent: state.intent,
+    legacyInvalidIntent: state.legacyInvalidIntent,
+    legacy: state.legacy,
+    queuedAt: state.queuedAt,
+    acceptedAt,
+    lastActivityAt: acceptedAt,
+    executionDeadlineAt: acceptedAt + 60_000,
+  });
 }
 
 function readObligation(
@@ -108,8 +128,8 @@ describe('control-plane run-state reporting', () => {
     });
 
     expect(captured).toEqual([]);
-    expect(result.first?.queuedAt).toEqual(expect.any(Number));
-    expect(result.second?.queuedAt).toBe(result.first?.queuedAt);
+    expect(result.first?.state.queuedAt).toEqual(expect.any(Number));
+    expect(result.second?.state.queuedAt).toBe(result.first?.state.queuedAt);
     expect(result.replay).toMatchObject({ success: true, outcome: 'queued' });
     expect(result.anchor).toEqual({
       version: 1,
@@ -128,7 +148,7 @@ describe('control-plane run-state reporting', () => {
     expect(result.obligation?.report.run).toMatchObject({
       messageId,
       status: 'queued',
-      queuedAt: new Date(result.first?.queuedAt ?? 0).toISOString(),
+      queuedAt: new Date(result.first?.state.queuedAt ?? 0).toISOString(),
     });
     expect(result.obligation?.report.run).not.toHaveProperty('dispatchAcceptedAt');
     expect(result.obligation?.report.run).not.toHaveProperty('terminalAt');
@@ -145,8 +165,11 @@ describe('control-plane run-state reporting', () => {
       suppressDispatch(instance);
       await register(instance, id);
       // Pre-existing message and no anchor: a legacy/unanchored session.
-      state.storage.kv.put('session_messages', [
-        { messageId: seededMessageId, state: 'completed', terminalAt: Date.now() },
+      writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, [
+        {
+          messageId: seededMessageId,
+          state: terminalState('completed', { at: Date.now() }),
+        } as SessionMessage,
       ]);
       await admit(instance, followUpId);
       return {
@@ -206,7 +229,7 @@ describe('control-plane run-state reporting', () => {
       await admit(instance, messageId);
       const messages = readMessages(state).map(message =>
         message.messageId === messageId
-          ? { ...message, state: 'accepted' as const, acceptedAt }
+          ? { ...message, state: acceptedRow(message, acceptedAt) }
           : message
       );
       instance['saveMessages'](messages);
@@ -233,7 +256,8 @@ describe('control-plane run-state reporting', () => {
       suppressDispatch(instance);
       await register(instance, id);
       await admit(instance, messageId);
-      const queued = readMessages(state).find(message => message.messageId === messageId)?.queuedAt;
+      const queued = readMessages(state).find(message => message.messageId === messageId)?.state
+        .queuedAt;
       await instance.failWaitingMessages('missing_metadata');
       await instance.alarm();
       return queued;
@@ -273,7 +297,7 @@ describe('control-plane run-state reporting', () => {
         await instance.failWaitingMessages('preparation_timeout');
         await instance.alarm();
         const policy = readMessages(state).find(message => message.messageId === messageId);
-        const policyState = policy?.state;
+        const policyState = policy?.state.kind;
         const policyFailedReports = captured.filter(
           report => report.run.status === 'failed'
         ).length;
@@ -289,7 +313,12 @@ describe('control-plane run-state reporting', () => {
               scope?: 'message' | 'runtime'
             ) => Promise<void>;
           }
-        ).failDelivery(messageId, 'preparation_timeout', policy?.wrapperInstanceId, 'message');
+        ).failDelivery(
+          messageId,
+          'preparation_timeout',
+          policy?.state.wrapperInstanceId,
+          'message'
+        );
         await instance.alarm();
         return { policyState, policyFailedReports };
       }
@@ -324,7 +353,7 @@ describe('control-plane run-state reporting', () => {
         instance['saveMessages'](
           readMessages(state).map(message =>
             message.messageId === messageId
-              ? { ...message, state: 'accepted' as const, acceptedAt }
+              ? { ...message, state: acceptedRow(message, acceptedAt) }
               : message
           )
         );
@@ -358,21 +387,29 @@ describe('control-plane run-state reporting', () => {
         await admit(instance, messageId);
         // The wrapper runtime is fenced so the real outcome mapper applies.
         const messages = readMessages(state).map(message =>
-          message.messageId === messageId ? { ...message, wrapperInstanceId } : message
+          message.messageId === messageId
+            ? { ...message, state: { ...message.state, wrapperInstanceId } }
+            : message
         );
         const updated = applyMessageOutcome(
-          messages,
+          {
+            binding: {
+              kind: 'bound' as const,
+              handle: { incarnation: 'incarnation_1', wrapper: wrapperInstanceId, epoch: 0 },
+            },
+            messages,
+          },
           { messageId, status: 'failed', reason: 'missing_metadata' },
           wrapperInstanceId,
           Date.now(),
           terminalSource
         );
         expect(updated).toBeDefined();
-        expect(updated?.find(message => message.messageId === messageId)?.acceptedAt).toEqual(
-          expect.any(Number)
-        );
-        state.storage.kv.put('session_messages', messages);
-        instance['saveMessages'](updated as SessionMessageRecord[]);
+        expect(
+          updated?.messages.find(message => message.messageId === messageId)?.state.acceptedAt
+        ).toEqual(expect.any(Number));
+        writeSessionMessages(state.storage.kv, { kind: 'unresolved' }, messages);
+        instance['saveMessages'](updated?.messages as SessionMessage[]);
         await instance.alarm();
         return true;
       });
@@ -402,7 +439,8 @@ describe('control-plane run-state reporting', () => {
       suppressDispatch(instance);
       await register(instance, id);
       await admit(instance, messageId);
-      const queued = readMessages(state).find(message => message.messageId === messageId)?.queuedAt;
+      const queued = readMessages(state).find(message => message.messageId === messageId)?.state
+        .queuedAt;
       expect(await instance.cancelQueuedMessage(messageId)).toEqual({ dropped: true });
       await instance.alarm();
       return queued;

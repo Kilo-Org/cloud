@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { encodeUserIdForPath } from '../util/user-id-encoding';
+import { encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 
 vi.mock('../util/do-retry', () => ({
   withDORetry: async <TStub, TResult>(

@@ -159,6 +159,26 @@ describe('DiffLine gutter alignment', () => {
   });
 });
 
+describe('DiffLine code direction', () => {
+  // Code is written left to right whatever the interface language. The code
+  // Text must name its own base direction: under the interface's RTL direction
+  // Android aligns LTR script to the right margin, so the continuation of a
+  // wrapped line starts mid-row instead of under the first line's start.
+  it('names the left-to-right base direction on the code text', () => {
+    const renderer = mountLine({ line: line(), language: null, keyId: 'ltr-code' });
+
+    const [codeText] = renderer.root.findAll(
+      node => node.type === ('RNText' as never) && node.props.selectable === true
+    );
+    if (codeText === undefined) {
+      throw new Error('expected a selectable code Text');
+    }
+    const style = codeText.props.style as { direction?: string; writingDirection?: string };
+    expect(style.direction).toBe('ltr');
+    expect(style.writingDirection).toBe('ltr');
+  });
+});
+
 describe('DiffLine highlight runs', () => {
   // The diff line shares the code block's run renderer: untagged tokens stay
   // raw strings (React Native coalesces them into the code Text's own

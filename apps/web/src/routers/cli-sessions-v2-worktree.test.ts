@@ -136,6 +136,7 @@ const ownershipRow = {
   parent_session_id: null,
   organization_id: null,
   cloud_agent_session_id: WORKSPACE_ID,
+  profile_id: null,
   cloud_agent_session_scope_id: null,
   cloud_agent_worktree_id: WORKTREE_ID,
   created_on_platform: 'cloud-agent-web',

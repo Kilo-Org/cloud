@@ -46,7 +46,8 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
     expect(query.params).toContain(2);
-    expect(query.params).toContain('exclusive');
+    expect(query.params).toContain('workflow');
+    expect(query.params).not.toContain('agent_only');
   });
 
   it('requires current membership for every organization-scoped credential candidate', () => {
@@ -88,11 +89,33 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(1);
   });
 
-  it('requires exclusive mode for managed lookups without an exact association ID', () => {
+  it('requires workflow authority for managed lookups without an exact association ID', () => {
     const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
     const query = buildManagedInstallationLookupQuery(db, params).toSQL();
 
-    expect(query.params).toContain('exclusive');
+    expect(query.params).toContain('workflow');
+    expect(query.params).not.toContain('agent_only');
+  });
+
+  it('only admits agent-only associations for an exact, trusted managed purpose', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const agent = {
+      ...params,
+      accessPurpose: 'agent' as const,
+      expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
+    };
+    expect(buildManagedInstallationLookupQuery(db, agent).toSQL().params).toContain('agent_only');
+    expect(buildInstallationLookupQuery(db, agent).toSQL().params).not.toContain('agent_only');
+    expect(
+      buildManagedInstallationLookupQuery(db, {
+        ...agent,
+        expectedIntegrationId: undefined,
+      }).toSQL().params
+    ).not.toContain('agent_only');
+    expect(
+      buildManagedInstallationLookupQuery(db, { ...agent, accessPurpose: 'workflow' }).toSQL()
+        .params
+    ).not.toContain('agent_only');
   });
 
   it('uses a supplied integration ID as an exact personal authorization fence', () => {

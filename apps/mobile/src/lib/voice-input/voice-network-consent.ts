@@ -1,5 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
-
+import { readStoredValueSafe, writeStoredValueSafe } from '@/lib/auth/secure-store-value';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { encodeStorageKey, VOICE_NETWORK_CONSENT_KEY_PREFIX } from '@/lib/storage-keys';
 
@@ -33,7 +32,9 @@ export function subscribeToVoiceNetworkConsent(listener: VoiceNetworkConsentList
 }
 
 export async function readVoiceNetworkConsent(userId: string): Promise<VoiceNetworkConsent> {
-  const raw = await SecureStore.getItemAsync(keyFor(userId));
+  // A failed read is reported and treated as unset, so the consent gate asks
+  // again instead of the read rejecting into the voice flow.
+  const raw = await readStoredValueSafe(keyFor(userId));
   if (raw === 'granted' || raw === 'declined') {
     return raw;
   }
@@ -41,12 +42,24 @@ export async function readVoiceNetworkConsent(userId: string): Promise<VoiceNetw
   return 'unset';
 }
 
+/**
+ * Stores one decision and reports whether it reached the device. A failed write
+ * is reported at warning level and returned as `false` rather than rejecting:
+ * the settings switch rolls back and toasts on `false`, while the voice flow's
+ * fire-and-forget callers stay rejection-free. Subscribers hear only about a
+ * stored decision, so the in-memory state never claims a choice the device did
+ * not keep — a relaunch asks again.
+ */
 export async function writeVoiceNetworkConsent(
   userId: string,
   value: 'granted' | 'declined'
-): Promise<void> {
-  await chainSave(keyFor(userId), async () => {
-    await SecureStore.setItemAsync(keyFor(userId), value);
+): Promise<boolean> {
+  const stored = await chainSave(keyFor(userId), async () => {
+    const result = await writeStoredValueSafe(keyFor(userId), value);
+    return result;
   });
-  notifyVoiceNetworkConsent(userId, value);
+  if (stored) {
+    notifyVoiceNetworkConsent(userId, value);
+  }
+  return stored;
 }

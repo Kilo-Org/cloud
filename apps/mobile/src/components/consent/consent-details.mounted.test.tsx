@@ -393,7 +393,9 @@ describe('Voice transcription section', () => {
   it('rolls back the switch and toasts when the write fails', async () => {
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(false);
     voiceNetworkConsentMock.readVoiceNetworkConsent.mockResolvedValue('unset');
-    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockRejectedValue(new Error('boom'));
+    // The real write resolves `false` on a keychain failure (it reports at
+    // warning level and stays total); the row owns the rollback.
+    voiceNetworkConsentMock.writeVoiceNetworkConsent.mockResolvedValue(false);
     const renderer = mountVoiceControl();
     await TestRenderer.act(flush);
 

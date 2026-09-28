@@ -22,6 +22,7 @@ export const NOTIFICATION_CATEGORY_KEYS = [
   'sessionStatus',
   'kiloclawActivity',
   'balanceAlerts',
+  'spendAlerts',
   'securityFindings',
 ] as const;
 
@@ -35,6 +36,7 @@ export type NotificationPreferences = Readonly<{
   sessionStatus: boolean;
   kiloclawActivity: boolean;
   balanceAlerts: boolean;
+  spendAlerts: boolean;
   securityFindings: boolean;
   agentPushEnabled: boolean;
   notificationPreviews?: 'generic' | 'full';
@@ -111,6 +113,7 @@ function defaultPreferences(
     sessionStatus: DEFAULT_NOTIFICATION_PREFERENCE,
     kiloclawActivity: DEFAULT_NOTIFICATION_PREFERENCE,
     balanceAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
+    spendAlerts: DEFAULT_NOTIFICATION_PREFERENCE,
     securityFindings: DEFAULT_NOTIFICATION_PREFERENCE,
     agentPushEnabled: DEFAULT_NOTIFICATION_PREFERENCE,
     ...overrides,

@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as z from 'zod';
 
 import { PICKER_LAUNCH_CONTEXT_KEY } from '@/lib/storage-keys';

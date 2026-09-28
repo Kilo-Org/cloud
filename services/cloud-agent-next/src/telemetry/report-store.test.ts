@@ -464,6 +464,32 @@ describe('cloud agent reporting store', () => {
     });
   });
 
+  it('persists a provider failure responsibility and reason unchanged', async () => {
+    const fake = makeDb([[{ createdAt: occurredAt }], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    const result = await store.saveReport(
+      {
+        ...failedReport,
+        run: {
+          ...failedReport.run,
+          failureResponsibility: 'provider',
+          failureReason: 'provider_unavailable',
+        },
+      },
+      occurredAt
+    );
+    expect(result).toEqual({ outcome: 'applied' });
+    expect(
+      fake.inserts.find(call => call.table === cloud_agent_session_runs)?.values
+    ).toMatchObject({
+      cloud_agent_session_id: cloudAgentSessionId,
+      message_id: failedReport.run.messageId,
+      status: 'failed',
+      failure_responsibility: 'provider',
+      failure_reason: 'provider_unavailable',
+    });
+  });
+
   it('does not attach responsibility from a replay with conflicting terminal facts', async () => {
     const fake = makeDb([
       [{ createdAt: occurredAt }],

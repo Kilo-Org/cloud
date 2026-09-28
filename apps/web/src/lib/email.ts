@@ -18,6 +18,7 @@ export const subjects = {
   magicLink: 'Sign in to Kilo Code',
   signInCode: 'Your Kilo Code sign-in code',
   balanceAlert: 'Kilo: Low Balance Alert',
+  spendAlert: 'Kilo: Spend alert',
   autoTopUpFailed: 'Kilo: Auto Top-Up Failed',
   codeReviewDisabled: 'Action Required: Code Reviewer Disabled',
   ossInviteNewUser: 'Kilo: OSS Sponsorship Offer',
@@ -357,6 +358,100 @@ export async function sendBalanceAlertEmail(props: SendBalanceAlertEmailProps): 
   for (let i = 0; i < to.length; i += BATCH_SIZE) {
     await Promise.all(to.slice(i, i + BATCH_SIZE).map(sendToRecipient));
   }
+}
+
+type SendSpendAlertEmailProps = {
+  /** Every authorized billing contact of the one scope; one email each. */
+  to: string[];
+  /** Personal renders the personal usage view; organization its usage details. */
+  scopeType: 'personal' | 'organization';
+  /** The scope's owner id: the user id for personal, the organization id otherwise. */
+  scopeId: string;
+  scopeName: string;
+  kindLabel: string;
+  /** The scope's own rolling spend, in USD. */
+  amountUsd: number;
+  /** The threshold that spend crossed, in USD. */
+  thresholdUsd: number;
+};
+
+/**
+ * Per-recipient outcome of one alert send, classified so the delivery outbox
+ * can tell a permanent rejection from a transient failure. A `neverbounce`
+ * rejection or an unconfigured provider never succeeds on a retry, so the row
+ * must reach a terminal outcome instead of resending the alert to everyone
+ * forever; a thrown provider error is the only retryable case.
+ */
+export type SpendAlertEmailOutcome = {
+  /** Recipients the provider accepted. Never send these again. */
+  delivered: string[];
+  /** Recipients whose send failed transiently and should be retried. */
+  retryable: string[];
+  /** Recipients that can never receive this mail (rejected address, no provider). */
+  undeliverable: string[];
+};
+
+/**
+ * One alert email per recipient, carrying only this scope's amount and
+ * threshold. The single call to action opens this scope's spend view.
+ *
+ * Never throws: each recipient's result is classified so the delivery outbox
+ * can reschedule only the transient failures, keep a permanent rejection out of
+ * the retry loop, and avoid re-emailing a recipient an earlier attempt reached.
+ */
+export async function sendSpendAlertEmail(
+  props: SendSpendAlertEmailProps
+): Promise<SpendAlertEmailOutcome> {
+  const { to, scopeType, scopeId, scopeName, kindLabel, amountUsd, thresholdUsd } = props;
+
+  const outcome: SpendAlertEmailOutcome = { delivered: [], retryable: [], undeliverable: [] };
+
+  if (!to || to.length === 0) {
+    console.warn('[sendSpendAlertEmail] No recipients configured - skipping email');
+    return outcome;
+  }
+
+  const spend_url =
+    scopeType === 'organization'
+      ? `${NEXTAUTH_URL}/organizations/${scopeId}/usage-details`
+      : `${NEXTAUTH_URL}/usage`;
+
+  const templateVars = {
+    spend_url,
+    cta_label: 'Open spend view',
+    scope_name: scopeName,
+    kind_label: kindLabel,
+    amount_usd: amountUsd.toFixed(2),
+    threshold_usd: thresholdUsd.toFixed(2),
+  };
+
+  const sendToRecipient = async (email: string) => {
+    try {
+      const result = await send({ to: email, templateName: 'spendAlert', templateVars });
+      if (result.sent) {
+        outcome.delivered.push(email);
+        logExceptInTest(`[sendSpendAlertEmail] Sent to ${email} for scope ${scopeId}`);
+      } else {
+        outcome.undeliverable.push(email);
+        warnExceptInTest(
+          `[sendSpendAlertEmail] Failed to send to ${email} for scope ${scopeId}: reason=${result.reason}`
+        );
+      }
+    } catch (error) {
+      outcome.retryable.push(email);
+      warnExceptInTest(
+        `[sendSpendAlertEmail] Transport failure for ${email} on scope ${scopeId}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  };
+
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < to.length; i += BATCH_SIZE) {
+    await Promise.all(to.slice(i, i + BATCH_SIZE).map(sendToRecipient));
+  }
+  return outcome;
 }
 
 const ossTierConfig = {

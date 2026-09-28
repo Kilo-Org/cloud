@@ -25,7 +25,11 @@ const layoutDirection = vi.hoisted(() => ({ isRTL: false }));
 const safeAreaInsets = vi.hoisted(() => ({ bottom: 0, left: 0, right: 0, top: 0 }));
 const TEXT_DIRECTIONS = [
   { direction: 'LTR', isRTL: false, style: undefined },
-  { direction: 'RTL', isRTL: true, style: [{ writingDirection: 'rtl' }, undefined] },
+  {
+    direction: 'RTL',
+    isRTL: true,
+    style: [{ writingDirection: 'rtl' }, undefined, undefined],
+  },
 ];
 
 vi.mock('@rn-primitives/slot', () => ({ Text: 'SlotText' }));
@@ -218,6 +222,7 @@ vi.mock('@/components/agents/remote-session-exit-alert', () => ({
 vi.mock('@/components/agents/use-text-height', () => ({
   useTextHeight: () => ({
     height: 88,
+    maxHeight: 124,
     measureElement: null,
     reset: vi.fn(),
     setText: vi.fn(),

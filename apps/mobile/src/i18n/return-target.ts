@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 
 import { LANGUAGE_RETURN_TARGET_KEY } from '@/lib/storage-keys';
 

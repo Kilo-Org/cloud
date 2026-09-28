@@ -11,7 +11,9 @@
 import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { z } from 'zod';
-import { mintApiToken, mintStreamTicket, type TestUser } from './auth.js';
+import { mintApiToken, mintStreamTicket } from './auth.js';
+import { resolveFakeAdminToken } from './fake-llm-admin.js';
+import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
 import type { FakeScenarioStatus } from './fake-llm-server.js';
 
 /**
@@ -31,17 +33,39 @@ export type CallbackTarget = {
   headers?: Record<string, string>;
 };
 
+/**
+ * Identity-only user shape for the driver. The local profile's `TestUser`
+ * (which also carries `api_token_pepper`) satisfies it; the deployed profile
+ * supplies identity only and authenticates with a bearer token.
+ */
+export type DriverUser = { id: string; email?: string; api_token_pepper?: string };
+
 export type DriverConfig = {
   /** Track returned session IDs, including prepare success followed by initiation failure. */
   onSessionCreated?: (sessionId: string) => void;
   workerUrl: string;
   expectControlPlane?: boolean;
-  user: TestUser;
-  nextAuthSecret: string;
+  user: DriverUser;
+  /** Local profile only: mints JWTs. Deployed profile uses `bearerToken`. */
+  nextAuthSecret?: string;
+  /**
+   * Deployed profile: a real ordinary personal API token presented verbatim as
+   * the tRPC bearer. Takes precedence over `nextAuthSecret` minting.
+   */
+  bearerToken?: string;
+  /** Deployed profile: fetches a fresh stream ticket for a session. */
+  fetchStreamTicket?: (sessionId: string) => Promise<string>;
+  /**
+   * When explicitly `false`, omit `x-skip-balance-check`. Both e2e profiles
+   * send it: the deterministic fake LLM performs no billable inference, so the
+   * driver never needs a funded user.
+   */
+  skipBalanceCheck?: boolean;
   /**
    * Shared internal-API secret required by `prepareSession` /
-   * `updateSession`. Only the legacy flow needs it; unified `start` is
-   * `protectedProcedure`. Loaded from `.dev.vars` in the runner.
+   * `updateSession`. The legacy flow and the e2e surface both present it; it is
+   * loaded from `.dev.vars` for the Docker profile and resolved from the
+   * deployed/local-HTTP profile environment otherwise.
    */
   internalApiSecret?: string;
   /** HTTPS git URL to bootstrap the workspace. Public tiny repos work fine. */
@@ -77,10 +101,6 @@ export const DEFAULT_CONFIG: Omit<DriverConfig, 'user' | 'nextAuthSecret'> = {
   model: 'kilo/fake-deterministic',
   fakeLlmUrl: process.env.FAKE_LLM_URL ?? 'http://localhost:8811',
 };
-
-// ---------------------------------------------------------------------------
-// tRPC helpers
-// ---------------------------------------------------------------------------
 
 /**
  * Minimal tRPC HTTP-link client. The cloud-agent-next server mounts tRPC
@@ -135,17 +155,24 @@ export async function trpcCall<T>(
   config: DriverConfig,
   procedure: string,
   input: unknown,
-  opts?: { internalApiSecret?: string; method?: 'GET' | 'POST'; signal?: AbortSignal }
+  opts?: {
+    internalApiSecret?: string;
+    method?: 'GET' | 'POST';
+    signal?: AbortSignal;
+  }
 ): Promise<T> {
   const method = opts?.method ?? 'POST';
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${mintApiToken(config.user, config.nextAuthSecret)}`,
-    // cloud-agent-client.ts sends this for App Builder callers; it cleanly
-    // skips dev billing checks and is safe to always send from the driver.
-    'x-skip-balance-check': 'true',
+    Authorization: `Bearer ${config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret)}`,
   };
+  if (config.skipBalanceCheck !== false) {
+    // cloud-agent-client.ts sends this for App Builder callers; it cleanly
+    // skips dev billing checks. Both e2e profiles send it, because the fake
+    // LLM performs no billable inference.
+    headers['x-skip-balance-check'] = 'true';
+  }
   if (opts?.internalApiSecret) {
     headers['x-internal-api-key'] = opts.internalApiSecret;
   }
@@ -167,10 +194,6 @@ export async function trpcCall<T>(
   return envelope.result.data as T;
 }
 
-// ---------------------------------------------------------------------------
-// High-level session operations
-// ---------------------------------------------------------------------------
-
 export type StartSessionResult = {
   cloudAgentSessionId: string;
   kiloSessionId: string;
@@ -186,6 +209,8 @@ export type StartSessionArgs = {
   branch?: string;
   callbackTarget?: CallbackTarget;
   messageId?: string;
+  /** Bounds the start HTTP call(s) from the caller's scenario deadline. */
+  signal?: AbortSignal;
 };
 
 /**
@@ -224,32 +249,60 @@ async function startSessionUnified(
   if (args.callbackTarget) {
     throw new Error('callbackTarget is accepted by prepareSession only; rerun with --api=legacy');
   }
-  return trpcCall<StartSessionResult>(config, 'start', {
-    message: {
-      prompt: args.prompt,
-      ...(args.messageId ? { id: args.messageId } : {}),
+  return trpcCall<StartSessionResult>(
+    config,
+    'start',
+    {
+      message: {
+        prompt: args.prompt,
+        ...(args.messageId ? { id: args.messageId } : {}),
+      },
+      agent: {
+        mode: args.mode ?? 'code',
+        model: config.model,
+      },
+      repository: config.githubRepo
+        ? {
+            type: 'github' as const,
+            repo: config.githubRepo,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
+          }
+        : {
+            type: 'git' as const,
+            url: config.gitUrl,
+            ...(args.branch !== undefined ? { branch: args.branch } : {}),
+          },
+      options: {
+        createdOnPlatform: 'cloud-agent-web',
+        ...(config.kilocodeOrganizationId
+          ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+          : {}),
+      },
     },
-    agent: {
-      mode: args.mode ?? 'code',
-      model: config.model,
-    },
-    repository: config.githubRepo
-      ? {
-          type: 'github' as const,
-          repo: config.githubRepo,
-          ...(args.branch !== undefined ? { branch: args.branch } : {}),
-        }
-      : {
-          type: 'git' as const,
-          url: config.gitUrl,
-          ...(args.branch !== undefined ? { branch: args.branch } : {}),
-        },
-    options: {
-      createdOnPlatform: 'cloud-agent-web',
-      ...(config.kilocodeOrganizationId
-        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
-        : {}),
-    },
+    { signal: args.signal }
+  );
+}
+
+/**
+ * Dispatch the `prepareSession` procedure to the internal
+ * `/trpc/prepareSession` endpoint with the shared internal API secret. Both
+ * callers of the procedure — the legacy start and the browser-equivalent
+ * prepare — go through here so there is one place that decides, and the
+ * production tRPC handler stays the only prepare mutation.
+ */
+async function prepareSessionCall<T>(
+  config: DriverConfig,
+  input: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<T> {
+  if (!config.internalApiSecret) {
+    throw new Error(
+      'prepareSession requires the e2e INTERNAL_API_SECRET (from .dev.vars for the Docker profile, or the resolved e2e secret for the deployed/local-HTTP profile)'
+    );
+  }
+  return trpcCall<T>(config, 'prepareSession', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -267,19 +320,12 @@ async function startSessionLegacy(
   config: DriverConfig,
   args: StartSessionArgs
 ): Promise<StartSessionResult> {
-  if (!config.internalApiSecret) {
-    throw new Error(
-      'legacy startSession requires INTERNAL_API_SECRET from .dev.vars — add it or pass api=unified'
-    );
-  }
-
   type PrepareResult = {
     cloudAgentSessionId: string;
     kiloSessionId: string;
   };
-  const prepared = await trpcCall<PrepareResult>(
+  const prepared = await prepareSessionCall<PrepareResult>(
     config,
-    'prepareSession',
     {
       prompt: args.prompt,
       mode: args.mode ?? 'code',
@@ -294,7 +340,7 @@ async function startSessionLegacy(
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
     },
-    { internalApiSecret: config.internalApiSecret }
+    args.signal
   );
 
   type InitiateResult = {
@@ -306,9 +352,14 @@ async function startSessionLegacy(
     status?: string;
   };
   config.onSessionCreated?.(prepared.cloudAgentSessionId);
-  const initiated = await trpcCall<InitiateResult>(config, 'initiateFromKilocodeSessionV2', {
-    cloudAgentSessionId: prepared.cloudAgentSessionId,
-  });
+  const initiated = await trpcCall<InitiateResult>(
+    config,
+    'initiateFromKilocodeSessionV2',
+    {
+      cloudAgentSessionId: prepared.cloudAgentSessionId,
+    },
+    { signal: args.signal }
+  );
 
   return {
     cloudAgentSessionId: prepared.cloudAgentSessionId,
@@ -332,12 +383,8 @@ export async function prepareBrowserSession(
   input: { prompt: string; operationKey?: string; autoCommit?: boolean },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  if (!config.internalApiSecret) {
-    throw new Error('browser-equivalent prepareSession requires INTERNAL_API_SECRET');
-  }
-  return trpcCall<WorktreeSessionResult>(
+  const prepared = await prepareSessionCall<WorktreeSessionResult>(
     config,
-    'prepareSession',
     {
       prompt: input.prompt,
       mode: 'code',
@@ -353,8 +400,13 @@ export async function prepareBrowserSession(
         ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
         : {}),
     },
-    { internalApiSecret: config.internalApiSecret, signal }
+    signal
   );
+  // Success only: a rejected prepare never produced a session to clean up. The
+  // local `smoke.ts` already supplies this hook, so its cleanup now also
+  // releases browser-created sessions it previously missed.
+  config.onSessionCreated?.(prepared.cloudAgentSessionId);
+  return prepared;
 }
 
 export async function createWorktreeChat(
@@ -366,7 +418,7 @@ export async function createWorktreeChat(
   },
   signal?: AbortSignal
 ): Promise<WorktreeSessionResult> {
-  return trpcCall<WorktreeSessionResult>(
+  const created = await trpcCall<WorktreeSessionResult>(
     config,
     'createWorktreeChat',
     {
@@ -380,6 +432,11 @@ export async function createWorktreeChat(
     },
     { internalApiSecret: config.internalApiSecret, signal }
   );
+  // Success only, matching the legacy/unified start pattern. As with
+  // `prepareBrowserSession`, the local `smoke.ts` cleanup now also captures
+  // worktree-chat sessions it previously missed.
+  config.onSessionCreated?.(created.cloudAgentSessionId);
+  return created;
 }
 
 export type SessionSnapshot = {
@@ -393,7 +450,9 @@ export type SessionSnapshot = {
   platform?: string;
   upstreamBranch?: string;
   autoCommit?: boolean;
-  worktreeId?: string;
+  worktreeId?: string | null;
+  parentSessionId?: string | null;
+  cloudAgentSessionScopeId?: string | null;
   cloudAgentWorktreeId?: string;
   initialMessageId?: string;
   latestEventId?: number | null;
@@ -402,13 +461,14 @@ export type SessionSnapshot = {
 
 export async function getSessionSnapshot(
   config: DriverConfig,
-  cloudAgentSessionId: string
+  cloudAgentSessionId: string,
+  signal?: AbortSignal
 ): Promise<SessionSnapshot> {
   return trpcCall<SessionSnapshot>(
     config,
     'getSession',
     { cloudAgentSessionId },
-    { method: 'GET' }
+    { method: 'GET', signal }
   );
 }
 
@@ -463,23 +523,24 @@ export async function sendMessage(
   );
 }
 
-// ---------------------------------------------------------------------------
-// Control-plane helpers
-// ---------------------------------------------------------------------------
-
 const messageResultSchema = z.object({
   cloudAgentSessionId: z.string(),
   messageId: z.string(),
   status: z.enum(['queued', 'running', 'completed', 'failed', 'interrupted']),
 });
 
-export async function getMessageResult(config: DriverConfig, sessionId: string, messageId: string) {
+export async function getMessageResult(
+  config: DriverConfig,
+  sessionId: string,
+  messageId: string,
+  signal?: AbortSignal
+) {
   const result = messageResultSchema.parse(
     await trpcCall<unknown>(
       config,
       'getMessageResult',
       { cloudAgentSessionId: sessionId, messageId },
-      { method: 'GET' }
+      { method: 'GET', signal }
     )
   );
   if (result.cloudAgentSessionId !== sessionId || result.messageId !== messageId) {
@@ -519,25 +580,35 @@ export async function answerQuestion(
   config: DriverConfig,
   sessionId: string,
   questionId: string,
-  answers: string[][]
+  answers: string[][],
+  signal?: AbortSignal
 ): Promise<{ success: boolean }> {
-  return trpcCall<{ success: boolean }>(config, 'answerQuestion', {
-    sessionId,
-    questionId,
-    answers,
-  });
+  return trpcCall<{ success: boolean }>(
+    config,
+    'answerQuestion',
+    { sessionId, questionId, answers },
+    { signal }
+  );
 }
 
 export async function deleteSession(
   config: DriverConfig,
-  sessionId: string
+  sessionId: string,
+  signal?: AbortSignal
 ): Promise<{ success: boolean }> {
-  return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId });
+  return trpcCall<{ success: boolean }>(config, 'deleteSession', { sessionId }, { signal });
 }
 
-// ---------------------------------------------------------------------------
-// Fake-LLM gate helpers
-// ---------------------------------------------------------------------------
+/**
+ * Headers for the fake LLM `/test/*` side channel.
+ *
+ * The token comes from `resolveFakeAdminToken()` — the same resolver the local
+ * Node fake server uses — so one `FAKE_LLM_ADMIN_TOKEN` value reaches both ends.
+ * A deployed fake Worker needs the driver's value configured as its secret.
+ */
+function fakeControlHeaders(): Record<string, string> {
+  return { Authorization: `Bearer ${resolveFakeAdminToken()}` };
+}
 
 /**
  * Release a `gate:<tag>` scenario parked on the fake LLM server. The driver
@@ -550,7 +621,7 @@ export async function releaseGate(
   signal?: AbortSignal
 ): Promise<void> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/release?tag=${encodeURIComponent(tag)}`;
-  const res = await fetch(url, { method: 'POST', signal });
+  const res = await fetch(url, { method: 'POST', signal, headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`releaseGate(${tag}) failed: ${res.status} ${res.statusText}`);
   }
@@ -567,7 +638,7 @@ export type FakeWaitersSnapshot = {
 
 export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersSnapshot> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/waiters`;
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: fakeControlHeaders() });
   if (!res.ok) {
     throw new Error(`fetchFakeWaiters failed: ${res.status} ${res.statusText}`);
   }
@@ -576,11 +647,18 @@ export async function fetchFakeWaiters(fakeLlmUrl: string): Promise<FakeWaitersS
 
 export type FakeRequestSnapshot = {
   chatCompletions: number;
+  /** Present when the query was scoped; echoes the requested scope. */
+  scope?: string;
 };
 
-export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequestSnapshot> {
-  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests`;
-  const res = await fetch(url);
+export async function fetchFakeRequests(
+  fakeLlmUrl: string,
+  signal?: AbortSignal
+): Promise<FakeRequestSnapshot> {
+  const scope = resolveFakeScope();
+  const query = scope === undefined ? '' : `?scope=${encodeURIComponent(scope)}`;
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/requests${query}`;
+  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!res.ok) {
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }
@@ -589,10 +667,11 @@ export async function fetchFakeRequests(fakeLlmUrl: string): Promise<FakeRequest
 
 export async function fetchFakeScenarioStatus(
   fakeLlmUrl: string,
-  tag: string
+  tag: string,
+  signal?: AbortSignal
 ): Promise<FakeScenarioStatus> {
   const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/scenario-status?tag=${encodeURIComponent(tag)}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: fakeControlHeaders(), signal });
   if (!response.ok) {
     throw new Error(`fetchFakeScenarioStatus(${tag}) failed: ${response.status}`);
   }
@@ -600,37 +679,74 @@ export async function fetchFakeScenarioStatus(
 }
 
 /**
+ * Diagnostic detail for a gate that never engaged. The boolean wait alone
+ * cannot distinguish "the model request was never sent" (requests=0, a sandbox
+ * or startup stall) from "the model answered without running the gate tool"
+ * (requests>0), so report the fake-server counters too.
+ */
+export async function gateEngagementDetail(
+  config: DriverConfig,
+  tag: string,
+  timeoutMs: number
+): Promise<string> {
+  const status = await fetchFakeScenarioStatus(config.fakeLlmUrl, tag).catch(() => null);
+  const detail = status
+    ? `requests=${status.requests}; toolCalls=${JSON.stringify(status.toolCalls)}; toolResults=${JSON.stringify(status.toolResults)}`
+    : 'fake scenario status unavailable';
+  return `gate:${tag} did not engage within ${timeoutMs}ms; ${detail}`;
+}
+
+/**
+ * A `setTimeout` that settles early when `signal` aborts, so an aborted poll
+ * stops immediately instead of waiting out the interval.
+ */
+function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.resolve();
+  return new Promise(resolve => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      resolve();
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+/**
  * Poll the fake LLM server until a `gate:<tag>` scenario is actively parked —
  * meaning kilo has dialed the fake and the turn is blocked mid-stream.
- * Returns true on success, false on timeout.
+ * Returns true on success, false on timeout. An abort stops the polling and
+ * returns false; the caller owns the abort accounting.
  */
 export async function waitForGateEngaged(
   config: DriverConfig,
   tag: string,
   timeoutMs = 120_000,
-  pollIntervalMs = 100
+  pollIntervalMs = 100,
+  signal?: AbortSignal
 ): Promise<boolean> {
   const base = config.fakeLlmUrl.replace(/\/$/, '');
   const url = `${base}/test/gate-status?tag=${encodeURIComponent(tag)}`;
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (signal?.aborted) return false;
     try {
-      const res = await fetch(url);
+      const res = await fetch(url, { headers: fakeControlHeaders(), signal });
       if (res.ok) {
         const body = (await res.json()) as { engaged?: boolean };
         if (body.engaged === true) return true;
       }
     } catch {
-      // Server not ready yet — keep polling until the deadline.
+      // Server not ready yet — keep polling until the deadline. An abort is
+      // also caught here; the loop-top check returns false on the next pass.
     }
-    await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+    await abortableDelay(pollIntervalMs, signal);
   }
   return false;
 }
-
-// ---------------------------------------------------------------------------
-// WebSocket stream
-// ---------------------------------------------------------------------------
 
 export const streamEventSchema = z.object({
   eventId: z.number(),
@@ -657,12 +773,20 @@ export type StreamConnection = {
   get receivedCount(): number;
   /** Whether the socket is still open. */
   get isOpen(): boolean;
+  /**
+   * Close code/reason of the first socket close observed on this connection, or
+   * `null` while no close frame has been seen. It lets a caller tell an observed
+   * transport drop from a wait that simply timed out on a live socket.
+   */
+  closeInfo: { code: number; reason: string } | null;
 };
 
 export type StreamOptions = {
   replay?: boolean;
   onEvent?: (event: StreamEvent) => void;
   signal?: AbortSignal;
+  /** A pre-fetched stream ticket. Deployed callers must supply one. */
+  ticket?: string;
 };
 
 /** Event types we treat as terminal for scenario purposes. */
@@ -686,6 +810,22 @@ export function messageIdFromEvent(event: StreamEvent): string | undefined {
     : undefined;
 }
 
+export type QueuedOrCompleted = 'queued' | 'completed' | 'failed';
+
+/** Classify a message lifecycle event, or null for a non-message event. */
+export function messagePhase(event: StreamEvent): QueuedOrCompleted | null {
+  switch (event.streamEventType) {
+    case 'cloud.message.queued':
+      return 'queued';
+    case 'cloud.message.completed':
+      return 'completed';
+    case 'cloud.message.failed':
+      return 'failed';
+    default:
+      return null;
+  }
+}
+
 export function isMessageCompleted(
   event: StreamEvent | null,
   messageId: string
@@ -700,32 +840,83 @@ export function isMessageCompleted(
   );
 }
 
+/**
+ * Thrown by `resolveStreamTicket` only when neither `config.fetchStreamTicket`
+ * nor `config.nextAuthSecret` is configured. It gives the "no source" condition
+ * a name the resolver owns, so the retry path can fall back to `null` for it
+ * while every real ticket-acquisition failure propagates and is logged.
+ */
+export class NoStreamTicketSourceError extends Error {
+  constructor() {
+    super(
+      'openStream requires options.ticket or a stream-ticket source (config.fetchStreamTicket or config.nextAuthSecret)'
+    );
+    this.name = 'NoStreamTicketSourceError';
+  }
+}
+
+/**
+ * The single owner of the connected-stream credential: `config.fetchStreamTicket`
+ * wins, else a synchronous mint from `config.nextAuthSecret`, else it throws
+ * `NoStreamTicketSourceError`.
+ * The `string | Promise<string>` return is deliberate: the local socket is
+ * created synchronously while deployed ticket fetching is asynchronous.
+ */
+export function resolveStreamTicket(
+  config: DriverConfig,
+  sessionId: string
+): string | Promise<string> {
+  if (config.fetchStreamTicket) return config.fetchStreamTicket(sessionId);
+  if (config.nextAuthSecret) return mintStreamTicket(config.user, sessionId, config.nextAuthSecret);
+  throw new NoStreamTicketSourceError();
+}
+
 export function openStream(
   config: DriverConfig,
   cloudAgentSessionId: string,
   options: StreamOptions = {}
 ): StreamConnection {
   const wsBase = config.workerUrl.replace(/^http/, 'ws');
-  const url = new URL(`/stream`, wsBase);
-  url.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
-  url.searchParams.set(
-    'ticket',
-    mintStreamTicket(config.user, cloudAgentSessionId, config.nextAuthSecret)
-  );
-  if (options.replay === false) {
-    url.searchParams.set('replay', 'false');
-  }
-
-  const ws = new WebSocket(url.toString());
   const events: StreamEvent[] = [];
   let abortListener: (() => void) | undefined;
   let closed = false;
+  let retried = false;
+  let retryPending = false;
+  let currentGeneration = 0;
+  let currentWs: WebSocket | undefined;
+  let closeInfo: { code: number; reason: string } | null = null;
   const listeners: Array<{
     predicate: (event: StreamEvent) => boolean;
     resolve: (event: StreamEvent | null) => void;
   }> = [];
 
-  ws.on('message', raw => {
+  function buildUrl(ticket: string): string {
+    const url = new URL(`/stream`, wsBase);
+    url.searchParams.set('cloudAgentSessionId', cloudAgentSessionId);
+    url.searchParams.set('ticket', ticket);
+    if (options.replay === false) {
+      url.searchParams.set('replay', 'false');
+    }
+    return url.toString();
+  }
+
+  function initialTicket(): string | Promise<string> {
+    return options.ticket ?? resolveStreamTicket(config, cloudAgentSessionId);
+  }
+
+  async function acquireFreshTicket(): Promise<string | null> {
+    try {
+      return await resolveStreamTicket(config, cloudAgentSessionId);
+    } catch (error) {
+      // Only "no source configured" is a soft fallback. A real acquisition
+      // failure (ticket fetch or mint rejection) must reach the retry catch so
+      // it is logged as the refresh error rather than masked by the handshake error.
+      if (error instanceof NoStreamTicketSourceError) return null;
+      throw error;
+    }
+  }
+
+  function handleMessage(raw: unknown): void {
     let parsed: StreamEvent;
     try {
       const text =
@@ -733,7 +924,7 @@ export function openStream(
           ? Buffer.from(raw).toString('utf8')
           : Array.isArray(raw)
             ? Buffer.concat(raw).toString('utf8')
-            : raw.toString('utf8');
+            : (raw as Buffer).toString('utf8');
       const decoded: unknown = JSON.parse(text);
       parsed = streamEventSchema.parse(decoded);
     } catch {
@@ -748,29 +939,122 @@ export function openStream(
         listeners.splice(i, 1);
       }
     }
-  });
+  }
 
-  ws.on('close', () => {
+  function openSocket(ticket: string): void {
+    const generation = ++currentGeneration;
+    const ws = new WebSocket(buildUrl(ticket));
+    currentWs = ws;
+    let opened = false;
+
+    ws.on('open', () => {
+      if (generation !== currentGeneration) return;
+      opened = true;
+    });
+
+    ws.on('message', raw => {
+      if (generation !== currentGeneration) return;
+      handleMessage(raw);
+    });
+
+    ws.on('close', (code, reason) => {
+      if (generation !== currentGeneration) return;
+      // `ws` emits `error` then `close` for a rejected handshake. While the
+      // single retry is pending, this socket's close must not end the shared
+      // connection or drop pending waits.
+      if (retryPending) return;
+      // First cause wins: a later close (an explicit close after the server
+      // already closed, or a stale socket) must not overwrite the drop evidence.
+      if (closeInfo === null) closeInfo = { code, reason: reason.toString('utf8') };
+      finalizeClose();
+    });
+
+    ws.on('error', error => {
+      // A superseded socket may still emit an error after the retry; ignore it.
+      if (generation !== currentGeneration) return;
+      // Runtime errors after a successful open are not handshake rejections.
+      if (opened) {
+        console.error('session stream connection failed', error);
+        return;
+      }
+      // Claim the single retry synchronously so a second error on this socket
+      // cannot schedule another one.
+      if (retried || closed) {
+        console.error('session stream connection failed', error);
+        return;
+      }
+      retried = true;
+      retryPending = true;
+      acquireFreshTicket()
+        .then(freshTicket => {
+          retryPending = false;
+          if (generation !== currentGeneration) return;
+          if (closed) {
+            // The caller closed while the fresh ticket was in flight; settle waits.
+            finalizeClose();
+            return;
+          }
+          if (freshTicket === null) {
+            console.error('session stream connection failed', error);
+            finalizeClose();
+            return;
+          }
+          openSocket(freshTicket);
+        })
+        .catch(retryError => {
+          retryPending = false;
+          console.error('session stream connection failed', retryError);
+          if (generation !== currentGeneration) return;
+          finalizeClose();
+        });
+    });
+  }
+
+  /**
+   * Open the initial socket. An explicit or locally minted ticket is a string
+   * and opens synchronously. A fetched ticket is a promise: the socket opens
+   * when it settles, a ticket resolved after close/abort is discarded so no
+   * socket is created, and a rejected acquisition settles the connection
+   * instead of surfacing an unhandled rejection.
+   */
+  function openInitialSocket(ticket: string | Promise<string>): void {
+    if (typeof ticket === 'string') {
+      openSocket(ticket);
+      return;
+    }
+    ticket.then(
+      resolved => {
+        if (closed) return;
+        openSocket(resolved);
+      },
+      error => {
+        console.error('session stream connection failed', error);
+        if (closed) return;
+        finalizeClose();
+      }
+    );
+  }
+
+  function finalizeClose(): void {
     detachAbortListener();
     closed = true;
     for (const listener of listeners.splice(0)) {
       listener.resolve(null);
     }
-  });
-
-  ws.on('error', () => {
-    console.error('session stream connection failed');
-  });
+  }
 
   function close(): void {
-    detachAbortListener();
     if (closed) return;
+    // Settle the shared connection now. An explicit close must not leave pending
+    // waits unresolved while a ticket refresh is still in flight: the socket
+    // `close` event is ignored during that window, so the retry path cannot be
+    // relied on to settle them. `closed` still prevents a replacement socket.
+    finalizeClose();
     try {
-      ws.close();
+      currentWs?.close();
     } catch {
       /* ignore */
     }
-    closed = true;
   }
 
   function detachAbortListener(): void {
@@ -778,6 +1062,8 @@ export function openStream(
     options.signal?.removeEventListener('abort', abortListener);
     abortListener = undefined;
   }
+
+  openInitialSocket(initialTicket());
 
   if (options.signal?.aborted) {
     close();
@@ -829,7 +1115,74 @@ export function openStream(
     get isOpen() {
       return !closed;
     },
+    get closeInfo() {
+      return closeInfo;
+    },
   };
+}
+
+/** Require the `connected` handshake event, closing the stream if it never arrives. */
+async function requireConnected(
+  stream: StreamConnection,
+  sessionId: string
+): Promise<StreamConnection> {
+  const connected = await stream.waitFor(event => event.streamEventType === 'connected', 10_000);
+  if (!connected) {
+    stream.close();
+    throw new Error(`Stream did not connect for ${sessionId}`);
+  }
+  return stream;
+}
+
+export async function openConnectedStream(
+  config: DriverConfig,
+  sessionId: string,
+  replay = true,
+  onEvent?: (event: StreamEvent) => void,
+  signal?: AbortSignal
+): Promise<StreamConnection> {
+  const ticket = await resolveStreamTicket(config, sessionId);
+  const stream = openStream(
+    config,
+    sessionId,
+    onEvent === undefined ? { replay, signal, ticket } : { replay, onEvent, signal, ticket }
+  );
+  return requireConnected(stream, sessionId);
+}
+
+export function fakeDirective(conversation: string): string {
+  const scope = resolveFakeScope();
+  const directive = `__fake__:${conversation}`;
+  return scope === undefined ? directive : `${FAKE_SCOPE_MARKER_PREFIX}${scope}\n${directive}`;
+}
+
+/**
+ * Parallel matrix shards set `E2E_FAKE_SCOPE` to a unique token so the shared
+ * fake attributes that shard's completions to it. Absent means the global
+ * counters, which is what a single focused run uses.
+ */
+export function resolveFakeScope(): string | undefined {
+  const raw = process.env.E2E_FAKE_SCOPE;
+  if (raw === undefined || raw === '') return undefined;
+  if (!isFakeScopeToken(raw)) {
+    throw new Error(`E2E_FAKE_SCOPE must match [A-Za-z0-9_-]{1,64}; got ${JSON.stringify(raw)}`);
+  }
+  return raw;
+}
+
+export function hasPreparationForMessage(events: StreamEvent[], messageId: string): boolean {
+  return events.some(
+    event => event.streamEventType === 'preparing' && event.data.triggerMessageId === messageId
+  );
+}
+
+export async function collectUntilTerminal(
+  stream: StreamConnection,
+  messageId: string,
+  timeoutMs: number
+): Promise<{ terminal: StreamEvent | null; events: StreamEvent[] }> {
+  const terminal = await stream.waitForTerminal(timeoutMs, messageId);
+  return { terminal, events: [...stream.events] };
 }
 
 /** Wait for the WebSocket to actually open (not just for instantiation). */
@@ -847,10 +1200,6 @@ export function waitForOpen(ws: WebSocket, timeoutMs = 5_000): Promise<void> {
     });
   });
 }
-
-// ---------------------------------------------------------------------------
-// Assertions
-// ---------------------------------------------------------------------------
 
 export type AssertionResult = { ok: boolean; message: string };
 

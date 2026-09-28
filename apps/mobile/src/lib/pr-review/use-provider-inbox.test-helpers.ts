@@ -1,6 +1,25 @@
 import { createElement, type ReactNode } from 'react';
 import { vi } from 'vitest';
 
+import type * as UtilsModule from '@/lib/utils';
+
+/**
+ * `parseTimestamp` spy for tests that count parses. This helper registers the
+ * partial `@/lib/utils` mock (`utilsMockFactory`) for every file that imports
+ * it, so a test asserts on `parseTimestampSpy`; the factory delegates each call
+ * to the real export and leaves every other `@/lib/utils` export untouched.
+ */
+export const parseTimestampSpy = vi.fn();
+
+async function utilsMockFactory(
+  importOriginal: <T = unknown>() => Promise<T>
+): Promise<Record<string, unknown>> {
+  const actual = await importOriginal<typeof UtilsModule>();
+  parseTimestampSpy.mockImplementation(actual.parseTimestamp);
+  return { ...actual, parseTimestamp: parseTimestampSpy };
+}
+vi.mock('@/lib/utils', utilsMockFactory);
+
 // Native hosts only: the inbox, authorization queries, and reconnect mutation
 // remain real in the mounted recovery tests.
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable' }));

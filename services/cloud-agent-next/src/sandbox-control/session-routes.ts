@@ -1,5 +1,3 @@
-import { DEADLINE_MS } from './deadlines.js';
-
 export type SessionActivityState = 'idle' | 'active' | 'finalizing';
 
 export type SessionRoute = {
@@ -185,16 +183,6 @@ export function pinsEnvironment(
   if (state === 'finalizing') return true;
   if (waitingOn === 'input') return false;
   return state === 'active';
-}
-
-export function pinsEnvironmentWithinLiveness(
-  route: Pick<SessionRoute, 'lastState' | 'lastStateAt' | 'waitingOn'>,
-  now: number
-): boolean {
-  return (
-    pinsEnvironment(route.lastState, route.waitingOn) &&
-    (route.lastStateAt === null || now < route.lastStateAt + DEADLINE_MS.heartbeatExpiry)
-  );
 }
 
 export function hasEnvironmentPinningWork(

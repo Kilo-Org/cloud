@@ -1,10 +1,17 @@
-import React, { act, createElement, useEffect, type ComponentProps, type ReactNode } from 'react';
+import React, {
+  act,
+  createElement,
+  useEffect,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
-import type { WorktreeChangesDrawer } from './WorktreeChanges';
+import type { WorktreeChangesView } from './WorktreeChanges';
 import type { ConversationMessages } from './ConversationMessages';
 import type { StoredMessage, StoredSession } from './types';
 import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
@@ -154,18 +161,29 @@ jest.mock('./ChatHeader', () => ({
       : null,
 }));
 jest.mock('./WorktreeChanges', () => ({
-  WorktreeChangesDrawer: ({
+  WorktreeChangesView: ({
     cloudAgentSessionId,
     organizationId,
     open,
-    onSelectFile,
-  }: ComponentProps<typeof WorktreeChangesDrawer>) =>
-    createElement('aside', {
-      onClick: () => onSelectFile?.('README.md'),
-      'data-changes-owner': cloudAgentSessionId,
-      'data-changes-organization': organizationId ?? 'personal',
-      hidden: !open,
-    }),
+  }: ComponentProps<typeof WorktreeChangesView>) => {
+    const [selected, setSelected] = useState(false);
+    useEffect(() => {
+      if (!open) setSelected(false);
+    }, [open]);
+    return createElement(
+      'aside',
+      {
+        'data-changes-owner': cloudAgentSessionId,
+        'data-changes-organization': organizationId ?? 'personal',
+        hidden: !open,
+      },
+      createElement('button', {
+        'data-changes-select': true,
+        onClick: () => setSelected(true),
+      }),
+      selected ? createElement('pre', { 'data-changes-diff': true }) : null
+    );
+  },
 }));
 jest.mock('./WorktreeFilePane', () => ({
   WorktreeFilePane: ({
@@ -526,33 +544,58 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     });
   });
 
-  it('keeps the conversation, composer and PTY mounted while files are selected and clears files before sibling identity resolves', () => {
+  it('keeps the conversation, composer and PTY mounted while a file is selected in the changes view', () => {
     render();
     const conversation = dom.container.querySelector('[data-conversation]');
     const composer = dom.container.querySelector('[data-composer]');
     const terminal = openTerminal();
-    const drawer = openChanges();
-    act(() => drawer?.click());
-    expect(dom.container.querySelector('[data-file-owner]')?.getAttribute('data-file-owner')).toBe(
-      'workspace_recent'
-    );
+    const view = openChanges();
+    const select = view?.querySelector<HTMLButtonElement>('[data-changes-select]');
+    act(() => select?.click());
+    expect(dom.container.querySelector('[data-changes-diff]')).not.toBeNull();
+    expect(mockTabs.files).toEqual([]);
+    expect(view?.hidden).toBe(false);
     expect(dom.container.querySelector('[data-composer]')).toBe(composer);
     expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+
     mockSessionId = 'ses_historical';
     render();
-    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
-    expect(mockTabs.files).toEqual([]);
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
     resolveSession('worktree_shared');
-    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
-    const siblingDrawer = openChanges();
-    act(() => siblingDrawer?.click());
-    expect(dom.container.querySelector('[data-file-owner]')?.getAttribute('data-file-owner')).toBe(
-      'workspace_ses_historical'
-    );
+    const siblingView = openChanges();
+    expect(siblingView?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
     render({ organizationId: 'organization-a' });
-    expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
     expect(mockTabs.files).toEqual([]);
+  });
+
+  it('closes the changes view when a terminal becomes the active tab', () => {
+    render();
+    const view = openChanges();
+    expect(view?.hidden).toBe(false);
+
+    openTerminal();
+
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+  });
+
+  it('suppresses workspace tab selection while the changes view is open without changing the active tab', () => {
+    render();
+    const activeTabId = mockTabs.activeTabId;
+    expect(mockTabs.selectionSuppressed).toBe(false);
+
+    openChanges();
+    expect(mockTabs.selectionSuppressed).toBe(true);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    if (!trigger) throw new Error('Missing changes trigger');
+    act(() => trigger.click());
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    expect(mockTabs.selectionSuppressed).toBe(false);
+    expect(mockTabs.activeTabId).toBe(activeTabId);
   });
 
   function receiveCommit() {

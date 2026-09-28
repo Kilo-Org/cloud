@@ -103,6 +103,28 @@ export const kiloExtras = {
       },
       additionalProperties: false,
     },
+    retention: {
+      // Effect Schema models maxAgeDays as number|'NaN'|'Infinity'|'-Infinity',
+      // but JSON config can only carry plain numbers, so the editor schema
+      // accepts number only.
+      description:
+        'Machine-wide session retention. Evaluated by the backend; clients only trigger runs.',
+      type: 'object',
+      properties: {
+        enabled: {
+          description:
+            'Enable automatic deletion of old sessions across all projects and every Kilo client on this machine. Defaults to false; deletion is permanent.',
+          type: 'boolean',
+        },
+        maxAgeDays: {
+          description:
+            'Days a session is kept before retention deletes it. Defaults to 30, minimum 1.',
+          type: 'number',
+          minimum: 1,
+        },
+      },
+      additionalProperties: false,
+    },
   },
   agents: {
     ask: agentConfig,

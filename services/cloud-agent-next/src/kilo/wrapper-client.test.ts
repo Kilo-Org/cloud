@@ -36,10 +36,6 @@ vi.mock('./ports.js', () => ({
 
 import { randomPort } from './ports.js';
 
-// ---------------------------------------------------------------------------
-// Test Helpers
-// ---------------------------------------------------------------------------
-
 type MockExecResult = {
   exitCode: number;
   stdout?: string;
@@ -159,16 +155,52 @@ const createPromptOptions = (
   session: overrides.session ?? defaultPromptSession,
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
+const createReadyRequest = (
+  overrides: Partial<WrapperSessionReadyRequest> = {}
+): WrapperSessionReadyRequest => ({
+  agentSessionId: 'agent_test',
+  userId: 'user_test',
+  sandboxId: 'usr-test',
+  kiloSessionId: 'kilo_sess_1',
+  workspace: {
+    workspacePath: '/workspace/user/sessions/agent_test',
+    sessionHome: '/home/agent_test',
+    branchName: 'main',
+  },
+  repo: {
+    kind: 'github',
+    repo: 'acme/repo',
+    token: 'gh-token',
+  },
+  materialized: {
+    env: { HOME: '/home/agent_test', KILO_PLATFORM: 'github' },
+  },
+  session: {
+    ingestUrl: 'wss://worker.example.com/sessions/user_test/agent_test/ingest',
+    workerAuthToken: 'kilo-token',
+    wrapperRunId: 'wr_test',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_test',
+  },
+  ...overrides,
+});
+
+const createReadyResponse = (telemetry?: Record<string, unknown>): Response =>
+  Response.json({
+    status: 'ready',
+    kiloSessionId: 'kilo_sess_1',
+    workspaceReady: {
+      workspacePath: '/workspace/user/sessions/agent_test',
+      sandboxId: 'usr-test',
+      sessionHome: '/home/agent_test',
+      branchName: 'main',
+      kiloSessionId: 'kilo_sess_1',
+    },
+    ...(telemetry ? { telemetry } : {}),
+  });
 
 describe('WrapperClient', () => {
   const defaultPort = 5000;
-
-  // -------------------------------------------------------------------------
-  // Constructor
-  // -------------------------------------------------------------------------
 
   describe('constructor', () => {
     it('creates client with session and port', () => {
@@ -387,6 +419,105 @@ describe('WrapperClient', () => {
       expect(session.exec).not.toHaveBeenCalled();
     });
 
+    it('reports an incomplete restore as a named event with the skipped paths', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            restore: {
+              path: 'backup',
+              diffs: {
+                applied: 1,
+                skipped: 1,
+                total: 2,
+                skippedDiffs: [{ file: 'src/a.ts', reason: 'patch_apply_failed' }],
+              },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const response = await client.ensureSessionReady(createReadyRequest());
+
+      expect(response.telemetry?.restore?.diffs?.skipped).toBe(1);
+      expect(loggerWarn).toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.objectContaining({
+          metric: 'cloud_agent_restore_incomplete',
+          count: 1,
+          sessionId: 'agent_test',
+          platform: 'github',
+          wrapperRunId: 'wr_test',
+          wrapperGeneration: 1,
+          restorePath: 'backup',
+          diffsApplied: 1,
+          diffsSkipped: 1,
+          diffsTotal: 2,
+          skippedPaths: ['src/a.ts'],
+          skippedReasons: ['patch_apply_failed'],
+        })
+      );
+      loggerWarn.mockRestore();
+    });
+
+    it('keeps a successful ready response when the restore telemetry is malformed', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            // The response body is parsed without runtime validation, so a
+            // wrapper bug can send a non-array `skippedDiffs`. Formatting the
+            // log fields must not turn the already-successful ready response
+            // into a readiness failure.
+            restore: {
+              path: 'backup',
+              diffs: { applied: 0, skipped: 1, total: 1, skippedDiffs: {} },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      const response = await client.ensureSessionReady(createReadyRequest());
+
+      expect(response.status).toBe('ready');
+      expect(loggerWarn).not.toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.anything()
+      );
+      loggerWarn.mockRestore();
+    });
+
+    it('does not report a complete restore', async () => {
+      const transport: WrapperTransport = {
+        request: vi.fn().mockResolvedValue(
+          createReadyResponse({
+            workspaceWasWarm: true,
+            restoredFromBackup: true,
+            restore: {
+              path: 'backup',
+              diffs: { applied: 2, skipped: 0, total: 2 },
+            },
+          })
+        ),
+      };
+      const client = new WrapperClient({ transport });
+      const loggerWarn = vi.spyOn(logger, 'warn').mockImplementation(() => logger);
+
+      await client.ensureSessionReady(createReadyRequest());
+
+      expect(loggerWarn).not.toHaveBeenCalledWith(
+        'Cloud agent restore incomplete',
+        expect.anything()
+      );
+      loggerWarn.mockRestore();
+    });
+
     it('propagates validated workspace failure diagnostics', async () => {
       const transport: WrapperTransport = {
         request: vi.fn().mockResolvedValue(
@@ -470,10 +601,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Health Check
-  // -------------------------------------------------------------------------
-
   describe('health', () => {
     it('returns health status on success', async () => {
       const healthResponse: WrapperHealthResponse = {
@@ -502,10 +629,6 @@ describe('WrapperClient', () => {
       await expect(client.health()).rejects.toThrow(WrapperError);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Job Status
-  // -------------------------------------------------------------------------
 
   describe('status', () => {
     it('returns job status', async () => {
@@ -551,14 +674,6 @@ describe('WrapperClient', () => {
       await expect(client.status()).resolves.toEqual(statusResponse);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // (startJob removed — execution binding is now inline in prompt/command)
-  // -------------------------------------------------------------------------
-
-  // -------------------------------------------------------------------------
-  // Prompt
-  // -------------------------------------------------------------------------
 
   describe('prompt', () => {
     it('returns messageId on success', async () => {
@@ -756,10 +871,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Command
-  // -------------------------------------------------------------------------
-
   describe('command', () => {
     it('returns command result', async () => {
       const commandResult = { messages: ['Cleared 5 messages'] };
@@ -817,10 +928,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Answer Permission
-  // -------------------------------------------------------------------------
-
   describe('answerPermission', () => {
     it('returns success on valid response', async () => {
       const session = createMockSession(
@@ -873,10 +980,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Answer Question
-  // -------------------------------------------------------------------------
-
   describe('answerQuestion', () => {
     it('returns success', async () => {
       const session = createMockSession(
@@ -902,10 +1005,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('q_456');
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Reject Question
-  // -------------------------------------------------------------------------
 
   describe('rejectQuestion', () => {
     it('returns success', async () => {
@@ -933,10 +1032,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Abort
-  // -------------------------------------------------------------------------
-
   describe('abort', () => {
     it('completes without error', async () => {
       const session = createMockSession(createSuccessResponse({ status: 'aborted' }));
@@ -955,10 +1050,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain('/job/abort');
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Ensure Running
-  // -------------------------------------------------------------------------
 
   describe('ensureRunning', () => {
     const agentSessionId = 'test-session';
@@ -1436,10 +1527,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Pre-flight checks
-  // -------------------------------------------------------------------------
-
   describe('pre-flight checks', () => {
     it('throws WrapperNotReadyError when bun exits with SIGILL (exit code 132)', async () => {
       const session = createMockSession(createCurlError(7, 'Connection refused'));
@@ -1773,10 +1860,6 @@ describe('WrapperClient', () => {
       expect(execCommands).toContain(`rm -f '${envFilePath}'`);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Ensure Wrapper (static method)
-  // -------------------------------------------------------------------------
 
   describe('ensureWrapper', () => {
     const wrapperOptions = {
@@ -2336,10 +2419,6 @@ describe('WrapperClient', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Error Handling
-  // -------------------------------------------------------------------------
-
   describe('error handling', () => {
     it('parses JSON error response', async () => {
       const session = createMockSession(
@@ -2385,10 +2464,6 @@ describe('WrapperClient', () => {
       }
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Request Formatting
-  // -------------------------------------------------------------------------
 
   describe('request formatting', () => {
     it('escapes single quotes in JSON body', async () => {
@@ -2445,10 +2520,6 @@ describe('WrapperClient', () => {
       expect(execCall).toContain(`http://127.0.0.1:${customPort}`);
     });
   });
-
-  // -------------------------------------------------------------------------
-  // Error Classes
-  // -------------------------------------------------------------------------
 
   describe('error classes', () => {
     it('WrapperFinalizingError carries optional wrapper run identity', () => {

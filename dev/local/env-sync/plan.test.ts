@@ -183,6 +183,33 @@ test('generates the user data export Worker URL for local Next.js', () => {
   }
 });
 
+test('generates the session ingest Worker URL for local Next.js', () => {
+  // The web app mints web tickets through Session Ingest, so the generated dev
+  // env has to carry the worker URL: without it `activeSessions.createWebTicket`
+  // throws PRECONDITION_FAILED ("Session ingest is not configured").
+  const repo = createRepo({
+    '.env.local': '',
+    'apps/web/.env.development.local.example': fs.readFileSync(
+      new URL('../../../apps/web/.env.development.local.example', import.meta.url),
+      'utf-8'
+    ),
+  });
+  try {
+    const plan = computePlan(repo.root, new Set(['nextjs']));
+
+    assert.deepEqual(
+      plan.envDevLocalChanges.find(change => change.key === 'SESSION_INGEST_WORKER_URL'),
+      {
+        key: 'SESSION_INGEST_WORKER_URL',
+        oldValue: undefined,
+        newValue: `http://localhost:${getService('cloudflare-session-ingest').port}`,
+      }
+    );
+  } finally {
+    repo.cleanup();
+  }
+});
+
 test('reconciles an incorrect generated web override to its template literal', () => {
   const repo = createRepo({
     '.env.local': 'ATTACHMENTS_BUCKET=production-bucket\n',

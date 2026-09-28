@@ -540,16 +540,17 @@ async function queueOverflowBody(
                 ),
               fillRemaining
             )
-            .then(ack => ({ kind: 'admitted' as const, ack }))
-            .catch((err: unknown) => ({ kind: 'error' as const, err }));
+            .then(ack => ({ kind: 'admitted' as const, attempt, ack }))
+            .catch((err: unknown) => ({ kind: 'error' as const, attempt, err }));
         })
       );
       fillAttempt += waveSize;
       for (const result of results) {
+        if (overflowOk) break;
         if (result.kind === 'admitted') {
           if (result.ack.delivery !== 'queued') {
             return fail(
-              `fill-${fillAttempt}: expected delivery=queued, got ${result.ack.delivery}`
+              `fill-${result.attempt}: expected delivery=queued, got ${result.ack.delivery}`
             );
           }
           queuedIds.push(result.ack.messageId);

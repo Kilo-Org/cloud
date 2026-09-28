@@ -5,6 +5,7 @@ import {
   cloud_agent_session_runs,
   cloud_agent_sessions,
   cli_sessions_v2,
+  organization_memberships,
   organizations,
   type User,
 } from '@kilocode/db/schema';
@@ -130,9 +131,17 @@ describe('cloudAgentNextFailuresRouter', () => {
     ]);
 
     caller = await createCallerForUser(owner.id);
+
+    await db.insert(organization_memberships).values({
+      kilo_user_id: owner.id,
+      organization_id: organization.id,
+    });
   });
 
   afterAll(async () => {
+    await db
+      .delete(organization_memberships)
+      .where(inArray(organization_memberships.kilo_user_id, [OWNER_ID, OTHER_USER_ID]));
     await db
       .delete(cloud_agent_sessions)
       .where(inArray(cloud_agent_sessions.cloud_agent_session_id, SESSION_IDS));
@@ -194,7 +203,7 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(completed.diagnostic).toBeNull();
     });
 
-    it('denies a session owned by another user, even inside a shared organization', async () => {
+    it('denies a session owned by another user, even when the caller is an org member', async () => {
       const otherCaller = await createCallerForUser(otherUser.id);
       await expect(
         otherCaller.cloudAgentNextFailures.getSessionFailureHistory({

@@ -33,13 +33,30 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
       enabled ? { cloudAgentSessionId } : skipToken
     ),
     staleTime: 30_000,
-    retry: false,
+    retry: 2,
   });
 
   const history = historyQuery.data;
 
-  if (!enabled || historyQuery.isError || !history) {
+  if (!enabled || !history) {
     return null;
+  }
+
+  if (historyQuery.isError) {
+    return (
+      <section
+        className="border-border bg-muted/30 space-y-3 rounded-lg border p-4 text-sm"
+        aria-label="Failure history"
+      >
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="text-destructive h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="text-foreground font-medium">Could not load failure history</span>
+        </div>
+        <p className="text-muted-foreground text-xs">
+          A transient error hid this section. Reopen the dialog to try again.
+        </p>
+      </section>
+    );
   }
 
   const summary = summarizeSessionFailureHistory(history);

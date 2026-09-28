@@ -24,7 +24,6 @@ const uuidSchema = z.uuid().transform(id => id.toLowerCase());
 const scopeInputSchema = z.object({ organizationId: uuidSchema.nullable() });
 const folderInputSchema = z.object({ folderId: uuidSchema });
 const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
-const sessionIdSchema = z.string().min(1);
 const folderOutputSchema = z.object({
   id: z.uuid(),
   name: workspaceFolderNameSchema,
@@ -307,6 +306,77 @@ export const workspaceFoldersRouter = createTRPCRouter({
           and(
             ownerScopeCondition(cloud_agent_worktrees, ctx.folderScope),
             eq(cloud_agent_worktrees.worktree_id, input.worktreeId)
+          )
+        );
+      return { success: true };
+    }),
+
+  moveSession: workspaceFolderProcedure
+    .input(z.object({ sessionId: workspaceSessionIdSchema, folderId: uuidSchema.nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.folderId !== null) {
+        const [folder] = await ctx.folderDb
+          .select({ id: cloud_agent_workspace_folders.id })
+          .from(cloud_agent_workspace_folders)
+          .where(
+            and(
+              ownerScopeCondition(cloud_agent_workspace_folders, ctx.folderScope),
+              eq(cloud_agent_workspace_folders.id, input.folderId)
+            )
+          )
+          .for('key share');
+        if (!folder) throw new TRPCError({ code: 'NOT_FOUND', message: 'Folder not found' });
+      }
+
+      const [session] = await ctx.folderDb
+        .select({
+          createdAt: cli_sessions_v2.created_at,
+          cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id,
+        })
+        .from(cli_sessions_v2)
+        .where(
+          and(
+            ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
+            eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
+            isNull(cli_sessions_v2.parent_session_id)
+          )
+        )
+        .for('update');
+      if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+
+      const groupedWorktreeId = session.cloudAgentWorktreeId;
+      const worktreeId =
+        groupedWorktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
+      if (groupedWorktreeId) {
+        await lockMovableWorktree(ctx.folderDb, ctx.folderScope, groupedWorktreeId);
+      } else {
+        await ctx.folderDb
+          .insert(cloud_agent_worktrees)
+          .values({
+            worktree_id: worktreeId,
+            kilo_user_id: ctx.folderScope.userId,
+            organization_id: ctx.folderScope.organizationId,
+            created_at: session.createdAt,
+          })
+          .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+        await ctx.folderDb
+          .update(cli_sessions_v2)
+          .set({ cloud_agent_worktree_id: worktreeId })
+          .where(
+            and(
+              ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
+              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId)
+            )
+          );
+      }
+
+      await ctx.folderDb
+        .update(cloud_agent_worktrees)
+        .set({ folder_id: input.folderId })
+        .where(
+          and(
+            ownerScopeCondition(cloud_agent_worktrees, ctx.folderScope),
+            eq(cloud_agent_worktrees.worktree_id, worktreeId)
           )
         );
       return { success: true };

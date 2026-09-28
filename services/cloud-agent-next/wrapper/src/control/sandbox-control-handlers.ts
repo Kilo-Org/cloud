@@ -608,12 +608,13 @@ export async function handleControlRequest(
           await deps.terminalRuntime?.detachDirectory(directory);
         },
         retireDirectory: async (directory: string) => {
-          // The worktree is going away, so its captured work must not linger in
-          // object storage until the bundle's own TTL expires.
+          // Delete first: dropping the grant and bundle beforehand would leave
+          // a surviving worktree with no way to recover its captured work when
+          // the deletion itself fails.
+          await kiloRuntimes.deleteDirectory(directory);
           const endpoint = worktreeStateEndpointFor(directory);
           forgetWorktreeStateEndpoint(directory);
           if (endpoint) await (deps.discardWorktreeState ?? discardWorktreeState)(endpoint);
-          await kiloRuntimes.deleteDirectory(directory);
         },
       };
       failureStage = undefined;

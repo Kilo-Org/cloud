@@ -116,6 +116,7 @@ import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -678,9 +679,11 @@ export async function handleLlmProxyRequest(
       groupModelAllowed = groupDecision.allowed;
       if (groupDecision.eligibleProviderRoutes) {
         const currentOnly = providerConfig?.only;
-        const only = currentOnly
-          ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
-          : [...groupDecision.eligibleProviderRoutes];
+        const only = withoutVirtualProvider(
+          currentOnly
+            ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
+            : [...groupDecision.eligibleProviderRoutes]
+        );
         groupProvidersAllowed = only.length > 0;
         effectiveProviderConfig = { ...providerConfig, only };
       }

@@ -47,6 +47,7 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -249,9 +250,11 @@ export async function handleEmbeddingsRequest(
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {
         const currentOnly = providerConfig?.only;
-        const only = currentOnly
-          ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
-          : [...decision.eligibleProviderRoutes];
+        const only = withoutVirtualProvider(
+          currentOnly
+            ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
+            : [...decision.eligibleProviderRoutes]
+        );
         if (only.length === 0) return modelNotAllowedResponse();
         requestBodyParsed.provider = { ...providerConfig, only };
       } else if (providerConfig) {

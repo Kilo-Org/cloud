@@ -1514,6 +1514,7 @@
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
       "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
       "tryAdjustFilters": "Filtrelerini değiştirmeyi veya temizlemeyi dene.",

@@ -533,6 +533,7 @@ function sendHello(
     nativeRuntimeIdCapture?: boolean;
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
+    gitAuthor?: boolean;
     connectionRecovery?: boolean;
     eventReceipts?: boolean;
   } = {}
@@ -544,6 +545,7 @@ function sendHello(
     ...(identity.nativeRuntimeIdCapture ? { nativeRuntimeIdCapture: true } : {}),
     ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
     ...(identity.workingBranches ? { workingBranches: true } : {}),
+    ...(identity.gitAuthor ? { gitAuthor: true } : {}),
     ...(identity.connectionRecovery ? { connectionRecovery: true } : {}),
     ...(identity.eventReceipts ? { eventReceipts: true, eventBatches: true } : {}),
   };
@@ -573,6 +575,7 @@ async function completeHello(
     nativeRuntimeIdCapture?: boolean;
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
+    gitAuthor?: boolean;
     connectionRecovery?: boolean;
     eventReceipts?: boolean;
   } = {}
@@ -3018,6 +3021,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         await completeHello(replacement, 'hello-replacement-wrapper', {
           providerInstanceId: replacementLaunch.env.PROVIDER_INSTANCE_ID,
           workingBranches: true,
+          gitAuthor: true,
         });
         signalWrapperReady(replacement);
         await waitFor(async () => {
@@ -3769,6 +3773,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
       url: 'https://github.com/acme/repo.git',
       platform: 'github',
       token: grant.scm?.alias,
+      author: { name: 'fixture bot', email: 'fixture@example.com' },
     });
     expect(payload.setupCommands).toEqual([`fixture-command --credential=${grant.kilo.alias}`]);
     expect(broker.kiloSubjects.get(grant.kilo.capabilities[input.sessionId].credential)).toEqual({
@@ -3813,6 +3818,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
       await completeHello(ws, 'hello-joined-containment', {
         providerInstanceId: providerRef,
         workingBranches: true,
+        gitAuthor: true,
       });
       const stale = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
       await rejectHello(
@@ -3870,6 +3876,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
         sessionOperationResults: true,
         nativeRuntimeIdCapture: true,
         workingBranches: true,
+        gitAuthor: true,
       });
       signalWrapperReady(ws);
       await waitFor(async () => {

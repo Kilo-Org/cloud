@@ -16,6 +16,7 @@ import {
   normalizeKilocodeModel,
 } from './persistence/model-utils.js';
 import {
+  installationGitAuthorFromEnv,
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentBitbucketSessionCapability,
@@ -654,25 +655,6 @@ export type ResolvedWorkspaceTokens = {
   gitlabInstanceUrl?: string;
   glabIsOAuth2?: boolean;
 };
-
-function installationGitAuthorFromEnv(
-  env: PersistenceEnv,
-  githubAppType: 'standard' | 'lite'
-): GitAuthorConfig | undefined {
-  const slug =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
-      : env.GITHUB_APP_SLUG;
-  const userId =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
-      : env.GITHUB_APP_BOT_USER_ID;
-  if (!slug || !userId) return undefined;
-  return {
-    name: `${slug}[bot]`,
-    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
-  };
-}
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;

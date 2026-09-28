@@ -9,6 +9,8 @@ const ASSISTANT_FAILURE_MESSAGES = {
   model_unavailable: 'Assistant request failed: model not found',
   provider_authentication: 'Assistant request was not authorized',
   provider_unavailable: 'Assistant service is unavailable',
+  provider_disconnect: 'Assistant provider connection was lost',
+  gateway_unavailable: 'Assistant gateway was temporarily unavailable',
   timeout: 'Assistant request timed out',
   invalid_request: 'Assistant request was invalid',
   context_limit: 'The model context limit was exceeded',
@@ -93,6 +95,7 @@ export function classifyAssistantFailure(
   const reason = specificMessageReason
     ? messageReason
     : (classifySdkErrorName(source) ??
+      classifyGatewayOrigin(source) ??
       (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
       'unknown');
   const terminalCode = assistantTerminalCode(reason);
@@ -147,6 +150,54 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
   if (status >= 500) return 'provider_unavailable';
   if (status >= 400) return 'invalid_request';
   return undefined;
+}
+
+/**
+ * The Kilo gateway tags its own non-2xx responses with a bounded `error_type`
+ * (and, for upstream disconnects, a `failure_family`) in the JSON body. That is
+ * the only place a gateway-shaped 5xx keeps its origin, and it is what separates
+ * an upstream provider failure from the gateway's own `temporarily_unavailable`,
+ * which the status code alone cannot.
+ *
+ * The body is provider-influenced on the passthrough path, so it is read only to
+ * select a reason from a fixed set and is never retained or copied into a
+ * message. The frame sanitizer bounds the body elsewhere; the read is bounded
+ * again here so a large body is never parsed.
+ */
+const GATEWAY_ERROR_BODY_MAX_LENGTH = 4096;
+
+function classifyGatewayOrigin(source: unknown): CloudAgentAssistantFailureReason | undefined {
+  switch (readGatewayErrorType(source)) {
+    case 'upstream_disconnect':
+      return 'provider_disconnect';
+    case 'temporarily_unavailable':
+      return 'gateway_unavailable';
+    default:
+      return undefined;
+  }
+}
+
+function readGatewayErrorType(source: unknown): string | undefined {
+  if (typeof source !== 'object' || source === null || !('data' in source)) return undefined;
+  const data = source.data;
+  if (typeof data !== 'object' || data === null || !('responseBody' in data)) return undefined;
+  const body = data.responseBody;
+  if (
+    typeof body !== 'string' ||
+    body.length === 0 ||
+    body.length > GATEWAY_ERROR_BODY_MAX_LENGTH
+  ) {
+    return undefined;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return undefined;
+  }
+  if (typeof parsed !== 'object' || parsed === null || !('error_type' in parsed)) return undefined;
+  const errorType = parsed.error_type;
+  return typeof errorType === 'string' ? errorType : undefined;
 }
 
 function classifyAssistantFailureText(message: string): CloudAgentAssistantFailureReason {

@@ -566,7 +566,14 @@
       "deletedUser": "මකා දැමූ පරිශීලකයා",
       "replyForbiddenTerm": "මෙම {{term}}ට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
       "moreLinesAbove_one": "… ඉහළින් තවත් පේළි {{displayCount}} ක් ඇත.",
-      "moreLinesAbove_other": "… ඉහළින් තවත් පේළි {{displayCount}} ක් ඇත."
+      "moreLinesAbove_other": "… ඉහළින් තවත් පේළි {{displayCount}} ක් ඇත.",
+      "deleteComment": "අදහස මකන්න",
+      "deleteCommentTitle": "අදහස මකන්නද?",
+      "deleteCommentMessage": "මෙම අදහස පුල් ඉල්ලීමෙන් මකා දැමෙනු ඇත.",
+      "commentEditFailed": "ඔබේ අදහස සුරැකීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "commentEditUnavailable": "මෙම අදහස සංස්කරණය කළ නොහැක. එය මකා දමා තිබිය හැක.",
+      "commentDeleteFailed": "ඔබේ අදහස මැකීමට නොහැකි විය. ඔබේ සම්බන්ධතාවය පරීක්ෂා කර නැවත උත්සාහ කරන්න.",
+      "commentDeleteUnavailable": "මෙම අදහස මකා දැමිය නොහැක."
     },
     "couldNotOpenGitHubAppSettings": "GitHub යෙදුමේ සැකසුම් විවෘත කළ නොහැකි විය.",
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "මෙය පුල් ඉල්ලීමක හෝ මර්ජ ඉල්ලීමක සබැඳියක් නොවේ",
     "announce": {
       "commentPosted": "අදහස පළ කරන ලදී",
+      "commentUpdated": "අදහස යාවත්කාලීන කරන ලදී",
+      "commentDeleted": "අදහස මකා දමන ලදී",
       "reviewSubmitted": "සමාලෝචනය ඉදිරිපත් කරන ලදී",
       "autoMergeEnabled": "ස්වයංක්‍රීය ඒකාබද්ධ කිරීම සක්‍රීය කර ඇත"
     },

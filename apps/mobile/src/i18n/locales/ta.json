@@ -566,7 +566,14 @@
       "deletedUser": "நீக்கப்பட்ட பயனர்",
       "replyForbiddenTerm": "இந்த {{term}}-க்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
       "moreLinesAbove_one": "… மேலே மேலும் {{displayCount}} வரி உள்ளது.",
-      "moreLinesAbove_other": "… மேலே மேலும் {{displayCount}} வரிகள் உள்ளன."
+      "moreLinesAbove_other": "… மேலே மேலும் {{displayCount}} வரிகள் உள்ளன.",
+      "deleteComment": "கருத்தை நீக்கு",
+      "deleteCommentTitle": "கருத்தை நீக்கவா?",
+      "deleteCommentMessage": "இந்தக் கருத்து இணைப்புக் கோரிக்கையிலிருந்து நீக்கப்படும்.",
+      "commentEditFailed": "உங்கள் கருத்தைச் சேமிக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+      "commentEditUnavailable": "இந்தக் கருத்தைத் திருத்த முடியாது. அது நீக்கப்பட்டிருக்கலாம்.",
+      "commentDeleteFailed": "உங்கள் கருத்தை நீக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+      "commentDeleteUnavailable": "இந்தக் கருத்தை நீக்க முடியாது."
     },
     "couldNotOpenGitHubAppSettings": "GitHub செயலியின் அமைப்புகளைத் திறக்க முடியவில்லை.",
     "installKiloGitHubApp": "Kilo GitHub செயலியை நிறுவவும்",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "இது இணைப்புக் கோரிக்கை இணைப்பு அல்ல",
     "announce": {
       "commentPosted": "கருத்து இடுகையிடப்பட்டது",
+      "commentUpdated": "கருத்து புதுப்பிக்கப்பட்டது",
+      "commentDeleted": "கருத்து நீக்கப்பட்டது",
       "reviewSubmitted": "மதிப்பாய்வு சமர்ப்பிக்கப்பட்டது",
       "autoMergeEnabled": "தானியங்கி இணைப்பு இயக்கப்பட்டது"
     },

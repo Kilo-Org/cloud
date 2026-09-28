@@ -566,7 +566,14 @@
       "deletedUser": "ړنګ شوی کارن",
       "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
       "moreLinesAbove_one": "… پورته {{displayCount}} نورې کرښې شته.",
-      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته."
+      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته.",
+      "deleteComment": "تبصره ړنګه کړئ",
+      "deleteCommentTitle": "تبصره ړنګه شي؟",
+      "deleteCommentMessage": "دا تبصره به له پل ریکویسټ څخه ړنګه شي.",
+      "commentEditFailed": "ستاسو تبصره خوندي نشوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "commentEditUnavailable": "دا تبصره سمون نه شي کول کېدای. ممکن ړنګه شوې وي.",
+      "commentDeleteFailed": "ستاسو تبصره ړنګه نشوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "commentDeleteUnavailable": "دا تبصره ړنګه نه شي کول کېدای."
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ امستنې پرانیستل نه شوې.",
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
+      "commentUpdated": "تبصره تازه شوه",
+      "commentDeleted": "تبصره ړنګه شوه",
       "reviewSubmitted": "بیاکتنه وسپارل شوه",
       "autoMergeEnabled": "خپلکار یوځای کول فعال شول"
     },

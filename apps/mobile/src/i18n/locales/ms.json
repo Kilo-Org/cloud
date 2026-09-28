@@ -566,7 +566,14 @@
       "deletedUser": "pengguna yang telah dipadam",
       "replyForbiddenTerm": "Anda tidak mempunyai kebenaran untuk membalas {{term}} ini.",
       "moreLinesAbove_one": "… {{displayCount}} baris lagi di atas",
-      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
+      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas",
+      "deleteComment": "Padam komen",
+      "deleteCommentTitle": "Padam komen?",
+      "deleteCommentMessage": "Komen ini akan dipadamkan daripada permintaan tarik.",
+      "commentEditFailed": "Tidak dapat menyimpan komen anda. Semak sambungan anda dan cuba lagi.",
+      "commentEditUnavailable": "Komen ini tidak boleh disunting. Ia mungkin telah dipadamkan.",
+      "commentDeleteFailed": "Tidak dapat memadamkan komen anda. Semak sambungan anda dan cuba lagi.",
+      "commentDeleteUnavailable": "Komen ini tidak boleh dipadamkan."
     },
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka tetapan apl GitHub.",
     "installKiloGitHubApp": "Pasang apl GitHub Kilo",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Ini bukan pautan permintaan tarik atau permintaan gabungan",
     "announce": {
       "commentPosted": "Komen disiarkan",
+      "commentUpdated": "Komen dikemas kini",
+      "commentDeleted": "Komen dipadamkan",
       "reviewSubmitted": "Semakan dihantar",
       "autoMergeEnabled": "Penggabungan automatik didayakan"
     },

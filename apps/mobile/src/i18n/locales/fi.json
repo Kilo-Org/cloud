@@ -566,7 +566,14 @@
       "deletedUser": "poistettu käyttäjä",
       "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön.",
       "moreLinesAbove_one": "… yläpuolella on vielä {{displayCount}} rivi.",
-      "moreLinesAbove_other": "… yläpuolella on vielä {{displayCount}} riviä."
+      "moreLinesAbove_other": "… yläpuolella on vielä {{displayCount}} riviä.",
+      "deleteComment": "Poista kommentti",
+      "deleteCommentTitle": "Poistetaanko kommentti?",
+      "deleteCommentMessage": "Tämä kommentti poistetaan muutospyynnöstä.",
+      "commentEditFailed": "Kommenttiasi ei voitu tallentaa. Tarkista yhteys ja yritä uudelleen.",
+      "commentEditUnavailable": "Tätä kommenttia ei voi muokata. Se on ehkä poistettu.",
+      "commentDeleteFailed": "Kommenttiasi ei voitu poistaa. Tarkista yhteys ja yritä uudelleen.",
+      "commentDeleteUnavailable": "Tätä kommenttia ei voi poistaa."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetusten avaaminen epäonnistui.",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
     "announce": {
       "commentPosted": "Kommentti julkaistu",
+      "commentUpdated": "Kommentti päivitetty",
+      "commentDeleted": "Kommentti poistettu",
       "reviewSubmitted": "Katselmointi lähetetty",
       "autoMergeEnabled": "Automaattinen yhdistäminen käytössä"
     },

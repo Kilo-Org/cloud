@@ -3168,14 +3168,6 @@
     "revoke": "Vertrouwen in {{host}} intrekken",
     "backToPreferences": "Terug naar voorkeuren"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start een chat",
-      "description": "Stuur een bericht om met een model te praten."
-    },
-    "historyRetry": "De chatgeschiedenis kon niet worden geladen.",
-    "sendError": "Het bericht kon niet worden verzonden. Probeer het opnieuw."
-  },
   "glanceable": {
     "waiting": "Agents bijwerken",
     "empty": "Geen lopende taken",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Voer Kilo uit op je eigen machine via de `kilo remote`-CLI.",
     "skip": "Tour overslaan",
     "tutorialLabel": "Zelfstudie"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start een chat",
+      "description": "Stuur een bericht om met een model te praten."
+    },
+    "list": {
+      "loadFailed": "Kon de chatgeschiedenis niet laden.",
+      "new": "Nieuwe chat",
+      "openHint": "Opent de chat. Lang indrukken om te verwijderen.",
+      "deleteTitle": "Deze chat verwijderen?"
+    },
+    "beta": "Bèta",
+    "mcp": {
+      "title": "Kilo-tools",
+      "use": "Kilo-tools gebruiken",
+      "useDescription": "Laat deze chat de tools gebruiken die de Kilo-server aanbiedt.",
+      "off": "Kilo-tools staan uit",
+      "offDescription": "Deze chat stuurt geen enkele Kilo-tool naar het model.",
+      "connecting": "Verbinden met Kilo-tools…",
+      "available": "Beschikbare tools: {{count}}",
+      "none": "Geen tools beschikbaar",
+      "noneDescription": "De Kilo-server heeft geen tools teruggegeven.",
+      "unreachable": "Kilo-tools konden niet worden bereikt",
+      "unreachableDescription": "De server heeft niet geantwoord. Controleer je verbinding en probeer het opnieuw.",
+      "unauthorized": "Kilo-tools hebben deze sessie geweigerd",
+      "unauthorizedDescription": "Meld je opnieuw aan om de Kilo-tools in deze chat te gebruiken.",
+      "unavailable": "Kilo-tools zijn niet beschikbaar",
+      "unavailableDescription": "De Kilo-server is niet beschikbaar voor dit account."
+    }
   },
   "appActions": {
     "start": {

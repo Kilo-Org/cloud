@@ -3254,14 +3254,6 @@
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začni klepet",
-      "description": "Pošlji sporočilo za pogovor z modelom."
-    },
-    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
-    "sendError": "Sporočila ni bilo mogoče poslati. Poskusi znova."
-  },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
     "empty": "Trenutno ni aktivnih nalog",
@@ -3307,6 +3299,36 @@
     "remoteOptionBody": "Zaženi Kilo na svojem računalniku prek CLI-ja `kilo remote`.",
     "skip": "Preskoči ogled",
     "tutorialLabel": "Vodič"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "list": {
+      "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
+      "new": "Nov klepet",
+      "openHint": "Odpre klepet. Pridržite za brisanje.",
+      "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Orodja Kilo",
+      "use": "Uporabi orodja Kilo",
+      "useDescription": "Dovoli temu klepetu uporabljati orodja, ki jih ponuja strežnik Kilo.",
+      "off": "Orodja Kilo so izklopljena",
+      "offDescription": "Ta klepet modelu ne pošlje nobenega orodja Kilo.",
+      "connecting": "Povezovanje z orodji Kilo…",
+      "available": "Razpoložljiva orodja: {{count}}",
+      "none": "Ni razpoložljivih orodij",
+      "noneDescription": "Strežnik Kilo ni vrnil nobenega orodja.",
+      "unreachable": "Ni bilo mogoče doseči orodij Kilo",
+      "unreachableDescription": "Strežnik ni odgovoril. Preveri povezavo in poskusi znova.",
+      "unauthorized": "Orodja Kilo so zavrnila to sejo",
+      "unauthorizedDescription": "Prijavi se znova, da boš lahko v tem klepetu uporabljal orodja Kilo.",
+      "unavailable": "Orodja Kilo niso na voljo",
+      "unavailableDescription": "Strežnik Kilo ni na voljo za ta račun."
+    }
   },
   "appActions": {
     "start": {

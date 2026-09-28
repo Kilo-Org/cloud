@@ -7,7 +7,7 @@ import {
   type CallRejectedReason,
   type McpAnalytics,
 } from './analytics';
-import { forwardedAuthFromProps } from './auth';
+import { forwardedAuthFromProps, ORGANIZATION_ID_HEADER, verifyKiloSessionToken } from './auth';
 import { MCP_SCOPE, scopeTokens } from './auth/http';
 import {
   callCatalogEndpoint,
@@ -56,6 +56,8 @@ import OAuthProvider, {
   type ClientRegistrationCallbackOptions,
   type ClientRegistrationCallbackResult,
   type OAuthProviderOptions,
+  type ResolveExternalTokenInput,
+  type ResolveExternalTokenResult,
 } from '@cloudflare/workers-oauth-provider';
 import type { ZodError } from 'zod';
 
@@ -907,6 +909,38 @@ export function clientRegistrationCallback(
 }
 
 /**
+ * The library's external-token resolver: a bearer that is not one of this
+ * provider's own access tokens is validated as the signed-in app's Kilo
+ * session token, so the app connects with the session it already has — no key
+ * pasted and no URL typed. The organization the client sent on
+ * `ORGANIZATION_ID_HEADER` is a context selector only (the bearer is the
+ * authorization), and apps/web re-checks membership on every proxied call.
+ *
+ * On a verified identity the returned props are exactly the ones the API
+ * handler forwards to apps/web. Anything else returns `null`, which the library
+ * turns into a generic `invalid_token` challenge. No `audience` is supplied
+ * because `resourceMetadata.resource` is unset.
+ */
+export async function resolveExternalToken(
+  input: ResolveExternalTokenInput<Env>
+): Promise<ResolveExternalTokenResult | null> {
+  const identity = await verifyKiloSessionToken({
+    webBaseUrl: input.env.WEB_BASE_URL,
+    token: input.token,
+  });
+  if (!identity) return null;
+
+  const organizationId = input.request.headers.get(ORGANIZATION_ID_HEADER) ?? undefined;
+  return {
+    props: {
+      kiloToken: input.token,
+      kiloUserId: identity.kiloUserId,
+      ...(organizationId ? { organizationId } : {}),
+    },
+  };
+}
+
+/**
  * Every non-/mcp path (including the browser-facing authorize UI) is owned by
  * the consent handler, rebuilt per request so its Durable-Object store and
  * analytics are bound to that request's env.
@@ -951,6 +985,7 @@ const providerOptions: OAuthProviderOptions<Env> = {
     bearer_methods_supported: ['header'],
   },
   clientRegistrationCallback,
+  resolveExternalToken,
   tokenExchangeCallback: options => tokenExchangeCallback(options),
 };
 

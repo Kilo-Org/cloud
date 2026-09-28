@@ -3168,14 +3168,6 @@
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
     "backToPreferences": "Takaisin asetuksiin"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Aloita keskustelu",
-      "description": "Aloita keskustelu mallin kanssa lähettämällä viesti."
-    },
-    "historyRetry": "Keskusteluhistoriaa ei voitu ladata.",
-    "sendError": "Viestiä ei voitu lähettää. Yritä uudelleen."
-  },
   "glanceable": {
     "waiting": "Päivitetään agentteja",
     "empty": "Ei keskeneräisiä töitä",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Suorita Kilo omalla koneellasi `kilo remote` -CLI:n kautta.",
     "skip": "Ohita esittely",
     "tutorialLabel": "Käyttöopas"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Aloita keskustelu",
+      "description": "Lähetä viesti keskustellaksesi mallin kanssa."
+    },
+    "list": {
+      "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
+      "new": "Uusi keskustelu",
+      "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
+      "deleteTitle": "Poistetaanko tämä keskustelu?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilon työkalut",
+      "use": "Käytä Kilon työkaluja",
+      "useDescription": "Salli tämän keskustelun käyttää työkaluja, joita Kilo-palvelin tarjoaa.",
+      "off": "Kilon työkalut ovat pois käytöstä",
+      "offDescription": "Tämä keskustelu ei lähetä mallille yhtään Kilon työkalua.",
+      "connecting": "Yhdistetään Kilon työkaluihin…",
+      "available": "Käytettävissä olevat työkalut: {{count}}",
+      "none": "Työkaluja ei ole saatavilla",
+      "noneDescription": "Kilo-palvelin ei palauttanut yhtään työkalua.",
+      "unreachable": "Kilon työkaluihin ei saatu yhteyttä",
+      "unreachableDescription": "Palvelin ei vastannut. Tarkista yhteytesi ja yritä uudelleen.",
+      "unauthorized": "Kilon työkalut hylkäsivät tämän istunnon",
+      "unauthorizedDescription": "Kirjaudu uudelleen sisään käyttääksesi Kilon työkaluja tässä keskustelussa.",
+      "unavailable": "Kilon työkalut eivät ole saatavilla",
+      "unavailableDescription": "Kilo-palvelin ei ole käytettävissä tälle tilille."
+    }
   },
   "appActions": {
     "start": {

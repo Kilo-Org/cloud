@@ -3211,14 +3211,6 @@
     "revoke": "Opozovi povjerenje za {{host}}",
     "backToPreferences": "Natrag na postavke"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Započni razgovor",
-      "description": "Pošalji poruku za razgovor s modelom."
-    },
-    "historyRetry": "Nije moguće učitati povijest razgovora.",
-    "sendError": "Nije moguće poslati poruku. Pokušaj ponovno."
-  },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
     "empty": "Nema zadataka u tijeku",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "Pokreni Kilo na vlastitom računalu putem `kilo remote` CLI-ja.",
     "skip": "Preskoči obilazak",
     "tutorialLabel": "Vodič"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Započnite chat",
+      "description": "Pošaljite poruku za razgovor s modelom."
+    },
+    "list": {
+      "loadFailed": "Nije moguće učitati povijest razgovora.",
+      "new": "Novi razgovor",
+      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovaj razgovor?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo alati",
+      "use": "Koristi Kilo alate",
+      "useDescription": "Dopusti ovom razgovoru da koristi alate koje nudi Kilo poslužitelj.",
+      "off": "Kilo alati su isključeni",
+      "offDescription": "Ovaj razgovor ne šalje modelu nijedan Kilo alat.",
+      "connecting": "Povezivanje s Kilo alatima…",
+      "available": "Dostupni alati: {{count}}",
+      "none": "Nema dostupnih alata",
+      "noneDescription": "Kilo poslužitelj nije vratio nijedan alat.",
+      "unreachable": "Nije moguće doći do Kilo alata",
+      "unreachableDescription": "Poslužitelj nije odgovorio. Provjeri vezu i pokušaj ponovo.",
+      "unauthorized": "Kilo alati odbili su ovu sesiju",
+      "unauthorizedDescription": "Prijavi se ponovo da bi koristio Kilo alate u ovom razgovoru.",
+      "unavailable": "Kilo alati nisu dostupni",
+      "unavailableDescription": "Kilo poslužitelj nije dostupan za ovaj račun."
+    }
   },
   "appActions": {
     "start": {

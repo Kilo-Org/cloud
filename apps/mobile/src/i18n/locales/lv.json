@@ -3211,14 +3211,6 @@
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Sāc tērzēt",
-      "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
-    },
-    "historyRetry": "Neizdevās ielādēt tērzēšanas vēsturi.",
-    "sendError": "Neizdevās nosūtīt ziņojumu. Mēģini vēlreiz."
-  },
   "glanceable": {
     "waiting": "Tiek atjaunināta informācija par aģentiem",
     "empty": "Pašlaik nav aktīvu uzdevumu",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "Palaid Kilo savā datorā, izmantojot `kilo remote` CLI.",
     "skip": "Izlaist apskati",
     "tutorialLabel": "Apmācība"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Sākt tērzēšanu",
+      "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
+    },
+    "list": {
+      "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
+      "new": "Jauna tērzēšana",
+      "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
+      "deleteTitle": "Vai dzēst šo tērzēšanu?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo rīki",
+      "use": "Izmantot Kilo rīkus",
+      "useDescription": "Ļauj šai tērzēšanai izmantot rīkus, ko piedāvā Kilo serveris.",
+      "off": "Kilo rīki ir izslēgti",
+      "offDescription": "Šī tērzēšana modelim nenosūta nevienu Kilo rīku.",
+      "connecting": "Savienojas ar Kilo rīkiem…",
+      "available": "Pieejamie rīki: {{count}}",
+      "none": "Nav pieejamu rīku",
+      "noneDescription": "Kilo serveris neatgrieza nevienu rīku.",
+      "unreachable": "Neizdevās sasniegt Kilo rīkus",
+      "unreachableDescription": "Serveris neatbildēja. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "unauthorized": "Kilo rīki atteica šo sesiju",
+      "unauthorizedDescription": "Piesakies vēlreiz, lai šajā tērzēšanā izmantotu Kilo rīkus.",
+      "unavailable": "Kilo rīki nav pieejami",
+      "unavailableDescription": "Kilo serveris nav pieejams šim kontam."
+    }
   },
   "appActions": {
     "start": {

@@ -3211,14 +3211,6 @@
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "backToPreferences": "Înapoi la preferințe"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Începe o conversație",
-      "description": "Trimite un mesaj pentru a vorbi cu un model."
-    },
-    "historyRetry": "Nu s-a putut încărca istoricul conversației.",
-    "sendError": "Nu s-a putut trimite mesajul. Încearcă din nou."
-  },
   "glanceable": {
     "waiting": "Se actualizează agenții",
     "empty": "Nicio sarcină în curs",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "Rulează Kilo pe propria ta mașină prin CLI-ul `kilo remote`.",
     "skip": "Sari peste tur",
     "tutorialLabel": "Tutorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Începe un chat",
+      "description": "Trimite un mesaj pentru a vorbi cu un model."
+    },
+    "list": {
+      "loadFailed": "Nu s-a putut încărca istoricul de chat.",
+      "new": "Chat nou",
+      "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
+      "deleteTitle": "Ștergi acest chat?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Instrumentele Kilo",
+      "use": "Folosește instrumentele Kilo",
+      "useDescription": "Permite acestui chat să folosească instrumentele oferite de serverul Kilo.",
+      "off": "Instrumentele Kilo sunt oprite",
+      "offDescription": "Acest chat nu trimite niciun instrument Kilo modelului.",
+      "connecting": "Se conectează la instrumentele Kilo…",
+      "available": "Instrumente disponibile: {{count}}",
+      "none": "Niciun instrument disponibil",
+      "noneDescription": "Serverul Kilo nu a returnat niciun instrument.",
+      "unreachable": "Nu s-a putut contacta instrumentele Kilo",
+      "unreachableDescription": "Serverul nu a răspuns. Verifică conexiunea și încearcă din nou.",
+      "unauthorized": "Instrumentele Kilo au refuzat această sesiune",
+      "unauthorizedDescription": "Autentifică-te din nou pentru a folosi instrumentele Kilo în acest chat.",
+      "unavailable": "Instrumentele Kilo nu sunt disponibile",
+      "unavailableDescription": "Serverul Kilo nu este disponibil pentru acest cont."
+    }
   },
   "appActions": {
     "start": {

@@ -3254,14 +3254,6 @@
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "backToPreferences": "Späť na predvoľby"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začnite chat",
-      "description": "Pošlite správu a porozprávajte sa s modelom."
-    },
-    "historyRetry": "Históriu chatu sa nepodarilo načítať.",
-    "sendError": "Nepodarilo sa odoslať správu. Skúste to znova."
-  },
   "glanceable": {
     "waiting": "Aktualizujú sa údaje o agentoch",
     "empty": "Žiadne rozpracované úlohy",
@@ -3307,6 +3299,36 @@
     "remoteOptionBody": "Spusti Kilo na vlastnom stroji cez CLI `kilo remote`.",
     "skip": "Preskočiť prehliadku",
     "tutorialLabel": "Sprievodca"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začať chat",
+      "description": "Pošlite správu a porozprávajte sa s modelom."
+    },
+    "list": {
+      "loadFailed": "Históriu chatu sa nepodarilo načítať.",
+      "new": "Nový chat",
+      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
+      "deleteTitle": "Odstrániť tento chat?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Nástroje Kilo",
+      "use": "Používať nástroje Kilo",
+      "useDescription": "Povoľte tomuto chatu používať nástroje, ktoré ponúka server Kilo.",
+      "off": "Nástroje Kilo sú vypnuté",
+      "offDescription": "Tento chat neposiela modelu žiadny nástroj Kilo.",
+      "connecting": "Pripájanie k nástrojom Kilo…",
+      "available": "Dostupné nástroje: {{count}}",
+      "none": "Nie sú dostupné žiadne nástroje",
+      "noneDescription": "Server Kilo nevrátil žiadne nástroje.",
+      "unreachable": "Nepodarilo sa pripojiť k nástrojom Kilo",
+      "unreachableDescription": "Server neodpovedal. Skontrolujte pripojenie a skúste to znova.",
+      "unauthorized": "Nástroje Kilo odmietli túto reláciu",
+      "unauthorizedDescription": "Prihláste sa znova, aby ste mohli v tomto chate používať nástroje Kilo.",
+      "unavailable": "Nástroje Kilo nie sú dostupné",
+      "unavailableDescription": "Server Kilo nie je pre tento účet k dispozícii."
+    }
   },
   "appActions": {
     "start": {

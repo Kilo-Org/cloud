@@ -3168,14 +3168,6 @@
     "revoke": "Herroep vertroue in {{host}}",
     "backToPreferences": "Terug na voorkeure"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Begin 'n klets",
-      "description": "Stuur 'n boodskap om met 'n model te gesels."
-    },
-    "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
-    "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
-  },
   "glanceable": {
     "waiting": "Besig om agente op te dateer",
     "empty": "Geen werk aan die gang nie",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Voer Kilo op jou eie masjien uit deur die `kilo remote`-CLI.",
     "skip": "Slaan toer oor",
     "tutorialLabel": "Tutorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Begin 'n klets",
+      "description": "Stuur 'n boodskap om met 'n model te gesels."
+    },
+    "list": {
+      "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
+      "new": "Nuwe klets",
+      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
+      "deleteTitle": "Skrap hierdie klets?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-nutsmiddels",
+      "use": "Gebruik Kilo-nutsmiddels",
+      "useDescription": "Laat hierdie klets die nutsmiddels gebruik wat die Kilo-bediener bied.",
+      "off": "Kilo-nutsmiddels is af",
+      "offDescription": "Hierdie klets stuur geen Kilo-nutsmiddel aan die model nie.",
+      "connecting": "Koppel aan Kilo-nutsmiddels…",
+      "available": "Nutsmiddels beskikbaar: {{count}}",
+      "none": "Geen nutsmiddels beskikbaar nie",
+      "noneDescription": "Die Kilo-bediener het geen nutsmiddels teruggegee nie.",
+      "unreachable": "Kon nie Kilo-nutsmiddels bereik nie",
+      "unreachableDescription": "Die bediener het nie geantwoord nie. Kontroleer jou verbinding en probeer weer.",
+      "unauthorized": "Kilo-nutsmiddels het hierdie sessie geweier",
+      "unauthorizedDescription": "Meld weer aan om die Kilo-nutsmiddels in hierdie klets te gebruik.",
+      "unavailable": "Kilo-nutsmiddels is nie beskikbaar nie",
+      "unavailableDescription": "Die Kilo-bediener is nie vir hierdie rekening beskikbaar nie."
+    }
   },
   "appActions": {
     "start": {

@@ -3168,14 +3168,6 @@
     "revoke": "Sluta lita på {{host}}",
     "backToPreferences": "Tillbaka till inställningarna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Starta en chatt",
-      "description": "Skicka ett meddelande för att prata med en modell."
-    },
-    "historyRetry": "Kunde inte läsa in chatthistoriken.",
-    "sendError": "Kunde inte skicka meddelandet. Försök igen."
-  },
   "glanceable": {
     "waiting": "Uppdaterar agenter",
     "empty": "Inget arbete pågår",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kör Kilo på din egen maskin via `kilo remote`-CLI:n.",
     "skip": "Hoppa över guiden",
     "tutorialLabel": "Handledning"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Starta en chatt",
+      "description": "Skicka ett meddelande för att prata med en modell."
+    },
+    "list": {
+      "loadFailed": "Det gick inte att läsa in chatthistoriken.",
+      "new": "Ny chatt",
+      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
+      "deleteTitle": "Ta bort den här chatten?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-verktyg",
+      "use": "Använd Kilo-verktyg",
+      "useDescription": "Låt den här chatten använda verktygen som Kilo-servern erbjuder.",
+      "off": "Kilo-verktyg är avstängda",
+      "offDescription": "Den här chatten skickar inga Kilo-verktyg till modellen.",
+      "connecting": "Ansluter till Kilo-verktyg…",
+      "available": "Tillgängliga verktyg: {{count}}",
+      "none": "Inga verktyg tillgängliga",
+      "noneDescription": "Kilo-servern svarade utan verktyg.",
+      "unreachable": "Kunde inte nå Kilo-verktyg",
+      "unreachableDescription": "Servern svarade inte. Kontrollera anslutningen och försök igen.",
+      "unauthorized": "Kilo-verktyg avvisade den här sessionen",
+      "unauthorizedDescription": "Logga in igen för att använda Kilo-verktygen i den här chatten.",
+      "unavailable": "Kilo-verktyg är inte tillgängliga",
+      "unavailableDescription": "Kilo-servern är inte tillgänglig för det här kontot."
+    }
   },
   "appActions": {
     "start": {

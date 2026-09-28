@@ -3211,14 +3211,6 @@
     "revoke": "Deixar de confiar em {{host}}",
     "backToPreferences": "Voltar às preferências"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Iniciar um chat",
-      "description": "Envie uma mensagem para conversar com um modelo."
-    },
-    "historyRetry": "Não foi possível carregar o histórico do chat.",
-    "sendError": "Não foi possível enviar a mensagem. Tente novamente."
-  },
   "glanceable": {
     "waiting": "Atualizando agentes",
     "empty": "Nenhuma tarefa em andamento",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "Execute o Kilo na sua própria máquina pela CLI `kilo remote`.",
     "skip": "Pular tour",
     "tutorialLabel": "Tutorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Iniciar um chat",
+      "description": "Envie uma mensagem para conversar com um modelo."
+    },
+    "list": {
+      "loadFailed": "Não foi possível carregar o histórico do chat.",
+      "new": "Nova conversa",
+      "openHint": "Abre a conversa. Toque e segure para excluir.",
+      "deleteTitle": "Excluir esta conversa?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Ferramentas do Kilo",
+      "use": "Usar as ferramentas do Kilo",
+      "useDescription": "Permita que esta conversa use as ferramentas que o servidor do Kilo oferece.",
+      "off": "As ferramentas do Kilo estão desativadas",
+      "offDescription": "Esta conversa não envia nenhuma ferramenta do Kilo ao modelo.",
+      "connecting": "Conectando às ferramentas do Kilo…",
+      "available": "Ferramentas disponíveis: {{count}}",
+      "none": "Nenhuma ferramenta disponível",
+      "noneDescription": "O servidor do Kilo não retornou nenhuma ferramenta.",
+      "unreachable": "Não foi possível alcançar as ferramentas do Kilo",
+      "unreachableDescription": "O servidor não respondeu. Verifique sua conexão e tente novamente.",
+      "unauthorized": "As ferramentas do Kilo recusaram esta sessão",
+      "unauthorizedDescription": "Entre novamente para usar as ferramentas do Kilo nesta conversa.",
+      "unavailable": "As ferramentas do Kilo não estão disponíveis",
+      "unavailableDescription": "O servidor do Kilo não está disponível para esta conta."
+    }
   },
   "appActions": {
     "start": {

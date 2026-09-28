@@ -20,13 +20,15 @@ export default defineProject({
     // The app build's config module cannot load in this project; the setup
     // file stubs the exports its importers read.
     setupFiles: ['./vitest.setup.ts'],
-    // Project configs do not inherit the root test options, and this suite
-    // runs both projects in parallel: on a loaded host (dev stack, simulator,
-    // Appium) workers starve and real-timer tests exceed the 5s default. One
-    // timeout leaks its pending act() loop into the worker and cascades
-    // through the file. Bounded pollers (settleBootstrap's 4s budget) still
-    // fail on their own budget, so this only absorbs starvation.
-    testTimeout: 15_000,
+    // The mobile-app gate runs `vitest related` over the branch's changed files
+    // (170+ suites) beside Metro, the simulator, and the local services. On that
+    // loaded machine the first transform/import of a heavy dependency
+    // (react-native-render-html, react-native-marked) can exceed the 5 s default
+    // and fail a test that passes in isolation. The slow suite moves between
+    // files from run to run, so the headroom belongs at the project level, not
+    // in a single test file.
+    testTimeout: 30_000,
+    hookTimeout: 30_000,
     // encrypted-kv.test.ts imports node:sqlite on purpose (it is the only way
     // to run real SQL semantics under Node), and Node prints an
     // ExperimentalWarning for that API on every worker start. Pass the warning
@@ -40,6 +42,7 @@ export default defineProject({
       'src/lib/agent-attachments/**/*.test.ts',
       'src/lib/analytics/**/*.test.ts',
       'src/lib/auth/**/*.test.ts',
+      'src/lib/chat/**/*.test.ts',
       'src/lib/auth/**/*.test.tsx',
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',

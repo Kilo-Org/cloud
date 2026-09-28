@@ -3340,14 +3340,6 @@
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
     "backToPreferences": "العودة إلى التفضيلات"
   },
-  "quickChat": {
-    "empty": {
-      "title": "ابدأ محادثة",
-      "description": "أرسل رسالة للتحدث مع نموذج."
-    },
-    "historyRetry": "تعذّر تحميل سجل المحادثة.",
-    "sendError": "تعذّر إرسال الرسالة. حاول مرة أخرى."
-  },
   "glanceable": {
     "waiting": "جارٍ تحديث الوكلاء",
     "empty": "لا يوجد عمل قيد التنفيذ",
@@ -3393,6 +3385,36 @@
     "remoteOptionBody": "شغّل Kilo على جهازك نفسه عبر واجهة سطر الأوامر `kilo remote`.",
     "skip": "تخطي الجولة",
     "tutorialLabel": "برنامج تعليمي"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "بدء محادثة",
+      "description": "أرسل رسالة للتحدث مع نموذج."
+    },
+    "list": {
+      "loadFailed": "تعذّر تحميل سجل المحادثة.",
+      "new": "محادثة جديدة",
+      "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
+      "deleteTitle": "حذف هذه المحادثة؟"
+    },
+    "beta": "بيتا",
+    "mcp": {
+      "title": "أدوات Kilo",
+      "use": "استخدام أدوات Kilo",
+      "useDescription": "اسمح لهذه المحادثة باستخدام الأدوات التي يقدمها خادم Kilo.",
+      "off": "أدوات Kilo متوقفة",
+      "offDescription": "لا ترسل هذه المحادثة أي أداة من Kilo إلى النموذج.",
+      "connecting": "جارٍ الاتصال بأدوات Kilo…",
+      "available": "الأدوات المتاحة: {{count}}",
+      "none": "لا توجد أدوات متاحة",
+      "noneDescription": "لم يُرجع خادم Kilo أي أدوات.",
+      "unreachable": "تعذّر الوصول إلى أدوات Kilo",
+      "unreachableDescription": "لم يستجب الخادم. تحقق من اتصالك ثم حاول مرة أخرى.",
+      "unauthorized": "رفضت أدوات Kilo هذه الجلسة",
+      "unauthorizedDescription": "سجّل الدخول مرة أخرى لاستخدام أدوات Kilo في هذه المحادثة.",
+      "unavailable": "أدوات Kilo غير متاحة",
+      "unavailableDescription": "خادم Kilo غير متاح لهذا الحساب."
+    }
   },
   "appActions": {
     "start": {

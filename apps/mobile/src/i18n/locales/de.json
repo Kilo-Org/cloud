@@ -3168,14 +3168,6 @@
     "revoke": "Vertrauen in {{host}} widerrufen",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Chat starten",
-      "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
-    },
-    "historyRetry": "Der Chatverlauf konnte nicht geladen werden.",
-    "sendError": "Die Nachricht konnte nicht gesendet werden. Versuche es erneut."
-  },
   "glanceable": {
     "waiting": "Agenten werden aktualisiert",
     "empty": "Keine laufenden Aufgaben",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Führe Kilo über die `kilo remote`-CLI auf deinem eigenen Rechner aus.",
     "skip": "Tour überspringen",
     "tutorialLabel": "Tutorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Chat starten",
+      "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
+    },
+    "list": {
+      "loadFailed": "Chatverlauf konnte nicht geladen werden.",
+      "new": "Neuer Chat",
+      "openHint": "Öffnet den Chat. Zum Löschen lange drücken.",
+      "deleteTitle": "Diesen Chat löschen?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo-Tools",
+      "use": "Kilo-Tools verwenden",
+      "useDescription": "Erlaube diesem Chat, die Tools zu verwenden, die der Kilo-Server anbietet.",
+      "off": "Kilo-Tools sind aus",
+      "offDescription": "Dieser Chat sendet kein Kilo-Tool an das Modell.",
+      "connecting": "Verbindung zu Kilo-Tools wird hergestellt…",
+      "available": "Verfügbare Tools: {{count}}",
+      "none": "Keine Tools verfügbar",
+      "noneDescription": "Der Kilo-Server hat keine Tools zurückgegeben.",
+      "unreachable": "Kilo-Tools konnten nicht erreicht werden",
+      "unreachableDescription": "Der Server hat nicht geantwortet. Prüfe deine Verbindung und versuche es erneut.",
+      "unauthorized": "Kilo-Tools haben diese Sitzung abgelehnt",
+      "unauthorizedDescription": "Melde dich erneut an, um die Kilo-Tools in diesem Chat zu verwenden.",
+      "unavailable": "Kilo-Tools sind nicht verfügbar",
+      "unavailableDescription": "Der Kilo-Server ist für dieses Konto nicht verfügbar."
+    }
   },
   "appActions": {
     "start": {

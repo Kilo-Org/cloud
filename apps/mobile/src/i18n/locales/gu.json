@@ -2848,7 +2848,7 @@
     "legalConnectorPrivacy": " અને આનો સ્વીકાર કરો છો: ",
     "manageFailed": "App Store માં સબસ્ક્રિપ્શનનું સંચાલન ખોલી શકાયું નહીં.",
     "kiloPassSetup": "Kilo Pass નું સેટઅપ",
-    "subscriptionHeaderDescription": "એક માસિક સબસ્ક્રિપ્શન જે Kilo એપમાં AI કોડિંગ સત્રો.",
+    "subscriptionHeaderDescription": "આ માસિક સબસ્ક્રિપ્શન તમારા Kilo બેલેન્સમાં ક્રેડિટ ઉમેરે છે, જેથી તમે Kilo App માં AI કોડિંગ સત્રો ચલાવી શકો.",
     "tierDescription": "Kilo App વાપરવા માટે દર મહિને {{price}} ના ખરીદેલા ક્રેડિટ ઉમેરાય છે.",
     "subscribe": "સબસ્ક્રાઇબ કરો",
     "subscribeDescription": "બોનસ તરફની પ્રગતિ સાથે માસિક ક્રેડિટ",
@@ -3168,14 +3168,6 @@
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "વાતચીત શરૂ કરો",
-      "description": "મોડલ સાથે વાત કરવા સંદેશ મોકલો."
-    },
-    "historyRetry": "વાતચીતનો ઇતિહાસ લોડ કરી શકાયો નહીં.",
-    "sendError": "સંદેશ મોકલી શકાયો નહીં. ફરી પ્રયાસ કરો."
-  },
   "glanceable": {
     "waiting": "એજન્ટોની માહિતી અપડેટ થઈ રહી છે",
     "empty": "કોઈ કાર્ય ચાલુ નથી",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "તમારા પોતાના મશીન પર `kilo remote` CLI દ્વારા Kilo ચલાવો.",
     "skip": "ટૂર છોડી દો",
     "tutorialLabel": "ટ્યુટોરિયલ"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "list": {
+      "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+      "new": "નવી ચેટ",
+      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
+      "deleteTitle": "આ ચેટ કાઢી નાખવી?"
+    },
+    "beta": "બીટા",
+    "mcp": {
+      "title": "Kilo સાધનો",
+      "use": "Kilo સાધનો વાપરો",
+      "useDescription": "આ ચેટને Kilo સર્વર આપે છે તે સાધનો વાપરવા દો.",
+      "off": "Kilo સાધનો બંધ છે",
+      "offDescription": "આ ચેટ મોડેલને કોઈ પણ Kilo સાધન મોકલતી નથી.",
+      "connecting": "Kilo સાધનો સાથે જોડાઈ રહ્યું છે…",
+      "available": "ઉપલબ્ધ સાધનો: {{count}}",
+      "none": "કોઈ સાધન ઉપલબ્ધ નથી",
+      "noneDescription": "Kilo સર્વરે કોઈ સાધન પરત આપ્યું નથી.",
+      "unreachable": "Kilo સાધનો સુધી પહોંચી શકાયું નથી",
+      "unreachableDescription": "સર્વરે જવાબ આપ્યો નથી. તમારું કનેક્શન તપાસો અને ફરી પ્રયાસ કરો.",
+      "unauthorized": "Kilo સાધનોએ આ સત્ર નકાર્યું",
+      "unauthorizedDescription": "આ ચેટમાં Kilo સાધનો વાપરવા માટે ફરી સાઇન ઇન કરો.",
+      "unavailable": "Kilo સાધનો ઉપલબ્ધ નથી",
+      "unavailableDescription": "આ ખાતા માટે Kilo સર્વર ઉપલબ્ધ નથી."
+    }
   },
   "appActions": {
     "start": {

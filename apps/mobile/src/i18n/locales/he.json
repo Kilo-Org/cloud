@@ -3211,14 +3211,6 @@
     "revoke": "ביטול האמון באתר {{host}}",
     "backToPreferences": "חזרה להעדפות"
   },
-  "quickChat": {
-    "empty": {
-      "title": "התחלת שיחה",
-      "description": "שלח הודעה כדי לשוחח עם מודל."
-    },
-    "historyRetry": "לא ניתן לטעון את היסטוריית השיחה.",
-    "sendError": "לא ניתן לשלוח את ההודעה. נסה שוב."
-  },
   "glanceable": {
     "waiting": "נתוני הסוכנים מתעדכנים",
     "empty": "אין משימות בביצוע",
@@ -3264,6 +3256,36 @@
     "remoteOptionBody": "הרץ את Kilo על המחשב שלך באמצעות ה-CLI של `kilo remote`.",
     "skip": "דלג על הסיור",
     "tutorialLabel": "מדריך"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "התחל שיחה",
+      "description": "שלח הודעה כדי לשוחח עם מודל."
+    },
+    "list": {
+      "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
+      "new": "צ'אט חדש",
+      "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
+      "deleteTitle": "למחוק את הצ'אט הזה?"
+    },
+    "beta": "בטא",
+    "mcp": {
+      "title": "כלי Kilo",
+      "use": "שימוש בכלי Kilo",
+      "useDescription": "אפשר לשיחה הזו להשתמש בכלים שהשרת של Kilo מציע.",
+      "off": "כלי Kilo כבויים",
+      "offDescription": "השיחה הזו לא שולחת שום כלי של Kilo למודל.",
+      "connecting": "מתחבר לכלי Kilo…",
+      "available": "כלים זמינים: {{count}}",
+      "none": "אין כלים זמינים",
+      "noneDescription": "השרת של Kilo לא החזיר כלים.",
+      "unreachable": "לא ניתן היה להגיע לכלי Kilo",
+      "unreachableDescription": "השרת לא הגיב. בדוק את החיבור שלך ונסה שוב.",
+      "unauthorized": "כלי Kilo דחו את ההפעלה הזו",
+      "unauthorizedDescription": "היכנס שוב כדי להשתמש בכלי Kilo בשיחה הזו.",
+      "unavailable": "כלי Kilo אינם זמינים",
+      "unavailableDescription": "השרת של Kilo אינו זמין לחשבון הזה."
+    }
   },
   "appActions": {
     "start": {

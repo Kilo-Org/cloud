@@ -3168,14 +3168,6 @@
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
     "backToPreferences": "Itzuli hobespenetara"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Hasi txat bat",
-      "description": "Bidali mezu bat eredu batekin hitz egiteko."
-    },
-    "historyRetry": "Ezin izan da txataren historiala kargatu.",
-    "sendError": "Ezin izan da mezua bidali. Saiatu berriro."
-  },
   "glanceable": {
     "waiting": "Agenteak eguneratzen",
     "empty": "Ez dago lanik abian",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Exekutatu Kilo zure makinean `kilo remote` CLIaren bidez.",
     "skip": "Baztertu bira",
     "tutorialLabel": "Tutorial-a"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Hasi txat bat",
+      "description": "Bidali mezu bat modelo batekin hitz egiteko."
+    },
+    "list": {
+      "loadFailed": "Ezin izan da txat-historia kargatu.",
+      "new": "Txat berria",
+      "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
+      "deleteTitle": "Txat hau ezabatu?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kiloren tresnak",
+      "use": "Erabili Kiloren tresnak",
+      "useDescription": "Utzi txat honi Kilo zerbitzariak eskaintzen dituen tresnak erabiltzen.",
+      "off": "Kiloren tresnak desgaituta daude",
+      "offDescription": "Txat honek ez dio ereduari Kilo tresnarik bidaltzen.",
+      "connecting": "Kiloren tresnekin konektatzen…",
+      "available": "Erabilgarri dauden tresnak: {{count}}",
+      "none": "Ez dago tresnarik erabilgarri",
+      "noneDescription": "Kilo zerbitzariak ez du tresnarik itzuli.",
+      "unreachable": "Ezin izan da Kiloren tresnetara iritsi",
+      "unreachableDescription": "Zerbitzariak ez du erantzun. Egiaztatu konexioa eta saiatu berriro.",
+      "unauthorized": "Kiloren tresnek txat saio hau baztertu dute",
+      "unauthorizedDescription": "Hasi saioa berriro txat honetan Kilo tresnak erabiltzeko.",
+      "unavailable": "Kiloren tresnak ez daude erabilgarri",
+      "unavailableDescription": "Kilo zerbitzaria ez dago erabilgarri kontu honetarako."
+    }
   },
   "appActions": {
     "start": {

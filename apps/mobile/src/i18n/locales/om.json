@@ -3168,14 +3168,6 @@
     "revoke": "Amanamummaa {{host}} haqi",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Marii jalqabi",
-      "description": "Moodeela waliin haasa'uuf ergaa ergi."
-    },
-    "historyRetry": "Seenaa marii fe'uun hin danda'amne.",
-    "sendError": "Ergaa erguun hin danda'amne. Irra deebi'ii yaali."
-  },
   "glanceable": {
     "waiting": "Eejentoota haaromsaa jira",
     "empty": "Hojiin hojjetamaa jiru hin jiru",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Kilo kompiitara kee irratti `kilo remote` CLI'n hojjechisi.",
     "skip": "Daawannoo darbi",
     "tutorialLabel": "Barnoota"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Chaat jalqabi",
+      "description": "Modeelii wajjin haasa'uuf ergaa ergi."
+    },
+    "list": {
+      "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
+      "new": "Marii haaraa",
+      "openHint": "Marii ni bana. Haquuf cuqaasii dheeraa godhi.",
+      "deleteTitle": "Marii kana haquuf?"
+    },
+    "beta": "Beetaa",
+    "mcp": {
+      "title": "Meeshaalee Kilo",
+      "use": "Meeshaalee Kilo fayyadami",
+      "useDescription": "Marii kanaaf meeshaalee sarvariin Kilo dhiyeessu fayyadamuu hayyami.",
+      "off": "Meeshaalee Kilo dhaamaniiru",
+      "offDescription": "Mariin kun modeelaaf meeshaa Kilo tokkollee hin ergu.",
+      "connecting": "Meeshaalee Kilo waliin walqunnamaa jira…",
+      "available": "Meeshaalee jiran: {{count}}",
+      "none": "Meeshaalee hin jiran",
+      "noneDescription": "Sarvariin Kilo meeshaa tokkollee hin deebisne.",
+      "unreachable": "Meeshaalee Kilo bira ga'uun hin danda'amne",
+      "unreachableDescription": "Sarvariin hin deebisne. Walqunnamtii kee ilaali, sana booda ammas yaali.",
+      "unauthorized": "Meeshaaleen Kilo marii kana didaniiru",
+      "unauthorizedDescription": "Marii kana keessatti meeshaalee Kilo fayyadamuu keetii ammas seeni.",
+      "unavailable": "Meeshaaleen Kilo hin jiran",
+      "unavailableDescription": "Sarvariin Kilo herrega kanaaf hin jiru."
+    }
   },
   "appActions": {
     "start": {

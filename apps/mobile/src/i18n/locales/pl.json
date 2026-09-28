@@ -3254,14 +3254,6 @@
     "revoke": "Cofnij zaufanie do {{host}}",
     "backToPreferences": "Wróć do preferencji"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Rozpocznij czat",
-      "description": "Wyślij wiadomość, aby porozmawiać z modelem."
-    },
-    "historyRetry": "Nie udało się wczytać historii czatu.",
-    "sendError": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
-  },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",
     "empty": "Brak zadań w toku",
@@ -3307,6 +3299,36 @@
     "remoteOptionBody": "Uruchom Kilo na własnej maszynie za pomocą CLI `kilo remote`.",
     "skip": "Pomiń przewodnik",
     "tutorialLabel": "Samouczek"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Rozpocznij czat",
+      "description": "Wyślij wiadomość, aby porozmawiać z modelem."
+    },
+    "list": {
+      "loadFailed": "Nie udało się wczytać historii czatu.",
+      "new": "Nowy czat",
+      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
+      "deleteTitle": "Usunąć ten czat?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Narzędzia Kilo",
+      "use": "Używaj narzędzi Kilo",
+      "useDescription": "Pozwól temu czatowi używać narzędzi oferowanych przez serwer Kilo.",
+      "off": "Narzędzia Kilo są wyłączone",
+      "offDescription": "Ten czat nie wysyła modelowi żadnego narzędzia Kilo.",
+      "connecting": "Łączenie z narzędziami Kilo…",
+      "available": "Dostępne narzędzia: {{count}}",
+      "none": "Brak dostępnych narzędzi",
+      "noneDescription": "Serwer Kilo nie zwrócił żadnych narzędzi.",
+      "unreachable": "Nie udało się połączyć z narzędziami Kilo",
+      "unreachableDescription": "Serwer nie odpowiedział. Sprawdź połączenie i spróbuj ponownie.",
+      "unauthorized": "Narzędzia Kilo odrzuciły tę sesję",
+      "unauthorizedDescription": "Zaloguj się ponownie, aby używać narzędzi Kilo w tym czacie.",
+      "unavailable": "Narzędzia Kilo są niedostępne",
+      "unavailableDescription": "Serwer Kilo jest niedostępny dla tego konta."
+    }
   },
   "appActions": {
     "start": {

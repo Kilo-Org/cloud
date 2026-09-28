@@ -3168,14 +3168,6 @@
     "revoke": "Bỏ tin cậy {{host}}",
     "backToPreferences": "Quay lại cài đặt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
-    },
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
-  },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
     "empty": "Không có tác vụ đang chạy",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Chạy Kilo trên máy của bạn qua CLI `kilo remote`.",
     "skip": "Bỏ qua tour",
     "tutorialLabel": "Hướng dẫn"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "list": {
+      "loadFailed": "Không thể tải lịch sử trò chuyện.",
+      "new": "Cuộc trò chuyện mới",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
+      "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Công cụ Kilo",
+      "use": "Dùng công cụ Kilo",
+      "useDescription": "Cho phép cuộc trò chuyện này dùng các công cụ mà máy chủ Kilo cung cấp.",
+      "off": "Công cụ Kilo đang tắt",
+      "offDescription": "Cuộc trò chuyện này không gửi công cụ Kilo nào cho mô hình.",
+      "connecting": "Đang kết nối với công cụ Kilo…",
+      "available": "Công cụ khả dụng: {{count}}",
+      "none": "Không có công cụ nào khả dụng",
+      "noneDescription": "Máy chủ Kilo không trả về công cụ nào.",
+      "unreachable": "Không thể kết nối với công cụ Kilo",
+      "unreachableDescription": "Máy chủ không phản hồi. Kiểm tra kết nối của bạn, rồi thử lại.",
+      "unauthorized": "Công cụ Kilo đã từ chối phiên này",
+      "unauthorizedDescription": "Đăng nhập lại để dùng công cụ Kilo trong cuộc trò chuyện này.",
+      "unavailable": "Công cụ Kilo không khả dụng",
+      "unavailableDescription": "Máy chủ Kilo không khả dụng cho tài khoản này."
+    }
   },
   "appActions": {
     "start": {

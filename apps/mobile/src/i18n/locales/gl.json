@@ -3168,14 +3168,6 @@
     "revoke": "Revogar a confianza en {{host}}",
     "backToPreferences": "Volver ás preferencias"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Inicia un chat",
-      "description": "Envía unha mensaxe para falar cun modelo."
-    },
-    "historyRetry": "Non se puido cargar o historial do chat.",
-    "sendError": "Non se puido enviar a mensaxe. Téntao de novo."
-  },
   "glanceable": {
     "waiting": "Actualizando axentes",
     "empty": "Non hai traballo en curso",
@@ -3221,6 +3213,36 @@
     "remoteOptionBody": "Executa Kilo na túa propia máquina mediante a CLI `kilo remote`.",
     "skip": "Omitir o tour",
     "tutorialLabel": "Titorial"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Inicia un chat",
+      "description": "Envía unha mensaxe para falar cun modelo."
+    },
+    "list": {
+      "loadFailed": "Non se puido cargar o historial do chat.",
+      "new": "Chat novo",
+      "openHint": "Abre o chat. Mantén premido para eliminar.",
+      "deleteTitle": "Eliminar este chat?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Ferramentas de Kilo",
+      "use": "Usar as ferramentas de Kilo",
+      "useDescription": "Permite que este chat use as ferramentas que ofrece o servidor de Kilo.",
+      "off": "As ferramentas de Kilo están desactivadas",
+      "offDescription": "Este chat non envía ningunha ferramenta de Kilo ao modelo.",
+      "connecting": "Conectando coas ferramentas de Kilo…",
+      "available": "Ferramentas dispoñibles: {{count}}",
+      "none": "Non hai ferramentas dispoñibles",
+      "noneDescription": "O servidor de Kilo non devolveu ningunha ferramenta.",
+      "unreachable": "Non se puido contactar coas ferramentas de Kilo",
+      "unreachableDescription": "O servidor non respondeu. Comproba a túa conexión e volve intentalo.",
+      "unauthorized": "As ferramentas de Kilo rexeitaron esta sesión",
+      "unauthorizedDescription": "Inicia sesión de novo para usar as ferramentas de Kilo neste chat.",
+      "unavailable": "As ferramentas de Kilo non están dispoñibles",
+      "unavailableDescription": "O servidor de Kilo non está dispoñible para esta conta."
+    }
   },
   "appActions": {
     "start": {

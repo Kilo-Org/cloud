@@ -3254,14 +3254,6 @@
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "backToPreferences": "Grįžti į nuostatas"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Pradėk pokalbį",
-      "description": "Parašyk žinutę ir pradėk pokalbį su modeliu."
-    },
-    "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
-    "sendError": "Nepavyko išsiųsti žinutės. Bandyk dar kartą."
-  },
   "glanceable": {
     "waiting": "Atnaujinami agentai",
     "empty": "Nėra vykdomų darbų",
@@ -3307,6 +3299,36 @@
     "remoteOptionBody": "Paleiskite Kilo savo kompiuteryje per `kilo remote` CLI.",
     "skip": "Praleisti apžvalgą",
     "tutorialLabel": "Pamoka"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Pradėti pokalbį",
+      "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
+    },
+    "list": {
+      "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
+      "new": "Naujas pokalbis",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
+      "deleteTitle": "Ištrinti šį pokalbį?"
+    },
+    "beta": "Beta",
+    "mcp": {
+      "title": "Kilo įrankiai",
+      "use": "Naudoti Kilo įrankius",
+      "useDescription": "Leisk šiam pokalbiui naudoti įrankius, kuriuos siūlo Kilo serveris.",
+      "off": "Kilo įrankiai išjungti",
+      "offDescription": "Šis pokalbis nesiunčia modeliui jokio Kilo įrankio.",
+      "connecting": "Jungiamasi prie Kilo įrankių…",
+      "available": "Galimi įrankiai: {{count}}",
+      "none": "Nėra galimų įrankių",
+      "noneDescription": "Kilo serveris negrąžino jokių įrankių.",
+      "unreachable": "Nepavyko pasiekti Kilo įrankių",
+      "unreachableDescription": "Serveris neatsakė. Patikrink ryšį ir bandyk dar kartą.",
+      "unauthorized": "Kilo įrankiai atmetė šią sesiją",
+      "unauthorizedDescription": "Prisijunk iš naujo, kad galėtum naudoti Kilo įrankius šiame pokalbyje.",
+      "unavailable": "Kilo įrankiai nepasiekiami",
+      "unavailableDescription": "Kilo serveris nepasiekiamas šiai paskyrai."
+    }
   },
   "appActions": {
     "start": {

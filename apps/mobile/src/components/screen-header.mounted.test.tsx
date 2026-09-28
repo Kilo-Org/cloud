@@ -598,6 +598,43 @@ describe('ScreenHeader mounted', () => {
     expect(renderer.root.props.className).toContain('pt-3');
   });
 
+  it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const back = findBackPressable(renderer.root);
+    const row = back.parent;
+    if (!row || typeof row.props.className !== 'string') {
+      throw new Error('back control row not found');
+    }
+    expect(row.props.className).toContain('flex-row items-center');
+    expect(row.props.className).toContain('min-h-11');
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
+    expect(title.parent?.parent?.parent).toBe(back.parent);
+
+    const spacer = row.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-11 w-11 shrink-0'
+    );
+    expect(spacer).toBeDefined();
+  });
+
+  it('omits the mirroring spacer when the centered header has no back control', () => {
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-11 w-11 shrink-0'
+    );
+    expect(spacers).toHaveLength(0);
+  });
+
   it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
     i18nManager.isRTL = isRTL;
     platform.OS = 'android';

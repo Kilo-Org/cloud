@@ -124,12 +124,6 @@ describe('activeSessionMetaTimestamp', () => {
 });
 
 describe('remoteMeta', () => {
-  it('returns the same relative-time string as formatMeta when updatedAt is present', () => {
-    const updatedAt = '2024-01-01T00:00:00.000Z';
-    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
-    expect(remoteMeta({ updatedAt })).toBe(timeAgo(parseTimestamp(updatedAt)).toUpperCase());
-  });
-
   it('prefers lastActivityAt over updatedAt', () => {
     const lastActivityAt = '2024-06-01T00:00:00.000Z';
     const updatedAt = '2024-01-01T00:00:00.000Z';
@@ -154,11 +148,6 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ updatedAt }, laterTick)).not.toBe(remoteMeta({ updatedAt }, firstTick));
   });
 
-  it('falls back to updatedAt when lastActivityAt is absent', () => {
-    const updatedAt = '2024-01-01T00:00:00.000Z';
-    expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
-  });
-
   it('returns undefined when neither timestamp is present (never idle/busy/retry status words)', () => {
     // Former fallback uppercased session.status into the timestamp slot
     // (BUSY/IDLE/RETRY). Status is no longer a parameter; assert undefined
@@ -179,14 +168,6 @@ describe('remoteMeta', () => {
     expect(remoteMeta(busyRow)).toBeUndefined();
     expect(remoteMeta(retryRow)).toBeUndefined();
     expect(remoteMeta(noStatusRow)).toBeUndefined();
-  });
-});
-
-describe('formatMeta (moved helper, regression guard)', () => {
-  it('matches the original timeAgo + toUpperCase behavior', () => {
-    expect(formatMeta('2024-01-01T00:00:00.000Z')).toBe(
-      timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
-    );
   });
 });
 

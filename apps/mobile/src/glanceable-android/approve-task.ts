@@ -7,6 +7,7 @@ import { restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { republishAnsweredAsk } from '@/lib/glanceable/republish-ask';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
 import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from '@/lib/glanceable/waiting-ask';
+import { dismissNeedsInputNotification } from '@/lib/needs-input-notification';
 
 import {
   androidSink,
@@ -125,6 +126,14 @@ export async function handleApproveTask(): Promise<void> {
   }
   if (ask === null) {
     return;
+  }
+  if (askEnded) {
+    // The same raise is presented twice: on this card and on the app-owned
+    // needs-input notification, which is a separate carrier with its own
+    // Approve action. The mount that re-plans the posted set is not mounted on
+    // this headless path, so nothing else takes the answered raise off the
+    // shade; awaited, because the headless task ends with this promise.
+    await dismissNeedsInputNotification(ask.kiloSessionId);
   }
   if (failed) {
     await showApproveFailed(ask);

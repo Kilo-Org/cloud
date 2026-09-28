@@ -119,6 +119,8 @@ supabase/.temp
 *.cyclonedx.json
 *.cyclonedx.json.gz
 *.spdx.json
+# where the release workflow writes the SBOMs and the downloaded IPA/AAB
+/apps/mobile/artifacts/
 
 # misc
 TMP_CI_commit_msg.txt

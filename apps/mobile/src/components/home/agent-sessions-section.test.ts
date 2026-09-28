@@ -125,13 +125,18 @@ function session(id: string): ActiveSession {
   return { id, status: 'running', title: id, connectionId: 'c1' };
 }
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+// `RemoteSessionRow` is a `memo()` component, and the test renderer reports the
+// wrapped function (not the memo object) as an instance's `type`, so the row
+// matches either identity.
+const RemoteSessionRowInner = (RemoteSessionRow as unknown as { type: unknown }).type;
 function nodes(type: string) {
   if (!renderer) {
     throw new Error('Missing renderer');
   }
   return renderer.root.findAll(
     candidate =>
-      (type === 'RemoteSessionRow' && candidate.type === RemoteSessionRow) ||
+      (type === 'RemoteSessionRow' &&
+        (candidate.type === RemoteSessionRow || candidate.type === RemoteSessionRowInner)) ||
       (typeof candidate.type === 'string' && candidate.type === type)
   );
 }
@@ -174,7 +179,10 @@ describe('Home live section', () => {
       'a1',
       'a4',
     ]);
-    (node('RemoteSessionRow', 1).props.onPress as () => void)();
+    const secondRow = node('RemoteSessionRow', 1);
+    (secondRow.props.onPress as (session: ActiveSession) => void)(
+      secondRow.props.session as ActiveSession
+    );
     expect(sessionDestination.id).toBe('a1');
   });
 
@@ -185,7 +193,7 @@ describe('Home live section', () => {
     await render({ ...sessions, isFetching: true });
     expect(node('RemoteSessionRow')).toBe(row);
     expect(nodes('Skeleton')).toHaveLength(0);
-    (row.props.onPress as () => void)();
+    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
     expect(sessionDestination.id).toBe('a1');
   });
 

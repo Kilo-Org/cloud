@@ -100,7 +100,7 @@ vi.mock('./kilo-chat-provider', () => ({
 }));
 vi.mock('./hooks/use-app-active-and-focused', () => ({ useAppActiveAndFocused: () => true }));
 vi.mock('./hooks/use-current-user-id', () => ({ useCurrentUserId: () => 'user-1' }));
-vi.mock('./hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => 1_800_000_000_000 }));
 vi.mock('./hooks/use-kilo-chat-client', () => ({ useKiloChatClient: () => ({}) }));
 vi.mock('./hooks/use-conversation-presence', () => ({ useConversationPresence: vi.fn() }));
 vi.mock('./hooks/use-conversation-event-subscription', () => ({

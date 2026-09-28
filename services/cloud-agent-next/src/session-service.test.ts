@@ -3470,6 +3470,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
           '*': 'deny',
           '/tmp/agent_test/**': 'allow',
           '/tmp/attachments/agent_test/**': 'allow',
+          '/tmp/kilo/**': 'allow',
         },
       },
     });

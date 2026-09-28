@@ -1416,6 +1416,10 @@ export class SessionService {
         '*': 'deny',
         [`/tmp/${sessionId}/**`]: 'allow',
         [`/tmp/attachments/${sessionId}/**`]: 'allow',
+        // The bundled shell tool advertises /tmp/kilo as the pre-approved temp
+        // directory for work outside the workspace. Allow it here so sessions
+        // that follow the tool guidance don't hit an external_directory deny.
+        '/tmp/kilo/**': 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',
         ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),

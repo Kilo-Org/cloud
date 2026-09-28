@@ -3071,7 +3071,7 @@
       "sharingUnavailable": "A partilha não está disponível neste dispositivo.",
       "status": {
         "paid": "Paga",
-        "open": "Abrir",
+        "open": "Aberta",
         "void": "Anulada",
         "uncollectible": "Incobrável"
       },

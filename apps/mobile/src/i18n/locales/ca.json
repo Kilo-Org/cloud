@@ -602,7 +602,7 @@
       "openAccessibility": "Obre una sol·licitud d'integració o de fusió",
       "clearLink": "Esborra l'enllaç",
       "pasteLink": "Enganxa l'enllaç de la sol·licitud d'integració o de fusió",
-      "open": "Obertura"
+      "open": "Obre"
     },
     "checks": {
       "title": "Comprovacions",
@@ -3071,7 +3071,7 @@
       "sharingUnavailable": "Aquest dispositiu no permet compartir contingut.",
       "status": {
         "paid": "Pagada",
-        "open": "Obertura",
+        "open": "Oberta",
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },

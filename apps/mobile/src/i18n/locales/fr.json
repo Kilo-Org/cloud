@@ -2666,7 +2666,7 @@
       "openAccessibility": "Ouvrir une PR ou un merge request",
       "clearLink": "Effacer le lien",
       "pasteLink": "Coller le lien de PR ou de merge request",
-      "open": "Ouverture"
+      "open": "Ouvrir"
     },
     "eventChips": {
       "comment": "Commenter",
@@ -3070,7 +3070,7 @@
       "sharingUnavailable": "Le partage n'est pas disponible sur cet appareil.",
       "status": {
         "paid": "Payée",
-        "open": "Ouverture",
+        "open": "Ouverte",
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },

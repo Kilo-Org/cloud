@@ -9,8 +9,9 @@ import {
 import { trpcClient } from '@/lib/trpc';
 
 /**
- * Build the `RemoteAttachmentPart[]` payload for a CAPABLE remote CLI
- * session (the active CLI advertised `capabilities.attachments: true`).
+ * Build the `RemoteAttachmentPart[]` payload for a remote CLI session the CLI
+ * has not reported as incapable (an unknown `capabilities.attachments` is
+ * optimistic; only an explicit `false` hides the paperclip).
  * For each `file` in the composer's submission payload this mints a
  * presigned GET via `trpcClient.cloudAgentNext.getAttachmentDownloadUrl`
  * and returns the wire part the SDK appends to `send_message.parts`

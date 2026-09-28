@@ -9,10 +9,6 @@
 import type { StreamFilters, StreamEventType, StoredEvent } from './types.js';
 import type { ExecutionId, SessionId } from '../types/ids.js';
 
-// ---------------------------------------------------------------------------
-// Timestamp Parsing
-// ---------------------------------------------------------------------------
-
 /**
  * Parse a timestamp value from query parameter.
  * Supports both integer milliseconds and ISO 8601 format.
@@ -31,13 +27,11 @@ import type { ExecutionId, SessionId } from '../types/ids.js';
 function parseTimestamp(value: string | null): number | undefined {
   if (!value) return undefined;
 
-  // Try integer milliseconds first
   const parsed = parseInt(value, 10);
   if (!isNaN(parsed)) {
     return parsed;
   }
 
-  // Try ISO 8601 timestamp
   const date = new Date(value);
   if (!isNaN(date.getTime())) {
     return date.getTime();
@@ -45,10 +39,6 @@ function parseTimestamp(value: string | null): number | undefined {
 
   return undefined;
 }
-
-// ---------------------------------------------------------------------------
-// Query Parameter Parsing
-// ---------------------------------------------------------------------------
 
 /**
  * Parse query params from /stream URL into StreamFilters.
@@ -93,10 +83,6 @@ export function parseStreamFilters(url: URL, sessionId: SessionId): StreamFilter
   return filters;
 }
 
-// ---------------------------------------------------------------------------
-// Event Matching
-// ---------------------------------------------------------------------------
-
 /**
  * Check if a stored event matches the given filters.
  *
@@ -108,26 +94,22 @@ export function parseStreamFilters(url: URL, sessionId: SessionId): StreamFilter
  * @returns true if the event matches all applicable filters
  */
 export function matchesFilters(event: StoredEvent, filters: StreamFilters): boolean {
-  // Check executionIds filter
   if (filters.executionIds && filters.executionIds.length > 0) {
     if (!filters.executionIds.includes(event.execution_id as ExecutionId)) {
       return false;
     }
   }
 
-  // Check eventTypes filter
   if (filters.eventTypes && filters.eventTypes.length > 0) {
     if (!filters.eventTypes.includes(event.stream_event_type as StreamEventType)) {
       return false;
     }
   }
 
-  // Check time range (startTime is inclusive)
   if (filters.startTime !== undefined && event.timestamp < filters.startTime) {
     return false;
   }
 
-  // Check time range (endTime is inclusive)
   if (filters.endTime !== undefined && event.timestamp > filters.endTime) {
     return false;
   }

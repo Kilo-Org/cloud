@@ -1,0 +1,2 @@
+ALTER TABLE "github_installation_webhook_receipts" ADD COLUMN "status" text DEFAULT 'completed' NOT NULL;--> statement-breakpoint
+ALTER TABLE "github_installation_webhook_receipts" ADD CONSTRAINT "github_installation_webhook_receipts_status_check" CHECK ("github_installation_webhook_receipts"."status" IN ('processing', 'completed'));

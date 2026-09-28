@@ -14,7 +14,7 @@ import { resError, resSuccess } from '@kilocode/worker-utils';
 import { withDORetry } from '../util/do-retry';
 import { internalApiMiddleware } from '../util/auth';
 import { clampRequestLimit } from '../util/constants';
-import { decodeUserIdFromPath, encodeUserIdForPath } from '../util/user-id-encoding';
+import { decodeUserIdFromPath, encodeUserIdForPath } from '@kilocode/worker-utils/user-id-encoding';
 import { validateCronExpression, enforcesMinimumInterval, isValidTimezone } from '../util/cron';
 import type { ScheduledInvocationResult } from '../dos/TriggerDO';
 

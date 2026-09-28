@@ -33,7 +33,9 @@ jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
     mockAssertRuntimeAuthorized(installationId, appType),
 }));
 
-import { POST } from './route';
+import { maxDuration, POST } from './route';
+import { maxDuration as liteMaxDuration } from '../github-lite/route';
+import { GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS } from '@/lib/integrations/db/github-installations';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
 function githubRequest(
@@ -141,5 +143,13 @@ describe('GitHub webhook route', () => {
     );
     expect(response.status).toBe(503);
     expect(mockGithubWebhook).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitHub webhook delivery-claim window', () => {
+  it('keeps every webhook route maxDuration below the stale-claim reclaim window', () => {
+    const staleWindowMs = GITHUB_INSTALLATION_DELIVERY_STALE_CLAIM_MS;
+    expect(maxDuration * 1000).toBeLessThan(staleWindowMs);
+    expect(liteMaxDuration * 1000).toBeLessThan(staleWindowMs);
   });
 });

@@ -1,4 +1,5 @@
 import { type RepoPlatform } from '@/lib/picker-bridge';
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
 
 export type RepositoryPlatform = RepoPlatform;
 
@@ -59,10 +60,18 @@ export function resolveProviderStatus({
   if (isError && repositoryCount === 0) {
     return 'error';
   }
-  if (integrationInstalled === false) {
+  // `undefined` means the query has produced no data at all, not "not
+  // installed": a paused query (iOS boot / the NetInfo probe not settled yet)
+  // reports `isLoading === false` and leaves `data` undefined, so the flag is
+  // undefined too. A provider whose list is not known yet must never read as
+  // settled, or the section renders its heading with no control under it.
+  if (integrationInstalled === undefined) {
+    return 'loading';
+  }
+  if (!integrationInstalled) {
     return 'connect';
   }
-  if (integrationInstalled === true && repositoryCount === 0) {
+  if (repositoryCount === 0) {
     return 'connected-empty';
   }
   return 'repos';
@@ -120,16 +129,7 @@ const repositoryKey = (repository: NewSessionRepository): string =>
 export function dedupeRepositoriesByPlatformAndFullName(
   repositories: readonly NewSessionRepository[]
 ): NewSessionRepository[] {
-  const seen = new Set<string>();
-  const result: NewSessionRepository[] = [];
-  for (const repository of repositories) {
-    const key = repositoryKey(repository);
-    if (!seen.has(key)) {
-      seen.add(key);
-      result.push(repository);
-    }
-  }
-  return result;
+  return dedupeBy(repositories, repositoryKey);
 }
 
 /**
@@ -188,4 +188,112 @@ export function detectRepositoryPlatform(
     return 'bitbucket';
   }
   return undefined;
+}
+
+// ── Branch selection state ───────────────────────────────────────────
+
+/**
+ * The full identity of one repository row: provider, path, and (Bitbucket
+ * only) the workspace/repository uuids. Two same-named rows on two providers,
+ * or two same-named Bitbucket rows in renamed workspaces, never share a key,
+ * so a branch chosen for one can never be read back for the other.
+ */
+export function repositoryIdentityKey(repository: NewSessionRepository): string {
+  return [
+    repository.platform,
+    repository.fullName,
+    repository.workspaceUuid ?? '',
+    repository.repositoryUuid ?? '',
+  ].join('\n');
+}
+
+/**
+ * New-session branch state, shared by the repository section (which owns the
+ * picker) and `useNewSessionCreator` (which sends the checkout branch).
+ *
+ * It is a module store rather than props because the branch picker is a
+ * separate route (`agent-chat/branch-picker`) that reports the choice through
+ * the slot, and the creator reads it outside the section's subtree. The store
+ * holds nothing durable: the screen body clears it on mount and on unmount, so
+ * a branch never outlives the screen that chose it.
+ *
+ * `overrides` only ever holds a *non-default* branch, keyed by
+ * `repositoryIdentityKey`. Reading with another repository's key yields
+ * `null` — that is the identity rule: a branch that belongs to one repository
+ * can never survive a repository change onto another.
+ *
+ * The organization scope is NOT stored here: the branch query reads it from
+ * the new-session route's own `organizationId` prop, so a scope change lands
+ * on the same render that changed it. A store copy would be published by a
+ * passive effect and leave the previous organization installed for one
+ * render — long enough for a branch query to run under it.
+ */
+export type NewSessionBranchSnapshot = {
+  overrides: ReadonlyMap<string, string>;
+};
+
+const EMPTY_OVERRIDES: ReadonlyMap<string, string> = new Map();
+
+let branchSnapshot: NewSessionBranchSnapshot = {
+  overrides: EMPTY_OVERRIDES,
+};
+
+const branchListeners = new Set<() => void>();
+
+function publishBranchSnapshot(next: NewSessionBranchSnapshot): void {
+  branchSnapshot = next;
+  for (const listener of branchListeners) {
+    listener();
+  }
+}
+
+export function subscribeNewSessionBranchState(listener: () => void): () => void {
+  branchListeners.add(listener);
+  return () => {
+    branchListeners.delete(listener);
+  };
+}
+
+/** Stable between mutations, so `useSyncExternalStore` never loops. */
+export function getNewSessionBranchState(): NewSessionBranchSnapshot {
+  return branchSnapshot;
+}
+
+/**
+ * Record the branch override for one repository. `null` (the provider default
+ * was chosen) drops the entry, so the create body carries no `upstreamBranch`
+ * and the server checks out the provider's own default.
+ */
+export function setSelectedBranchOverride(
+  repository: NewSessionRepository,
+  branch: string | null
+): void {
+  const key = repositoryIdentityKey(repository);
+  const current = branchSnapshot.overrides.get(key) ?? null;
+  if (current === branch) {
+    return;
+  }
+  const overrides = new Map(branchSnapshot.overrides);
+  if (branch === null) {
+    overrides.delete(key);
+  } else {
+    overrides.set(key, branch);
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides });
+}
+
+/** The non-default branch chosen for exactly this repository, or `null`. */
+export function getSelectedBranchOverride(repository: NewSessionRepository | null): string | null {
+  if (!repository) {
+    return null;
+  }
+  return branchSnapshot.overrides.get(repositoryIdentityKey(repository)) ?? null;
+}
+
+/** Drop every override (screen mount/unmount); the published scope is a prop. */
+export function resetSelectedBranchOverrides(): void {
+  if (branchSnapshot.overrides.size === 0) {
+    return;
+  }
+  publishBranchSnapshot({ ...branchSnapshot, overrides: EMPTY_OVERRIDES });
 }

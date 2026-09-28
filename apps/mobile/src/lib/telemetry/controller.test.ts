@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   allowsMandatory,
@@ -9,6 +9,7 @@ import {
   currentGeneration,
   resetTelemetryControllerForTests,
   setTelemetryDecision,
+  subscribeToTelemetryGeneration,
 } from './controller';
 
 beforeEach(() => {
@@ -180,5 +181,96 @@ describe('currentAccountId', () => {
     setTelemetryDecision('acct-1', true);
     clearTelemetryDecision();
     expect(currentAccountId()).toBeUndefined();
+  });
+});
+
+describe('subscribeToTelemetryGeneration', () => {
+  it('notifies a listener when the account changes', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToTelemetryGeneration(listener);
+
+    // undefined -> a defined decision is not an account change, so no notify.
+    setTelemetryDecision('acct-1', true);
+    expect(listener).not.toHaveBeenCalled();
+
+    setTelemetryDecision('acct-2', true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('does not notify when a repeated decision keeps the same account', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToTelemetryGeneration(listener);
+    setTelemetryDecision('acct-1', true);
+    setTelemetryDecision('acct-2', false);
+    expect(listener).toHaveBeenCalledTimes(1);
+    listener.mockClear();
+
+    // Same account: only the epoch advances, and the epoch scopes nothing to
+    // an account, so subscribers must not wake.
+    setTelemetryDecision('acct-2', true);
+    expect(listener).not.toHaveBeenCalled();
+    expect(currentEpoch()).toBe(3);
+    expect(currentGeneration()).toBe(1);
+
+    unsubscribe();
+  });
+
+  it('notifies a listener when the decision is cleared', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToTelemetryGeneration(listener);
+
+    clearTelemetryDecision();
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    unsubscribe();
+  });
+
+  it('stops notifying after unsubscribe', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToTelemetryGeneration(listener);
+
+    unsubscribe();
+    setTelemetryDecision('acct-1', true);
+    setTelemetryDecision('acct-2', true);
+    clearTelemetryDecision();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it('does not stop a second listener when one throws', () => {
+    const throwing = vi.fn<() => void>(() => {
+      throw new Error('listener boom');
+    });
+    const second = vi.fn<() => void>();
+    const unsubscribeThrowing = subscribeToTelemetryGeneration(throwing);
+    const unsubscribeSecond = subscribeToTelemetryGeneration(second);
+
+    setTelemetryDecision('acct-1', true);
+    expect(() => {
+      setTelemetryDecision('acct-2', true);
+    }).not.toThrow();
+
+    expect(throwing).toHaveBeenCalledTimes(1);
+    expect(second).toHaveBeenCalledTimes(1);
+    // The gate write still landed despite the throwing listener.
+    expect(currentAccountId()).toBe('acct-2');
+    expect(allowsMandatory()).toBe(true);
+
+    unsubscribeThrowing();
+    unsubscribeSecond();
+  });
+
+  it('does not notify on the test-only reset', () => {
+    const listener = vi.fn<() => void>();
+    const unsubscribe = subscribeToTelemetryGeneration(listener);
+    setTelemetryDecision('acct-1', true);
+    listener.mockClear();
+
+    resetTelemetryControllerForTests();
+
+    expect(listener).not.toHaveBeenCalled();
+    unsubscribe();
   });
 });

@@ -351,7 +351,7 @@ const nonSelfServicePromos: readonly NonSelfServicePromoCreditCategoryConfig[] =
  */
 const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCategoryConfig[] = [
   {
-    encrypted_credit_category: 'CobZxuHxiuCy3AhW/ObaOQ==:oVLeCsiu4IDqCXzUqliNUg==:IxCjLOrL8EPkWRNw',
+    encrypted_credit_category: 'npRJk1O/OkLHSao8YUh5fg==:w6gQihplxtmmrFgLROaY6g==:FEFfQAn6VUeOxKat',
     description: 'Friday promo',
     expiry_hours: 60 * 24,
     amount_usd: 5,
@@ -361,7 +361,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2026-04-17T23:59:59Z'),
   },
   {
-    encrypted_credit_category: 'DMAB+J9SP5P7rxN19iajXg==:l+/sU/o65wg/imvGdNPCTg==:SlcbjsV0',
+    encrypted_credit_category: 'v7CwlWTk0QZXn7ab6xZCeQ==:MtXTBCed7YTfzkYYzEGEzg==:OZD48zJh',
     description: 'GitHub incentive',
     expiry_hours: 30 * 24,
     amount_usd: 5,
@@ -372,7 +372,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2025-11-07'),
   },
   {
-    encrypted_credit_category: 'xg/r5QNfg/b2Hbvpgzsr/A==:8AzfSaWcIKnZEzbFr0Vraw==:XOdYcdPeoA==',
+    encrypted_credit_category: 'eHrsSFTqVjP1/7WSuaK07g==:DYSgjmZfj5PeyPTXyIGRpw==:Tp9rLHQNqg==',
     description: 'Celebrating Kilo Code reaching 10k GitHub stars',
     expiry_hours: 60 * 24,
     amount_usd: 10,
@@ -383,7 +383,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2025-09-25'),
   },
   {
-    encrypted_credit_category: 'mIm3nTc3wgDDq4YXZQp9ZA==:h5otxBPI32TG17ZtBIxI3g==:HDCcgZYZR/s=',
+    encrypted_credit_category: 'xmq91nXGdp/Gz4Avnza8Sw==:c7q2di4MLBydN+2uNB0j7g==:MjcxI1eyUE8=',
     description: 'Participated in live SF event with Alex, Olesya & Chris 2025-09-11',
     expiry_hours: 14 * 24,
     amount_usd: 20,
@@ -395,7 +395,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      '14Zfp5JfOOVUNq606Njbdw==:4jEDTrK5ROcDfK/oekr+rw==:GzmFKDBtooQJNFUaMnEvvg==',
+      '9TtQ1++USjC2fKWITqU/yw==:gsvVnfK4kRmS36vdDSAUvA==:5yEWieNypMzZh5i2yuo0pQ==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 13.37,
@@ -405,7 +405,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     // ref: https://kilo-code.slack.com/archives/C08HFNY5457/p1753805417217909?thread_ts=1753802681.932019&cid=C08HFNY5457
-    encrypted_credit_category: '4OXLJK+RolYrVlh4NdddqA==:w+wVzlDFjLCoDNTueeY/1w==:z86VakX2rzhPF/lr',
+    encrypted_credit_category: 'vXY/Q5ONiXCV5qWizOY/ug==:9RUiwrE9D0RFXF8Wdsm3Bw==:Vbi/AbyFNly+2nc8',
     description: 'Welcome back for previous payers who churned',
     is_user_selfservicable: true,
     amount_usd: 20,
@@ -415,7 +415,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_used1usd_andHoldOrPayment, // ref: https://kilo-code.slack.com/archives/C08H16KGBUK/p1753874625951609
   },
   {
-    encrypted_credit_category: 'FEZhjS28hWE20Pam4lVuiA==:xPVmp+fZVKYZV7YYh1cKsw==:HLP+lBdBivdM',
+    encrypted_credit_category: 'vu9Vd/guKd8N5rxWrBOHXQ==:tM3iW5pSdbUzScAoVWp/rA==:7YMUVtW/TME1',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -424,7 +424,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2025-08-01T00:00:00Z'),
   },
   {
-    encrypted_credit_category: 'Dgm1duM/IXukF1ByEAEpQg==:ekQ7a5iHFaxG9oza+pyV3w==:gLGJhyFAxGw=',
+    encrypted_credit_category: 'DggfZR8YH5olfslwFX63og==:MJ4YPPfDMMbAYywdTYHx8Q==:1RgFeAVCSoo=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -433,7 +433,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2025-08-07T03:00:00Z'),
   },
   {
-    encrypted_credit_category: 'UqYUabCOrhX1QFq/1NpPDw==:Pw/kEurVK5h7Fj2BsjdoFg==:DSFcufScJ1A=',
+    encrypted_credit_category: '7SrRrUHfDOQHi1NGL2OfbA==:JqSJxJoXwyH4Xoi43AmApw==:lG1gjhcHg9U=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -443,7 +443,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_stytchApprovedOrHoldOrPayment,
   },
   {
-    encrypted_credit_category: 'dPwhggUz8RFJ1lZC/zi4oA==:rI7KH1nByxtT0IXpIdpo0g==:6nfc9Hdr9jg=',
+    encrypted_credit_category: 'lYOiVk5sBw4AJhgm+uN02Q==:Hlb9EGjHPEqBOXhiD5m3bA==:Zb3GrOVDB+Y=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -453,7 +453,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_stytchApprovedOrHoldOrPayment,
   },
   {
-    encrypted_credit_category: 'CcBSaURLI/q62XjKkZ4LCw==:VFkIgLXXF7hkx74cYVBqLw==:HXY4CHhyxw==',
+    encrypted_credit_category: 'wNTVFl71h65+85ILFgwLSA==:KE7OaaFW4DZOyi3IPK95wg==:0JL1aHcnVg==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 48,
@@ -463,7 +463,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'GfQV0ooPWb7fumMTuhv2zQ==:WGlFbxgEaKegUfCpfGLvCw==:TkSVHWVgx3TASGtmWw==',
+      'lYp7th9S/X1aDIUm+AOzSA==:V84owhnMn+BwSZpm2o46uA==:NRn8oUjoWXOY9Ga3iw==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 48,
@@ -475,7 +475,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   // Reactivated Nov 2025. Moved from promoCreditCategoriesOld.ts back to active
   // status since Theo specifically mentioned the code "REDACTED" in his latest video.
   {
-    encrypted_credit_category: '7qXpqKvmKRScbtWtzyD1kA==:HI8gJUO6O/qwLyZNUjKqJA==:wT/7+g==',
+    encrypted_credit_category: 'arTJ8jpU3ApP9zJ6vmB2ww==:Ly0prRAHER/NNeBBGVSqNA==:InaeZA==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 13.37,
@@ -486,7 +486,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   // Creator promo codes - January 2026
   {
-    encrypted_credit_category: '4aVd/vjpEbMGLJoEa55KOg==:hGSGXu8otdmUkX2d2nDJOQ==:F2zk8g==',
+    encrypted_credit_category: 'RJs4C9WiSPBNpMoOkJAUgA==:rKMRrvlf1RqZEyqUCW+kpQ==:DGIRZg==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -496,7 +496,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: '9JwWBUyTj3/V/wx/Q2j9bw==:DQnC1IfP3ul3+XAkT7vQcQ==:clDQK9yYOg==',
+    encrypted_credit_category: 'iutoU0G1wpqyupTVeZ4zjg==:nEbiH4Lpp0QrUo9fxjeltw==:JdHGSYhbUw==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -506,7 +506,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'D4pK6ddWXZIZKzLLAlFjIw==:AxeKVJ2ddJ2GtZKgDWigtw==:CrLtOw==',
+    encrypted_credit_category: '9/1LzjWBHd+sLrTdL0YDaA==:bfBQlPaJFUfQff3Y6VZ9uw==:dIVl0g==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -516,7 +516,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'JNUpAZEOIub4CrXKhMIIRw==:mNDvThJWHcOOD7driWhsqA==:CtytDNmr',
+    encrypted_credit_category: '93AOl0JY3OPv7a+G3DEkmw==:NZX6ONqmEfv2V0oSK0+FGA==:KM70ZRl3',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -526,7 +526,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'D9KdkuVIeM0v+gfWhkYAUQ==:/fMdCDsc6//Kzgr224xS5Q==:fJUhsg==',
+    encrypted_credit_category: '5pMKo2DUhAbUN7sozMPshQ==:MD3SwxEOSKuiraHqAhjAgQ==:4xjv/A==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -536,7 +536,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'NgNNcWcgnZ/0BvkQUXdiSA==:rG3ZRS78dIk/RidG8qFjIA==:oCdK1w==',
+    encrypted_credit_category: 'rtghl1Ox+53Q+n0f1y+wqw==:j0an0KxAmUGq9vTnRGsumw==:MC8bUg==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -546,7 +546,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'dDJQHG/ZF4zBEJFH8Dm7gA==:/OPvKUpk0WsHOp1yd9U0zQ==:+3jkN7n/',
+    encrypted_credit_category: 'Nl+5hgZ6KOs9jjUOYq+pQA==:RYDgxo36Kc1ml0mhdCj1JQ==:KMhYTdWU',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -556,7 +556,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'T4mrIarsnjUH+d1mHyYLig==:qMVRwrfu0jwYaERsj03taQ==:5zC0ai1mrA==',
+    encrypted_credit_category: '+dmizu2C8oTyUGDcAbw42Q==:89VgVNELylKGEQaGzJ+jqA==:ues/EBbWVA==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -566,7 +566,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'bUBH/KYgjDUDCAmsisO6gA==:os23+PKf/+ylzZrRIdTrMw==:aTjfaaFT',
+    encrypted_credit_category: 'RkcKq8lXnNERDPlIGXgTqA==:ii+TfQfoeEDcrgLdvYsrCg==:cS8xXsYJ',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -576,7 +576,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'Lv/n+j5FHRWZbFkUmiNWVg==:KW9t+ff7f1GIYjpJc7ygFw==:s43cvUA=',
+    encrypted_credit_category: '2JXUG2b8I5xSBJRy6lVwog==:VLfQrcnrQNrJI7FDmDBA2w==:gUzAj0A=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -586,7 +586,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'DmCrimPb2V4wgkVbsNf0HQ==:lxbOSsz1m8Q8rjIugY09GA==:j/zWkOA=',
+    encrypted_credit_category: '8F8BYuEsHpp0l9Asm0H51w==:V3teTY4W064xMc6Np1JG/A==:2QFGNbg=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -596,16 +596,16 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     customer_requirement: has_Payment,
   },
   {
-    encrypted_credit_category: 'WYiw0GGnTc4IkH85VQlpOg==:OAcEL5bCRN7F5fbA50Mg6A==:+HldhiRr',
+    encrypted_credit_category: 'SxAz6FRWvkkdD74gTjt0Iw==:Rua56Lqu7CmLiq22e/R4xQ==:md/XvfAx',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
-    promotion_ends_at: new Date('2027-01-01'),
+    promotion_ends_at: new Date('2026-09-16'),
     description: 'Emilie Valentine Experiment',
     total_redemptions_allowed: 5000,
   },
   {
-    encrypted_credit_category: 'C3wdUIGcWvHqGKkb+S1caw==:y0x+2EPqORv/Cj/0iJRAoQ==:8mc/1wDaNo0=',
+    encrypted_credit_category: '6t5DuiB0djbUtFV5ahkcyw==:5XLIrrhZkAjbzKUk+fi5AQ==:fwxIYM/v1Sw=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 13.37,
@@ -616,7 +616,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'dXWYTW0RN46CrqbYrC5R/Q==:r4lcZrq8nbBLVHx79tDP6A==:nmfM5TVjuJ9nqo2UWd/5',
+      '3mxJjt/8VsFrt8ReFrvjMg==:hzJPfJoeWEl1nm9YNjS2dg==:c6iOCOY2p4afagvxeYWU',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -625,7 +625,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 200,
   },
   {
-    encrypted_credit_category: 'Hsa2A3AMnO9WALOpOUgShg==:QeOJcNa5uVzCEf6rzz5/qg==:/TJ9IpdtDw==',
+    encrypted_credit_category: '+9ccNqMgf/tnvTQhUNNMjA==:s6a3Va/1nEIpG7bMmYVFvA==:eO3NGhlvvQ==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -634,7 +634,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     promotion_ends_at: new Date('2025-07-12T00:00:00Z'),
   },
   {
-    encrypted_credit_category: '8EgpuUwFg4M7Eer29TzJOQ==:VoVZ8nv07naqbLkF3LPFHw==:yWjPs94wmGI=',
+    encrypted_credit_category: 'fZbpUDbusEoRUdAaN04peA==:xwNdzVyaJ6PbSCZjK7vI/g==:d2pGvk41LeM=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 5,
@@ -645,7 +645,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'R6Xhw26/Yqlfbs/9OQqeVA==:9xYRMemIYt8kEK7bBGqYCQ==:/KC7MXLRNmATMH8Y5WQ=',
+      'Ll1D9fFzM4EBYSTZynp6kQ==:Y9f1iwaN6LKRi5yJCt1d2g==:yLXPSWBO2ilkmVYNvhQ=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 20,
@@ -655,7 +655,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 200,
   },
   {
-    encrypted_credit_category: 'xdmWWjmAONcAvH3BH7i5Tw==:ScHtinC8BbZ70KYeswSbsQ==:wWSH6jFnouY7YHgV',
+    encrypted_credit_category: 'qg9tWiS+yKLb6BERnKwn8A==:mYrn4BpshhGzzQWRQHhlOA==:C71AdyDiinwIB1lG',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 20,
@@ -665,7 +665,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 200,
   },
   {
-    encrypted_credit_category: 'rUz27MDgRmqf1gHHX+/Zbw==:GW4ojyf9ENrTCKHw31xUcA==:oTGF49ieP0peAQ==',
+    encrypted_credit_category: 'UPPw13ZjDPF253lAQ9H0mg==:L4sXfqtLbZgwt0fYJmb7Kg==:NIp0C1R2Xm+ARA==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 20,
@@ -675,7 +675,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'AGBh1ht9Ae9xm358inZC4A==:82DdufHKhw6kMS2KTtlJpw==:TiBmyJMaGtk2K/A9ELFQ0I7MIrG8kog=',
+      'kK3TxQiRRrybX/lRtokmuw==:2Ya4zINN/ATr1E53P7XWYw==:ql85CNhT/gv1R5Y1I3NghGm9qF5+8Qs=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 20,
@@ -685,7 +685,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 200,
   },
   {
-    encrypted_credit_category: 'eAvvANNkXdXdhto8/cw31w==:8PjtR26E3MOZqyhVG6r30g==:2OJb8DiaCA==',
+    encrypted_credit_category: '1tUyCI4PXf55lYRMegAYRA==:oCyDfEkERD01aYZ9ato26A==:Xhe535+6KA==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -695,7 +695,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 2000,
   },
   {
-    encrypted_credit_category: 'FCD+K/F3UGQR533OdgPViQ==:n5QOBh7aSdIR/hxdtBI7gA==:LkUxLKCCiQw=',
+    encrypted_credit_category: 'eDleuTp6Nb8gv0VN8V2scg==:Ql1vQvO4nAW6Ql/DVa8BWQ==:Q7CaOl/+1zM=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 50,
@@ -705,7 +705,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 2000,
   },
   {
-    encrypted_credit_category: 'RFk4Mcj/NAJbHZoMe9zs2Q==:80p2tRoXKZS91Rd4DFeLVg==:aVXBzgFw/2Ppmg==',
+    encrypted_credit_category: 'BFZDiYs28gFhxZgnlla7Tg==:Xv3GK0ztm1jvyvxnAq2gSg==:XGLy0E3SF1bGfg==',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 100,
@@ -714,7 +714,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
     total_redemptions_allowed: 30,
   },
   {
-    encrypted_credit_category: 'RIm83T1nOqaomIGaGB/uqA==:+LACBlJljL/mS/65uzflrw==:fNGT77oHV8M=',
+    encrypted_credit_category: 'Ask7EbCTpqKCGzYQb/Zpxw==:WUETQMOyhUlPm+QbEwKZXA==:f/fLRPibgFo=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 50,
@@ -725,7 +725,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'vJgJcT7c/a9FMk3NKVsbgA==:21MktBLukQU8qyUX4OHDQA==:PPkWdB0MzOPAynfY/5Cla2c=',
+      'QnEXhs31+/tUpgUJCyxsUg==:yr86uoJW07lXPbGVaz25gA==:zW0mCF3n7Aq3JK55yxFb3Fs=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 9,
@@ -734,7 +734,7 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
   {
     encrypted_credit_category:
-      'uUuur9I2iZOBVuFT12Qesw==:nzwZRYrw5yNyIceuzIlFIA==:2gJR8oVMRq6ka1mEQ0U=',
+      'nP8snVufUYT0JZ6S6lG9CQ==:qv4cQcPsg1yjrNWaavFRBA==:9kdOHDfw8+0DWG4ky/Y=',
     is_user_selfservicable: true,
     is_idempotent: true,
     amount_usd: 10,
@@ -746,13 +746,38 @@ const encryptedSelfServicePromos: readonly EncryptedSelfServicePromoCreditCatego
   },
 ];
 
-const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] =
-  encryptedSelfServicePromos.map(
-    ({ encrypted_credit_category, ...rest }): SelfServicePromoCreditCategoryConfig => ({
-      ...rest,
-      credit_category: decryptPromoCode(encrypted_credit_category),
-    })
-  );
+/**
+ * Decrypts each stored promo code into its runtime `credit_category`.
+ *
+ * Decrypting the whole catalogue happens at module scope, so a ciphertext that
+ * does not decrypt with the configured key (a rotated or missing
+ * `CREDIT_CATEGORIES_ENCRYPTION_KEY_V2`) must not stop this module from
+ * loading. Sign-in and cloud-agent session creation import it transitively, and
+ * a throw at module scope takes those routes down with a 500 for every user.
+ * Skip only the entries that fail and log them, so a key misconfiguration
+ * degrades to "that promo is unavailable" instead of "nobody can sign in".
+ */
+export function buildSelfServicePromos(
+  entries: readonly EncryptedSelfServicePromoCreditCategoryConfig[],
+  decrypt: (encrypted: string) => string = decryptPromoCode
+): SelfServicePromoCreditCategoryConfig[] {
+  const promos: SelfServicePromoCreditCategoryConfig[] = [];
+  for (const { encrypted_credit_category, ...rest } of entries) {
+    try {
+      promos.push({ ...rest, credit_category: decrypt(encrypted_credit_category) });
+    } catch (error) {
+      console.error(
+        'Failed to decrypt a self-service promo credit category; skipping it. Check CREDIT_CATEGORIES_ENCRYPTION_KEY_V2 / CREDIT_CATEGORIES_ENCRYPTION_KEY.',
+        error
+      );
+    }
+  }
+  return promos;
+}
+
+const selfServicePromos: readonly SelfServicePromoCreditCategoryConfig[] = buildSelfServicePromos(
+  encryptedSelfServicePromos
+);
 
 export const promoCreditCategories: readonly PromoCreditCategoryConfig[] = [
   ...promoCategoriesOld,

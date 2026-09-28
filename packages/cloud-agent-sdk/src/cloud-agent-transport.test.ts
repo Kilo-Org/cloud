@@ -7,8 +7,8 @@ import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
 import type { SessionStatus } from './schemas';
 import { createCloudAgentTransport } from './cloud-agent-transport';
-import type { SessionSnapshotPageOutcome } from './types';
-import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
+import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
+import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
 
 // ---------------------------------------------------------------------------
 // WebSocket mock
@@ -729,6 +729,42 @@ describe('CloudAgentTransport snapshot refetch on reconnect', () => {
     return newMockWs;
   }
 
+  it('threads a settled tool part settle time through the snapshot replay', async () => {
+    const taskPart = {
+      id: 'part-task-1',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool' as const,
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status: 'completed' as const,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const snapshot: SessionSnapshot = {
+      info: { id: 'ses-1' },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: 'ses-1' }),
+          parts: [taskPart],
+        },
+      ],
+    };
+    const { transport, chatEvents } = createTransportWithControllableSnapshot(snapshot);
+
+    transport.connect();
+    await flushMicrotasks();
+
+    expect(chatEvents).toContainEqual({ type: 'message.part.updated', part: taskPart, time: 2 });
+
+    transport.destroy();
+  });
+
   it('resumes from the replay cursor on reconnect instead of refetching the snapshot', async () => {
     jest.useFakeTimers();
     try {
@@ -1443,6 +1479,28 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
         state: { status: 'completed', input: { command: 'pwd' } },
       },
     });
+
+    transport.destroy();
+  });
+
+  it('delivers the part update event time to the sink', async () => {
+    const { transport, chatEvents } = createTransportWithSinks();
+
+    transport.connect();
+    await flushPromises();
+
+    const part = {
+      id: 'part-tool-1',
+      sessionID: 'ses-1',
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 1 } },
+    };
+    sendRaw(kilocode('message.part.updated', { part, time: 1_772_214_640_111 }));
+
+    expect(chatEvents).toEqual([{ type: 'message.part.updated', part, time: 1_772_214_640_111 }]);
 
     transport.destroy();
   });

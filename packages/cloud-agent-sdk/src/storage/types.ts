@@ -12,7 +12,7 @@ type SessionStorage = {
   getMessageInfo(messageId: string): MessageInfo | undefined;
 
   // Parts (sorted by ID within their message)
-  upsertPart(messageId: string, part: Part): void;
+  upsertPart(messageId: string, part: Part, eventTime?: number): void;
   applyPartDelta(messageId: string, partId: string, field: string, delta: string): void;
   deletePart(messageId: string, partId: string): void;
   getParts(messageId: string): readonly Part[];
@@ -34,7 +34,7 @@ type SessionStorage = {
  */
 type StorageMutation =
   | { type: 'upsert_message'; info: MessageInfo }
-  | { type: 'upsert_part'; messageId: string; part: Part }
+  | { type: 'upsert_part'; messageId: string; part: Part; eventTime?: number | undefined }
   | { type: 'apply_delta'; messageId: string; partId: string; field: string; delta: string }
   | { type: 'delete_part'; messageId: string; partId: string }
   | { type: 'delete_message'; messageId: string };

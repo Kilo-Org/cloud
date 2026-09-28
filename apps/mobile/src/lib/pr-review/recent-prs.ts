@@ -1,7 +1,17 @@
-import * as SecureStore from 'expo-secure-store';
 import { z } from 'zod';
 
+import {
+  gitlabInstanceOrigin,
+  type ProviderPrPlatform,
+  type ProviderPrRef,
+} from '@kilocode/app-shared/provider-review';
+
 import { deleteAccountMetadata, writeAccountMetadata } from '@/lib/auth/account-metadata-write';
+import {
+  readStoredValueForUpdate,
+  readStoredValueSafe,
+  writeStoredValueSafe,
+} from '@/lib/auth/secure-store-value';
 import { PR_REVIEW_RECENTS_KEY } from '@/lib/storage-keys';
 
 export type RecentPr = {
@@ -16,6 +26,19 @@ export type RecentPr = {
    * missing field on a legacy stored entry) marks a successful load.
    */
   lastResult?: 'ok' | 'failed';
+  /**
+   * The provider this entry belongs to. Entries stored before the
+   * multi-provider recents (s7) carry no platform and read as `'github'` —
+   * they were only ever written by the GitHub backfill.
+   */
+  platform?: ProviderPrPlatform;
+  /**
+   * GitLab only: the origin of the instance the entry was opened on.
+   * Identity/recents only — the server re-derives the authoritative
+   * instance (s2), so a stale hint never redirects, it only keeps one row
+   * per instance.
+   */
+  instanceHint?: string;
 };
 
 const recentPrSchema = z.object({
@@ -25,18 +48,60 @@ const recentPrSchema = z.object({
   title: z.string(),
   lastOpenedAt: z.number(),
   lastResult: z.enum(['ok', 'failed']).optional(),
+  platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+  instanceHint: z.string().optional(),
 });
 
 const RECENT_PR_LIMIT = 10;
 
-type RecentPrRef = {
+/** The identity one recents entry is stored, keyed, removed and marked under. */
+export type RecentPrRef = {
   owner: string;
   repo: string;
   number: number;
+  platform?: ProviderPrPlatform;
+  instanceHint?: string;
 };
 
-function recentPrKey(item: RecentPrRef): string {
-  return `${item.owner.toLowerCase()}/${item.repo.toLowerCase()}#${item.number}`;
+/**
+ * The collision-free recents key: platform, the GitLab instance origin, and
+ * the lowercased repository path plus number. The bare `owner/repo#number`
+ * triple collided across providers — the same-named repository on GitHub,
+ * GitLab and Bitbucket is three separate rows, and one GitLab project on two
+ * instances is two rows. GitHub paths keep their existing case-fold so a
+ * differently cased paste of the same PR still dedupes.
+ */
+export function recentPrKey(item: RecentPrRef): string {
+  const platform = item.platform ?? 'github';
+  const instance = platform === 'gitlab' ? gitlabInstanceOrigin(item.instanceHint) : '';
+  return `${platform}|${instance}|${item.owner.toLowerCase()}/${item.repo.toLowerCase()}#${item.number}`;
+}
+
+/**
+ * The provider ref a recents row navigates with. The entry's writers store
+ * the `owner`/`repo`/`number` triple exactly as `providerPrTriple` splits
+ * the provider path at its last separator, so folding it back with the
+ * platform (legacy entries: GitHub) restores the ref losslessly.
+ */
+export function providerRefFromRecentPr(entry: RecentPrRef): ProviderPrRef {
+  const platform: ProviderPrPlatform = entry.platform ?? 'github';
+  if (platform === 'gitlab') {
+    return {
+      platform: 'gitlab',
+      projectPath: `${entry.owner}/${entry.repo}`,
+      mrIid: entry.number,
+      ...(entry.instanceHint ? { instanceHint: entry.instanceHint } : {}),
+    };
+  }
+  if (platform === 'bitbucket') {
+    return {
+      platform: 'bitbucket',
+      workspace: entry.owner,
+      repoSlug: entry.repo,
+      prId: entry.number,
+    };
+  }
+  return { platform: 'github', owner: entry.owner, repo: entry.repo, number: entry.number };
 }
 
 function parseRecents(raw: string | null): RecentPr[] {
@@ -54,7 +119,9 @@ function parseRecents(raw: string | null): RecentPr[] {
         return [];
       }
       // Legacy entries predate `lastResult`; read a missing field as 'ok'
-      // so an installed app's existing recents survive the upgrade.
+      // so an installed app's existing recents survive the upgrade. A
+      // missing `platform` (s7) reads as GitHub, which is the only provider
+      // the pre-s7 writers could have stored.
       return [
         { ...result.data, lastResult: result.data.lastResult === 'failed' ? 'failed' : 'ok' },
       ];
@@ -71,8 +138,35 @@ function toJsonString(recents: RecentPr[]): string {
 }
 
 export async function getRecentPrs(): Promise<RecentPr[]> {
-  const raw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
+  // A failed read is reported and reads as "no recents"; the list is a
+  // convenience and must not reject into the screen.
+  const raw = await readStoredValueSafe(PR_REVIEW_RECENTS_KEY);
   return parseRecents(raw);
+}
+
+/**
+ * The recents for the OS search index. `undefined` means the read failed and
+ * was reported at warning level; the index must then claim no recents scope,
+ * because a read that did not happen is not evidence that an indexed entry is
+ * gone. {@link getRecentPrs} cannot serve this: reading a failure as "no
+ * recents" is the right screen outcome and the wrong index one, because the
+ * collector treats a read list as the whole scope and would delete every
+ * indexed recents entry.
+ */
+export async function getRecentPrsForIndex(): Promise<RecentPr[] | undefined> {
+  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
+  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
+}
+
+/**
+ * The recents for a read-modify-write. `undefined` means the read failed and
+ * was reported at warning level; the caller must abort, because treating it as
+ * "no recents" would persist a list that never contained the stored entries and
+ * so destroy them. A successful read of nothing stored is `[]`.
+ */
+async function readRecentsForUpdate(): Promise<RecentPr[] | undefined> {
+  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
+  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
 }
 
 /**
@@ -85,12 +179,18 @@ export async function getRecentPrs(): Promise<RecentPr[]> {
  */
 export async function upsertRecentPr(entry: RecentPr): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      // Unreadable: leave the stored recents untouched rather than replacing
+      // them with a list built from an empty one.
+      return;
+    }
     const incomingKey = recentPrKey(entry);
     const filtered = existing.filter(item => recentPrKey(item) !== incomingKey);
     const next = [entry, ...filtered].slice(0, RECENT_PR_LIMIT);
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(next));
+    // Best effort: the caller fires this without awaiting, so a failed write is
+    // reported and swallowed rather than surfacing as an unhandled rejection.
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(next));
   });
 }
 
@@ -99,11 +199,13 @@ export async function upsertRecentPr(entry: RecentPr): Promise<void> {
  */
 export async function removeRecentPr(ref: RecentPrRef): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      return;
+    }
     const targetKey = recentPrKey(ref);
     const next = existing.filter(item => recentPrKey(item) !== targetKey);
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(next));
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(next));
   });
 }
 
@@ -115,8 +217,10 @@ export async function removeRecentPr(ref: RecentPrRef): Promise<void> {
  */
 export async function markRecentPrFailed(ref: RecentPrRef): Promise<void> {
   await writeAccountMetadata(PR_REVIEW_RECENTS_KEY, async () => {
-    const existingRaw = await SecureStore.getItemAsync(PR_REVIEW_RECENTS_KEY);
-    const existing = parseRecents(existingRaw);
+    const existing = await readRecentsForUpdate();
+    if (existing === undefined) {
+      return;
+    }
     const targetKey = recentPrKey(ref);
     // `existing` is freshly parsed (safe to mutate in place); set the marker
     // only on the matching entry and never create one.
@@ -130,7 +234,7 @@ export async function markRecentPrFailed(ref: RecentPrRef): Promise<void> {
     if (!found) {
       return;
     }
-    await SecureStore.setItemAsync(PR_REVIEW_RECENTS_KEY, toJsonString(existing));
+    await writeStoredValueSafe(PR_REVIEW_RECENTS_KEY, toJsonString(existing));
   });
 }
 

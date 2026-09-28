@@ -159,7 +159,11 @@ describe('runtime authorization recovery', () => {
         expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
           status: 'denied',
         });
-        expect(fields).toHaveBeenLastCalledWith({ sessionId, reason: 'missing_secret' });
+        expect(fields).toHaveBeenLastCalledWith({
+          sessionId,
+          stage: 'recovery',
+          reason: 'missing_secret',
+        });
         expect(error).toHaveBeenCalledWith('Runtime authorization recovery denied');
         expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toBeUndefined();
         instance['env'].NEXTAUTH_SECRET = originalSecret;
@@ -627,5 +631,85 @@ describe('runtime authorization recovery', () => {
       'session.attach',
       'session.prompt',
     ]);
+  });
+});
+
+describe.each(['legacy', 'control'] as const)('%s recovery denial diagnostics', plane => {
+  it('reports each early denial without leaking seals, tokens or error text', async () => {
+    const sessionId =
+      plane === 'legacy' ? 'agent_denial_diagnostic' : 'workspace_denial_diagnostic';
+    const namespace = plane === 'legacy' ? env.CLOUD_AGENT_SESSION : env.SANDBOX_SESSION;
+    const stub = namespace.getByName(`user_diagnostic:${sessionId}`);
+    await runInDurableObject(stub, async instance => {
+      const metadata = {
+        metadataSchemaVersion: 2 as const,
+        identity: { sessionId, userId: 'user_diagnostic', orgId: organizationId },
+        auth: {
+          kiloSessionId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaab',
+          kilocodeToken: 'private-token',
+        },
+        lifecycle: { version: 1, timestamp: 0 },
+      };
+      const getMetadata = vi.spyOn(instance, 'getMetadata').mockResolvedValue(metadata);
+      const getState = vi
+        .spyOn(instance, 'getRuntimeAuthorizationRecoveryState')
+        .mockResolvedValue({ state: 'revoked' });
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const originalSecret = instance['env'].NEXTAUTH_SECRET;
+      const fresh = authorization({
+        id: '00000000-0000-4000-8000-000000000601',
+        sessionId,
+        userId: metadata.identity.userId,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      const input = {
+        ownerId: metadata.identity.userId,
+        expectedOldId: '00000000-0000-4000-8000-000000000602',
+        recoveryId: '00000000-0000-4000-8000-000000000603',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: 'private-runtime-token',
+      };
+      try {
+        const assertDenial = async (reason: string, request = input) => {
+          fields.mockClear();
+          expect(await instance.recoverExpiredRuntimeAuthorization(request)).toEqual({
+            status: 'denied',
+          });
+          expect(fields.mock.calls).toEqual([[{ sessionId, stage: 'recovery', reason }]]);
+        };
+        getMetadata.mockResolvedValueOnce(null);
+        // The DO name supplies the identity when metadata is unavailable.
+        fields.mockClear();
+        expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
+          status: 'denied',
+        });
+        expect(fields.mock.calls).toEqual([
+          [{ sessionId, stage: 'recovery', reason: 'metadata_unavailable' }],
+        ]);
+        await assertDenial('owner_mismatch', { ...input, ownerId: 'other' });
+        instance['env'].NEXTAUTH_SECRET = '';
+        await assertDenial('missing_secret');
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        await assertDenial('invalid_seal', {
+          ...input,
+          runtimeAuthorizationSeal: 'private-invalid-seal',
+        });
+        await assertDenial('fresh_authorization_inactive', {
+          ...input,
+          runtimeAuthorizationSeal: await seal({ ...fresh, state: 'revoked' }),
+        });
+        if (plane === 'control') {
+          getMetadata.mockResolvedValueOnce({ ...metadata, auth: {} });
+          await assertDenial('kilo_session_missing');
+        }
+        await assertDenial('authorization_state_changed');
+        expect(getState).toHaveBeenCalledOnce();
+      } finally {
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        vi.restoreAllMocks();
+      }
+    });
   });
 });

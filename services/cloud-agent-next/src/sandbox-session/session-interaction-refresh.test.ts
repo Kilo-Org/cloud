@@ -9,7 +9,17 @@ const result: SessionSyncResult = { status: { type: 'busy' }, questions: [], per
 
 function fixture() {
   let scope: InteractionRefreshScope | undefined = {
-    message: { messageId: 'msg_1', state: 'accepted', wrapperInstanceId: 'wrapper_1' },
+    message: {
+      messageId: 'msg_1',
+      state: {
+        kind: 'accepted',
+        intent: null,
+        legacyInvalidIntent: true,
+        acceptedAt: 1,
+        executionDeadlineAt: 2,
+        wrapperInstanceId: 'wrapper_1',
+      },
+    },
     epoch: 1,
     interactionRevision: 0,
     sessionId: 'session_1',
@@ -76,11 +86,22 @@ describe('interaction refresh', () => {
       await Promise.resolve();
       const scope = f.scope();
       if (!scope) throw new Error('Missing scope');
-      f.setScope(
-        field === 'messageId' || field === 'wrapperInstanceId'
-          ? { ...scope, message: { ...scope.message, [field]: 'new' } }
-          : { ...scope, [field]: typeof scope[field] === 'number' ? 2 : 'new' }
-      );
+      const message =
+        field === 'wrapperInstanceId' && scope.message.state.kind === 'accepted'
+          ? {
+              ...scope.message,
+              state: { ...scope.message.state, wrapperInstanceId: 'new' },
+            }
+          : field === 'messageId'
+            ? { ...scope.message, messageId: 'new' }
+            : scope.message;
+      f.setScope({
+        ...scope,
+        message,
+        ...(field === 'messageId' || field === 'wrapperInstanceId'
+          ? {}
+          : { [field]: typeof scope[field] === 'number' ? 2 : 'new' }),
+      });
       const second = f.refresh.refresh(f.scope(), 'pending_interactions');
       await Promise.resolve();
       old.resolve(result);

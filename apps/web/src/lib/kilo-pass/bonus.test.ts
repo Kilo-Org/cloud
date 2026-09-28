@@ -1,112 +1,17 @@
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   computeMonthlyCadenceBonusPercent,
-  computeYearlyCadenceMonthlyBonusUsd,
-  getMonthlyPriceUsd,
   isKiloPassSelectionEligibleForKiloclawCommitUpsell,
 } from './bonus';
 
 import {
   KILO_PASS_FIRST_MONTH_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT,
-  KILO_PASS_MONTHLY_RAMP_STEP_BONUS_PERCENT,
   KILO_PASS_TIER_CONFIG,
-  KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
 } from './constants';
 
 describe('kilo pass bonus utilities', () => {
-  describe('getMonthlyPriceUsd', () => {
-    it('returns the correct monthly prices', () => {
-      expect(getMonthlyPriceUsd(KiloPassTier.Tier19)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_19.monthlyPriceUsd
-      );
-      expect(getMonthlyPriceUsd(KiloPassTier.Tier49)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_49.monthlyPriceUsd
-      );
-      expect(getMonthlyPriceUsd(KiloPassTier.Tier199)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_199.monthlyPriceUsd
-      );
-    });
-  });
-
   describe('monthly ramp (non-promo)', () => {
-    it('computes ramp for tier_19 (base 5%, step 5%, cap 40%)', () => {
-      const config = KILO_PASS_TIER_CONFIG.tier_19;
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 0);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 2,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 1);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier19,
-          streakMonths: 3,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 2);
-    });
-
-    it('computes ramp for tier_49 (base 5%, step 5%, cap 40%)', () => {
-      const config = KILO_PASS_TIER_CONFIG.tier_49;
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier49,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 0);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier49,
-          streakMonths: 2,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 1);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier49,
-          streakMonths: 3,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 2);
-    });
-
-    it('computes ramp for tier_199 (base 5%, step 5%, cap 40%)', () => {
-      const config = KILO_PASS_TIER_CONFIG.tier_199;
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier199,
-          streakMonths: 1,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 0);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier199,
-          streakMonths: 2,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 1);
-      expect(
-        computeMonthlyCadenceBonusPercent({
-          tier: KiloPassTier.Tier199,
-          streakMonths: 3,
-          isFirstTimeSubscriberEver: false,
-        })
-      ).toBeCloseTo(config.monthlyBaseBonusPercent + config.monthlyStepBonusPercent * 2);
-    });
-
     it('caps at 0.40 for all tiers', () => {
       expect(
         computeMonthlyCadenceBonusPercent({
@@ -129,38 +34,6 @@ describe('kilo pass bonus utilities', () => {
           isFirstTimeSubscriberEver: false,
         })
       ).toBeCloseTo(KILO_PASS_TIER_CONFIG.tier_199.monthlyCapBonusPercent);
-    });
-
-    it('uses the unified base/step/cap constants for all tiers', () => {
-      expect(KILO_PASS_TIER_CONFIG.tier_19.monthlyBaseBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_49.monthlyBaseBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_199.monthlyBaseBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_BASE_BONUS_PERCENT
-      );
-
-      expect(KILO_PASS_TIER_CONFIG.tier_19.monthlyStepBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_STEP_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_49.monthlyStepBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_STEP_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_199.monthlyStepBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_STEP_BONUS_PERCENT
-      );
-
-      expect(KILO_PASS_TIER_CONFIG.tier_19.monthlyCapBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_49.monthlyCapBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT
-      );
-      expect(KILO_PASS_TIER_CONFIG.tier_199.monthlyCapBonusPercent).toBe(
-        KILO_PASS_MONTHLY_RAMP_CAP_BONUS_PERCENT
-      );
     });
   });
 
@@ -276,20 +149,6 @@ describe('kilo pass bonus utilities', () => {
           subscriptionStartedAtIso: '2026-01-26T23:59:59.000Z',
         })
       ).toBe(computeFallback({ streakMonths: 1, isFirstTimeSubscriberEver: false }));
-    });
-  });
-
-  describe('computeYearlyCadenceMonthlyBonusUsd', () => {
-    it('returns half of monthly price as monthly bonus USD', () => {
-      expect(computeYearlyCadenceMonthlyBonusUsd(KiloPassTier.Tier19)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_19.monthlyPriceUsd * KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT
-      );
-      expect(computeYearlyCadenceMonthlyBonusUsd(KiloPassTier.Tier49)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_49.monthlyPriceUsd * KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT
-      );
-      expect(computeYearlyCadenceMonthlyBonusUsd(KiloPassTier.Tier199)).toBe(
-        KILO_PASS_TIER_CONFIG.tier_199.monthlyPriceUsd * KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT
-      );
     });
   });
 

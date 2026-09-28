@@ -7,6 +7,11 @@
 // 56-point gutter; honouring the raw a11y scale (1.8x at AX5) would
 // overflow the gutter and break the side-by-side grid.
 //
+// The code `Text` names its own LTR base direction (`LTR_TEXT_DIRECTION`):
+// code reads left to right in every interface language, and inheriting an RTL
+// interface's direction would right-align it, so a wrapped line's continuation
+// would start mid-row instead of under the first line's start.
+//
 // S7a adds two opt-in behaviours, both passed from the diff list:
 //   - `onTap` makes the line tappable; the diff list runs the
 //     selection reducer and updates the bridge / floating action.
@@ -31,7 +36,14 @@
 
 import { memo, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text as RNText, type TextStyle, View, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  Text as RNText,
+  type TextStyle,
+  useColorScheme,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { highlightLine, type HighlightToken } from '@/lib/pr-review/diff/highlight';
@@ -41,12 +53,14 @@ import {
   diffLineMarker,
   type ParsedDiffLine,
 } from '@/lib/pr-review/diff/parse-patch';
-import { MUTED_COLOR, tokenColorFor } from '@/lib/pr-review/diff/syntax-colors';
+import { MUTED_COLOR } from '@/lib/pr-review/diff/syntax-colors';
+import { LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 import {
   DIFF_MAX_FONT_SCALE,
   useDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
+import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 
 const GUTTER_WIDTH = 56;
 const VERTICAL_PADDING = 2;
@@ -97,7 +111,8 @@ function markerColorFor(
 function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLineProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const isDark = colors.background === '#0E0E10';
+  // Same signal `useThemeColors` reads; never a background-token equality.
+  const isDark = useColorScheme() === 'dark';
   const metrics = useDiffFontMetrics();
 
   const tokens = useMemo<HighlightToken[]>(
@@ -121,9 +136,15 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
   const gutterStyle: ViewStyle = {
     width: GUTTER_WIDTH,
     minHeight: metrics.rowMinHeight,
+    // Top-aligned with the code's first line: the code container pads both
+    // edges by VERTICAL_PADDING, so a wrapped code line makes the row two
+    // lines tall and a centered number would drift onto the later visual
+    // line instead of lining up with the row's start.
+    paddingTop: VERTICAL_PADDING,
   };
   const codeContainerStyle: ViewStyle = { paddingVertical: VERTICAL_PADDING };
   const codeBaseStyle: TextStyle = {
+    ...LTR_TEXT_DIRECTION,
     fontFamily: 'JetBrainsMono_500Medium',
     fontSize: metrics.codeFontSize,
     lineHeight: metrics.lineHeight,
@@ -146,7 +167,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
 
   const content = (
     <View className={cn('flex-row items-stretch', rowBackground, selectionClass)} style={rowStyle}>
-      <View className="items-end justify-center pr-2" style={gutterStyle}>
+      <View className="items-end justify-start pr-2" style={gutterStyle}>
         {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme color + mono font for gutter */}
         <RNText
           adjustsFontSizeToFit
@@ -181,15 +202,9 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
           selectable
           style={{ ...codeBaseStyle, color: colors.foreground }}
         >
-          {tokens.map((token, index) => {
-            const tokenColor = tokenColorFor(token.className, isDark);
-            return (
-              // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- per-token syntax color
-              <RNText key={`tok-${index}`} style={{ color: tokenColor }}>
-                {token.text}
-              </RNText>
-            );
-          })}
+          {/* Untagged runs are raw strings inside this Text, so only the
+              highlighter's tagged runs cost an Android span. */}
+          {highlightRunChildren(tokens, isDark)}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

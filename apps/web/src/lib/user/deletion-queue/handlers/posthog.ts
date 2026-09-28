@@ -117,9 +117,13 @@ function parsePersons(payload: unknown, distinctId?: string): ParsePersonsResult
 function isAcceptedBulkDelete(status: number, body: unknown, ids: string[]): boolean {
   if (status !== 202 || !isRecord(body)) return false;
   const deletionErrors = Array.isArray(body.deletion_errors) ? body.deletion_errors : null;
+  const personsDeleted = typeof body.persons_deleted === 'number' ? body.persons_deleted : null;
+  const personsQueued =
+    typeof body.persons_queued_for_deletion === 'number' ? body.persons_queued_for_deletion : 0;
   return (
     body.persons_found === ids.length &&
-    body.persons_deleted === ids.length &&
+    personsDeleted !== null &&
+    personsDeleted + personsQueued === ids.length &&
     body.events_queued_for_deletion === true &&
     body.recordings_queued_for_deletion === true &&
     deletionErrors !== null &&

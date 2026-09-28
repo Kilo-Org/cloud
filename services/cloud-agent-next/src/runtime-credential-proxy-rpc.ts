@@ -7,6 +7,8 @@ import {
   resolveRuntimeProxyCredential,
   RUNTIME_PROXY_GRANT_KEY,
   runtimeProxyGrantSchema,
+  sameRuntimeProxyControlBinding,
+  sameRuntimeProxyPhysicalBinding,
   verifyRuntimeCredentialProxyHandle,
   type RuntimeProxyFence,
   type RuntimeProxyGrant,
@@ -40,17 +42,32 @@ function context(metadata: SessionMetadata, fence: RuntimeProxyFence) {
   };
 }
 
-function sameFence(left: RuntimeProxyFence, right: RuntimeProxyFence): boolean {
-  if (left.plane !== right.plane || left.allocationId !== right.allocationId) return false;
-  return left.plane === 'legacy' && right.plane === 'legacy'
-    ? left.generation === right.generation &&
-        left.wrapperRunId === right.wrapperRunId &&
-        left.wrapperConnectionId === right.wrapperConnectionId
-    : left.plane === 'control' &&
-        right.plane === 'control' &&
-        left.providerInstanceId === right.providerInstanceId &&
-        left.connectionId === right.connectionId &&
-        left.wrapperInstanceId === right.wrapperInstanceId;
+function samePersistedGrantFence(grant: RuntimeProxyGrant, fence: RuntimeProxyFence): boolean {
+  if (fence.plane === 'legacy') return sameRuntimeProxyPhysicalBinding(grant, fence);
+  return grant.plane === 'control' && sameRuntimeProxyControlBinding(grant, fence);
+}
+
+function upgradeLegacyGrantToV3(
+  grant: RuntimeProxyGrant,
+  instanceGeneration: number
+): RuntimeProxyGrant {
+  return runtimeProxyGrantSchema.parse({
+    version: 3,
+    plane: 'legacy',
+    grantId: grant.grantId,
+    authorizationId: grant.authorizationId,
+    sessionId: grant.sessionId,
+    kiloSessionId: grant.kiloSessionId,
+    userId: grant.userId,
+    ...(grant.orgId === undefined ? {} : { orgId: grant.orgId }),
+    nonce: grant.nonce,
+    mode: grant.mode,
+    allocationId: grant.allocationId,
+    issuedAt: grant.issuedAt,
+    leaseExpiresAt: grant.leaseExpiresAt,
+    state: 'active',
+    instanceGeneration,
+  });
 }
 
 /**
@@ -92,17 +109,24 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     parsedExisting.data.kiloSessionId === current.kiloSessionId &&
     parsedExisting.data.userId === current.userId &&
     parsedExisting.data.orgId === current.orgId &&
-    parsedExisting.data.allocationId === current.fence.allocationId &&
-    sameFence(parsedExisting.data, current.fence) &&
     parsedExisting.data.mode === input.mode &&
     parsedExisting.data.leaseExpiresAt > now &&
-    parsedExisting.data.leaseExpiresAt <= delegationExpiresAt
+    parsedExisting.data.leaseExpiresAt <= delegationExpiresAt &&
+    samePersistedGrantFence(parsedExisting.data, current.fence)
   ) {
-    return issueRuntimeCredentialProxyHandle(
-      input.env,
-      parsedExisting.data,
-      parsedExisting.data.issuedAt
-    );
+    const stored = parsedExisting.data;
+    const upgraded =
+      stored.plane === 'legacy' && current.fence.plane === 'legacy' && stored.version !== 3
+        ? upgradeLegacyGrantToV3(stored, current.fence.instanceGeneration)
+        : stored;
+    const refreshed: RuntimeProxyGrant =
+      upgraded.plane === 'control' &&
+      current.fence.plane === 'control' &&
+      upgraded.connectionId !== current.fence.connectionId
+        ? { ...upgraded, connectionId: current.fence.connectionId }
+        : upgraded;
+    if (refreshed !== stored) await input.storage.put(RUNTIME_PROXY_GRANT_KEY, refreshed);
+    return issueRuntimeCredentialProxyHandle(input.env, refreshed, stored.issuedAt);
   }
   const issuedAt = now;
   const { fence, ...identity } = current;

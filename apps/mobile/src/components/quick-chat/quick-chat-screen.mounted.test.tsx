@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 /* eslint-disable max-lines -- the mounted screen contract shares one mock harness across the state tests */
 
 // Quick-chat screen contract: an empty composer always renders, a send accept
@@ -16,7 +15,7 @@
 
 import { createElement, type ReactNode } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import TabsLayout from '@/app/(app)/(tabs)/_layout';

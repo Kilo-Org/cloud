@@ -92,7 +92,6 @@ describe('Event Storage', () => {
       const events = createEventQueries(db, state.storage.sql);
       const now = Date.now();
 
-      // Insert multiple events
       events.insert({
         executionId: 'exc_1',
         sessionId: 'sess_1',
@@ -122,25 +121,19 @@ describe('Event Storage', () => {
         timestamp: now - 2000,
       });
 
-      // Filter by executionId
       const byExecution = events.findByFilters({ executionIds: ['exc_1'] });
 
-      // Filter by eventType
       const byType = events.findByFilters({ eventTypes: ['output'] });
 
-      // Filter by multiple executionIds
       const byMultiExec = events.findByFilters({ executionIds: ['exc_1', 'exc_2'] });
 
-      // Filter by time range
       const byTimeRange = events.findByFilters({
         startTime: now - 4500,
         endTime: now - 2500,
       });
 
-      // Filter with limit
       const withLimit = events.findByFilters({ limit: 2 });
 
-      // Combined filters
       const combined = events.findByFilters({
         executionIds: ['exc_1'],
         eventTypes: ['output', 'error'],
@@ -149,24 +142,18 @@ describe('Event Storage', () => {
       return { byExecution, byType, byMultiExec, byTimeRange, withLimit, combined };
     });
 
-    // By execution: 3 events for exc_1
     expect(result.byExecution).toHaveLength(3);
     expect(result.byExecution.every(e => e.execution_id === 'exc_1')).toBe(true);
 
-    // By type: 2 output events
     expect(result.byType).toHaveLength(2);
     expect(result.byType.every(e => e.stream_event_type === 'output')).toBe(true);
 
-    // By multiple executions: all 4 events
     expect(result.byMultiExec).toHaveLength(4);
 
-    // By time range: 2 events (error at -4000 and output 2 at -3000)
     expect(result.byTimeRange).toHaveLength(2);
 
-    // With limit: only 2 events
     expect(result.withLimit).toHaveLength(2);
 
-    // Combined (exc_1 + output/error): 2 events
     expect(result.combined).toHaveLength(2);
   });
 
@@ -178,7 +165,6 @@ describe('Event Storage', () => {
       const events = createEventQueries(db, state.storage.sql);
       const now = Date.now();
 
-      // Insert events at different times
       const oldTimestamp = now - 100 * 24 * 60 * 60 * 1000; // 100 days ago
       const recentTimestamp = now - 5 * 24 * 60 * 60 * 1000; // 5 days ago
 
@@ -197,14 +183,11 @@ describe('Event Storage', () => {
         timestamp: recentTimestamp,
       });
 
-      // Count before cleanup
       const beforeCount = events.findByFilters({}).length;
 
-      // Delete events older than 90 days
       const cutoff = now - 90 * 24 * 60 * 60 * 1000;
       const deletedCount = events.deleteOlderThan(cutoff);
 
-      // Get remaining events
       const remaining = events.findByFilters({});
 
       return { beforeCount, deletedCount, remaining };

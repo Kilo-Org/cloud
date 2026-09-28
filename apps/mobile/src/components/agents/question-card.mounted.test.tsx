@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as permission-card.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { MockTextInput } from '@/test/native-input.test-helpers';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { QuestionCard } from './question-card';
@@ -14,9 +14,12 @@ vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'Activ
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `@/lib/rtl-text`; the mock must expose it or the shared box throws.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
-  TextInput: 'TextInput',
+  TextInput: MockTextInput,
   View: 'View',
 }));
 vi.mock('expo-haptics', () => ({
@@ -112,12 +115,18 @@ function optionButton(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
-  return root.findAll(
-    node =>
-      typeof node.type === 'string' &&
-      (node.type as string) === 'Button' &&
-      node.props.accessibilityLabel === label
-  )[0];
+  // A described option joins its subtitle into the accessible name
+  // (`<label>, <description>`), so match the leading label too.
+  return root.findAll(node => {
+    if (typeof node.type !== 'string' || (node.type as string) !== 'Button') {
+      return false;
+    }
+    const accessibleLabel = node.props.accessibilityLabel;
+    return (
+      accessibleLabel === label ||
+      (typeof accessibleLabel === 'string' && accessibleLabel.startsWith(`${label},`))
+    );
+  })[0];
 }
 
 function press(node: TestRenderer.ReactTestInstance | undefined): void {
@@ -146,6 +155,19 @@ function typeCustomText(root: TestRenderer.ReactTestInstance, text: string): voi
   act(() => {
     (input.props.onChangeText as (text: string) => void)(text);
   });
+}
+
+/** The row of text lines rendered inside one preset option button. */
+function optionTextLines(root: TestRenderer.ReactTestInstance, label: string): string[] {
+  const button = optionButton(root, label);
+  if (!button) {
+    throw new Error(`option button "${label}" not found`);
+  }
+  return button
+    .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+    .map(node =>
+      node.children.filter((child): child is string => typeof child === 'string').join('')
+    );
 }
 
 describe('QuestionCard custom answer selection', () => {
@@ -199,6 +221,51 @@ describe('QuestionCard custom answer selection', () => {
     expect(customChoiceChecked(renderer.root)).toBe(false);
   });
 
+  it('renders an option description as a subtitle under its label', async () => {
+    const renderer = await renderCard([
+      {
+        question: 'How should the agent proceed?',
+        header: 'Agent needs input',
+        options: [
+          { label: 'Continue', description: 'Deploy to production' },
+          { label: 'Stop', description: '' },
+        ],
+        custom: true,
+      },
+    ]);
+
+    expect(optionTextLines(renderer.root, 'Continue')).toEqual([
+      'Continue',
+      'Deploy to production',
+    ]);
+    // No description means no empty subtitle line under the label.
+    expect(optionTextLines(renderer.root, 'Stop')).toEqual(['Stop']);
+  });
+
+  it('announces an option description in its accessible name, never only as a hint', async () => {
+    const renderer = await renderCard([
+      {
+        question: 'How should the agent proceed?',
+        header: 'Agent needs input',
+        options: [
+          { label: 'Continue', description: 'Deploy to production' },
+          { label: 'Stop', description: '' },
+        ],
+        custom: true,
+      },
+    ]);
+
+    // TalkBack reads a node's hint text, not the tooltip React Native fills
+    // from `accessibilityHint`, so the subtitle has to be part of the name.
+    const described = optionButton(renderer.root, 'Continue');
+    expect(described?.props.accessibilityLabel).toBe('Continue, Deploy to production');
+    expect(described?.props.accessibilityHint).toBeUndefined();
+
+    // An option without a description keeps its bare label and no hint.
+    expect(optionButton(renderer.root, 'Stop')?.props.accessibilityLabel).toBe('Stop');
+    expect(optionButton(renderer.root, 'Stop')?.props.accessibilityHint).toBeUndefined();
+  });
+
   it('cancels the delayed focus retry when a new request replaces the card', async () => {
     vi.useFakeTimers();
     // First mount misses the node handle (schedules a retry); the replacement
@@ -237,5 +304,22 @@ describe('QuestionCard custom answer selection', () => {
 
     vi.advanceTimersByTime(100);
     expect(a11yMocks.moveA11yFocus).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('QuestionCard custom answer placeholder contrast', () => {
+  // The custom answer field swaps its fill to `bg-primary` once its radio or
+  // checkbox is active. A placeholder painted for the plain background
+  // (`mutedForeground`, near-black) is invisible on that fill, so the field's
+  // purpose cannot be read (ios session-answer-kb-up finding). The placeholder
+  // colour must follow the fill, the same way the typed text does.
+  it('paints the placeholder with the fill foreground once the custom answer is active', async () => {
+    const renderer = await renderCard(makeQuestion());
+
+    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#6F6A61');
+
+    press(customChoice(renderer.root));
+
+    expect(customInput(renderer.root)?.props.placeholderTextColor).toBe('#ffffff');
   });
 });

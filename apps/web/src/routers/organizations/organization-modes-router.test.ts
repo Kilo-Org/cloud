@@ -44,10 +44,6 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server
   ),
 }));
 
-jest.mock('@/lib/ai-gateway/experiments/membership', () => ({
-  isPublicIdExperimented: jest.fn(async () => false),
-}));
-
 const mockedIsReleaseToggleEnabled = jest.mocked(
   jest.requireMock('@/lib/posthog-feature-flags').isReleaseToggleEnabled
 );

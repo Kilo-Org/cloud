@@ -224,6 +224,13 @@
   },
   "overrides": [
     {
+      "files": ["vitest.config.ts", "vitest.pure.config.ts", "vitest.mounted.config.ts"],
+      "rules": {
+        "import/no-default-export": "off",
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
       "files": ["src/components/ui/icons.test.ts"],
       "rules": {
         "import/no-nodejs-modules": "off"
@@ -232,8 +239,13 @@
     {
       "files": ["src/lib/expo-router-linking.mounted.test.tsx"],
       "rules": {
-        "import/no-nodejs-modules": "off",
-        "@typescript-eslint/no-deprecated": "off"
+        "import/no-nodejs-modules": "off"
+      }
+    },
+    {
+      "files": ["src/test/renderer.mounted.test.tsx"],
+      "rules": {
+        "import/no-nodejs-modules": "off"
       }
     },
     {
@@ -272,7 +284,8 @@
         "**/*.test.tsx",
         "**/__tests__/**",
         "**/*test-utils*",
-        "**/*test-helpers*"
+        "**/*test-helpers*",
+        "src/test/**"
       ],
       "rules": {
         "anti-slop/no-chained-type-assertions": "off",

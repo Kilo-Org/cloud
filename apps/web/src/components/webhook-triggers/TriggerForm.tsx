@@ -16,6 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ProfileSelector } from '@/components/cloud-agent/ProfileSelector';
+import { RepoProfileBindingsDialog } from '@/components/cloud-agent/RepoProfileBindingsDialog';
 import { RepositoryCombobox, type RepositoryOption } from '@/components/shared/RepositoryCombobox';
 import { ModeCombobox } from '@/components/shared/ModeCombobox';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
@@ -159,6 +160,7 @@ export function TriggerForm({
     hasSavedSandboxAllocation ||
     sandboxAllocation === 'isolated-standard';
   const modelVariants = models.find(option => option.id === model)?.variants ?? [];
+  const [showRepoDefaults, setShowRepoDefaults] = useState(false);
 
   const handleModelChange = (nextModel: string) => {
     if (nextModel === model) return;
@@ -689,8 +691,8 @@ export function TriggerForm({
                 </p>
                 {!canSetSandboxAllocation && hasSavedSandboxAllocation && (
                   <p className="text-muted-foreground text-xs">
-                    Only Kilo admins can newly enable Dedicated Standard. You can keep this
-                    allocation or clear it.
+                    Dedicated Standard requires an enabled organization. Choose Automatic to use
+                    default routing.
                   </p>
                 )}
               </div>
@@ -707,6 +709,12 @@ export function TriggerForm({
                 onProfileSelect={setProfileId}
                 disabled={isLoading}
                 orgProfilesOnly={!!organizationId}
+                onRepoDefaultsClick={() => setShowRepoDefaults(true)}
+              />
+              <RepoProfileBindingsDialog
+                organizationId={organizationId}
+                open={showRepoDefaults}
+                onOpenChange={setShowRepoDefaults}
               />
               {!profileId && (
                 <p className="flex items-center gap-1 text-xs text-amber-400">

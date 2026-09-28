@@ -53,6 +53,7 @@ const hoisted = vi.hoisted(() => {
   // so tests can prove sentry-init renames the instance per consented init.
   const hermesProfilingIntegration = vi.fn(() => ({ name: 'HermesProfiling' }));
   const expoRouterIntegration = vi.fn(() => ({ name: 'expo-router-integration' }));
+  const extraErrorDataIntegration = vi.fn(() => ({ name: 'ExtraErrorData' }));
 
   const storage = {
     sealPostHogStorage: vi.fn(),
@@ -76,6 +77,7 @@ const hoisted = vi.hoisted(() => {
     deeplinkIntegration,
     hermesProfilingIntegration,
     expoRouterIntegration,
+    extraErrorDataIntegration,
     storage,
   };
 });
@@ -159,6 +161,7 @@ vi.mock('@sentry/react-native', () => ({
   deeplinkIntegration: hoisted.deeplinkIntegration,
   hermesProfilingIntegration: hoisted.hermesProfilingIntegration,
   expoRouterIntegration: hoisted.expoRouterIntegration,
+  extraErrorDataIntegration: hoisted.extraErrorDataIntegration,
   setUser: vi.fn(),
   setTag: vi.fn(),
   captureException: vi.fn(),
@@ -408,6 +411,10 @@ describe('Sentry transport spy', () => {
     // replaced by the uniquely named consented instance (lifecycle note in
     // lib/sentry-init.ts).
     expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual(['HermesProfiling#1']);
+    // Errors' own properties attach even for the consented client.
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'ExtraErrorData'
+    );
   });
 
   it('registers no replay and disables screenshots when optional consent is false', async () => {
@@ -425,6 +432,11 @@ describe('Sentry transport spy', () => {
     expect(profilerNames(hoisted.sentryHolder.initOptions)).toEqual([]);
     expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
       'DeviceContext'
+    );
+    // Error reporting is mandatory (DEC-02): extra error data attaches before
+    // optional consent is decided too.
+    expect(resolveIntegrations(hoisted.sentryHolder.initOptions).map(i => i.name)).toContain(
+      'ExtraErrorData'
     );
   });
 

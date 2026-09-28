@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { consumeDeviceAuthByDeviceCode } from '@/lib/device-auth/device-auth';
 import * as z from 'zod';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const TokenBodySchema = z.object({
   deviceCode: z.string().min(1),
   supportsRefresh: z.boolean().optional(),
 });
 
-export async function POST(request: Request) {
+export const POST = withRestTiming('/api/device-auth/token', async (request: Request) => {
   let body: unknown;
   try {
     body = await request.json();
@@ -54,4 +55,4 @@ export async function POST(request: Request) {
     default:
       return NextResponse.json({ error: 'Unknown status' }, { status: 500 });
   }
-}
+});

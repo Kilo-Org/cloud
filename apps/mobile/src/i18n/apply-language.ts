@@ -9,6 +9,7 @@ import {
   type LanguagePreference,
   setLanguagePreferenceAsync,
 } from '@/lib/hooks/use-language-preference';
+import { registerNeedsInputCategories } from '@/lib/notification-actions';
 import { renameAndroidNotificationChannels } from '@/lib/notifications';
 import { prewarmIntl } from '@/lib/intl-cache';
 
@@ -86,5 +87,9 @@ export async function applyLanguagePreference(
   }
 
   void renameAndroidNotificationChannels();
+  // The launch-time category registration ran under the previous language, so
+  // re-register the needs-input action buttons in the applied one (same
+  // localization pass as the channel rename above; idempotent).
+  void registerNeedsInputCategories();
   return { kind: 'applied-ltr' };
 }

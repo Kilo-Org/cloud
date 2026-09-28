@@ -57,6 +57,12 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
           <dd className="text-right">{view.provider}</dd>
           <dt className="text-muted-foreground">Sandbox type</dt>
           <dd className="text-right">{view.sandboxType}</dd>
+          {view.capacity !== null && (
+            <>
+              <dt className="text-muted-foreground">Capacity</dt>
+              <dd className="text-right tabular-nums">{view.capacity}</dd>
+            </>
+          )}
         </dl>
       </section>
       {hasTiming && (

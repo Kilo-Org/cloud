@@ -48,21 +48,18 @@ import {
 
 const LOG = '[reconciler]';
 
-// ── Circuit breaker ─────────────────────────────────────────────────
-
 /** Number of dispatch failures in a 30-min window to trip the town-level breaker. */
 const CIRCUIT_BREAKER_FAILURE_THRESHOLD = 20;
-/** Window in minutes for counting dispatch failures. */
 const CIRCUIT_BREAKER_WINDOW_MINUTES = 30;
 
 /** Max landing MR creation attempts before failing the convoy (#2260). */
 const MAX_LANDING_MR_ATTEMPTS = 5;
 
 /** Base cooldown for landing MR retry: min(2^attempts * BASE, MAX) (#2260). */
-const LANDING_MR_COOLDOWN_BASE_MS = 30_000; // 30s
+const LANDING_MR_COOLDOWN_BASE_MS = 30_000;
 
 /** Max cooldown for landing MR retry (#2260). */
-const LANDING_MR_COOLDOWN_MAX_MS = 30 * 60_000; // 30 min
+const LANDING_MR_COOLDOWN_MAX_MS = 30 * 60_000;
 
 /**
  * Town-level dispatch circuit breaker. Counts beads with at least one
@@ -108,28 +105,28 @@ function checkDispatchCircuitBreaker(sql: SqlStorage): Action[] {
 // ── Timeouts (from spec §7) ─────────────────────────────────────────
 
 /** Reset non-PR MR beads stuck in_progress with no working agent */
-const STUCK_REVIEW_TIMEOUT_MS = 30 * 60_000; // 30 min
+const STUCK_REVIEW_TIMEOUT_MS = 30 * 60_000;
 
 /** Reset unhooked MR beads to open */
-const ABANDONED_MR_TIMEOUT_MS = 2 * 60_000; // 2 min
+const ABANDONED_MR_TIMEOUT_MS = 2 * 60_000;
 
 /** Reset in_review beads with all-terminal MRs */
-const ORPHANED_SOURCE_TIMEOUT_MS = 5 * 60_000; // 5 min
+const ORPHANED_SOURCE_TIMEOUT_MS = 5 * 60_000;
 
 /** Fail PR-strategy beads with dead agents */
-const ORPHANED_PR_REVIEW_TIMEOUT_MS = 30 * 60_000; // 30 min
+const ORPHANED_PR_REVIEW_TIMEOUT_MS = 30 * 60_000;
 
 /** In-progress issue bead with no working agent considered stale.
  * Must be longer than AGENT_IDLE_TIMEOUT_MS (2 min) + one alarm tick (5s)
  * to avoid racing with the idle-timer → agentCompleted → reconciler flow. */
-const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000; // 5 min
+const STALE_IN_PROGRESS_TIMEOUT_MS = 5 * 60_000;
 
 /** Time in 'stalled' before auto-transitioning to idle.
  * Today, stalled agents are only cleared via container_status: exited|not_found
  * events. If the container crashed hard or /status keeps returning
  * running/unknown, the stalled row persists indefinitely. This time-based
  * cleanup closes the loop. */
-const STALLED_AUTO_IDLE_MS = 2.5 * 60 * 60_000; // 2h 30min
+const STALLED_AUTO_IDLE_MS = 2.5 * 60 * 60_000;
 
 // ── Helper: staleness check ─────────────────────────────────────────
 
@@ -138,24 +135,13 @@ function staleMs(timestamp: string | null, thresholdMs: number): boolean {
   return Date.now() - new Date(timestamp).getTime() > thresholdMs;
 }
 
-/**
- * Compute the dispatch cooldown for a bead based on its attempt count.
- * Implements exponential backoff:
- *   attempts 1-2: 2 min (DISPATCH_COOLDOWN_MS)
- *   attempt 3:    5 min
- *   attempt 4:   10 min
- *   attempt 5+:  30 min
- */
 function getDispatchCooldownMs(dispatchAttempts: number): number {
-  if (dispatchAttempts <= 1) return 30_000; // 30 sec
-  if (dispatchAttempts === 2) return 60_000; // 1 min
-  if (dispatchAttempts === 3) return 2 * 60_000; // 2 min
-  if (dispatchAttempts === 4) return 5 * 60_000; // 5 min
-  return 10 * 60_000; // 10 min
+  if (dispatchAttempts <= 1) return 30_000;
+  if (dispatchAttempts === 2) return 60_000;
+  if (dispatchAttempts === 3) return 2 * 60_000;
+  if (dispatchAttempts === 4) return 5 * 60_000;
+  return 10 * 60_000;
 }
-
-// ── Row schemas for queries ─────────────────────────────────────────
-// Derived from table record schemas for traceability back to table defs.
 
 const AgentRow = AgentMetadataRecord.pick({
   bead_id: true,
@@ -169,7 +155,6 @@ const AgentRow = AgentMetadataRecord.pick({
   active_tools: true,
   stalled_at: true,
 }).extend({
-  // Joined from beads table
   rig_id: BeadRecord.shape.rig_id,
 });
 type AgentRow = z.infer<typeof AgentRow>;
@@ -196,7 +181,6 @@ const MrBeadRow = BeadRecord.pick({
   assignee_agent_bead_id: true,
   metadata: true,
 }).extend({
-  // Joined from review_metadata
   pr_url: ReviewMetadataRecord.shape.pr_url,
 });
 type MrBeadRow = z.infer<typeof MrBeadRow>;
@@ -211,14 +195,9 @@ const ConvoyRow = BeadRecord.pick({
   feature_branch: ConvoyMetadataRecord.shape.feature_branch,
   merge_mode: ConvoyMetadataRecord.shape.merge_mode,
   staged: ConvoyMetadataRecord.shape.staged,
-  // Raw JSON string from beads.metadata
   metadata: z.string(),
 });
 type ConvoyRow = z.infer<typeof ConvoyRow>;
-
-// ════════════════════════════════════════════════════════════════════
-// Event application — translates facts into state transitions
-// ════════════════════════════════════════════════════════════════════
 
 /**
  * Apply a single event to the database. Events represent facts that
@@ -314,7 +293,6 @@ export function applyEvent(
 
       beadOps.updateBeadStatus(sql, event.bead_id, cancelStatus, 'system');
 
-      // Unhook any agent hooked to this bead
       const hookedAgentRows = z
         .object({ bead_id: z.string() })
         .array()
@@ -425,7 +403,6 @@ export function applyEvent(
       const mrBead = beadOps.getBead(sql, mrBeadId);
       if (!mrBead || mrBead.status === 'closed' || mrBead.status === 'failed') return;
 
-      // Check for existing non-terminal feedback bead to prevent duplicates
       if (hasExistingPrFeedbackBead(sql, mrBeadId)) return;
 
       const prUrl = typeof payload.pr_url === 'string' ? payload.pr_url : '';
@@ -484,7 +461,6 @@ export function applyEvent(
         },
       });
 
-      // Feedback bead blocks the MR bead (same pattern as rework beads)
       beadOps.insertDependency(sql, mrBeadId, feedbackBead.bead_id, 'blocks');
       return;
     }
@@ -506,7 +482,6 @@ export function applyEvent(
       const branch = typeof payload.branch === 'string' ? payload.branch : '';
       const sourceBead = typeof payload.source_bead_id === 'string' ? payload.source_bead_id : null;
 
-      // Read the target_branch from review_metadata
       const rmRows = z
         .object({ target_branch: z.string() })
         .array()
@@ -570,7 +545,6 @@ export function applyEvent(
           },
         });
 
-        // Conflict bead blocks the MR bead (same pattern as feedback beads)
         beadOps.insertDependency(sql, mrBeadId, conflictBead.bead_id, 'blocks');
       } else {
         // auto_resolve_merge_conflicts disabled — route through the full
@@ -658,10 +632,6 @@ export function applyEvent(
   }
 }
 
-// ════════════════════════════════════════════════════════════════════
-// Top-level reconcile
-// ════════════════════════════════════════════════════════════════════
-
 export function reconcile(
   sql: SqlStorage,
   opts?: { draining?: boolean; townConfig?: TownConfig }
@@ -677,11 +647,6 @@ export function reconcile(
   actions.push(...reconcileWastelandClaims(sql));
   return actions;
 }
-
-// ════════════════════════════════════════════════════════════════════
-// reconcileAgents — detect working agents with dead containers,
-// idle agents with stale hooks to terminal beads
-// ════════════════════════════════════════════════════════════════════
 
 export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
   const actions: Action[] = [];
@@ -802,7 +767,6 @@ export function reconcileAgents(sql: SqlStorage, opts?: { draining?: boolean }):
     }
   }
 
-  // Auto-reset dispatch_attempts after 30-minute cooldown
   const staleAgents = AgentRow.array().parse([
     ...query(
       sql,
@@ -939,7 +903,6 @@ export function reconcileBeads(
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
-  // Resolve per-rig max_dispatch_attempts, falling back to the module default.
   const rigMaxDispatchAttempts = (rigId: string | null): number => {
     if (!rigId || !opts?.townConfig) return MAX_DISPATCH_ATTEMPTS;
     const rig = getRig(sql, rigId);
@@ -1000,7 +963,6 @@ export function reconcileBeads(
       continue;
     }
 
-    // Per-bead dispatch cap: fail the bead if it exhausted all attempts
     if (bead.dispatch_attempts >= rigMaxDispatchAttempts(bead.rig_id)) {
       actions.push({
         type: 'transition_bead',
@@ -1017,7 +979,6 @@ export function reconcileBeads(
     const cooldownMs = getDispatchCooldownMs(bead.dispatch_attempts);
     if (!staleMs(bead.last_dispatch_attempt_at, cooldownMs)) continue;
 
-    // Town-level circuit breaker suppresses dispatch
     if (circuitBreakerOpen) continue;
 
     actions.push({
@@ -1177,7 +1138,6 @@ export function reconcileBeads(
       continue;
     }
 
-    // Town-level circuit breaker suppresses dispatch
     if (circuitBreakerOpen) continue;
 
     actions.push({
@@ -1361,7 +1321,6 @@ export function reconcileReviewQueue(
   const draining = opts?.draining ?? false;
   const actions: Action[] = [];
 
-  // Town-level circuit breaker
   const circuitBreakerOpen = checkDispatchCircuitBreaker(sql).length > 0;
 
   // Resolve per-rig code_review setting. Falls back to town default when
@@ -1372,7 +1331,6 @@ export function reconcileReviewQueue(
     return resolveRigConfig(opts.townConfig, rig?.config ?? null).code_review;
   };
 
-  // Resolve per-rig max_dispatch_attempts, falling back to the module default.
   const rigMaxDispatchAttempts = (rigId: string | null): number => {
     if (!rigId || !opts?.townConfig) return MAX_DISPATCH_ATTEMPTS;
     const rig = getRig(sql, rigId);
@@ -1382,7 +1340,6 @@ export function reconcileReviewQueue(
     );
   };
 
-  // Get all MR beads that need attention
   const mrBeads = MrBeadRow.array().parse([
     ...query(
       sql,
@@ -1708,7 +1665,6 @@ export function reconcileReviewQueue(
         ]);
       if ((inProgressCount[0]?.cnt ?? 0) > 0) continue;
 
-      // Check if the refinery for this rig is idle and unhooked
       const refinery = AgentRow.array().parse([
         ...query(
           sql,
@@ -1751,13 +1707,11 @@ export function reconcileReviewQueue(
 
       if (oldestMr.length === 0) continue;
 
-      // Skip dispatch if the town is draining (container eviction in progress)
       if (draining) {
         console.log(`${LOG} Town is draining, skipping dispatch for bead ${oldestMr[0].bead_id}`);
         continue;
       }
 
-      // Town-level circuit breaker suppresses dispatch
       if (circuitBreakerOpen) continue;
 
       // If no refinery exists or it's busy, emit a dispatch_agent with empty
@@ -1827,7 +1781,6 @@ export function reconcileReviewQueue(
     for (const ref of idleRefineries) {
       if (!ref.current_hook_bead_id) continue;
 
-      // Read the bead's dispatch_attempts for the per-bead circuit breaker
       const mrRows = z
         .object({
           status: z.string(),
@@ -1898,7 +1851,6 @@ export function reconcileReviewQueue(
       const cooldownMs = getDispatchCooldownMs(mr.dispatch_attempts);
       if (!staleMs(mr.last_dispatch_attempt_at, cooldownMs)) continue;
 
-      // Town-level circuit breaker suppresses dispatch
       if (circuitBreakerOpen) continue;
 
       // Container status is checked at apply time (async). In shadow mode,
@@ -1964,10 +1916,6 @@ export function reconcileReviewQueue(
   return actions;
 }
 
-// ════════════════════════════════════════════════════════════════════
-// reconcileConvoys — track convoy progress, trigger landing
-// ════════════════════════════════════════════════════════════════════
-
 export function reconcileConvoys(sql: SqlStorage): Action[] {
   const actions: Action[] = [];
 
@@ -1992,7 +1940,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
   ]);
 
   for (const convoy of convoys) {
-    // Count actually closed tracked beads
     const progressRows = z
       .object({ closed_count: z.number(), total_count: z.number() })
       .array()
@@ -2030,7 +1977,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
         ? parsedMeta.last_landing_mr_attempt_at
         : null;
 
-    // Check for in-flight MR beads (open or in_progress) for tracked issue beads
     const inFlightMrCount = z
       .object({ cnt: z.number() })
       .array()
@@ -2056,7 +2002,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
 
     const hasInFlightReviews = (inFlightMrCount[0]?.cnt ?? 0) > 0;
 
-    // Check if all beads done
     const allBeadsDone = closed_count >= total_count && total_count > 0 && !hasInFlightReviews;
 
     // Update progress if stale (skip if we're failing/closing the convoy this tick)
@@ -2079,7 +2024,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
       }
 
       if (parsedMeta.ready_to_land) {
-        // Check if a landing MR already exists (any status)
         const landingMrs = z
           .object({ status: z.string(), metadata: z.string() })
           .array()
@@ -2098,7 +2042,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
             ),
           ]);
 
-        // If a landing MR was already merged (closed), close the convoy
         const hasMergedLanding = landingMrs.some(mr => mr.status === 'closed');
         if (hasMergedLanding) {
           actions.push({
@@ -2238,10 +2181,6 @@ export function reconcileConvoys(sql: SqlStorage): Action[] {
   return actions;
 }
 
-// ════════════════════════════════════════════════════════════════════
-// reconcileGUPP — detect agents exceeding activity thresholds
-// ════════════════════════════════════════════════════════════════════
-
 export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): Action[] {
   // During container drain the heartbeat reporter is stopped, so
   // last_event_at freezes. Skip GUPP checks entirely to avoid
@@ -2340,7 +2279,6 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
         });
       }
     } else if (elapsed > 15 * 60_000) {
-      // Tighter warn threshold (15min vs old 30min) using SDK activity.
       // Skip if agent is mid-tool-call — long-running tools like git clone are normal.
       let tools: string[] = [];
       try {
@@ -2363,10 +2301,6 @@ export function reconcileGUPP(sql: SqlStorage, opts?: { draining?: boolean }): A
 
   return actions;
 }
-
-// ════════════════════════════════════════════════════════════════════
-// reconcileGC — garbage-collect idle agents with no hook
-// ════════════════════════════════════════════════════════════════════
 
 export function reconcileGC(sql: SqlStorage): Action[] {
   const actions: Action[] = [];
@@ -2402,8 +2336,6 @@ export function reconcileGC(sql: SqlStorage): Action[] {
 
   return actions;
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────
 
 /** Check if an MR bead has open rework beads blocking it. */
 function hasUnresolvedReworkBlockers(sql: SqlStorage, mrBeadId: string): boolean {
@@ -2917,10 +2849,6 @@ export function checkInvariants(sql: SqlStorage): Violation[] {
 
   return violations;
 }
-
-// ════════════════════════════════════════════════════════════════════
-// Reconciler metrics — collected per alarm tick
-// ════════════════════════════════════════════════════════════════════
 
 export type ReconcilerMetrics = {
   eventsDrained: number;

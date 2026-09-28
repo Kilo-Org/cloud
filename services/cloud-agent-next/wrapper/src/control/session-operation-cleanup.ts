@@ -15,6 +15,7 @@ export type NativeOperationTarget = Readonly<{
 }>;
 
 export type NativeRetirement = 'retired' | 'stale' | 'unconfirmed';
+export type RetireDirectoryResult = NativeRetirement | 'operation_process_stop_unconfirmed';
 export type NativeCleanupEvidence = 'not_issued' | 'finished' | 'unconfirmed';
 export type RootScopedCleanupResult = 'confirmed' | 'unconfirmed';
 

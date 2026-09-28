@@ -14,7 +14,9 @@ const mockUpdateRepositoriesForIntegration =
 const mockGetIntegrationsByOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration[]>>();
 const mockFetchGitHubRepositories =
-  jest.fn<(installationId: string, appType: string) => Promise<unknown[]>>();
+  jest.fn<
+    (installationId: string, appType: string, expectedIntegrationId?: string) => Promise<unknown[]>
+  >();
 const mockGenerateGitHubInstallationToken =
   jest.fn<(installationId: string, appType: string) => Promise<{ token: string }>>();
 const mockCheckExistingFork =
@@ -78,9 +80,29 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'org/repo',
+          private: false,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: [] }));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
     it('returns integrationInstalled false when no integration exists', async () => {
@@ -168,7 +190,15 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 2, name: 'fresh', fullName: 'org/fresh', private: true },
+        {
+          id: 2,
+          name: 'fresh',
+          fullName: 'org/fresh',
+          private: true,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
@@ -192,9 +222,24 @@ describe('github-integration-helpers', () => {
           fullName: 'org/repo',
           private: false,
           platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
         },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration({ repositories: [] })]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
     it('preserves installation provenance across multiple GitHub organizations', async () => {
@@ -232,7 +277,7 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
-    it('lists a repository shared by two installations exactly once, from the primary installation', async () => {
+    it('preserves both association choices when two installations expose one repository', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           id: 'integration-1',
@@ -268,6 +313,58 @@ describe('github-integration-helpers', () => {
         }),
         expect.objectContaining({
           fullName: 'acme-labs/scanner',
+          platformIntegrationId: 'integration-2',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
+    });
+
+    it('drops exact duplicate entries within a single installation without touching cross-installation duplicates', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            // Duplicate entry within the same installation's own cached list
+            // (for example, a corrupted or duplicated cache) should collapse.
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-labs',
+          repositories: [
+            // Same repository as integration-1's "shared" repo, granted through
+            // a different installation: this association is kept, not deduped.
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          id: 1,
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          id: 2,
+          fullName: 'acme-core/shared',
           platformIntegrationId: 'integration-2',
         }),
       ]);

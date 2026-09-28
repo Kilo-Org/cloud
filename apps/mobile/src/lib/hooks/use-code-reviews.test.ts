@@ -1,9 +1,19 @@
+/* eslint-disable max-lines -- one file for the review-list pagination builder and the mutation wiring suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  buildReviewFirstPageQueryOptions,
+  buildReviewListQueryKey,
+  buildReviewListQueryOptions,
   cancelReviewMutationFn,
   createManualReviewMutationFn,
+  mergeReviewFirstPage,
+  nextReviewPollFailureStreak,
   retriggerReviewMutationFn,
+  REVIEW_LIST_MAX_PAGES,
+  REVIEW_PAGE_SIZE,
+  REVIEW_POLL_MAX_CONSECUTIVE_FAILURES,
+  selectReviewFirstPageAction,
   useCancelReview,
   useCreateManualReview,
   useRetriggerReview,
@@ -19,6 +29,8 @@ const cancelMutateMock = vi.fn();
 const retriggerMutateMock = vi.fn();
 const personalCreateMutateMock = vi.fn();
 const orgCreateMutateMock = vi.fn();
+const listForUserQueryMock = vi.fn();
+const listForOrganizationQueryMock = vi.fn();
 const invalidateQueriesMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const getQueryDataMock = vi.fn();
@@ -33,6 +45,7 @@ vi.mock('@tanstack/react-query', () => ({
     return { mutate: vi.fn() };
   },
   useQuery: () => ({ data: undefined }),
+  useInfiniteQuery: () => ({ data: undefined }),
   useQueryClient: () => ({
     cancelQueries: cancelQueriesMock,
     getQueryData: getQueryDataMock,
@@ -51,6 +64,10 @@ vi.mock('@/lib/trpc', () => ({
   }),
   trpcClient: {
     codeReviews: {
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      listForUser: { query: (vars: unknown) => listForUserQueryMock(vars) },
+      // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+      listForOrganization: { query: (vars: unknown) => listForOrganizationQueryMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
       cancel: { mutate: (vars: unknown) => cancelMutateMock(vars) },
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -78,7 +95,8 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
 }));
 
 vi.mock('@kilocode/app-shared/code-review', () => ({
-  hasInFlightReview: () => false,
+  hasInFlightReview: (reviews: { status: string }[]) =>
+    reviews.some(review => review.status === 'running'),
   isInFlightReviewStatus: () => false,
 }));
 
@@ -117,6 +135,8 @@ beforeEach(() => {
   retriggerMutateMock.mockReset();
   personalCreateMutateMock.mockReset();
   orgCreateMutateMock.mockReset();
+  listForUserQueryMock.mockReset();
+  listForOrganizationQueryMock.mockReset();
   invalidateQueriesMock.mockReset();
   cancelQueriesMock.mockReset();
   getQueryDataMock.mockReset();
@@ -289,5 +309,433 @@ describe('useCreateManualReview wiring', () => {
 
     expect(invalidateQueriesMock).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildReviewListQueryOptions: offset pagination behind useReviewList
+// ---------------------------------------------------------------------------
+
+type ReviewPage = {
+  success: boolean;
+  reviews: { id: string; status: string }[];
+  total?: number;
+  hasMore?: boolean;
+  error?: string;
+};
+
+type ReviewListOptions = ReturnType<typeof buildReviewListQueryOptions>;
+
+function createReviewTrpcStub() {
+  const stub = {
+    codeReviews: {
+      listForUser: { queryKey: () => ['codeReviews', 'listForUser'] },
+      listForOrganization: {
+        queryKey: (input: { organizationId: string }) => [
+          'codeReviews',
+          'listForOrganization',
+          input,
+        ],
+      },
+    },
+  };
+  return stub as never;
+}
+
+function makePage(count: number, hasMore = false, status = 'completed'): ReviewPage {
+  return {
+    success: true,
+    reviews: Array.from({ length: count }, (_, index) => ({
+      id: `review-${index}`,
+      status,
+    })),
+    total: count,
+    hasMore,
+  };
+}
+
+function makePageWithIds(ids: string[], hasMore = false): ReviewPage {
+  return {
+    success: true,
+    reviews: ids.map(id => ({ id, status: 'running' })),
+    total: ids.length,
+    hasMore,
+  };
+}
+
+// eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
+function callQueryFn(options: ReviewListOptions, pageParam: number): Promise<ReviewPage> {
+  const queryFn = options.queryFn as unknown as (context: {
+    pageParam: number;
+  }) => Promise<ReviewPage>;
+  return queryFn({ pageParam });
+}
+
+function readGetNextPageParam(
+  options: ReviewListOptions
+): (lastPage: ReviewPage, pages: ReviewPage[], lastPageParam: number) => number | undefined {
+  return options.getNextPageParam as unknown as (
+    lastPage: ReviewPage,
+    pages: ReviewPage[],
+    lastPageParam: number
+  ) => number | undefined;
+}
+
+type ReviewProbeOptions = ReturnType<typeof buildReviewFirstPageQueryOptions>;
+
+function readProbeRefetchInterval(
+  options: ReviewProbeOptions
+): (query: { state: { data?: ReviewPage } }) => number | false {
+  return options.refetchInterval as unknown as (query: {
+    state: { data?: ReviewPage };
+  }) => number | false;
+}
+
+describe('buildReviewListQueryOptions (offset pagination)', () => {
+  it('uses the listForUser key, starts at offset 0, and requests the first page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    listForUserQueryMock.mockResolvedValueOnce(makePage(1));
+
+    expect(options.queryKey).toEqual(['codeReviews', 'listForUser']);
+    expect(options.initialPageParam).toBe(0);
+    expect(REVIEW_PAGE_SIZE).toBe(50);
+
+    await callQueryFn(options, 0);
+
+    expect(listForUserQueryMock).toHaveBeenCalledWith({ limit: 50, offset: 0 });
+  });
+
+  it('uses the listForOrganization key and passes the requested offset through', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'org_42');
+    listForOrganizationQueryMock.mockResolvedValueOnce(makePage(50));
+
+    expect(options.queryKey).toEqual([
+      'codeReviews',
+      'listForOrganization',
+      { organizationId: 'org_42' },
+    ]);
+
+    await callQueryFn(options, 50);
+
+    expect(listForOrganizationQueryMock).toHaveBeenCalledWith({
+      organizationId: 'org_42',
+      limit: 50,
+      offset: 50,
+    });
+  });
+
+  it('advances the offset by the loaded row count while hasMore is true', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+    const page = makePage(50, true);
+
+    expect(getNextPageParam(page, [page], 0)).toBe(50);
+    expect(getNextPageParam(page, [page], 50)).toBe(100);
+  });
+
+  it('stops forward paging at the retention bound instead of evicting the newest page', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+    const page = makePage(50, true);
+    const atBound = Array.from({ length: REVIEW_LIST_MAX_PAGES }, () => page);
+    const belowBound = atBound.slice(0, REVIEW_LIST_MAX_PAGES - 1);
+
+    // The list is newest-first, so React Query's `maxPages` trim would drop the
+    // front (newest) page. Refusing the next page keeps the newest page retained
+    // and makes `mergeReviewFirstPage`'s page-one guard reachable forever.
+    expect(
+      getNextPageParam(page, atBound, (REVIEW_LIST_MAX_PAGES - 1) * REVIEW_PAGE_SIZE)
+    ).toBeUndefined();
+    expect(getNextPageParam(page, belowBound, (REVIEW_LIST_MAX_PAGES - 2) * REVIEW_PAGE_SIZE)).toBe(
+      (REVIEW_LIST_MAX_PAGES - 1) * REVIEW_PAGE_SIZE
+    );
+  });
+
+  it('stops pagination when hasMore is false or the page failed', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    expect(getNextPageParam(makePage(50, false), [], 0)).toBeUndefined();
+    expect(getNextPageParam({ success: false, reviews: [], error: 'boom' }, [], 0)).toBeUndefined();
+  });
+
+  it('rejects a resolved failure page instead of treating it as an ordinary page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+
+    await expect(callQueryFn(options, 0)).rejects.toThrow('boom');
+  });
+
+  it('rejects a resolved failure next page and retries the same offset', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    const page1 = makePage(50, true);
+    listForUserQueryMock.mockResolvedValueOnce(page1);
+    const loaded = await callQueryFn(options, 0);
+    expect(loaded.reviews).toHaveLength(50);
+
+    // A resolved `{ success: false }` payload must reject like a thrown error
+    // so `isFetchNextPageError` fires; the already-loaded rows stay held.
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+    await expect(callQueryFn(options, 50)).rejects.toThrow('boom');
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // No page was appended, so retrying asks for the same offset again.
+    const page2 = makePage(10, false);
+    listForUserQueryMock.mockResolvedValueOnce(page2);
+    await expect(callQueryFn(options, 50)).resolves.toEqual(page2);
+    expect(listForUserQueryMock).toHaveBeenLastCalledWith({ limit: 50, offset: 50 });
+  });
+
+  it('keeps the loaded rows and retries the same offset after a failed next page', async () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+    const getNextPageParam = readGetNextPageParam(options);
+
+    const page1 = makePage(50, true);
+    listForUserQueryMock.mockResolvedValueOnce(page1);
+    const loaded = await callQueryFn(options, 0);
+
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // The next page fails: the rows already loaded stay held and the retry
+    // policy asks for the same offset again instead of dropping or skipping.
+    listForUserQueryMock.mockRejectedValueOnce(new Error('network down'));
+    await expect(callQueryFn(options, 50)).rejects.toThrow('network down');
+    expect(loaded.reviews).toHaveLength(50);
+    expect(getNextPageParam(page1, [page1], 0)).toBe(50);
+
+    // Retrying the same offset resolves, and the terminal page stops paging.
+    const page2 = makePage(10, false);
+    listForUserQueryMock.mockResolvedValueOnce(page2);
+    await callQueryFn(options, 50);
+
+    expect(listForUserQueryMock).toHaveBeenLastCalledWith({ limit: 50, offset: 50 });
+    expect(getNextPageParam(page2, [page1, page2], 50)).toBeUndefined();
+  });
+
+  it('bounds retention with maxPages and keeps the poll off the infinite query', () => {
+    const options = buildReviewListQueryOptions(createReviewTrpcStub(), 'personal');
+
+    expect(options.maxPages).toBe(REVIEW_LIST_MAX_PAGES);
+    expect(options.maxPages).toBeGreaterThan(0);
+    expect(options).not.toHaveProperty('refetchInterval');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildReviewFirstPageQueryOptions: the off-the-infinite-query page-one poll
+// ---------------------------------------------------------------------------
+
+type ReviewListCacheParam = Parameters<typeof mergeReviewFirstPage>[0];
+type ReviewListPageParam = Parameters<typeof mergeReviewFirstPage>[1];
+
+function asListCache(pages: ReviewPage[], pageParams: number[]): NonNullable<ReviewListCacheParam> {
+  return { pages, pageParams } as unknown as NonNullable<ReviewListCacheParam>;
+}
+
+function asReviewPage(page: ReviewPage): NonNullable<ReviewListPageParam> {
+  return page as unknown as NonNullable<ReviewListPageParam>;
+}
+
+describe('buildReviewFirstPageQueryOptions (page-one probe)', () => {
+  it('keys the probe under the list key so prefix invalidation still matches', () => {
+    const trpc = createReviewTrpcStub();
+    const listKey = buildReviewListQueryKey(trpc, 'personal');
+    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: true });
+
+    expect(listKey).toEqual(['codeReviews', 'listForUser']);
+    expect(options.queryKey.slice(0, listKey.length)).toEqual(listKey);
+    expect(options.queryKey.length).toBeGreaterThan(listKey.length);
+  });
+
+  it('keys the org probe under the org list key', () => {
+    const trpc = createReviewTrpcStub();
+    const listKey = buildReviewListQueryKey(trpc, 'org_42');
+    const options = buildReviewFirstPageQueryOptions(trpc, 'org_42', { enabled: true });
+
+    expect(listKey).toEqual(['codeReviews', 'listForOrganization', { organizationId: 'org_42' }]);
+    expect(options.queryKey.slice(0, listKey.length)).toEqual(listKey);
+    expect(options.queryKey.length).toBeGreaterThan(listKey.length);
+  });
+
+  it('fetches offset 0 only, with the caller enabled flag and a zero staleTime', async () => {
+    const trpc = createReviewTrpcStub();
+    const options = buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: true });
+
+    expect(options.staleTime).toBe(0);
+    expect(options.enabled).toBe(true);
+    expect(buildReviewFirstPageQueryOptions(trpc, 'personal', { enabled: false }).enabled).toBe(
+      false
+    );
+
+    listForUserQueryMock.mockResolvedValueOnce(makePage(1));
+    await options.queryFn();
+
+    expect(listForUserQueryMock).toHaveBeenCalledTimes(1);
+    expect(listForUserQueryMock).toHaveBeenCalledWith({ limit: 50, offset: 0 });
+  });
+
+  it('polls page one every 5s only while that page holds a running review', () => {
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
+    const refetchInterval = readProbeRefetchInterval(options);
+
+    expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
+    // A settled page with no running review is the one state that stops it.
+    expect(refetchInterval({ state: { data: makePage(50, false) } })).toBe(false);
+  });
+
+  it('keeps polling through a transient failure instead of clearing the interval', () => {
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
+    const refetchInterval = readProbeRefetchInterval(options);
+
+    // No page delivered yet (the first probe fetch failed): the review may still
+    // be running, so the interval must not clear on that one blip.
+    expect(refetchInterval({ state: {} })).toBe(5000);
+    // The last successful page is still held after a failed refetch (React Query
+    // keeps `data` on error), and a defensive failure payload keeps it polling.
+    expect(
+      refetchInterval({ state: { data: { success: false, reviews: [], error: 'boom' } } })
+    ).toBe(5000);
+    expect(refetchInterval({ state: { data: makePage(50, true, 'running') } })).toBe(5000);
+  });
+
+  it('stops polling once the consecutive-failure bound is reached', () => {
+    const withoutPage = { state: {} };
+    const withRunningReview = { state: { data: makePage(50, true, 'running') } };
+    const belowBound = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+      failedPolls: REVIEW_POLL_MAX_CONSECUTIVE_FAILURES - 1,
+    });
+    const atBound = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+      failedPolls: REVIEW_POLL_MAX_CONSECUTIVE_FAILURES,
+    });
+
+    // Below the bound a running review keeps re-arming, with or without a page.
+    expect(readProbeRefetchInterval(belowBound)(withoutPage)).toBe(5000);
+    expect(readProbeRefetchInterval(belowBound)(withRunningReview)).toBe(5000);
+    // At the bound every poll has failed: stop the loop until a refresh restarts it.
+    expect(readProbeRefetchInterval(atBound)(withoutPage)).toBe(false);
+    expect(readProbeRefetchInterval(atBound)(withRunningReview)).toBe(false);
+  });
+
+  it('counts consecutive failed polls and clears them on a delivered page', () => {
+    // No failure has settled yet: the streak stays empty.
+    expect(nextReviewPollFailureStreak(0, { dataUpdatedAt: 0, errorUpdatedAt: 0 })).toBe(0);
+    // A delivered page is the newer settle: the streak restarts even though the
+    // probe still holds the page it delivered before.
+    expect(nextReviewPollFailureStreak(2, { dataUpdatedAt: 200, errorUpdatedAt: 100 })).toBe(0);
+    // A failed poll is the newer settle: advance. This is the retained-page case
+    // — `dataUpdatedAt` stays put on a failed refetch.
+    expect(nextReviewPollFailureStreak(0, { dataUpdatedAt: 100, errorUpdatedAt: 200 })).toBe(1);
+    expect(nextReviewPollFailureStreak(1, { dataUpdatedAt: 100, errorUpdatedAt: 300 })).toBe(2);
+  });
+
+  it('rejects a resolved failure page like the list builder so a handler error never becomes probe data', async () => {
+    const options = buildReviewFirstPageQueryOptions(createReviewTrpcStub(), 'personal', {
+      enabled: true,
+    });
+    listForUserQueryMock.mockResolvedValueOnce({ success: false, reviews: [], error: 'boom' });
+
+    await expect(options.queryFn()).rejects.toThrow('boom');
+  });
+});
+
+describe('mergeReviewFirstPage', () => {
+  it('replaces page one and leaves pageParams and later pages untouched', () => {
+    const oldFirst = makePage(2, true);
+    const oldSecond = makePage(2, false);
+    const fresh = makePage(3, true);
+    const existing = asListCache([oldFirst, oldSecond], [0, 2]);
+
+    const merged = mergeReviewFirstPage(existing, asReviewPage(fresh));
+
+    expect(merged?.pages).toEqual([fresh, oldSecond]);
+    expect(merged?.pageParams).toEqual([0, 2]);
+  });
+
+  it('returns the existing cache unchanged when it has no pages', () => {
+    const existing = asListCache([], []);
+
+    expect(mergeReviewFirstPage(existing, asReviewPage(makePage(1)))).toBe(existing);
+  });
+
+  it('leaves the list untouched when the cache does not start at offset 0', () => {
+    // `buildReviewListQueryOptions` caps forward paging so page one is never
+    // evicted from the front; the guard is the defensive no-op for any cache
+    // whose head is not offset 0.
+    const retainedFirst = makePage(2, true, 'running');
+    const retainedSecond = makePage(2, false);
+    const existing = asListCache([retainedFirst, retainedSecond], [50, 100]);
+
+    expect(mergeReviewFirstPage(existing, asReviewPage(makePage(3, true)))).toBe(existing);
+  });
+
+  it('leaves the list untouched when the probe page is not successful', () => {
+    const existing = asListCache([makePage(1)], [0]);
+
+    expect(
+      mergeReviewFirstPage(existing, asReviewPage({ success: false, reviews: [], error: 'boom' }))
+    ).toBe(existing);
+  });
+
+  it('no-ops on a missing cache', () => {
+    expect(mergeReviewFirstPage(undefined, asReviewPage(makePage(1)))).toBeUndefined();
+    expect(mergeReviewFirstPage(undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe('selectReviewFirstPageAction', () => {
+  it('merges when the fresh page one holds the same rows in the same order', () => {
+    const existing = asListCache(
+      [makePageWithIds(['a', 'b'], true), makePageWithIds(['c'])],
+      [0, 2]
+    );
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['a', 'b'], true)))
+    ).toBe('merge');
+  });
+
+  it('refetches the retained pages when a review added at the top shifts the boundary', () => {
+    // `created_at desc`: page one is [a, b] and page two starts at offset 2. A
+    // new review at the top makes page one [new, a], so the retained page two
+    // (offset 2) now starts at the row that was page one's last entry — merging
+    // would skip the row that moved across the boundary.
+    const existing = asListCache(
+      [makePageWithIds(['a', 'b'], true), makePageWithIds(['c'])],
+      [0, 2]
+    );
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['new', 'a'], true)))
+    ).toBe('refetch');
+  });
+
+  it('merges when only one page is retained, whatever the probe holds', () => {
+    // No later page to desync: the next page param is recomputed from the new
+    // page one.
+    const existing = asListCache([makePageWithIds(['a', 'b'], true)], [0]);
+
+    expect(
+      selectReviewFirstPageAction(existing, asReviewPage(makePageWithIds(['new', 'a'], true)))
+    ).toBe('merge');
+  });
+
+  it('merges (no-op) when there is no cache or the probe failed', () => {
+    expect(selectReviewFirstPageAction(undefined, asReviewPage(makePage(1)))).toBe('merge');
+    expect(
+      selectReviewFirstPageAction(
+        asListCache([makePage(1), makePage(1)], [0, 1]),
+        asReviewPage({ success: false, reviews: [], error: 'boom' })
+      )
+    ).toBe('merge');
   });
 });

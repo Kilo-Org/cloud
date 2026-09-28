@@ -9,6 +9,7 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
+import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
   diagnosticDetail,
@@ -19,6 +20,7 @@ import {
 import {
   git,
   isTimeoutTermination,
+  logToFile,
   runProcess,
   withTimeoutAndAbort,
   type ExecResult,
@@ -37,12 +39,14 @@ import { createOutputRedactor, createSecretRedactor } from '../redact-output';
 import { stripAnsi } from '../event-parser';
 import type { ControlHandlerResult } from './sandbox-control-handlers';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
+import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import type { WrapperRestoreTelemetry } from '../../../src/shared/wrapper-bootstrap.js';
 import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
 import { withKiloRequestDeadline } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
-import { formatGitFailure, formatGitResultFailure } from '../git-errors.js';
+import { formatGitFailure, formatGitResultFailure, gitOperationError } from '../git-errors.js';
 import {
   WorktreeKiloRuntimeError,
   type WorktreeKiloRuntime,
@@ -99,16 +103,20 @@ export type ApplyAttachDeps = {
   emitPreparing?: AttachPreparingEmitter;
 };
 
-function ok(): ControlHandlerResult {
-  return { ok: true, result: { attached: true } };
+function ok(restore?: WrapperRestoreTelemetry): ControlHandlerResult {
+  return { ok: true, result: { attached: true, ...(restore ? { restore } : {}) } };
 }
 
 function fail(
   code: ControlErrorCode,
   message: string,
-  retryable: boolean
+  retryable: boolean,
+  subtype?: WorkspaceFailureSubtype
 ): Extract<ControlHandlerResult, { ok: false }> {
-  return { ok: false, error: { code, message, retryable } };
+  return {
+    ok: false,
+    error: { code, message, retryable, ...(subtype === undefined ? {} : { subtype }) },
+  };
 }
 
 function diagnosticErrorCode(
@@ -129,6 +137,31 @@ function attachFailureFields(
     retryable: result.error.retryable,
     ...(detail ? { detail } : {}),
   };
+}
+
+// `withKiloRequestDeadline` rejects a probe/create with this message. Diagnostics
+// only: it distinguishes the 10s control-request deadline from an abort.
+const KILO_REQUEST_TIMEOUT_MESSAGE = 'Kilo request timed out';
+
+function isKiloRequestTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message === KILO_REQUEST_TIMEOUT_MESSAGE;
+}
+
+// Closed failure category for a failed attach diagnostic. Falls back to the
+// emitted `errorCode` when no stage-specific category applies.
+function attachFailureReason(input: {
+  stage: ControlDiagnosticRecord['fields']['stage'];
+  aborted: boolean;
+  timedOut: boolean;
+  errorCode?: ControlDiagnosticRecord['fields']['errorCode'];
+}): string {
+  if (input.aborted) return 'attachment_cancelled';
+  if (input.stage === 'runtime_attach') return 'runtime_attach_failed';
+  if (input.stage === 'session_probe')
+    return input.timedOut ? 'session_probe_timeout' : (input.errorCode ?? 'not_ready');
+  if (input.stage === 'session_restore') return 'session_restore_failed';
+  if (input.stage === 'session_create') return 'session_create_failed';
+  return input.errorCode ?? 'not_ready';
 }
 
 async function defaultHasGit(directory: string): Promise<boolean> {
@@ -328,11 +361,13 @@ async function executeSessionAttach(
   let stage: ControlDiagnosticRecord['fields']['stage'] = 'attach_validation';
   let workspaceAction: ControlDiagnosticRecord['fields']['workspaceAction'];
   let sessionResolution: ControlDiagnosticRecord['fields']['sessionResolution'];
+  let restoreTelemetry: WrapperRestoreTelemetry | undefined;
   let attachment: WorktreeKiloAttachment | undefined;
   const diagnostic = (
     phase: 'completed' | 'failed',
     extra: Partial<ControlDiagnosticRecord['fields']> = {}
-  ): void =>
+  ): void => {
+    const aborted = Boolean(deps.signal?.aborted || attachment?.signal.aborted);
     emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
       operation: 'session.attach',
       phase,
@@ -344,9 +379,20 @@ async function executeSessionAttach(
       sessionResolution,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
-      aborted: Boolean(deps.signal?.aborted || attachment?.signal.aborted),
+      aborted,
+      ...(phase === 'failed'
+        ? {
+            reason: attachFailureReason({
+              stage,
+              aborted,
+              timedOut: extra.timedOut === true,
+              errorCode: extra.errorCode,
+            }),
+          }
+        : {}),
       ...extra,
     });
+  };
   const existingDirectory = directoryForSession(session.kiloSessionId);
   if (existingDirectory && existingDirectory !== directory) {
     const result = fail('unauthorized', 'Session directory mismatch', false);
@@ -430,7 +476,12 @@ async function executeSessionAttach(
               if (cloned.exitCode !== 0) {
                 const message = formatGitResultFailure(cloned, 'git clone failed', redact);
                 progress.fail('cloning', cloneStepId, message);
-                return fail('not_ready', message, true);
+                return fail(
+                  'not_ready',
+                  message,
+                  true,
+                  gitOperationError(cloned, 'clone', redact).subtype
+                );
               }
             }
             const branch = attach.branch ?? `session/${attach.kilo.scopeId}`;
@@ -491,14 +542,19 @@ async function executeSessionAttach(
               if (checked.exitCode !== 0) {
                 const message = formatGitResultFailure(checked, 'git checkout failed', redact);
                 progress.fail('cloning', cloneStepId, message);
-                return fail('not_ready', message, true);
+                return fail(
+                  'not_ready',
+                  message,
+                  true,
+                  gitOperationError(checked, 'checkout', redact).subtype
+                );
               }
             }
             progress.complete('cloning', cloneStepId);
             await configureWorkspaceGitAuthor(
               directory,
               (args, options) => runGit(args, options?.cwd, options?.signal),
-              undefined,
+              attach.git.author,
               signal
             );
             signal.throwIfAborted();
@@ -558,9 +614,19 @@ async function executeSessionAttach(
             );
           }
         }
+        if (alreadyBootstrapped && attach.git?.author) {
+          stage = 'git_setup';
+          await configureWorkspaceGitAuthor(
+            directory,
+            (args, options) => runGit(args, options?.cwd, options?.signal),
+            attach.git.author,
+            signal
+          );
+          signal.throwIfAborted();
+        }
       } catch (error) {
         if (error instanceof WrapperBootstrapError) {
-          const result = fail('not_ready', formatGitFailure(error), error.retryable);
+          const result = fail('not_ready', formatGitFailure(error), error.retryable, error.subtype);
           progress.fail('cloning', 'phase:cloning', result.error.message);
           return result;
         }
@@ -615,15 +681,38 @@ async function executeSessionAttach(
           sessionResolution = 'created';
         } else {
           sessionResolution = 'restored';
+          // A runtime replacement restores the worktree from the session
+          // snapshot. A skipped diff must be a named outcome here too — not only
+          // in the cold/backup bootstrap — so report it, write the agent rules
+          // file, and carry the telemetry back to the worker.
+          const incomplete = await reportRestoreIncomplete({
+            diffs: restored.diffs,
+            sessionHome: env.HOME ?? directory,
+            identity: `kiloSessionId=${kiloSessionId}`,
+            log: logToFile,
+            step: {
+              started: label =>
+                progress.start('restore_incomplete', 'phase:restore_incomplete', label, {
+                  kind: 'phase',
+                  label,
+                }),
+              failed: safeError =>
+                progress.fail('restore_incomplete', 'phase:restore_incomplete', safeError),
+            },
+          });
+          if (incomplete) restoreTelemetry = { path: 'backup', diffs: restored.diffs };
         }
       }
       signal.throwIfAborted();
       progress.complete('kilo_session', 'phase:kilo_session');
-    } catch {
+    } catch (error) {
       const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
       progress.fail('kilo_session', 'phase:kilo_session', message);
       const result = fail('not_ready', message, true);
-      diagnostic('failed', attachFailureFields(result));
+      diagnostic('failed', {
+        ...attachFailureFields(result),
+        timedOut: isKiloRequestTimeout(error),
+      });
       return result;
     }
     stage = 'attachment_commit';
@@ -639,7 +728,7 @@ async function executeSessionAttach(
       throw error;
     }
     diagnostic('completed');
-    return ok();
+    return ok(restoreTelemetry);
   } catch (error) {
     deps.onError?.(error);
     const result =

@@ -1,11 +1,31 @@
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Share } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
+
+/**
+ * How much top clearance the header reserves:
+ *
+ * - 'always': the surface owns the top of the window (full-screen modals), so
+ *   the status-bar inset applies whenever it is non-zero.
+ * - 'bottom-form-sheet': a bottom-anchored formSheet never draws under the
+ *   status bar, so it reserves no top clearance on either platform — the
+ *   window inset would only be a dead band above the header (p7). Android
+ *   caps the detents just below the inset (useFormSheetScreenOptions) and the
+ *   iOS sheet clears the top edge with its grabber, so the same rule holds
+ *   everywhere.
+ * - 'ios-page-sheet': the SessionPageSheet surface owns the top of the window
+ *   on both platforms, so the header reserves no top clearance — the native
+ *   iOS pageSheet presents below the status bar, and the Android full-window
+ *   Modal pads its own top inset (session-page-sheet). `useSafeAreaInsets`
+ *   still reports the window's inset inside either Modal, so reading it in the
+ *   header would leave a dead band above the title.
+ */
+export type SheetHeaderTopInset = 'always' | 'bottom-form-sheet' | 'ios-page-sheet';
 
 export function SheetHeader({
   title,
@@ -17,6 +37,7 @@ export function SheetHeader({
   onShare,
   sharing = false,
   disabled = false,
+  topInset = 'always',
 }: {
   title: string;
   /**
@@ -35,21 +56,34 @@ export function SheetHeader({
   onShare?: () => void;
   sharing?: boolean;
   disabled?: boolean;
+  topInset?: SheetHeaderTopInset;
 }) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const resolvedDoneLabel = doneLabel ?? t('common.done');
   const resolvedCancelLabel = cancelLabel ?? t('common.cancel');
-  // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
-  // header row off the sensor on full-width sheets. They go on an inner wrapper
-  // so they ADD to the `px-4` gutter: an inline padding on the container would
-  // beat the className (inline style wins in React Native) and swallow the
-  // gutter. Zero insets collapse the wrapper style to `undefined`, so portrait
-  // pixels are byte-identical and a rotation never moves anything vertically.
-  const sideInsetStyle =
-    insets.left > 0 || insets.right > 0
+  // Reserve top clearance as well as landscape cutout clearance inside the
+  // gutters. Keeping the inset on an inner wrapper preserves the header's own
+  // padding. Android can report top: 0 for the frame a freshly presented
+  // sheet first lays out (before the insets propagate); fall back to the
+  // synchronous status-bar height the same way the form-sheet detents do.
+  // `StatusBar.currentHeight` is an Android-only API and `undefined` on iOS,
+  // so the nullish fallback yields the status-bar height on both platforms
+  // without branching on Platform.OS.
+  const statusBarHeight = StatusBar.currentHeight ?? 0;
+  const resolvedTopInset = insets.top > 0 ? insets.top : statusBarHeight;
+  // Both sheet surfaces own the top of the window, so the header reserves no
+  // top clearance: a bottom formSheet is anchored below the status bar and a
+  // SessionPageSheet presents below it too (the native pageSheet on iOS, a
+  // full-window Modal that pads its own top inset on Android). Any resolved
+  // window inset here would only be a dead band above the header.
+  const dropsTopInset = topInset === 'bottom-form-sheet' || topInset === 'ios-page-sheet';
+  const topInsetHeight = dropsTopInset ? 0 : resolvedTopInset;
+  const safeAreaStyle =
+    topInsetHeight > 0 || insets.left > 0 || insets.right > 0
       ? {
+          ...(topInsetHeight > 0 ? { paddingTop: topInsetHeight } : undefined),
           ...(insets.left > 0 ? { paddingLeft: insets.left } : undefined),
           ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
         }
@@ -61,7 +95,7 @@ export function SheetHeader({
     // view by finding the header at the screen content's subview index 0 — a
     // flattened header breaks that native pass and the list paints over it.
     <View collapsable={false} className="border-b border-border bg-background px-4 pb-3 pt-4">
-      <View style={sideInsetStyle}>
+      <View style={safeAreaStyle}>
         <View className="min-h-11 flex-row items-center gap-x-3">
           {onShare !== undefined ? (
             <Pressable
@@ -83,7 +117,7 @@ export function SheetHeader({
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel={resolvedCancelLabel}
-              className="min-h-11 min-w-11 shrink-0 items-center justify-center px-2 py-2 active:opacity-70 disabled:opacity-50"
+              className="min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50"
             >
               <Text className="text-center text-base font-medium text-foreground">
                 {resolvedCancelLabel}
@@ -111,7 +145,7 @@ export function SheetHeader({
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel={resolvedDoneLabel}
-            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full bg-secondary px-4 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
+            className="ms-auto min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md px-2 py-2 active:opacity-70 disabled:opacity-50 will-change-pressable"
           >
             <Text className="text-center text-base font-medium text-foreground">
               {resolvedDoneLabel}

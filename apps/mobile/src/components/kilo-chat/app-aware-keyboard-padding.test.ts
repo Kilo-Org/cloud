@@ -21,6 +21,18 @@ describe('app-aware keyboard padding', () => {
     ).toBe(0);
   });
 
+  it('keeps the padded height through a transient inactive state', () => {
+    // A keyboard that stays up across Control Center or a system alert must not
+    // have its reserved padding collapsed: iOS fires no `keyboardWillShow`
+    // again on the way back to `active`.
+    expect(
+      resolveAppAwareKeyboardPadding({
+        currentPadding: 320,
+        event: { type: 'app-state-change', appState: 'inactive' },
+      })
+    ).toBe(320);
+  });
+
   it('keeps padding reset on foreground until a fresh keyboard event arrives', () => {
     expect(
       resolveAppAwareKeyboardPadding({

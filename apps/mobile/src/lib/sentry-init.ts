@@ -5,8 +5,9 @@ import { SENTRY_ENVIRONMENT } from '@/lib/config';
 import { SENTRY_DSN } from '@/lib/sentry-dsn';
 import { sentryOptionsForConsent } from '@/lib/sentry-consent';
 import { applySentryContext } from '@/lib/sentry-context';
-import { scrubBreadcrumb, scrubEvent } from '@/lib/telemetry/sentry-scrub';
 import { resolveSentryEnvironment } from '@/lib/sentry-environment';
+import { beforeSendScrubbedEvent } from '@/lib/telemetry/sentry-before-send';
+import { scrubBreadcrumb } from '@/lib/telemetry/sentry-scrub';
 
 const expoRouterIntegration = Sentry.expoRouterIntegration({
   enableTimeToInitialDisplay: !isRunningInExpoGo(),
@@ -63,6 +64,10 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
   const userIntegrations: SentryIntegration[] = optionalConsented
     ? [
         expoRouterIntegration,
+        // Attaches a thrown error's own properties (e.g. tRPC `data`) to the
+        // event under a context named after the error; `beforeSend`/
+        // `scrubEvent` walks that context and redacts token-shaped values.
+        Sentry.extraErrorDataIntegration(),
         Sentry.deeplinkIntegration(),
         Sentry.mobileReplayIntegration({
           maskAllText: true,
@@ -76,7 +81,13 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
           name: `HermesProfiling#${(profilerRegistrations += 1)}`,
         },
       ]
-    : [expoRouterIntegration, Sentry.deeplinkIntegration()];
+    : [
+        expoRouterIntegration,
+        // Error reporting is mandatory (DEC-02), so extra error data is
+        // attached even before optional consent is decided.
+        Sentry.extraErrorDataIntegration(),
+        Sentry.deeplinkIntegration(),
+      ];
 
   Sentry.init({
     dsn: SENTRY_DSN,
@@ -103,7 +114,9 @@ export function initSentry(optionalConsented: boolean, extras?: SentryInitExtras
     ],
     enableNativeFramesTracking: false,
 
-    beforeSend: scrubEvent as NonNullable<Parameters<typeof Sentry.init>[0]>['beforeSend'],
+    beforeSend: beforeSendScrubbedEvent as NonNullable<
+      Parameters<typeof Sentry.init>[0]
+    >['beforeSend'],
     beforeBreadcrumb: scrubBreadcrumb as NonNullable<
       Parameters<typeof Sentry.init>[0]
     >['beforeBreadcrumb'],

@@ -1,7 +1,9 @@
-import { act, createElement, type ReactNode } from 'react';
+import { act, createElement, Fragment, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
+
+import '@/i18n';
 import { type ShareCliSpawnRow } from './share-cli-spawn';
 import { ShareDestinationList } from './share-destination-list';
 import { type ShareDestinationRow } from './share-destinations';
@@ -10,20 +12,31 @@ import { type ShareGateState } from './share-gate-state';
 vi.mock('react-native', () => ({
   View: 'View',
   TextInput: 'TextInput',
-  FlatList: (props: {
-    data: ShareDestinationRow[];
+  // `@/components/ui/input` reads `I18nManager.isRTL` through
+  // `withRtlInputAlignment` on every render.
+  I18nManager: { isRTL: false },
+}));
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
+    data?: readonly ShareDestinationRow[];
+    getItemType?: (item: unknown) => string;
     ListHeaderComponent?: ReactNode;
     ListEmptyComponent?: ReactNode;
     renderItem: (info: { item: ShareDestinationRow }) => ReactNode;
-  }) =>
-    createElement(
-      'FlatList',
-      null,
+  }) => {
+    const data = props.data ?? [];
+    return createElement(
+      'FlashList',
+      { getItemType: props.getItemType },
       props.ListHeaderComponent,
-      props.data.length > 0
-        ? props.data.map((item): ReactNode => props.renderItem({ item }))
+      data.length > 0
+        ? data.map(
+            (item, index): ReactNode =>
+              createElement(Fragment, { key: index }, props.renderItem({ item }))
+          )
         : props.ListEmptyComponent
-    ),
+    );
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 12 }) }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
@@ -106,7 +119,7 @@ describe('ShareDestinationList surface states', () => {
     'lifts $kind outside the list without connected CLI choices',
     async state => {
       const { renderer, unmount } = await mount(state);
-      expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+      expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
       const bodyType = state.kind === 'retryable' ? 'QueryError' : 'CenteredState';
       const body = renderer.root.find(node => String(node.type) === bodyType);
       expect((body.props as { placement?: string }).placement).not.toBe('top');
@@ -117,7 +130,7 @@ describe('ShareDestinationList surface states', () => {
 
   it.each([empty, retryable])('keeps $kind inline beside connected CLI choices', async state => {
     const { renderer, unmount } = await mount(state, [instance]);
-    const list = renderer.root.find(node => String(node.type) === 'FlatList');
+    const list = renderer.root.find(node => String(node.type) === 'FlashList');
     expect(list.findAll(node => String(node.type) === 'DestinationOptionRow')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
     if (state.kind === 'retryable') {
@@ -142,7 +155,7 @@ describe('ShareDestinationList surface states', () => {
         [instance]
       );
       expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
-      expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+      expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
       expect(
         renderer.root.findAll(node => String(node.type) === 'DestinationOptionRow')
       ).toHaveLength(0);
@@ -161,7 +174,7 @@ describe('ShareDestinationList surface states', () => {
     act(() => {
       onChangeText('no match');
     });
-    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
     expect(renderer.root.find(node => String(node.type) === 'TextInput')).toBe(input);
     act(() => {
@@ -169,6 +182,26 @@ describe('ShareDestinationList surface states', () => {
     });
     expect(renderer.root.findAll(node => String(node.type) === 'StoredSessionRow')).toHaveLength(9);
     expect(renderer.root.find(node => String(node.type) === 'TextInput')).toBe(input);
+    unmount();
+  });
+
+  it('gives every destination row one constant item type', async () => {
+    const { renderer, unmount } = await mount(happy, [], destinations);
+    const list = renderer.root.find(node => String(node.type) === 'FlashList');
+    const getItemType = (list.props as { getItemType?: (item: unknown) => string }).getItemType;
+    expect(getItemType).toBeTypeOf('function');
+    expect(getItemType?.(destinations[0])).toBe('destination');
+    act(() => {
+      (
+        renderer.root.find(node => String(node.type) === 'TextInput').props as {
+          onChangeText: (text: string) => void;
+        }
+      ).onChangeText('main');
+    });
+    // The identity is the hoisted `useCallback`, so a parent re-render does not
+    // invalidate the list's recycling.
+    const rerendered = renderer.root.find(node => String(node.type) === 'FlashList');
+    expect((rerendered.props as { getItemType?: unknown }).getItemType).toBe(getItemType);
     unmount();
   });
 

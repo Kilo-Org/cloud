@@ -36,21 +36,10 @@ import { extractRepoFromGitUrl } from '../utils/git-utils';
 // Many files import it from here, so we keep the export to avoid breaking changes
 export { extractRepoFromGitUrl };
 
-// ============================================================================
-// IndexedDB Types
-// ============================================================================
-
-/**
- * Organization context for a session
- */
 export type OrgContext = {
   organizationId: string;
 };
 
-/**
- * Resume configuration stored with the session
- * Captures the settings needed to resume a session
- */
 export type StoredResumeConfig = {
   mode: string;
   model: string;
@@ -58,10 +47,6 @@ export type StoredResumeConfig = {
   setupCommands?: string[];
 };
 
-/**
- * Session data stored in IndexedDB
- * Contains all the information needed to display and resume a session
- */
 export type IndexedDbSessionData = {
   /** Local session ID (UUID) - used as the key in IndexedDB */
   sessionId: string;
@@ -69,7 +54,6 @@ export type IndexedDbSessionData = {
   /** Cloud agent session ID (agent_xxx format) - set when connected to cloud */
   cloudAgentSessionId: string | null;
 
-  /** Messages in CloudMessage format (streaming format with ts, type, etc.) */
   messages: CloudMessage[];
 
   /**
@@ -85,53 +69,29 @@ export type IndexedDbSessionData = {
   /** Session title (user-provided or auto-generated) */
   title: string | null;
 
-  /** Git URL of the repository */
   gitUrl: string | null;
 
   /** Repository in owner/repo format */
   repository: string | null;
 
-  /** Organization context if applicable */
   orgContext: OrgContext | null;
 
   /** Whether org context has been confirmed by user */
   orgContextConfirmed: boolean;
 
-  /** Resume configuration for restarting the session */
   resumeConfig: StoredResumeConfig | null;
 
-  /** When the session was created */
   createdAt: string;
 
-  /** When the session was last updated */
   updatedAt: string;
 
-  /** Last mode used for this session (from DB) */
   lastMode: string | null;
 
-  /** Last model used for this session (from DB) */
   lastModel: string | null;
 };
 
-// ============================================================================
-// IndexedDB Store (jotai-minidb)
-// ============================================================================
-
-/** Lazily initialized session store instance */
 let _sessionStore: MiniDb<IndexedDbSessionData> | null = null;
 
-/**
- * Get the IndexedDB store for cloud agent sessions.
- *
- * Uses jotai-minidb for reactive IndexedDB access with Jotai integration.
- * Sessions are keyed by their sessionId (UUID).
- *
- * The store is created lazily on first access to avoid SSR issues
- * (IndexedDB is only available in browser environments).
- *
- * @returns The MiniDb session store instance
- * @throws Error if called in server-side context
- */
 function getSessionStore(): MiniDb<IndexedDbSessionData> {
   if (typeof window === 'undefined') {
     throw new Error(
@@ -148,14 +108,6 @@ function getSessionStore(): MiniDb<IndexedDbSessionData> {
   return _sessionStore;
 }
 
-/**
- * Create a new IndexedDbSessionData object from session details.
- *
- * @param session - Partial session data (requires at least sessionId)
- * @param messages - Array of CloudMessage objects to store
- * @param repository - Optional repository string in owner/repo format
- * @returns Complete IndexedDbSessionData object with defaults filled in
- */
 export function createSessionData(
   session: {
     sessionId: string;
@@ -174,8 +126,6 @@ export function createSessionData(
   repository?: string | null
 ): IndexedDbSessionData {
   const now = new Date().toISOString();
-  // Initialize highWaterMark from DB's updated_at timestamp (converted to ms)
-  // This represents "the most recent DB update we know about"
   const highWaterMark = session.dbUpdatedAt ? new Date(session.dbUpdatedAt).getTime() : 0;
 
   return {
@@ -197,10 +147,6 @@ export function createSessionData(
   };
 }
 
-// ============================================================================
-// Database Session Types
-// ============================================================================
-
 /**
  * API session type - matches the shape returned by cli-sessions-router.list
  * Dates are returned as strings from the tRPC API
@@ -219,9 +165,6 @@ export type ApiSession = {
   organization_id: string | null;
 };
 
-/**
- * Database session type - with Date objects for convenient manipulation
- */
 export type DbSession = {
   session_id: string;
   title: string | null;
@@ -236,9 +179,6 @@ export type DbSession = {
   organization_id: string | null;
 };
 
-/**
- * Convert an API session (with string dates) to DbSession format (with Date objects)
- */
 export function apiSessionToDbSession(apiSession: ApiSession): DbSession {
   return {
     ...apiSession,
@@ -262,38 +202,18 @@ export type DbSessionDetails = DbSession & {
   last_model: string | null;
 };
 
-/**
- * Resume strategy when loading a session
- */
 export type ResumeStrategy = 'sendMessageStream' | 'initiateFromKilocodeSession';
 
-/**
- * Result from loading a session
- */
 export type LoadSessionResult = {
   session: DbSessionDetails;
   messages: CloudMessage[];
   resumeStrategy: ResumeStrategy;
 };
 
-// ============================================================================
-// State Atoms
-// ============================================================================
-
-/**
- * Recent sessions fetched from database
- * This is populated by the useDbSessions hook
- */
 export const dbSessionsAtom = atom<DbSession[]>([]);
 
-/**
- * Loading state for sessions list
- */
 export const sessionsLoadingAtom = atom(false);
 
-/**
- * Error state for sessions operations
- */
 export const sessionsErrorAtom = atom<string | null>(null);
 
 /**
@@ -302,20 +222,10 @@ export const sessionsErrorAtom = atom<string | null>(null);
  */
 export const currentDbSessionIdAtom = atom<string | null>(null);
 
-/**
- * Cloud agent session ID for the current session
- * Used to determine resume strategy
- */
 export const cloudAgentSessionIdAtom = atom<string | null>(null);
 
-/**
- * Flag indicating the local session is stale (DB has newer data)
- */
 export const sessionStaleAtom = atom(false);
 
-/**
- * Pagination cursor for loading more sessions
- */
 export const sessionsNextCursorAtom = atom<string | null>(null);
 
 /**
@@ -325,35 +235,16 @@ export const sessionsNextCursorAtom = atom<string | null>(null);
  */
 export const pendingMessagesAtom = atom<CloudMessage[]>([]);
 
-// ============================================================================
-// Derived Atoms
-// ============================================================================
-
-/**
- * Recent sessions for display - returns dbSessionsAtom data
- * Falls back to empty array if loading
- */
 export const recentSessionsAtom = atom(get => {
   const isLoading = get(sessionsLoadingAtom);
   if (isLoading) return [];
   return get(dbSessionsAtom);
 });
 
-/**
- * Check if there are more sessions to load
- */
 export const hasMoreSessionsAtom = atom(get => {
   return get(sessionsNextCursorAtom) !== null;
 });
 
-// ============================================================================
-// Action Atoms
-// ============================================================================
-
-/**
- * Action atom for updating sessions list from DB
- * Called by useDbSessions hook when data is fetched
- */
 export const setDbSessionsAtom = atom(
   null,
   (
@@ -376,50 +267,28 @@ export const setDbSessionsAtom = atom(
   }
 );
 
-/**
- * Action atom for setting loading state
- */
 export const setSessionsLoadingAtom = atom(null, (_get, set, loading: boolean) => {
   set(sessionsLoadingAtom, loading);
 });
 
-/**
- * Action atom for setting error state
- */
 export const setSessionsErrorAtom = atom(null, (_get, set, error: string | null) => {
   set(sessionsErrorAtom, error);
   set(sessionsLoadingAtom, false);
 });
 
-/**
- * Action atom for clearing staleness flag after refresh
- */
 export const clearSessionStaleAtom = atom(null, (_get, set) => {
   set(sessionStaleAtom, false);
 });
 
-/**
- * Action atom for updating cloud agent session ID
- * Called when a session is linked to a cloud-agent session
- */
 export const linkCloudAgentSessionAtom = atom(null, (_get, set, cloudAgentSessionId: string) => {
   set(cloudAgentSessionIdAtom, cloudAgentSessionId);
 });
 
-/**
- * Action atom for setting the current DB session ID
- * Used when receiving session_created events to enable IndexedDB tracking
- */
 export const setCurrentDbSessionIdAtom = atom(null, (_get, set, sessionId: string | null) => {
   set(currentDbSessionIdAtom, sessionId);
 });
 
 /**
- * Action atom for creating a new session in IndexedDB
- *
- * Called when receiving a session_created SSE event during a new session.
- * This initializes IndexedDB storage so subsequent messages are persisted.
- *
  * IMPORTANT: This atom sets currentDbSessionIdAtom FIRST (before async IndexedDB write)
  * so that processIncomingMessageAtom can immediately start queueing messages for this session.
  * After the IndexedDB entry is created, pending messages are flushed.
@@ -438,26 +307,18 @@ export const createNewSessionInIndexedDbAtom = atom(
       cloudAgentSessionId: string;
       /** Repository in owner/repo format */
       repository: string;
-      /** Initial prompt/title for the session */
       title: string;
-      /** Organization context if applicable */
       orgContext?: OrgContext | null;
-      /** Session mode from the form */
       mode?: 'architect' | 'code' | 'ask' | 'debug' | 'orchestrator';
-      /** Session model from the form */
       model?: string;
     }
   ): Promise<void> => {
     const { kiloSessionId, cloudAgentSessionId, repository, title, orgContext, mode, model } =
       payload;
 
-    // CRITICAL: Set session ID atoms FIRST (synchronous) before async IndexedDB write
-    // This allows processIncomingMessageAtom to immediately know which session messages belong to
-    // Messages arriving between now and IndexedDB creation will be queued in pendingMessagesAtom
     set(currentDbSessionIdAtom, kiloSessionId);
     set(cloudAgentSessionIdAtom, cloudAgentSessionId);
 
-    // Create initial session data
     const now = new Date().toISOString();
 
     // Store mode/model as resumeConfig so it's preserved across refreshes
@@ -477,29 +338,26 @@ export const createNewSessionInIndexedDbAtom = atom(
       cloudAgentSessionId,
       messages: [], // Will be populated after we flush pending messages
       highWaterMark: 0, // Will be set by session_synced events
-      loadedFromDbAt: null, // Not loaded from DB - this is a new session
+      loadedFromDbAt: null,
       title,
-      gitUrl: null, // Not known yet
+      gitUrl: null,
       repository,
       orgContext: orgContext ?? null,
       orgContextConfirmed: true, // New session - context is implicit (either org or personal)
-      resumeConfig, // Store form config for refresh persistence
+      resumeConfig,
       createdAt: now,
       updatedAt: now,
       lastMode: mode ?? null,
       lastModel: model ?? null,
     };
 
-    // Save to IndexedDB using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
         await set(store.setMany, [[kiloSessionId, sessionData]]);
 
-        // Flush any messages that were queued while IndexedDB entry was being created
         const pendingMessages = get(pendingMessagesAtom);
         if (pendingMessages.length > 0) {
-          // Get the session data we just saved and append pending messages
           const currentData = get(store.item(kiloSessionId));
           if (currentData) {
             const updatedData: IndexedDbSessionData = {
@@ -510,7 +368,6 @@ export const createNewSessionInIndexedDbAtom = atom(
             await set(store.setMany, [[kiloSessionId, updatedData]]);
           }
 
-          // Clear the pending messages queue
           set(pendingMessagesAtom, []);
         }
       } catch {
@@ -518,7 +375,6 @@ export const createNewSessionInIndexedDbAtom = atom(
       }
     }
 
-    // Update in-memory session atom
     set(currentIndexedDbSessionAtom, sessionData);
 
     // Add new session to the sessions list for immediate sidebar display
@@ -543,42 +399,14 @@ export const createNewSessionInIndexedDbAtom = atom(
   }
 );
 
-/**
- * Action atom for resetting all DB session state
- */
 export const resetDbSessionAtom = atom(null, (_get, set) => {
   set(currentDbSessionIdAtom, null);
   set(cloudAgentSessionIdAtom, null);
   set(sessionStaleAtom, false);
 });
 
-// ============================================================================
-// IndexedDB State Atoms
-// ============================================================================
-
-/**
- * Current session's IndexedDB data (reactive)
- * This holds the full session data including messages from IndexedDB
- */
 export const currentIndexedDbSessionAtom = atom<IndexedDbSessionData | null>(null);
 
-// ============================================================================
-// IndexedDB Action Atoms
-// ============================================================================
-
-/**
- * Action atom for loading a session from DB into IndexedDB
- *
- * Flow:
- * 1. Receive session data from DB/R2 (passed as payload)
- * 2. Check if session exists in IndexedDB (to preserve client-side state)
- * 3. Store/update in IndexedDB with proper merging
- * 4. Update currentIndexedDbSessionAtom
- * 5. Return resume strategy and whether org context prompt is needed
- *
- * @param payload - Session details and messages from DB
- * @returns Object containing sessionData, resumeStrategy, and needsOrgContextPrompt
- */
 export const loadSessionToIndexedDbAtom = atom(
   null,
   async (
@@ -595,7 +423,6 @@ export const loadSessionToIndexedDbAtom = atom(
   }> => {
     const { session, messages } = payload;
 
-    // Check if session exists in IndexedDB using jotai-minidb (client-side only)
     let existingData: IndexedDbSessionData | null = null;
     if (typeof window !== 'undefined') {
       try {
@@ -606,7 +433,6 @@ export const loadSessionToIndexedDbAtom = atom(
       }
     }
 
-    // Extract repository from git URL
     const repository = extractRepoFromGitUrl(session.git_url);
 
     // Determine if we need org context prompt
@@ -618,40 +444,28 @@ export const loadSessionToIndexedDbAtom = atom(
     const needsOrgContextPrompt =
       !knowsOrgContextFromDb && (!existingData || !existingData.orgContextConfirmed);
 
-    // Create or merge session data
     let sessionData: IndexedDbSessionData;
 
-    // Convert DB's updated_at to milliseconds for highWaterMark
     const dbUpdatedAtMs = new Date(session.updated_at).getTime();
 
     if (existingData) {
-      // Merge: preserve client-side state (orgContext, resumeConfig) but update messages
-      // When loading from DB, we always use DB messages and update highWaterMark to match
-      // the DB's updated_at timestamp. This is our new sync point for staleness detection.
-
       sessionData = {
         ...existingData,
-        // Update metadata from DB
         cloudAgentSessionId: session.cloud_agent_session_id ?? existingData.cloudAgentSessionId,
         title: session.title ?? existingData.title,
         gitUrl: session.git_url ?? existingData.gitUrl,
         repository: repository ?? existingData.repository,
-        // Always use DB messages when loading from DB - this is a refresh
         messages: messages,
         // CRITICAL: Set highWaterMark to DB's updated_at. After loading from DB,
         // the DB's timestamp becomes our sync reference point. Don't use Math.max
         // because that can keep an old value that causes false staleness reports.
         highWaterMark: dbUpdatedAtMs,
-        // Record that we loaded from DB
         loadedFromDbAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        // Update last mode/model from DB (prefer DB values as source of truth)
         lastMode: session.last_mode ?? existingData.lastMode,
         lastModel: session.last_model ?? existingData.lastModel,
       };
     } else {
-      // Create new session data
-      // For sessions with version >= 2, auto-set org context from DB
       const orgContextFromDb: OrgContext | null =
         knowsOrgContextFromDb && session.organization_id
           ? { organizationId: session.organization_id }
@@ -664,7 +478,7 @@ export const loadSessionToIndexedDbAtom = atom(
           title: session.title,
           gitUrl: session.git_url,
           orgContext: orgContextFromDb,
-          orgContextConfirmed: knowsOrgContextFromDb, // Auto-confirm if we know from DB
+          orgContextConfirmed: knowsOrgContextFromDb,
           createdAt: session.created_at.toISOString(),
           dbUpdatedAt: session.updated_at.toISOString(),
           lastMode: session.last_mode,
@@ -676,7 +490,6 @@ export const loadSessionToIndexedDbAtom = atom(
       sessionData.loadedFromDbAt = new Date().toISOString();
     }
 
-    // Save to IndexedDB using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -686,18 +499,13 @@ export const loadSessionToIndexedDbAtom = atom(
       }
     }
 
-    // Update current session atom
     set(currentIndexedDbSessionAtom, sessionData);
 
-    // Clear stale flag since we just loaded fresh data
     set(sessionStaleAtom, false);
 
-    // Update DB session atoms
     set(currentDbSessionIdAtom, session.session_id);
     set(cloudAgentSessionIdAtom, session.cloud_agent_session_id);
 
-    // Populate in-memory atoms for UI rendering
-    // Clear existing messages first
     set(clearMessagesAtom);
 
     // Load messages into the messages atom (feeds into staticMessagesAtom/dynamicMessagesAtom)
@@ -728,7 +536,6 @@ export const loadSessionToIndexedDbAtom = atom(
     // When this is null, sendMessage will fall through to initiateFromKilocodeSession flow.
     set(currentLocalSessionIdAtom, session.cloud_agent_session_id);
 
-    // Determine resume strategy
     const resumeStrategy: ResumeStrategy = session.cloud_agent_session_id
       ? 'sendMessageStream'
       : 'initiateFromKilocodeSession';
@@ -751,8 +558,6 @@ export const loadSessionToIndexedDbAtom = atom(
  * If the DB's current updated_at is newer than our highWaterMark, someone else
  * (another device, CLI, etc.) has updated the session and we should refresh.
  *
- * @param payload - Session ID and DB's current updated_at timestamp
- * @returns True if local data is stale (DB has been updated since we last synced)
  */
 export const checkStalenessWithHighWaterMarkAtom = atom(
   null,
@@ -766,10 +571,8 @@ export const checkStalenessWithHighWaterMarkAtom = atom(
   ): Promise<boolean> => {
     const { sessionId, dbUpdatedAt } = payload;
 
-    // Get current IndexedDB session
     const currentSession = get(currentIndexedDbSessionAtom);
 
-    // Helper to perform the staleness check
     const performStalenessCheck = (highWaterMark: number): boolean => {
       // If we don't have a highWaterMark (0), we can't determine staleness
       // This happens on first load - don't mark as stale
@@ -780,13 +583,11 @@ export const checkStalenessWithHighWaterMarkAtom = atom(
       // Convert DB's updated_at to milliseconds for comparison
       const dbUpdatedAtMs = new Date(dbUpdatedAt).getTime();
 
-      // Stale if DB's updated_at is NEWER than our highWaterMark
       // Use a 2-second tolerance to handle timestamp precision differences
       const TOLERANCE_MS = 2000;
       return dbUpdatedAtMs > highWaterMark + TOLERANCE_MS;
     };
 
-    // If we have the session in memory, use that
     if (currentSession && currentSession.sessionId === sessionId) {
       const isStale = performStalenessCheck(currentSession.highWaterMark);
 
@@ -797,7 +598,6 @@ export const checkStalenessWithHighWaterMarkAtom = atom(
       return isStale;
     }
 
-    // Otherwise, try to get from IndexedDB using jotai-minidb
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -821,13 +621,6 @@ export const checkStalenessWithHighWaterMarkAtom = atom(
   }
 );
 
-/**
- * Update org context in IndexedDB
- *
- * Called when user confirms or changes the organization context for a session.
- *
- * @param payload - Session ID, orgContext, and confirmation flag
- */
 export const updateOrgContextAtom = atom(
   null,
   async (
@@ -841,7 +634,6 @@ export const updateOrgContextAtom = atom(
   ): Promise<void> => {
     const { sessionId, orgContext, orgContextConfirmed } = payload;
 
-    // Update current session atom if it matches
     const currentSession = get(currentIndexedDbSessionAtom);
     if (currentSession && currentSession.sessionId === sessionId) {
       const updatedSession: IndexedDbSessionData = {
@@ -853,7 +645,6 @@ export const updateOrgContextAtom = atom(
       set(currentIndexedDbSessionAtom, updatedSession);
     }
 
-    // Update IndexedDB using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -874,14 +665,6 @@ export const updateOrgContextAtom = atom(
   }
 );
 
-/**
- * Update resume config in IndexedDB
- *
- * Called when user configures session settings (mode, model, env vars, etc.)
- * that should be preserved for session resumption.
- *
- * @param payload - Session ID and resume configuration
- */
 export const updateResumeConfigAtom = atom(
   null,
   async (
@@ -894,7 +677,6 @@ export const updateResumeConfigAtom = atom(
   ): Promise<void> => {
     const { sessionId, resumeConfig } = payload;
 
-    // Update current session atom if it matches
     const currentSession = get(currentIndexedDbSessionAtom);
     if (currentSession && currentSession.sessionId === sessionId) {
       const updatedSession: IndexedDbSessionData = {
@@ -905,7 +687,6 @@ export const updateResumeConfigAtom = atom(
       set(currentIndexedDbSessionAtom, updatedSession);
     }
 
-    // Update IndexedDB using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -925,10 +706,6 @@ export const updateResumeConfigAtom = atom(
   }
 );
 
-/**
- * Action atom for clearing IndexedDB session state
- * Called when resetting or starting a new session
- */
 export const clearIndexedDbSessionAtom = atom(null, (_get, set) => {
   set(currentIndexedDbSessionAtom, null);
 });
@@ -940,7 +717,6 @@ export const clearIndexedDbSessionAtom = atom(null, (_get, set) => {
  * 1. The staleness check reads from currentIndexedDbSessionAtom (memory) first
  * 2. Writing only to IndexedDB creates a desync where memory has stale highWaterMark
  *
- * @param payload - Session ID and new highWaterMark timestamp
  */
 export const updateHighWaterMarkAtom = atom(
   null,
@@ -957,10 +733,8 @@ export const updateHighWaterMarkAtom = atom(
     // Detect if timestamp is in seconds (10 digits) or milliseconds (13 digits)
     const timestampMs = timestamp < 10_000_000_000 ? timestamp * 1000 : timestamp;
 
-    // Update in-memory atom if it's the current session
     const currentSession = get(currentIndexedDbSessionAtom);
     if (currentSession && currentSession.sessionId === sessionId) {
-      // Only update if newer
       if (timestampMs > currentSession.highWaterMark) {
         const updatedSession: IndexedDbSessionData = {
           ...currentSession,
@@ -971,7 +745,6 @@ export const updateHighWaterMarkAtom = atom(
       }
     }
 
-    // Also update IndexedDB for persistence using jotai-minidb (client-side only)
     if (typeof window !== 'undefined') {
       try {
         const store = getSessionStore();
@@ -991,10 +764,6 @@ export const updateHighWaterMarkAtom = atom(
   }
 );
 
-// ============================================================================
-// SSE Stream Action Atoms
-// ============================================================================
-
 /**
  * Action atom for processing an incoming SSE message.
  *
@@ -1003,8 +772,6 @@ export const updateHighWaterMarkAtom = atom(
  * from Jotai state (always fresh, no stale closures) and either:
  * 1. Appends to IndexedDB if session exists
  * 2. Queues in pendingMessagesAtom if session doesn't exist yet
- *
- * @param message - The CloudMessage to process
  */
 export const processIncomingMessageAtom = atom(null, async (get, set, message: CloudMessage) => {
   if (typeof window === 'undefined') return;
@@ -1012,13 +779,10 @@ export const processIncomingMessageAtom = atom(null, async (get, set, message: C
   const sessionId = get(currentDbSessionIdAtom);
 
   if (sessionId) {
-    // Session ID is set, try to append to IndexedDB
     const store = getSessionStore();
     const currentData = get(store.item(sessionId));
 
     if (currentData) {
-      // IndexedDB entry exists, append directly
-      // Check if message already exists (by timestamp)
       const existingIndex = currentData.messages.findIndex(m => m.ts === message.ts);
 
       let updatedMessages: CloudMessage[];
@@ -1027,7 +791,6 @@ export const processIncomingMessageAtom = atom(null, async (get, set, message: C
         updatedMessages = [...currentData.messages];
         updatedMessages[existingIndex] = message;
       } else {
-        // Append new message
         updatedMessages = [...currentData.messages, message];
       }
 
@@ -1043,24 +806,13 @@ export const processIncomingMessageAtom = atom(null, async (get, set, message: C
         // Error appending to IndexedDB - message still in memory
       }
     } else {
-      // Session ID set but IndexedDB entry not ready yet - queue the message
       set(pendingMessagesAtom, prev => [...prev, message]);
     }
   } else {
-    // No session ID yet - queue the message
     set(pendingMessagesAtom, prev => [...prev, message]);
   }
 });
 
-/**
- * Action atom for appending a message to a session in IndexedDB.
- *
- * Used by useCloudAgentStream to persist SSE messages as they arrive.
- * Handles deduplication by timestamp (updates existing message if ts matches).
- *
- * @param payload - Session ID and message to append
- * @returns true if message was appended, false if session doesn't exist in IndexedDB
- */
 export const appendMessageToSessionAtom = atom(
   null,
   async (
@@ -1083,7 +835,6 @@ export const appendMessageToSessionAtom = atom(
         return false;
       }
 
-      // Check if message already exists (by timestamp)
       const existingIndex = currentData.messages.findIndex(m => m.ts === message.ts);
 
       let updatedMessages: CloudMessage[];
@@ -1092,7 +843,6 @@ export const appendMessageToSessionAtom = atom(
         updatedMessages = [...currentData.messages];
         updatedMessages[existingIndex] = message;
       } else {
-        // Append new message
         updatedMessages = [...currentData.messages, message];
       }
 
@@ -1110,13 +860,6 @@ export const appendMessageToSessionAtom = atom(
   }
 );
 
-/**
- * Action atom for updating the cloudAgentSessionId in IndexedDB.
- *
- * Used when a resumed CLI session receives its cloud-agent session ID.
- *
- * @param payload - Session ID and cloud agent session ID
- */
 export const updateCloudAgentSessionIdAtom = atom(
   null,
   async (
@@ -1136,7 +879,6 @@ export const updateCloudAgentSessionIdAtom = atom(
       const currentData = get(store.item(sessionId));
       if (!currentData) return;
 
-      // Only update if not already set
       if (!currentData.cloudAgentSessionId) {
         const updatedData: IndexedDbSessionData = {
           ...currentData,
@@ -1151,15 +893,6 @@ export const updateCloudAgentSessionIdAtom = atom(
   }
 );
 
-/**
- * Action atom for checking if a session exists in IndexedDB.
- *
- * Used by useCloudAgentStream to determine if a session_created event
- * is for a new session or a resumed CLI session.
- *
- * @param sessionId - The session ID to check
- * @returns The session data if found, null otherwise
- */
 export const getSessionFromStoreAtom = atom(null, (get, _set, sessionId: string) => {
   if (typeof window === 'undefined') return null;
 
@@ -1171,13 +904,6 @@ export const getSessionFromStoreAtom = atom(null, (get, _set, sessionId: string)
   }
 });
 
-/**
- * Action atom for deleting a session from IndexedDB.
- *
- * Used when deleting sessions from the UI.
- *
- * @param sessionId - The session ID to delete
- */
 export const deleteSessionFromStoreAtom = atom(
   null,
   async (_get, set, sessionId: string): Promise<void> => {
@@ -1191,13 +917,6 @@ export const deleteSessionFromStoreAtom = atom(
     }
   }
 );
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
-
-// Note: extractRepoFromGitUrl has been moved to utils/git-utils.ts
-// and is re-exported at the top of this file for backwards compatibility
 
 /**
  * Convert database message format to CloudMessage format
@@ -1242,17 +961,14 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
 
   return dbMessages
     .map((msg): CloudMessage | null => {
-      // Get timestamp
       const ts = msg.ts as number | undefined;
       const timestampStr = msg.timestamp as string | undefined;
       const timestamp = ts || (timestampStr ? new Date(timestampStr).getTime() : Date.now());
 
-      // Get message content
       const text = (msg.text as string) || (msg.content as string) || '';
       const content = (msg.content as string) || (msg.text as string) || '';
       const say = msg.say as string | undefined;
       const ask = msg.ask as string | undefined;
-      // Preserve the partial value from DB (default to false if not present)
       const partial = (msg.partial as boolean | undefined) ?? false;
       const rawMetadata = msg.metadata;
       const parsedStringMetadata =
@@ -1268,22 +984,18 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
         metadata = parseTextMetadata(rawText);
       }
 
-      // Determine message type from various formats
       const rawType = msg.type as string | undefined;
       const rawRole = msg.role as string | undefined;
 
       let messageType: 'user' | 'assistant' | 'system';
 
-      // Handle CLI extension format (type: 'say' | 'ask')
       if (rawType === 'say') {
-        // CLI 'say' messages - check the say field for user_feedback
         if (say === 'user_feedback') {
           messageType = 'user';
         } else {
           messageType = 'assistant';
         }
       } else if (rawType === 'ask') {
-        // CLI 'ask' messages - these are assistant messages asking for input
         messageType = 'assistant';
       } else if (rawType === 'user' || rawRole === 'user') {
         messageType = 'user';
@@ -1292,7 +1004,6 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
       } else if (rawType === 'system' || rawRole === 'system') {
         messageType = 'system';
       } else {
-        // Default to assistant for unknown types
         messageType = 'assistant';
       }
 
@@ -1310,12 +1021,6 @@ export function convertToCloudMessages(dbMessages: Array<Record<string, unknown>
     .filter((msg): msg is CloudMessage => msg !== null);
 }
 
-/**
- * Format a date for display in the session list
- *
- * @param date - Date to format
- * @returns Formatted string like "2 hours ago" or "Dec 5"
- */
 export function formatSessionDate(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   const now = new Date();
@@ -1333,38 +1038,22 @@ export function formatSessionDate(date: Date | string): string {
 }
 
 /**
- * Get a display title for a session
- *
  * Note: Visual truncation should be handled via CSS (e.g., `truncate` class)
  * rather than JavaScript string manipulation for responsive behavior.
- *
- * @param session - The session to get a title for
- * @returns A display-friendly title
  */
 export function getSessionDisplayTitle(session: DbSession): string {
   if (session.title) {
     return session.title;
   }
 
-  // Fall back to repository name
   const repo = extractRepoFromGitUrl(session.git_url);
   if (repo) return repo;
 
-  // Last resort: use session ID prefix
   return `Session ${session.session_id.substring(0, 8)}`;
 }
 
-// ============================================================================
-// IndexedDB Cleanup
-// ============================================================================
-
-/** Default max age for IndexedDB sessions: 60 minutes */
 const DEFAULT_MAX_AGE_MS = 60 * 60 * 1000;
 
-/**
- * Derived atom that reads all entries from the IndexedDB session store.
- * Used by the cleanup atom to find old sessions.
- */
 export const indexedDbEntriesAtom = atom(get => {
   if (typeof window === 'undefined') {
     return [] as [string, IndexedDbSessionData][];
@@ -1373,17 +1062,6 @@ export const indexedDbEntriesAtom = atom(get => {
   return get(store.entries);
 });
 
-/**
- * Action atom for cleaning up old sessions from IndexedDB.
- *
- * Deletes sessions where updatedAt is older than the specified max age.
- * Excludes the current active session from cleanup.
- *
- * Uses jotai-minidb's entries and delete atoms for reactive cleanup.
- *
- * @param maxAgeMs - Maximum age in milliseconds (default: 60 minutes)
- * @returns Number of sessions deleted
- */
 export const cleanupOldSessionsAtom = atom(
   null,
   async (get, set, maxAgeMs: number = DEFAULT_MAX_AGE_MS): Promise<number> => {
@@ -1399,11 +1077,9 @@ export const cleanupOldSessionsAtom = atom(
       const store = getSessionStore();
       const entries = get(store.entries);
 
-      // Find sessions to delete
       const sessionsToDelete: string[] = [];
 
       for (const [sessionId, session] of entries) {
-        // Skip the current active session
         if (sessionId === currentSessionId) {
           continue;
         }
@@ -1415,7 +1091,6 @@ export const cleanupOldSessionsAtom = atom(
         }
       }
 
-      // Delete old sessions using jotai-minidb's delete atom
       for (const sessionId of sessionsToDelete) {
         try {
           await set(store.delete, sessionId);

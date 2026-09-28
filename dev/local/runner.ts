@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
-import { getService, getInfraProfile, getAllInfraProfiles } from './services';
+import { getService, getInfraProfile, getAllInfraProfiles, serviceCommand } from './services';
 import {
   createWindow,
   sendKeys,
@@ -87,20 +87,21 @@ export async function waitForPort(port: number, name: string, maxWaitMs: number)
 // Command building
 // ---------------------------------------------------------------------------
 
-export function buildStartCommand(serviceName: string): string {
+export function buildStartCommand(serviceName: string, serviceNames?: readonly string[]): string {
   const svc = getService(serviceName);
+  const command = serviceNames ? serviceCommand(serviceName, serviceNames) : svc.command;
 
   // Use pnpm --filter instead of cd to avoid cwd issues on restart —
   // after ctrl-c the shell stays in the service dir, so a relative cd
   // would try to descend into <dir>/<dir> which doesn't exist.
-  if (svc.dir !== '.' && svc.command[0] === 'pnpm') {
-    const [, ...rest] = svc.command;
+  if (svc.dir !== '.' && command[0] === 'pnpm') {
+    const [, ...rest] = command;
     return `pnpm --filter {./${svc.dir}} ${rest.join(' ')}`;
   }
 
   const parts: string[] = [];
   if (svc.dir !== '.') parts.push(`cd ${shellQuote(path.join(findRepoRoot(), svc.dir))}`);
-  parts.push(svc.command.join(' '));
+  parts.push(command.join(' '));
 
   return parts.join(' && ');
 }
@@ -112,11 +113,14 @@ export function buildStartCommand(serviceName: string): string {
 export function startServiceInTmux(
   sessionName: string,
   serviceName: string,
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  serviceNames?: readonly string[]
 ): void {
   const svc = getService(serviceName);
   const startupCommand =
-    svc.type === 'infra' ? buildInfraLogCommand(serviceName) : buildStartCommand(serviceName);
+    svc.type === 'infra'
+      ? buildInfraLogCommand(serviceName)
+      : buildStartCommand(serviceName, serviceNames);
   const winIndex = createWindow(sessionName, serviceName, env, startupCommand);
   setPaneServiceIdentity(sessionName, winIndex, 0, serviceName);
   const logPath = path.join(findRepoRoot(), 'dev', 'logs', `${serviceName}.log`);
@@ -395,11 +399,12 @@ const inFlightRestarts = new Map<string, () => void>();
 export function restartServiceInTmux(
   sessionName: string,
   serviceName: string,
-  env?: Record<string, string>
+  env?: Record<string, string>,
+  serviceNames?: readonly string[]
 ): Promise<RestartOutcome> {
   const svc = getService(serviceName);
   if (svc.type === 'infra') return Promise.resolve('not-running');
-  const cmd = buildStartCommand(serviceName);
+  const cmd = buildStartCommand(serviceName, serviceNames);
   // Find the service wherever it lives (own window or joined into window 0).
   // Bail before touching the in-flight map: if the pane is already gone, a
   // previous restart's poll may be mid-recreate and must not be cancelled.
@@ -441,7 +446,7 @@ export function restartServiceInTmux(
         // window instead of leaving the service stopped after reporting
         // "Restarted"; the new window inherits the tmux session environment.
         try {
-          startServiceInTmux(sessionName, serviceName, env);
+          startServiceInTmux(sessionName, serviceName, env, serviceNames);
           settle('recreated');
         } catch {
           // Same policy as below: keep the TUI alive; the next explicit

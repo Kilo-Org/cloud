@@ -1,7 +1,7 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the mounted settings states share one native test fixture. */
+/* eslint-disable max-lines -- the mounted settings states share one native test fixture. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
-import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
+import { act, type ReactTestInstance, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -231,8 +231,8 @@ describe.each([
       failures.clear();
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
-      expect(host(root, 'CenteredState')).toHaveLength(isEnabled ? 0 : 1);
-      expect(host(root, 'TabScreenScrollView')).toHaveLength(isEnabled ? 1 : 0);
+      expect(host(root, 'CenteredState')).toHaveLength(0);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(1);
       expect(active.every(query => query.state.status === 'success')).toBe(true);
       expect(onlineManager.isOnline()).toBe(false);
     }
@@ -310,4 +310,25 @@ describe.each([
     expect(host(root, 'Switch')).toHaveLength(0);
     expect(texts(root)).not.toContain(denialCopy);
   });
+
+  // The settings card is a control surface, not an empty state: it must scroll
+  // from the top like the Account settings list, not float in the middle of the
+  // screen (explorer security-agent-settings, 2026-09-20). CenteredState is the
+  // component that vertically centres a fitting body, so its absence is the
+  // proof the void above the card is gone.
+  it.each(['personal', 'org_123'])(
+    'top-aligns the disabled settings body instead of centring it (%s)',
+    async scope => {
+      configData.isEnabled = false;
+      configData.repositorySelectionMode = 'selected';
+      configData.selectedRepositoryIds = [];
+      const root = await mount(scope);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(1);
+      expect(host(root, 'CenteredState')).toHaveLength(0);
+      expect(host(root, 'Switch')[0]?.props.value).toBe(false);
+      expect(
+        host(root, 'ConfigureRow').some(node => node.props.title === 'Select repositories')
+      ).toBe(true);
+    }
+  );
 });

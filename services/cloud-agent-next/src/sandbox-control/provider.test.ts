@@ -17,6 +17,12 @@ describe('memory provider adapter', () => {
     expect(createMemoryProviderAdapter({ resumable: true }).resumable).toBe(true);
   });
 
+  it('declares the workspace and stop-effect capabilities', () => {
+    const provider = createMemoryProviderAdapter();
+    expect(provider.persistentWorkspace).toBe(false);
+    expect(provider.destroysOnStop).toBe(false);
+  });
+
   it('observe never returns a boolean', async () => {
     const provider = createMemoryProviderAdapter();
     const created = await provider.create({ intentId: 'a', createdAt: 1_000 });

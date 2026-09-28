@@ -33,7 +33,7 @@ const toPersistedToolResult = (
 ): ToolResultEvent => {
   if (
     event.ok &&
-    toolCall?.name === 'get_viewport_screenshot' &&
+    toolCall?.name === 'kilo_browser_take_screenshot' &&
     isViewportScreenshotValue(event.value)
   ) {
     return {

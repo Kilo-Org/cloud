@@ -7,6 +7,7 @@ import {
   clonePart,
   createReadonlyPartView,
   createSeedTextPart,
+  forgetPartUpdateTime,
   insertPartSorted,
   insertSorted,
   isSupportedDeltaField,
@@ -20,6 +21,9 @@ function createMemoryStorage(): SessionStorage {
 
   const parts = new Map<string, Part[]>();
   const partsSnapshot = new Map<string, Part[] | null>();
+  // Ordering evidence of the last accepted update per part, owned next to the
+  // parts it describes (see `upsertPartDroppingStaleSyntheticParts`).
+  const partEvidence = new Map<string, number>();
 
   const subscribers = new Map<string, Set<() => void>>();
 
@@ -43,9 +47,12 @@ function createMemoryStorage(): SessionStorage {
       return messages.get(messageId);
     },
 
-    upsertPart(messageId, part) {
+    upsertPart(messageId, part, eventTime) {
       const arr = parts.get(messageId) ?? [];
-      parts.set(messageId, upsertPartDroppingStaleSyntheticParts(arr, part));
+      parts.set(
+        messageId,
+        upsertPartDroppingStaleSyntheticParts(arr, part, eventTime, partEvidence)
+      );
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
     },
@@ -90,6 +97,7 @@ function createMemoryStorage(): SessionStorage {
       if (!arr) return;
       const filtered = arr.filter(p => p.id !== partId);
       parts.set(messageId, filtered);
+      forgetPartUpdateTime(partEvidence, messageId, partId);
       partsSnapshot.set(messageId, null);
       notify(subscribers, `parts:${messageId}`);
     },
@@ -127,6 +135,7 @@ function createMemoryStorage(): SessionStorage {
       messageIds = [];
       parts.clear();
       partsSnapshot.clear();
+      partEvidence.clear();
 
       for (const messageId of existingMessageIds) {
         notify(subscribers, `message:${messageId}`);
@@ -144,6 +153,9 @@ function createMemoryStorage(): SessionStorage {
       messageIds = messageIds.filter(id => id !== messageId);
 
       if (parts.has(messageId)) {
+        for (const part of parts.get(messageId) ?? []) {
+          forgetPartUpdateTime(partEvidence, messageId, part.id);
+        }
         parts.delete(messageId);
         partsSnapshot.delete(messageId);
         notify(subscribers, `parts:${messageId}`);

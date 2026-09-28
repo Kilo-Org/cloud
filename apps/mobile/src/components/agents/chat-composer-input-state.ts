@@ -4,6 +4,14 @@ type ChatComposerControlInput = {
   sendableAttachmentsCount: number;
   attachmentMax: number;
   disabled: boolean;
+  /**
+   * Session-level send gate: the active session cannot accept a message right
+   * now (a failed turn, a dropped remote owner, an unresolved open). It gates
+   * sending and the rest of the toolbar, but never the text input — the reader
+   * must be able to type the next message beside the error's Retry. Absent
+   * means the session can send.
+   */
+  sendDisabled?: boolean;
   hasText: boolean;
   isFocused: boolean;
   isSending: boolean;
@@ -42,7 +50,9 @@ type ChatComposerControlState = {
  * the input editable so dictation can insert at the caret (a user edit during
  * dictation aborts the session in the selection-aware draft path). A
  * terminally failed attachment chip gates send (`hasFailedAttachments`), so a
- * failed upload renders Send disabled instead of toasting on press.
+ * failed upload renders Send disabled instead of toasting on press. A session
+ * that cannot send (`sendDisabled`) still leaves the input editable: the reader
+ * types the next message while Retry sits beside it.
  */
 export function resolveChatComposerControlState(
   input: ChatComposerControlInput
@@ -52,6 +62,7 @@ export function resolveChatComposerControlState(
     sendableAttachmentsCount,
     attachmentMax,
     disabled,
+    sendDisabled = false,
     hasText,
     isFocused,
     isSending,
@@ -65,17 +76,22 @@ export function resolveChatComposerControlState(
   // parent, and `disabled` cover every other lock (read-only, missing model,
   // blocking interaction, interrupt-in-flight); `isUploading` covers the
   // upload-in-progress lock.
-  const toolbarDisabled = disabled || isSending;
+  // `sendDisabled` is the session's live send capability: it collapses the
+  // toolbar and send like `disabled` did, but leaves the input editable, so a
+  // failed turn cannot take the composer away from the reader.
+  const sendGated = disabled || sendDisabled;
+  const toolbarDisabled = sendGated || isSending;
   const voiceDisabled = toolbarDisabled;
   const paperclipDisabled =
     toolbarDisabled || voiceInputActive || attachmentsCount >= attachmentMax;
   // Voice activity no longer makes the input read-only: dictation inserts at
   // the caret, so the user can keep editing (an edit aborts the session).
-  const inputEditable = !toolbarDisabled;
+  const inputEditable = !(disabled || isSending);
   const showToolbar = isFocused || hasText || attachmentsCount > 0 || voiceInputActive;
   const hasSendableContent = hasText || sendableAttachmentsCount > 0;
   return {
-    canSend: hasSendableContent && !disabled && !isSending && !isUploading && !hasFailedAttachments,
+    canSend:
+      hasSendableContent && !sendGated && !isSending && !isUploading && !hasFailedAttachments,
     hasSendableContent,
     inputAccessibilityDisabled: !inputEditable,
     inputEditable,

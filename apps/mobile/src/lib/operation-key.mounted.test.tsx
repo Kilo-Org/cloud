@@ -1,10 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 // Mounted tests for `useHoistedOperationKey` (P1-A-08c): one stable key per
 // unchanged intent fingerprint, rotated when the fingerprint changes or when
 // `rotateKey()` ends the intent.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { expect, test, vi } from 'vitest';
 
 import { useHoistedOperationKey } from './operation-key';

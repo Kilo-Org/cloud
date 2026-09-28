@@ -24,13 +24,14 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { Platform, Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { NavigatorFileRow } from '@/components/pr-review/diff/pr-diff-navigator-file-row';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -43,6 +44,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
@@ -108,7 +110,11 @@ export function PrDiffFileNavigator({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The viewed set is keyed by the live provider ref (s6, identity rule 17),
+  // so the sheet toggling a file here and the diff list behind it read and
+  // write the SAME provider-scoped set — and never a same-numbered PR's.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
 
   const hasActiveSearch = searchRef.current.trim().length > 0;
@@ -331,7 +337,7 @@ export function PrDiffFileNavigator({
         {header}
         <View className="mx-4 mt-2 flex-row items-center gap-2 rounded-md border border-border bg-card px-3 py-2">
           <Search size={16} color={colors.mutedForeground} />
-          <TextInput
+          <Input
             ref={inputRef}
             defaultValue=""
             editable={!query.isLoading || files.length > 0}
@@ -342,7 +348,9 @@ export function PrDiffFileNavigator({
               searchRef.current = value;
               setSearchVersion(version => version + 1);
             }}
-            className="flex-1 text-sm leading-[normal] text-foreground"
+            // The shared single-line box supplies the height floor and the one
+            // line box; this field keeps only its own size and text size.
+            className="flex-1 text-sm text-foreground"
             returnKeyType="search"
             autoCorrect={false}
             autoCapitalize="none"

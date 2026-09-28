@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
+import { Modal, Platform, Pressable, type TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withUiDeadline } from '@/lib/ui-deadline';
@@ -17,6 +18,13 @@ type RenameModalProps<TSaveResult> = {
   onSave: (name: string) => Promise<TSaveResult>;
   onClose: () => void;
   maxLength?: number;
+  /**
+   * Render the field as a wrapping multi-line box. Goal text is prose that can
+   * hold a long unbroken line: a single-line field scrolls horizontally and
+   * clips the start of the value, so that caller opts in here. Rename dialogs
+   * keep the single-line field.
+   */
+  multiline?: boolean;
 };
 
 // Mount this component only while the modal should be open (e.g. `{visible && <RenameModal ... />}`)
@@ -28,6 +36,7 @@ export function RenameModal<TSaveResult>({
   onSave,
   onClose,
   maxLength = 50,
+  multiline = false,
 }: Readonly<RenameModalProps<TSaveResult>>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -100,20 +109,25 @@ export function RenameModal<TSaveResult>({
           }}
         >
           <Text className="text-base font-semibold">{title}</Text>
-          <TextInput
+          <Input
             ref={inputRef}
             accessible
             accessibilityLabel={placeholder}
-            // leading-[normal] (not leading-5) so no lineHeight reaches the style: a
-            // lineHeight above the font's natural one makes iOS draw the placeholder
-            // lower than the typed text and clip its bottom.
+            // Single-line: leading-[normal] (not leading-5) so no lineHeight reaches
+            // the style: a lineHeight above the font's natural one makes iOS draw the
+            // placeholder lower than the typed text and clip its bottom.
+            // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
+            // value soft-wraps into the field and scrolls vertically past the cap.
             className={cn(
-              'rounded-md border border-input bg-background px-3 py-2.5 text-sm leading-[normal] text-foreground',
+              'rounded-md border border-input bg-background px-3 text-sm text-foreground',
+              multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
               pending && 'opacity-50'
             )}
             placeholder={placeholder}
             placeholderTextColor={colors.mutedForeground}
             defaultValue={initialValue}
+            multiline={multiline}
+            textAlignVertical={multiline ? 'top' : undefined}
             onChangeText={val => {
               nameRef.current = val;
               const trimmed = val.trim();

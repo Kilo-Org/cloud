@@ -1,6 +1,7 @@
 import {
   heartbeatIdempotencyKey,
   heartbeatAckSchema,
+  nonRetryableSkuAdmissionCodes,
   recordAckSchema,
   recordStartResultSchema,
   startIdempotencyKey,
@@ -64,6 +65,22 @@ export class ContainerUsageAdmissionError extends Error {
 
 function delay(milliseconds: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
+}
+
+/**
+ * True only for an admission rejection that cannot succeed on retry until SKU
+ * configuration changes. Budget admission (`insufficient_credits`) is excluded
+ * at the type level.
+ */
+export function isNonRetryableSkuAdmissionError(
+  error: unknown
+): error is ContainerUsageAdmissionError & {
+  code: (typeof nonRetryableSkuAdmissionCodes)[number];
+} {
+  return (
+    error instanceof ContainerUsageAdmissionError &&
+    (nonRetryableSkuAdmissionCodes as readonly string[]).includes(error.code)
+  );
 }
 
 export class ContainerUsageClient {

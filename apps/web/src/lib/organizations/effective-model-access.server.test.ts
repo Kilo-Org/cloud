@@ -5,6 +5,7 @@ import {
   getEffectiveModelDecision,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { VIRTUAL_PROVIDER } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -376,10 +377,10 @@ describe('effective organization model access', () => {
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'openai']);
+    const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     expect(
-      await getEffectiveModelDecision(policy, 'openai/gpt-5.6-sol-discounted', catalogLookup)
+      await getEffectiveModelDecision(policy, 'stepfun/step-3.7-flash:free', catalogLookup)
     ).toEqual({ allowed: false, denialSource: 'organization_provider' });
   });
 
@@ -388,19 +389,19 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai', 'fireworks'], model_deny_list: [] },
+          settings: { provider_allow_list: ['stepfun', 'fireworks'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       async () => new Set(['fireworks'])
     );
 
     expect(decision.allowed).toBe(true);
-    expect([...decision.eligibleProviderRoutes!]).toEqual(['openai']);
+    expect([...decision.eligibleProviderRoutes!]).toEqual(['stepfun']);
   });
 
   it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
@@ -413,16 +414,16 @@ describe('effective organization model access', () => {
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
     );
-    const catalogLookup = async () => new Set(['fireworks', 'openai']);
+    const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol',
+      'stepfun/step-3.7-flash',
       catalogLookup
     );
 
@@ -436,7 +437,7 @@ describe('effective organization model access', () => {
       context({
         organization: {
           ...context().organization,
-          settings: { provider_allow_list: ['openai'], model_deny_list: [] },
+          settings: { provider_allow_list: ['stepfun'], model_deny_list: [] },
         },
         defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
       })
@@ -445,13 +446,92 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'openai/gpt-5.6-sol-discounted',
+      'stepfun/step-3.7-flash:free',
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);
 
     expect(restricted.allowed).toBe(true);
-    expect([...restricted.eligibleProviderRoutes!]).toEqual(['openai']);
+    expect([...restricted.eligibleProviderRoutes!]).toEqual(['stepfun']);
     expect(unrestricted).toEqual({ allowed: false, denialSource: 'organization_model' });
+  });
+
+  describe('virtual routers', () => {
+    const ROUTER = 'openrouter/auto';
+    const routerLookup = async (modelId: string) =>
+      new Set(modelId === ROUTER ? [VIRTUAL_PROVIDER.slug] : ['anthropic']);
+
+    function baselinePolicy(providerAllowList: string[]) {
+      return evaluateEffectiveModelAccessPolicy(
+        context({
+          organization: {
+            ...context().organization,
+            settings: { provider_allow_list: providerAllowList, model_deny_list: [] },
+          },
+          defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+        })
+      );
+    }
+
+    it('routes through the real providers the organization allows', async () => {
+      const decision = await getEffectiveModelDecision(
+        baselinePolicy(['anthropic', VIRTUAL_PROVIDER.slug, 'openai']),
+        ROUTER,
+        routerLookup
+      );
+
+      expect(decision).toEqual({
+        allowed: true,
+        eligibleProviderRoutes: new Set([VIRTUAL_PROVIDER.slug, 'anthropic', 'openai']),
+      });
+    });
+
+    it('denies routers when the virtual provider is not allowed', async () => {
+      await expect(
+        getEffectiveModelDecision(baselinePolicy(['anthropic', 'openai']), ROUTER, routerLookup)
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+
+    it('denies routers when no real provider is allowed', async () => {
+      await expect(
+        getEffectiveModelDecision(baselinePolicy([VIRTUAL_PROVIDER.slug]), ROUTER, routerLookup)
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+
+    it('routes member provider grants through the granted real providers', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({
+          groupPolicies: [
+            [
+              {
+                type: 'model_access',
+                data: {
+                  mode: 'selected',
+                  model_allow_list: [],
+                  provider_allow_list: [VIRTUAL_PROVIDER.slug, 'google'],
+                },
+              },
+            ],
+          ],
+        })
+      );
+
+      const decision = await getEffectiveModelDecision(policy, ROUTER, routerLookup);
+
+      expect(decision).toEqual({
+        allowed: true,
+        eligibleProviderRoutes: new Set([VIRTUAL_PROVIDER.slug, 'google']),
+      });
+    });
+
+    it('does not widen routes for models served by real providers', async () => {
+      const decision = await getEffectiveModelDecision(
+        baselinePolicy(['anthropic', VIRTUAL_PROVIDER.slug, 'openai']),
+        'anthropic/claude',
+        routerLookup
+      );
+
+      expect(decision).toEqual({ allowed: true, eligibleProviderRoutes: new Set(['anthropic']) });
+    });
   });
 });

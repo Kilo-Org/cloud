@@ -42,6 +42,7 @@ const GitHubSessionCapabilityClaimsBaseSchema = z.object({
   userId: z.string().min(1),
   orgId: z.string().uuid().optional(),
   integrationId: z.string().uuid().optional(),
+  accessPurpose: z.enum(['workflow', 'agent']).optional(),
   owner: GitHubPathPartSchema,
   repo: GitHubPathPartSchema,
   source: z.enum(['user', 'installation']),
@@ -74,6 +75,7 @@ export type GitHubSessionCapabilitySubject = {
   outboundContainerId?: string;
   orgId?: string;
   integrationId?: string;
+  accessPurpose?: 'workflow' | 'agent';
   owner: string;
   repo: string;
   source: GitHubAuthSource;

@@ -73,7 +73,6 @@ export async function handleCreateRig(c: Context<GastownEnv>, params: { userId: 
   const rig = await townDO.createRig(parsed.data);
   console.log(`${TOWNS_LOG} handleCreateRig: rig created id=${rig.id}, now configuring Rig DO`);
 
-  // Configure the Town DO with rig metadata and register the rig.
   // If this fails, roll back the rig creation to avoid an orphaned record.
   try {
     const townDOStub = getTownDOStub(c.env, parsed.data.town_id);
@@ -156,7 +155,6 @@ export async function handleDeleteRig(
   const deleted = await userDO.deleteRig(params.rigId);
   if (!deleted) return c.json(resError('Rig not found'), 404);
 
-  // Remove the rig from the Town DO
   try {
     const townDOStub = getTownDOStub(c.env, rig.town_id);
     await townDOStub.removeRig(params.rigId);

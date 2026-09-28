@@ -2,7 +2,7 @@ import {
   OpenRouterInferenceProviderIdSchema,
   type OpenRouterInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { ProviderId } from '@/lib/ai-gateway/providers/types';
+import type { Provider } from '@/lib/ai-gateway/providers/types';
 import {
   isOpenRouterProviderConfig,
   type GatewayRequest,
@@ -80,7 +80,7 @@ export type KiloExclusiveModel = {
   max_completion_tokens: number;
   status: 'public' | 'hidden' | 'disabled';
   flags: KiloExclusiveModelFlag[];
-  gateway: ProviderId;
+  provider: Provider;
   internal_id: string;
   pricing: KiloExclusivePricing | null;
   /**
@@ -202,9 +202,9 @@ export function getInferenceProvider(model: KiloExclusiveModel): InferenceProvid
   const slug: OpenRouterInferenceProviderId | null =
     model.inference_provider_restriction.length === 1
       ? model.inference_provider_restriction[0]
-      : model.gateway === 'openrouter' || model.gateway === 'vercel'
+      : model.provider.id === 'openrouter' || model.provider.id === 'vercel'
         ? null
-        : OpenRouterInferenceProviderIdSchema.parse(model.gateway);
+        : OpenRouterInferenceProviderIdSchema.parse(model.provider.id);
   if (!slug) return null;
 
   return {

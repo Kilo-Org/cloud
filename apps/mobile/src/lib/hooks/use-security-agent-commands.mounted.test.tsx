@@ -1,5 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
-
 // P1-G-51b mounted wiring tests for `useSecurityAgentCommands`: both batch
 // query shapes stay mounted unconditionally with `enabled` gating, the batch
 // carries the first 100 ids with the overflow going to per-command queries,
@@ -7,7 +5,7 @@
 // old-server fallback engages only on the procedure-missing signature.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {

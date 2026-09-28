@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   VercelSandboxRestError,
   type VercelSandboxCreateEnvelope,
+  type VercelSandboxSession,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { parseSandboxBillingInput } from '../container-usage-context.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { deriveSandboxAllocationId } from '../sandbox-id.js';
 import {
+  classifyVercelSessionStatus,
   createVercelProviderAdapter,
   decodeVercelProviderRef,
   encodeVercelProviderRef,
@@ -91,6 +93,22 @@ function fakeClient(overrides: Partial<VercelControlRestClient> = {}): VercelCon
 }
 
 describe('vercel provider adapter', () => {
+  it('declares a persistent workspace with a non-destroying stop', () => {
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient(),
+    });
+    expect(provider.persistentWorkspace).toBe(true);
+    expect(provider.destroysOnStop).toBe(false);
+  });
+
+  it('keeps the capabilities when the runtime configuration is unavailable', () => {
+    const provider = createVercelProviderAdapter({ sandboxName: intent.allocationName });
+    expect(provider.persistentWorkspace).toBe(true);
+    expect(provider.destroysOnStop).toBe(false);
+  });
+
   it('returns the allocated ref before wrapper launch and preserves logical control routing', async () => {
     const executeCommand = vi.fn().mockResolvedValue({});
     const createSandbox = vi.fn(fakeClient().createSandbox);
@@ -122,6 +140,84 @@ describe('vercel provider adapter', () => {
       },
     });
   });
+
+  it('classifies every session status into the shared alive/terminal sets', () => {
+    expect(classifyVercelSessionStatus('pending')).toBe('active');
+    expect(classifyVercelSessionStatus('running')).toBe('active');
+    expect(classifyVercelSessionStatus('snapshotting')).toBe('active');
+    expect(classifyVercelSessionStatus('stopping')).toBe('active');
+    expect(classifyVercelSessionStatus('stopped')).toBe('terminal');
+    expect(classifyVercelSessionStatus('failed')).toBe('terminal');
+    expect(classifyVercelSessionStatus('aborted')).toBe('terminal');
+    expect(classifyVercelSessionStatus('future-status' as VercelSandboxSession['status'])).toBe(
+      'unknown'
+    );
+  });
+
+  it('writes the create-response createdAt to the billing lifetime sink before returning', async () => {
+    const seen: Array<{ providerRef: string; createdAtMs?: number; terminalAtMs?: number }> = [];
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient(),
+      billingLifetimeSink: async evidence => {
+        seen.push(evidence);
+      },
+    });
+
+    await expect(provider.create(intent)).resolves.toEqual({ providerRef: ref });
+    expect(seen).toEqual([{ providerRef: ref, createdAtMs: runningSession.createdAt }]);
+  });
+
+  it('writes the terminal timestamp from observe and stop to the billing lifetime sink', async () => {
+    const seen: Array<{ providerRef: string; createdAtMs?: number; terminalAtMs?: number }> = [];
+    const provider = createVercelProviderAdapter({
+      sandboxName: intent.allocationName,
+      config,
+      restClient: fakeClient({
+        getSession: async () => ({
+          session: { ...runningSession, status: 'stopped' as const, stoppedAt: 9_000 },
+          routes: [],
+        }),
+        stopSession: async () => ({
+          ...runningSession,
+          status: 'aborted' as const,
+          abortedAt: 8_000,
+        }),
+      }),
+      billingLifetimeSink: async evidence => {
+        seen.push(evidence);
+      },
+    });
+
+    await expect(provider.observe(ref)).resolves.toEqual({ status: 'terminal' });
+    await expect(provider.stop(ref)).resolves.toBe('terminal');
+    expect(seen).toEqual([
+      { providerRef: ref, createdAtMs: runningSession.createdAt, terminalAtMs: 9_000 },
+      { providerRef: ref, createdAtMs: runningSession.createdAt, terminalAtMs: 8_000 },
+    ]);
+  });
+
+  it.each([
+    { vcpus: 2, memory: 4096 },
+    { vcpus: 4, memory: 8192 },
+  ] as const)(
+    'propagates $vcpus vCPU resources for creation and uncertain-create inspection',
+    async resources => {
+      const createSandbox = vi.fn().mockRejectedValue(new Error('response lost'));
+      const inspectByName = vi.fn(fakeClient().inspectByName);
+      const provider = createVercelProviderAdapter({
+        sandboxName: intent.allocationName,
+        config: { ...config, resources },
+        restClient: fakeClient({ createSandbox, inspectByName }),
+      });
+      await expect(provider.create(intent)).rejects.toThrow('response lost');
+      await expect(provider.observe(null, intent)).resolves.toMatchObject({ status: 'active' });
+      expect(createSandbox).toHaveBeenCalledWith(expect.objectContaining({ resources }));
+      expect(inspectByName).toHaveBeenCalledWith(expect.objectContaining({ resources }));
+      expect(createSandbox).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('installs the creation policy before launching the control wrapper', async () => {
     const createSandbox = vi.fn(fakeClient().createSandbox);
@@ -157,8 +253,8 @@ describe('vercel provider adapter', () => {
     expect(executeCommand).not.toHaveBeenCalled();
   });
 
-  it('rejects enforced billing before allocating a Vercel sandbox', async () => {
-    const createSandbox = vi.fn();
+  it('does not admit billing inside create; the allocated re-check still rejects', async () => {
+    const createSandbox = vi.fn(fakeClient().createSandbox);
     const provider = createVercelProviderAdapter({
       sandboxName: intent.allocationName,
       config,
@@ -170,10 +266,11 @@ describe('vercel provider adapter', () => {
       actor: { type: 'user', id: 'owner_1' },
       enforcementRequested: true,
     });
-    await expect(provider.create({ ...intent, billing })).rejects.toThrow(
+    await expect(provider.create({ ...intent, billing })).resolves.toEqual({ providerRef: ref });
+    expect(createSandbox).toHaveBeenCalledTimes(1);
+    await expect(provider.ensureBillingAdmission(ref, billing)).rejects.toThrow(
       'billing admission is unavailable for Vercel'
     );
-    expect(createSandbox).not.toHaveBeenCalled();
   });
 
   it('creates a fresh named resource after stop even when the provider retains old names', async () => {

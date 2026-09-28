@@ -1,7 +1,7 @@
 import 'server-only';
 import { type db } from '@/lib/drizzle';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   getModelUserByokProviders,
   getOrganizationByokProviderIds,
@@ -24,7 +24,7 @@ export type BalanceCheckModelEligibility = {
  *   configured that can serve it, so the session is billed against the
  *   user's own key rather than their balance.
  *
- * Kilo-exclusive models (e.g. `openai/gpt-5.6-sol-discounted`) are
+ * Kilo-exclusive models (e.g. `stealth/qwen3.6-plus`) are
  * always excluded from the BYOK bypass: they are Kilo-funded and platform
  * billed, so even when `getModelUserByokProviders` reports a provider that
  * can route the model, they must still go through the worker-side balance
@@ -42,7 +42,7 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   modelId: string;
   organizationId?: string;
 }): Promise<BalanceCheckModelEligibility> {
-  const isFree = await isFreeModel(params.modelId);
+  const isFree = isFreeModel(params.modelId);
   if (isFree) {
     return { isFree: true, hasUserByokAvailable: false };
   }

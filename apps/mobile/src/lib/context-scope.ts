@@ -5,12 +5,23 @@ export type AuthenticatedOwner = Readonly<{
   authEpoch: number;
   generation: number;
   userId: string | null;
+  /**
+   * True only when the active credentials were read back from storage on this
+   * process's bootstrap (a cold start), and false once `beginAuthenticatedOwner`
+   * revokes ownership for a sign-in or sign-out. The persisted identity hint
+   * may scope local data only for a restored session: during a credential
+   * switch the hint still names the previous account, so a fresh sign-in's
+   * credentials must be confirmed by `user.getMe` before any account-scoped
+   * read (offline cached transcript, translations) may use the hint.
+   */
+  restored: boolean;
 }>;
 
 let owner: AuthenticatedOwner = Object.freeze({
   authEpoch: currentAuthEpoch(),
   generation: 0,
   userId: null,
+  restored: false,
 });
 const listeners = new Set<() => void>();
 
@@ -35,7 +46,22 @@ function publish(next: AuthenticatedOwner): AuthenticatedOwner {
 
 /** Revoke ownership before changing credentials. Ordinary refresh does not call this. */
 export function beginAuthenticatedOwner(): AuthenticatedOwner {
-  return publish({ authEpoch: currentAuthEpoch(), generation: owner.generation + 1, userId: null });
+  return publish({
+    authEpoch: currentAuthEpoch(),
+    generation: owner.generation + 1,
+    userId: null,
+    restored: false,
+  });
+}
+
+/**
+ * Marks the active credentials as restored from storage on bootstrap: the one
+ * state in which the persisted identity hint may scope local data while the
+ * live owner is still unconfirmed. A fresh `signIn` calls
+ * {@link beginAuthenticatedOwner}, which clears this again.
+ */
+export function markRestoredAuthenticatedOwner(): AuthenticatedOwner {
+  return publish({ ...owner, restored: true });
 }
 
 export function isCurrentOwner(captured: AuthenticatedOwner): boolean {

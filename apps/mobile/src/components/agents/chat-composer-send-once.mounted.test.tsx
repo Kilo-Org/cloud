@@ -1,9 +1,8 @@
 /* eslint-disable max-lines -- the mocked native surface needs one mock block per bridge */
 /* eslint-disable require-await, @typescript-eslint/require-await -- mock factories settle without await, matching chat-composer.test.ts */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as chat-composer-input-row.mounted.test.tsx) */
 import * as React from 'react';
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer } from './chat-composer';
@@ -255,17 +254,20 @@ async function mountComposer(
 type SendControl = { disabled: boolean; press: () => void };
 
 function sendControl(root: TestRenderer.ReactTestInstance, label = 'Send message'): SendControl {
+  // The composer input carries the same text as an accessibility label for the
+  // field whose native hint now lives in an overlay, so the send control is the
+  // matching node that also carries the press handler.
   const matches = root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === label
+    node =>
+      typeof node.type === 'string' &&
+      node.props.accessibilityLabel === label &&
+      typeof (node.props as { onPress?: unknown }).onPress === 'function'
   );
   const node = matches[0];
   if (node === undefined) {
     throw new Error(`pressable "${label}" not found`);
   }
-  const props = node.props as { disabled?: boolean; onPress?: () => void };
-  if (props.onPress === undefined) {
-    throw new Error(`pressable "${label}" has no onPress`);
-  }
+  const props = node.props as { disabled?: boolean; onPress: () => void };
   return { disabled: props.disabled === true, press: props.onPress };
 }
 

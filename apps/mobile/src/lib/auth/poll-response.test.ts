@@ -36,4 +36,12 @@ describe('classifyPollResponse', () => {
   it.each([429, 500, 503])('retries with backoff on %i', httpStatus => {
     expect(classifyPollResponse(httpStatus)).toEqual({ status: 'retry' });
   });
+
+  it('carries the server Retry-After on a throttled poll', () => {
+    expect(classifyPollResponse(429, '8')).toEqual({ status: 'retry', retryAfterMs: 8000 });
+  });
+
+  it('keeps retrying without a wait when Retry-After is unparseable', () => {
+    expect(classifyPollResponse(429, 'soon')).toEqual({ status: 'retry' });
+  });
 });

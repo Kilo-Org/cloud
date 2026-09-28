@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Kilo</string>
+	<!-- CFBundleShortVersionString/CFBundleVersion are intentionally absent:
+	     GENERATE_INFOPLIST_FILE injects them from the target's
+	     MARKETING_VERSION/CURRENT_PROJECT_VERSION, which the plugin derives from
+	     the app's version (the ShareExtension pattern), so the appex can never
+	     advertise a version that drifts from the containing app. -->
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionFileProviderDocumentGroup</key>
+		<string>group.com.kilocode.kiloapp</string>
+		<key>NSExtensionFileProviderSupportsEnumeration</key>
+		<true/>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.fileprovider-nonui</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ArtifactsFileProviderExtension</string>
+	</dict>
+</dict>
+</plist>

@@ -41,6 +41,7 @@ import SidebarMenuList from './SidebarMenuList';
 import SidebarUserFooter from './SidebarUserFooter';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import { CHATGPT_ACCESS_FLAG } from '@/lib/auth/openai/access';
 
 type OrganizationAppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   organizationId: string;
@@ -61,6 +62,7 @@ export default function OrganizationAppSidebar({
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
   const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
+  const isChatGptSignInEnabled = useFeatureFlagEnabled(CHATGPT_ACCESS_FLAG);
   const isDevelopment = process.env.NODE_ENV === 'development';
 
   // Get current organization role and data
@@ -322,6 +324,13 @@ export default function OrganizationAppSidebar({
             icon: CreditCard,
             url: `/organizations/${organizationId}/payment-details`,
           },
+        ]
+      : []),
+    // The ChatGPT connection is personal, so any member can manage their own for
+    // the organization and sees only that card. The pasted-key manager stays
+    // owner/admin only.
+    ...(hasOwnerLevelAccess || isChatGptSignInEnabled === true
+      ? [
           {
             title: 'Bring Your Own Key (BYOK)',
             icon: Key,

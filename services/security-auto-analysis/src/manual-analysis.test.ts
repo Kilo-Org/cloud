@@ -52,6 +52,7 @@ const command: ManualAnalysisStartCommand = {
 };
 
 const finding = {
+  platform_integration_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
   id: command.findingId,
   owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   owned_by_user_id: null,

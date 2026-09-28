@@ -26,6 +26,23 @@ import { TextPartRenderer } from './text-part-renderer';
 import { ToolPartRenderer } from './tool-part-renderer';
 import { type OpenChildSession } from './child-session-section';
 
+/**
+ * The absolute cloud-agent workspace prefixes a patch path can carry:
+ * `/workspace/<userId>/sessions/<sessionId>/` for a session workspace and
+ * `/workspace/<userId>/worktrees/<worktreeId>/` for a worktree-backed session
+ * (either optionally with an organization segment before the user id) — the
+ * repo is cloned at that root, so dropping it leaves the repo-relative path a
+ * reader wants instead of the workspace ids.
+ *
+ * services/cloud-agent-next/src/workspace.ts:202,211,371
+ */
+const CLOUD_AGENT_WORKSPACE_PREFIX =
+  /^\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/[^/]+\//;
+
+export function patchPartFileLabel(path: string): string {
+  return path.replace(CLOUD_AGENT_WORKSPACE_PREFIX, '');
+}
+
 type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -33,6 +50,12 @@ type PartRendererProps = {
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
   modelOptions?: SessionModelOption[];
+  /**
+   * Long-press handler forwarded into rendered code fences' copy trigger. The
+   * message bubble supplies its details long-press so a press-and-hold on a
+   * fence still opens message details. Omitted outside a bubble.
+   */
+  onLongPressCode?: () => void;
 };
 
 export function PartRenderer({
@@ -42,6 +65,7 @@ export function PartRenderer({
   defaultReasoningExpanded,
   onOpenChildSession,
   modelOptions,
+  onLongPressCode,
 }: Readonly<PartRendererProps>) {
   const { t } = useTranslation();
   if (!partRendersContent(part)) {
@@ -50,7 +74,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
-        <TextPartRenderer text={part.text} />
+        <TextPartRenderer text={part.text} onLongPressCode={onLongPressCode} />
       </MessageErrorBoundary>
     );
   }
@@ -60,7 +84,7 @@ export function PartRenderer({
         <ToolPartRenderer
           part={part}
           getChildMessages={getChildMessages}
-          renderPart={props => <PartRenderer {...props} />}
+          renderPart={props => <PartRenderer {...props} onLongPressCode={onLongPressCode} />}
           onOpenChildSession={onOpenChildSession}
           modelOptions={modelOptions}
         />
@@ -104,8 +128,13 @@ export function PartRenderer({
         <View className="my-1 gap-1">
           <Text className="text-xs text-muted-foreground">{summary}</Text>
           {part.files.map(file => (
-            <Text key={file} className="font-mono text-xs text-muted-foreground" numberOfLines={1}>
-              {file}
+            <Text
+              key={file}
+              className="font-mono text-xs text-muted-foreground"
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {patchPartFileLabel(file)}
             </Text>
           ))}
         </View>

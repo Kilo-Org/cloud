@@ -15,8 +15,14 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSessionListAutoScroll } from '@/components/agents/use-session-list-auto-scroll';
+import { useSessionListAnchorReport } from '@/components/agents/use-session-list-anchor-report';
+import { useSessionListResumeScroll } from '@/components/agents/use-session-list-resume-scroll';
 import { SessionPaginationHeader } from '@/components/agents/session-pagination-header';
 import { shouldTriggerOlderMessagesLoad } from '@/components/agents/session-message-list-state';
+import {
+  getSessionTranscriptItemMessageId,
+  type SessionTranscriptItem,
+} from '@/components/agents/session-transcript';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getOlderMessagesArrivedAnnouncement,
@@ -32,7 +38,7 @@ const listContentContainerStyle = { paddingVertical: 8 } satisfies ViewStyle;
 // otherwise spam the FlashList event log.
 const ON_START_REACHED_THRESHOLD = 2;
 
-const DRAW_DISTANCE = 1000;
+const DRAW_DISTANCE = 2000;
 
 type SessionMessageListProps<T> = {
   sessionId: string;
@@ -46,6 +52,30 @@ type SessionMessageListProps<T> = {
   onLoadOlderMessages: () => void;
   renderItem: ListRenderItem<T>;
   ListFooterComponent?: React.ComponentType | React.ReactElement | null;
+  /**
+   * Message id a `?at=` deep link wants the transcript to open on. When it is
+   * a rendered row the list scrolls to it once; when it lives in an older page
+   * the list loads pages up to a bound and re-plans. Absent/null keeps every
+   * existing caller byte-identical, and an anchor the session no longer has
+   * scrolls nothing and blanks nothing.
+   */
+  resumeAt?: string | null;
+  /**
+   * A send takes the transcript position over. The host bumps this counter on
+   * every send (the composer's prompt or slash-command path): the list ends
+   * any in-flight `?at=` resume, re-arms the tail follow and scrolls to the
+   * newest row, so the sent message and its reply are on screen even when the
+   * transcript was parked on an older anchor with follow off. Absent or
+   * unchanged keeps every existing caller byte-identical.
+   */
+  followTailNonce?: number;
+  /**
+   * Optional callback fired when the topmost viewable row's message changes.
+   * The host publishes it as the session's position (route search params and
+   * the OS handoff entry point). Absent keeps every existing caller
+   * byte-identical: no viewability wiring is attached at all.
+   */
+  onAnchorChange?: (messageId: string) => void;
   /**
    * Extra bottom padding (in dp) applied to the list's content container.
    * The default (undefined) keeps the legacy `paddingVertical: 8` behavior
@@ -78,15 +108,48 @@ export function SessionMessageList<T>({
   ListFooterComponent,
   contentBottomInset,
   onReachedBottom,
+  onAnchorChange,
+  resumeAt,
+  followTailNonce,
 }: Readonly<SessionMessageListProps<T>>) {
+  // Rows are already present when the list mounts (the resume never mounts a
+  // blank list), so the resume decision is derivable at render: every row's
+  // anchor id via `getSessionTranscriptItemMessageId`, and whether the anchor
+  // is one of them.
+  const anchorIds = useMemo(
+    () => items.map(item => getSessionTranscriptItemMessageId(item as SessionTranscriptItem)),
+    [items]
+  );
+  const resumeAnchor =
+    resumeAt !== undefined && resumeAt !== null && resumeAt.trim().length > 0
+      ? resumeAt.trim()
+      : null;
+  // Follow the newest message at mount exactly as before UNLESS the resume has
+  // work to do: an anchor that is already a row (scroll), or one that may still
+  // arrive with an older page (load-older). An anchor the session no longer has
+  // and no older history to search keeps the list byte-identical to an
+  // anchor-less open — at the bottom, following the tail.
+  const anchorIsRow = resumeAnchor !== null && anchorIds.includes(resumeAnchor);
+  const followTailAtMount = !(anchorIsRow || (resumeAnchor !== null && hasOlderMessages));
   // FlashList v2 renders the list in chronological order (oldest → newest).
   // `startRenderingFromBottom` keeps the viewport anchored at the newest
   // message on first render and after prepended older pages, which is the
   // exact behavior we want for the agent session transcript.
+  //
+  // `newestItemKey` is the key of `items.at(-1)`. The auto-scroll hook only
+  // schedules a scroll when that key changes, so growing the list with an
+  // older page can never yank the viewport back to the newest message.
+  const newestItem = items.at(-1);
+  const newestItemKey = newestItem === undefined ? null : keyExtractor(newestItem);
   const {
     isAtBottom,
     listRef,
     scrollToLatestAnimated,
+    suppressAutoFollow,
+    isUserScrollingRef,
+    userInteractedRef,
+    sendTakeoverRef,
+    followTailFromSend,
     handleContentSizeChange,
     handleKeyboardShow,
     handleListLayout,
@@ -97,7 +160,10 @@ export function SessionMessageList<T>({
     handleMomentumScrollEnd,
   } = useSessionListAutoScroll<T>({
     itemCount: items.length,
+    newestItemKey,
     resetKey: sessionId,
+    initialAutoScroll: followTailAtMount,
+    resumeKey: resumeAnchor,
   });
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -136,6 +202,54 @@ export function SessionMessageList<T>({
   useEffect(() => {
     inFlightRef.current = false;
   }, [sessionId]);
+
+  // Report the viewport's topmost message to the host. Absent `onAnchorChange`,
+  // nothing is wired: no viewability callback, no config.
+  const anchorReport = useSessionListAnchorReport<T>({ sessionId, onAnchorChange });
+
+  // The host's send path takes the position over through the counter. A list
+  // that mounts following the tail adopts the mount value as already handled:
+  // an empty transcript receiving its first message follows the tail at mount,
+  // so replaying an earlier send's take-over would be redundant. A list that
+  // mounts NOT following the tail — a `?at=` resume still paging for its
+  // anchor — must honour a counter the host already bumped, or a send issued
+  // while the transcript was in the zero-item `older-loading` state (the list
+  // was not mounted for the change) is dropped and the resume parks on the
+  // recorded anchor with the sent message and its reply off-screen.
+  //
+  // Declared before the resume hook on purpose: effects run in declaration
+  // order, so the take-over is in place when the resume plans this render. A
+  // send must end the resume in the same commit it lands, not one render later.
+  const handledFollowTailNonceRef = useRef(followTailAtMount ? followTailNonce : 0);
+  useEffect(() => {
+    if (followTailNonce === undefined) {
+      return;
+    }
+    if (handledFollowTailNonceRef.current === followTailNonce) {
+      return;
+    }
+    handledFollowTailNonceRef.current = followTailNonce;
+    followTailFromSend();
+  }, [followTailNonce, followTailFromSend]);
+
+  // Resume-position scroll for a `?at=` deep link — see
+  // `use-session-list-resume-scroll` for the plan, the page budget, and the
+  // device-proven retry schedule.
+  useSessionListResumeScroll<T>({
+    sessionId,
+    anchorIds,
+    hasOlderMessages,
+    isLoadingOlderMessages,
+    olderMessagesError,
+    onLoadOlderMessages,
+    isInFlightRef: inFlightRef,
+    listRef,
+    isUserScrollingRef,
+    userInteractedRef,
+    sendTakeoverRef,
+    suppressAutoFollow,
+    resumeAt,
+  });
 
   // Keep the newest message visible when the keyboard opens, but only while
   // the follow guard is true (the user is still at the bottom). On iOS,
@@ -185,8 +299,6 @@ export function SessionMessageList<T>({
     olderArrivalNewestKeyRef.current = null;
   }, [sessionId]);
   useEffect(() => {
-    const newestItem = items.at(-1);
-    const nextNewestKey = newestItem === undefined ? null : keyExtractor(newestItem);
     const nextCount = items.length;
     if (
       shouldAnnounceOlderMessagesArrival({
@@ -194,15 +306,15 @@ export function SessionMessageList<T>({
         previousCount: olderArrivalCountRef.current,
         nextCount,
         previousNewestKey: olderArrivalNewestKeyRef.current,
-        nextNewestKey,
+        nextNewestKey: newestItemKey,
       })
     ) {
       AccessibilityInfo.announceForAccessibility(getOlderMessagesArrivedAnnouncement());
     }
     olderArrivalInitializedRef.current = true;
     olderArrivalCountRef.current = nextCount;
-    olderArrivalNewestKeyRef.current = nextNewestKey;
-  }, [items, keyExtractor]);
+    olderArrivalNewestKeyRef.current = newestItemKey;
+  }, [items, newestItemKey]);
 
   // When the optional `contentBottomInset` is omitted and the landscape side
   // insets are 0 (portrait) we return the original module-level
@@ -225,6 +337,39 @@ export function SessionMessageList<T>({
     [contentBottomInset, left, right]
   );
 
+  // The host passes a fresh inline arrow for `onLoadOlderMessages` on every
+  // render, so the handler is held in a ref (the same pattern as
+  // `onReachedBottomRef` above) and exposed to the header through a stable
+  // callback. Without this the memo below would still produce a new element on
+  // every parent render, which is the remount/reflow it exists to prevent.
+  const onLoadOlderMessagesRef = useRef(onLoadOlderMessages);
+  onLoadOlderMessagesRef.current = onLoadOlderMessages;
+  const handleRetryOlderMessages = useCallback(() => {
+    onLoadOlderMessagesRef.current();
+  }, []);
+
+  // The header element is memoized on the pagination props so a new element
+  // identity is not handed to FlashList on every render (which would remount
+  // and reflow the header while the transcript streams). The pagination
+  // prompts only change when their own props change; the retry callback is
+  // stable and always calls the newest handler.
+  const listHeaderComponent = useMemo(
+    () => (
+      <SessionPaginationHeader
+        isLoadingOlderMessages={isLoadingOlderMessages}
+        olderMessagesError={olderMessagesError}
+        olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
+        onRetry={handleRetryOlderMessages}
+      />
+    ),
+    [
+      isLoadingOlderMessages,
+      olderMessagesError,
+      olderMessagesOmittedItemCount,
+      handleRetryOlderMessages,
+    ]
+  );
+
   return (
     <View className="flex-1">
       <FlashList<T>
@@ -237,7 +382,7 @@ export function SessionMessageList<T>({
         renderItem={renderItem}
         // Transcript rows are tall and parse markdown on mount. The 250 dp
         // default draws under half a screen ahead, so a fast fling shows blank
-        // space until the rows mount. Four screens of lookahead hides that.
+        // space until the rows mount. A 2000 dp lookahead hides that.
         drawDistance={DRAW_DISTANCE}
         // Android Fabric can race clipped-view reattachment with rapid transcript updates.
         // Kept explicit: flash-list ≥ 2.3.2 defaults this to false (PR #2202); the pin
@@ -253,6 +398,9 @@ export function SessionMessageList<T>({
         scrollEventThrottle={16}
         onStartReached={hasOlderMessages ? handleStartReached : undefined}
         onStartReachedThreshold={ON_START_REACHED_THRESHOLD}
+        // Viewability is only wired when a host asked for the position, so
+        // every other caller's list stays byte-identical.
+        {...anchorReport}
         maintainVisibleContentPosition={{
           // Start rendering from the bottom so the newest message is visible
           // on first render. `autoscrollToTopThreshold` is left at its default
@@ -261,14 +409,7 @@ export function SessionMessageList<T>({
           // streaming insertions at the bottom.
           startRenderingFromBottom: true,
         }}
-        ListHeaderComponent={
-          <SessionPaginationHeader
-            isLoadingOlderMessages={isLoadingOlderMessages}
-            olderMessagesError={olderMessagesError}
-            olderMessagesOmittedItemCount={olderMessagesOmittedItemCount}
-            onRetry={onLoadOlderMessages}
-          />
-        }
+        ListHeaderComponent={listHeaderComponent}
         ListFooterComponent={ListFooterComponent}
         keyboardDismissMode="interactive"
         keyboardShouldPersistTaps="handled"

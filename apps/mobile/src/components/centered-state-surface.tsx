@@ -14,7 +14,7 @@ import {
 import { type LayoutChangeEvent, Platform, View, type ViewProps } from 'react-native';
 import { type Stack } from 'expo-router';
 
-import { getStateSurfaceInsets } from '@/lib/centered-state-layout';
+import { getBottomReservation, getStateSurfaceInsets } from '@/lib/centered-state-layout';
 import {
   type SurfaceMeasurement,
   useStateSurfaceMeasurement,
@@ -227,6 +227,10 @@ export function StateSurfaceInsets({
   bottomInset,
 }: {
   children: ReactNode;
+  /** Raised onto the inherited bottom reservation: a nested surface can only
+   *  add clearance, never shrink it. The tabs layout reserves the tab bar alone
+   *  (its content gap is content-only), so the Agents screen's `tabBarHeight +
+   *  fabBand` is the whole reserve its centered states resolve. */
   bottomInset: number;
 }) {
   const surface = useStateSurface();
@@ -235,7 +239,10 @@ export function StateSurfaceInsets({
       surface
         ? resolveSurfaceGeometry(surface, {
             top: surface.topReservation,
-            bottom: Math.max(surface.bottomReservation, bottomInset),
+            bottom: getBottomReservation({
+              inherited: surface.bottomReservation,
+              bottomInset,
+            }),
             nativeViewportFillsSurface: surface.nativeViewportFillsSurface,
             register: surface.register,
           })

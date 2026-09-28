@@ -8,7 +8,7 @@ import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
 import type { LatestAssistantMessage } from '../session/types.js';
 import { safeErrorFromQueueReason } from './control-dispatch.js';
-import type { SessionMessageRecord } from './session-message-queue.js';
+import { failedDetailOf, failedReasonOf, type SessionMessage } from './session-message-queue.js';
 
 export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;
@@ -35,8 +35,10 @@ export type MessageCallbacksDependencies = {
 };
 
 export type MessageCallbacks = {
-  persistTerminalCallback(
-    message: SessionMessageRecord,
+  persistTerminalCallback(message: SessionMessage, metadata?: SessionMetadata | null): boolean;
+  persistDrainedBatchCallback(
+    messages: readonly SessionMessage[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
     metadata?: SessionMetadata | null
   ): boolean;
   pendingCallbackCount(): number;
@@ -120,12 +122,10 @@ function extractAssistantText(message: LatestAssistantMessage): string | undefin
   return text || undefined;
 }
 
-function callbackStatus(
-  message: SessionMessageRecord
-): CallbackJob['payload']['status'] | undefined {
-  if (message.state === 'completed') return 'completed';
-  if (message.state === 'failed') return 'failed';
-  if (message.state === 'cancelled') return 'interrupted';
+function callbackStatus(message: SessionMessage): CallbackJob['payload']['status'] | undefined {
+  if (message.state.kind === 'completed') return 'completed';
+  if (message.state.kind === 'failed') return 'failed';
+  if (message.state.kind === 'cancelled') return 'interrupted';
   return undefined;
 }
 
@@ -146,7 +146,7 @@ export function createMessageCallbacks(
   let repairInFlight: Promise<void> | undefined;
 
   function buildJob(
-    message: SessionMessageRecord,
+    message: SessionMessage,
     metadata: SessionMetadata,
     target: CallbackTarget
   ): CallbackJob | undefined {
@@ -178,8 +178,8 @@ export function createMessageCallbacks(
         ? undefined
         : status === 'interrupted'
           ? 'The message was interrupted'
-          : (message.failedDetail ??
-            safeErrorFromQueueReason(message.failedReason ?? 'environment_failed'));
+          : (failedDetailOf(message) ??
+            safeErrorFromQueueReason(failedReasonOf(message) ?? 'environment_failed'));
 
     return {
       target: structuredClone(target),
@@ -198,15 +198,15 @@ export function createMessageCallbacks(
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        ...(message.state.kind === 'completed' && message.state.gateResult !== undefined
+          ? { gateResult: message.state.gateResult }
+          : {}),
         idempotencyKey: message.messageId,
       },
     };
   }
 
-  function persistTerminalCallback(
-    message: SessionMessageRecord,
-    metadata = getMetadata()
-  ): boolean {
+  function persistTerminalCallback(message: SessionMessage, metadata = getMetadata()): boolean {
     const target = metadata?.callback?.target;
     if (!target || callbackStatus(message) === undefined) return false;
 
@@ -242,6 +242,25 @@ export function createMessageCallbacks(
       dueAt: Date.now(),
     });
     return true;
+  }
+
+  function persistDrainedBatchCallback(
+    messages: readonly SessionMessage[],
+    newlyTerminalMessageIds: ReadonlySet<string>,
+    metadata = getMetadata()
+  ): boolean {
+    if (newlyTerminalMessageIds.size === 0) return false;
+    if (
+      messages.some(message => message.state.kind === 'queued' || message.state.kind === 'accepted')
+    ) {
+      return false;
+    }
+    let representative: SessionMessage | undefined;
+    for (const message of messages) {
+      if (callbackStatus(message) !== undefined) representative = message;
+    }
+    if (!representative) return false;
+    return persistTerminalCallback(representative, metadata);
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {
@@ -339,6 +358,7 @@ export function createMessageCallbacks(
 
   return {
     persistTerminalCallback,
+    persistDrainedBatchCallback,
     pendingCallbackCount,
     nextCallbackDueAt,
     repair,

@@ -58,6 +58,22 @@ function collectToolPartText(part: ToolPart): string {
   return [part.tool, ...payload].join('\n');
 }
 
+/**
+ * The message's own prose. The Copy message action reads only these parts:
+ * the thinking block the transcript shows above a reply and the tool calls it
+ * shows between its paragraphs are transcript chrome, not message text, so
+ * they never reach the clipboard ahead of or around the reply.
+ */
+export function messageTextParts(parts: readonly Part[]): Part[] {
+  return parts.filter((part): part is TextPart => isTextPart(part));
+}
+
+/**
+ * Collects every copyable part kind of a message: text prose, reasoning text,
+ * and tool invocations with their input/output. The Copy message paths read it
+ * over `messageTextParts`, so what they put on the clipboard is the message
+ * text alone.
+ */
 export function collectCopyableText(message: CopyableMessage): string {
   return message.parts
     .map(part => {
@@ -74,4 +90,32 @@ export function collectCopyableText(message: CopyableMessage): string {
     })
     .filter(text => text.length > 0)
     .join('\n\n');
+}
+
+/**
+ * Whether `collectCopyableText` would return any text, without building it.
+ *
+ * The message bubble only needs the boolean to decide whether the copy action
+ * is available. Calling `collectCopyableText(...).length > 0` joins every part
+ * — including a streaming reasoning/text part that can hold hundreds of
+ * kilobytes — on every streamed publish. This short-circuits on the first
+ * part with copyable content instead of allocating the joined string.
+ */
+export function hasCopyableText(message: CopyableMessage): boolean {
+  return message.parts.some(part => {
+    if (isTextPart(part)) {
+      return !isSnapshotProgressText(part) && part.text.length > 0;
+    }
+    if (isReasoningPart(part)) {
+      return part.text.length > 0;
+    }
+    if (isToolPart(part)) {
+      return (
+        Object.keys(part.state.input).length > 0 ||
+        (part.state.status === 'completed' && Boolean(part.state.output)) ||
+        (part.state.status === 'error' && Boolean(part.state.error))
+      );
+    }
+    return false;
+  });
 }

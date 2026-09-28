@@ -24,11 +24,16 @@ validateGitLfs();
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
 
+// Next matches these entries against the request Origin's HOSTNAME only, so an
+// entry carrying a port (what `URL.host` yields for `http://127.0.0.1:7900`)
+// never matches and every `/_next/*` dev request from that origin is answered
+// 403 "Unauthorized" — the app URL a developer or device browser is told to use
+// then never hydrates. `hostname` is the form Next compares.
 const localNetworkDevOrigins = [
   '10.*.*.*',
   '192.168.*.*',
   ...Array.from({ length: 16 }, (_, index) => `172.${16 + index}.*.*`),
-  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).host] : []),
+  ...(process.env.APP_URL_OVERRIDE ? [new URL(process.env.APP_URL_OVERRIDE).hostname] : []),
 ];
 
 /** @type {import('next').NextConfig} */
@@ -47,7 +52,11 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
-  devIndicators: { position: 'bottom-right' },
+  // The dev-tools indicator is a fixed overlay pinned to a viewport corner. On
+  // phone-sized viewports (device runs) it covers the bottom-right of the page,
+  // e.g. the final lines of the Terms paragraph. Hide it; compile and runtime
+  // errors are still surfaced without the indicator.
+  devIndicators: false,
 
   async rewrites() {
     // Global API rewrites - proxy to global-api.kilo.ai when not on global backend

@@ -103,6 +103,20 @@ i.e. the function region. Given the table above it should only ever be `fra1` or
 `sfo1`, which is what makes `isUSRegion` in `apps/web/src/lib/drizzle.ts` behave
 correctly for the SFO half of `kilocode-global-app`.
 
+## Failure UX
+
+When changing failure handling — especially in the Cloud Agent control plane — optimize the
+user's experience, not only correctness:
+
+- Do not fail a turn on a transient or single-observation condition. Retry within a bound.
+- When progress is impossible, fail fast with a correct, specific reason. Do not make the user
+  wait for a long timeout to learn something the system already knows.
+- Never leave a session hanging silently. Surface the known error and release the session.
+- Resume promptly when the condition clears, for example when the user answers a question.
+
+A change that stops spurious failures but lengthens the wait for a genuine failure is only half a
+fix. State both effects in the change's verification.
+
 ## Security Baseline
 
 - Never log tokens, credentials, API keys, authentication headers, cookies, or webhook secrets. Use `redactSensitiveHeaders` when headers must be retained or logged. Do not enable `sendDefaultPii` or `attachRpcInput` in Sentry.

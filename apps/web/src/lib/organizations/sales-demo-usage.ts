@@ -19,7 +19,7 @@ import {
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
+import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
@@ -31,7 +31,7 @@ import type { FEATURE_VALUES } from '@/lib/feature-detection';
 const MODELS = [
   { id: CLAUDE_SONNET_CURRENT_MODEL_ID, inputPer1k: 3000, outputPer1k: 15000 },
   { id: CLAUDE_OPUS_CURRENT_MODEL_ID, inputPer1k: 15000, outputPer1k: 75000 },
-  { id: GPT_CURRENT_MODEL_ID, inputPer1k: 2500, outputPer1k: 10000 },
+  { id: GPT_SOL_CURRENT_MODEL_ID, inputPer1k: 2500, outputPer1k: 10000 },
   { id: GLM_CURRENT_MODEL_ID, inputPer1k: 1000, outputPer1k: 4000 },
   { id: KIMI_CURRENT_MODEL_ID, inputPer1k: 600, outputPer1k: 2400 },
   { id: MINIMAX_CURRENT_MODEL_ID, inputPer1k: 300, outputPer1k: 1200 },

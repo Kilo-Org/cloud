@@ -6,6 +6,7 @@ const MODEL_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-model';
 const VARIANTS_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-variants';
 const DEVCONTAINER_ENABLED_STORAGE_KEY = 'cloud-agent:devcontainer-enabled';
 const REPO_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-repo';
+const SANDBOX_ALLOCATION_STORAGE_KEY_PREFIX = 'cloud-agent:last-used-sandbox-allocation';
 
 type LastUsedRepo = {
   fullName: string;
@@ -192,6 +193,29 @@ export function setLastUsedVariant(
   const map = readLastUsedVariants(organizationId);
   map[modelId] = variant;
   safeLocalStorage.setItem(getLastUsedVariantsStorageKey(organizationId), JSON.stringify(map));
+}
+
+export function getLastUsedSandboxAllocationStorageKey(organizationId?: string) {
+  return organizationId
+    ? `${SANDBOX_ALLOCATION_STORAGE_KEY_PREFIX}:organization:${organizationId}`
+    : `${SANDBOX_ALLOCATION_STORAGE_KEY_PREFIX}:personal`;
+}
+
+export function getLastUsedSandboxAllocationKey(organizationId?: string): string | null {
+  const stored = safeLocalStorage.getItem(getLastUsedSandboxAllocationStorageKey(organizationId));
+  return stored && stored.trim().length > 0 ? stored : null;
+}
+
+export function setLastUsedSandboxAllocationKey(
+  allocationKey: string | undefined,
+  organizationId?: string
+): void {
+  const storageKey = getLastUsedSandboxAllocationStorageKey(organizationId);
+  if (allocationKey) {
+    safeLocalStorage.setItem(storageKey, allocationKey);
+  } else {
+    safeLocalStorage.removeItem(storageKey);
+  }
 }
 
 export function getPreferredInitialVariant({

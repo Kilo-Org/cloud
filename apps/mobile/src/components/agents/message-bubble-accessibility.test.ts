@@ -16,6 +16,9 @@ const clipboard = vi.hoisted(() => ({ text: '' }));
 vi.mock('react', async importOriginal => ({
   ...(await importOriginal<typeof React>()),
   useCallback: <T>(fn: T) => fn,
+  // The harness invokes the component directly, so React has no dispatcher;
+  // this file renders each message once and asserts nothing about memoization.
+  useMemo: <T>(fn: () => T) => fn(),
 }));
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -47,6 +50,14 @@ vi.mock('./chat-markdown-text', () => ({ ChatMarkdownText: 'ChatMarkdownText' })
 vi.mock('./compaction-separator', () => ({ CompactionSeparator: 'CompactionSeparator' }));
 vi.mock('./file-part-renderer', () => ({ FilePartRenderer: 'FilePartRenderer' }));
 vi.mock('./part-renderer', () => ({ PartRenderer: 'PartRenderer' }));
+// The condensed-row module pulls `fixed-part-row` → `activity-indicator` →
+// `a11y/motion` → `expo-battery`, which the pure project cannot load. The a11y
+// harness inspects the element tree, so stand the row in as a sentinel like the
+// sibling `message-bubble.test.ts` harness does.
+vi.mock('./tool-run-rows', () => ({
+  CondensedToolRunRow: 'CondensedToolRunRow',
+  ToolOneLineRow: 'ToolOneLineRow',
+}));
 
 describe.each([
   { role: 'user', makeMessage: userMessage, label: 'User message' },

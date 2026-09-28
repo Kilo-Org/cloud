@@ -1,0 +1,63 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!--
+    Android's equivalent of App Intents is an exported entry point per action,
+    plus the App Actions declarations the launcher and the Assistant surface.
+    `KiloActionActivity` is that entry point: it is exported, one intent-filter
+    per action, and it hands whatever it receives to the shared JS dispatcher
+    (`KiloAppActionsModule`). The same four actions, destinations and results as
+    the iOS App Intents provider.
+
+    Assistant surfacing additionally needs the Play Console capability
+    configuration, and the capability declarations the launcher and the
+    Assistant read are the `res/xml/shortcuts.xml` this activity's
+    `android.app.shortcuts` meta-data points at. The part the app itself
+    provides is the exported intent entry point, which is what
+    `adb shell am start`, the launcher, another app, or the Assistant can reach.
+  -->
+  <application>
+    <activity
+      android:name="expo.modules.kiloappactions.KiloActionActivity"
+      android:excludeFromRecents="true"
+      android:exported="true"
+      android:launchMode="singleTop">
+
+      <!-- StartAgent: start a new agent, from a prompt and optionally a repository or a session. -->
+      <intent-filter>
+        <action android:name="com.kilocode.kiloapp.action.START_AGENT" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+
+      <!-- OpenNeedsInput: open the agent that waits for an answer, or the list when several wait. -->
+      <intent-filter>
+        <action android:name="com.kilocode.kiloapp.action.OPEN_NEEDS_INPUT" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+
+      <!-- OpenSession: open one session by its id. -->
+      <intent-filter>
+        <action android:name="com.kilocode.kiloapp.action.OPEN_SESSION" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+
+      <!-- OpenPullRequest: open one pull request by its id. -->
+      <intent-filter>
+        <action android:name="com.kilocode.kiloapp.action.OPEN_PULL_REQUEST" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
+
+      <!--
+        The URL dialect: `kiloapp://actions/<slug>`, with the same slugs the
+        shared contract's `/actions/<slug>` URLs use. A VIEW intent may carry the
+        fields in its query, and the extras below override them.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="kiloapp" android:host="actions" />
+      </intent-filter>
+
+      <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
+    </activity>
+  </application>
+</manifest>

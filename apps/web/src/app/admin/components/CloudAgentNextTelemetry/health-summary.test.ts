@@ -50,30 +50,33 @@ describe('failure responsibility summary', () => {
   it('uses all observed outcomes as the shared percentage denominator', () => {
     const stats = getObservedHealthStats({
       completedRuns: 16,
-      failedRuns: 17,
+      failedRuns: 21,
       setupFailures: 3,
       interruptedRuns: 2,
       sessionsObserved: 20,
       platformFailures: 9,
+      providerFailures: 4,
       userFailures: 6,
       unknownFailures: 5,
     });
 
-    expect(stats.observedOutcomes).toBe(38);
-    expect(stats.observedRuns).toBe(35);
+    expect(stats.observedOutcomes).toBe(42);
+    expect(stats.observedRuns).toBe(39);
     expect(stats.setupFailures).toBe(3);
     expect(stats.outcomes.map(outcome => [outcome.kind, outcome.count])).toEqual([
       ['completed', 16],
       ['interrupted', 2],
       ['user', 6],
       ['platform', 9],
+      ['provider', 4],
       ['unknown', 5],
     ]);
+    expect(stats.outcomes.some(outcome => outcome.kind === 'provider')).toBe(true);
     expect(
       stats.outcomes.reduce((total, outcome) => total + (outcome.sharePercent ?? 0), 0)
     ).toBeCloseTo(100);
     expect(stats.outcomes.find(outcome => outcome.kind === 'platform')?.sharePercent).toBeCloseTo(
-      (9 / 38) * 100
+      (9 / 42) * 100
     );
   });
 
@@ -85,6 +88,7 @@ describe('failure responsibility summary', () => {
       interruptedRuns: 0,
       sessionsObserved: 0,
       platformFailures: 0,
+      providerFailures: 0,
       userFailures: 0,
       unknownFailures: 0,
     });

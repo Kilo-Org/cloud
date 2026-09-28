@@ -9,8 +9,12 @@ import { i18n } from '@/i18n';
 import { AGENT_ATTACHMENT_EXTENSION_REGEX } from '@/lib/agent-attachments/constants';
 import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-attachments/validate';
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
-import { writePickerLaunchContext } from '@/lib/agent-attachments/picker-launch-context';
+import {
+  type AttachmentSurface,
+  writePickerLaunchContext,
+} from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
@@ -98,11 +102,13 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   return candidates;
 }
 
-async function pickAgentLibraryImages(): Promise<AgentAttachmentCandidate[]> {
+async function pickAgentLibraryImages(
+  allowsMultipleSelection: boolean
+): Promise<AgentAttachmentCandidate[]> {
   const assets = await launchImagePicker(
     ImagePicker.launchImageLibraryAsync({
       ...IMAGE_PICKER_OPTIONS,
-      allowsMultipleSelection: true,
+      allowsMultipleSelection,
     })
   );
   const candidates = assets.map(asset => normalizeImageAsset(asset));
@@ -130,33 +136,60 @@ async function pickAgentDocuments(): Promise<AgentAttachmentCandidate[]> {
 
 type AttachmentSource = 'camera' | 'library' | 'files';
 
-function buildAttachmentSourceOptions(): string[] {
-  return [
-    i18n.t('agentChat.attachmentPicker.camera'),
-    i18n.t('agentChat.attachmentPicker.photoLibrary'),
-    i18n.t('agentChat.attachmentPicker.files'),
-    i18n.t('common.cancel'),
-  ];
+function attachmentSourceLabel(source: AttachmentSource): string {
+  if (source === 'camera') {
+    return i18n.t('agentChat.attachmentPicker.camera');
+  }
+  if (source === 'library') {
+    return i18n.t('agentChat.attachmentPicker.photoLibrary');
+  }
+  return i18n.t('agentChat.attachmentPicker.files');
 }
 
-async function pickFromSource(source: AttachmentSource): Promise<AgentAttachmentCandidate[]> {
+/** Sheet option labels for `sources`, with Cancel always appended last. */
+function buildAttachmentSourceOptions(sources: readonly AttachmentSource[]): string[] {
+  return [...sources.map(source => attachmentSourceLabel(source)), i18n.t('common.cancel')];
+}
+
+async function pickFromSource(
+  source: AttachmentSource,
+  libraryMultipleSelection: boolean
+): Promise<AgentAttachmentCandidate[]> {
   if (source === 'camera') {
     return pickAgentCameraImage();
   }
   if (source === 'library') {
-    return pickAgentLibraryImages();
+    return pickAgentLibraryImages(libraryMultipleSelection);
   }
   return pickAgentDocuments();
 }
 
-export function pickAgentAttachments(
+type AttachmentPickerContext = {
+  userId: string | undefined;
+  surface: AttachmentSurface;
+  sessionId: string | null;
+};
+
+type AttachmentSourceSheet = {
+  sources: readonly AttachmentSource[];
+  libraryMultipleSelection: boolean;
+  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread into the call. */
+  themedSheet: ThemedActionSheetOptions;
+};
+
+/**
+ * Show the source sheet and resolve the picked candidates. `sources` drives
+ * both the option list (Cancel is appended last) and the button-index mapping:
+ * the cancel button, or any index with no source, resolves with no candidates.
+ * Identical for every entry point apart from its sources and the library's
+ * multi-select flag.
+ */
+function showAttachmentSourceSheet(
   showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
-  context: {
-    userId: string | undefined;
-    surface: 'agent-new' | 'agent-chat';
-    sessionId: string | null;
-  }
+  context: AttachmentPickerContext,
+  sheet: AttachmentSourceSheet
 ): Promise<AgentAttachmentCandidate[]> {
+  const { sources, libraryMultipleSelection, themedSheet } = sheet;
   return new Promise(resolve => {
     let settled = false;
     const settle = (value: AgentAttachmentCandidate[]) => {
@@ -166,10 +199,6 @@ export function pickAgentAttachments(
       }
     };
     const handle = async (source: AttachmentSource) => {
-      // Record the launching composer + account before the camera/library
-      // launch so the recovery hook can match a pending result after an
-      // Activity recreation. NOT before the Files branch, which uses
-      // `startActivityForResult` and is unaffected by that bug.
       // Record the launching composer + account before the camera/library
       // launch so the recovery hook can match a pending result after an
       // Activity recreation. NOT before the Files branch, which uses
@@ -196,26 +225,76 @@ export function pickAgentAttachments(
           });
         }
       }
-      const result = await pickFromSource(source);
-      settle(result);
+      try {
+        settle(await pickFromSource(source, libraryMultipleSelection));
+      } catch (error) {
+        // A rejected `requestCameraPermissionsAsync` (or any other failure
+        // inside the source helper, e.g. a synchronous throw while building
+        // the native launch promise) must still settle the public helper.
+        // `handle` runs detached, so an uncaught rejection would hang the
+        // caller's `await` forever; no candidates means "nothing picked", so
+        // the caller stays where it is and can tap again.
+        Sentry.captureException(error, {
+          tags: {
+            'error.subsystem': 'agent-attachments',
+            'error.operation': 'pick-attachment-source',
+          },
+          extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
+        });
+        settle([]);
+      }
     };
-    const options = buildAttachmentSourceOptions();
+    const options = buildAttachmentSourceOptions(sources);
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         options,
         cancelButtonIndex: options.length - 1,
       },
       index => {
-        if (index === 0) {
-          void handle('camera');
-        } else if (index === 1) {
-          void handle('library');
-        } else if (index === 2) {
-          void handle('files');
-        } else {
+        // The sheet's button index is optional by its own types; the cancel
+        // button is the label appended after the last source.
+        const source = index === undefined ? undefined : sources[index];
+        if (source === undefined) {
           settle([]);
+          return;
         }
+        void handle(source);
       }
     );
+  });
+}
+
+/**
+ * Composer entry point: Camera, Photo Library, and Files, with a multi-select
+ * library. Resolves with no candidates on cancel, denied permission, or a
+ * failed launch.
+ */
+export function pickAgentAttachments(
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
+): Promise<AgentAttachmentCandidate[]> {
+  return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
+    sources: ['camera', 'library', 'files'],
+    libraryMultipleSelection: true,
+    themedSheet,
+  });
+}
+
+/**
+ * Picture entry point: Camera and the single-select Photo Library only, so one
+ * tap on a screenshot returns it. Resolves with no candidates on cancel,
+ * denied permission, or a failed launch — the caller stays where it is.
+ */
+export function pickAgentPicture(
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
+): Promise<AgentAttachmentCandidate[]> {
+  return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
+    sources: ['camera', 'library'],
+    libraryMultipleSelection: false,
+    themedSheet,
   });
 }

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["@types/node", "./worker-configuration.d.ts", "@cloudflare/vitest-pool-workers/types"]
+  },
+  "include": [
+    "test/e2e/fake-llm-core.ts",
+    "test/e2e/fake-llm-admin.ts",
+    "test/e2e/fake-llm-model-auth.ts",
+    "test/e2e/fake-llm-worker.ts",
+    "test/e2e/fake-llm-server.ts",
+    "test/fake-llm/fake-llm-worker.test.ts"
+  ]
+}

@@ -62,4 +62,27 @@ describe('useCurrentUserId', () => {
     expect(useCurrentUserId().isError).toBe(false);
     expect(useCurrentUserId().userId).toBe('user-1');
   });
+
+  it('reports the fetch failure while a cached identity is still present', () => {
+    Object.assign(query, {
+      data: { id: 'user-1', email: 'user@example.com' },
+      isError: true,
+      isFetched: true,
+    });
+
+    expect(useCurrentUserId().isFetchError).toBe(true);
+  });
+
+  it('reports no fetch failure on the initial load or after a success', () => {
+    Object.assign(query, { isLoading: true, isFetched: false });
+    expect(useCurrentUserId().isFetchError).toBe(false);
+
+    Object.assign(query, {
+      data: { id: 'user-1', email: 'user@example.com' },
+      isLoading: false,
+      isError: false,
+      isFetched: true,
+    });
+    expect(useCurrentUserId().isFetchError).toBe(false);
+  });
 });

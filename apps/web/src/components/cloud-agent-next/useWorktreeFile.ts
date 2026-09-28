@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { useSavedWorktreeChanges } from './WorktreeChanges';
+import { useSavedWorktreeChanges } from './useSavedWorktreeChanges';
 import { getSavedWorktreeFileState } from './worktree-file';
 
 export function useWorktreeFile({

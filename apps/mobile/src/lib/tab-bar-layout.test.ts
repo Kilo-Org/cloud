@@ -1,5 +1,12 @@
+/* eslint-disable max-lines -- the bar-height, label-width and label-fit suites all read one module and the same source-parity text; splitting them would duplicate that harness */
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { readFileSync } from 'node:fs';
+// eslint-disable-next-line import/no-nodejs-modules -- vitest-only parity check, runs in node, never bundled into the app
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import {
   getEffectiveTabBarHeight,
   getTabBarHorizontalInset,
@@ -9,11 +16,25 @@ import {
   shouldHideTabBar,
   shouldShowTabLabel,
   TAB_ICON_FORWARD_FONT_SCALE,
+  TAB_LABEL_MINIMUM_FONT_SCALE,
   TAB_LABEL_WRAP_FONT_SCALE,
   tabAccessibilityLabel,
   tabBarPosition,
+  tabLabelFits,
+  tabLabelLineCount,
+  tabLabelNumberOfLines,
+  tabLabelWidth,
   visibleTabCount,
 } from '@/lib/tab-bar-layout';
+
+const LAYOUT_SOURCE = readFileSync(
+  fileURLToPath(new URL('tab-bar-layout.ts', import.meta.url)),
+  'utf8'
+);
+const LABEL_SOURCE = readFileSync(
+  fileURLToPath(new URL('../components/tab-bar-label.tsx', import.meta.url)),
+  'utf8'
+);
 
 describe('getTabBarOverlayHeight', () => {
   it('includes the bottom safe area on iOS', () => {
@@ -30,6 +51,29 @@ describe('getTabBarOverlayHeight', () => {
 
   it('grows to preserve scaled tab labels', () => {
     expect(getTabBarOverlayHeight(34, 'ios', 3)).toBe(164);
+  });
+});
+
+describe('tabLabelLineCount', () => {
+  it('reserves one line below the wrap threshold', () => {
+    expect(tabLabelLineCount(1)).toBe(1);
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE)).toBe(1);
+  });
+
+  it('reserves the second line above the wrap threshold', () => {
+    expect(tabLabelLineCount(TAB_LABEL_WRAP_FONT_SCALE + 0.01)).toBe(2);
+    expect(tabLabelLineCount(3)).toBe(2);
+  });
+
+  it('agrees with the height the bar reserves', () => {
+    // The bar reserves one label line below the wrap threshold and two above
+    // it; the label is never allowed to render more lines than that.
+    expect(getTabBarOverlayHeight(0, 'android', 1)).toBeCloseTo(
+      34 + 16 * 1 * tabLabelLineCount(1) + 4
+    );
+    expect(getTabBarOverlayHeight(0, 'android', 1.9)).toBeCloseTo(
+      34 + 16 * 1.9 * tabLabelLineCount(1.9) + 4
+    );
   });
 });
 
@@ -80,6 +124,17 @@ describe('getEffectiveTabBarHeight', () => {
     expect(getEffectiveTabBarHeight({ bottomInset: 16, platform: 'android', fontScale: 3 })).toBe(
       70
     );
+  });
+
+  it('honours a caller-supplied label decision at the default font scale', () => {
+    expect(
+      getEffectiveTabBarHeight({
+        bottomInset: 16,
+        platform: 'android',
+        fontScale: 1,
+        showLabel: false,
+      })
+    ).toBe(getTabBarIconForwardHeight(16, 'android'));
   });
 });
 describe('getTabBarIconForwardHeight', () => {
@@ -136,6 +191,51 @@ describe('getTabBarHorizontalInset', () => {
   });
 });
 
+describe('tabLabelWidth', () => {
+  it('measures a single unbroken word at the tab label size', () => {
+    // "Profile" is 7 glyphs at (0.6em x 11) + 0.2 tracking = 47.6
+    expect(tabLabelWidth('Profile')).toBeCloseTo(47.6, 5);
+  });
+
+  it('measures a wrapped label line by line, but a space-separated label as one line', () => {
+    // Only the explicit break splits the label into two lines; a plain space
+    // stays on the single line the renderer lays out.
+    expect(tabLabelWidth('Kilo\nClaw')).toBeCloseTo(tabLabelWidth('Kilo'), 5);
+    expect(tabLabelWidth('Bogga shakhsiga')).toBeCloseTo(15 * (0.6 * 11 + 0.2), 5);
+  });
+
+  it('counts a plain space as part of the single rendered line', () => {
+    // "Kilo Claw" is one line of 9 glyphs, not the 4-glyph widest word.
+    expect(tabLabelWidth('Kilo Claw')).toBeCloseTo(9 * (0.6 * 11 + 0.2), 5);
+  });
+
+  it('scales the glyph advance (not the tracking) with the system font scale', () => {
+    expect(tabLabelWidth('Profile', 2)).toBeCloseTo(7 * (0.6 * 11 * 2 + 0.2), 5);
+  });
+
+  it('counts CJK/Kana/Hangul glyphs as one em wide', () => {
+    expect(tabLabelWidth('設定')).toBeCloseTo(2 * (11 + 0.2), 5);
+  });
+});
+
+describe('tabLabelFits', () => {
+  it('rejects a label wider than its tab minus the item padding', () => {
+    // 160dp / 3 tabs = 53.3dp box, less 10dp padding = 43.3dp for a 47.6dp word
+    expect(tabLabelFits('Profile', 160 / 3)).toBe(false);
+  });
+
+  it('accepts the same label on a normal phone width', () => {
+    expect(tabLabelFits('Profile', 360 / 3)).toBe(true);
+  });
+
+  it('rejects a space-separated label that overflows its single rendered line', () => {
+    // "KILO CLAW" renders on one 9-glyph line (61.2dp), so it cannot fit the
+    // 43.3dp label box even though either word alone would.
+    expect(tabLabelFits('Kilo Claw', 160 / 3)).toBe(false);
+    expect(tabLabelFits('Bogga shakhsiga', 160 / 3)).toBe(false);
+  });
+});
+
 describe('shouldShowTabLabel', () => {
   it('keeps the label below the icon-forward threshold', () => {
     expect(shouldShowTabLabel(1)).toBe(true);
@@ -146,6 +246,134 @@ describe('shouldShowTabLabel', () => {
     expect(shouldShowTabLabel(TAB_ICON_FORWARD_FONT_SCALE)).toBe(false);
     expect(shouldShowTabLabel(2.5)).toBe(false);
     expect(shouldShowTabLabel(3)).toBe(false);
+  });
+
+  it('drops the labels when any label is too wide for its tab', () => {
+    // Reported geometry: 160dp / 5 tabs = 32dp per tab, 22dp for the label
+    expect(shouldShowTabLabel(1, 160 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      false
+    );
+  });
+
+  it('keeps the labels when every label fits its tab', () => {
+    expect(shouldShowTabLabel(1, 360 / 5, ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'])).toBe(
+      true
+    );
+  });
+
+  it('drops the labels when a space-separated label overflows its single line', () => {
+    // `so` `common.profile` = "Bogga shakhsiga" (15 glyphs = 102dp) does not
+    // fit a 43.3dp label box at 160dp, so the bar goes icon-only instead of
+    // rendering a tail-ellipsized label.
+    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(false);
+    // "Quick Chat" (10 glyphs = 68dp) overflows even though each word alone
+    // fits, so the widest-word measure would wrongly keep the labels.
+    expect(shouldShowTabLabel(1, 160 / 3, ['Home', 'Agents', 'Quick Chat'])).toBe(false);
+  });
+
+  it('keeps a space-separated label once its whole line fits the tab', () => {
+    expect(shouldShowTabLabel(1, 360 / 3, ['Home', 'Agents', 'Bogga shakhsiga'])).toBe(true);
+  });
+
+  it('keeps the width rule from overriding the font-scale rule', () => {
+    expect(shouldShowTabLabel(2, 160 / 5, ['Home'])).toBe(false);
+  });
+});
+
+describe('tab label shrink floor', () => {
+  // `TabLabel` asks the platform to shrink an overflowing label and caps the
+  // shrink at `TAB_LABEL_MINIMUM_FONT_SCALE` on iOS; RN implements
+  // `minimumFontScale` on iOS only, so Android's `adjustsFontSizeToFit` floors
+  // at RN's own platform minimum instead. The cap is therefore a residual
+  // guard, and the legibility guarantee has to come from the width rule: the
+  // bar drops the whole label row as soon as one full-size label would not fit
+  // its tab, so every label that renders already fits at scale 1 and no label
+  // can reach either platform's floor. This suite pins that contract — the
+  // platform cap may not be the thing that keeps the labels legible.
+  const LABEL_SETS: readonly (readonly string[])[] = [
+    ['Home', 'Agents', 'Profile'],
+    ['Home', 'KiloClaw', 'Agents', 'Chat', 'Profile'],
+    ['Home', 'Agents', 'Bogga shakhsiga'],
+  ];
+  // The label box is the tab item minus its 10dp horizontal padding.
+  const TAB_ITEM_PADDING = 10;
+  const TAB_WIDTHS = [40, 50, 72, 80, 90, 106.67, 120, 200];
+
+  it('renders every label at the full size that already fits its tab', () => {
+    const renderedRows: { labels: readonly string[]; tabWidth: number }[] = [];
+    for (const labels of LABEL_SETS) {
+      for (const tabWidth of TAB_WIDTHS) {
+        if (shouldShowTabLabel(1, tabWidth, labels)) {
+          renderedRows.push({ labels, tabWidth });
+        }
+      }
+    }
+    // Guard against a vacuous sweep that never renders a label row.
+    expect(renderedRows.length).toBeGreaterThan(0);
+    for (const { labels, tabWidth } of renderedRows) {
+      const box = tabWidth - TAB_ITEM_PADDING;
+      for (const label of labels) {
+        expect(tabLabelFits(label, tabWidth)).toBe(true);
+        // A full-size render fits, so the shrink the platform is asked for
+        // stays a sub-1.0 margin, above `TAB_LABEL_MINIMUM_FONT_SCALE`.
+        expect(box / tabLabelWidth(label)).toBeGreaterThanOrEqual(TAB_LABEL_MINIMUM_FONT_SCALE);
+      }
+    }
+  });
+
+  it('drops the label row before a label could need a shrink below the floor', () => {
+    const floorBoundLabels = ['Profile', 'Kilo Claw', 'Bogga shakhsiga', '設定'];
+    let checkedWidths = 0;
+    for (const label of floorBoundLabels) {
+      for (const tabWidth of TAB_WIDTHS) {
+        const box = tabWidth - TAB_ITEM_PADDING;
+        // The label would only fit by shrinking below the floor, so the bar
+        // must drop the row rather than lean on the iOS-only cap to keep it
+        // legible.
+        if (tabLabelWidth(label) > box / TAB_LABEL_MINIMUM_FONT_SCALE) {
+          checkedWidths += 1;
+          expect(shouldShowTabLabel(1, tabWidth, [label])).toBe(false);
+        }
+      }
+    }
+    // The sweep must actually cross the floor boundary.
+    expect(checkedWidths).toBeGreaterThan(0);
+  });
+});
+
+describe('tabLabelNumberOfLines', () => {
+  it('keeps a word that fits its tab on one line', () => {
+    expect(tabLabelNumberOfLines('Home')).toBe(1);
+  });
+
+  it('keeps a word wider than a narrow tab on one line so it truncates instead of breaking mid-word', () => {
+    expect(tabLabelNumberOfLines('Conversazioni')).toBe(1);
+  });
+
+  it('keeps the two lines for copy that carries its own break', () => {
+    expect(tabLabelNumberOfLines(i18n.t('tabs.kiloclawWrapped'))).toBe(2);
+    expect(tabLabelNumberOfLines('Kilo\nClaw')).toBe(2);
+  });
+});
+
+describe('mirrored tab label metrics', () => {
+  // The metrics at the top of this module are copied from the label
+  // component's style, so the "keep these in step" pointer must name the file
+  // that actually owns that style, and the copied tokens must still match it.
+  it('points at the component that owns the tab label style', () => {
+    expect(LAYOUT_SOURCE).toContain('apps/mobile/src/components/tab-bar-label.tsx');
+    expect(LABEL_SOURCE).toContain('export function TabBarLabel');
+  });
+
+  it('mirrors the component font size and tracking in the width estimate', () => {
+    // JetBrains Mono advances 0.6em per glyph; the label adds 0.2px tracking.
+    // `tabLabelWidth` must use the same 11px/0.2px the component's class sets,
+    // and the component must render one line via `tabLabelNumberOfLines`.
+    expect(LABEL_SOURCE).toContain(
+      'font-mono-medium text-[11px] leading-4 uppercase tracking-[0.2px]'
+    );
+    expect(LABEL_SOURCE).toContain('numberOfLines={tabLabelNumberOfLines(label)}');
+    expect(tabLabelWidth('A')).toBeCloseTo(0.6 * 11 + 0.2);
   });
 });
 

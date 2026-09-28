@@ -94,4 +94,23 @@ describe('EmailInputForm validation visibility', () => {
     expect(input.getAttribute('aria-invalid')).toBe('false');
     expect(input.hasAttribute('aria-describedby')).toBe(false);
   });
+
+  it('names the method in the submit label when a surface asks for it', async () => {
+    const dom = installDom();
+    cleanup = dom.cleanup;
+    act(() => {
+      root ??= createRoot(dom.container);
+      root.render(
+        createElement(EmailInputForm, {
+          email: 'valid@example.com',
+          emailValidation: { isValid: true, error: null },
+          onSubmit: event => event.preventDefault(),
+          onEmailChange: () => undefined,
+          submitLabel: 'Continue with Email',
+        })
+      );
+    });
+
+    expect(dom.container.textContent).toContain('Continue with Email');
+  });
 });

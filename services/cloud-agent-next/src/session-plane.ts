@@ -2,12 +2,14 @@ import type { SessionId } from './types.js';
 
 export type SessionPlane = 'legacy' | 'control';
 
+export const CONTROL_PLANE_SESSION_PREFIX = 'workspace_';
+
 export type ControlPlaneOwnerEnv = {
   CONTROL_PLANE_IDS?: string;
 };
 
 export function sessionPlaneFromId(sessionId: string): SessionPlane {
-  return sessionId.startsWith('workspace_') ? 'control' : 'legacy';
+  return sessionId.startsWith(CONTROL_PLANE_SESSION_PREFIX) ? 'control' : 'legacy';
 }
 
 export function sessionSupportsTerminal(sessionId: string): boolean {
@@ -17,7 +19,7 @@ export function sessionSupportsTerminal(sessionId: string): boolean {
 
 export function generateSessionId(plane: SessionPlane = 'legacy'): SessionId {
   const id = crypto.randomUUID();
-  return plane === 'control' ? `workspace_${id}` : `agent_${id}`;
+  return plane === 'control' ? `${CONTROL_PLANE_SESSION_PREFIX}${id}` : `agent_${id}`;
 }
 
 export type SessionCreateOrigin = {

@@ -23,11 +23,39 @@ function requiredEnv(name: string): string {
 }
 
 function parseGooglePlayServiceAccountCredentials(json: string): JWTInput {
-  const parsed = JSON.parse(json) as JWTInput;
-  if (!parsed.client_email || !parsed.private_key) {
+  let value: unknown;
+  try {
+    value = JSON.parse(json);
+  } catch {
     throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
   }
-  return parsed;
+
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('client_email' in value) ||
+    !('private_key' in value)
+  ) {
+    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+  }
+
+  const credentials = value as JWTInput;
+  if (!credentials.client_email || !credentials.private_key) {
+    throw new Error('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid');
+  }
+  return credentials;
+}
+
+/**
+ * Validates GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON without issuing a Play
+ * request. A one-off run calls this before scanning so a missing or malformed
+ * service account stops it with one clear, non-zero-exit message instead of
+ * turning every order lookup into an indistinguishable `failed=N`.
+ */
+export function assertGooglePlayServiceAccountConfigured(): void {
+  parseGooglePlayServiceAccountCredentials(
+    requiredEnv('GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON')
+  );
 }
 
 export function createGooglePlayAndroidPublisherClient(): androidpublisher_v3.Androidpublisher {
@@ -65,7 +93,7 @@ export async function getGooglePlaySubscriptionOrder(
     packageName: GOOGLE_PLAY_PACKAGE_NAME,
     orderId,
     fields:
-      'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
   });
   return response.data;
 }
@@ -91,5 +119,37 @@ export async function acknowledgeGooglePlaySubscriptionPurchase(
     // The app can acknowledge concurrently, or the response can be lost.
     const current = await getGooglePlaySubscriptionPurchase(purchaseToken);
     if (current.acknowledgementState !== 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED') throw error;
+  }
+}
+
+/**
+ * Refunds the latest charge and revokes the subscription immediately.
+ *
+ * A user holds at most one Kilo Pass, so a second paid subscription is a
+ * duplicate: the charge is reversed instead of admitted. The full amount is
+ * refunded because Kilo granted nothing against a duplicate purchase; the
+ * Kilo-side clawback (`reverseGooglePlayRefundCredits`) accounts for the spent
+ * side, so the customer nets amount paid minus amount spent.
+ *
+ * A caller must treat a throw as "not reversed" and keep the notification
+ * unprocessed, because retiring a charged order without a reversal loses money.
+ */
+export async function revokeGooglePlaySubscriptionPurchase(purchaseToken: string): Promise<void> {
+  const client = createGooglePlayAndroidPublisherClient();
+  try {
+    await client.purchases.subscriptionsv2.revoke({
+      packageName: GOOGLE_PLAY_PACKAGE_NAME,
+      token: purchaseToken,
+      requestBody: { revocationContext: { fullRefund: {} } },
+    });
+  } catch (error) {
+    // A retried notification can find the subscription already revoked, and
+    // Play then rejects the repeat call. Only EXPIRED proves the reversal took
+    // effect: CANCELED, PAUSED, ON_HOLD and PENDING can still be entitled and
+    // still charged, so their errors must keep the notification unprocessed.
+    const current = await getGooglePlaySubscriptionPurchase(purchaseToken);
+    if (current.subscriptionState !== 'SUBSCRIPTION_STATE_EXPIRED') {
+      throw error;
+    }
   }
 }

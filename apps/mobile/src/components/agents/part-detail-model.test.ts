@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   findPartById,
   getPartDetailTitle,
+  type PartDetailTitle,
   shouldAutoFollowPartDetail,
   shouldCenterPartDetail,
 } from './part-detail-model';
@@ -98,31 +99,42 @@ describe('findPartById', () => {
   });
 });
 
+/** A prefixless, non-translatable title: reasoning and the non-tool fallback. */
+function untranslated(text: string): PartDetailTitle {
+  return { prefix: null, text, translatable: false };
+}
+
 describe('getPartDetailTitle', () => {
   beforeEach(() => {
     getToolDisplay.mockReset();
   });
 
-  it('combines the display title and subtitle for tools', () => {
-    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi' });
-    expect(getPartDetailTitle(makeToolPart())).toBe('bash: echo hi');
+  it('translates the row subtitle under the display title prefix and carries its provenance', () => {
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: 'echo hi', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual({
+      prefix: 'bash',
+      text: 'echo hi',
+      translatable: true,
+    });
+    getToolDisplay.mockReturnValue({ title: 'glob', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toEqual(untranslated('glob'));
   });
 
-  it('uses the display title alone when the tool has no subtitle', () => {
-    getToolDisplay.mockReturnValue({ title: 'glob' });
-    expect(getPartDetailTitle(makeToolPart({ tool: 'glob' }))).toBe('glob');
+  it('falls back to the tool title when the row subtitle is empty', () => {
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must show the tool title rather than a blank.
+    getToolDisplay.mockReturnValue({ title: 'bash', subtitle: '', translatable: true });
+    expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
   });
 
-  it('labels streaming reasoning as Thinking', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toBe('Thinking');
-  });
-
-  it('labels completed reasoning as Thought', () => {
-    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toBe('Thought');
-  });
-
-  it('falls back to Details for other part types', () => {
-    expect(getPartDetailTitle(makeTextPart())).toBe('Details');
+  it('never marks reasoning or other part types translatable', () => {
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
+      untranslated('Thinking')
+    );
+    expect(getPartDetailTitle(makeReasoningPart('reasoning', true))).toEqual(
+      untranslated('Thought')
+    );
+    expect(getPartDetailTitle(makeTextPart())).toEqual(untranslated('Details'));
   });
 });
 

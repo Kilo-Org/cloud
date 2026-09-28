@@ -5,11 +5,8 @@ import type * as DrizzleOrmModule from 'drizzle-orm';
 import type { ProfileRow } from './profiles';
 import type * as RunModule from './run';
 
-// ---------------------------------------------------------------------------
-// In-memory D1/drizzle stand-in for admission + status tests.
 // Honestly models ON CONFLICT WHERE (failed-only), onConflictDoNothing,
 // INSERT...SELECT...WHERE NOT EXISTS charge guards, and post-batch reads.
-// ---------------------------------------------------------------------------
 
 type EventRow = {
   id: number;
@@ -463,10 +460,6 @@ beforeEach(() => {
   vi.mocked(computeEngineIdentity).mockReturnValue(ENGINE);
 });
 
-// ---------------------------------------------------------------------------
-// Currency predicate
-// ---------------------------------------------------------------------------
-
 describe('isCurrentBenchmarkProfile', () => {
   const current = { engineIdentity: ENGINE, repetitions: REPS };
   const e = entry('m/a', 'xhigh');
@@ -547,10 +540,6 @@ describe('isCurrentBenchmarkProfile', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Pure admission classification
-// ---------------------------------------------------------------------------
-
 describe('classifyProfileAdmission', () => {
   const current = { engineIdentity: ENGINE, repetitions: REPS };
   const e = entry('m');
@@ -627,10 +616,6 @@ describe('computeQuotaRetryAt', () => {
     expect(computeQuotaRetryAt(oldest)).toBe('2026-07-29T01:00:00.000Z');
   });
 });
-
-// ---------------------------------------------------------------------------
-// registerProfiles (atomic admission)
-// ---------------------------------------------------------------------------
 
 describe('registerProfiles', () => {
   it('admits a missing pair once; a second owner is not charged', async () => {
@@ -938,10 +923,6 @@ describe('registerProfiles', () => {
     expect(store.events).toHaveLength(9);
   });
 });
-
-// ---------------------------------------------------------------------------
-// lookupProfileStatuses
-// ---------------------------------------------------------------------------
 
 describe('lookupProfileStatuses', () => {
   it('returns current statuses without charging', async () => {

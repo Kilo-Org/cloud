@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { TextInput, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useConnectBitbucket } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -40,8 +41,11 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
       <Text className="text-center text-xs text-muted-foreground">
         {t('codeReviewer.bitbucketConnect.scopes')}
       </Text>
-      <TextInput
-        className="h-12 rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+      <Input
+        // The shared single-line box supplies the touch floor
+        // (`min-h-[44px]`, never a fixed height or `py-*`); the field keeps
+        // its own chrome, horizontal inset and line box.
+        className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
         placeholder={t('codeReviewer.bitbucketConnect.tokenPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"

@@ -5,6 +5,7 @@ import {
   credit_transactions,
   organization_seats_purchases,
   organization_memberships,
+  organization_service_fee_exemptions,
   platform_integrations,
   kilo_pass_org_agreements,
   kilo_pass_org_allocation_plans,
@@ -14,7 +15,11 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import {
+  createOrganization,
+  addUserToOrganization,
+  markOrganizationAsDeleted,
+} from '@/lib/organizations/organizations';
 import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
 import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
@@ -1811,6 +1816,250 @@ describe('organization admin router', () => {
         await db
           .delete(organizations)
           .where(inArray(organizations.id, [tier19Org.id, tier49Org.id]));
+      }
+    });
+  });
+
+  describe('serviceFeeExemption', () => {
+    async function createExemptionTestOrganization(name = 'Service fee exemption') {
+      return createOrganization(`${name} ${crypto.randomUUID()}`, adminUser.id);
+    }
+
+    async function cleanupExemptionTestOrganization(organizationId: string) {
+      await db
+        .delete(organization_service_fee_exemptions)
+        .where(eq(organization_service_fee_exemptions.organization_id, organizationId));
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.organization_id, organizationId));
+      await db.delete(organizations).where(eq(organizations.id, organizationId));
+    }
+
+    it('grants an exemption with a trimmed reason, actor, and history row', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const result = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: '  nonprofit partner  ',
+        });
+
+        expect(result.current).toMatchObject({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'nonprofit partner',
+          changedByKiloUserId: adminUser.id,
+        });
+        expect(result.current.id).toBe(result.history.id);
+        expect(result.history).toMatchObject({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'nonprofit partner',
+          changedByKiloUserId: adminUser.id,
+        });
+        // Timestamps are normalized to UTC ISO at the API boundary.
+        expect(new Date(result.current.createdAt).toISOString()).toBe(result.current.createdAt);
+        expect(new Date(result.history.createdAt).toISOString()).toBe(result.history.createdAt);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current?.isExempt).toBe(true);
+        expect(view.current?.reason).toBe('nonprofit partner');
+        expect(view.history).toHaveLength(1);
+        expect(view.history[0].id).toBe(result.history.id);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('revokes an exemption and returns the newest history first', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'initial grant',
+        });
+        const revoked = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: false,
+          reason: 'revoked after contract review',
+        });
+
+        expect(revoked.current.isExempt).toBe(false);
+        expect(revoked.current.reason).toBe('revoked after contract review');
+        expect(revoked.current.id).toBe(revoked.history.id);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current?.isExempt).toBe(false);
+        expect(view.history.map(row => row.reason)).toEqual([
+          'revoked after contract review',
+          'initial grant',
+        ]);
+        expect(view.history.map(row => row.isExempt)).toEqual([false, true]);
+        expect(view.history.every(row => row.changedByKiloUserId === adminUser.id)).toBe(true);
+        expect(
+          view.history.every(row => new Date(row.createdAt).toISOString() === row.createdAt)
+        ).toBe(true);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('allows repeating the same state with a new reason and appends another row', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+        const first = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'initial grant',
+        });
+        const second = await caller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'renewed with updated documentation',
+        });
+
+        expect(second.current.isExempt).toBe(true);
+        expect(second.current.reason).toBe('renewed with updated documentation');
+        expect(second.current.id).toBe(second.history.id);
+        expect(second.current.id).not.toBe(first.current.id);
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.history).toHaveLength(2);
+        expect(view.history.map(row => row.reason)).toEqual([
+          'renewed with updated documentation',
+          'initial grant',
+        ]);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects non-admin users from reading and mutating exemption state', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(nonAdminUser.id);
+
+        await expect(
+          caller.organizations.admin.getServiceFeeExemption({ organizationId: org.id })
+        ).rejects.toThrow('Admin access required');
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'non-admin attempt',
+          })
+        ).rejects.toThrow('Admin access required');
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects blank and undersized reasons', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: '   ',
+          })
+        ).rejects.toThrow();
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'no',
+          })
+        ).rejects.toThrow();
+
+        const view = await caller.organizations.admin.getServiceFeeExemption({
+          organizationId: org.id,
+        });
+        expect(view.current).toBeNull();
+        expect(view.history).toEqual([]);
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('rejects oversized reasons', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'x'.repeat(501),
+          })
+        ).rejects.toThrow();
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('maps deleted and missing organizations to NOT_FOUND', async () => {
+      const org = await createExemptionTestOrganization();
+      try {
+        await markOrganizationAsDeleted(org.id);
+        const caller = await createCallerForUser(adminUser.id);
+
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: org.id,
+            isExempt: true,
+            reason: 'deleted organization',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+        await expect(
+          caller.organizations.admin.setServiceFeeExemption({
+            organizationId: '550e8400-e29b-41d4-a716-446655440099',
+            isExempt: true,
+            reason: 'missing organization',
+          })
+        ).rejects.toMatchObject({ code: 'NOT_FOUND', message: 'Organization not found' });
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
+      }
+    });
+
+    it('does not expose exemption fields through customer organization APIs', async () => {
+      const org = await createOrganization(
+        `Customer surface ${crypto.randomUUID()}`,
+        nonAdminUser.id
+      );
+      try {
+        const adminCaller = await createCallerForUser(adminUser.id);
+        await adminCaller.organizations.admin.setServiceFeeExemption({
+          organizationId: org.id,
+          isExempt: true,
+          reason: 'granted for customer surface check',
+        });
+
+        const customerCaller = await createCallerForUser(nonAdminUser.id);
+        const customerOrganizations = await customerCaller.organizations.list();
+        const row = customerOrganizations.find(entry => entry.organizationId === org.id);
+
+        expect(row).toBeDefined();
+        expect(Object.keys(row ?? {}).some(key => /exempt/i.test(key))).toBe(false);
+        expect(JSON.stringify(row)).not.toMatch(
+          /service_fee_exemption|serviceFeeExemption|isExempt/
+        );
+      } finally {
+        await cleanupExemptionTestOrganization(org.id);
       }
     });
   });

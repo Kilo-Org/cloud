@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runAutoCommit } from '../../../wrapper/src/auto-commit.js';
 import { createLifecycleManager } from '../../../wrapper/src/lifecycle.js';
 import type { WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
 import { WrapperState } from '../../../wrapper/src/state.js';
@@ -111,6 +112,22 @@ describe('sealed wrapper batch lifecycle', () => {
       }),
       timestamp: expect.any(String),
     });
+  });
+
+  it('passes the admitted user-message identity to the post-completion auto-commit', async () => {
+    state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
+    state.acceptMessage('message-2', { autoCommit: true, condenseOnComplete: false });
+    state.setLastAssistantMessageId('assistant-2');
+
+    manager.triggerDrainAndClose();
+    await vi.advanceTimersByTimeAsync(300);
+
+    expect(vi.mocked(runAutoCommit)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: 'assistant-2',
+        userMessageId: 'message-2',
+      })
+    );
   });
 
   it('requires a later root idle after root activity', async () => {

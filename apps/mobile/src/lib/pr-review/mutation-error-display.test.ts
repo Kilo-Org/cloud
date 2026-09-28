@@ -46,11 +46,11 @@ describe('mutationErrorDisplay', () => {
     const ambiguous = new Error(PR_OPERATION_AMBIGUOUS_MESSAGE);
     const classification = classifyPrReviewMutationError(ambiguous);
     expect(classification).toEqual({ kind: 'retryable' });
-    expect(mutationErrorDisplay('submit', classification, ambiguous)).toEqual({
+    expect(mutationErrorDisplay('submit', classification, { rawError: ambiguous })).toEqual({
       kind: 'retryable',
       message: PR_OPERATION_AMBIGUOUS_MESSAGE,
     });
-    expect(mutationErrorDisplay('composer', classification, ambiguous)).toEqual({
+    expect(mutationErrorDisplay('composer', classification, { rawError: ambiguous })).toEqual({
       kind: 'retryable',
       message: PR_OPERATION_AMBIGUOUS_MESSAGE,
     });
@@ -68,14 +68,18 @@ describe('mutationErrorDisplay', () => {
     const persistenceFailed = new Error(PR_OPERATION_PERSISTENCE_FAILED_MESSAGE);
     const classification = classifyPrReviewMutationError(persistenceFailed);
     expect(classification).toEqual({ kind: 'retryable' });
-    expect(mutationErrorDisplay('composer', classification, persistenceFailed)).toEqual({
+    expect(
+      mutationErrorDisplay('composer', classification, { rawError: persistenceFailed })
+    ).toEqual({
       kind: 'bad-request',
       message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
     });
-    expect(mutationErrorDisplay('submit', classification, persistenceFailed)).toEqual({
-      kind: 'bad-request',
-      message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
-    });
+    expect(mutationErrorDisplay('submit', classification, { rawError: persistenceFailed })).toEqual(
+      {
+        kind: 'bad-request',
+        message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
+      }
+    );
     expect(mutationErrorDisplayFromError('submit', persistenceFailed)).toEqual({
       kind: 'bad-request',
       message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -98,6 +102,74 @@ describe('mutationErrorDisplay', () => {
     });
   });
 
+  it('uses the edit-comment bad-request copy for the own-comment edit surface', () => {
+    // The own-comment edit sheet rejects a body the server will no longer
+    // accept with the "can't be edited" copy, not the composer's post copy.
+    const classification = classifyPrReviewMutationError(
+      makeError('BAD_REQUEST', 'Comment is too long')
+    );
+    expect(mutationErrorDisplay('edit-comment', classification)).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+    expect(
+      mutationErrorDisplayFromError('edit-comment', makeError('BAD_REQUEST', 'Comment is too long'))
+    ).toEqual({
+      kind: 'bad-request',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+  });
+
+  it('maps a provider 404 to the terminal edit-comment copy', () => {
+    // GitHub 404s a comment that no longer exists. The edit sheet must show
+    // the deleted-comment copy with Save down (the `not-found` kind), not the
+    // retryable fall-through its classifier yields for NOT_FOUND.
+    const gone = makeError('NOT_FOUND', 'PR not found, you do not have access');
+    expect(classifyPrReviewMutationError(gone)).toEqual({ kind: 'retryable' });
+    expect(mutationErrorDisplayFromError('edit-comment', gone)).toEqual({
+      kind: 'not-found',
+      message: "This comment can't be edited. It may have been deleted.",
+    });
+    // Other surfaces keep the retryable fall-through: their 404s are outside
+    // the own-comment edit slice.
+    expect(mutationErrorDisplayFromError('composer', gone)).toEqual({
+      kind: 'retryable',
+      message: 'PR not found, you do not have access',
+    });
+  });
+
+  it('words the submit bad-request copy after the connected provider when a term rides', () => {
+    // s6f: a rejected review submit on a GitLab merge request must never read
+    // "pull request". The provider arm passes the translated noun as `term`;
+    // GitHub (no term) keeps the exact pre-s6 copy asserted above.
+    const classification = classifyPrReviewMutationError(
+      makeError('BAD_REQUEST', 'You cannot perform the requested action')
+    );
+    expect(mutationErrorDisplay('submit', classification, { term: 'merge request' })).toEqual({
+      kind: 'bad-request',
+      message:
+        "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request.",
+    });
+    // The convenience wrapper forwards the term too.
+    expect(
+      mutationErrorDisplayFromError(
+        'submit',
+        makeError('BAD_REQUEST', 'You cannot perform the requested action'),
+        'merge request'
+      )
+    ).toEqual({
+      kind: 'bad-request',
+      message:
+        "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request.",
+    });
+    // The composer surface keeps its own copy even with a term.
+    expect(mutationErrorDisplay('composer', classification, { term: 'merge request' })).toEqual({
+      kind: 'bad-request',
+      message:
+        "This comment can't be posted. The selected line may have changed, or the PR may have been updated.",
+    });
+  });
+
   it('keeps reconnect copy fixed on both surfaces', () => {
     const classification = classifyPrReviewMutationError(
       makeError('PRECONDITION_FAILED', 'revoked')
@@ -115,7 +187,7 @@ describe('mutationErrorDisplay', () => {
   it('keeps retryable kinds with surface-appropriate messages', () => {
     const networkError = new Error('Network request failed');
     const classification = classifyPrReviewMutationError(networkError);
-    expect(mutationErrorDisplay('composer', classification, networkError)).toEqual({
+    expect(mutationErrorDisplay('composer', classification, { rawError: networkError })).toEqual({
       kind: 'retryable',
       message: 'Network request failed',
     });
@@ -123,7 +195,7 @@ describe('mutationErrorDisplay', () => {
       kind: 'retryable',
       message: 'Could not post comment.',
     });
-    expect(mutationErrorDisplay('submit', classification, networkError)).toEqual({
+    expect(mutationErrorDisplay('submit', classification, { rawError: networkError })).toEqual({
       kind: 'retryable',
       message: 'Could not submit review. Check your connection and try again.',
     });

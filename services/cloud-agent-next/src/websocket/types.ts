@@ -16,10 +16,6 @@ export type {
   KilocodeEventData,
 } from '../shared/protocol.js';
 
-// ---------------------------------------------------------------------------
-// Stream Event Types
-// ---------------------------------------------------------------------------
-
 /**
  * Types of events that can flow through the streaming system.
  * These map to execution lifecycle events and output streams.
@@ -47,10 +43,6 @@ export type StreamEventType =
   | 'cloud.message.failed' // user message delivery failed or was canceled
   | 'wrapper_event_truncated'; // internal size-safety signal (not persisted or broadcast)
 
-// ---------------------------------------------------------------------------
-// Server -> Client Events (/stream endpoint)
-// ---------------------------------------------------------------------------
-
 /**
  * Event envelope sent to clients connected to the /stream endpoint.
  * Each event is uniquely identified and associated with an execution and session.
@@ -70,10 +62,6 @@ export type StreamEvent = {
   data: unknown;
 };
 
-// ---------------------------------------------------------------------------
-// Wrapper -> DO Events (/ingest endpoint)
-// ---------------------------------------------------------------------------
-
 /**
  * Event envelope sent by the wrapper to the Durable Object via /ingest.
  * The execution and session context is established at connection time.
@@ -86,10 +74,6 @@ export type IngestEvent = {
   /** Event payload - structure depends on streamEventType */
   data: unknown;
 };
-
-// ---------------------------------------------------------------------------
-// Error Handling
-// ---------------------------------------------------------------------------
 
 /** Error codes for WebSocket protocol errors */
 export type StreamErrorCode =
@@ -108,10 +92,6 @@ export type StreamError = {
   code: StreamErrorCode;
   message: string;
 };
-
-// ---------------------------------------------------------------------------
-// Stream Filtering
-// ---------------------------------------------------------------------------
 
 /**
  * Filter options for the /stream endpoint.
@@ -144,10 +124,6 @@ export type ParsedStreamParams = {
   endTime?: number;
 };
 
-// ---------------------------------------------------------------------------
-// SQLite Storage
-// ---------------------------------------------------------------------------
-
 /**
  * Row structure for events stored in SQLite.
  * Uses snake_case to match SQL conventions.
@@ -166,10 +142,6 @@ export type StoredEvent = {
   /** Unix timestamp in milliseconds */
   timestamp: number;
 };
-
-// ---------------------------------------------------------------------------
-// WebSocket Hibernation
-// ---------------------------------------------------------------------------
 
 /**
  * Attachment data stored with hibernating WebSocket connections.

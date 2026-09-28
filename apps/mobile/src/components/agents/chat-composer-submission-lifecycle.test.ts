@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { parseChatComposerSubmission } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
 
 function makeCleanup() {
@@ -56,8 +57,22 @@ function makeCreateSessionSubmission() {
   return { type: 'create-session' as const };
 }
 
-function makeExitSessionSubmission() {
-  return { type: 'exit-session' as const };
+function makeExitSessionSubmission(command: string) {
+  const submission = parseChatComposerSubmission(`/${command}`, [], {
+    hasAttachments: false,
+    sessionType: 'remote',
+    remoteCommandState: {
+      ownerConnectionId: 'conn-1',
+      refresh: 'idle',
+      commands: [],
+      canExitSession: true,
+    },
+  });
+  expect(submission).toEqual({ type: 'exit-session' });
+  if (submission.type !== 'exit-session') {
+    throw new Error('Expected the shared exit-session action');
+  }
+  return submission;
 }
 
 function makeRestartSessionSubmission() {
@@ -120,7 +135,7 @@ describe('executeChatComposerSubmission', () => {
     });
   });
 
-  describe('exit-session submission', () => {
+  describe.each(['exit', 'quit'])('/%s exit-session submission', command => {
     it('does no cleanup and never exits when confirmation is cancelled', async () => {
       const handlers = makeHandlers({
         confirmExitSession: async () => {
@@ -130,10 +145,12 @@ describe('executeChatComposerSubmission', () => {
       });
       const cleanup = makeCleanup();
 
-      await executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup);
+      await executeChatComposerSubmission(makeExitSessionSubmission(command), handlers, cleanup);
 
       expect(handlers.confirmExitSession).toHaveBeenCalledTimes(1);
       expect(handlers.onExitSession).not.toHaveBeenCalled();
+      expect(handlers.onSendCommand).not.toHaveBeenCalled();
+      expect(handlers.onSendPrompt).not.toHaveBeenCalled();
       expect(cleanup.clearDraft).not.toHaveBeenCalled();
       expect(cleanup.dismiss).not.toHaveBeenCalled();
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();
@@ -159,10 +176,12 @@ describe('executeChatComposerSubmission', () => {
         dismiss: vi.fn(() => order.push('dismiss')),
       };
 
-      await executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup);
+      await executeChatComposerSubmission(makeExitSessionSubmission(command), handlers, cleanup);
 
       expect(order).toEqual(['confirm', 'exit', 'clear', 'dismiss']);
       expect(handlers.onExitSession).toHaveBeenCalledTimes(1);
+      expect(handlers.onSendCommand).not.toHaveBeenCalled();
+      expect(handlers.onSendPrompt).not.toHaveBeenCalled();
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();
     });
 
@@ -176,13 +195,40 @@ describe('executeChatComposerSubmission', () => {
       const cleanup = makeCleanup();
 
       await expect(
-        executeChatComposerSubmission(makeExitSessionSubmission(), handlers, cleanup)
+        executeChatComposerSubmission(makeExitSessionSubmission(command), handlers, cleanup)
       ).rejects.toThrow('CLI is already offline');
 
       expect(handlers.onExitSession).toHaveBeenCalledTimes(1);
       expect(cleanup.clearDraft).not.toHaveBeenCalled();
       expect(cleanup.dismiss).not.toHaveBeenCalled();
       expect(cleanup.resetAttachments).not.toHaveBeenCalled();
+    });
+
+    it('preserves the draft and keyboard until the pending exit is accepted', async () => {
+      const pending = Promise.withResolvers<undefined>();
+      const handlers = makeHandlers({
+        onExitSession: async onAccepted => {
+          await pending.promise;
+          onAccepted();
+        },
+      });
+      const cleanup = makeCleanup();
+      const submission = executeChatComposerSubmission(
+        makeExitSessionSubmission(command),
+        handlers,
+        cleanup
+      );
+
+      await vi.waitFor(() => {
+        expect(handlers.onExitSession).toHaveBeenCalledTimes(1);
+      });
+      expect(cleanup.clearDraft).not.toHaveBeenCalled();
+      expect(cleanup.dismiss).not.toHaveBeenCalled();
+
+      pending.resolve(undefined);
+      await submission;
+      expect(cleanup.clearDraft).toHaveBeenCalledTimes(1);
+      expect(cleanup.dismiss).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -1,7 +1,7 @@
 import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
-import { claude_opus_4_7_stealth_model } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { claude_opus_4_7_stealth_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
   cost_mUsd: 0,

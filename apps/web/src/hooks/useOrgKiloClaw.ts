@@ -28,131 +28,12 @@ export function useOrgKiloClawNavState(organizationId?: string) {
   );
 }
 
-export function useOrgKiloClawConfig(organizationId: string) {
-  const trpc = useTRPC();
-  return useQuery(trpc.organizations.kiloclaw.getConfig.queryOptions({ organizationId }));
-}
-
-export function useOrgKiloClawPairing(organizationId: string, enabled = true) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.listPairingRequests.queryOptions(
-      { organizationId },
-      { enabled, refetchInterval: enabled ? 120_000 : false }
-    )
-  );
-}
-
-export function useOrgRefreshPairing(organizationId: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return async () => {
-    const fresh = await queryClient.fetchQuery(
-      trpc.organizations.kiloclaw.listPairingRequests.queryOptions(
-        { organizationId, refresh: true },
-        { staleTime: 0 }
-      )
-    );
-    queryClient.setQueryData(
-      trpc.organizations.kiloclaw.listPairingRequests.queryKey({ organizationId }),
-      fresh
-    );
-  };
-}
-
-export function useOrgKiloClawDevicePairing(organizationId: string, enabled = true) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.listDevicePairingRequests.queryOptions(
-      { organizationId },
-      { enabled, refetchInterval: enabled ? 120_000 : false }
-    )
-  );
-}
-
-export function useOrgRefreshDevicePairing(organizationId: string) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  return async () => {
-    const fresh = await queryClient.fetchQuery(
-      trpc.organizations.kiloclaw.listDevicePairingRequests.queryOptions({
-        organizationId,
-        refresh: true,
-      })
-    );
-    queryClient.setQueryData(
-      trpc.organizations.kiloclaw.listDevicePairingRequests.queryKey({ organizationId }),
-      fresh
-    );
-  };
-}
-
 export function useOrgKiloClawGatewayStatus(organizationId: string, enabled: boolean) {
   const trpc = useTRPC();
   return useQuery(
     trpc.organizations.kiloclaw.gatewayStatus.queryOptions(
       { organizationId },
       { enabled, refetchInterval: enabled ? 30_000 : false }
-    )
-  );
-}
-
-export function useOrgGatewayReady(organizationId: string, enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.gatewayReady.queryOptions(
-      { organizationId },
-      { enabled, refetchInterval: enabled ? 5_000 : false }
-    )
-  );
-}
-
-export function useOrgControllerVersion(organizationId: string, enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.controllerVersion.queryOptions(
-      { organizationId },
-      { enabled, staleTime: 5 * 60_000 }
-    )
-  );
-}
-
-export function useOrgMorningBriefingStatus(organizationId: string, enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.getMorningBriefingStatus.queryOptions(
-      { organizationId },
-      { enabled, refetchInterval: enabled ? 30_000 : false }
-    )
-  );
-}
-
-export function useOrgKiloClawServiceDegraded(organizationId: string) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.serviceDegraded.queryOptions(
-      { organizationId },
-      { staleTime: 60_000, refetchInterval: 60_000 }
-    )
-  );
-}
-
-export function useOrgKiloClawLatestVersion(organizationId: string) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.latestVersion.queryOptions(
-      { organizationId },
-      { staleTime: 60_000 }
-    )
-  );
-}
-
-export function useOrgKiloClawAvailableVersions(organizationId: string, offset = 0, limit = 25) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.listAvailableVersions.queryOptions(
-      { organizationId, offset, limit },
-      { staleTime: 5 * 60_000 }
     )
   );
 }
@@ -164,31 +45,6 @@ export function useOrgKiloClawMyPin(organizationId: string, opts: { enabled?: bo
     trpc.organizations.kiloclaw.getMyPin.queryOptions(
       { organizationId },
       { staleTime: 60_000, enabled }
-    )
-  );
-}
-
-export function useOrgFileTree(organizationId: string, enabled: boolean, path?: string) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.fileTree.queryOptions(
-      { organizationId, ...(path === undefined ? {} : { path }) },
-      { enabled, refetchOnWindowFocus: false }
-    )
-  );
-}
-
-export function useOrgReadFile(organizationId: string, path: string | null, enabled: boolean) {
-  const trpc = useTRPC();
-  return useQuery(
-    trpc.organizations.kiloclaw.readFile.queryOptions(
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- guarded by `enabled: enabled && path !== null`
-      { organizationId, path: path! },
-      {
-        enabled: enabled && path !== null,
-        refetchOnWindowFocus: false,
-        refetchOnMount: 'always',
-      }
     )
   );
 }

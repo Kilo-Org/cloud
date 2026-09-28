@@ -758,7 +758,7 @@ describe('review identity', () => {
     });
 
     const cancelled = await cancelActiveCodeReviewsForIntegration({
-      organizationId,
+      owner: { type: 'org', id: organizationId },
       platform: 'github',
       integrationId: organizationIntegrationId,
     });
@@ -800,6 +800,74 @@ describe('review identity', () => {
     expect(attempts.map(attempt => attempt.status)).toEqual(['cancelled', 'cancelled']);
   });
 
+  it('clears a dangling dispatch reservation when cancelling for an integration', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'org', id: organizationId, userId: firstUser.id },
+      platformIntegrationId: organizationIntegrationId,
+      repoFullName: `${REPO}-integration-disconnect-reservation`,
+      prNumber: 40,
+      prUrl: `https://github.com/${REPO}-integration-disconnect-reservation/pull/40`,
+      prTitle: 'integration disconnect reservation',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/integration-disconnect-reservation',
+      headSha: 'integration-disconnect-reservation',
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+    await updateCodeReviewStatus(reviewId, 'queued');
+    await db
+      .update(cloud_agent_code_reviews)
+      .set({ dispatch_reservation_id: crypto.randomUUID() })
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+
+    const cancelled = await cancelActiveCodeReviewsForIntegration({
+      owner: { type: 'org', id: organizationId },
+      platform: 'github',
+      integrationId: organizationIntegrationId,
+    });
+    expect(cancelled.map(row => row.id)).toContain(reviewId);
+
+    const [row] = await db
+      .select({
+        status: cloud_agent_code_reviews.status,
+        dispatchReservationId: cloud_agent_code_reviews.dispatch_reservation_id,
+      })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(row).toMatchObject({ status: 'cancelled', dispatchReservationId: null });
+  });
+
+  it('cancels active reviews for a user-owned integration', async () => {
+    const reviewId = await createCodeReview({
+      owner: { type: 'user', id: firstUser.id, userId: firstUser.id },
+      platformIntegrationId: firstIntegrationId,
+      repoFullName: `${REPO}-user-integration-disconnect`,
+      prNumber: 41,
+      prUrl: `https://github.com/${REPO}-user-integration-disconnect/pull/41`,
+      prTitle: 'user integration disconnect',
+      prAuthor: 'octocat',
+      baseRef: 'main',
+      headRef: 'feature/user-integration-disconnect',
+      headSha: 'user-integration-disconnect',
+      platform: 'github',
+    });
+    createdReviewIds.push(reviewId);
+
+    const cancelled = await cancelActiveCodeReviewsForIntegration({
+      owner: { type: 'user', id: firstUser.id },
+      platform: 'github',
+      integrationId: firstIntegrationId,
+    });
+    expect(cancelled.map(row => row.id)).toContain(reviewId);
+
+    const [row] = await db
+      .select({ status: cloud_agent_code_reviews.status })
+      .from(cloud_agent_code_reviews)
+      .where(eq(cloud_agent_code_reviews.id, reviewId));
+    expect(row?.status).toBe('cancelled');
+  });
+
   it('settles the admitted ledger row for user-cancelled reviews', async () => {
     const reviewId = await createCodeReview({
       owner: { type: 'org', id: organizationId, userId: firstUser.id },
@@ -818,7 +886,7 @@ describe('review identity', () => {
     createdReviewIds.push(reviewId);
 
     const cancelled = await cancelActiveCodeReviewsForIntegration({
-      organizationId,
+      owner: { type: 'org', id: organizationId },
       platform: 'github',
       integrationId: organizationIntegrationId,
     });

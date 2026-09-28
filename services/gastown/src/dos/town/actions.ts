@@ -24,8 +24,6 @@ import { getRig } from './rigs';
 import { parseGitUrl } from '../../util/platform-pr.util';
 import type { PRStatusOutcome, PRStatusError } from './town-scm';
 
-// ── Bead mutations ──────────────────────────────────────────────────
-
 const TransitionBead = z.object({
   type: z.literal('transition_bead'),
   bead_id: z.string(),
@@ -77,8 +75,6 @@ const SetReviewPrUrl = z.object({
   pr_url: z.string(),
 });
 
-// ── Agent mutations ─────────────────────────────────────────────────
-
 const TransitionAgent = z.object({
   type: z.literal('transition_agent'),
   agent_id: z.string(),
@@ -115,8 +111,6 @@ const DeleteAgent = z.object({
   reason: z.string(),
 });
 
-// ── Convoy mutations ────────────────────────────────────────────────
-
 const UpdateConvoyProgress = z.object({
   type: z.literal('update_convoy_progress'),
   convoy_id: z.string(),
@@ -138,8 +132,6 @@ const FailConvoy = z.object({
   convoy_id: z.string(),
   reason: z.string(),
 });
-
-// ── Side effects (deferred) ─────────────────────────────────────────
 
 const DispatchAgent = z.object({
   type: z.literal('dispatch_agent'),
@@ -200,8 +192,6 @@ const ReportWastelandDone = z.object({
   evidence: z.string(),
 });
 
-// ── Union ───────────────────────────────────────────────────────────
-
 export const Action = z.discriminatedUnion('type', [
   // Bead mutations
   TransitionBead,
@@ -237,7 +227,6 @@ export const Action = z.discriminatedUnion('type', [
 
 export type Action = z.infer<typeof Action>;
 
-// ── Per-type exports for construction ───────────────────────────────
 // These aren't validated at construction time (they're built by the
 // reconciler itself), so we export plain type aliases for convenience.
 
@@ -268,7 +257,6 @@ export type NotifyMayor = z.infer<typeof NotifyMayor>;
 export type EmitEvent = z.infer<typeof EmitEvent>;
 export type ReportWastelandDone = z.infer<typeof ReportWastelandDone>;
 
-// ── Action application context ──────────────────────────────────────
 // applyAction needs access to TownDO-level resources for side effects.
 // The SQL handle is for synchronous mutations; the rest are for async
 // side effects (dispatch, stop, poll, nudge).
@@ -450,8 +438,6 @@ function now(): string {
   return new Date().toISOString();
 }
 
-// ── applyAction ─────────────────────────────────────────────────────
-
 /**
  * Apply a single action. Synchronous SQL mutations happen inline.
  * Async side effects (container dispatch, PR polling, etc.) are returned
@@ -493,7 +479,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'clear_bead_assignee': {
-      // Clear the assignee on the bead
       query(
         sql,
         /* sql */ `
@@ -884,7 +869,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               return;
             }
 
-            // PR is open — check for feedback and auto-merge if configured
             const townConfig = await ctx.getTownConfig();
             const refineryConfig = townConfig.refinery;
             if (!refineryConfig) return;
@@ -920,7 +904,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                 conflictMetaRows[0]?.has_conflicts === true;
 
               if (!alreadyMarked) {
-                // Mark conflict on MR bead metadata
                 query(
                   sql,
                   /* sql */ `
@@ -936,7 +919,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
                   [now(), now(), action.bead_id]
                 );
 
-                // Get MR bead source bead ID and branch for the event payload
                 const mrMetaRows = z
                   .object({ source_bead_id: z.string().nullable(), branch: z.string().nullable() })
                   .array()
@@ -1150,7 +1132,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
 
-            // Auto-resolve PR feedback: detect unresolved comments and failing CI
             if (
               wantsAutoResolve &&
               feedback &&
@@ -1215,7 +1196,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
 
-            // Auto-merge timer: track grace period when everything is green
             if (wantsAutoMerge) {
               if (!feedback) return;
 
@@ -1482,7 +1462,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
               }
             }
           }
-          // status === 'open' — no action needed, poll again next tick
         } catch (err) {
           console.warn(`${LOG} poll_pr failed: bead=${action.bead_id} url=${action.pr_url}`, err);
         }
@@ -1675,7 +1654,6 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     case 'notify_mayor': {
-      // Mayor notifications are informational — log for now
       console.log(`${LOG} notify_mayor: town=${townId} msg=${action.message}`);
       return null;
     }
@@ -1703,15 +1681,12 @@ export function applyAction(ctx: ApplyActionContext, action: Action): (() => Pro
     }
 
     default: {
-      // Exhaustiveness check via never
       const _exhaustive: never = action;
       console.warn(`${LOG} applyAction: unknown action type`, _exhaustive);
       return null;
     }
   }
 }
-
-// ── Helpers ─────────────────────────────────────────────────────────
 
 /** Check if an MR bead already has a non-terminal feedback bead blocking it. */
 function hasExistingFeedbackBead(sql: SqlStorage, mrBeadId: string): boolean {

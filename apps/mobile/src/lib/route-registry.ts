@@ -11,10 +11,12 @@ import { useEffect } from 'react';
 
 import { type DiffSelection } from './pr-review/diff-selection-bridge';
 import {
+  type BranchPickerBridge,
   type FolderPickerBridge,
   type InstancePickerBridge,
   type ModelPickerBridge,
   type ModePickerBridge,
+  type ProfilePickerBridge,
   type RepoPickerBridge,
 } from './picker-bridge';
 import { type SecurityFindingFilterBridge } from './security-finding-filter-bridge';
@@ -47,8 +49,10 @@ type SlotValue = {
   modelPicker: ModelPickerBridge;
   modePicker: ModePickerBridge;
   repoPicker: RepoPickerBridge;
+  branchPicker: BranchPickerBridge;
   instancePicker: InstancePickerBridge;
   folderPicker: FolderPickerBridge;
+  profilePicker: ProfilePickerBridge;
   prFileNav: Set<FileNavigatorListener>;
   prDiffSelection: DiffSelection;
   securityFilter: SecurityFindingFilterBridge;
@@ -62,8 +66,10 @@ const slots: RegistrySlots = {
   modelPicker: new Map<RouteKey, ModelPickerBridge>(),
   modePicker: new Map<RouteKey, ModePickerBridge>(),
   repoPicker: new Map<RouteKey, RepoPickerBridge>(),
+  branchPicker: new Map<RouteKey, BranchPickerBridge>(),
   instancePicker: new Map<RouteKey, InstancePickerBridge>(),
   folderPicker: new Map<RouteKey, FolderPickerBridge>(),
+  profilePicker: new Map<RouteKey, ProfilePickerBridge>(),
   prFileNav: new Map<RouteKey, Set<FileNavigatorListener>>(),
   prDiffSelection: new Map<RouteKey, DiffSelection>(),
   securityFilter: new Map<RouteKey, SecurityFindingFilterBridge>(),
@@ -73,8 +79,10 @@ const ALL_SLOT_KINDS: readonly SlotKind[] = [
   'modelPicker',
   'modePicker',
   'repoPicker',
+  'branchPicker',
   'instancePicker',
   'folderPicker',
+  'profilePicker',
   'prFileNav',
   'prDiffSelection',
   'securityFilter',
@@ -106,8 +114,10 @@ function createSlot<K extends SlotKind>(kind: K): RouteSlot<K> {
 export const modelPickerSlot = createSlot('modelPicker');
 export const modePickerSlot = createSlot('modePicker');
 export const repoPickerSlot = createSlot('repoPicker');
+export const branchPickerSlot = createSlot('branchPicker');
 export const instancePickerSlot = createSlot('instancePicker');
 export const folderPickerSlot = createSlot('folderPicker');
+export const profilePickerSlot = createSlot('profilePicker');
 export const prFileNavSlot = createSlot('prFileNav');
 export const prDiffSelectionSlot = createSlot('prDiffSelection');
 export const securityFilterSlot = createSlot('securityFilter');

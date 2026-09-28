@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 import { createElement } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
@@ -81,9 +80,6 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_PR_REVIEW: 'mobile-pr-review',
   useFeatureFlag: () => true,
-}));
-vi.mock('@/lib/hooks/use-after-interactions', () => ({
-  useAfterInteractions: () => false,
 }));
 vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),

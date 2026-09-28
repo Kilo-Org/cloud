@@ -1,7 +1,8 @@
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { Search, Terminal } from '@/components/ui/icons';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, TextInput, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
@@ -9,6 +10,7 @@ import { StoredSessionRow } from '@/components/agents/session-row';
 import { CenteredState } from '@/components/centered-state';
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { QueryError } from '@/components/query-error';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -39,14 +41,14 @@ function DestinationSearch({ onChange }: { onChange: (next: string) => void }) {
   return (
     <View className="mx-4 mb-3 mt-1 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
       <Search size={18} color={colors.mutedForeground} />
-      <TextInput
+      <Input
         placeholder={t('share.searchPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
         clearButtonMode="while-editing"
         returnKeyType="search"
-        className="h-8 flex-1 p-0 text-base text-foreground"
+        className="flex-1 px-0 text-base text-foreground"
         style={{ color: colors.foreground }}
         onChangeText={onChange}
         accessibilityLabel={t('share.searchPlaceholder')}
@@ -122,6 +124,7 @@ export function ShareDestinationList({
 }: Readonly<ShareDestinationListProps>) {
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [search, setSearch] = useState('');
   const showSearch = state.kind === 'happy' && destinations.length > SEARCH_THRESHOLD;
 
@@ -138,6 +141,40 @@ export function ShareDestinationList({
   }, [destinations, search]);
 
   const contentPad = useMemo(() => ({ paddingBottom: bottom + 16 }) satisfies ViewStyle, [bottom]);
+  // The list carries the sheet background itself: react-native-screens honors
+  // the formSheet header only when [header, scroll view] are the content's
+  // direct children, so no wrapping View may sit between them.
+  const listStyle = useMemo(
+    () => ({ flex: 1, backgroundColor: colors.background }) satisfies ViewStyle,
+    [colors.background]
+  );
+  // Hoisted so a parent re-render (the share gate animates while this list is
+  // mounted) does not hand every mounted row a new prop identity.
+  const renderDestination = useCallback(
+    ({ item }: ListRenderItemInfo<ShareDestinationRow>) => (
+      <View
+        pointerEvents={destinationsDisabled ? 'none' : 'auto'}
+        className={destinationsDisabled ? 'opacity-50' : undefined}
+      >
+        <StoredSessionRow
+          session={item}
+          sortBy="updated_at"
+          live={item.live}
+          metaWhileLive={item.live}
+          interactive={false}
+          onPress={() => {
+            if (destinationsDisabled) {
+              return;
+            }
+            onSelect(item);
+          }}
+        />
+      </View>
+    ),
+    [destinationsDisabled, onSelect]
+  );
+  const keyExtractor = useCallback((item: ShareDestinationRow) => item.session_id, []);
+  const getItemType = useCallback(() => 'destination', []);
   const noChoices = instances.length === 0;
   let body: ReactNode = null;
 
@@ -173,10 +210,11 @@ export function ShareDestinationList({
     }
 
     body = (
-      <FlatList
-        className="flex-1 bg-background"
+      <FlashList<ShareDestinationRow>
+        style={listStyle}
         data={state.kind === 'happy' ? filtered : []}
-        keyExtractor={item => item.session_id}
+        keyExtractor={keyExtractor}
+        getItemType={getItemType}
         ListHeaderComponent={
           instances.length > 0 ? (
             <CliInstanceRows
@@ -190,26 +228,7 @@ export function ShareDestinationList({
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         contentContainerStyle={contentPad}
-        renderItem={({ item }) => (
-          <View
-            pointerEvents={destinationsDisabled ? 'none' : 'auto'}
-            className={destinationsDisabled ? 'opacity-50' : undefined}
-          >
-            <StoredSessionRow
-              session={item}
-              sortBy="updated_at"
-              live={item.live}
-              metaWhileLive={item.live}
-              interactive={false}
-              onPress={() => {
-                if (destinationsDisabled) {
-                  return;
-                }
-                onSelect(item);
-              }}
-            />
-          </View>
-        )}
+        renderItem={renderDestination}
         ListEmptyComponent={emptyContent}
       />
     );

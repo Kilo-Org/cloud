@@ -7,9 +7,11 @@ import {
   cloudAgentWorktreeDeletionSchema,
   recordCloudAgentWorktreeCleanupSchema,
   canDestroyCloudAgentWorktreeSandboxSchema,
+  retireCloudAgentWorktreeIfSoleMemberSchema,
   type CloudAgentWorktreeDeletionParams,
   type RecordCloudAgentWorktreeCleanupParams,
   type CanDestroyCloudAgentWorktreeSandboxParams,
+  type RetireCloudAgentWorktreeIfSoleMemberParams,
   deleteSessionForCloudAgentSchema,
   getCloudAgentRootSessionMessagesSchema,
   getSessionMessagesSchema,
@@ -52,6 +54,7 @@ import {
   completeWorktreeDeletion,
   canDestroyWorktreeSandbox,
   registerCloudAgentWorktree,
+  retireWorktreeIfSoleMember,
   isWorktreeSessionDeleting,
   WORKTREE_DELETING,
 } from './services/worktree-deletion';
@@ -128,6 +131,13 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
     return canDestroyWorktreeSandbox(
       this.env,
       canDestroyCloudAgentWorktreeSandboxSchema.parse(params)
+    );
+  }
+
+  async retireCloudAgentWorktreeIfSoleMember(params: RetireCloudAgentWorktreeIfSoleMemberParams) {
+    return retireWorktreeIfSoleMember(
+      this.env,
+      retireCloudAgentWorktreeIfSoleMemberSchema.parse(params)
     );
   }
 
@@ -317,6 +327,7 @@ export class SessionIngestRPC extends WorkerEntrypoint<Env> implements SessionIn
           cloud_agent_session_scope_id: parsed.cloudAgentSessionId,
           cloud_agent_worktree_id: parsed.cloudAgentWorktreeId ?? null,
           organization_id: parsed.organizationId ?? null,
+          profile_id: parsed.profileId ?? null,
           created_on_platform: parsed.createdOnPlatform,
           ...(parsed.title !== undefined ? { title: parsed.title } : {}),
           ...(inputGitUrl !== undefined ? { git_url: inputGitUrl } : {}),

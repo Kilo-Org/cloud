@@ -7,6 +7,7 @@
       "instanceLifecycle": "ምሳሌዎ ማዘመኛ አለው",
       "scheduledAction": "የተያዘ ተግባር ማዘመኛ አለው",
       "lowBalance": "ቀሪ ሂሳብዎ ትኩረት ይፈልጋል",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
       "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "ዝቅተኛ ቀሪ-ሂሳብ ማንቂያ",
       "body": "የ{{organizationName}} ቀሪ ሂሳብ ከ${{minimumBalanceUsd}} በታች ወርዷል"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "አዲስ የደህንነት ግኝት ({{severity}})",

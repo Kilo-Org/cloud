@@ -1,8 +1,44 @@
 /* eslint-disable max-lines -- one cohesive pure-projection suite for getToolDisplay and toolPartHasDetails */
 import { type FilePart, type ToolPart } from '@kilocode/cloud-agent-sdk';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import {
+  Cpu,
+  Eye,
+  FileDiff,
+  FilePlus,
+  FileSearch,
+  FolderOpen,
+  Globe,
+  ListTodo,
+  Pencil,
+  Plug,
+  Search,
+  Sparkles,
+  Terminal,
+} from '@/components/ui/icons';
 
 import { getToolDisplay, type ToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { getToolRowIcon } from './tool-row-icon';
+
+// tool-card-display imports the Lucide icon components; the pure project cannot
+// parse the Flow-sourced react-native runtime, so stub the module with distinct
+// sentinels and assert the exact icon each tool maps to.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
+}));
 
 function makeToolPart(tool: string, state: ToolPart['state']): ToolPart {
   return {
@@ -49,9 +85,14 @@ function makeAttachment(mime: string): FilePart {
   };
 }
 
-/** Typed read of the projection — pins the exported `ToolDisplay` shape. */
-function getDisplay(part: ToolPart): ToolDisplay {
-  return getToolDisplay(part);
+/**
+ * Typed read of the visible projection. The `translatable` provenance flag has
+ * its own suite below, so it is dropped here to keep the title/subtitle/badge
+ * assertions exact.
+ */
+function getDisplay(part: ToolPart): Omit<ToolDisplay, 'translatable'> {
+  const display = getToolDisplay(part);
+  return { title: display.title, subtitle: display.subtitle, badge: display.badge };
 }
 
 describe('getToolDisplay mapping', () => {
@@ -273,11 +314,37 @@ describe('getToolDisplay mapping', () => {
     ).toEqual({ title: 'mcp', subtitle: 'filesystem/read_file' });
   });
 
+  it('falls back to the tool name for an incomplete MCP envelope', () => {
+    expect(getDisplay(makeToolPart('mcp', completed({ server_name: 'github' })))).toEqual({
+      title: 'mcp',
+      subtitle: 'mcp',
+    });
+  });
+
   it('falls back to the tool name for unknown tools', () => {
     expect(getDisplay(makeToolPart('unknown-tool', completed()))).toEqual({
       title: 'unknown-tool',
       subtitle: 'unknown-tool',
     });
+  });
+
+  it('summarizes a generic tool from its arguments', () => {
+    expect(
+      getDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+    ).toEqual({ title: 'lookup', subtitle: 'Find matching records' });
+  });
+
+  it('summarizes a question row from its first question text', () => {
+    expect(
+      getDisplay(
+        makeToolPart(
+          'question',
+          completed({
+            questions: [{ header: 'E2E', question: 'Which fields should the sheet show?' }],
+          })
+        )
+      )
+    ).toEqual({ title: 'question', subtitle: 'Which fields should the sheet show?' });
   });
 
   it('uses the running/completed state title for the generic subtitle', () => {
@@ -383,12 +450,12 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
     ).toBeUndefined();
   });
 
-  it('badges a single glob path as 1 files', () => {
+  it('badges a single glob path as 1 file', () => {
     expect(
       getDisplay(
         makeToolPart('glob', completed({ pattern: '**/*.ts' }, '/repo/apps/mobile/AGENTS.md'))
       ).badge
-    ).toBe('1 files');
+    ).toBe('1 file');
   });
 
   it('does not count the opencode truncated note as a file', () => {
@@ -425,6 +492,157 @@ describe('getToolDisplay badge rules — live CLI shapes', () => {
     expect(getDisplay(makeToolPart('grep', completed({ pattern: 'foo' }, output))).badge).toBe(
       '2 matches'
     );
+  });
+});
+
+describe('getToolDisplay translatable provenance', () => {
+  it('keeps the fallback read/edit/write label out of translation', () => {
+    expect(getToolDisplay(makeToolPart('read', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('edit', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('write', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('read', completed({ filePath: 'a.ts' }))).translatable).toBe(
+      true
+    );
+  });
+
+  it('keeps the fallback bash/glob/grep/list/patch labels out of translation', () => {
+    expect(getToolDisplay(makeToolPart('bash', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('bash', completed({ command: 'ls' }))).translatable).toBe(
+      true
+    );
+    expect(
+      getToolDisplay(makeToolPart('bash', completed({ description: 'List files' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('glob', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('glob', completed({ pattern: '**/*.ts' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('grep', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('grep', completed({ pattern: 'foo' }))).translatable).toBe(
+      true
+    );
+    expect(getToolDisplay(makeToolPart('list', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('list', completed({ path: '/repo/src' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('patch', completed())).translatable).toBe(false);
+  });
+
+  it('keeps the raw websearch/codesearch/webfetch ids out of translation', () => {
+    expect(getToolDisplay(makeToolPart('websearch', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ query: 'search terms' }))).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('websearch', completed({ url: 'https://example.com' })))
+        .translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('codesearch', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('webfetch', completed())).translatable).toBe(false);
+  });
+
+  it('never translates the todo read/write UI copy', () => {
+    expect(getToolDisplay(makeToolPart('todoread', completed())).translatable).toBe(false);
+    expect(getToolDisplay(makeToolPart('todowrite', running())).translatable).toBe(false);
+  });
+
+  it('keeps the task and suggestion fallbacks out of translation', () => {
+    expect(getToolDisplay(makeToolPart('task', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('task', completed({ description: 'Do the thing' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(makeToolPart('suggest', completed({ suggest: 'Review?' }))).translatable
+    ).toBe(true);
+    expect(getToolDisplay(makeToolPart('suggest', errorState())).translatable).toBe(false);
+  });
+
+  it('keeps a multi-file patch count and generic raw ids out of translation', () => {
+    const multi =
+      '*** Begin Patch\n*** Update File: src/a.ts\n@@\n-a\n+b\n*** Add File: src/b.ts\n+x\n*** End Patch';
+    expect(
+      getToolDisplay(makeToolPart('apply_patch', completed({ patchText: multi }))).translatable
+    ).toBe(false);
+    expect(getToolDisplay(makeToolPart('unknown-tool', completed())).translatable).toBe(false);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the projected argument summary that becomes the subtitle', () => {
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ description: 'Find matching records' })))
+        .translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(makeToolPart('question', completed({ question: 'Pick a color' }))).translatable
+    ).toBe(true);
+  });
+
+  it('keeps a projected name out of translation even when a summary exists', () => {
+    // `mcp` resolves to `server/tool`, an identifier, so the summary is not the
+    // shown subtitle and neither is agent prose to translate.
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({
+            server_name: 'filesystem',
+            tool_name: 'read_file',
+            arguments: { path: '/a' },
+          })
+        )
+      ).translatable
+    ).toBe(false);
+    // A summary-less generic tool falls back to its raw id.
+    expect(
+      getToolDisplay(makeToolPart('lookup', completed({ nested: { a: 1 } }))).translatable
+    ).toBe(false);
+    // An incomplete envelope has no summary, so its raw fields never reach the
+    // translation gateway.
+    expect(
+      getToolDisplay(makeToolPart('mcp', completed({ server_name: 'github' }))).translatable
+    ).toBe(false);
+  });
+
+  it('translates a known-tool label even though it is a projected name', () => {
+    // `Publish Image` is raw English app copy with no catalog, so it must reach
+    // the gateway; the surrounding identifiers must not.
+    expect(
+      getToolDisplay(makeToolPart('app-builder-images_transfer_image', completed())).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(
+        makeToolPart(
+          'mcp',
+          completed({ server_name: 'app-builder-images', tool_name: 'transfer_image' })
+        )
+      ).translatable
+    ).toBe(true);
+    expect(
+      getToolDisplay(
+        makeToolPart('mcp', completed({ server_name: 'filesystem', tool_name: 'read_file' }))
+      ).translatable
+    ).toBe(false);
+  });
+
+  it('translates the generic state title the tool summarized', () => {
+    expect(
+      getToolDisplay({
+        ...makeToolPart('mcp', completed()),
+        state: {
+          status: 'completed',
+          input: {},
+          output: '',
+          title: 'Custom title',
+          metadata: {},
+          time: { start: 0, end: 1 },
+        },
+      }).translatable
+    ).toBe(true);
   });
 });
 
@@ -473,5 +691,36 @@ describe('toolPartHasDetails', () => {
       attachments: [makeAttachment('image/png')],
     });
     expect(toolPartHasDetails(part)).toBe(true);
+  });
+});
+
+describe('getToolRowIcon mapping', () => {
+  // Every tool named in the ToolPartRenderer switch maps to the exact icon its
+  // card renders.
+  const expectedIcons: [string, unknown][] = [
+    ['read', Eye],
+    ['edit', Pencil],
+    ['write', FilePlus],
+    ['bash', Terminal],
+    ['glob', Search],
+    ['grep', FileSearch],
+    ['list', FolderOpen],
+    ['patch', FileDiff],
+    ['apply_patch', FileDiff],
+    ['todoread', ListTodo],
+    ['todowrite', ListTodo],
+    ['websearch', Globe],
+    ['codesearch', Globe],
+    ['webfetch', Globe],
+    ['task', Cpu],
+    ['suggest', Sparkles],
+  ];
+
+  it.each(expectedIcons)('maps %s to its card icon', (tool, icon) => {
+    expect(getToolRowIcon(tool)).toBe(icon);
+  });
+
+  it('defaults unknown tools to the generic Plug icon', () => {
+    expect(getToolRowIcon('unknown-tool')).toBe(Plug);
   });
 });

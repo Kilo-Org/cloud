@@ -4,9 +4,11 @@ import { usePathname } from 'next/navigation';
 import { Button } from '@/components/Button';
 import type { ButtonVariant } from '@/components/Button';
 import { AlertCircle, AlertTriangle, Clock } from 'lucide-react';
-import { getOrgTrialStatusFromDays } from '@/lib/organizations/trial-utils';
+import {
+  getOrgTrialStatusFromDays,
+  type OrganizationTrialDisplayStatus,
+} from '@/lib/organizations/trial-utils';
 import type {
-  OrgTrialStatus,
   OrganizationRole,
   OrganizationWithMembersResponse,
 } from '@/lib/organizations/organization-types';
@@ -20,7 +22,7 @@ type FreeTrialWarningBannerProps = {
   onUpgradeClick: () => void;
 };
 
-function getStylesForState(state: OrgTrialStatus, planName: string) {
+function getStylesForState(state: OrganizationTrialDisplayStatus, planName: string) {
   switch (state) {
     case 'trial_active':
       return {
@@ -74,13 +76,13 @@ function getStylesForState(state: OrgTrialStatus, planName: string) {
   }
 }
 
-function getIconForState(state: OrgTrialStatus, className?: string) {
+function getIconForState(state: OrganizationTrialDisplayStatus, className?: string) {
   const Icon =
     state === 'trial_active' ? Clock : state === 'trial_ending_soon' ? AlertCircle : AlertTriangle;
   return <Icon className={className} />;
 }
 
-function getButtonVariantForState(state: OrgTrialStatus): ButtonVariant {
+function getButtonVariantForState(state: OrganizationTrialDisplayStatus): ButtonVariant {
   switch (state) {
     case 'trial_active':
       return 'primary';

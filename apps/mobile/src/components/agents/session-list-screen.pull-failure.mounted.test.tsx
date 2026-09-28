@@ -1,11 +1,12 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted repro: the live Agents tab exercises the REAL hook chain (useLiveAgentSessions → useActiveSessions → ActiveSessionsLiveSync → query cache) with a controlled failing network, matching the app-level ActiveSessionsLiveSyncMount in (app)/_layout. */
+/* eslint-disable max-lines -- DOM-free mounted repro: the live Agents tab exercises the REAL hook chain (useLiveAgentSessions → useActiveSessions → ActiveSessionsLiveSync → query cache) with a controlled failing network, matching the app-level ActiveSessionsLiveSyncMount in (app)/_layout. */
 import { createElement, Fragment, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
+import { waitFor } from '@/test/render-with-providers';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClientProvider } from '@tanstack/react-query';
 
 import { AgentSessionListScreen } from './session-list-screen';
-import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
+import { PULL_FEEDBACK_BUDGET_MS, PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { ActiveSessionsLiveSync } from '@/lib/active-sessions-live-sync';
 import {
   makeCached,
@@ -24,19 +25,21 @@ const network = vi.hoisted(() => ({
 }));
 
 const appState = vi.hoisted(() => ({
-  listener: undefined as ((nextState: string) => void) | undefined,
+  listeners: new Set<(nextState: string) => void>(),
   addEventListener: (_event: string, listener: (nextState: string) => void) => {
-    appState.listener = listener;
+    appState.listeners.add(listener);
     return {
       remove: () => {
-        appState.listener = undefined;
+        appState.listeners.delete(listener);
       },
     };
   },
 }));
 
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
+vi.mock('@/lib/trpc', () => {
+  // The real provider returns a stable proxy; recreating it on each render
+  // changes the query scope and invalidates an otherwise accepted refresh.
+  const trpc = {
     activeSessions: {
       list: {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { type: 'query', input }],
@@ -50,8 +53,9 @@ vi.mock('@/lib/trpc', () => ({
         }),
       },
     },
-  }),
-}));
+  };
+  return { useTRPC: () => trpc };
+});
 
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
 vi.mock('expo-secure-store', () => ({
@@ -66,6 +70,23 @@ vi.mock('sonner-native', () => ({
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
+}));
+// The live list renders through FlashList v2. This stub renders every row
+// through the real `renderItem` and forwards the list props (`data`,
+// `refreshControl`), so the pull lifecycle is exercised without a DOM.
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
+    data: { id: string }[];
+    renderItem: (entry: { item: { id: string } }) => ReactNode;
+    keyExtractor: (item: { id: string }) => string;
+  }) =>
+    createElement(
+      'FlashList',
+      props,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      )
+    ),
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -82,8 +103,10 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
+  Keyboard: { addListener: () => ({ remove: () => undefined }) },
   FlatList: (props: {
     data: { id: string }[];
     renderItem: (entry: { item: { id: string } }) => ReactNode;
@@ -153,7 +176,13 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  // The screen imports the eyebrow's LTR display class constant; the mock only
+  // needs the export to exist (this suite asserts pull-failure states).
+  return {
+    EYEBROW_LATIN_DISPLAY: 'uppercase tracking-[1.5px]',
+    Text: 'Text',
+    TextClassContext: createContext(''),
+  };
 });
 vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'account', isLoading: false, isSigningOut: false, authEpoch: 0 }),
@@ -276,7 +305,7 @@ async function renderScreen() {
 }
 
 function refreshControl() {
-  const control = nodes('FlatList')[0]?.props.refreshControl as
+  const control = nodes('FlashList')[0]?.props.refreshControl as
     | { props: { refreshing: boolean; onRefresh: () => void } }
     | undefined;
   if (!control) {
@@ -288,7 +317,7 @@ function refreshControl() {
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   network.wsConnected = true;
-  appState.listener = undefined;
+  appState.listeners.clear();
   readFilterRecord.mockReset().mockResolvedValue(null);
   client = makeTestQueryClient();
   client.setQueryData(QUERY_KEY, {
@@ -319,7 +348,7 @@ async function i18nChangeLanguageEn() {
 describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
   async function expectFailedPullKeepsRowsAndShowsInlineRetry() {
     await renderScreen();
-    expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
     expect(text()).not.toContain("Couldn't refresh");
 
@@ -394,19 +423,51 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
       return result;
     };
     await act(async () => {
-      appState.listener?.('active');
+      expect(appState.listeners.size).toBeGreaterThan(0);
+      for (const listener of appState.listeners) {
+        listener('active');
+      }
       await flushMount();
-      await vi.waitFor(
-        () => {
-          expect(text()).not.toContain("Couldn't refresh");
-        },
-        { timeout: 2000, interval: 10 }
-      );
     });
+    // Finish the act scope before checking the effects it commits; each retry
+    // flushes another scope instead of waiting for a commit inside that scope.
+    await waitFor(() => !text().includes("Couldn't refresh"));
+    expect(text()).not.toContain("Couldn't refresh");
     expect(
       nodes('Pressable').find(node => node.props.accessibilityLabel === 'Retry')
     ).toBeUndefined();
     expect(refreshControl().refreshing).toBe(false);
     expect(nodes('RemoteSessionRow')).toHaveLength(1);
   }, 15_000);
+
+  it('hands a confirmed-offline pull to the inline failure with Retry', async () => {
+    // The device is in airplane mode: NetInfo has committed offline, so React
+    // Query pauses the refetch and it never settles. The pull must still hand
+    // off to the inline retryable failure within the feedback budget instead of
+    // leaving the reader on "Updating" with no next action.
+    const { onlineManager } = await import('@tanstack/react-query');
+    await renderScreen();
+    expect(nodes('RemoteSessionRow')).toHaveLength(1);
+
+    onlineManager.setOnline(false);
+    try {
+      act(() => {
+        refreshControl().onRefresh();
+      });
+      await act(async () => {
+        await new Promise(resolve => {
+          setTimeout(resolve, PULL_FEEDBACK_BUDGET_MS + 250);
+        });
+      });
+
+      expect(text()).toContain("Couldn't refresh");
+      expect(
+        nodes('Pressable').find(node => node.props.accessibilityLabel === 'Retry')
+      ).toBeDefined();
+      expect(nodes('RemoteSessionRow')).toHaveLength(1);
+      expect(refreshControl().refreshing).toBe(false);
+    } finally {
+      onlineManager.setOnline(true);
+    }
+  }, 45_000);
 });

@@ -1,3 +1,4 @@
+import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -21,6 +22,7 @@ export type SessionRepositoryRequest =
       type: 'github';
       repo: string;
       githubIntegrationId?: string;
+      githubAccessPurpose?: 'workflow' | 'agent';
       branch?: string;
     }
   | {
@@ -44,8 +46,8 @@ export type SessionRepositoryRequest =
     };
 
 export type SessionRuntimeIntent = {
+  sandboxAllocation?: SandboxAllocation;
   devcontainer?: boolean;
-  sandboxAllocation?: 'isolated-standard';
 };
 
 export type SessionCreateRequest = {
@@ -61,6 +63,13 @@ export type SessionCreateRequest = {
     id?: string;
     overrides?: ProfileOverrides;
     resolved?: SessionProfileBundle;
+    /**
+     * The active profile id after server-side resolution, set by
+     * `applyProfileResolution`. Distinguished from `id` (the client's
+     * requested pick) because a repository binding or the effective default
+     * can decide the session's profile. Persisted on `cli_sessions_v2`.
+     */
+    resolvedProfileId?: string;
   };
   finalization?: SessionFinalization;
   options?: {

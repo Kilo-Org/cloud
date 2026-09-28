@@ -7,6 +7,7 @@
       "instanceLifecycle": "உங்கள் நிகழ்வில் ஒரு புதுப்பிப்பு உள்ளது",
       "scheduledAction": "திட்டமிடப்பட்ட செயலில் ஒரு புதுப்பிப்பு உள்ளது",
       "lowBalance": "உங்கள் இருப்புக்கு கவனம் தேவை",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "ஒரு பாதுகாப்பு கண்டுபிடிப்புக்கு கவனம் தேவை",
       "activeAgentsGlanceable": "செயலில் உள்ள முகவர்களில் ஒரு புதுப்பிப்பு உள்ளது"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "குறைந்த இருப்பு எச்சரிக்கை",
       "body": "{{organizationName}} இருப்பு ${{minimumBalanceUsd}} க்கு கீழே விழுந்தது"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "புதிய பாதுகாப்பு கண்டுபிடிப்பு ({{severity}})",

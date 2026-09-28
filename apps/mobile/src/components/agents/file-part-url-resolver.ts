@@ -22,8 +22,13 @@ import { type CloudAgentAttachmentRef, parseCloudAgentAttachmentUrl } from './fi
 
 /** Start a renew when the presigned lifetime drops under two minutes. */
 const RENEW_THRESHOLD_MS = 120_000;
-/** Sweep the cache for near-expiry URLs every thirty seconds. */
+/** Floor before the next renew sweep: an entry whose renew keeps failing is
+ *  retried no more often than every thirty seconds. */
 const RENEW_INTERVAL_MS = 30_000;
+/** Longest `setTimeout` delay the JS runtime accepts. A delay above 2^31 - 1 ms
+ *  overflows and fires immediately, so a far-future expiry is re-checked here
+ *  instead of busy-looping the sweep. */
+const MAX_TIMER_DELAY_MS = 2_147_483_647;
 
 /** Part IDs with an on-demand presign in flight. Dedupes a StrictMode
  *  double-mount, a leave/reopen during the mutate, and the renewal sweep. */
@@ -31,7 +36,7 @@ const inFlight = new Map<string, () => boolean>();
 
 // One module-level sweeper serves every mounted subscriber across the app.
 let renewSubscribers = 0;
-let renewTimer: ReturnType<typeof setInterval> | undefined = undefined;
+let renewTimer: ReturnType<typeof setTimeout> | undefined = undefined;
 
 export type ResolvedFilePartUrl = {
   status: 'ready' | 'resolving' | 'unavailable' | 'error';
@@ -78,6 +83,9 @@ async function presignAttachment(
       ...(entry.filename ? { filename: entry.filename } : {}),
       urlExpiresAt: parseTimestamp(result.expiresAt).getTime(),
     });
+    // The trusted expiry moved: re-arm the sweep so the fresh URL is renewed
+    // before it lapses instead of waiting on the old deadline.
+    scheduleRenewSweep();
     return true;
   } catch {
     if (isCurrent()) {
@@ -95,36 +103,102 @@ async function presignAttachment(
   }
 }
 
+/** Milliseconds until a presigned entry is due for a renew. A missing or
+ *  non-finite `urlExpiresAt` (an unparseable server `expiresAt` stored as NaN)
+ *  is due at once: its URL has no trusted deadline to wait on, so the sweep
+ *  re-presigns it instead of letting a NaN poison the earliest-due reduction or
+ *  stranding the entry forever. */
+function renewDueInMs(entry: FilePartCacheEntry, now: number): number {
+  if (entry.urlExpiresAt === undefined || !Number.isFinite(entry.urlExpiresAt)) {
+    return 0;
+  }
+  return entry.urlExpiresAt - now - RENEW_THRESHOLD_MS;
+}
+
 /** True when a presigned entry needs a renew now: a ref and URL exist and the
- *  expiry is missing (old entry) or under the renew threshold. */
+ *  expiry is missing, non-finite, or at/reached the renew threshold. */
 function isRenewDue(entry: FilePartCacheEntry, now: number): boolean {
   return (
-    entry.attachmentRef !== undefined &&
-    entry.url !== undefined &&
-    (entry.urlExpiresAt === undefined || entry.urlExpiresAt - now < RENEW_THRESHOLD_MS)
+    entry.attachmentRef !== undefined && entry.url !== undefined && renewDueInMs(entry, now) <= 0
   );
 }
 
-function renewDueEntries(): void {
+/**
+ * Delay until the earliest entry is due for a renew, floored at
+ * RENEW_INTERVAL_MS, or null when no cached entry carries both an attachment
+ * ref and a URL (nothing to renew). `renewDueInMs` never returns NaN, so one
+ * malformed expiry cannot swallow a later entry's deadline or arm a ~1 ms
+ * timeout that re-schedules the sweep forever.
+ */
+function nextRenewDelayMs(now: number): number | null {
+  let soonest: number | undefined = undefined;
+  for (const { entry } of listFilePartCacheEntries()) {
+    if (entry.attachmentRef !== undefined && entry.url !== undefined) {
+      const dueIn = renewDueInMs(entry, now);
+      soonest = soonest === undefined || dueIn < soonest ? dueIn : soonest;
+    }
+  }
+  return soonest === undefined ? null : Math.max(RENEW_INTERVAL_MS, soonest);
+}
+
+/** Re-presign every cached entry that is due now and return the in-flight
+ *  renewals so the sweep can re-arm once they settle. */
+function renewDueEntries(): Promise<boolean>[] {
   const now = Date.now();
+  const renewals: Promise<boolean>[] = [];
   for (const { partId, entry } of listFilePartCacheEntries()) {
     const ref = entry.attachmentRef;
     if (ref !== undefined && isRenewDue(entry, now)) {
-      void presignAttachment(partId, { ...entry, attachmentRef: ref }, true);
+      renewals.push(presignAttachment(partId, { ...entry, attachmentRef: ref }, true));
     }
   }
+  return renewals;
+}
+
+/**
+ * Run one sweep, then re-arm: a successful renew moves the deadline out to the
+ * new far-future expiry, a failed one leaves the entry due at the 30 s floor.
+ */
+async function runRenewSweep(): Promise<void> {
+  const renewals = renewDueEntries();
+  if (renewals.length > 0) {
+    await Promise.allSettled(renewals);
+  }
+  scheduleRenewSweep();
+}
+
+/**
+ * Arm the single shared timeout at the earliest due renew, replacing any armed
+ * handle. No subscriber and no ref+URL entry both mean no timer at all.
+ */
+function scheduleRenewSweep(): void {
+  if (renewTimer !== undefined) {
+    clearTimeout(renewTimer);
+    renewTimer = undefined;
+  }
+  if (renewSubscribers === 0) {
+    return;
+  }
+  const delay = nextRenewDelayMs(Date.now());
+  if (delay === null) {
+    return;
+  }
+  renewTimer = setTimeout(
+    () => {
+      renewTimer = undefined;
+      void runRenewSweep();
+    },
+    Math.min(delay, MAX_TIMER_DELAY_MS)
+  );
 }
 
 function startRenewTimer(): void {
-  if (renewTimer !== undefined) {
-    return;
-  }
-  renewTimer = setInterval(renewDueEntries, RENEW_INTERVAL_MS);
+  scheduleRenewSweep();
 }
 
 function stopRenewTimer(): void {
   if (renewTimer !== undefined) {
-    clearInterval(renewTimer);
+    clearTimeout(renewTimer);
     renewTimer = undefined;
   }
 }

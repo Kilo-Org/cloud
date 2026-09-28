@@ -2,7 +2,6 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -11,6 +10,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -18,10 +18,16 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import {
+  namedSessionTitle,
+  SESSION_TITLE_MAX_LENGTH,
+  useUserSessionTitlesRevision,
+} from './session-detail-rename-state';
+import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
   formatMeta,
+  formatScheduledWake,
   formatSessionTotalCost,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
@@ -58,6 +64,12 @@ type StoredSessionRowProps = {
     git_branch: string | null;
     status: string | null;
     status_updated_at: string | null;
+    /**
+     * ISO-8601 wake time for a `scheduled` session, when the row carries one.
+     * Stored history rows have no wake time today (the column does not exist),
+     * so it is optional and the row falls back to the `SCHEDULED` label alone.
+     */
+    scheduledAt?: string | null;
     total_cost_microdollars: number | null;
     associatedPr?: { number: number } | null;
   };
@@ -103,14 +115,39 @@ export function StoredSessionRow({
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
+  // One derivation for the visible label, the spoken label and the rename
+  // prompt: the server's creation-default title (`New session - <ISO
+  // timestamp>`) is an internal marker, never row copy, so a creation
+  // placeholder title reads as "Untitled session" — the row falls back to the
+  // localized unnamed name the same way the session header does.
+  // `namedSessionTitle` makes that judgement through the shared
+  // `sessionDisplayTitle` helper and additionally keeps a placeholder-shaped
+  // title the user's own rename wrote, so the same label feeds the row, the
+  // accessibility label, and the rename prompt. The subscription repaints the
+  // row once the durable record hydrates after a cold start.
+  useUserSessionTitlesRevision();
   const title =
-    session.title && session.title.length > 0 ? session.title : t('agents.sessionRow.untitled');
+    namedSessionTitle(session.title, session.session_id) ?? t('agents.sessionRow.untitled');
+  // The rename field seeds the name a person wrote, never the backend default
+  // or the display fallback: a session still carrying `New session - <ISO>`
+  // opens an empty field (the "Session name" placeholder prompts for a name)
+  // instead of the machine string the row hides. Both save paths already
+  // refuse an unchanged or blank value, so a no-edit confirm cannot persist
+  // the empty seed. A title the user's own rename wrote is still seeded.
+  const renameInitialValue = namedSessionTitle(session.title, session.session_id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const agentLabel = storedSessionEyebrowLabel(session);
   const timestamp = getAgentSessionTimestamp(session, sortBy);
   const canManage = interactive && Boolean(onDelete) && Boolean(onRename);
+  // The scheduled branch keys off the status, not the `live` flag: a stored
+  // history row with status `scheduled` reads SCHEDULED (label only) rather
+  // than Idle. A stored row has no wake time today, so `scheduledWake` is null
+  // and the label carries no clock time.
+  const isScheduled = session.status === 'scheduled';
+  const scheduledWake =
+    isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -127,14 +164,14 @@ export function StoredSessionRow({
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     showSessionActionMenu({
       showActionSheetWithOptions,
-      bottomInset: bottom,
+      themedSheet,
       onCopySessionId: () => {
         void copySessionId(session.session_id);
       },
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {
-              showRenamePrompt(title, newTitle => {
+              showRenamePrompt(renameInitialValue, newTitle => {
                 onRename(newTitle);
               });
             } else {
@@ -153,17 +190,22 @@ export function StoredSessionRow({
   // Visible and spoken meta mirror `formatMeta(timestamp)`. When `needsInput`
   // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered.
   // When a cost is present, both forms fold it in first (matches the row's
-  // "$0.12 · time" order). Needs-input sessions have no persisted cost.
+  // "$0.12 · time" order). Needs-input sessions have no persisted cost. A
+  // scheduled row shows `SCHEDULED · <wake>` instead, so its spoken meta is
+  // the wake (null on a stored row, which carries none).
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
     formatMeta(timestamp)
   );
-  const spokenMeta = needsInput
+  const storedSpokenMeta = needsInput
     ? null
     : composeStoredSessionSpokenMeta(
         formatSpokenCost(session.total_cost_microdollars),
         formatSpokenTimeAgo(timestamp)
       );
+  // A scheduled row shows `SCHEDULED · <wake>` instead of the timestamp meta,
+  // so it speaks the wake (null on a stored row, which carries none).
+  const spokenMeta = isScheduled ? scheduledWake : storedSpokenMeta;
 
   // Provenance subtitle: list rows show "branch · #N", card rows keep the
   // branch-only subtitle. The spoken label mirrors this: branch text plus
@@ -178,15 +220,16 @@ export function StoredSessionRow({
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
   // Platform icon only on the Agents list variant, and only while the
-  // eyebrow draws no live status glyph (a glyph beside the status mark
-  // reads as a stray second mark). Home cards stay byte-identical
-  // (platformIcon defaults to undefined).
+  // eyebrow draws no status glyph (a glyph beside the status mark
+  // reads as a stray second mark). A scheduled row draws its Clock, so it
+  // suppresses the platform mark and the spoken origin with it. Home cards
+  // stay byte-identical (platformIcon defaults to undefined).
   const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
     selectRowPlatformPresentation({
       platform: session.created_on_platform,
       variant,
       needsInput,
-      statusGlyph: live,
+      statusGlyph: live || isScheduled,
       gitUrl: session.git_url,
     });
   const platformIcon =
@@ -210,6 +253,9 @@ export function StoredSessionRow({
           title,
           needsInput,
           live: variant === 'list' && live,
+          // Only the scheduled kind is named here: other stored rows keep the
+          // static LIVE word / no status word, unchanged.
+          statusKind: isScheduled ? 'scheduled' : null,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.git_branch,
@@ -225,6 +271,7 @@ export function StoredSessionRow({
           meta={visibleMeta}
           live={live}
           statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
+          scheduledWake={scheduledWake}
           metaWhileLive={metaWhileLive}
           needsInput={needsInput}
           platformIcon={platformIcon}
@@ -238,7 +285,8 @@ export function StoredSessionRow({
         <RenameModal
           title={t('agentChat.session.renameSession')}
           placeholder={t('agentChat.session.renamePlaceholder')}
-          initialValue={title}
+          initialValue={renameInitialValue}
+          maxLength={SESSION_TITLE_MAX_LENGTH}
           onClose={() => {
             setRenameVisible(false);
           }}

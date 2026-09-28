@@ -36,6 +36,10 @@ vi.mock('./session-access.js', () => ({
   requireCurrentSessionAccess: requireCurrentSessionAccessMock,
 }));
 
+const { getPgDbMock } = vi.hoisted(() => ({ getPgDbMock: vi.fn() }));
+
+vi.mock('./db/pg.js', () => ({ getPgDb: getPgDbMock }));
+
 vi.mock('./session/model-preflight.js', () => ({
   preflightExistingPromptModel: preflightExistingPromptModelMock,
   preflightPreparedInitialPromptModel: preflightPreparedInitialPromptModelMock,
@@ -121,6 +125,15 @@ function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessio
   return parseSessionMetadata(input);
 }
 
+function mockWorktreeOwnershipRow(
+  row: { parentSessionId: string | null; cloudAgentSessionScopeId: string | null } | null
+): void {
+  const limit = vi.fn().mockResolvedValue(row ? [row] : []);
+  const where = vi.fn(() => ({ limit }));
+  const from = vi.fn(() => ({ where }));
+  getPgDbMock.mockReturnValue({ select: vi.fn(() => ({ from })) });
+}
+
 // Note: Balance validation is now handled in the worker entry point (index.ts)
 // via pre-flight validation before the tRPC handler is called.
 // This returns proper HTTP status codes (401, 402) instead of SSE error events.
@@ -130,28 +143,21 @@ function legacySessionMetadata(input: Record<string, unknown>): CloudAgentSessio
 describe('router sessionId validation', () => {
   it('should reject invalid session ID formats', () => {
     const invalidIds = [
-      // Path traversal and command injection
       'agent_../../etc/passwd',
       'agent_abc123; rm -rf /',
       '../agent_12345678-1234-1234-1234-123456789abc',
-      // Missing or wrong prefix
       'session_12345678-1234-1234-1234-123456789abc',
       'agent2_12345678-1234-1234-1234-123456789abc',
       '12345678-1234-1234-1234-123456789abc',
-      // Incomplete formats
       'agent_',
       'agent_incomplete',
       '',
-      // Special characters
       'agent_test%00null',
       'agent_<script>alert(1)</script>',
-      // Non-hex characters in UUID
       'agent_xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx',
       'agent_ZZZZZZZZ-ZZZZ-ZZZZ-ZZZZ-ZZZZZZZZZZZZ',
-      // Wrong UUID length/format
       'agent_12345678-1234-1234-1234-123456789ab',
       'agent_123456781234123412341234567890abc',
-      // Whitespace/extra characters
       'agent_12345678-1234-1234-1234-123456789abc ',
       ' agent_12345678-1234-1234-1234-123456789abc',
     ];
@@ -344,7 +350,6 @@ describe('router sessionId validation', () => {
           const mockSession = { token: 'session' };
           getOrCreateSessionMock.mockResolvedValue(mockSession);
 
-          // Mock context
           mockContext = {
             userId: 'test-user-123',
             authToken: 'test-token',
@@ -361,6 +366,7 @@ describe('router sessionId validation', () => {
                 {} as TRPCContext['env']['SandboxCodeReviewContainment'],
               SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
               SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+              SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -391,7 +397,6 @@ describe('router sessionId validation', () => {
           };
           cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-          // Mock sandbox with deleteSession method
           mockSandbox = {
             configureBilling: vi.fn().mockResolvedValue(undefined),
             deleteSession: vi.fn().mockResolvedValue(undefined),
@@ -399,7 +404,6 @@ describe('router sessionId validation', () => {
 
           vi.mocked(getSandbox).mockReturnValue(mockSandbox);
 
-          // Create caller with mocked context
           caller = appRouter.createCaller(mockContext);
         });
 
@@ -819,6 +823,7 @@ describe('router sessionId validation', () => {
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
             SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+            SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => mockSessionStub),
@@ -909,14 +914,7 @@ describe('router sessionId validation', () => {
         const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
         const controlStub = {
           ...mockSessionStub,
-          getControlState: vi.fn().mockResolvedValue({
-            version: 1,
-            scope: { sandboxId: 'sandbox_1' },
-            targets: [{ messageId: 'message_1' }],
-          }),
-          interruptExecution: vi
-            .fn()
-            .mockImplementation(request => Promise.resolve({ ...request, state: 'confirmed' })),
+          interruptExecution: vi.fn().mockResolvedValue({ success: true }),
         };
         const sandboxSession = {
           idFromName: vi.fn((id: string) => ({ id })),
@@ -938,9 +936,46 @@ describe('router sessionId validation', () => {
         expect(result.success).toBe(true);
         expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-        expect(controlStub.interruptExecution).toHaveBeenCalledWith(
-          expect.objectContaining({ targets: [{ messageId: 'message_1' }] })
+        expect(controlStub.interruptExecution).toHaveBeenCalled();
+      });
+
+      it('keeps the interrupt failure reason out of the log message field', async () => {
+        const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abd';
+        const controlStub = {
+          ...mockSessionStub,
+          interruptExecution: vi.fn().mockResolvedValue({
+            success: false,
+            message: 'Stop cleanup deadline is invalid',
+          }),
+        };
+        const sandboxSession = {
+          idFromName: vi.fn((id: string) => ({ id })),
+          get: vi.fn(() => controlStub),
+        };
+        mockContext.env.SANDBOX_SESSION =
+          sandboxSession as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+        vi.mocked(fetchSessionMetadata).mockResolvedValue(
+          legacySessionMetadata({
+            version: 123456789,
+            sessionId,
+            orgId: 'org-123',
+            userId: 'test-user-123',
+            timestamp: 123456789,
+          })
         );
+        const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+        const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+        try {
+          await caller.interruptSession({ sessionId });
+
+          expect(fields).toHaveBeenCalledWith({ reason: 'Stop cleanup deadline is invalid' });
+          expect(info).toHaveBeenCalledWith(
+            'No accepted current messages or pending queued messages to interrupt'
+          );
+        } finally {
+          fields.mockRestore();
+          info.mockRestore();
+        }
       });
     });
 
@@ -959,7 +994,6 @@ describe('router sessionId validation', () => {
         mockGetCurrentRuntimeExecution = vi.fn().mockResolvedValue(null);
         mockGetCurrentMessageWork = vi.fn().mockResolvedValue(null);
 
-        // Mock context
         mockContext = {
           userId: 'test-user-123',
           authToken: 'test-token',
@@ -975,6 +1009,7 @@ describe('router sessionId validation', () => {
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
             SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+            SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1006,7 +1041,6 @@ describe('router sessionId validation', () => {
         };
         cloudAgentSession = mockContext.env.CLOUD_AGENT_SESSION as unknown as MockCAS;
 
-        // Create caller with mocked context
         caller = appRouter.createCaller(mockContext);
       });
 
@@ -1046,7 +1080,6 @@ describe('router sessionId validation', () => {
 
           const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
-          // Verify the result contains safe fields
           expect(result.sessionId).toBe(sessionId);
           expect(result.kiloSessionId).toBe('a0000000-0000-4000-8000-000000000001');
           expect(result.userId).toBe('test-user-123');
@@ -1062,7 +1095,6 @@ describe('router sessionId validation', () => {
           expect(result.timestamp).toBe(123456789);
           expect(result.version).toBe(123456789);
 
-          // Verify secrets are NOT returned
           expect(result).not.toHaveProperty('githubToken');
           expect(result).not.toHaveProperty('gitToken');
           expect(result).not.toHaveProperty('envVars');
@@ -1074,7 +1106,6 @@ describe('router sessionId validation', () => {
           expect(result).not.toHaveProperty('callbackTarget');
           expect(result).not.toHaveProperty('providerRuntime');
 
-          // Verify DO was accessed with correct key
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
 
@@ -1186,6 +1217,64 @@ describe('router sessionId validation', () => {
         });
       });
 
+      describe('worktree ownership', () => {
+        const WORKTREE_ID = 'worktree_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+        const SCOPE_ID = 'workspace_bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+        const PARENT_KILO_SESSION_ID = 'ses_abcdefghijklmnopqrstuvwxyz';
+
+        function worktreeSessionMetadata(sessionId: SessionId): CloudAgentSessionState {
+          return parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: 'test-user-123' },
+            auth: { kiloSessionId: PARENT_KILO_SESSION_ID },
+            workspace: { worktreeId: WORKTREE_ID },
+            lifecycle: { version: 1, timestamp: 123456789 },
+          });
+        }
+
+        it('exposes worktree ownership from the PostgreSQL row for a worktree session', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777771';
+          mockGetMetadata.mockResolvedValue(worktreeSessionMetadata(sessionId));
+          mockWorktreeOwnershipRow({
+            parentSessionId: PARENT_KILO_SESSION_ID,
+            cloudAgentSessionScopeId: SCOPE_ID,
+          });
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.worktreeId).toBe(WORKTREE_ID);
+          expect(result.parentSessionId).toBe(PARENT_KILO_SESSION_ID);
+          expect(result.cloudAgentSessionScopeId).toBe(SCOPE_ID);
+          expect(getPgDbMock).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns null ownership fields when a worktree session has no ownership row', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777772';
+          mockGetMetadata.mockResolvedValue(worktreeSessionMetadata(sessionId));
+          mockWorktreeOwnershipRow(null);
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result.worktreeId).toBe(WORKTREE_ID);
+          expect(result.parentSessionId).toBeNull();
+          expect(result.cloudAgentSessionScopeId).toBeNull();
+        });
+
+        it('omits ownership fields and skips PostgreSQL for an ordinary session', async () => {
+          const sessionId: SessionId = 'agent_77777777-7777-4777-8777-777777777773';
+          mockGetMetadata.mockResolvedValue(
+            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
+          );
+
+          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+          expect(result).not.toHaveProperty('worktreeId');
+          expect(result).not.toHaveProperty('parentSessionId');
+          expect(result).not.toHaveProperty('cloudAgentSessionScopeId');
+          expect(getPgDbMock).not.toHaveBeenCalled();
+        });
+      });
+
       describe('not found', () => {
         it('should return NOT_FOUND for non-existent session', async () => {
           const sessionId: SessionId = 'agent_00000000-0000-0000-0000-000000000000';
@@ -1215,7 +1304,6 @@ describe('router sessionId validation', () => {
             'Session not found'
           );
 
-          // Verify the DO was keyed with the authenticated user's ID
           expect(cloudAgentSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         });
       });
@@ -1229,7 +1317,6 @@ describe('router sessionId validation', () => {
             userId: 'test-user-123',
             timestamp: 123456789,
             preparedAt: 1700000000000,
-            // initiatedAt is undefined - not yet initiated
           });
 
           mockGetMetadata.mockResolvedValue(metadata);
@@ -1307,6 +1394,7 @@ describe('router sessionId validation', () => {
                 {} as TRPCContext['env']['SandboxCodeReviewContainment'],
               SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
               SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+              SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
               CLOUD_AGENT_SESSION: {
                 idFromName: vi.fn((id: string) => ({ id })),
                 get: vi.fn(() => ({
@@ -1426,6 +1514,7 @@ describe('router sessionId validation', () => {
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
             SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+            SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({
@@ -1737,6 +1826,7 @@ describe('router sessionId validation', () => {
             SandboxCodeReviewContainment: {} as TRPCContext['env']['SandboxCodeReviewContainment'],
             SANDBOX_CONTROL: {} as TRPCContext['env']['SANDBOX_CONTROL'],
             SANDBOX_SESSION: {} as TRPCContext['env']['SANDBOX_SESSION'],
+            SANDBOX_CONTAINERS: {} as TRPCContext['env']['SANDBOX_CONTAINERS'],
             CLOUD_AGENT_SESSION: {
               idFromName: vi.fn((id: string) => ({ id })),
               get: vi.fn(() => ({

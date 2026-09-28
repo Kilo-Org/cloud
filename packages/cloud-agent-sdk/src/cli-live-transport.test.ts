@@ -712,6 +712,58 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('forwards a scheduled heartbeat with its wake time and re-derives on a changed wake', () => {
+    const { userWebConnection, transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const heartbeat = (session: {
+      id: string;
+      status: string;
+      title: string;
+      scheduledAt?: string;
+    }) => {
+      userWebConnection.emitSystem({
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'owner', sessions: [session] },
+      });
+    };
+
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    // Same wake time: deduped.
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    // Changed wake time: re-derived.
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T10:00:00.000Z',
+    });
+
+    expect(serviceEvents.filter(event => event.type === 'session.status')).toEqual([
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      },
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T10:00:00.000Z' },
+      },
+    ]);
+    transport.destroy();
+  });
+
   it('buffers chat during initial snapshot replay but does not delay service events', async () => {
     let resolveSnapshot: ((snapshot: SessionSnapshot) => void) | undefined;
     const fetchSnapshot = jest.fn(
@@ -757,6 +809,70 @@ describe('CliLiveTransport unified user web connection', () => {
       'message.part.updated',
       'message.updated',
     ]);
+    transport.destroy();
+  });
+
+  it('delivers the CLI part update event time to the sink', () => {
+    const { userWebConnection, transport, chatEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const part = {
+      id: 'part-task-1',
+      sessionID: KILO_SESSION_ID,
+      messageID: 'msg-1',
+      type: 'tool',
+      callID: 'call-1',
+      tool: 'task',
+      state: { status: 'running', input: {}, time: { start: 1 } },
+    };
+    userWebConnection.emitCli({
+      sessionId: KILO_SESSION_ID,
+      event: 'message.part.updated',
+      data: { sessionID: KILO_SESSION_ID, part, time: 1_772_214_640_111 },
+    });
+
+    expect(chatEvents).toEqual([{ type: 'message.part.updated', part, time: 1_772_214_640_111 }]);
+    transport.destroy();
+  });
+
+  it('threads a settled tool part settle time through the snapshot replay', async () => {
+    const taskPart = {
+      id: 'part-task-1',
+      sessionID: KILO_SESSION_ID,
+      messageID: 'msg-1',
+      type: 'tool' as const,
+      callID: 'call-1',
+      tool: 'task',
+      state: {
+        status: 'completed' as const,
+        input: {},
+        output: 'done',
+        title: 'task',
+        metadata: {},
+        time: { start: 1, end: 2 },
+      },
+    };
+    const snapshot: SessionSnapshot = {
+      info: { id: KILO_SESSION_ID },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-1', sessionID: KILO_SESSION_ID }),
+          parts: [taskPart],
+        },
+      ],
+    };
+    const { transport, chatEvents } = createTransportWithSinks({
+      fetchSnapshot: () => Promise.resolve(snapshot),
+    });
+    transport.connect();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(chatEvents).toContainEqual({
+      type: 'message.part.updated',
+      part: taskPart,
+      time: 2,
+    });
     transport.destroy();
   });
 

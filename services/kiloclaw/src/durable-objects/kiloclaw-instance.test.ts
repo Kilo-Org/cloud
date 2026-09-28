@@ -148,6 +148,8 @@ import { buildChannelConfigPatch } from './kiloclaw-instance/channel-config';
 import { destroyRetryDelay } from './kiloclaw-instance/log';
 import * as flyClient from '../fly/client';
 import { FlyApiError } from '../fly/client';
+import type { FlyVolume } from '../fly/types';
+import { volumeNameFromSandboxId } from './machine-config';
 import * as db from '../db';
 import * as gatewayEnv from '../gateway/env';
 import * as regions from './regions';
@@ -169,10 +171,6 @@ import {
   STALE_PROVISION_THRESHOLD_MS,
   WORKER_CONTROLLER_CAPABILITIES_VERSION,
 } from '../config';
-
-// ============================================================================
-// Test harness
-// ============================================================================
 
 /**
  * Find a structured doWarn call by message substring and verify the JSON envelope.
@@ -435,6 +433,18 @@ async function seedRecovering(
   });
 }
 
+function flyVolume(overrides: Partial<FlyVolume> & Pick<FlyVolume, 'id'>): FlyVolume {
+  return {
+    name: volumeNameFromSandboxId('sandbox-1'),
+    state: 'created',
+    size_gb: 10,
+    region: 'sjc',
+    attached_machine_id: null,
+    created_at: '2026-09-14T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 function dockerProviderState(overrides: Record<string, unknown> = {}) {
   return {
     provider: 'docker-local',
@@ -490,10 +500,6 @@ async function seedNorthflankInstance(
     ...overrides,
   });
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -2485,6 +2491,102 @@ describe('reconciliation: volume', () => {
     });
     expect(dataLossLog).toBeDefined();
   });
+
+  it('adopts the newest existing volume when flyVolumeId is null after a restart', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null, lastStartedAt: Date.now() });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({
+        id: 'vol-original',
+        name,
+        state: 'pending_destroy',
+        created_at: '2026-09-08T17:39:32.095Z',
+      }),
+      flyVolume({ id: 'vol-fork', name, created_at: '2026-09-14T22:21:19.270Z' }),
+      flyVolume({
+        id: 'vol-other-sandbox',
+        name: 'kiloclaw_other',
+        created_at: '2026-09-16T00:00:00Z',
+      }),
+    ]);
+
+    await instance.alarm();
+
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+    expect(storage._store.get('flyRegion')).toBe('sjc');
+  });
+
+  it('creates a fresh volume when every matching volume is non-adoptable', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: null, lastStartedAt: Date.now() });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-reaping', name, state: 'pending_destroy' }),
+      flyVolume({ id: 'vol-gone', name, state: 'destroyed' }),
+    ]);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'iad',
+    });
+
+    await instance.alarm();
+
+    expect(flyClient.createVolumeWithFallback).toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+  });
+
+  it('does not adopt a matching volume that another machine holds', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      lastStartedAt: Date.now(),
+    });
+
+    const name = volumeNameFromSandboxId('sandbox-1');
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-orphan', name, attached_machine_id: 'machine-other' }),
+    ]);
+    (flyClient.createVolumeWithFallback as Mock).mockResolvedValue({
+      id: 'vol-new',
+      region: 'iad',
+    });
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyVolumeId')).toBe('vol-new');
+  });
+
+  it('does not log data loss when a lost volume pointer is repaired by adopting a fork', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, { flyVolumeId: 'vol-dead', lastStartedAt: Date.now() });
+
+    (flyClient.getVolume as Mock).mockRejectedValueOnce(new FlyApiError('not found', 404, '{}'));
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-fork', name: volumeNameFromSandboxId('sandbox-1') }),
+    ]);
+
+    await instance.alarm();
+
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+
+    const replaced = (console.log as Mock).mock.calls
+      .map((args: unknown[]) => {
+        try {
+          return JSON.parse(String(args[0])) as { action?: string; data_loss?: boolean };
+        } catch {
+          return null;
+        }
+      })
+      .find(entry => entry?.action === 'replace_lost_volume');
+    expect(replaced).toBeDefined();
+    expect(replaced?.data_loss).toBe(false);
+  });
 });
 
 describe('destroying: no recreation', () => {
@@ -3329,10 +3431,6 @@ describe('gateway process control via controller', () => {
   });
 });
 
-// ============================================================================
-// selectRecoveryCandidate (pure function, no mocks needed)
-// ============================================================================
-
 import { selectRecoveryCandidate } from './machine-recovery';
 import {
   parseRegions,
@@ -3528,9 +3626,36 @@ describe('start: metadata recovery re-arms alarm', () => {
   });
 });
 
-// ============================================================================
-// updateChannels
-// ============================================================================
+describe('start: metadata recovery cooldown', () => {
+  it('escapes an active metadata-recovery cooldown when the caller passes skipCooldown', async () => {
+    const { instance, storage } = createInstance();
+    // The reconcile alarm stamps lastMetadataRecoveryAt every idle cycle, so a
+    // user-initiated start on a machine-less instance always lands inside the
+    // cooldown. Without skipCooldown that turns every Start into a hard 500.
+    await seedProvisioned(storage, {
+      flyMachineId: null,
+      status: 'stopped',
+      lastMetadataRecoveryAt: Date.now(),
+    });
+
+    (flyClient.listMachines as Mock).mockResolvedValue([]);
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-new', region: 'iad' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+    (flyClient.getVolume as Mock).mockResolvedValue({ id: 'vol-1', region: 'iad' });
+
+    await expect(instance.start('user-1')).rejects.toThrow(
+      'Metadata recovery failed; aborting start to avoid creating a duplicate machine'
+    );
+    expect(flyClient.listMachines).not.toHaveBeenCalled();
+
+    // skipCooldown runs recovery, confirms no machine exists, then provisions.
+    await instance.start('user-1', { skipCooldown: true });
+
+    expect(flyClient.listMachines).toHaveBeenCalled();
+    expect(flyClient.createMachine).toHaveBeenCalled();
+    expect(storage._store.get('flyMachineId')).toBe('machine-new');
+  });
+});
 
 describe('updateChannels', () => {
   const fakeEnvelope = {
@@ -3818,10 +3943,6 @@ describe('updateChannels', () => {
   });
 });
 
-// ============================================================================
-// updateSecrets
-// ============================================================================
-
 describe('updateSecrets', () => {
   const fakeEnvelope = {
     encryptedData: 'data',
@@ -4014,8 +4135,6 @@ describe('updateSecrets', () => {
     );
   });
 
-  // ─── Custom (non-catalog) secrets ─────────────────────────────────
-
   it('stores custom secrets by env var name in encryptedSecrets', async () => {
     const { instance, storage } = createInstance();
     await seedProvisioned(storage);
@@ -4144,10 +4263,6 @@ describe('updateSecrets', () => {
     ).rejects.toThrow('Config path "talk.apiKey" is already used by secret "KEY_A"');
   });
 });
-
-// ============================================================================
-// updateKiloCodeConfig — memory & dreaming fields
-// ============================================================================
 
 describe('updateKiloCodeConfig memory fields', () => {
   it('persists vector memory and dreaming fields on a provisioned instance', async () => {
@@ -4354,10 +4469,6 @@ describe('updateKiloCodeConfig memory fields', () => {
   });
 });
 
-// ============================================================================
-// updateGoogleCredentials
-// ============================================================================
-
 describe('updateGoogleCredentials', () => {
   it('persists gmailPushOidcEmail from credentials', async () => {
     const { instance, storage } = createInstance();
@@ -4431,10 +4542,6 @@ describe('updateGoogleCredentials', () => {
   });
 });
 
-// ============================================================================
-// clearGoogleCredentials
-// ============================================================================
-
 describe('clearGoogleCredentials', () => {
   it('sets googleCredentials to null and gmailNotificationsEnabled to false in storage', async () => {
     const { instance, storage } = createInstance();
@@ -4465,10 +4572,6 @@ describe('clearGoogleCredentials', () => {
     expect(storage._store.get('gmailPushOidcEmail')).toBeNull();
   });
 });
-
-// ============================================================================
-// updateGmailNotifications
-// ============================================================================
 
 describe('updateGmailNotifications', () => {
   const fakeCredentials = {
@@ -4532,10 +4635,6 @@ describe('updateGmailNotifications', () => {
   });
 });
 
-// ============================================================================
-// updateGmailHistoryId
-// ============================================================================
-
 describe('updateGmailHistoryId', () => {
   it('stores historyId when none exists', async () => {
     const { instance, storage } = createInstance();
@@ -4598,10 +4697,6 @@ describe('updateGmailHistoryId', () => {
   });
 });
 
-// ============================================================================
-// getGmailOidcEmail
-// ============================================================================
-
 describe('getGmailOidcEmail', () => {
   it('returns stored gmailPushOidcEmail', async () => {
     const { instance, storage } = createInstance();
@@ -4625,10 +4720,6 @@ describe('getGmailOidcEmail', () => {
     expect(result).toEqual({ gmailPushOidcEmail: null });
   });
 });
-
-// ============================================================================
-// parseRegions + deprioritizeRegion (pure functions)
-// ============================================================================
 
 describe('parseRegions', () => {
   it('splits comma-separated regions', () => {
@@ -4713,10 +4804,6 @@ describe('shuffleRegions', () => {
     expect(orderings.size).toBeGreaterThan(1);
   });
 });
-
-// ============================================================================
-// isMetaRegion + prepareRegions + resolveRegions
-// ============================================================================
 
 describe('isMetaRegion', () => {
   it('returns true for eu', () => {
@@ -4839,10 +4926,6 @@ describe('resolveRegions', () => {
     expect(result).toEqual(['eu', 'us']);
   });
 });
-
-// ============================================================================
-// Live check in getStatus()
-// ============================================================================
 
 describe('getStatus: throttled live Fly check', () => {
   it('confirms running when Fly says started', async () => {
@@ -4970,10 +5053,6 @@ describe('getStatus: throttled live Fly check', () => {
     expect(flyClient.getMachine).not.toHaveBeenCalled();
   });
 });
-
-// ============================================================================
-// Volume region validation before machine creation
-// ============================================================================
 
 describe('start: volume region validation', () => {
   // Reset listMachines to return [] so metadata recovery is a no-op in these tests.
@@ -5128,11 +5207,42 @@ describe('start: volume region validation', () => {
     // Region was not changed since volume matches stored flyRegion
     expect(storage._store.get('flyRegion')).toBe('iad');
   });
-});
 
-// ============================================================================
-// 412 insufficient resources recovery
-// ============================================================================
+  it('adopts the existing data volume on start when flyVolumeId was lost', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      flyRegion: null,
+      lastStartedAt: Date.now(),
+    });
+
+    (flyClient.listVolumes as Mock).mockResolvedValueOnce([
+      flyVolume({ id: 'vol-fork', name: volumeNameFromSandboxId('sandbox-1'), region: 'sjc' }),
+    ]);
+    (flyClient.createMachine as Mock).mockResolvedValue({ id: 'machine-1', region: 'sjc' });
+    (flyClient.waitForState as Mock).mockResolvedValue(undefined);
+
+    await instance.start('user-1');
+
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+    expect(storage._store.get('flyVolumeId')).toBe('vol-fork');
+  });
+
+  it('start fails closed instead of creating an empty volume when adoption lookup fails', async () => {
+    const { instance, storage } = createInstance();
+    await seedProvisioned(storage, {
+      flyVolumeId: null,
+      flyMachineId: null,
+      lastStartedAt: Date.now(),
+    });
+
+    (flyClient.listVolumes as Mock).mockRejectedValueOnce(new FlyApiError('fly down', 500, '{}'));
+
+    await expect(instance.start('user-1')).rejects.toThrow('fly down');
+    expect(flyClient.createVolumeWithFallback).not.toHaveBeenCalled();
+  });
+});
 
 describe('start: 412 insufficient resources recovery', () => {
   // Reset listMachines to return [] so metadata recovery is a no-op in these tests.
@@ -5478,10 +5588,6 @@ describe('start: 412 insufficient resources recovery', () => {
   });
 });
 
-// ============================================================================
-// start: region eviction on machine-creation capacity errors
-// ============================================================================
-
 describe('start: evicts region from KV on machine-creation capacity error', () => {
   beforeEach(() => {
     (flyClient.listMachines as Mock).mockResolvedValue([]);
@@ -5608,10 +5714,6 @@ describe('start: evicts region from KV on machine-creation capacity error', () =
   });
 });
 
-// ============================================================================
-// stop() error handling
-// ============================================================================
-
 describe('stop: error propagation', () => {
   it('propagates non-404 Fly errors', async () => {
     const { instance, storage } = createInstance();
@@ -5678,10 +5780,6 @@ describe('stop: error propagation', () => {
   });
 });
 
-// ============================================================================
-// listVolumeSnapshots
-// ============================================================================
-
 describe('listVolumeSnapshots', () => {
   it('returns snapshots from Fly API when volume exists', async () => {
     const { instance, storage } = createInstance();
@@ -5729,9 +5827,6 @@ describe('listVolumeSnapshots', () => {
   });
 });
 
-// ============================================================================
-// Device pairing
-// ============================================================================
 describe('listDevicePairingRequests', () => {
   it('returns empty when not running', async () => {
     const { instance, storage } = createInstance();
@@ -5868,10 +5963,6 @@ describe('approveDevicePairingRequest', () => {
     expect(result).toEqual({ success: false, message: 'Approval failed: request not found' });
   });
 });
-
-// ============================================================================
-// Controller-first pairing (try controller, fall back to fly exec)
-// ============================================================================
 
 import { GatewayControllerError } from './gateway-controller-types';
 
@@ -6665,10 +6756,6 @@ describe('controller-first pairing', () => {
   });
 });
 
-// ============================================================================
-// Pairing + runDoctor on non-Fly providers
-// ============================================================================
-
 describe('non-Fly pairing + runDoctor behavior', () => {
   it('listPairingRequests on Northflank returns empty when controller route is unavailable, does not fly-exec', async () => {
     const { instance, storage } = createInstance();
@@ -6807,10 +6894,6 @@ describe('non-Fly pairing + runDoctor behavior', () => {
     expect(flyClient.execCommand).not.toHaveBeenCalled();
   });
 });
-
-// ============================================================================
-// Kilo CLI run controller routing
-// ============================================================================
 
 describe('kilo CLI run routing', () => {
   it('starts a Kilo CLI run for docker-local via controller without flyMachineId', async () => {
@@ -7007,10 +7090,6 @@ describe('kilo CLI run routing', () => {
     fetchSpy.mockRestore();
   });
 });
-
-// ============================================================================
-// provision: auto-start
-// ============================================================================
 
 describe('provision: auto-start after fresh provision', () => {
   // Reset listMachines to return [] so metadata recovery is a no-op in these tests.
@@ -7970,10 +8049,6 @@ describe('auto-destroy stale provisioned instances', () => {
   });
 });
 
-// ============================================================================
-// restartMachine image tag override
-// ============================================================================
-
 describe('restartMachine image tag override', () => {
   beforeEach(() => {
     (flyClient.stopMachineAndWait as Mock).mockResolvedValue(undefined);
@@ -8084,10 +8159,6 @@ describe('restartMachine image tag override', () => {
     expect(storage._store.get('imageVariant')).toBeNull();
   });
 });
-
-// ============================================================================
-// applyPinnedVersion — admin pin push into DO state
-// ============================================================================
 
 describe('applyPinnedVersion', () => {
   beforeEach(() => {
@@ -8293,10 +8364,6 @@ describe('applyPinnedVersion', () => {
     await expect(instance.applyPinnedVersion('2026-04-09')).rejects.toThrow(/being destroyed/);
   });
 });
-
-// ============================================================================
-// Proactive API key refresh via reconciliation
-// ============================================================================
 
 describe('reconcileApiKeyExpiry', () => {
   /** Set up fetch mock to handle env patch RPCs alongside default health-probe responses. */
@@ -8544,10 +8611,6 @@ describe('reconcileApiKeyExpiry', () => {
     expect(storage._store.get('kilocodeApiKey')).toBe('old-jwt');
   });
 });
-
-// ============================================================================
-// 'starting' status
-// ============================================================================
 
 describe("provision: async start sets status to 'starting'", () => {
   it("sets status='starting' immediately and fires start() via waitUntil", async () => {
@@ -8998,10 +9061,6 @@ describe('reconcileStarting: transient Fly API errors respect starting timeout',
   });
 });
 
-// ============================================================================
-// start: concurrent call guard
-// ============================================================================
-
 describe('start: concurrent calls do not create duplicate machines', () => {
   it('second start() returns early when first is still in progress', async () => {
     const { instance, storage } = createInstance();
@@ -9049,10 +9108,6 @@ describe('start: concurrent calls do not create duplicate machines', () => {
     expect(flyClient.listMachines).toHaveBeenCalledTimes(1);
   });
 });
-
-// ============================================================================
-// restartMachine live check race guard
-// ============================================================================
 
 describe('restartMachine restartingAt guard', () => {
   beforeEach(() => {
@@ -9494,10 +9549,6 @@ describe('restartMachine restartingAt guard', () => {
   });
 });
 
-// ============================================================================
-// Volume reassociation (admin)
-// ============================================================================
-
 describe('listCandidateVolumes', () => {
   it('returns all usable volumes with isCurrent flag', async () => {
     const { instance, storage } = createInstance();
@@ -9678,10 +9729,6 @@ describe('reassociateVolume', () => {
   });
 });
 
-// ============================================================================
-// instanceType resolution (getStatus self-heal)
-// ============================================================================
-
 describe('getStatus instanceType resolution', () => {
   it('drops a stale custom label when machineSize is null', async () => {
     const { instance, storage } = createInstance();
@@ -9722,10 +9769,6 @@ describe('getStatus instanceType resolution', () => {
     expect(storage._store.get('instanceType')).not.toBe('custom');
   });
 });
-
-// ============================================================================
-// instanceType backfill from live Fly machine config
-// ============================================================================
 
 describe('instanceType alarm-driven backfill', () => {
   it('backfills machineSize and instanceType during alarm reconcile when DO state is legacy', async () => {
@@ -9921,10 +9964,6 @@ describe('getDebugState live-check dispatch', () => {
     expect(dbModule.syncInstanceType).not.toHaveBeenCalled();
   });
 });
-
-// ============================================================================
-// resizeMachine
-// ============================================================================
 
 describe('resizeMachine', () => {
   it('rejects when instance is not provisioned', async () => {
@@ -10336,10 +10375,6 @@ describe('resizeMachine', () => {
   });
 });
 
-// ============================================================================
-// adminMachineSizeOverride
-// ============================================================================
-
 describe('setAdminMachineSizeOverride', () => {
   const overrideArgs = {
     size: { cpus: 4, memory_mb: 8192, cpu_kind: 'performance' as const },
@@ -10600,10 +10635,6 @@ describe('clearAdminMachineSizeOverride', () => {
   });
 });
 
-// ============================================================================
-// recordVolumeExtend
-// ============================================================================
-
 describe('recordVolumeExtend', () => {
   it('persists the new volume size, marks the instance custom, and syncs Postgres', async () => {
     const { instance, storage, waitUntilPromises } = createInstance();
@@ -10648,10 +10679,6 @@ describe('recordVolumeExtend', () => {
     await expect(instance.recordVolumeExtend(20)).rejects.toThrow('Instance is not provisioned');
   });
 });
-
-// ============================================================================
-// updateExecPreset
-// ============================================================================
 
 describe('updateExecPreset', () => {
   it('persists exec security and ask to DO storage', async () => {
@@ -11227,10 +11254,6 @@ describe('tryMarkInstanceReady', () => {
     expect(storage._store.get('instanceReadyEmailSent')).toBe(true);
   });
 });
-
-// ============================================================================
-// Lifecycle push notifications
-// ============================================================================
 
 type LifecyclePushCall = {
   userId: string;

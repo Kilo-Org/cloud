@@ -7,6 +7,7 @@
       "instanceLifecycle": "instance ຂອງທ່ານມີການອັບເດດ",
       "scheduledAction": "ການດຳເນີນການທີ່ກຳນົດໄວ້ມີການອັບເດດ",
       "lowBalance": "ຍອດຂອງທ່ານຕ້ອງການຄວາມສົນໃຈ",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "ການກວດພົບຄວາມປອດໄພຕ້ອງການຄວາມສົນໃຈ",
       "activeAgentsGlanceable": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກມີການອັບເດດ"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "ການແຈ້ງເຕືອນຍອດຕໍ່າ",
       "body": "ຍອດ {{organizationName}} ຕົກຕໍ່າກວ່າ ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "ການກວດພົບຄວາມປອດໄພໃໝ່ ({{severity}})",

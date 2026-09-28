@@ -12,19 +12,11 @@ import type { Attachments } from '../router/schemas.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 
-// ---------------------------------------------------------------------------
-// Execution Modes
-// ---------------------------------------------------------------------------
-
 /** Mode of execution - passed directly to kilocode CLI */
 export type ExecutionMode = AgentMode;
 
 /** How the client receives streaming output */
 export type StreamingMode = 'sse' | 'websocket';
-
-// ---------------------------------------------------------------------------
-// Parameter Bundles
-// ---------------------------------------------------------------------------
 
 /** Identity fields shared across most session operations. */
 export type SessionScope = {
@@ -148,10 +140,6 @@ export type MessageRequest = {
   executionOptions?: AgentSelectionOverride & TurnFinalization;
 };
 
-// ---------------------------------------------------------------------------
-// Session Message Intent
-// ---------------------------------------------------------------------------
-
 /**
  * Durable intent for a user message queued in the session.
  *
@@ -165,10 +153,6 @@ export type SessionMessageIntent = {
   agent: AgentSelection;
   finalization?: TurnFinalization;
 };
-
-// ---------------------------------------------------------------------------
-// Delivery Context
-// ---------------------------------------------------------------------------
 
 /**
  * Context for delivering a queued message to the wrapper.
@@ -184,10 +168,6 @@ export type ExecutionDeliveryContext = {
   kiloSessionId?: string;
   metadata: SessionMetadata;
 };
-
-// ---------------------------------------------------------------------------
-// V2 Request/Response Types (for DO methods and tRPC handlers)
-// ---------------------------------------------------------------------------
 
 /** Turn payload preserved by the queue seam before the DO accepts a durable turn. */
 export type QueueExecutionTurnCommand = {
@@ -299,10 +279,6 @@ export type StartExecutionV2Request = SubmittedSessionMessageRequest;
 /** @deprecated Use SessionMessageAdmissionResult. */
 export type StartExecutionV2Result = SessionMessageAdmissionResult;
 
-// ---------------------------------------------------------------------------
-// Delivery Plan Components
-// ---------------------------------------------------------------------------
-
 export type WorkspaceDeliveryPlan = {
   sandboxId: string;
   metadata: SessionMetadata;
@@ -343,10 +319,6 @@ export type FencedWrapperDeliveryBinding = WrapperDeliveryTarget & {
   fence: WrapperRunFence;
 };
 
-// ---------------------------------------------------------------------------
-// Message Delivery Boundary
-// ---------------------------------------------------------------------------
-
 type DeliveryRequestBase = {
   scope: Pick<SessionScope, 'sessionId' | 'userId' | 'orgId'>;
   turn: AcceptedExecutionTurn;
@@ -378,10 +350,6 @@ export type FencedLegacyExecutionRequest = FencedWrapperDispatchRequest & {
 
 /** @deprecated Use FencedLegacyExecutionRequest. */
 export type ExecutionPlan = FencedLegacyExecutionRequest;
-
-// ---------------------------------------------------------------------------
-// Execution Result
-// ---------------------------------------------------------------------------
 
 /**
  * Result of starting an execution.

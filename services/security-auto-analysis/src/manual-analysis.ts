@@ -22,7 +22,7 @@ import {
 } from './db/queries.js';
 import { transitionAnalysisStartLifecycle } from './analysis-start-lifecycle.js';
 import { InsufficientCreditsError, startSecurityAnalysis } from './launch.js';
-import { generateApiToken } from './token.js';
+import { generateControlToken } from './token.js';
 import {
   resolveSecurityAgentModels,
   SECURITY_ANALYSIS_OWNER_CAP,
@@ -130,6 +130,7 @@ export async function processManualAnalysisStart(params: {
     return { status: 'finding-missing' };
   }
   const isActiveRestart = params.command.restartActive === true;
+  if (!finding.platform_integration_id) return { status: 'token-missing' };
   if (!isActiveRestart) {
     const inflight = await countOwnerInflightAnalyses(params.db, owner);
     if (inflight >= SECURITY_ANALYSIS_OWNER_CAP) return { status: 'owner-cap' };
@@ -163,10 +164,12 @@ export async function processManualAnalysisStart(params: {
       ]);
     if (!tokenResult.success) return { status: 'token-missing' };
 
-    const authToken = await generateApiToken(
+    const authToken = await generateControlToken(
       actor,
       nextAuthSecret,
-      params.env.ENVIRONMENT === 'production' ? 'production' : 'development'
+      params.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+      params.env.SHARED_RESOURCE_TOKENS_ENABLED,
+      owner.type === 'org' ? owner.id : undefined
     );
     const restart = await prepareActiveAnalysisRestart(params.db, {
       findingId: finding.id,
@@ -238,7 +241,6 @@ export async function processManualAnalysisStart(params: {
       triageModel,
       analysisModel,
       analysisMode: config.analysis_mode,
-      organizationId: owner.type === 'org' ? owner.id : undefined,
       nextAuthSecret,
       internalApiSecret,
       callbackTokenSecret,

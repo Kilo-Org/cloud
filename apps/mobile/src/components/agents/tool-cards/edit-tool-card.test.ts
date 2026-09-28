@@ -232,6 +232,17 @@ describe('EditToolCard — fixed row', () => {
     }
     expect((row.props as { onPress?: unknown }).onPress).toBeUndefined();
   });
+
+  it('forwards the display translatable provenance to the row', () => {
+    getToolDisplay.mockReturnValue({ title: 'edit', subtitle: 'edit', translatable: false });
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = EditToolCard({ part: makeEditPart({}) }) as unknown as React.ReactElement;
+    const row = findByType(root, 'FixedPartRow')[0];
+    if (!row) {
+      throw new Error('row not found');
+    }
+    expect((row.props as { translatable?: unknown }).translatable).toBe(false);
+  });
 });
 
 describe('EditToolCardBody — diff preview routing', () => {

@@ -7,6 +7,7 @@ import {
   controlFrameSchema,
   sandboxHeartbeatPayloadSchema,
   sandboxEventPublicationPayloadSchema,
+  sandboxEventBatchPayloadSchema,
   sandboxHelloPayloadSchema,
   sandboxReconcilePayloadSchema,
   sandboxReadyPayloadSchema,
@@ -50,6 +51,7 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'sandbox.status': sandboxStatusPayloadSchema,
   'sandbox.reconcile': sandboxReconcilePayloadSchema,
   'sandbox.event.publish': sandboxEventPublicationPayloadSchema,
+  'sandbox.event.publishBatch': sandboxEventBatchPayloadSchema,
   'sandbox.shutdown': sandboxShutdownPayloadSchema,
   'worktree.prepareDeletion': worktreeDeletePayloadSchema,
   'worktree.delete': worktreeDeletePayloadSchema,
@@ -188,7 +190,8 @@ export function errorResponse(
 export function helloResult(capabilities?: {
   connectionRecovery?: boolean;
   eventReceipts?: boolean;
-  scopedCleanupResult?: boolean;
+  eventBatches?: boolean;
+  kiloLocalPhase?: boolean;
 }): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
@@ -196,11 +199,10 @@ export function helloResult(capabilities?: {
     capabilities: {
       kiloVersionHeartbeat: true,
       sessionOperationResults: true,
-      scopedStopAbort: true,
-      nativeRuntimeRetirement: true,
       ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
       ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
-      ...(capabilities?.scopedCleanupResult ? { scopedCleanupResult: true } : {}),
+      ...(capabilities?.eventBatches ? { eventBatches: true } : {}),
+      ...(capabilities?.kiloLocalPhase ? { kiloLocalPhase: true } : {}),
     },
   };
 }

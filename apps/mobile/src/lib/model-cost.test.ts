@@ -27,39 +27,39 @@ describe('formatModelCostPer1M', () => {
     expect(formatModelCostPer1M({ prompt: '', completion: '0.000014' })).toBeNull();
   });
 
-  it('renders $120-class with trailing zeros stripped', () => {
+  it('renders $120-class with fixed two decimals', () => {
     expect(formatModelCostPer1M({ prompt: '0.00012', completion: '0.000014' })).toBe(
-      'Input $120 · Output $14 / 1M tokens'
+      'Input $120.00 · Output $14.00 / 1M tokens'
     );
   });
 
-  it('renders $3 with trailing zeros stripped', () => {
+  it('renders $3 with fixed two decimals', () => {
     expect(formatModelCostPer1M({ prompt: '0.000003', completion: '0.000014' })).toBe(
-      'Input $3 · Output $14 / 1M tokens'
+      'Input $3.00 · Output $14.00 / 1M tokens'
     );
   });
 
-  it('renders $1.75 and $1.5 with proper trim rules', () => {
+  it('renders $1.75 and $1.50 with fixed two decimals', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000175', completion: '0.0000015' })).toBe(
-      'Input $1.75 · Output $1.5 / 1M tokens'
+      'Input $1.75 · Output $1.50 / 1M tokens'
     );
   });
 
   it('renders $0.15', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000015', completion: '0.000014' })).toBe(
-      'Input $0.15 · Output $14 / 1M tokens'
+      'Input $0.15 · Output $14.00 / 1M tokens'
     );
   });
 
   it('renders $0.03', () => {
     expect(formatModelCostPer1M({ prompt: '0.00000003', completion: '0.000014' })).toBe(
-      'Input $0.03 · Output $14 / 1M tokens'
+      'Input $0.03 · Output $14.00 / 1M tokens'
     );
   });
 
   it('renders <$0.01 for sub-cent (but positive) prices', () => {
     expect(formatModelCostPer1M({ prompt: '0.000000009', completion: '0.000014' })).toBe(
-      'Input <$0.01 · Output $14 / 1M tokens'
+      'Input <$0.01 · Output $14.00 / 1M tokens'
     );
     expect(formatModelCostPer1M({ prompt: '0.00000175', completion: '0.000000009' })).toBe(
       'Input $1.75 · Output <$0.01 / 1M tokens'
@@ -68,7 +68,16 @@ describe('formatModelCostPer1M', () => {
 
   it('renders asymmetric pairs with one side sub-cent', () => {
     expect(formatModelCostPer1M({ prompt: '0.000000005', completion: '0.00003' })).toBe(
-      'Input <$0.01 · Output $30 / 1M tokens'
+      'Input <$0.01 · Output $30.00 / 1M tokens'
+    );
+  });
+
+  it('uses the same two-decimal precision as sibling rows ($0.60 beside $0.54)', () => {
+    expect(formatModelCostPer1M({ prompt: '0.0000006', completion: '0.00000054' })).toBe(
+      'Input $0.60 · Output $0.54 / 1M tokens'
+    );
+    expect(formatModelCostPer1M({ prompt: '0.00000015', completion: '0.0000006' })).toBe(
+      'Input $0.15 · Output $0.60 / 1M tokens'
     );
   });
 });
@@ -97,7 +106,7 @@ describe('modelPickerCostLabel', () => {
       modelPickerCostLabel({
         pricing: { prompt: '0.00000175', completion: '0.000014' },
       })
-    ).toBe('Input $1.75 · Output $14 / 1M tokens');
+    ).toBe('Input $1.75 · Output $14.00 / 1M tokens');
   });
 
   it('returns null for undefined pricing on non-free, non-BYOK option', () => {

@@ -44,11 +44,9 @@ export function sanitizeIdForPath(value: string): string {
   return value.replace(/[/:]/g, '-');
 }
 
-// Sanitize a git URL by removing any credentials (username/password) from it.
 function sanitizeGitUrlForLogging(gitUrl: string): string {
   try {
     const url = new URL(gitUrl);
-    // Remove username and password if present
     url.username = '';
     url.password = '';
     return url.toString();
@@ -198,7 +196,6 @@ export function getBaseWorkspacePath(
   if (kilocodeOrganizationId === null || kilocodeOrganizationId === undefined) {
     return `/workspace/${safeUserId}`;
   }
-  // Org accounts maintain orgId/userId structure
   return `/workspace/${requireGeneratedIdPathSegment(kilocodeOrganizationId, 'organization id')}/${safeUserId}`;
 }
 
@@ -846,7 +843,6 @@ export async function cloneGitRepo(
 
     logger.info('Successfully cloned generic git repository');
   } catch (err) {
-    // Log actual error for debugging
     const errorMessage = err instanceof Error ? err.message : String(err);
     logger.error('Git clone failed', {
       error: sanitizeGitOutput(errorMessage),
@@ -1115,7 +1111,6 @@ export async function manageBranch(
   logger.setTags({ branchName, workspacePath });
   logger.withTags({ isUpstream: isUpstreamBranch }).info('Managing branch');
 
-  // Fetch latest refs from remote
   await gitFetch(session, workspacePath);
 
   if (
@@ -1128,7 +1123,6 @@ export async function manageBranch(
     return branchName;
   }
 
-  // Check branch existence in parallel
   const [existsLocally, existsRemotely] = await Promise.all([
     branchExistsLocally(session, workspacePath, branchName),
     branchExistsRemotely(session, workspacePath, branchName),
@@ -1136,24 +1130,18 @@ export async function manageBranch(
 
   logger.withTags({ existsLocally, existsRemotely }).debug('Branch status');
 
-  // Four explicit cases
   if (existsLocally && existsRemotely) {
-    // Case 1: Exists in both places - checkout and sync
     await checkoutExistingBranch(session, workspacePath, branchName);
 
-    // Only pull for session branches, not upstream
     if (!isUpstreamBranch) {
       await pullLatestChangesLenient(session, workspacePath, branchName);
     }
     // For upstream: fetch already happened, checkout is done, leave as-is
   } else if (existsLocally && !existsRemotely) {
-    // Case 2: Only exists locally - just checkout
     await checkoutExistingBranch(session, workspacePath, branchName);
   } else if (!existsLocally && existsRemotely) {
-    // Case 3: Only exists remotely - create tracking branch
     await createTrackingBranch(session, workspacePath, branchName);
   } else {
-    // Case 4: Doesn't exist anywhere
     if (isUpstreamBranch) {
       throw new BranchNotFoundError(branchName);
     }

@@ -1,5 +1,6 @@
 import { hashKey, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { rememberUserSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { i18n } from '@/i18n';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { applyActiveSessionTitle, type CachedActiveSessionsData } from '@/lib/active-sessions-live';
@@ -188,6 +189,10 @@ export function useSessionMutations() {
   const renameSessionAsync = async (sessionId: string, title: string) => {
     const epoch = currentAuthEpoch();
     const input = { session_id: sessionId, title };
+    // Record the user's own title before the write so the render paths never
+    // hide it as the backend's unnamed placeholder (the rename API accepts any
+    // nonblank title, including one that looks like the placeholder).
+    rememberUserSessionTitle(sessionId, title);
     operationEpochs.set(input, epoch);
     await chainSave(sessionId, async () => {
       assertCurrentOperation(epoch);

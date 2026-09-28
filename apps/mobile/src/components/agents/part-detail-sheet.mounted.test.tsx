@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: mono-control presence and streaming auto-follow share one sheet harness */
 import {
   type Part,
@@ -6,9 +5,15 @@ import {
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
-import { createElement, type ReactElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, type Mock, vi } from 'vitest';
+import {
+  createElement,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  useImperativeHandle,
+} from 'react';
+import { act, TestRenderer } from '@/test/renderer';
+import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 
 // Real block, imported before the sheet: the hoisted body-mock factory runs
 // while the sheet module loads, so its binding must already be initialized.
@@ -16,13 +21,36 @@ import { MonoScrollBlock } from './mono-scroll-block';
 import { PartDetailSheet } from './part-detail-sheet';
 import { PartDetailSheetHost } from './part-detail-sheet-host';
 import { useOpenPartDetail } from './open-part-detail-context';
+import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
+
+const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
+  requestMock: vi.fn(),
+  readMock: vi.fn(),
+  writeMock: vi.fn(),
+}));
+
+vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
+  requestToolSummaryTranslations: requestMock,
+}));
+// The encrypted-KV cache is a native module, loaded by the runtime's dynamic
+// import; mock it the same way as the client so this suite stays native-free.
+vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
+  readToolSummaryTranslations: readMock,
+  writeToolSummaryTranslation: writeMock,
+}));
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
+const scrollMock = vi.hoisted(() => ({
+  scrollToEnd: vi.fn<(params?: { animated?: boolean }) => void>(),
+}));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
-  ScrollView: 'ScrollView',
+  ScrollView: (props: { children?: ReactNode; ref?: Ref<typeof scrollMock> }) => {
+    useImperativeHandle(props.ref, () => scrollMock, []);
+    return createElement('ScrollView', { ...props, ref: undefined });
+  },
   Pressable: 'Pressable',
   View: 'View',
   Platform: { OS: 'ios' },
@@ -36,6 +64,23 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurf
 vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
+}));
+// `tool-card-display` imports the Lucide icon components; the node project cannot
+// parse their Flow-sourced react-native runtime, so stub the icon module.
+vi.mock('@/components/ui/icons', () => ({
+  Cpu: 'Cpu',
+  Eye: 'Eye',
+  FileDiff: 'FileDiff',
+  FilePlus: 'FilePlus',
+  FileSearch: 'FileSearch',
+  FolderOpen: 'FolderOpen',
+  Globe: 'Globe',
+  ListTodo: 'ListTodo',
+  Pencil: 'Pencil',
+  Plug: 'Plug',
+  Search: 'Search',
+  Sparkles: 'Sparkles',
+  Terminal: 'Terminal',
 }));
 vi.mock('@/components/ui/text', async () => {
   const React = await import('react');
@@ -55,11 +100,11 @@ vi.mock('expo-haptics', () => ({
 vi.mock('react-native-gesture-handler', () => ({
   ScrollView: 'ScrollView',
 }));
-// Content-driven body mock that mirrors the real bodies' mono content:
+// Content-driven body mock that stands in for the real bodies' mono content:
 // BashToolCardBody renders the `$ command` line as plain text, so only a
 // completed bash output block is mono (running and error bash bodies are
-// mono-free); GenericToolCardBody renders the input JSON as a mono block at
-// any status, plus the completed output block. Mounting a real
+// mono-free); the generic fixture emits a mono block at any status so the
+// control's presence can be driven deterministically. Mounting a real
 // MonoScrollBlock proves the full wiring: sheet state -> real SegmentedControl
 // -> context provider -> real MonoScrollBlock branch. Keyed by part id so a
 // part swap unmounts and remounts the block in one commit (the
@@ -186,7 +231,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -246,21 +291,18 @@ async function unmount(renderer: TestRenderer.ReactTestRenderer): Promise<void> 
 }
 
 /**
- * Mounts the sheet with a per-case `createNodeMock` so the sheet ScrollView's
- * ref resolves to a fresh `scrollToEnd` mock. Never reuse the returned mock
- * across cases.
+ * Mounts the sheet with a fresh imperative ScrollView handle for each case.
  */
 async function mountSheetWithScroll(element: ReactElement): Promise<{
   renderer: TestRenderer.ReactTestRenderer;
   scrollToEnd: Mock<(params?: { animated?: boolean }) => void>;
 }> {
   const scrollToEnd = vi.fn<(params?: { animated?: boolean }) => void>();
+  scrollMock.scrollToEnd = scrollToEnd;
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
-    ref.current = TestRenderer.create(element, {
-      createNodeMock: node => (node.type === 'ScrollView' ? { scrollToEnd } : null),
-    });
+    ref.current = TestRenderer.create(element);
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -434,8 +476,8 @@ describe('PartDetailSheet mounted', () => {
   });
 
   it('shows the control for running generic input JSON and hides it for command-only bash bodies', async () => {
-    // Running generic input JSON is mono (GenericToolCardBody renders the
-    // input as a mono block at any status), so the control appears.
+    // The generic fixture emits a mono block at any status, so the control
+    // appears.
     const withMono = await mountSheet(makeGenericPart('generic-1', { query: 'x' }, 'running'));
     expect(radiogroup(withMono.root)).toBeTruthy();
     await unmount(withMono);
@@ -516,6 +558,19 @@ describe('PartDetailSheet mounted', () => {
     );
     expect(unavailable).toHaveLength(1);
     await unmount(nullPart);
+  });
+
+  it('opts its header out of the iOS pageSheet top inset', async () => {
+    const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
+
+    // The tool detail sheet is a native pageSheet: the header drops the window
+    // top inset on iOS so the title row sits under the grabber, while Android
+    // keeps the clearance (read at the SheetHeader boundary, mocked above).
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'topInset')).toBe('ios-page-sheet');
+
+    await unmount(renderer);
   });
 });
 
@@ -664,5 +719,120 @@ describe('PartDetailSheet auto-follow', () => {
     expect(scrollToEnd).toHaveBeenCalled();
 
     await unmount(renderer);
+  });
+});
+
+const TRANSLATION_MODEL = { id: 'kilo-auto/small', name: 'Auto Small' };
+
+function makeToolPartWithInput(id: string, tool: string, input: Record<string, unknown>): ToolPart {
+  return {
+    id,
+    sessionID: 's1',
+    messageID: 'm1',
+    type: 'tool',
+    callID: `call-${id}`,
+    tool,
+    state: {
+      status: 'completed',
+      input,
+      output: '',
+      title: tool,
+      metadata: {},
+      time: { start: 1, end: 2 },
+    },
+  };
+}
+
+/** Flush the dynamic client import and the queued request. */
+async function settleTranslation(): Promise<void> {
+  await act(async () => {
+    for (let i = 0; i < 5; i += 1) {
+      // eslint-disable-next-line no-await-in-loop -- real time for the batch window, then the macrotask that settles the dynamic import and request
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 20);
+      });
+    }
+  });
+}
+
+describe('PartDetailSheet tool-summary translation gate', () => {
+  beforeEach(() => {
+    requestMock.mockReset();
+    readMock.mockReset();
+    writeMock.mockReset();
+    readMock.mockResolvedValue([]);
+    writeMock.mockResolvedValue(undefined);
+    setConfig({ enabled: false, model: TRANSLATION_MODEL });
+  });
+
+  it('never requests a translation for a deliberately non-translatable tool header', async () => {
+    requestMock.mockResolvedValue(['Liste des tâches']);
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    const renderer = await mountSheet(makeToolPartWithInput('todo-1', 'todoread', {}));
+    await settleTranslation();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('shows the tool name in the header when the row subtitle is empty', async () => {
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A bash call whose `description` is '' projects an empty subtitle; the
+    // header must fall back to the tool name, never a blank title.
+    const renderer = await mountSheet(makeToolPartWithInput('bash-1', 'bash', { description: '' }));
+    await settleTranslation();
+
+    const headers = findByType(renderer.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('bash');
+    expect(requestMock).not.toHaveBeenCalled();
+    await unmount(renderer);
+  });
+
+  it('requests a translation for the row subtitle under the content-bearing tool header', async () => {
+    requestMock.mockResolvedValue(['lire : app.ts']);
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    const renderer = await mountSheet(
+      makeToolPartWithInput('read-1', 'read', { filePath: 'src/app.ts' })
+    );
+    await settleTranslation();
+
+    // The header asks for the row's own labelled text (`app.ts`), not the
+    // composed `read: app.ts`, so it shares the row's cached entry.
+    expect(requestMock).toHaveBeenCalledWith(
+      expect.objectContaining({ texts: ['app.ts'], model: TRANSLATION_MODEL.id })
+    );
+    await unmount(renderer);
+  });
+
+  it('opens the header on the row translation cached under the part id, with no new request', async () => {
+    requestMock.mockResolvedValue(['Fichier cache-me.ts']);
+    setConfig({ enabled: true, model: TRANSLATION_MODEL });
+
+    // A part id this suite does not otherwise use: the runtime caches by item
+    // id and only a test's own entry may serve it.
+    const cachedPart = (): ToolPart =>
+      makeToolPartWithInput('read-cache-1', 'read', { filePath: 'src/cache-me.ts' });
+
+    // First open: the row and the header share the part id, so the one request
+    // resolves the subtitle and the runtime caches it under `read-cache-1`.
+    const first = await mountSheet(cachedPart());
+    await settleTranslation();
+    expect(requestMock).toHaveBeenCalledTimes(1);
+    await unmount(first);
+
+    requestMock.mockClear();
+
+    const second = await mountSheet(cachedPart());
+    await settleTranslation();
+
+    expect(requestMock).not.toHaveBeenCalled();
+    const headers = findByType(second.root, 'SheetHeader');
+    expect(headers).toHaveLength(1);
+    expect(propOf(headers[0], 'title')).toBe('read: Fichier cache-me.ts');
+    await unmount(second);
   });
 });

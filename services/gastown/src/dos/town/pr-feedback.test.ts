@@ -144,42 +144,6 @@ describe('ReviewMetadataRecord', () => {
   });
 });
 
-describe('config deep merge for refinery extensions', () => {
-  it('preserves auto_resolve_pr_feedback when updating other refinery fields', () => {
-    // Simulate the merge logic from config.ts updateTownConfig:
-    // When a partial update provides only gates, the new refinery fields
-    // should fall through to the current value.
-    const current = TownConfigSchema.parse({
-      refinery: {
-        gates: ['npm test'],
-        auto_resolve_pr_feedback: true,
-        auto_merge_delay_minutes: 15,
-      },
-    });
-
-    // Partial update only touches gates — other fields come from current
-    const updateGates: string[] | undefined = ['npm run test:all'];
-    const updateAutoResolve: boolean | undefined = undefined;
-    const updateDelayMinutes: number | null | undefined = undefined;
-
-    const merged = {
-      gates: updateGates ?? current.refinery?.gates ?? [],
-      auto_merge: current.refinery?.auto_merge ?? true,
-      require_clean_merge: current.refinery?.require_clean_merge ?? true,
-      auto_resolve_pr_feedback:
-        updateAutoResolve ?? current.refinery?.auto_resolve_pr_feedback ?? false,
-      auto_merge_delay_minutes:
-        updateDelayMinutes !== undefined
-          ? updateDelayMinutes
-          : (current.refinery?.auto_merge_delay_minutes ?? null),
-    };
-
-    expect(merged.auto_resolve_pr_feedback).toBe(true);
-    expect(merged.auto_merge_delay_minutes).toBe(15);
-    expect(merged.gates).toEqual(['npm run test:all']);
-  });
-});
-
 describe('buildRefinerySystemPrompt with existingPrUrl', () => {
   const baseParams = {
     identity: 'refinery-alpha',

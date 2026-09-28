@@ -51,6 +51,7 @@ export function BashToolCard({ part }: Readonly<{ part: ToolPart }>) {
     <FixedPartRow
       icon={Terminal}
       label={display.subtitle ?? display.title}
+      translatable={display.translatable}
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibilityLabel', {
         name: display.subtitle ?? display.title,

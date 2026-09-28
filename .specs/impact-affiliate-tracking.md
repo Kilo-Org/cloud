@@ -51,7 +51,8 @@ BCP 14 [RFC 2119] [RFC 8174] keywords apply only when they appear in all capital
   governed by KiloClaw billing. Zero-dollar periods, fully comped periods, organization-scoped KiloClaw activity, and
   admin-only interventions are excluded.
 - **Affiliate-eligible Kilo Pass invoice settlement**: Kilo Pass Stripe invoice settlement for an attributed user with
-  positive paid amount and resolvable Kilo Pass tier and cadence. Initial purchases and renewals can qualify.
+  a positive settled eligible product amount and resolvable Kilo Pass tier and cadence. The eligible product amount
+  excludes any service-fee line. Initial purchases and renewals can qualify.
 - **Reported amount**: Monetary amount represented in the payment currency's major units from the authoritative
   monetized amount for the eligible event. Catalog/list price and Kilo Pass credit issuance amounts are not substitutes.
 - **Kilo Pass tier**: Eligible package level `19`, `49`, or `199`.
@@ -148,8 +149,10 @@ after the winning attribution is established.
     payment period or invoice they represent.
 
 17. SALE events MUST report the eligible event's reported amount and payment currency. KiloClaw SALE amounts MUST use
-    the monetized KiloClaw payment-period amount. Kilo Pass SALE amounts MUST use the positive settled invoice paid
-    amount, not catalog price or credit issuance value.
+    the monetized KiloClaw payment-period amount. Kilo Pass SALE amounts MUST use the settled eligible product amount,
+    excluding any service-fee line. That product amount is the service-fee assessment's `settled_product_minor`
+    converted to major units, not the gross settled invoice paid amount, catalog price, or credit issuance value. A
+    zero settled product amount MUST NOT produce a SALE.
 
 18. The reported amount MUST be normalized to the payment currency's major units without changing the authoritative
     settled or monetized value. Any rounding needed by a provider integration must preserve that business amount.
@@ -251,6 +254,11 @@ after the winning attribution is established.
     commission behavior governed by this spec.
 
 ## Changelog
+
+### 2026-08-11 -- Kilo Pass SALE amount excludes the service fee
+
+Amended rule 17 so Kilo Pass SALE amounts use the assessment's settled eligible product amount
+(`settled_product_minor`), not the gross settled invoice paid amount. A zero product amount suppresses SALE.
 
 ### 2026-05-28 -- Enforced EFW refund reversals
 

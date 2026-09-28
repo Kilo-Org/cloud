@@ -144,7 +144,6 @@ export async function getOrganizationSeatUsage(
 function getPlanTypeFromSubscription(subscription: Stripe.Subscription): OrganizationPlan | null {
   const planTypeFromSubscriptionMetadata = subscription.metadata?.planType;
   if (!planTypeFromSubscriptionMetadata) {
-    // If planType doesn't exist in metadata, return null (do nothing - works as it used to)
     return null;
   }
 
@@ -153,7 +152,6 @@ function getPlanTypeFromSubscription(subscription: Stripe.Subscription): Organiz
     return validationResult.data;
   }
 
-  // If planType exists but is invalid, log and return null
   sentryError(
     `Invalid planType value in subscription ${subscription.id} metadata: ${planTypeFromSubscriptionMetadata}`,
     {
@@ -212,7 +210,6 @@ async function handleSubscriptionEventInternal(
           existingActive[0].subscription_stripe_id
         );
         if (!existingSub.ended_at) {
-          // Genuinely still active in Stripe — reject the duplicate
           sentryError(
             `Duplicate seat subscription detected: org ${meta.organizationId} already has a non-ended subscription ${existingActive[0].subscription_stripe_id}. Rejecting subscription ${subscription.id}.`
           );
@@ -326,7 +323,6 @@ async function handleSubscriptionEventInternal(
     );
   }
 
-  // handle subscription deletion
   const isSubscriptionEnded = subscription.ended_at;
   // Only update seat_count when subscription is fully active (payment succeeded).
   // For 'incomplete' or 'past_due' subscriptions, we record the purchase but don't
@@ -334,7 +330,6 @@ async function handleSubscriptionEventInternal(
   const isSubscriptionActive = subscription.status === 'active';
 
   await db.transaction(async tx => {
-    // Insert with conflict handling - will do nothing if idempotency key already exists
     const { rowCount } = await tx
       .insert(organization_seats_purchases)
       .values({
@@ -351,7 +346,6 @@ async function handleSubscriptionEventInternal(
       })
       .onConflictDoNothing({ target: [organization_seats_purchases.idempotency_key] });
 
-    // if there were no rows changed, we hit our idempotency key
     if (rowCount === 0) {
       logExceptInTest(`Skipping update for ${idempotencyKey} - already exists`);
       return;
@@ -363,9 +357,7 @@ async function handleSubscriptionEventInternal(
       await tx.update(organizations).set({ plan }).where(eq(organizations.id, meta.organizationId));
     }
 
-    // if the subscription is ended, set seat count to 0 and do nothing else
     if (isSubscriptionEnded) {
-      // update organization with new seat count only if it differs
       await tx
         .update(organizations)
         .set({ seat_count: 0 })
@@ -375,9 +367,6 @@ async function handleSubscriptionEventInternal(
       return;
     }
 
-    // If subscription is not active (e.g., 'incomplete' due to failed payment),
-    // don't update seat_count yet. The seat_count will be updated when the
-    // subscription becomes active (via customer.subscription.updated webhook).
     if (!isSubscriptionActive) {
       logExceptInTest(
         `Subscription ${subscription.id} is ${subscription.status}, not updating seat_count yet`

@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/lib/hooks/use-offline-banner-state.mounted.test.tsx) */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { reportTrpcError } from '@/lib/force-update-signal';
@@ -74,7 +73,7 @@ function textChildren(renderer: TestRenderer.ReactTestRenderer): string[] | null
   if (!json || Array.isArray(json)) {
     return null;
   }
-  return json.children?.filter((child): child is string => typeof child === 'string') ?? null;
+  return json.children.filter((child): child is string => typeof child === 'string');
 }
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
@@ -127,6 +126,22 @@ describe('useForceUpdate mounted', () => {
     online.listeners.clear();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it('sends the mobile client-dimension headers on the min-version check', async () => {
+    fetchMock.mockResolvedValue(okResponse({ ios: '1.0.0', android: '1.0.0' }));
+    await renderProbe();
+    await flush();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, { headers?: Record<string, string> }];
+    expect(url).toBe('https://api.example.com/api/app/min-version');
+    expect(init.headers).toMatchObject({
+      Accept: 'application/json',
+      'x-kilo-client': 'mobile',
+      'x-kilo-app-platform': 'android',
+      'x-kilo-app-version': '1.0.4',
+    });
   });
 
   it('rechecks on foreground (AppState → active)', async () => {

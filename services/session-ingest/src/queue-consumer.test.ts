@@ -106,10 +106,8 @@ describe('createItemExtractor', () => {
   });
 
   it('skips oversized items (byte budget)', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
-    // Create an item that exceeds 500 bytes
     const bigValue = 'x'.repeat(600);
     const payload = JSON.stringify({
       data: [
@@ -120,13 +118,11 @@ describe('createItemExtractor', () => {
 
     feedAll(ext, payload);
 
-    // The oversized item should be skipped, but the small one should parse
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'small', data: { ok: true } });
   });
 
   it('clears skippingItem when oversize item ends on closing brace', () => {
-    // MAX_SINGLE_ITEM_BYTES is mocked to 500
     const ext = createItemExtractor('test-key');
 
     // A flat object (no nested braces) that exceeds budget — the closing }
@@ -138,7 +134,6 @@ describe('createItemExtractor', () => {
 
     feedAll(ext, payload);
 
-    // The first item is oversized and skipped; the second should parse fine
     expect(ext.pending).toHaveLength(1);
     expect(ext.pending[0]).toEqual({ type: 'after', ok: true });
   });
@@ -146,7 +141,6 @@ describe('createItemExtractor', () => {
   it('sets parseError on malformed JSON', () => {
     const ext = createItemExtractor('test-key');
 
-    // Feed invalid JSON
     ext.tokenizer.write(encoder.encode('{ data: ['));
     ext.tokenizer.end();
 
@@ -1585,7 +1579,6 @@ describe('agent_notification attention signals', () => {
     const { ack } = await runAgentNotificationQueue(env);
 
     expect(ack).toHaveBeenCalledTimes(1);
-    // Invalid item was dropped before reaching the DO ingest.
     expect(ingest).toHaveBeenCalledWith(
       [{ type: 'agent_notification', data: { id: 'note_ok', message: 'OK' } }],
       'usr_agent',

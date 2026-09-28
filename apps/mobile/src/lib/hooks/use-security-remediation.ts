@@ -13,49 +13,8 @@ import { i18n } from '@/i18n';
 import { reconcileFirstPage } from '@/lib/query/infinite-retention';
 import { scheduleCacheMaintenance } from '@/lib/query/schedule-cache-maintenance';
 import { type SecurityAnalysis } from '@/lib/security-agent';
+import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { trpcClient, useTRPC } from '@/lib/trpc';
-
-// Catalog keys for the remediation-unavailable reason codes, mapped from
-// REMEDIATION_UNAVAILABLE_COPY and getRemediationUnavailableCopy in
-// packages/app-shared. Unknown reasons keep the generic copy; a null/eligible
-// reason stays null so callers keep their existing fallback.
-const REMEDIATION_UNAVAILABLE_KEYS = {
-  finding_not_found: 'securityAgent.remediationUnavailable.findingNotFound',
-  approval_required: 'securityAgent.remediationUnavailable.approvalRequired',
-  finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
-  repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
-  analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
-  not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
-  exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
-  manual_review_required: 'securityAgent.remediationUnavailable.manualReviewRequired',
-  monitor_required: 'securityAgent.remediationUnavailable.monitorRequired',
-  triage_only: 'securityAgent.remediationUnavailable.triageOnly',
-  action_not_concrete: 'securityAgent.remediationUnavailable.actionNotConcrete',
-  remediation_active: 'securityAgent.remediationUnavailable.remediationActive',
-  pr_already_opened: 'securityAgent.remediationUnavailable.prAlreadyOpened',
-  duplicate_analysis_result: 'securityAgent.remediationUnavailable.duplicateAnalysisResult',
-  retry_not_allowed: 'securityAgent.remediationUnavailable.retryNotAllowed',
-  security_agent_disabled: 'securityAgent.remediationUnavailable.securityAgentDisabled',
-  auto_remediation_disabled: 'securityAgent.remediationUnavailable.autoRemediationDisabled',
-  include_existing_disabled: 'securityAgent.remediationUnavailable.includeExistingDisabled',
-  below_threshold: 'securityAgent.remediationUnavailable.belowThreshold',
-  before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
-} as const satisfies Record<string, string>;
-
-const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediation.unavailable';
-
-function getRemediationUnavailableKey(reason: string | null | undefined): string | null {
-  if (!reason || reason === 'eligible') {
-    return null;
-  }
-  // Object.hasOwn (not `in`) so inherited keys like 'constructor' fall
-  // through to the generic copy instead of leaking prototype members.
-  return Object.hasOwn(REMEDIATION_UNAVAILABLE_KEYS, reason)
-    ? REMEDIATION_UNAVAILABLE_KEYS[reason as keyof typeof REMEDIATION_UNAVAILABLE_KEYS]
-    : REMEDIATION_UNAVAILABLE_GENERIC_KEY;
-}
 
 async function invalidateRemediationQueries(
   deps: {

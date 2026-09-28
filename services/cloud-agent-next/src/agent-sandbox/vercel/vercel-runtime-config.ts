@@ -1,3 +1,7 @@
+import {
+  vercelSandboxResourcesSchema,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
 
 const positiveIntegerString = z
@@ -24,6 +28,7 @@ export type VercelSandboxRuntimeConfig = {
   snapshotId: string;
   runtimeBuildId: string;
   runtime: 'node24';
+  resources?: VercelSandboxResources;
   initialTimeoutMs: number;
   extendDurationMs: number;
 };
@@ -82,22 +87,26 @@ export function resolveVercelSandboxRuntimeConfig(
     snapshotId?: string;
     runtimeBuildId?: string;
     runtime?: string;
+    resources?: VercelSandboxResources;
   }
 ): VercelSandboxRuntimeConfig | undefined {
+  const resources = vercelSandboxResourcesSchema.optional().parse(persisted?.resources);
   const configured = parseVercelSandboxRuntimeConfig(env);
   if (!configured) return undefined;
-  return persisted?.projectId &&
+  const resolved: VercelSandboxRuntimeConfig =
+    persisted?.projectId &&
     persisted.snapshotId &&
     persisted.runtimeBuildId &&
     persisted.runtime === 'node24'
-    ? {
-        ...configured,
-        projectId: persisted.projectId,
-        snapshotId: persisted.snapshotId,
-        runtimeBuildId: persisted.runtimeBuildId,
-        runtime: persisted.runtime,
-      }
-    : configured;
+      ? {
+          ...configured,
+          projectId: persisted.projectId,
+          snapshotId: persisted.snapshotId,
+          runtimeBuildId: persisted.runtimeBuildId,
+          runtime: persisted.runtime,
+        }
+      : configured;
+  return resources === undefined ? resolved : { ...resolved, resources };
 }
 
 export type VercelSandboxEnrollmentEnv = {

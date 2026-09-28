@@ -18,7 +18,8 @@ import { isSignOutActive } from './auth/sign-out-state';
 import { captureActiveSessionsQueryRefresh, fenceActiveSessionsQuery } from './query-client';
 
 const ENRICHMENT_RETRY_MIN_INTERVAL_MS = 10_000;
-type RefreshReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect' | 'manual';
+type LiveSyncReason = 'enrichment' | 'cli-connected' | 'cli-disconnected' | 'reconnect' | 'manual';
+type RefreshReason = LiveSyncReason | 'foreground';
 type WriteUpdater = (current: CachedActiveSession[]) => CachedActiveSession[];
 export type LiveSyncConnection = Pick<
   UserWebConnection,
@@ -136,9 +137,7 @@ export class ActiveSessionsLiveSync {
     if (!this.isCurrentAttachment(epoch)) {
       return { accepted: false, canceled: true };
     }
-    return {
-      accepted: !this.pendingReasons.has('manual') && refresh.hasAcceptedResult(),
-    };
+    return { accepted: !this.pendingReasons.has('manual') && refresh.hasAcceptedResult() };
   }
 
   async getWriteQueue(): Promise<void> {

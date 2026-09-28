@@ -4,6 +4,7 @@ import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import {
+  BookOpenCheck,
   Building2,
   GitMerge,
   GitPullRequest,
@@ -16,8 +17,9 @@ import {
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, View } from 'react-native';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, { FadeOut } from 'react-native-reanimated';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -29,19 +31,21 @@ import { FormField } from '@/components/ui/form-field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
+import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
-import { showFeedbackPrompt } from '@/lib/feedback';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
   getProfileAgentScope,
+  getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
+import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -69,14 +73,26 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
+  const { left, right } = useScreenSideInsets();
+  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const colors = useThemeColors();
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
+  // The account queries wait for the tab transition to settle, but the hook
+  // bounds that wait: an interaction queue that never reports idle (an
+  // automated UI session holds one open) must not hide the Linked accounts row,
+  // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  // One destructive confirm for both platforms: the in-app dialog carries the
+  // destructive (red) affordance on iOS and Android alike, so the sign-out
+  // path never branches on the platform. The confirmation itself, and its
+  // rationale, live in `useSignOutConfirmation`.
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
     isLoading,
@@ -104,6 +120,9 @@ export function ProfileScreen() {
   const orgName = selectedOrg?.organizationName;
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
+  // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
+  // the tile requests it and the screen renders whichever one applies.
+  const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
 
@@ -116,6 +135,11 @@ export function ProfileScreen() {
     setCode,
   } = useDeleteAccount();
 
+  // Delete account keeps the native alert: Android's AppCompat dialog takes its
+  // panel and action accent from the activity theme, which the
+  // `plugins/withAndroidAlertDialogTheme` prebuild overlay points at the app
+  // tokens, and iOS renders the same call as a `UIAlertController` that already
+  // follows the device appearance.
   const confirmDeleteAccount = () => {
     Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -123,19 +147,6 @@ export function ProfileScreen() {
         text: t('profile.deleteAccountConfirm'),
         style: 'destructive',
         onPress: beginDelete,
-      },
-    ]);
-  };
-
-  const confirmSignOut = () => {
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => {
-          void signOut();
-        },
       },
     ]);
   };
@@ -149,7 +160,8 @@ export function ProfileScreen() {
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 pt-4"
+        style={scrollStyle}
+        contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {/* Credits */}
@@ -164,6 +176,7 @@ export function ProfileScreen() {
             icon={GitPullRequest}
             title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
             onPress={() => {
@@ -176,13 +189,23 @@ export function ProfileScreen() {
             icon={ShieldCheck}
             title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
+            hue="honey"
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
-            last
             onPress={() => {
               if (agentScope) {
                 router.push(getSecurityAgentPath(agentScope));
               }
+            }}
+          />
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('profiles.title')}
+            subtitle={t('profiles.entrySubtitle')}
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getProfilesPath());
             }}
           />
         </View>
@@ -197,6 +220,7 @@ export function ProfileScreen() {
               icon={GitMerge}
               title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
+              hue="gold"
               className="rounded-lg bg-secondary px-3"
               last
               onPress={() => {
@@ -230,6 +254,7 @@ export function ProfileScreen() {
                     : t('profile.manageOrganization')
                 }
                 subtitle={orgName}
+                hue="lime"
                 className="rounded-lg bg-secondary px-3"
                 disabled={!orgRole}
                 last
@@ -241,11 +266,47 @@ export function ProfileScreen() {
           </View>
         )}
 
+        {/* App */}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.app')}
+          </Text>
+          <ConfigureRow
+            icon={SlidersHorizontal}
+            title={t('common.preferences')}
+            subtitle={t('profile.preferencesSubtitle')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          {/* Permanent replay entry: opens the tour at any time, including
+              after the account finished or skipped it. Opening it is an
+              explicit user action, never a re-arm of the auto-open. */}
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('tour.tutorialLabel')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push('/(app)/tour' as Href);
+            }}
+          />
+        </View>
+
         {/* Linked accounts — hide the whole section when there are no linked
             providers (and we're not loading/erroring) so the header never dangles. */}
         {/* No layout animation on this section: siblings above mount/resize
             asynchronously; LinearTransition would animate this container's
-            position lag as a visible header overlap. Opacity fades are safe. */}
+            position lag as a visible header overlap.
+            The rows below carry no entering fade either: a Reanimated entering
+            animation does not run while the app is backgrounded, so the row
+            stayed mounted at opacity 0 and left the header alone above the tab
+            bar (Android `profile-error`, 2026-09-22). The skeleton reserves the
+            row's height, so painting a row directly cannot shift the sections
+            below — only the skeleton's exit fade remains. */}
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
@@ -286,62 +347,47 @@ export function ProfileScreen() {
             )}
 
             {data?.providers.map((p, index) => (
-              <Animated.View key={`${p.provider}-${p.email}`} entering={FadeIn.duration(200)}>
+              <View key={`${p.provider}-${p.email}`}>
                 <ConfigureRow
                   icon={KeyRound}
                   title={providerLabel(p.provider)}
                   subtitle={p.email}
+                  subtitleNumberOfLines={1}
+                  hue="moss"
                   className="rounded-lg bg-secondary px-3"
                   last={index === data.providers.length - 1}
                 />
-              </Animated.View>
+              </View>
             ))}
           </View>
         )}
-
-        {/* App */}
-        <View className="mt-6 gap-3">
-          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.app')}
-          </Text>
-          <ConfigureRow
-            icon={SlidersHorizontal}
-            title={t('common.preferences')}
-            subtitle={t('profile.preferencesSubtitle')}
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
-            }}
-          />
-        </View>
 
         {/* Actions — stacked full-width tiles so labels never clip side-by-side at max Dynamic Type */}
         <View className="mt-6 gap-3">
           <ActionTile
             icon={MessageSquare}
             label={t('profile.feedback')}
-            color={colors.mutedForeground}
+            hue="fern"
             onPress={() => {
-              showFeedbackPrompt(userId);
+              void feedbackPrompt.requestPrompt(userId);
             }}
           />
           <ActionTile
             icon={Lock}
             label={t('profile.privacyChoices')}
-            color={colors.mutedForeground}
+            hue="fern"
             onPress={showPrivacyChoices}
           />
           <ActionTile
             icon={LogOut}
             label={t('common.signOut')}
-            color={colors.mutedForeground}
-            onPress={confirmSignOut}
+            hue="fern"
+            onPress={requestSignOut}
           />
           <ActionTile
             icon={Trash2}
             label={t('profile.deleteAccount')}
-            color={colors.destructive}
+            hue="fern"
             destructive
             disabled={deletePending}
             onPress={confirmDeleteAccount}
@@ -373,6 +419,18 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+
+      {confirmVisible && (
+        <DestructiveConfirmDialog
+          title={t('profile.signOutTitle')}
+          message={t('profile.signOutMessage')}
+          confirmLabel={t('common.signOut')}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
+        />
+      )}
+
+      {feedbackPrompt.promptDialog}
     </View>
   );
 }

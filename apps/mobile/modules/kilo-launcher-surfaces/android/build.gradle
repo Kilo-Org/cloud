@@ -1,0 +1,21 @@
+// The `expo-module-gradle-plugin` keeps `expo-modules-core` on the compile
+// classpath only, so this module's runtime classpath stays framework-only and
+// resolves from the warm cache under `--offline` (the `useCoreDependencies()`
+// style pulls the whole androidx appcompat tree, whose pinned versions are not
+// in the offline cache).
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.kilocode.kilaunchersurfaces'
+version = '0.1.0'
+
+android {
+  namespace 'com.kilocode.kilaunchersurfaces'
+
+  defaultConfig {
+    versionCode 1
+    versionName '0.1.0'
+  }
+}

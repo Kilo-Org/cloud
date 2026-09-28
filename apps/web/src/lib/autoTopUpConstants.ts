@@ -16,4 +16,14 @@ export const OrgAutoTopUpAmountCentsSchema = z.union(
 export type OrgAutoTopUpAmountCents = z.infer<typeof OrgAutoTopUpAmountCentsSchema>;
 export const DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS: OrgAutoTopUpAmountCents = 50000;
 
+// An in-flight auto-top-up holds its lock until the `invoice.paid` webhook posts
+// credits. A lock older than this is stale and can be reclaimed.
+export const AUTO_TOP_UP_ATTEMPT_LOCK_TIMEOUT_SECONDS = 60 * 60 * 2; // 2 hours
+
+// A blocked request is reported as retryable only while a top-up is plausibly
+// still in transit. A delivered `invoice.paid` webhook clears the lock within
+// seconds, so this is deliberately shorter than the reclaim timeout: a lost
+// webhook must not mask a terminal no-credits state for hours.
+export const AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS = 15 * 60; // 15 minutes
+
 export const SYSTEM_AUTO_TOP_UP_USER_ID = 'system-auto-topup';

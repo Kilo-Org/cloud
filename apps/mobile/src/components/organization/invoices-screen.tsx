@@ -1,7 +1,8 @@
 import { Download, FileText } from '@/components/ui/icons';
-import { type ReactNode, useState } from 'react';
+import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
+import { memo, type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
@@ -29,6 +30,22 @@ import {
   shareOrganizationInvoicePdf,
 } from '@/lib/organization-invoice-download';
 import { cn, firstNonEmpty } from '@/lib/utils';
+
+// FlashList takes `contentContainerStyle` (no className), so the FlatList's
+// `grow gap-3 px-6 pt-4` content classes map to their pixel values. FlashList v2
+// positions every cell absolutely and has no `gap` handling (2.3.2 ships zero
+// `gap` references), so the 12px inter-row gap rides on the measured item
+// separator instead of `contentContainerStyle.gap`. The old container `gap` also
+// sat between the last row and the pagination footer; FlashList's separator only
+// spans items, so that boundary carries the same 12px as `pt-3` on the footer.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  flexGrow: 1,
+  paddingHorizontal: 24,
+  paddingTop: 16,
+} satisfies ViewStyle;
+
+const InvoiceRowSeparator = () => <View className="h-3" />;
 
 const STATUS_LABEL_KEYS = {
   paid: 'organization.invoices.status.paid',
@@ -118,7 +135,7 @@ function InvoiceRowContent({
   );
 }
 
-function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
+const InvoiceRow = memo(function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [sharing, setSharing] = useState(false);
@@ -181,7 +198,7 @@ function InvoiceRow({ invoice }: Readonly<{ invoice: OrgInvoice }>) {
       />
     </Pressable>
   );
-}
+});
 
 export function OrganizationInvoicesScreen() {
   const { t } = useTranslation();
@@ -189,6 +206,13 @@ export function OrganizationInvoicesScreen() {
   const { query, entries: invoices, hasMore } = useOrgInvoicesPage(organizationId);
   const paddingBottom = useTabBarBottomPadding();
   useRouteForegroundRefresh([[['organizations']]]);
+
+  // `InvoiceRow` is memoized at module scope, so the renderer keeps one identity
+  // across data updates and only the changed rows re-render.
+  const renderItem = useCallback(
+    ({ item }: ListRenderItemInfo<OrgInvoice>) => <InvoiceRow invoice={item} />,
+    []
+  );
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.invoices.title')} />;
@@ -248,7 +272,9 @@ export function OrganizationInvoicesScreen() {
     );
   } else {
     const footer = (
-      <View>
+      // The former container gap also separated the last row from this footer
+      // block, which the item separator does not cover.
+      <View className="pt-3">
         {hasMore && !isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
@@ -287,11 +313,14 @@ export function OrganizationInvoicesScreen() {
 
     body = (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
-        <FlatList
+        <FlashList
+          style={listStyle}
           data={invoices}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => <InvoiceRow invoice={item} />}
-          contentContainerClassName="grow gap-3 px-6 pt-4"
+          renderItem={renderItem}
+          getItemType={() => 'invoice'}
+          ItemSeparatorComponent={InvoiceRowSeparator}
+          contentContainerStyle={listContentContainerStyle}
           ListEmptyComponent={
             <EmptyState
               placement="top"

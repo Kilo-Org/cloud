@@ -156,27 +156,27 @@ describe('model access predicates', () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['deepseek', 'fireworks'],
-      lookup({ 'openai/gpt-5.6-sol': ['fireworks', 'openai'] })
+      lookup({ 'stepfun/step-3.7-flash': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('openai/gpt-5.6-sol-discounted')).resolves.toBe(false);
-    await expect(isAllowed('openai/gpt-5.6-sol')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(false);
+    await expect(isAllowed('stepfun/step-3.7-flash')).resolves.toBe(true);
   });
 
   test('provider allow list keeps restricted exclusive models when a restricted provider remains enabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
-      ['openai', 'fireworks'],
-      lookup({ 'openai/gpt-5.6-sol': ['fireworks'] })
+      ['stepfun', 'fireworks'],
+      lookup({ 'stepfun/step-3.7-flash': ['fireworks'] })
     );
 
-    await expect(isAllowed('openai/gpt-5.6-sol-discounted')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
   });
 
   test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
-    const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['openai'], lookup({}));
+    const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('openai/gpt-5.6-sol-discounted')).resolves.toBe(true);
+    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

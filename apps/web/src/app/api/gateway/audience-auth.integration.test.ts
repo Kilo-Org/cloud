@@ -21,9 +21,6 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
 jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/experiments/list-available-experiment-models', () => ({
-  listAvailableExperimentModels: jest.fn(),
-}));
 jest.mock('@/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
@@ -47,9 +44,6 @@ import {
 
 const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
 const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
-const { listAvailableExperimentModels } = jest.requireMock(
-  '@/lib/ai-gateway/experiments/list-available-experiment-models'
-);
 const { addUserByokAvailability, getUserByokProviderIds } =
   jest.requireMock('@/lib/ai-gateway/byok');
 const { getAvailableModelsForOrganization } = jest.requireMock(
@@ -85,7 +79,6 @@ describe('gateway models audience authentication', () => {
     mockGetServerSession.mockResolvedValue(null);
     getEnhancedOpenRouterModels.mockResolvedValue(publicCatalog);
     getDirectByokModelsForUser.mockResolvedValue([{ id: 'private/byok' }]);
-    listAvailableExperimentModels.mockResolvedValue([]);
     getUserByokProviderIds.mockResolvedValue([]);
     addUserByokAvailability.mockImplementation(async (models: unknown[]) => models);
     getAvailableModelsForOrganization.mockResolvedValue({ data: [{ id: 'organization/model' }] });

@@ -137,7 +137,6 @@ function dropCheckConstraints(sql: SqlStorage): void {
     // Skip if nothing changed (shouldn't happen given the WHERE clause)
     if (cleanedSql === originalSql) continue;
 
-    // Rebuild the table: rename → recreate → copy → drop old
     const tmpName = `_${tableName}_migrate`;
     try {
       query(sql, /* sql */ `ALTER TABLE "${tableName}" RENAME TO "${tmpName}"`, []);
@@ -312,8 +311,6 @@ export function updateBeadStatus(
     metadata: failureReason && status === 'failed' ? { failure_reason: failureReason } : {},
   });
 
-  // If the bead reached a terminal status and is tracked by a convoy,
-  // update the convoy's closed_beads counter and auto-land if complete.
   if (status === 'closed' || status === 'failed') {
     updateConvoyProgress(sql, beadId, timestamp);
   }
@@ -398,7 +395,6 @@ export function updateConvoyProgress(sql: SqlStorage, beadId: string, timestamp:
       [closedCount, convoyId]
     );
 
-    // Check if convoy should auto-land
     const metaRows = [
       ...query(
         sql,
@@ -570,7 +566,6 @@ export function setDependencies(sql: SqlStorage, beadId: string, dependsOnBeadId
  * Returns whether the bead was newly added (true) or already tracked (false).
  */
 export function convoyAddBead(sql: SqlStorage, convoyId: string, beadId: string): boolean {
-  // Check if already tracked
   const existing = [
     ...query(
       sql,
@@ -615,7 +610,6 @@ export function convoyAddBead(sql: SqlStorage, convoyId: string, beadId: string)
  * Returns whether the bead was actually tracked (true) or not found (false).
  */
 export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: string): boolean {
-  // Check if tracked
   const existing = [
     ...query(
       sql,
@@ -630,7 +624,6 @@ export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: stri
   ];
   if (existing.length === 0) return false;
 
-  // Remove the tracks edge
   query(
     sql,
     /* sql */ `
@@ -641,7 +634,6 @@ export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: stri
     `,
     [beadId, convoyId]
   );
-  // Decrement total_beads, floor at 0
   query(
     sql,
     /* sql */ `
@@ -652,7 +644,6 @@ export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: stri
     [convoyId]
   );
 
-  // Find all other beads tracked by this convoy
   const siblingRows = [
     ...query(
       sql,
@@ -708,7 +699,6 @@ export function convoyRemoveBead(sql: SqlStorage, convoyId: string, beadId: stri
  * (all their 'blocks' dependencies are resolved).
  */
 export function getNewlyUnblockedBeads(sql: SqlStorage, closedBeadId: string): string[] {
-  // Find beads that depend on the closed bead via 'blocks'
   const dependentRows = [
     ...query(
       sql,
@@ -728,7 +718,6 @@ export function getNewlyUnblockedBeads(sql: SqlStorage, closedBeadId: string): s
     .parse(dependentRows)
     .map(r => r.bead_id);
 
-  // For each dependent, check if ALL blockers are now resolved
   return dependentIds.filter(id => !hasUnresolvedBlockers(sql, id));
 }
 
@@ -763,7 +752,6 @@ export function updateBeadFields(
     updateBeadStatus(sql, beadId, fields.status, actorId);
   }
 
-  // Build the SQL update for non-status fields only.
   const timestamp = now();
   const setClauses: string[] = [];
   const values: unknown[] = [];
@@ -811,7 +799,6 @@ export function updateBeadFields(
       ...values
     );
 
-    // Log fields_updated only for the non-status fields that were changed.
     const nonStatusFields = Object.keys(fields).filter(k => k !== 'status');
     if (nonStatusFields.length > 0) {
       logBeadEvent(sql, {
@@ -867,7 +854,6 @@ export function deleteBead(sql: SqlStorage, beadId: string, rigId?: string): boo
     deleteBead(sql, bead_id);
   }
 
-  // Unhook any agent assigned to this bead
   query(
     sql,
     /* sql */ `
@@ -879,7 +865,6 @@ export function deleteBead(sql: SqlStorage, beadId: string, rigId?: string): boo
     [beadId]
   );
 
-  // Delete dependencies referencing this bead
   query(
     sql,
     /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} = ? OR ${bead_dependencies.depends_on_bead_id} = ?`,
@@ -888,7 +873,6 @@ export function deleteBead(sql: SqlStorage, beadId: string, rigId?: string): boo
 
   query(sql, /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} = ?`, [beadId]);
 
-  // Delete satellite metadata if present
   query(sql, /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} = ?`, [
     beadId,
   ]);
@@ -960,12 +944,10 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string):
     .parse(childRows)
     .map(r => r.bead_id);
 
-  // Recursively collect children of children
   if (childIds.length > 0) {
     for (const childId of childIds) {
       allIds.add(childId);
     }
-    // Recurse for deeper nesting
     const deeperIds = collectChildBeadIds(sql, childIds);
     for (const id of deeperIds) {
       allIds.add(id);
@@ -975,7 +957,6 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string):
   const allIdsArr = [...allIds];
   const placeholders = ph(allIdsArr);
 
-  // Unhook agents assigned to any of these beads
   sql.exec(
     /* sql */ `UPDATE ${agent_metadata}
       SET ${agent_metadata.columns.current_hook_bead_id} = NULL,
@@ -984,20 +965,17 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string):
     ...allIdsArr
   );
 
-  // Delete dependencies referencing any of these beads
   sql.exec(
     /* sql */ `DELETE FROM ${bead_dependencies} WHERE ${bead_dependencies.bead_id} IN (${placeholders}) OR ${bead_dependencies.depends_on_bead_id} IN (${placeholders})`,
     ...allIdsArr,
     ...allIdsArr
   );
 
-  // Delete events
   sql.exec(
     /* sql */ `DELETE FROM ${bead_events} WHERE ${bead_events.bead_id} IN (${placeholders})`,
     ...allIdsArr
   );
 
-  // Delete satellite metadata
   sql.exec(
     /* sql */ `DELETE FROM ${agent_metadata} WHERE ${agent_metadata.bead_id} IN (${placeholders})`,
     ...allIdsArr
@@ -1025,7 +1003,6 @@ export function deleteBeads(sql: SqlStorage, beadIds: string[], rigId?: string):
     ...allIdsArr
   );
 
-  // Delete the beads themselves
   sql.exec(
     /* sql */ `DELETE FROM ${beads} WHERE ${beads.bead_id} IN (${placeholders})`,
     ...allIdsArr
@@ -1074,8 +1051,6 @@ export function deleteBeadsByStatus(sql: SqlStorage, status: BeadStatus, type?: 
   if (beadIds.length === 0) return 0;
   return deleteBeads(sql, beadIds);
 }
-
-// ── Bead Events ─────────────────────────────────────────────────────
 
 export function logBeadEvent(
   sql: SqlStorage,
@@ -1146,8 +1121,6 @@ export function listBeadEvents(
   return BeadEventRecord.array().parse(rows);
 }
 
-// ── Bead Dependencies (DAG queries) ─────────────────────────────────
-
 /**
  * Return all dependency edges for a given bead (both directions).
  * - blockers: beads that block this bead (this bead depends_on them)
@@ -1214,8 +1187,6 @@ export function getConvoyDependencyEdges(
     depends_on_bead_id: z.string(),
   });
 
-  // First get all bead IDs tracked by this convoy
-  // Then get all 'blocks' edges between those beads
   const rows = [
     ...query(
       sql,

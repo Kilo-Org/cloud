@@ -21,7 +21,6 @@ function isAuthFailure(err: unknown): boolean {
   return AUTH_FAILURE_PATTERNS.some(re => re.test(msg));
 }
 
-// ── Per-rig mutex ────────────────────────────────────────────────────────
 // Git operations (clone, fetch, worktree add/remove) on the same bare repo
 // must be serialized because git acquires index.lock internally. Concurrent
 // operations on different rigs are unaffected.
@@ -639,9 +638,6 @@ async function createWorktreeInner(options: WorktreeOptions): Promise<string> {
   return dir;
 }
 
-/**
- * Remove a git worktree.
- */
 export function removeWorktree(rigId: string, branch: string): Promise<void> {
   return withRigLock(rigId, async () => {
     const repo = await repoDir(rigId);
@@ -654,9 +650,6 @@ export function removeWorktree(rigId: string, branch: string): Promise<void> {
   });
 }
 
-/**
- * List all active worktrees for a rig.
- */
 export async function listWorktrees(rigId: string): Promise<string[]> {
   const repo = await repoDir(rigId);
   if (!(await pathExists(repo))) return [];
@@ -679,7 +672,6 @@ export function setupRigBrowseWorktree(
   options: CloneOptions & { envVars?: Record<string, string> }
 ): Promise<string> {
   return withRigLock(options.rigId, async () => {
-    // Ensure the repo is cloned/up-to-date first
     await cloneRepoInner(options);
     return setupBrowseWorktreeInner(options.rigId, options.defaultBranch);
   });
@@ -778,7 +770,6 @@ export async function mergeBranch(options: {
 
   const repo = await repoDir(options.rigId);
 
-  // Ensure repo exists and is up to date
   if (!(await pathExists(join(repo, '.git')))) {
     await cloneRepo({
       rigId: options.rigId,
@@ -803,7 +794,6 @@ export async function mergeBranch(options: {
     });
   }
 
-  // Create a temporary worktree for the merge on the target branch
   const mergeDir = resolve(WORKSPACE_ROOT, options.rigId, 'merge-tmp', `merge-${Date.now()}`);
   await assertInsideWorkspace(mergeDir);
   // Only create the parent — git worktree add creates the leaf directory itself
@@ -820,7 +810,6 @@ export async function mergeBranch(options: {
     // Use a temporary name to avoid conflicts with the main worktree.
     await exec('git', ['checkout', '-b', tmpBranch], mergeDir);
 
-    // Attempt the merge
     try {
       await exec(
         'git',
@@ -842,10 +831,8 @@ export async function mergeBranch(options: {
       return { status: 'conflict', message };
     }
 
-    // Get the commit SHA of the merge commit
     const commitSha = await exec('git', ['rev-parse', 'HEAD'], mergeDir);
 
-    // Push the merge commit to the target branch on the remote
     await execWithAuthRetry(
       'git',
       () => ['push', 'origin', `${tmpBranch}:${options.targetBranch}`],
@@ -854,7 +841,6 @@ export async function mergeBranch(options: {
 
     return { status: 'merged', message: 'Merge successful', commitSha };
   } finally {
-    // Always clean up the temporary worktree and temp branch
     await exec('git', ['worktree', 'remove', '--force', mergeDir], repo).catch(() => {});
     await rm(mergeDir, { recursive: true, force: true }).catch(() => {});
     await exec('git', ['branch', '-D', tmpBranch], repo).catch(() => {});

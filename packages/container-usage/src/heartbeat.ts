@@ -1,6 +1,6 @@
 import type { Container } from '@cloudflare/containers';
-import type { BudgetVerdict, RecordAck } from './contracts';
-import type { ContainerUsageClient } from './client';
+import type { nonRetryableSkuAdmissionCodes, BudgetVerdict, RecordAck } from './contracts';
+import { isNonRetryableSkuAdmissionError, type ContainerUsageClient } from './client';
 import {
   clearBillingContext,
   getBillingContext,
@@ -18,6 +18,10 @@ export const DEFAULT_STOPPED_STATE_ABANDON_SECONDS = 60 * 60;
 
 type BillingContainer = Pick<Container, 'deleteSchedules' | 'getState' | 'schedule'>;
 
+export type BillingGenerationCloseCause = {
+  nonRetryableSkuAdmissionCode: (typeof nonRetryableSkuAdmissionCodes)[number];
+};
+
 export type BillingHeartbeatDependencies = {
   client: ContainerUsageClient;
   storage: BillingContextStorage;
@@ -33,7 +37,10 @@ export type BillingHeartbeatDependencies = {
   stoppedStateAbandonSeconds?: number;
   beforeHeartbeatDelivery?: (context: BillingContext) => Promise<void>;
   beforeStopDelivery?: (context: BillingContext) => Promise<void>;
-  onGenerationClosed?: (context: BillingContext) => void;
+  onGenerationClosed?: (
+    context: BillingContext,
+    cause?: BillingGenerationCloseCause
+  ) => void | Promise<void>;
   enforceBudgetStop: (
     budget: BudgetVerdict,
     expected: { generation: string; startEpochMs: number }
@@ -143,13 +150,67 @@ export function installBillingHeartbeat(
     };
   };
 
-  const abandonIfCurrent = async (expected: BillingContext): Promise<boolean> => {
+  const notifyGenerationClosed = async (
+    context: BillingContext,
+    cause?: BillingGenerationCloseCause
+  ): Promise<void> => {
+    try {
+      await dependencies.onGenerationClosed?.(context, cause);
+    } catch (error) {
+      // The generation is already closed. A failing close notification must not
+      // recreate the scheduled-callback error or reopen the settled generation.
+      console.warn('Billing generation close notification failed', {
+        error: error instanceof Error ? error.message : String(error),
+        generation: context.generation,
+        instanceId: context.instanceId,
+        nonRetryableSkuAdmissionCode: cause?.nonRetryableSkuAdmissionCode,
+      });
+    }
+  };
+
+  const abandonIfCurrent = async (
+    expected: BillingContext,
+    cause?: BillingGenerationCloseCause
+  ): Promise<boolean> => {
     const current = await getBillingContext(dependencies.storage);
     if (!current || !isSameBillingGeneration(current, expected)) return false;
     await clearBillingContext(dependencies.storage);
     cancelHeartbeat();
-    dependencies.onGenerationClosed?.(expected);
+    await notifyGenerationClosed(expected, cause);
     return true;
+  };
+
+  const recoverDeliveryFailure = async (
+    context: BillingContext,
+    error: unknown,
+    options: {
+      abandonAfterStoppedTimeout: boolean;
+      rethrowAfterReschedule: boolean;
+    }
+  ): Promise<void> => {
+    if (isNonRetryableSkuAdmissionError(error)) {
+      const abandoned = await abandonIfCurrent(context, {
+        nonRetryableSkuAdmissionCode: error.code,
+      });
+      if (abandoned) {
+        console.warn('Billing generation abandoned after non-retryable SKU admission rejection', {
+          code: error.code,
+          generation: context.generation,
+          instanceId: context.instanceId,
+        });
+      }
+      return;
+    }
+    if (
+      options.abandonAfterStoppedTimeout &&
+      context.stoppedObservedAtMs !== undefined &&
+      Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
+    ) {
+      await abandonIfCurrent(context);
+      return;
+    }
+    const rescheduled = await rescheduleIfCurrent(context);
+    if (options.rethrowAfterReschedule || rescheduled) throw error;
   };
 
   const computeStopSegment = (context: BillingContext, usageEndedAtMs: number) => {
@@ -226,7 +287,7 @@ export function installBillingHeartbeat(
     if (!current || !isSameBillingGeneration(current, context)) return ack;
     cancelHeartbeat();
     await clearBillingContext(dependencies.storage);
-    dependencies.onGenerationClosed?.(context);
+    await notifyGenerationClosed(context);
     return ack;
   };
 
@@ -262,15 +323,10 @@ export function installBillingHeartbeat(
       try {
         await recordStopForGeneration(context.pendingStop, context.generation);
       } catch (error) {
-        if (
-          context.stoppedObservedAtMs !== undefined &&
-          Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
-        ) {
-          await abandonIfCurrent(context);
-          return;
-        }
-        if (!(await rescheduleIfCurrent(context))) return;
-        throw error;
+        await recoverDeliveryFailure(context, error, {
+          abandonAfterStoppedTimeout: true,
+          rethrowAfterReschedule: false,
+        });
       }
       return;
     }
@@ -313,15 +369,10 @@ export function installBillingHeartbeat(
           context.stoppedObservedAtMs
         );
       } catch (error) {
-        if (
-          context.stoppedObservedAtMs !== undefined &&
-          Date.now() - context.stoppedObservedAtMs >= stoppedStateAbandonSeconds * 1_000
-        ) {
-          await abandonIfCurrent(context);
-          return;
-        }
-        if (!(await rescheduleIfCurrent(context))) return;
-        throw error;
+        await recoverDeliveryFailure(context, error, {
+          abandonAfterStoppedTimeout: true,
+          rethrowAfterReschedule: false,
+        });
       }
       return;
     }
@@ -394,8 +445,10 @@ export function installBillingHeartbeat(
       }
       await rescheduleIfCurrent(context);
     } catch (error) {
-      await rescheduleIfCurrent(context);
-      throw error;
+      await recoverDeliveryFailure(context, error, {
+        abandonAfterStoppedTimeout: false,
+        rethrowAfterReschedule: true,
+      });
     }
   };
   const billingHeartbeatTick = (generation?: string) =>

@@ -14,6 +14,12 @@ type PreferenceRowProps = Readonly<{
   disabled: boolean;
   busy?: boolean;
   onValueChange: (next: boolean) => void;
+  /**
+   * Accessibility label for the switch. Defaults to the row title; pass an
+   * action label when the title names the setting and the action differs
+   * (e.g. "Default profile" row whose switch says "Remove as default").
+   */
+  switchAccessibilityLabel?: string;
 }>;
 
 /** Switch row shaped like the Notifications category row. */
@@ -25,6 +31,7 @@ export function PreferenceRow({
   disabled,
   busy = false,
   onValueChange,
+  switchAccessibilityLabel,
 }: PreferenceRowProps) {
   const colors = useThemeColors();
   return (
@@ -47,7 +54,7 @@ export function PreferenceRow({
       <Switch
         value={value}
         disabled={disabled}
-        accessibilityLabel={title}
+        accessibilityLabel={switchAccessibilityLabel ?? title}
         accessibilityState={{ disabled, busy }}
         onValueChange={onValueChange}
       />

@@ -77,7 +77,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
     sendViaMailgunMock.mockClear().mockResolvedValue(true);
     verifyEmailMock.mockClear().mockResolvedValue(true);
     mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
-    // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
   });
@@ -122,7 +121,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
   });
 
   test('should return existing organization if stripe_customer_id already exists', async () => {
-    // Update organization to have a stripe_customer_id
     const existingStripeCustomerId = 'cus_existing_123';
     await db
       .update(organizations)
@@ -142,7 +140,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
   });
 
   test('should throw error if organization does not exist', async () => {
-    // Use a valid UUID format that doesn't exist in the database
     const nonExistentOrgId = '00000000-0000-0000-0000-000000000000';
 
     const mockCreateStripeCustomer = async (): Promise<Stripe.Customer> => {
@@ -167,7 +164,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
   });
 
   test('should work with organization created without user', async () => {
-    // Create organization without a user
     const orgWithoutUser = await createOrganization('Org Without User', null);
 
     const mockStripeCustomer: Stripe.Customer = {
@@ -209,7 +205,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
   });
 
   test('should preserve other organization fields when updating stripe_customer_id', async () => {
-    // Update organization with additional data
     const updatedBalance = 50000; // 50 dollars in microdollars
     await db
       .update(organizations)
@@ -254,7 +249,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
   });
 
   test('should create new organization and then create Stripe customer', async () => {
-    // Create a fresh organization for this test
     const freshOrg = await createOrganization('Fresh Organization', testUser.id);
 
     const mockStripeCustomer: Stripe.Customer = {
@@ -287,7 +281,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
       return mockStripeCustomer;
     };
 
-    // Verify organization starts without stripe_customer_id
     expect(freshOrg.stripe_customer_id).toBeNull();
 
     const result = await getOrCreateStripeCustomerIdForOrganization(
@@ -297,7 +290,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
 
     expect(result).toBe('cus_fresh_123');
 
-    // Verify the database was actually updated
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, freshOrg.id),
     });
@@ -346,7 +338,6 @@ describe('getOrCreateStripeCustomerIdForOrganization', () => {
       shipping: null,
     };
 
-    // Create a fresh organization
     const freshOrg = await createOrganization('Race Condition Org', testUser.id);
 
     const mockCreateStripeCustomer = async (): Promise<Stripe.Customer> => {
@@ -374,7 +365,6 @@ describe('findOrganizationByStripeCustomerId', () => {
     sendViaMailgunMock.mockClear().mockResolvedValue(true);
     verifyEmailMock.mockClear().mockResolvedValue(true);
     mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
-    // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
   });
@@ -382,7 +372,6 @@ describe('findOrganizationByStripeCustomerId', () => {
   test('should return organization when stripe_customer_id exists', async () => {
     const stripeCustomerId = 'cus_find_test_unique_123';
 
-    // Update organization to have a stripe_customer_id
     await db
       .update(organizations)
       .set({ stripe_customer_id: stripeCustomerId })
@@ -405,7 +394,6 @@ describe('findOrganizationByStripeCustomerId', () => {
   });
 
   test('should return null when stripe_customer_id is null in database', async () => {
-    // testOrganization starts with null stripe_customer_id by default
     const result = await findOrganizationByStripeCustomerId('cus_find_any_unique_123');
 
     expect(result).toBeNull();
@@ -415,11 +403,9 @@ describe('findOrganizationByStripeCustomerId', () => {
     const stripeCustomerId1 = 'cus_find_multi_unique_123';
     const stripeCustomerId2 = 'cus_find_multi_unique_456';
 
-    // Create another organization
     const testUser2 = await insertTestUser();
     const testOrganization2 = await createOrganization('Second Organization', testUser2.id);
 
-    // Update both organizations with different stripe_customer_ids
     await db
       .update(organizations)
       .set({ stripe_customer_id: stripeCustomerId1 })
@@ -430,14 +416,12 @@ describe('findOrganizationByStripeCustomerId', () => {
       .set({ stripe_customer_id: stripeCustomerId2 })
       .where(eq(organizations.id, testOrganization2.id));
 
-    // Test finding first organization
     const result1 = await findOrganizationByStripeCustomerId(stripeCustomerId1);
     expect(result1).toBeTruthy();
     expect(result1?.id).toBe(testOrganization.id);
     expect(result1?.name).toBe('Test Organization');
     expect(result1?.stripe_customer_id).toBe(stripeCustomerId1);
 
-    // Test finding second organization
     const result2 = await findOrganizationByStripeCustomerId(stripeCustomerId2);
     expect(result2).toBeTruthy();
     expect(result2?.id).toBe(testOrganization2.id);
@@ -448,13 +432,11 @@ describe('findOrganizationByStripeCustomerId', () => {
   test('should work with transaction parameter', async () => {
     const stripeCustomerId = 'cus_find_txn_unique_123';
 
-    // Update organization to have a stripe_customer_id
     await db
       .update(organizations)
       .set({ stripe_customer_id: stripeCustomerId })
       .where(eq(organizations.id, testOrganization.id));
 
-    // Test with transaction
     await db.transaction(async txn => {
       const result = await findOrganizationByStripeCustomerId(stripeCustomerId, txn);
 
@@ -474,7 +456,6 @@ describe('findOrganizationByStripeCustomerId', () => {
     const stripeCustomerId = 'cus_find_preserve_unique_123';
     const updatedBalance = 50000; // 50 dollars in microdollars
 
-    // Update organization with stripe_customer_id and balance
     await db
       .update(organizations)
       .set({
@@ -544,7 +525,6 @@ describe('processTopupForOrganization', () => {
     sendViaMailgunMock.mockClear().mockResolvedValue(true);
     verifyEmailMock.mockClear().mockResolvedValue(true);
     mockResolveStripeReceiptUrl.mockClear().mockResolvedValue(null);
-    // Create test user and organization
     testUser = await insertTestUser();
     testOrganization = await createOrganization('Test Organization', testUser.id);
   });
@@ -560,7 +540,6 @@ describe('processTopupForOrganization', () => {
 
     await processTopupForOrganization(testUser.id, testOrganization.id, amountInCents, config);
 
-    // Verify organization balance was updated
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
@@ -573,7 +552,6 @@ describe('processTopupForOrganization', () => {
       testOrganization.total_microdollars_acquired + expectedBalanceIncrease
     );
 
-    // Verify credit transaction was created
     const creditTransaction = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, stripePaymentId),
     });
@@ -592,8 +570,9 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.to).toBe(testUser.google_user_email);
     expect(topUpEmail.subject).toBe('Your Kilo org credit top-up');
     expect(topUpEmail.html).toContain('Team credits added');
-    expect(topUpEmail.html).toContain('Amount:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain('Amount:</strong>');
     expect(topUpEmail.html).toContain('Credits:</strong> $50.00 USD');
+    expect(topUpEmail.html).toContain('$50.00 USD');
     expect(topUpEmail.html).toContain(
       'A Kilo credit top-up has been processed for Test Organization. The credits are now available to the organization.'
     );
@@ -633,18 +612,51 @@ describe('processTopupForOrganization', () => {
     expect(topUpEmail.subject).toBe('Kilo team auto top-up successful');
     expect(topUpEmail.html).toContain('Team auto top-up was successful');
     expect(topUpEmail.html).toContain('$25.00 USD');
+    expect(topUpEmail.html).toContain('Amount:</strong>');
+    expect(topUpEmail.html).not.toContain('Service fee (5%)');
     expect(topUpEmail.html).toContain(
       'Test Organization was automatically topped up so your team can keep using Kilo without interruption. The new credits are available now.'
     );
     expect(topUpEmail.html).toContain(`/organizations/${testOrganization.id}/payment-details`);
     expect(topUpEmail.html).toContain('https://pay.stripe.test/receipts/ch');
+  });
+
+  test('itemizes credits added, service fee, and gross when a positive fee is passed', async () => {
+    const amountInCents = 5000;
+    const stripePaymentId = 'pi_test_org_service_fee';
+    mockResolveStripeReceiptUrl.mockResolvedValueOnce('https://pay.stripe.test/receipts/fee');
+
+    await processTopupForOrganization(
+      testUser.id,
+      testOrganization.id,
+      amountInCents,
+      {
+        type: 'stripe',
+        stripe_payment_id: stripePaymentId,
+      },
+      {
+        serviceFeeCents: 250,
+        grossPaidCents: 5250,
+        creditsCents: 5000,
+      }
+    );
+
+    expect(sendViaMailgunMock).toHaveBeenCalledTimes(1);
+    const [topUpEmail] = sendViaMailgunMock.mock.calls[0];
+    expect(topUpEmail.html).toContain('Credits added:</strong>');
+    expect(topUpEmail.html).toContain('$50.00 USD');
+    expect(topUpEmail.html).toContain('Service fee (5%):</strong> $2.50 USD');
+    expect(topUpEmail.html).toContain('Total paid:</strong> $52.50 USD');
+    expect(topUpEmail.html).not.toContain('Credits:</strong> $50.00 USD');
+    expect(topUpEmail.html).not.toContain('Credit principal');
+    expect(topUpEmail.html).not.toContain('Amount:</strong> $50.00 USD');
 
     const emailMarkers = await getOrganizationTopUpEmailMarkers(stripePaymentId);
     expect(emailMarkers).toHaveLength(1);
     expect(emailMarkers[0]).toMatchObject({
       email_type: 'organization_credits_top_up_confirmation',
       idempotency_key: stripePaymentId,
-      user_id: null,
+      user_id: testUser.id,
       organization_id: testOrganization.id,
     });
   });
@@ -1093,19 +1105,16 @@ describe('processTopupForOrganization', () => {
     const initialBalance =
       testOrganization.total_microdollars_acquired - testOrganization.microdollars_used;
 
-    // First topup
     await processTopupForOrganization(testUser.id, testOrganization.id, firstAmount, {
       type: 'stripe',
       stripe_payment_id: stripePaymentId1,
     });
 
-    // Second topup
     await processTopupForOrganization(testUser.id, testOrganization.id, secondAmount, {
       type: 'stripe',
       stripe_payment_id: stripePaymentId2,
     });
 
-    // Verify final balance
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
@@ -1118,7 +1127,6 @@ describe('processTopupForOrganization', () => {
       testOrganization.total_microdollars_acquired + expectedTotalIncrease
     );
 
-    // Verify both credit transactions were created
     const transactions = await db.query.credit_transactions.findMany({
       where: eq(credit_transactions.organization_id, testOrganization.id),
     });
@@ -1132,7 +1140,6 @@ describe('processTopupForOrganization', () => {
     const existingBalance = 25000; // $25 in microdollars
     const amountInCents = 3000; // $30
 
-    // Set existing balance
     await db
       .update(organizations)
       .set({ total_microdollars_acquired: existingBalance })
@@ -1143,7 +1150,6 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: 'pi_test_existing_balance',
     });
 
-    // Verify balance was added to existing balance
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
@@ -1185,7 +1191,6 @@ describe('processTopupForOrganization', () => {
       stripe_payment_id: 'pi_test_zero_amount',
     });
 
-    // Verify balance remains unchanged
     const updatedOrg = await db.query.organizations.findFirst({
       where: eq(organizations.id, testOrganization.id),
     });
@@ -1194,7 +1199,6 @@ describe('processTopupForOrganization', () => {
       (updatedOrg?.total_microdollars_acquired ?? 0) - (updatedOrg?.microdollars_used ?? 0);
     expect(computedBalanceZero).toBe(initialBalance);
 
-    // Verify credit transaction was still created with zero amount
     const creditTransaction = await db.query.credit_transactions.findFirst({
       where: eq(credit_transactions.stripe_payment_id, 'pi_test_zero_amount'),
     });
@@ -1215,7 +1219,6 @@ describe('processTopupForOrganization', () => {
       where: eq(organizations.id, testOrganization.id),
     });
 
-    // Verify other fields are preserved
     expect(updatedOrg?.id).toBe(testOrganization.id);
     expect(updatedOrg?.name).toBe(testOrganization.name);
     expect(updatedOrg?.created_at).toBe(testOrganization.created_at);

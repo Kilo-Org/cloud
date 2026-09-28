@@ -5,6 +5,7 @@ import type {
   OpenRouterModel,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
+  buildDataCollectionRequiredModelIds,
   buildModelIdToProviderSlugsIndex,
   createModelsByProviderIndexLoader,
   getEndpointProviderSlugs,
@@ -79,6 +80,54 @@ describe('getSnapshotModelVariantId', () => {
   });
 });
 
+describe('buildDataCollectionRequiredModelIds', () => {
+  function provider(slug: string, training: boolean, models: OpenRouterModel[]) {
+    return {
+      name: slug,
+      displayName: slug,
+      slug,
+      dataPolicy: { training, retainsPrompts: true, canPublish: false },
+      models,
+    };
+  }
+
+  function withTraining(model: OpenRouterModel, training: boolean): OpenRouterModel {
+    return model.endpoint
+      ? { ...model, endpoint: { ...model.endpoint, data_policy: { training } } }
+      : model;
+  }
+
+  it('includes only model variants that train on every provider', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('meta', false, [
+        withTraining(snapshotModel('meta/muse-spark-1.3-contributor', 'standard'), true),
+        withTraining(snapshotModel('meta/muse-spark-1.3', 'standard'), false),
+        withTraining(snapshotModel('mixed/model', 'standard'), true),
+      ]),
+      provider('other', true, [
+        snapshotModel('mixed/model', 'standard'),
+        snapshotModel(MODEL, 'free'),
+      ]),
+      provider('private', false, [withTraining(snapshotModel('mixed/model', 'standard'), false)]),
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(
+      new Set(['meta/muse-spark-1.3-contributor', FREE_MODEL])
+    );
+  });
+
+  it('keys standard and free variants separately', () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = [
+      provider('paid', false, [snapshotModel(MODEL, 'standard')]),
+      provider('free', false, [withTraining(snapshotModel(MODEL, 'free'), true)]),
+    ];
+
+    expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set([FREE_MODEL]));
+  });
+});
+
 describe('getEndpointProviderSlugs', () => {
   it('maps endpoint tags to provider slugs and ignores untagged endpoints', () => {
     expect(
@@ -111,10 +160,15 @@ describe('narrowProviderSlugsToVariant', () => {
 });
 
 describe('createModelsByProviderIndexLoader', () => {
-  function loader(models: Record<string, StoredModel> = storedModels) {
+  function loader(
+    models: Record<string, StoredModel> = storedModels,
+    vercelModels: Record<string, StoredModel> = {},
+    snapshot = makeSnapshot()
+  ) {
     return createModelsByProviderIndexLoader({
-      fetchSnapshot: async () => makeSnapshot(),
-      fetchStoredModels: async () => models,
+      fetchSnapshot: async () => snapshot,
+      fetchOpenRouterModels: async () => models,
+      fetchVercelModels: async () => vercelModels,
       ttlMs: 60_000,
       nowMs: () => 0,
     });
@@ -124,6 +178,32 @@ describe('createModelsByProviderIndexLoader', () => {
     expect(buildModelIdToProviderSlugsIndex(makeSnapshot()).get(MODEL)).toEqual(
       new Set(['deepinfra', 'coreweave', 'nvidia'])
     );
+  });
+
+  it('retries a failed snapshot read instead of caching an empty data-collection set', async () => {
+    const snapshot = makeSnapshot();
+    snapshot.providers = snapshot.providers.map(provider =>
+      provider.slug === 'nvidia'
+        ? { ...provider, dataPolicy: { ...provider.dataPolicy, training: true } }
+        : provider
+    );
+    let calls = 0;
+    const { getDataCollectionRequiredModelIds } = createModelsByProviderIndexLoader({
+      fetchSnapshot: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('database unavailable');
+        return snapshot;
+      },
+      fetchOpenRouterModels: async () => storedModels,
+      fetchVercelModels: async () => ({}),
+      ttlMs: 60_000,
+      nowMs: () => 0,
+    });
+
+    await expect(getDataCollectionRequiredModelIds()).resolves.toEqual(new Set());
+    await expect(getDataCollectionRequiredModelIds()).resolves.toEqual(new Set([FREE_MODEL]));
+    await getDataCollectionRequiredModelIds();
+    expect(calls).toBe(2);
   });
 
   it('resolves variant-specific providers for suffixed ids', async () => {
@@ -148,5 +228,72 @@ describe('createModelsByProviderIndexLoader', () => {
 
     await expect(getProviderSlugsForModel('unknown/model')).resolves.toEqual(new Set());
     await expect(getProviderSlugsForModel('unknown/model:free')).resolves.toEqual(new Set());
+  });
+
+  it.each(['provider_name', 'tag'] as const)(
+    'retains Vercel-only Bedrock and Alibaba endpoints identified by %s',
+    async providerField => {
+      const modelId = 'moonshotai/kimi-k3';
+      const snapshot = makeSnapshot();
+      snapshot.providers = ['novita', 'amazon-bedrock', 'alibaba', 'deepinfra'].map(slug => ({
+        name: slug,
+        displayName: slug,
+        slug,
+        dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+        models: [snapshotModel(modelId, 'standard')],
+      }));
+      const { getProviderSlugsForModel } = loader(
+        { [modelId]: storedModel(modelId, ['novita/bf16']) },
+        {
+          [modelId]: {
+            id: modelId,
+            name: modelId,
+            endpoints: ['bedrock', 'alibaba', 'fireworks'].map(provider => ({
+              [providerField]: provider,
+            })),
+          },
+        },
+        snapshot
+      );
+
+      await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
+        new Set(['novita', 'amazon-bedrock', 'alibaba'])
+      );
+    }
+  );
+
+  it('does not retain paid Vercel providers for a free variant', async () => {
+    const { getProviderSlugsForModel } = loader(storedModels, {
+      [MODEL]: { ...storedModel(MODEL, []), endpoints: [{ provider_name: 'deepinfra' }] },
+    });
+
+    await expect(getProviderSlugsForModel(FREE_MODEL)).resolves.toEqual(new Set(['nvidia']));
+  });
+
+  it('maps model and provider IDs when retaining Vercel endpoints', async () => {
+    const modelId = 'anthropic/claude-sonnet-4-6';
+    const vercelModelId = 'anthropic/claude-sonnet-4.6';
+    const snapshot = makeSnapshot();
+    snapshot.providers = ['anthropic', 'google-vertex'].map(slug => ({
+      name: slug,
+      displayName: slug,
+      slug,
+      dataPolicy: { training: false, retainsPrompts: false, canPublish: false },
+      models: [snapshotModel(modelId, 'standard')],
+    }));
+    const { getProviderSlugsForModel } = loader(
+      { [modelId]: storedModel(modelId, ['anthropic']) },
+      {
+        [vercelModelId]: {
+          ...storedModel(vercelModelId, []),
+          endpoints: [{ provider_name: 'vertexAnthropic' }],
+        },
+      },
+      snapshot
+    );
+
+    await expect(getProviderSlugsForModel(modelId)).resolves.toEqual(
+      new Set(['anthropic', 'google-vertex'])
+    );
   });
 });

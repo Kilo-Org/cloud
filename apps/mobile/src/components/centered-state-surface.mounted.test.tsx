@@ -1,6 +1,7 @@
 import {
   act,
   type ComponentProps,
+  type ComponentPropsWithRef,
   createElement,
   createRef,
   type ReactNode,
@@ -27,7 +28,13 @@ const platform = vi.hoisted(() => ({ OS: 'ios' }));
 vi.mock('react-native', () => ({
   Platform: platform,
   useWindowDimensions: () => ({ width: 400, height: 800 }),
-  View: 'View',
+  View: ({ ref, ...props }: ComponentPropsWithRef<typeof View>) => {
+    useImperativeHandle(ref, () => {
+      const handle: Partial<View> = { measureInWindow: vi.fn<View['measureInWindow']>() };
+      return handle as View;
+    }, []);
+    return createElement('View', props);
+  },
 }));
 
 function createHarness(initialOptions: Options = {}, strict = false) {

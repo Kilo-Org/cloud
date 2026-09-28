@@ -306,11 +306,10 @@ describe('shouldRouteToVercel', () => {
         vercelPaid: 100,
         vercelFree: 100,
         vercelOptOutModels: new Set(options?.optOut ? ['anthropic/claude-sonnet-4.5'] : []),
-        perplexity: 0,
       })),
     }));
     jest.doMock('@/lib/ai-gateway/is-free-model', () => ({
-      isFreeModel: jest.fn(async () => false),
+      isFreeModel: jest.fn(() => false),
     }));
     jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
@@ -587,8 +586,7 @@ describe('applyVercelSettings BYOK pinning', () => {
     ).rejects.toThrow('Failed to parse Google Vertex credentials');
   });
 
-  it('does not add managed OpenAI credentials to user BYOK settings', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
+  it('forwards user OpenAI BYOK credentials', async () => {
     const request = byokRequest([]);
 
     await applyVercelSettings('openai/gpt-5', request, [
@@ -689,7 +687,6 @@ describe('applyVercelSettings managed requests', () => {
 
   it('does not add managed Friendli credentials from the environment', async () => {
     process.env.FRIENDLI_API_KEY = 'friendli-managed-key';
-    delete process.env.OPENAI_API_KEY;
     const request = managedRequest();
 
     await applyManagedVercelSettings('moonshotai/kimi-k3', request);
@@ -697,73 +694,8 @@ describe('applyVercelSettings managed requests', () => {
     expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
   });
 
-  it('adds managed OpenAI credentials when OpenAI is an allowed provider', async () => {
+  it('does not add managed OpenAI credentials from the environment', async () => {
     process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest({ only: ['openai', 'anthropic'] });
-
-    await applyManagedVercelSettings('openai/gpt-5', request);
-
-    expect(request.body.providerOptions?.gateway?.byok).toEqual({
-      openai: [{ apiKey: 'openai-managed-key' }],
-    });
-    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai', 'anthropic']);
-  });
-
-  it('adds managed OpenAI credentials when providers are unrestricted', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest();
-
-    const getVercelInferenceProvidersMock = await applyManagedVercelSettings(
-      'openai/gpt-5',
-      request
-    );
-
-    expect(request.body.providerOptions?.gateway?.byok).toEqual({
-      openai: [{ apiKey: 'openai-managed-key' }],
-    });
-    expect(getVercelInferenceProvidersMock).toHaveBeenCalledWith('openai/gpt-5');
-  });
-
-  it('does not add managed OpenAI BYOK to the discounted GPT-5.6 Sol endpoint', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest({ only: ['openai'] });
-
-    await applyManagedVercelSettings('openai/gpt-5.6-sol-discounted', request);
-
-    expect(request.body.model).toBe('openai/gpt-5.6-sol');
-    expect(request.body.providerOptions?.gateway?.only).toEqual(['openai']);
-    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
-  });
-
-  it('does not add managed OpenAI credentials when Vercel does not offer OpenAI', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest();
-
-    await applyManagedVercelSettings('anthropic/claude-sonnet-4.5', request, ['anthropic']);
-
-    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
-  });
-
-  it('does not add managed OpenAI credentials when provider metadata is unavailable', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest();
-
-    await applyManagedVercelSettings('openai/gpt-5', request, null);
-
-    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
-  });
-
-  it('does not add managed OpenAI credentials when OpenAI is excluded', async () => {
-    process.env.OPENAI_API_KEY = 'openai-managed-key';
-    const request = managedRequest({ only: ['anthropic'] });
-
-    await applyManagedVercelSettings('anthropic/claude-sonnet-4.5', request);
-
-    expect(request.body.providerOptions?.gateway?.byok).toBeUndefined();
-  });
-
-  it('does not add managed OpenAI credentials when the key is empty', async () => {
-    process.env.OPENAI_API_KEY = '';
     const request = managedRequest({ only: ['openai'] });
 
     await applyManagedVercelSettings('openai/gpt-5', request);

@@ -90,6 +90,22 @@ describe('buildControlWrapperLaunchEnv', () => {
     });
   });
 
+  it('forwards a non-empty workload cgroup and omits an absent or empty one', () => {
+    const base = {
+      workerUrl: 'https://worker.example.com',
+      sandboxId: 'sbx_1',
+      credential: 'control-credential',
+    };
+    expect(buildControlWrapperLaunchEnv(base)).not.toHaveProperty('CONTROL_WORKLOAD_CGROUP');
+    expect(
+      buildControlWrapperLaunchEnv({ ...base, workloadCgroup: 'kilo-workloads' })
+        .CONTROL_WORKLOAD_CGROUP
+    ).toBe('kilo-workloads');
+    expect(
+      buildControlWrapperLaunchEnv({ ...base, workloadCgroup: '' }).CONTROL_WORKLOAD_CGROUP
+    ).toBeUndefined();
+  });
+
   it.each([
     { workerUrl: undefined, expectedBase: '' },
     {

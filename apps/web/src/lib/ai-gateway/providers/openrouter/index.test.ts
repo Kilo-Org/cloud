@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import {
   formatName,
   getEnhancedOpenRouterModels,
@@ -7,19 +7,24 @@ import {
 } from '@/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/providers/qwen';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google';
+import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   findKiloExclusiveModel,
   isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
-} from '@/lib/ai-gateway/models';
+} from '@/lib/ai-gateway/kilo-exclusive-models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
+}));
+
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
 }));
 
 const originalFetch = global.fetch;
@@ -205,6 +210,15 @@ describe('auto models', () => {
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
+  it('explicitly caches authenticated catalog requests', async () => {
+    await getEnhancedOpenRouterModels();
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://openrouter.ai/api/v1/models',
+      expect.objectContaining({ cache: 'force-cache', next: { revalidate: 60 } })
+    );
+  });
+
   it('excludes OpenRouter batch variants from the public model list', async () => {
     global.fetch = jest.fn(() =>
       Promise.resolve(
@@ -294,6 +308,99 @@ describe('reasoning variants', () => {
       models.data.find(model => model.id === unsupportedId)?.opencode?.variants
     ).toBeUndefined();
     expect(models.data.find(model => model.id === supportedId)?.opencode?.variants).toBeDefined();
+  });
+});
+
+describe('virtual router tool support', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function buildVirtualModel(overrides: Partial<OpenRouterModel>): OpenRouterModel {
+    return buildModel({
+      architecture: {
+        input_modalities: ['text'],
+        output_modalities: ['text'],
+        tokenizer: 'Router',
+      },
+      pricing: { prompt: '-1', completion: '-1' },
+      supported_parameters: [],
+      ...overrides,
+    });
+  }
+
+  async function supportedParametersById(models: OpenRouterModel[]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: models } }))
+    ) as unknown as typeof fetch;
+    const catalog = await getEnhancedOpenRouterModels();
+    return new Map(catalog.data.map(model => [model.id, model.supported_parameters]));
+  }
+
+  it('adds tools to the allowlisted virtual routers', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'typesafe/jev-router', name: 'TypeSafe: Jev Router' }),
+      buildVirtualModel({
+        id: 'openrouter/pareto-code',
+        name: 'Pareto Code Router',
+        supported_parameters: undefined,
+      }),
+    ]);
+
+    expect(params.get('typesafe/jev-router')).toEqual(['tools']);
+    expect(params.get('openrouter/pareto-code')).toEqual(['tools']);
+  });
+
+  it('does not duplicate tools when upstream already lists it', async () => {
+    const upstream = ['max_tokens', 'tools'];
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'typesafe/jev-router', supported_parameters: upstream }),
+    ]);
+
+    expect(params.get('typesafe/jev-router')).toEqual(upstream);
+  });
+
+  it('does not add tools to other virtual models', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'openrouter/fusion', name: 'OpenRouter: Fusion' }),
+      buildVirtualModel({ id: 'vendor/other-router', name: 'Other Router' }),
+    ]);
+
+    expect(params.get('openrouter/fusion')).toEqual([]);
+    expect(params.get('vendor/other-router')).toEqual([]);
+  });
+});
+
+describe('mayTrainOnYourPrompts', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  it('flags free models and models whose every provider trains on prompts', async () => {
+    jest
+      .mocked(getDataCollectionRequiredModelIds)
+      .mockResolvedValueOnce(new Set(['meta/muse-spark-1.3-contributor']));
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        createMockResponse({
+          jsonData: {
+            data: [
+              buildModel({ id: 'meta/muse-spark-1.3-contributor' }),
+              buildModel({ id: 'meta/muse-spark-1.3' }),
+              buildModel({ id: 'vendor/model:free', pricing: { prompt: '0', completion: '0' } }),
+            ],
+          },
+        })
+      )
+    ) as unknown as typeof fetch;
+
+    const models = await getEnhancedOpenRouterModels();
+    const mayTrain = (id: string) =>
+      models.data.find(model => model.id === id)?.mayTrainOnYourPrompts;
+
+    expect(mayTrain('meta/muse-spark-1.3-contributor')).toBe(true);
+    expect(mayTrain('meta/muse-spark-1.3')).toBe(false);
+    expect(mayTrain('vendor/model:free')).toBe(true);
   });
 });
 

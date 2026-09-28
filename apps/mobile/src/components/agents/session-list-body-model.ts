@@ -3,7 +3,7 @@
  *
  * Encapsulates the "what should the body show right now?" question so the
  * component only has to map the result onto the existing UI pieces
- * (`EmptyState`, `QueryError`, `SectionList`). Every input is a boolean
+ * (`EmptyState`, `QueryError`, `FlashList`). Every input is a boolean
  * flag, the output is a small discriminated union — there is no React or
  * native dependency, so this module is unit-testable in plain Node.
  *

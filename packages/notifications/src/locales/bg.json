@@ -7,6 +7,7 @@
       "instanceLifecycle": "Вашата инстанция има актуализация",
       "scheduledAction": "Планирано действие има актуализация",
       "lowBalance": "Вашият баланс изисква внимание",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Открит проблем със сигурността изисква внимание",
       "activeAgentsGlanceable": "Активните агенти имат актуализация"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Предупреждение за нисък баланс",
       "body": "Балансът на {{organizationName}} падна под ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Нов проблем със сигурността ({{severity}})",

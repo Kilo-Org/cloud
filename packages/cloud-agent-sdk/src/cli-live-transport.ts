@@ -3,6 +3,7 @@
  * one remote CLI session into normalized transport events and commands.
  */
 import { normalizeCliEvent, isChatEvent } from './normalizer';
+import { partSettledAt } from './part-utils';
 import { parseRemoteCommandCatalog, type RemoteCommandState } from './remote-command-catalog';
 import { parseCreateSessionResponse } from './create-session';
 import { cloudAgentSdkRuntime } from './runtime';
@@ -91,8 +92,9 @@ type CliLiveTransportConfig = {
    * CLI in `sessions.heartbeat` / `sessions.list` change (upgrade, downgrade,
    * reconnect, or absent). The payload is the latest capabilities — `undefined`
    * means the CLI has not reported any (older CLIs, mid-reconnect, or a CLI
-   * whose session list dropped this session). The session manager uses this
-   * to recompute the `supportsAttachments` gate.
+   * whose session list dropped this session), which the session manager's
+   * gate treats as supported. The session manager uses this to recompute the
+   * `supportsAttachments` gate.
    */
   onCapabilitiesChange?:
     | ((capabilities: { attachments?: boolean | undefined } | undefined) => void)
@@ -240,9 +242,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         });
       }
       // A CLI handoff or a permanent drop invalidates whatever the prior
-      // owner reported — the new owner has to re-advertise before any
-      // capability re-enables. Empty currentCapabilities also drives the
-      // existing 'idle' reset on the consumer side.
+      // owner reported. The session manager's gate is optimistic, so it keeps
+      // the feature available until the new owner's next heartbeat /
+      // sessions.list reports an explicit negative. Empty currentCapabilities
+      // also drives the existing 'idle' reset on the consumer side.
       publishCapabilities(undefined);
       config.onCapabilityChange?.();
 
@@ -509,7 +512,12 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         sink.onChatEvent({ type: 'message.updated', info: msg.info });
 
         for (const part of msg.parts) {
-          sink.onChatEvent({ type: 'message.part.updated', part });
+          const settledAt = partSettledAt(part);
+          sink.onChatEvent({
+            type: 'message.part.updated',
+            part,
+            ...(settledAt === undefined ? {} : { time: settledAt }),
+          });
         }
       }
     }
@@ -545,15 +553,21 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
     // Heartbeats carry the CLI's current per-session status. Forwarding it
     // re-derives activity after a reconnect: a terminal `session.status: idle`
     // fired while the socket was dead is never replayed, which otherwise
-    // leaves the UI stuck on a busy indicator forever.
-    function forwardHeartbeatStatus(status: string): void {
-      if (status !== 'idle' && status !== 'busy') return;
-      if (status === lastForwardedHeartbeatStatus) return;
-      lastForwardedHeartbeatStatus = status;
+    // leaves the UI stuck on a busy indicator forever. A `scheduled` status
+    // carries the wake time, which is part of the dedupe key so a changed wake
+    // re-derives instead of being swallowed as a repeat.
+    function forwardHeartbeatStatus(status: string, scheduledAt?: string): void {
+      if (status !== 'idle' && status !== 'busy' && status !== 'scheduled') return;
+      const key = status === 'scheduled' ? `scheduled:${scheduledAt ?? ''}` : status;
+      if (key === lastForwardedHeartbeatStatus) return;
+      lastForwardedHeartbeatStatus = key;
       sink.onServiceEvent({
         type: 'session.status',
         sessionId: config.kiloSessionId,
-        status: { type: status },
+        status:
+          status === 'scheduled'
+            ? { type: 'scheduled', ...(scheduledAt ? { scheduledAt } : {}) }
+            : { type: status },
       });
     }
 
@@ -575,7 +589,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           setOwnerConnectionId(session.connectionId);
           sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
+          forwardHeartbeatStatus(session.status, session.scheduledAt);
           publishCapabilities(session.capabilities);
           return;
         }
@@ -593,7 +607,7 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
         if (session) {
           setOwnerConnectionId(parsed.data.connectionId);
           sessionStopped = false;
-          forwardHeartbeatStatus(session.status);
+          forwardHeartbeatStatus(session.status, session.scheduledAt);
           publishCapabilities(session.capabilities);
           return;
         }
@@ -831,9 +845,10 @@ function createCliLiveTransport(config: CliLiveTransportConfig): TransportFactor
           handleSystemMessage(msg.event, msg.data);
         });
         const offReconnect = config.userWebConnection.onReconnect(() => {
-          // Recompute the capability gate fail-closed immediately. The prior
-          // owner may have been attachment-capable, but after a reconnect we
-          // must wait for the next heartbeat / sessions.list to re-advertise.
+          // Publish the absent capabilities immediately. The session manager's
+          // gate is optimistic, so it keeps reporting supported until the next
+          // heartbeat / sessions.list either re-advertises the capability or
+          // explicitly denies it.
           publishCapabilities(undefined);
           replayCurrentSnapshot(false);
           // The snapshot store lags the live stream, and the CLI only forwards

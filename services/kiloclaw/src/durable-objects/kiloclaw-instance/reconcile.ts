@@ -241,8 +241,6 @@ export async function reconcileWithFly(
   return result;
 }
 
-// ---- API key proactive refresh ----
-
 const MINT_TIMEOUT_MS = 15_000;
 
 async function reconcileApiKeyExpiry(
@@ -399,8 +397,6 @@ async function reconcileApiKeyExpiry(
     label: pushed ? 'refreshed+pushed' : flyConfigUpdated ? 'refreshed+fly-config' : 'refreshed',
   });
 }
-
-// ---- Starting reconciliation ----
 
 /**
  * Reconcile a 'starting' instance.
@@ -761,8 +757,6 @@ async function reconcileRestarting(
   }
 }
 
-// ---- Volume reconciliation ----
-
 async function reconcileVolume(
   flyConfig: FlyClientConfig,
   ctx: DurableObjectState,
@@ -771,7 +765,7 @@ async function reconcileVolume(
   rctx: ReconcileContext
 ): Promise<void> {
   if (!state.flyVolumeId) {
-    const providerState = await ensureVolume(
+    const { providerState } = await ensureVolume(
       flyConfig,
       state,
       getFlyProviderState(state),
@@ -800,7 +794,7 @@ async function reconcileVolume(
       await ctx.storage.put(
         storageUpdate(syncProviderStateForStorage(state, { flyVolumeId: null }))
       );
-      const providerState = await ensureVolume(
+      const { providerState, adoptedVolumeId } = await ensureVolume(
         flyConfig,
         state,
         getFlyProviderState(state),
@@ -817,7 +811,7 @@ async function reconcileVolume(
         )
       );
       rctx.log('replace_lost_volume', {
-        data_loss: true,
+        data_loss: adoptedVolumeId === null,
         old_volume_id: oldVolumeId,
         new_volume_id: state.flyVolumeId,
         durationMs: performance.now() - repairStart,
@@ -834,8 +828,6 @@ async function reconcileVolume(
     }
   }
 }
-
-// ---- Machine reconciliation ----
 
 /**
  * @returns true if machine state was conclusively determined.
@@ -1395,9 +1387,7 @@ async function handleMachineGone(
   );
 }
 
-// ========================================================================
 // Two-phase destroy helpers
-// ========================================================================
 
 const MACHINE_ID_RE = /^[a-z0-9]+$/;
 

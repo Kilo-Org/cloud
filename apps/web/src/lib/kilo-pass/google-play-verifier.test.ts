@@ -96,6 +96,45 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     });
   });
 
+  it('maps the charged amount, currency and tax from the order money', () => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+    const purchase = mapGooglePlayKiloPassPurchase(
+      decoded(),
+      order({
+        total: { currencyCode: 'USD', units: '19', nanos: 0 },
+        tax: { currencyCode: 'USD', units: '3', nanos: 170000000 },
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            total: { currencyCode: 'USD', units: '19', nanos: 0 },
+            tax: { currencyCode: 'USD', units: '3', nanos: 170000000 },
+            subscriptionDetails: {
+              servicePeriodStartTime: '2026-06-01T09:00:00.000Z',
+              servicePeriodEndTime: '2026-07-01T09:00:00.000Z',
+            },
+          },
+        ],
+      })
+    );
+
+    expect(purchase).toMatchObject({
+      amountChargedMinorUnits: 1900,
+      currency: 'USD',
+      taxMinorUnits: 317,
+    });
+  });
+
+  it('maps a money-less order to null money without throwing', () => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+
+    expect(mapGooglePlayKiloPassPurchase(decoded(), order())).toMatchObject({
+      amountChargedMinorUnits: null,
+      currency: null,
+      taxMinorUnits: null,
+    });
+  });
+
   it('accepts a paid period that starts before the subscription grant timestamp', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
     const purchase = mapGooglePlayKiloPassPurchase(

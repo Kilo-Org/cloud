@@ -1,7 +1,7 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Bell, FileText, Pencil, Receipt, Users } from '@/components/ui/icons';
+import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,6 +19,7 @@ import { OrgUsageStats } from '@/components/organization/org-usage-stats';
 import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
+import { IconButton } from '@/components/ui/icon-button';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -111,17 +112,14 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
               {org.organizationName}
             </Text>
             {showMoney && (
-              <Pressable
+              <IconButton
                 onPress={() => {
                   setRenameVisible(true);
                 }}
-                hitSlop={12}
-                accessibilityRole="button"
                 accessibilityLabel={t('organization.hub.renameTitle')}
-                className="active:opacity-70"
               >
                 <Pencil size={16} color={colors.mutedForeground} />
-              </Pressable>
+              </IconButton>
             )}
           </View>
           {showMoney && (
@@ -201,9 +199,18 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
                 icon={Bell}
                 title={t('organization.lowBalanceAlert.title')}
                 subtitle={lowBalanceSubtitle}
-                last
                 onPress={() => {
                   router.push('/(app)/(tabs)/(3_profile)/organization/low-balance-alert' as Href);
+                }}
+              />
+              <ConfigureRow
+                icon={Wallet}
+                title={t('notifications.channel.spend')}
+                last
+                onPress={() => {
+                  router.push(
+                    `/(app)/(tabs)/(3_profile)/spend-alerts?org=${organizationId}` as Href
+                  );
                 }}
               />
             </>

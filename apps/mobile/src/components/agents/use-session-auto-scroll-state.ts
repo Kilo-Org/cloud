@@ -24,27 +24,43 @@ export function isSessionListAtBottom({
  * the start of every session — a fresh transcript is rendered anchored
  * to the latest message, so the floating "scroll to bottom" button
  * must never be visible until the user has actually scrolled away.
+ *
+ * `followTail: false` opens the session without following the newest
+ * message: a `?at=` deep-link resume lands on an older row, and the
+ * mount-time scroll-to-end would otherwise override the resume scroll.
+ * The button state stays at-bottom so the first real scroll event decides it.
  */
-export function getInitialSessionListAutoScrollVisibility() {
-  return { shouldAutoScroll: true, isAtBottom: true };
+export function getInitialSessionListAutoScrollVisibility({
+  followTail = true,
+}: {
+  followTail?: boolean;
+} = {}) {
+  return { shouldAutoScroll: followTail, isAtBottom: true };
 }
 
 /**
  * Decide whether a programmatic scroll-to-latest should be scheduled.
  *
- * Mirrors the four guards inside `useSessionAutoScroll`'s `scheduleScrollToLatestMessage`:
+ * Mirrors the guards inside `useSessionAutoScroll`'s `scheduleScrollToLatestMessage`:
  *  - `isAutoScrolling`     – a programmatic scroll is in flight, skip the retry.
  *  - `isUserScrolling`     – user is dragging or in momentum, never yank.
  *  - `shouldAutoScroll`    – the user has scrolled away from the bottom.
+ *  - `newestKeyChanged`    – the newest item actually changed. Prepending an
+ *    older page grows the list without moving the tail, so scheduling a
+ *    scroll there would yank the viewport back to the newest message while
+ *    the user is reading history. Callers that do not track item identity
+ *    (layout/keyboard triggers) omit it and keep the previous behavior.
  */
 export function shouldScheduleSessionAutoScroll({
   isAutoScrolling,
   isUserScrolling,
   shouldAutoScroll,
+  newestKeyChanged = true,
 }: {
   isAutoScrolling: boolean;
   isUserScrolling: boolean;
   shouldAutoScroll: boolean;
+  newestKeyChanged?: boolean;
 }): boolean {
   if (!shouldAutoScroll) {
     return false;
@@ -53,6 +69,9 @@ export function shouldScheduleSessionAutoScroll({
     return false;
   }
   if (isAutoScrolling) {
+    return false;
+  }
+  if (!newestKeyChanged) {
     return false;
   }
   return true;
@@ -110,6 +129,43 @@ export function shouldFollowSessionContentSize({
     return false;
   }
   if (!didContentHeightChange) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Decide whether a transcript viewport resize should trigger a follow scroll
+ * to the latest message. The fixed status rows (the working indicator, the
+ * session status indicator) live OUTSIDE the list, so they shrink the list's
+ * viewport while its scroll offset stays put: the newest row is then left
+ * below the fold and — because the list does not clip its overflow
+ * (`removeClippedSubviews={false}`, see session-message-list.tsx) — is drawn
+ * under the transparent status row. Re-pin on the resize.
+ *
+ * Like `shouldFollowSessionContentSize`, this does NOT gate on
+ * `isAutoScrolling`: the resize lands during the streaming follow window, and
+ * gating on it would drop exactly the correction this exists for. The
+ * user-facing guards still apply, and an unchanged viewport height does not
+ * take this path (the caller keeps the guarded scheduler for it), so a
+ * redundant layout pass cannot stack scrolls.
+ */
+export function shouldFollowSessionViewportResize({
+  isUserScrolling,
+  shouldAutoScroll,
+  didViewportHeightChange,
+}: {
+  isUserScrolling: boolean;
+  shouldAutoScroll: boolean;
+  didViewportHeightChange: boolean;
+}): boolean {
+  if (!shouldAutoScroll) {
+    return false;
+  }
+  if (isUserScrolling) {
+    return false;
+  }
+  if (!didViewportHeightChange) {
     return false;
   }
   return true;

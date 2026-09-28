@@ -11,13 +11,14 @@ export type SlashCommandInfo = {
 /**
  * Source Kilo version / ref used to generate this catalog.
  *
- * Note: skills (source: 'skill') are intentionally omitted. The Kilo TUI
- * filters them from slash-command autocomplete, so they never appear in the
- * local `/` list even though they can be invoked by typing the name manually.
+ * Note: this snapshot is generated with project config disabled, so it carries
+ * the commands the CLI always has and no session skills. Skills are surfaced
+ * from the live wrapper-reported catalog, which keeps every `source: 'skill'`
+ * row the CLI reports for the session.
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */
-export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.4.20';
+export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.6.2';
 
 /**
  * Default slash command catalog used when no live wrapper-reported catalog is
@@ -25,24 +26,32 @@ export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.4.20';
  */
 export const DEFAULT_SLASH_COMMANDS = [
   {
+    name: 'goal',
+    description: 'Keep working toward a session goal. /goal <objective> or pause, resume, clear',
+    source: 'command',
+    hints: ['$ARGUMENTS'],
+  },
+  {
     name: 'init',
     description: 'guided AGENTS.md setup',
     source: 'command',
     hints: ['$ARGUMENTS'],
   },
   {
-    name: 'local-review',
-    description: 'deprecated; use /review branch',
+    name: 'resume-claude',
+    description: 'import a Claude Code session transcript',
+    source: 'command',
     hints: [],
   },
   {
-    name: 'local-review-uncommitted',
-    description: 'deprecated; use /review uncommitted',
+    name: 'resume-codex',
+    description: 'import an OpenAI Codex session transcript',
+    source: 'command',
     hints: [],
   },
   {
     name: 'review',
-    description: 'review changes [uncommitted|commit|branch|pr]',
+    description: 'review changes [uncommitted|staged|unpushed|branch|commit|pr]',
     hints: ['$ARGUMENTS'],
   },
 ] satisfies SlashCommandInfo[];

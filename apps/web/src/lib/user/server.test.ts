@@ -27,6 +27,7 @@ import {
   isBlockedTLD,
   parseLinkedInProfileName,
   parseAnacondaProfile,
+  parseOpenAiProfile,
   profileProvesEmailOwnership,
   authOptions,
   getUserUUID,
@@ -39,12 +40,16 @@ import {
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
 import { db } from '@/lib/drizzle';
+import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
 import {
+  openai_chatgpt_connections,
   kilocode_users,
   organization_domain_claims,
   organization_seats_purchases,
   organizations,
+  passkey_sign_in_tickets,
+  user_auth_provider,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -52,16 +57,26 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
+import type { Account, Profile } from 'next-auth';
+import type { JWT } from 'next-auth/jwt';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@/lib/config.server';
+import {
+  OPENAI_IDENTITY_SCOPE,
+  OPENAI_ISSUER,
+  OPENAI_REDIRECT_URI,
+  OPENAI_TOKEN_SHARING_SCOPE,
+} from '@/lib/auth/openai/config';
+import { hosted_domain_specials } from '@/lib/auth/constants';
+import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -316,6 +331,259 @@ describe('Anaconda OAuth provider', () => {
       checks: ['pkce', 'state', 'nonce'],
       client: { token_endpoint_auth_method: 'client_secret_post' },
     });
+  });
+});
+
+describe('OpenAI (ChatGPT) OAuth provider', () => {
+  test('maps verified claims and uses sub as the stable account id', () => {
+    expect(
+      parseOpenAiProfile({
+        sub: 'openai-user-123',
+        email: 'user@example.com',
+        name: 'ChatGPT User',
+        picture: 'https://example.com/avatar.png',
+        email_verified: true,
+      })
+    ).toEqual({
+      id: 'openai-user-123',
+      email: 'user@example.com',
+      name: 'ChatGPT User',
+      image: 'https://example.com/avatar.png',
+    });
+  });
+
+  test('uses the email local part and null image when the profile omits them', () => {
+    expect(parseOpenAiProfile({ sub: 'openai-user-123', email: 'local-part@example.com' })).toEqual(
+      {
+        id: 'openai-user-123',
+        email: 'local-part@example.com',
+        name: 'local-part',
+        image: null,
+      }
+    );
+  });
+
+  test.each([
+    [{ email: 'user@example.com' }, 'missing subject'],
+    [{ sub: '', email: 'user@example.com' }, 'empty subject'],
+    [{ sub: 'openai-user-123' }, 'missing email'],
+    [{ sub: 'openai-user-123', email: 'not-an-email' }, 'invalid email'],
+  ])('rejects a profile with %s (%s)', (profile, _reason) => {
+    expect(() => parseOpenAiProfile(profile)).toThrow();
+  });
+
+  test('registers the registered callback path, ID tokens, OIDC checks and confidential-client auth', () => {
+    const provider = authOptions.providers.find(p => p.id === 'openai') as unknown as
+      | {
+          id: string;
+          name: string;
+          type: string;
+          issuer: string;
+          idToken: boolean;
+          checks: string[];
+          client: { token_endpoint_auth_method: string; redirect_uris?: string[] };
+          clientId: string;
+          callbackUrl: string;
+          token: { request?: unknown };
+        }
+      | undefined;
+
+    expect(provider).toMatchObject({
+      id: 'openai',
+      name: 'ChatGPT',
+      type: 'oauth',
+      issuer: 'https://auth.openai.com',
+      idToken: true,
+      client: { token_endpoint_auth_method: 'client_secret_basic' },
+      clientId: OPENAI_CLIENT_ID,
+    });
+    expect(provider?.checks).toEqual(expect.arrayContaining(['pkce', 'state', 'nonce']));
+    expect(provider?.callbackUrl.endsWith('/auth/openai/callback')).toBe(true);
+    // NextAuth rewrites `callbackUrl` to /api/auth/callback/openai, so the
+    // registered redirect URI is declared on the client metadata and repeated
+    // in the token exchange.
+    expect(provider?.client.redirect_uris).toEqual([OPENAI_REDIRECT_URI]);
+    expect(provider?.token.request).toBeInstanceOf(Function);
+  });
+});
+
+describe('OpenAI (ChatGPT) sign-in connection persistence', () => {
+  const jwtCallback = authOptions.callbacks?.jwt;
+
+  async function seedOpenAiUser(sub: string) {
+    const email = `openai-${crypto.randomUUID()}@example.com`;
+    const user = await insertTestUser({
+      google_user_email: email,
+      google_user_name: 'ChatGPT User',
+    });
+    await db.insert(user_auth_provider).values({
+      kilo_user_id: user.id,
+      provider: 'openai',
+      provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+      email,
+      avatar_url: '',
+      hosted_domain: hosted_domain_specials.openai,
+    });
+    return { user, email };
+  }
+
+  function openAiSignInArgs(
+    userId: string,
+    email: string,
+    sub: string,
+    accountOverrides: Partial<Account> = {}
+  ) {
+    return {
+      token: {} as JWT,
+      account: {
+        provider: 'openai',
+        type: 'oauth' as const,
+        providerAccountId: `openai-account-${sub}`,
+        access_token: 'signin-access-token',
+        refresh_token: 'signin-refresh-token',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        scope: OPENAI_TOKEN_SHARING_SCOPE,
+        token_type: 'Bearer',
+        ...accountOverrides,
+      },
+      user: { id: userId, email, name: 'ChatGPT User', image: null },
+      profile: { sub, email, name: 'ChatGPT User' } as Profile,
+      trigger: 'signIn' as const,
+    };
+  }
+
+  test('persists the delegated connection for the resolved user', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    expect(token.kiloUserId).toBe(user.id);
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+      issuer: OPENAI_ISSUER,
+      client_id: OPENAI_CLIENT_ID,
+      subject: sub,
+      email,
+      status: 'connected',
+    });
+
+    const [row] = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(
+        and(
+          eq(openai_chatgpt_connections.kilo_user_id, user.id),
+          isNull(openai_chatgpt_connections.organization_id)
+        )
+      );
+    expect(row?.is_enabled).toBe(true);
+  });
+
+  test('persists an organization connection when the profile carries the organization', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    const organization = await createTestOrganization(
+      `ChatGPT BYOK ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+
+    const args = openAiSignInArgs(user.id, email, sub);
+    (args.profile as Record<string, unknown>).openAiChatGptOrganizationId = organization.id;
+
+    await jwtCallback!(args);
+
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: organization.id })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+      subject: sub,
+      status: 'connected',
+    });
+
+    await db.delete(organizations).where(eq(organizations.id, organization.id));
+  });
+
+  test('does not store a connection for an identity-only sign-in', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    await jwtCallback!(
+      openAiSignInArgs(user.id, email, sub, {
+        scope: OPENAI_IDENTITY_SCOPE,
+        refresh_token: undefined,
+      })
+    );
+
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toBeNull();
+  });
+
+  test('does not overwrite a working connection with an identity-only sign-in', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+
+    await jwtCallback!(
+      openAiSignInArgs(user.id, email, sub, {
+        scope: OPENAI_IDENTITY_SCOPE,
+        refresh_token: undefined,
+        access_token: 'identity-only-access-token',
+        expires_at: Math.floor(Date.now() / 1000) + 60,
+      })
+    );
+
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+    });
+  });
+
+  test('stores the delegated connection when a grant omits the scope but returns a refresh token', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+
+    // RFC 6749 §5.1 lets the token response omit `scope` when it equals the
+    // requested scope; the refresh token is then the delegated grant's marker.
+    await jwtCallback!(openAiSignInArgs(user.id, email, sub, { scope: undefined }));
+
+    await expect(
+      getOpenAiChatGptConnection({ kiloUserId: user.id, organizationId: null })
+    ).resolves.toMatchObject({
+      access_token: 'signin-access-token',
+      refresh_token: 'signin-refresh-token',
+    });
+  });
+
+  test('does not fail the sign-in when storing the connection fails', async () => {
+    const sub = `subject-${crypto.randomUUID()}`;
+    const { user, email } = await seedOpenAiUser(sub);
+    const originalInsert = (db.insert as unknown as (table: unknown) => unknown).bind(db);
+    const insertSpy = jest.spyOn(db, 'insert').mockImplementation(((table: unknown) => {
+      if (table === openai_chatgpt_connections) throw new Error('simulated storage failure');
+      return originalInsert(table);
+    }) as unknown as typeof db.insert);
+
+    try {
+      const token = await jwtCallback!(openAiSignInArgs(user.id, email, sub));
+      expect(token.kiloUserId).toBe(user.id);
+    } finally {
+      insertSpy.mockRestore();
+    }
+
+    const rows = await db
+      .select()
+      .from(openai_chatgpt_connections)
+      .where(eq(openai_chatgpt_connections.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
   });
 });
 
@@ -587,6 +855,51 @@ describe('getUserFromAuth', () => {
     expect(result.user).toBeNull();
     expect(result.authFailedResponse?.status).toBe(401);
     expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('flags a rejected credential so the caller does not answer as anonymous', async () => {
+    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from('{').toString('base64url');
+    mockHeaders.mockResolvedValue(
+      new Headers({ authorization: `Bearer ${header}.${payload}.signature` })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('does not flag a request that presented no credential', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockResolvedValue(null);
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(false);
+  });
+
+  test('flags an operation-scoped token presented to another endpoint', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    // The token verified, but not for this endpoint. It is still a credential
+    // that was presented and refused, so it must not become anonymous access.
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
   });
 
   test('enforces the requested audience without falling through to a valid session', async () => {
@@ -950,6 +1263,32 @@ describe('credential issuance authentication guards', () => {
       'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fprofile'
     );
     expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('keeps the request query in the callback-aware sign-in URL', async () => {
+    // A resume link (`/cloud/sessions/<id>?at=<anchor>`) must not lose its
+    // anchor on the way to sign-in: the cloud-agent layout redirects before the
+    // session page can supply its own callbackPath, so the query has to come
+    // from the request the proxy stamped.
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '?at=msg_2' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1%3Fat%3Dmsg_2'
+    );
+  });
+
+  test('appends no query when the request has none', async () => {
+    mockHeaders.mockResolvedValue(
+      new Headers({ 'x-pathname': '/cloud/sessions/ses_1', 'x-search': '' })
+    );
+    mockGetServerSession.mockResolvedValue(null);
+
+    await expect(getUserFromSessionForCredentialIssuanceOrRedirect()).rejects.toThrow(
+      'NEXT_REDIRECT:/users/sign_in?callbackPath=%2Fcloud%2Fsessions%2Fses_1'
+    );
   });
 });
 
@@ -1586,5 +1925,111 @@ describe('getProfileRedirectPath', () => {
 
       await expect(getProfileRedirectPath(orphanUser)).resolves.toBe('/connected-accounts');
     });
+  });
+});
+
+type PasskeyAuthorizeResult = {
+  id: string;
+  email: string;
+  name: string;
+  image: string;
+} | null;
+
+type PasskeyProviderConfig = {
+  id?: string;
+  name?: string;
+  credentials?: Record<string, unknown>;
+  authorize?: (credentials: { ticket: string } | undefined) => unknown;
+};
+
+/**
+ * next-auth v4 keeps a CredentialsProvider's user config under `options` until
+ * the request-scoped normalization merges it onto the provider, so the raw
+ * `authOptions.providers` entries for both `email` and `passkey` read
+ * `id: 'credentials'`. Resolve the user config the way next-auth does.
+ */
+function passkeyProviderConfigs(): PasskeyProviderConfig[] {
+  return authOptions.providers.map(candidate => ({
+    id: candidate.id,
+    ...((candidate as { options?: PasskeyProviderConfig }).options ?? {}),
+  }));
+}
+
+function getPasskeyAuthorize() {
+  const config = passkeyProviderConfigs().find(candidate => candidate.id === 'passkey');
+  if (!config || typeof config.authorize !== 'function') {
+    throw new Error('Passkey credentials provider is not registered');
+  }
+  return config.authorize as unknown as (
+    credentials: { ticket: string } | undefined
+  ) => Promise<PasskeyAuthorizeResult>;
+}
+
+describe('passkey provider', () => {
+  test('registers a passkey credentials provider that exchanges a ticket', () => {
+    expect(passkeyProviderConfigs().find(candidate => candidate.id === 'passkey')).toMatchObject({
+      name: 'Passkey',
+      credentials: { ticket: expect.anything() },
+    });
+  });
+
+  test('a ticket authorizes its owner and a replayed ticket mints no session', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser({ google_user_name: 'Passkey Owner' });
+    const ticket = await createSignInTicket(user.id);
+
+    await expect(authorize({ ticket })).resolves.toEqual({
+      id: user.id,
+      email: user.google_user_email,
+      name: 'Passkey Owner',
+      image: user.google_user_image_url,
+    });
+
+    // A ticket is single-use: the atomic redemption consumed the row, so the
+    // replay resolves no user and NextAuth mints no session for it.
+    await expect(authorize({ ticket })).resolves.toBeNull();
+    await expect(authorize({ ticket: 'not-a-ticket' })).resolves.toBeNull();
+    await expect(authorize(undefined)).resolves.toBeNull();
+
+    // No `user_auth_provider` row is written for a passkey.
+    const providerRows = await db
+      .select({ provider: user_auth_provider.provider })
+      .from(user_auth_provider)
+      .where(eq(user_auth_provider.kilo_user_id, user.id));
+    expect(providerRows).toEqual([]);
+  });
+
+  test('an expired ticket is refused', async () => {
+    const authorize = getPasskeyAuthorize();
+    const user = await insertTestUser();
+    const ticket = await createSignInTicket(user.id);
+    await db
+      .update(passkey_sign_in_tickets)
+      .set({ expires_at: new Date(Date.now() - 60_000).toISOString() })
+      .where(eq(passkey_sign_in_tickets.kilo_user_id, user.id));
+
+    await expect(authorize({ ticket })).resolves.toBeNull();
+  });
+
+  test('the jwt callback resolves a passkey by user id and sets the session claims', async () => {
+    const user = await insertTestUser({
+      google_user_name: 'Passkey Jwt User',
+      web_session_pepper: 'passkey-web-session-pepper',
+    });
+    const jwtCallback = authOptions.callbacks!.jwt!;
+
+    const token = await jwtCallback({
+      token: {},
+      account: { provider: 'passkey', providerAccountId: user.id, type: 'credentials' },
+      user: { id: user.id, email: user.google_user_email },
+      trigger: 'signIn',
+      profile: undefined,
+      isNewUser: false,
+      session: undefined,
+    } as never);
+
+    expect(token.kiloUserId).toBe(user.id);
+    expect(token.authProvider).toBe('passkey');
+    expect(token.webSessionPepper).toBe('passkey-web-session-pepper');
   });
 });

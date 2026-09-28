@@ -1,10 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { securityConfigFixture } from './security-config.test-fixture';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createElement } from 'react';
-import { act, type default as TestRenderer } from 'react-test-renderer';
+import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -229,8 +228,8 @@ describe.each([
       onlineManager.setOnline(false);
       const root = await mount('personal', Screen);
       await retry(root);
-      expect(host(root, 'CenteredState')).toHaveLength(1);
-      expect(host(root, 'TabScreenScrollView')).toHaveLength(0);
+      expect(host(root, 'CenteredState')).toHaveLength(0);
+      expect(host(root, 'TabScreenScrollView')).toHaveLength(1);
       expect(host(root, 'Switch')[0]?.props.value).toBe(false);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(expected.disabled);
       expect(

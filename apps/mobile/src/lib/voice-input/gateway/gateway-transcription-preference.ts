@@ -69,6 +69,11 @@ export function readGatewayTranscriptionModel(): GatewayTranscriptionModel | nul
   return modelStore.get();
 }
 
+/** Await the persisted model read. For callers with no React tree. */
+export async function whenGatewayTranscriptionModelLoaded(): Promise<void> {
+  await modelStore.whenLoaded();
+}
+
 export function writeGatewayTranscriptionModel(model: GatewayTranscriptionModel | null): void {
   modelStore.set(model);
 }

@@ -348,42 +348,6 @@ describe('withDORetry', () => {
     });
   });
 
-  describe('type safety', () => {
-    it('preserves return type from operation', async () => {
-      type Metadata = { id: string; name: string };
-      const mockStub = {
-        getMetadata: vi.fn().mockResolvedValue({ id: '1', name: 'test' } satisfies Metadata),
-      };
-      const getStub = vi.fn().mockReturnValue(mockStub);
-
-      const result: Metadata = await withDORetry(
-        getStub,
-        (stub: typeof mockStub) => stub.getMetadata() as Promise<Metadata>,
-        'getMetadata',
-        undefined,
-        mockLogger
-      );
-
-      expect(result.id).toBe('1');
-      expect(result.name).toBe('test');
-    });
-
-    it('handles void return type', async () => {
-      const mockStub = { deleteSession: vi.fn().mockResolvedValue(undefined) };
-      const getStub = vi.fn().mockReturnValue(mockStub);
-
-      const result = await withDORetry(
-        getStub,
-        (stub: typeof mockStub) => stub.deleteSession() as Promise<undefined>,
-        'deleteSession',
-        undefined,
-        mockLogger
-      );
-
-      expect(result).toBeUndefined();
-    });
-  });
-
   describe('logging', () => {
     it('logs non-retryable errors as warnings', async () => {
       const error = new Error('app error');

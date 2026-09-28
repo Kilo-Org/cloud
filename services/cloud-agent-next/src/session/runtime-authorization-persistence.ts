@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { logRuntimeAuthorizationDiagnostic } from './runtime-authorization-diagnostics.js';
 import {
   RuntimeAuthorizationExpiredError,
   RuntimeAuthorizationRevokedError,
@@ -101,11 +102,24 @@ export async function getRuntimeAuthorizationRecoveryState(input: {
 }): Promise<RuntimeAuthorizationRecoveryState> {
   const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
   if (!authorization.success) {
-    return input.metadata && hasModernRuntimeAuthorization(input.metadata)
-      ? { state: 'revoked' }
-      : { state: 'legacy' };
+    if (input.metadata && hasModernRuntimeAuthorization(input.metadata)) {
+      logRuntimeAuthorizationDiagnostic(
+        input.metadata.identity.sessionId,
+        'recovery_state',
+        'stored_authorization_invalid'
+      );
+      return { state: 'revoked' };
+    }
+    return { state: 'legacy' };
   }
-  if (authorization.data.state !== 'active') return { state: 'revoked' };
+  if (authorization.data.state !== 'active') {
+    logRuntimeAuthorizationDiagnostic(
+      input.metadata?.identity.sessionId,
+      'recovery_state',
+      'stored_authorization_revoked'
+    );
+    return { state: 'revoked' };
+  }
   return Date.parse(authorization.data.delegationExpiresAt) <= (input.now ?? Date.now())
     ? { state: 'expired', id: authorization.data.id }
     : { state: 'active', id: authorization.data.id };
@@ -124,10 +138,24 @@ export async function renewStoredRuntimeAuthorization(input: {
   if (!metadata) return null;
   const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
   if (!authorization.success) {
-    if (hasModernRuntimeAuthorization(metadata)) throw new RuntimeAuthorizationRevokedError();
+    if (hasModernRuntimeAuthorization(metadata)) {
+      logRuntimeAuthorizationDiagnostic(
+        metadata.identity.sessionId,
+        'renewal',
+        'stored_authorization_invalid'
+      );
+      throw new RuntimeAuthorizationRevokedError();
+    }
     return metadata.auth.kilocodeToken ?? null;
   }
-  if (authorization.data.state !== 'active') throw new RuntimeAuthorizationRevokedError();
+  if (authorization.data.state !== 'active') {
+    logRuntimeAuthorizationDiagnostic(
+      metadata.identity.sessionId,
+      'renewal',
+      'stored_authorization_revoked'
+    );
+    throw new RuntimeAuthorizationRevokedError();
+  }
   const now = input.now ?? Date.now();
   const revokeIfCurrent = async () => {
     const current = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
@@ -137,9 +165,15 @@ export async function renewStoredRuntimeAuthorization(input: {
       current.data.state === 'active'
     ) {
       await input.putAuthorization({ ...current.data, state: 'revoked' });
+      logRuntimeAuthorizationDiagnostic(
+        metadata.identity.sessionId,
+        'renewal',
+        'revocation_persisted'
+      );
     }
   };
   if (Date.parse(authorization.data.delegationExpiresAt) <= now) {
+    logRuntimeAuthorizationDiagnostic(metadata.identity.sessionId, 'renewal', 'delegation_expired');
     throw new RuntimeAuthorizationExpiredError();
   }
   const token = metadata.auth.kilocodeToken;
@@ -154,6 +188,7 @@ export async function renewStoredRuntimeAuthorization(input: {
   ) {
     return token ?? null;
   }
+  let postRenewalStateChanged = false;
   try {
     const renewed = await input.renew(authorization.data);
     const currentAuthorization = RuntimeAuthorizationSchema.safeParse(
@@ -169,6 +204,7 @@ export async function renewStoredRuntimeAuthorization(input: {
       currentMetadata.identity.userId !== metadata.identity.userId ||
       currentMetadata.identity.orgId !== metadata.identity.orgId
     ) {
+      postRenewalStateChanged = true;
       throw new RuntimeAuthorizationRevokedError();
     }
     await input.putMetadata(
@@ -179,6 +215,17 @@ export async function renewStoredRuntimeAuthorization(input: {
     );
     return renewed.token;
   } catch (error) {
+    logRuntimeAuthorizationDiagnostic(
+      metadata.identity.sessionId,
+      'renewal',
+      postRenewalStateChanged
+        ? 'post_renewal_state_changed'
+        : error instanceof RuntimeAuthorizationRevokedError
+          ? 'renewal_revoked'
+          : error instanceof RuntimeAuthorizationExpiredError
+            ? 'delegation_expired'
+            : 'renewal_failed'
+    );
     if (error instanceof RuntimeAuthorizationRevokedError) await revokeIfCurrent();
     throw error;
   }

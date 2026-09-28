@@ -12,7 +12,6 @@ describe('getAuthorizedOrgContext', () => {
   let testOrganizationId: string;
 
   beforeEach(async () => {
-    // Create a test organization
     const orgResult = await db
       .insert(organizations)
       .values({
@@ -24,7 +23,6 @@ describe('getAuthorizedOrgContext', () => {
   });
 
   afterEach(async () => {
-    // Clean up organization_memberships table
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organization_memberships);
     // Self-referential organization FKs require unlinking children before deleting all orgs.
@@ -32,7 +30,6 @@ describe('getAuthorizedOrgContext', () => {
       .update(organizations)
       .set({ parent_organization_id: null })
       .where(isNotNull(organizations.parent_organization_id));
-    // Clean up organizations table
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(organizations);
   });
@@ -67,7 +64,6 @@ describe('getAuthorizedOrgContext', () => {
         authFailedResponse: null,
       });
 
-      // Explicitly verify no membership exists
       const memberships = await db
         .select()
         .from(organization_memberships)
@@ -113,7 +109,6 @@ describe('getAuthorizedOrgContext', () => {
     test('should allow non-admin users with valid organization membership', async () => {
       const regularUser = await insertTestUser({ is_admin: false });
 
-      // Insert membership
       await db.insert(organization_memberships).values({
         organization_id: testOrganizationId,
         kilo_user_id: regularUser.id,
@@ -164,7 +159,6 @@ describe('getAuthorizedOrgContext', () => {
     test('should allow non-admin users with correct role when roles are specified', async () => {
       const regularUser = await insertTestUser({ is_admin: false });
 
-      // Insert membership with 'owner' role
       await db.insert(organization_memberships).values({
         organization_id: testOrganizationId,
         kilo_user_id: regularUser.id,
@@ -193,7 +187,6 @@ describe('getAuthorizedOrgContext', () => {
     test('should deny non-admin users with wrong role when roles are specified', async () => {
       const regularUser = await insertTestUser({ is_admin: false });
 
-      // Insert membership with 'member' role
       await db.insert(organization_memberships).values({
         organization_id: testOrganizationId,
         kilo_user_id: regularUser.id,
@@ -223,7 +216,6 @@ describe('getAuthorizedOrgContext', () => {
     test('should deny non-admin users with membership in different organization', async () => {
       const regularUser = await insertTestUser({ is_admin: false });
 
-      // Create another organization
       const otherOrgResult = await db
         .insert(organizations)
         .values({
@@ -233,7 +225,6 @@ describe('getAuthorizedOrgContext', () => {
         .returning();
       const otherOrganizationId = otherOrgResult[0].id;
 
-      // Insert membership for the OTHER organization
       await db.insert(organization_memberships).values({
         organization_id: otherOrganizationId,
         kilo_user_id: regularUser.id,

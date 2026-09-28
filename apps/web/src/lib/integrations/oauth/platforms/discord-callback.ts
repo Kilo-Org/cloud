@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -12,7 +12,9 @@ import {
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
+  cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
+import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
 /**
  * Discord OAuth Callback
@@ -35,6 +37,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // Handle OAuth errors from Discord
     if (error) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'discord' });
       captureMessage('Discord OAuth error', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -55,6 +58,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // Validate code is present
     if (!code) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'discord' });
       captureMessage('Discord callback missing code', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -71,7 +75,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // 3. Verify signed state (CSRF protection)
     const verified = verifyOAuthState(state);
-    if (!verified) {
+    if (!state || !verified) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -110,6 +114,23 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       if (user.id !== owner.id) {
         return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
       }
+    }
+
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
+    }
+
+    if (
+      verified.purpose === 'provider_install' &&
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'discord',
+        state,
+        purpose: 'provider_install',
+      }))
+    ) {
+      throw new Error('Discord OAuth attempt is invalid, expired, or already used');
     }
 
     // 7. Exchange code for access token

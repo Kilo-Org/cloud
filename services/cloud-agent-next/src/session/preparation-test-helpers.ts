@@ -1,7 +1,26 @@
 import { materializePreparationEvent } from './preparation-history.js';
 import type { PreparationAttempt, PreparationStepSnapshot } from '../shared/protocol.js';
 import type { EventQueries } from './queries/index.js';
+import type {
+  AssistantMessageInfo,
+  AssistantMessagePart,
+  LatestAssistantMessage,
+} from './types.js';
 import type { StoredEvent } from '../websocket/types.js';
+
+type KilocodePayload = {
+  event?: string;
+  properties?: { info?: AssistantMessageInfo; part?: AssistantMessagePart };
+};
+
+function parseKilocodePayload(payload: string): KilocodePayload | null {
+  try {
+    const parsed: unknown = JSON.parse(payload);
+    return typeof parsed === 'object' && parsed !== null ? (parsed as KilocodePayload) : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Entity-keyed in-memory stand-in for the preparation slice of EventQueries. */
 export function createMemoryEventQueries(): EventQueries {
@@ -34,6 +53,43 @@ export function createMemoryEventQueries(): EventQueries {
         .filter(([entityId]) => entityId.startsWith(prefix))
         .map(([, row]) => row)
         .sort((a, b) => a.timestamp - b.timestamp || a.id - b.id),
+    getAssistantMessageForUserMessage: (
+      sessionId: string,
+      kiloSessionId: string,
+      parentMessageId: string
+    ): LatestAssistantMessage | null => {
+      const updated = [...rows.values()]
+        .filter(row => row.stream_event_type === 'kilocode' && row.session_id === sessionId)
+        .flatMap(row => {
+          const payload = parseKilocodePayload(row.payload);
+          const info = payload?.event === 'message.updated' ? payload.properties?.info : undefined;
+          if (
+            info?.role !== 'assistant' ||
+            info.sessionID !== kiloSessionId ||
+            info.parentID !== parentMessageId
+          )
+            return [];
+          return [{ row, info }];
+        })
+        .sort(
+          (left, right) => left.row.timestamp - right.row.timestamp || left.row.id - right.row.id
+        );
+      const latest = updated[updated.length - 1];
+      if (!latest) return null;
+      const partsById = new Map<string, AssistantMessagePart>();
+      for (const row of rows.values()) {
+        const payload = parseKilocodePayload(row.payload);
+        const part =
+          payload?.event === 'message.part.updated' ? payload.properties?.part : undefined;
+        if (part?.messageID === latest.info.id) partsById.set(part.id, part);
+      }
+      return {
+        eventId: latest.row.id,
+        timestamp: latest.row.timestamp,
+        info: latest.info,
+        parts: [...partsById.values()].sort((left, right) => left.id.localeCompare(right.id)),
+      } satisfies LatestAssistantMessage;
+    },
   } as unknown as EventQueries;
 }
 

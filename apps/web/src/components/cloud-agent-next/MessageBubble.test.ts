@@ -2,12 +2,72 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
+import { WORKTREE_REVIEW_PROMPT_INTRO, type WorktreeReviewComment } from './worktree-review';
 
 jest.mock('./PartRenderer', () => ({ PartRenderer: () => null }));
 jest.mock('@/components/shared/TimeAgo', () => ({ TimeAgo: () => null }));
 jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
+jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
+  iterateOverDiff: () => [],
+}));
 
 import { MessageBubble } from './MessageBubble';
+
+const reviewComment: WorktreeReviewComment = {
+  id: 'comment-1',
+  anchor: {
+    capture: {
+      userId: 'user-1',
+      organizationId: undefined,
+      workspaceScope: 'workspace-1',
+      sourceCloudAgentSessionId: 'source-session',
+      revision: 3,
+      capturedAt: '2026-09-09T09:00:00.000Z',
+      comparison: {
+        baseRef: 'main',
+        mergeBase: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+      },
+    },
+    path: 'src/example.ts',
+    range: { side: 'additions', startLine: 4, endLine: 4 },
+    quote: {
+      source: 'saved-patch',
+      lines: [{ lineNumber: 4, kind: 'addition', text: 'const value = 1;\n' }],
+    },
+  },
+  text: 'Use the shared value helper.',
+};
+
+function reviewMessage(overall?: string): string {
+  return `${WORKTREE_REVIEW_PROMPT_INTRO}\n\n${JSON.stringify({
+    version: 1,
+    overall: overall?.trim() || undefined,
+    comments: [{ ...reviewComment, contextStatus: 'current-saved-capture' }],
+  })}`;
+}
+
+function userMessage(text: string): StoredMessage {
+  return {
+    info: {
+      id: 'msg-review',
+      sessionID: 'ses-1',
+      role: 'user',
+      time: { created: 1 },
+      agent: 'build',
+      model: { providerID: 'openrouter', modelID: 'anthropic/claude-sonnet-4' },
+    },
+    parts: [
+      {
+        id: 'part-review',
+        sessionID: 'ses-1',
+        messageID: 'msg-review',
+        type: 'text',
+        text,
+      },
+    ],
+  };
+}
 
 describe('MessageBubble', () => {
   it('renders a sanitized string assistant error', () => {
@@ -141,5 +201,37 @@ describe('MessageBubble', () => {
     expect(html).toContain('href="https://example.com"');
     expect(html).not.toContain('href="javascript:');
     expect(html).toContain('javascript:alert(1)');
+  });
+
+  it('renders a parsed review as a compact card without exposing the JSON payload', () => {
+    const raw = reviewMessage('  Check the boundary first.  ');
+    const html = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(raw) })
+    );
+
+    expect(html).toContain('Code review feedback');
+    expect(html).toContain('1 file · 1 comment');
+    expect(html).toContain('cursor-pointer');
+    expect(html).not.toContain('Check the boundary first.');
+    expect(html).not.toContain('Use the shared value helper.');
+    expect(html).not.toContain('"version":1');
+    expect(html).not.toContain('Please address the following worktree review feedback');
+    expect(html).toContain('<button');
+    expect(html).toContain('data-state="closed"');
+  });
+
+  it('keeps malformed review JSON and ordinary user prompts as ordinary bubbles', () => {
+    const malformed = `${reviewMessage()} trailing text`;
+    const malformedHtml = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage(malformed) })
+    );
+    const ordinaryHtml = renderToStaticMarkup(
+      React.createElement(MessageBubble, { message: userMessage('Please inspect this file.') })
+    );
+
+    expect(malformedHtml).not.toContain('Code review feedback');
+    expect(malformedHtml).toContain('Please address the following worktree review feedback');
+    expect(ordinaryHtml).not.toContain('Code review feedback');
+    expect(ordinaryHtml).toContain('Please inspect this file.');
   });
 });

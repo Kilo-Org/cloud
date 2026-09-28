@@ -50,8 +50,6 @@ describe('sandbox control frames', () => {
       capabilities: {
         kiloVersionHeartbeat: true,
         sessionOperationResults: true,
-        scopedStopAbort: true,
-        nativeRuntimeRetirement: true,
       },
     });
     const previous = { protocolVersion: 1, handshakeComplete: true };
@@ -69,9 +67,17 @@ describe('sandbox control frames', () => {
     expect(
       sandboxHelloResultSchema.safeParse({ ...helloResult(), handshakeComplete: false }).success
     ).toBe(false);
+  });
+
+  it('advertises the local-phase capability only when the handler sets it', () => {
     expect(
-      sandboxHelloResultSchema.parse(helloResult({ scopedCleanupResult: true })).capabilities
-    ).toMatchObject({ scopedCleanupResult: true });
+      sandboxHelloResultSchema.parse(helloResult({ kiloLocalPhase: true })).capabilities
+    ).toEqual({
+      kiloVersionHeartbeat: true,
+      sessionOperationResults: true,
+      kiloLocalPhase: true,
+    });
+    expect(helloResult().capabilities).not.toHaveProperty('kiloLocalPhase');
   });
 
   it('accepts a valid request envelope', () => {

@@ -4,11 +4,11 @@ import * as Haptics from 'expo-haptics';
 import { MessageSquare, MoreVertical } from '@/components/ui/icons';
 import { Alert, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { timeAgo } from '@/lib/utils';
 
 import { useConversationRename } from './hooks/use-conversation-rename';
@@ -17,6 +17,12 @@ import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 type ConversationRowProps = {
   conversation: ConversationListItem;
   sandboxId: string;
+  /**
+   * The list's ticker clock. The relative timestamp must be derived from this
+   * prop, not from a live `Date.now()` read: React Compiler memoizes the label
+   * against its traced inputs, so an untracked clock would freeze the text.
+   */
+  now: number;
   onPress: (conversationId: string) => void;
   onLeave: (conversationId: string) => void;
 };
@@ -35,12 +41,13 @@ function hasUnread(conversation: ConversationListItem): boolean {
 export function ConversationRow({
   conversation,
   sandboxId,
+  now,
   onPress,
   onLeave,
 }: Readonly<ConversationRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const client = useKiloChatClient();
   const { renaming, openRename, closeRename, saveRename } = useConversationRename(
@@ -49,6 +56,7 @@ export function ConversationRow({
     sandboxId
   );
   const title = conversation.title ?? t('chat.conversation.untitledConversation');
+  const timestampLabel = timeAgo(new Date(conversationTimestamp(conversation)), undefined, now);
 
   function confirmLeave() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -68,11 +76,11 @@ export function ConversationRow({
     void Haptics.selectionAsync();
     showActionSheetWithOptions(
       {
+        ...themedSheet,
         title: title,
         options: [t('common.rename'), t('chat.conversation.leave'), t('common.cancel')],
         cancelButtonIndex: 2,
         destructiveButtonIndex: 1,
-        containerStyle: { paddingBottom: bottom },
       },
       index => {
         if (index === 0) {
@@ -116,7 +124,7 @@ export function ConversationRow({
               />
             ) : null}
             <Text variant="muted" numberOfLines={1}>
-              {timeAgo(new Date(conversationTimestamp(conversation)))}
+              {timestampLabel}
             </Text>
           </View>
         </View>

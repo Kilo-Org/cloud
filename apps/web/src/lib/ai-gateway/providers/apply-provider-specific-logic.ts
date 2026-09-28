@@ -6,7 +6,7 @@ import {
   type GatewayMessagesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { applyMistralModelSettings, isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   applyKiloExclusiveModelSettings,
   type KiloExclusiveModel,
@@ -21,7 +21,6 @@ import {
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,
@@ -53,6 +52,8 @@ import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
 import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
+import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
+import { sanitizeJsonRefToolResults } from '@/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -138,9 +139,9 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
     // specifying this for fable breaks the opus fallback on vercel
     return [
-      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
+      OpenRouterInferenceProviderIdSchema.enum['google-vertex'],
     ];
   }
   if (isMinimaxModel(requestedModel)) {
@@ -150,7 +151,10 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
     return [OpenRouterInferenceProviderIdSchema.enum.mistral];
   }
   if (isKimiModel(requestedModel)) {
-    return [OpenRouterInferenceProviderIdSchema.enum.novita];
+    return [
+      OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
+      OpenRouterInferenceProviderIdSchema.enum.alibaba,
+    ];
   }
   if (isStepModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.stepfun];
@@ -197,7 +201,7 @@ export async function applyGatewayModelsFallback(
   requestToMutate: GatewayRequest
 ) {
   if (
-    !(await isFreeModel(requestedModel)) &&
+    !isFreeModel(requestedModel) &&
     (isFableModel(requestedModel) || isOpus5Model(requestedModel)) &&
     (providerId === 'openrouter' || providerId === 'vercel')
   ) {
@@ -214,8 +218,7 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === 'z-ai/glm-5.2' ||
-    requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
+    requestedModel === 'z-ai/glm-5.2';
   if (
     defaultsToThinking &&
     requestToMutate.kind === 'messages' &&
@@ -294,6 +297,10 @@ export async function applyProviderSpecificLogic(
   applyTrackingIds(requestToMutate, provider, userId, taskId);
 
   sanitizeBinaryToolResults(requestToMutate);
+
+  if (isGeminiModel(requestedModel)) {
+    sanitizeJsonRefToolResults(requestToMutate);
+  }
 
   if (requestToMutate.kind === 'chat_completions') {
     scrubOpenCodeSpecificProperties(requestToMutate.body);

@@ -26,10 +26,6 @@ import {
 } from './env-encryption';
 import { InstanceConfigSchema } from '../schemas/instance-config';
 
-// =============================================================================
-// Shell escape function — standard single-quote escaping for bash `export` lines
-// =============================================================================
-
 function shellEscapeSingleQuote(value: string): string {
   return value.replace(/'/g, "'\\''");
 }
@@ -38,10 +34,6 @@ function buildExportLine(name: string, value: string): string {
   const escaped = shellEscapeSingleQuote(value);
   return `export ${name}='${escaped}'`;
 }
-
-// =============================================================================
-// Adversarial env var VALUES — shell injection attempts
-// =============================================================================
 
 const SHELL_INJECTION_VALUES = [
   // Command substitution
@@ -130,10 +122,6 @@ const SHELL_INJECTION_VALUES = [
   },
 ];
 
-// =============================================================================
-// Adversarial env var NAMES — injection via variable names
-// =============================================================================
-
 const SHELL_INJECTION_NAMES = [
   '$(whoami)',
   '`whoami`',
@@ -169,10 +157,6 @@ const RESERVED_PREFIX_NAMES = [
   'KILOCLAW_ENV_KEY',
   'KILOCLAW_NPM_GLOBAL_PREFIX',
 ];
-
-// =============================================================================
-// Tests: Adversarial env var VALUES
-// =============================================================================
 
 describe('shell escaping — adversarial env var values', () => {
   it('single-quote escaping produces safe export lines for all injection payloads', () => {
@@ -239,10 +223,6 @@ describe('shell escaping — adversarial env var values', () => {
   });
 });
 
-// =============================================================================
-// Tests: Adversarial env var NAMES
-// =============================================================================
-
 describe('shell escaping — adversarial env var names', () => {
   it('validateUserEnvVarName rejects all injection payloads', () => {
     for (const name of SHELL_INJECTION_NAMES) {
@@ -284,10 +264,6 @@ describe('shell escaping — adversarial env var names', () => {
   });
 });
 
-// =============================================================================
-// Tests: Reserved env var protection
-// =============================================================================
-
 describe('shell escaping — reserved env var protection', () => {
   it('rejects KILOCLAW_ENC_ prefix', () => {
     expect(() => validateUserEnvVarName('KILOCLAW_ENC_ANYTHING')).toThrow('reserved prefix');
@@ -312,10 +288,6 @@ describe('shell escaping — reserved env var protection', () => {
     expect(featureResult.success).toBe(false);
   });
 });
-
-// =============================================================================
-// Tests: Encryption integrity
-// =============================================================================
 
 describe('shell escaping — encryption integrity', () => {
   it('all injection payloads survive AES-256-GCM round-trip', () => {
@@ -344,10 +316,6 @@ describe('shell escaping — encryption integrity', () => {
     expect(() => decryptEnvValue(key, tampered)).toThrow();
   });
 });
-
-// =============================================================================
-// Tests: Regex consistency between bootstrap decryption and env-encryption.ts
-// =============================================================================
 
 describe('shell escaping — regex consistency', () => {
   // bootstrap.ts VALID_NAME: /^[A-Za-z_][A-Za-z0-9_]*$/;

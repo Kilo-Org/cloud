@@ -1,10 +1,15 @@
-import type { PreparationAttempt } from '@kilocode/cloud-agent-sdk';
+import type {
+  PreparationAttempt,
+  SessionCommit,
+  SessionStatusIndicator,
+} from '@kilocode/cloud-agent-sdk';
 import type { Part, StoredMessage, ToolPart } from './types';
 import { isAssistantMessage, shouldRenderReasoningPart } from './types';
 
 export function groupConversationMessages(
   messages: StoredMessage[],
-  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>
+  preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>,
+  commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]> = new Map()
 ): StoredMessage[][] {
   const groups: StoredMessage[][] = [];
 
@@ -20,6 +25,7 @@ export function groupConversationMessages(
       previous.info.parentID === message.info.parentID &&
       previous.info.error == null &&
       message.info.error == null &&
+      !commitsAfterMessage.has(previous.info.id) &&
       !preparationByMessageId.get(previous.info.id)?.length &&
       !preparationByMessageId.get(message.info.id)?.length
     ) {
@@ -30,6 +36,63 @@ export function groupConversationMessages(
   }
 
   return groups;
+}
+
+export function commitsByMessageAnchor(
+  messages: readonly StoredMessage[],
+  commits: readonly SessionCommit[]
+): ReadonlyMap<string, readonly SessionCommit[]> {
+  const messagesById = new Map(messages.map(message => [message.info.id, message]));
+  const byAnchor = new Map<string, SessionCommit[]>();
+  const seen = new Set<string>();
+  const time = (commit: SessionCommit) => {
+    const value = Date.parse(commit.committedAt ?? commit.timestamp ?? '');
+    return Number.isFinite(value) ? value : 0;
+  };
+  const ordered = [...commits].sort(
+    (a, b) => time(a) - time(b) || a.commitHash.localeCompare(b.commitHash)
+  );
+  for (const commit of ordered) {
+    if (seen.has(commit.commitHash)) continue;
+    seen.add(commit.commitHash);
+    const assistant = messagesById.get(commit.messageId);
+    let anchor = assistant?.info.role === 'assistant' ? assistant.info.id : undefined;
+    if (!anchor && commit.messageId === commit.userMessageId) {
+      const user = messagesById.get(commit.userMessageId);
+      if (user?.info.role !== 'user') continue;
+      const turn = messages.filter(
+        message =>
+          message.info.role === 'assistant' &&
+          message.info.parentID === user.info.id &&
+          message.info.sessionID === user.info.sessionID
+      );
+      if (
+        turn.some(
+          message => message.info.role === 'assistant' && message.info.time.completed === undefined
+        )
+      )
+        continue;
+      anchor = turn.at(-1)?.info.id ?? user.info.id;
+    }
+    if (!anchor) continue;
+    const anchored = byAnchor.get(anchor) ?? [];
+    anchored.push(commit);
+    byAnchor.set(anchor, anchored);
+  }
+  return byAnchor;
+}
+
+export function isCommitSummaryRepresented(
+  indicator: SessionStatusIndicator | null,
+  commitsAfterMessage: ReadonlyMap<string, readonly SessionCommit[]>
+): boolean {
+  return (
+    indicator?.type === 'info' &&
+    indicator.commitHash !== undefined &&
+    [...commitsAfterMessage.values()].some(commits =>
+      commits.some(commit => commit.commitHash === indicator.commitHash)
+    )
+  );
 }
 
 export function shouldRenderToolPart(part: ToolPart): boolean {

@@ -30,10 +30,6 @@ import type { KiloEvent, WrapperKiloClient } from '../../../wrapper/src/kilo-api
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import * as wrapperUtils from '../../../wrapper/src/utils.js';
 
-// ---------------------------------------------------------------------------
-// Polyfills for Node.js test environment
-// ---------------------------------------------------------------------------
-
 // CloseEvent is a browser API not available in Node — provide a minimal shim
 if (typeof CloseEvent === 'undefined') {
   const g = globalThis as Record<string, unknown>;
@@ -61,10 +57,6 @@ if (typeof MessageEvent === 'undefined') {
     }
   };
 }
-
-// ---------------------------------------------------------------------------
-// MockWebSocket
-// ---------------------------------------------------------------------------
 
 class MockWebSocket {
   static CONNECTING = 0;
@@ -95,7 +87,6 @@ class MockWebSocket {
     this.readyState = MockWebSocket.CLOSED;
   }
 
-  // Test helpers
   simulateOpen(): void {
     this.readyState = MockWebSocket.OPEN;
     this.onopen?.(new Event('open'));
@@ -118,10 +109,6 @@ class MockWebSocket {
     return MockWebSocket.instances[MockWebSocket.instances.length - 1];
   }
 }
-
-// ---------------------------------------------------------------------------
-// Test helpers
-// ---------------------------------------------------------------------------
 
 const createSessionContext = (overrides: Partial<SessionContext> = {}): SessionContext => ({
   kiloSessionId: 'kilo_sess_456',
@@ -231,17 +218,12 @@ async function openConnection(
   manager: ReturnType<typeof createConnectionManager>
 ): Promise<MockWebSocket> {
   const openPromise = manager.open();
-  // openIngestWs creates a WS and waits for onopen
   const ws = MockWebSocket.latest!;
   ws.simulateOpen();
   // Event subscription starts in the background (fire-and-forget)
   await openPromise;
   return ws;
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('wrapper runtime state', () => {
   const createStorage = () => {
@@ -545,30 +527,22 @@ describe('ingest WS reconnection', () => {
     return createConnectionManager(state, { kiloClient }, callbacks);
   }
 
-  // -------------------------------------------------------------------------
-  // Test: unexpected close triggers reconnection
-  // -------------------------------------------------------------------------
-
   it('attempts reconnection on unexpected WS close', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Unexpected close (code 1006 = abnormal closure)
     ws.simulateClose(1006);
 
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(manager.isReconnecting()).toBe(true);
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(1);
 
-    // Advance past first backoff (1s)
     await vi.advanceTimersByTimeAsync(1_000);
 
-    // A new WS should have been created
     const newWs = MockWebSocket.latest!;
     expect(newWs).not.toBe(ws);
     newWs.simulateOpen();
 
-    // Wait for reconnect promise to resolve
     await vi.advanceTimersByTimeAsync(0);
 
     expect(callbacks.onReconnected).toHaveBeenCalled();
@@ -615,10 +589,6 @@ describe('ingest WS reconnection', () => {
       }
     }
   );
-
-  // -------------------------------------------------------------------------
-  // Test: reconnection fails after all attempts
-  // -------------------------------------------------------------------------
 
   it('keeps retrying reconnect handshakes until one opens', async () => {
     const manager = createManager();
@@ -753,15 +723,10 @@ describe('ingest WS reconnection', () => {
     expect(initialWs.readyState).toBe(MockWebSocket.CLOSED);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: expected close (closedByUs) — no reconnection
-  // -------------------------------------------------------------------------
-
   it('does not reconnect when connection is closed by us', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // close() sets closedByUs = true, then calls ws.close()
     await manager.close();
 
     // The WS is already closed by close(), but simulate the onclose event
@@ -771,25 +736,17 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
     expect(manager.isReconnecting()).toBe(false);
 
-    // Advance timers to verify no reconnection attempts
     await vi.advanceTimersByTimeAsync(60_000);
-    // Only the initial WS should exist (no new connections attempted)
     expect(MockWebSocket.instances).toHaveLength(1);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: events are buffered during reconnection and flushed on reconnect
-  // -------------------------------------------------------------------------
 
   it('buffers events during reconnection and flushes on reconnect', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Simulate unexpected close
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Send events via state.sendToIngest while disconnected
     const event1: IngestEvent = {
       streamEventType: 'kilocode',
       timestamp: new Date().toISOString(),
@@ -832,14 +789,12 @@ describe('ingest WS reconnection', () => {
     });
     expect(oldWsSentAfterClose).toHaveLength(0);
 
-    // Advance past first backoff (1s) and reconnect
     await vi.advanceTimersByTimeAsync(1_000);
     const newWs = MockWebSocket.latest!;
     expect(newWs).not.toBe(ws);
     newWs.simulateOpen();
     await vi.advanceTimersByTimeAsync(0);
 
-    // Verify wrapper_resumed marker was sent
     const resumeMsg = newWs.sent.find(msg => {
       const parsed = JSON.parse(msg);
       return parsed.streamEventType === 'wrapper_resumed';
@@ -879,15 +834,10 @@ describe('ingest WS reconnection', () => {
     });
   });
 
-  // -------------------------------------------------------------------------
-  // Test: SSE consumer stays alive during reconnection
-  // -------------------------------------------------------------------------
-
   it('keeps event subscription alive during WS reconnection', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Simulate unexpected WS close
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
@@ -895,19 +845,13 @@ describe('ingest WS reconnection', () => {
     // (only WS disconnected, not the event stream).
     expect(callbacks.onDisconnect).not.toHaveBeenCalled();
 
-    // Reconnect
     await vi.advanceTimersByTimeAsync(1_000);
     MockWebSocket.latest!.simulateOpen();
     await vi.advanceTimersByTimeAsync(0);
 
-    // After reconnection, the connection should be working again
     expect(manager.isReconnecting()).toBe(false);
     expect(manager.isConnected()).toBe(true);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: close() during reconnection cancels it
-  // -------------------------------------------------------------------------
 
   it('cancels reconnection when close() is called during reconnect', async () => {
     const manager = createManager();
@@ -918,26 +862,18 @@ describe('ingest WS reconnection', () => {
 
     const instanceCountBefore = MockWebSocket.instances.length;
 
-    // Call close() while reconnecting
     await manager.close();
     expect(manager.isReconnecting()).toBe(false);
 
-    // Advance past all possible backoff delays (1+2+4+8+16 = 31s)
     await vi.advanceTimersByTimeAsync(60_000);
 
-    // No new WebSocket connections should have been attempted
     expect(MockWebSocket.instances).toHaveLength(instanceCountBefore);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: no custom heartbeat interval (heartbeats are forwarded from kilo)
-  // -------------------------------------------------------------------------
 
   it('does not send custom heartbeat — heartbeats come from kilo server.heartbeat forwarding', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Advance well past the old 20s heartbeat interval
     await vi.advanceTimersByTimeAsync(60_000);
 
     // No heartbeats should be sent by the wrapper — they are forwarded
@@ -948,10 +884,6 @@ describe('ingest WS reconnection', () => {
     });
     expect(heartbeats.length).toBe(0);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: exponential backoff delays
-  // -------------------------------------------------------------------------
 
   it('uses exponential backoff delays for reconnection attempts', async () => {
     const manager = createManager();
@@ -966,23 +898,16 @@ describe('ingest WS reconnection', () => {
     for (let i = 0; i < delays.length; i++) {
       const countBefore = MockWebSocket.instances.length;
 
-      // Advance just under the delay — no new WS yet
       await vi.advanceTimersByTimeAsync(delays[i] - 1);
       expect(MockWebSocket.instances).toHaveLength(countBefore);
 
-      // Advance the remaining 1ms — new WS should appear
       await vi.advanceTimersByTimeAsync(1);
       expect(MockWebSocket.instances).toHaveLength(countBefore + 1);
 
-      // Simulate failure to trigger next attempt
       MockWebSocket.latest!.simulateError();
       await vi.advanceTimersByTimeAsync(0);
     }
   });
-
-  // -------------------------------------------------------------------------
-  // Test: onReconnecting fires with correct attempt number
-  // -------------------------------------------------------------------------
 
   it('fires onReconnecting with incrementing attempt number', async () => {
     const manager = createManager();
@@ -990,17 +915,14 @@ describe('ingest WS reconnection', () => {
 
     ws.simulateClose(1006);
 
-    // First attempt fires immediately on close
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(1);
 
-    // Fail attempt 1
     await vi.advanceTimersByTimeAsync(1_000);
     MockWebSocket.latest!.simulateError();
     await vi.advanceTimersByTimeAsync(0);
 
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(2);
 
-    // Fail attempt 2
     await vi.advanceTimersByTimeAsync(2_000);
     MockWebSocket.latest!.simulateError();
     await vi.advanceTimersByTimeAsync(0);
@@ -1008,10 +930,6 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onReconnecting).toHaveBeenCalledWith(3);
     expect(callbacks.onReconnecting).toHaveBeenCalledTimes(3);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: WS messages received after reconnect are dispatched as commands
-  // -------------------------------------------------------------------------
 
   it('dispatches commands received on the reconnected WS', async () => {
     const manager = createManager();
@@ -1024,26 +942,19 @@ describe('ingest WS reconnection', () => {
     newWs.simulateOpen();
     await vi.advanceTimersByTimeAsync(0);
 
-    // Simulate a command message on the new WS
     const cmd = { type: 'ping' };
     newWs.onmessage?.(new MessageEvent('message', { data: JSON.stringify(cmd) }));
 
     expect(callbacks.onCommand).toHaveBeenCalledWith(cmd);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: stale onclose from old WS is ignored during reconnection
-  // -------------------------------------------------------------------------
-
   it('ignores onclose from a stale WebSocket instance', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Trigger reconnection
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Reconnect successfully
     await vi.advanceTimersByTimeAsync(1_000);
     const newWs = MockWebSocket.latest!;
     newWs.simulateOpen();
@@ -1061,27 +972,20 @@ describe('ingest WS reconnection', () => {
     expect(manager.isReconnecting()).toBe(false);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: successful reconnect on later attempt (not the first)
-  // -------------------------------------------------------------------------
-
   it('reconnects successfully on a later attempt after initial failures', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
     ws.simulateClose(1006);
 
-    // Fail attempt 1
     await vi.advanceTimersByTimeAsync(1_000);
     MockWebSocket.latest!.simulateError();
     await vi.advanceTimersByTimeAsync(0);
 
-    // Fail attempt 2
     await vi.advanceTimersByTimeAsync(2_000);
     MockWebSocket.latest!.simulateError();
     await vi.advanceTimersByTimeAsync(0);
 
-    // Succeed attempt 3
     await vi.advanceTimersByTimeAsync(4_000);
     const newWs = MockWebSocket.latest!;
     newWs.simulateOpen();
@@ -1093,26 +997,18 @@ describe('ingest WS reconnection', () => {
     expect(callbacks.onReconnecting).toHaveBeenCalledTimes(3);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: isConnected reflects disconnected state during reconnection
-  // -------------------------------------------------------------------------
-
   it('returns false from isConnected during reconnection', async () => {
     const manager = createManager();
     await openConnection(manager);
     await vi.advanceTimersByTimeAsync(0);
 
-    // Initially connected
     expect(manager.isConnected()).toBe(true);
 
-    // Simulate unexpected close
     MockWebSocket.latest!.simulateClose(1006);
 
-    // During reconnection, not connected
     expect(manager.isConnected()).toBe(false);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Reconnect
     await vi.advanceTimersByTimeAsync(1_000);
     MockWebSocket.latest!.simulateOpen();
     await vi.advanceTimersByTimeAsync(0);
@@ -1124,24 +1020,18 @@ describe('ingest WS reconnection', () => {
     expect(manager.isConnected()).toBe(true);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: no buffer overflow marker when buffer hasn't overflowed
-  // -------------------------------------------------------------------------
-
   it('sends wrapper_resumed with eventsLost=false when buffer does not overflow', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
     ws.simulateClose(1006);
 
-    // Buffer a single event
     state.sendToIngest({
       streamEventType: 'output',
       timestamp: new Date().toISOString(),
       data: { text: 'test' },
     });
 
-    // Reconnect
     await vi.advanceTimersByTimeAsync(1_000);
     const newWs = MockWebSocket.latest!;
     newWs.simulateOpen();
@@ -1152,19 +1042,12 @@ describe('ingest WS reconnection', () => {
     expect(JSON.parse(resumeMsg!).data.eventsLost).toBe(false);
   });
 
-  // -------------------------------------------------------------------------
-  // Test: no wrapper_resumed when no events were buffered
-  // -------------------------------------------------------------------------
-
   it('does not send wrapper_resumed when no events were buffered', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
     ws.simulateClose(1006);
 
-    // Don't send any events during disconnection
-
-    // Reconnect
     await vi.advanceTimersByTimeAsync(1_000);
     const newWs = MockWebSocket.latest!;
     newWs.simulateOpen();
@@ -1174,19 +1057,13 @@ describe('ingest WS reconnection', () => {
     expect(resumeMsg).toBeUndefined();
   });
 
-  // -------------------------------------------------------------------------
-  // Test: close() during in-flight reconnect discards stale socket
-  // -------------------------------------------------------------------------
-
   it('discards stale socket when close() is called during in-flight reconnect', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Trigger reconnection
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Advance past the backoff timer — openIngestWs() is called, new WS created
     await vi.advanceTimersByTimeAsync(1_000);
     const reconnectWs = MockWebSocket.latest!;
     expect(reconnectWs).not.toBe(ws);
@@ -1201,15 +1078,10 @@ describe('ingest WS reconnection', () => {
 
     expect(callbacks.onReconnected).not.toHaveBeenCalled();
 
-    // Verify no heartbeats are running on the stale socket
     reconnectWs.sent.length = 0;
     await vi.advanceTimersByTimeAsync(20_000);
     expect(reconnectWs.sent).toHaveLength(0);
   });
-
-  // -------------------------------------------------------------------------
-  // Test: closedByUs flag does not leak into next execution
-  // -------------------------------------------------------------------------
 
   it('does not leak closedByUs flag into the next execution', async () => {
     const manager = createManager();
@@ -1218,7 +1090,6 @@ describe('ingest WS reconnection', () => {
     // close() sets closedByUs=true, closes WS, then resets closedByUs=false
     await manager.close();
 
-    // Old WS fires onclose (stale socket — ignored by guard)
     ws.simulateClose(1000, 'normal close');
 
     // Simulate starting a new session with a fresh manager on the same state
@@ -1232,7 +1103,6 @@ describe('ingest WS reconnection', () => {
     );
     const ws2 = await openConnection(manager2);
 
-    // Simulate unexpected close on the new connection
     ws2.simulateClose(1006);
 
     // Should trigger reconnection, NOT be swallowed by closedByUs
@@ -1858,10 +1728,6 @@ describe('ingest WS reconnection', () => {
     }
   );
 
-  // -------------------------------------------------------------------------
-  // Test: close() clears event buffer to prevent stale events leaking
-  // -------------------------------------------------------------------------
-
   it('clears event buffer on close() so stale events do not leak into the next open', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
@@ -1870,7 +1736,6 @@ describe('ingest WS reconnection', () => {
     ws.simulateClose(1006);
     expect(manager.isReconnecting()).toBe(true);
 
-    // Buffer events while disconnected
     state.sendToIngest({
       streamEventType: 'output',
       timestamp: new Date().toISOString(),
@@ -1888,7 +1753,6 @@ describe('ingest WS reconnection', () => {
     newWs.simulateOpen();
     await openPromise;
 
-    // The stale buffered event should NOT be sent through the new connection
     const staleEventSent = newWs.sent.some(msg => {
       const parsed = JSON.parse(msg);
       return (
@@ -1904,18 +1768,12 @@ describe('ingest WS reconnection', () => {
     expect(resumedMsg).toBeUndefined();
   });
 
-  // -------------------------------------------------------------------------
-  // Test: event buffer survives same-run reconnect
-  // -------------------------------------------------------------------------
-
   it('preserves event buffer across unexpected disconnect and reconnect within the same run', async () => {
     const manager = createManager();
     const ws = await openConnection(manager);
 
-    // Simulate unexpected close
     ws.simulateClose(1006);
 
-    // Buffer events while disconnected
     state.sendToIngest({
       streamEventType: 'output',
       timestamp: new Date().toISOString(),
@@ -1928,7 +1786,6 @@ describe('ingest WS reconnection', () => {
     newWs.simulateOpen();
     await vi.advanceTimersByTimeAsync(0);
 
-    // The buffered event should be sent through the reconnected WS
     const bufferedEvent = newWs.sent.some(msg => {
       const parsed = JSON.parse(msg);
       return parsed.streamEventType === 'output' && parsed.data?.text === 'event during reconnect';
@@ -1937,11 +1794,9 @@ describe('ingest WS reconnection', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Subscribe handshake ordering — regression guard for the queue-while-busy
 // hang caused by open() returning before the SSE subscription was live.
 // See .plans/cloud-agent-queue-while-busy-findings.md.
-// ---------------------------------------------------------------------------
 
 type DeferredSubscribe = {
   promise: Promise<{ stream?: AsyncIterable<unknown> }>;
@@ -1994,7 +1849,6 @@ describe('subscribe-handshake ordering', () => {
     const manager = createConnectionManager(state, { kiloClient }, callbacks);
 
     const openPromise = manager.open();
-    // Let openIngestWs's WS creation happen and resolve onopen
     MockWebSocket.latest!.simulateOpen();
     // Flush microtasks so open() can reach the attachEventSubscription await
     await vi.advanceTimersByTimeAsync(0);

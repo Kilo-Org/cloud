@@ -6,8 +6,12 @@ import {
   sandboxHeartbeatPayloadSchema,
   type SandboxHeartbeatPayload,
 } from '../shared/sandbox-control-protocol.js';
-import { createSandboxControlSocketHandler, readSandboxControlConnection } from './socket.js';
-import { createControlRequestWaiters } from './waiters.js';
+import {
+  createSandboxControlSocketHandler,
+  readSandboxControlConnection,
+  summarizeHeartbeatIdle,
+} from './socket.js';
+import { createControlRequestWaiters, type ControlRequestWaiters } from './waiters.js';
 
 vi.mock('../logger.js', () => {
   const logger = {
@@ -65,11 +69,14 @@ function helloFrame(
   wrapperInstanceId?: string,
   requestId = 'req_hello',
   capabilities?: {
+    scopedStopAbort?: boolean;
     nativeRuntimeRetirement?: boolean;
     runtimeIsolation?: true;
     runtimeRecovery?: true;
     scopedCleanupResult?: boolean;
     workingBranches?: boolean;
+    gitAuthor?: boolean;
+    nativeRuntimeIdCapture?: boolean;
   }
 ): string {
   return JSON.stringify({
@@ -89,6 +96,18 @@ const WRAPPER_INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
 const REPLACEMENT_WRAPPER_INSTANCE_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('sandbox control socket handler', () => {
+  it('exposes the current isolate outstanding control-request waiter count', () => {
+    const pendingCount = vi.fn(() => 4);
+    const handler = createSandboxControlSocketHandler(createFakeState(), 'sbx_test', {
+      wait: vi.fn(),
+      settle: vi.fn(),
+      rejectAll: vi.fn(),
+      pendingCount,
+    } as unknown as ControlRequestWaiters);
+    expect(handler.pendingControlRequests()).toBe(4);
+    expect(pendingCount).toHaveBeenCalledTimes(1);
+  });
+
   it('accepts old heartbeats and ignores invalid optional versions without rejecting readiness', () => {
     const heartbeat = { state: 'idle', kilo: { ready: true }, sessions: [] };
     expect(sandboxHeartbeatPayloadSchema.parse(heartbeat)).toEqual(heartbeat);
@@ -107,7 +126,7 @@ describe('sandbox control socket handler', () => {
       expect(JSON.stringify(parsed)).not.toContain('private');
     }
   });
-  it('retains runtime isolation and recovery alongside scoped cleanup negotiation', async () => {
+  it('retains runtime isolation and recovery from the wrapper handshake', async () => {
     const incoming = createFakeWebSocket();
     const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
 
@@ -116,7 +135,6 @@ describe('sandbox control socket handler', () => {
       helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', {
         runtimeIsolation: true,
         runtimeRecovery: true,
-        scopedCleanupResult: true,
       })
     );
 
@@ -125,10 +143,60 @@ describe('sandbox control socket handler', () => {
       runtimeIsolation: true,
       runtimeRecovery: true,
     });
-    expect(handler.supportsScopedCleanupResult?.()).toBe(true);
-    expect(incoming.send).toHaveBeenCalledWith(
-      expect.stringContaining('"scopedCleanupResult":true')
+  });
+  it('accepts an old-wrapper hello advertising retired capabilities without negotiating them', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_legacy', WRAPPER_INSTANCE_ID, 'req_legacy', {
+        scopedStopAbort: true,
+        nativeRuntimeRetirement: true,
+        scopedCleanupResult: true,
+        runtimeIsolation: true,
+      })
     );
+
+    expect(handler.getConnectionIdentity()).toMatchObject({
+      providerInstanceId: 'inst_legacy',
+      runtimeIsolation: true,
+    });
+    const response = JSON.parse(incoming.send.mock.calls[0]?.[0] as string) as {
+      result?: { capabilities?: Record<string, boolean> };
+    };
+    expect(response.result?.capabilities).not.toHaveProperty('scopedStopAbort');
+    expect(response.result?.capabilities).not.toHaveProperty('nativeRuntimeRetirement');
+    expect(response.result?.capabilities).not.toHaveProperty('scopedCleanupResult');
+  });
+  it('treats the retired nativeRuntimeRetirement capability as native runtime id capture', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_retired', WRAPPER_INSTANCE_ID, 'req_retired', {
+        nativeRuntimeRetirement: true,
+      })
+    );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(true);
+
+    const response = JSON.parse(incoming.send.mock.calls[0]?.[0] as string) as {
+      result?: { capabilities?: Record<string, boolean> };
+    };
+    expect(response.result?.capabilities).not.toHaveProperty('nativeRuntimeRetirement');
+  });
+  it('does not claim native runtime id capture when the hello advertises neither capability', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_plain', WRAPPER_INSTANCE_ID, 'req_plain', { workingBranches: true })
+    );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(false);
   });
   it.each([
     ['2.4.0', '2.4.0'],
@@ -357,8 +425,8 @@ describe('sandbox control socket handler', () => {
           capabilities: {
             kiloVersionHeartbeat: true,
             sessionOperationResults: true,
-            scopedStopAbort: true,
-            nativeRuntimeRetirement: true,
+            eventBatches: true,
+            kiloLocalPhase: true,
           },
         },
       })
@@ -397,20 +465,6 @@ describe('sandbox control socket handler', () => {
     });
   });
 
-  it('reads the native runtime retirement capability from the wrapper handshake', async () => {
-    const incoming = createFakeWebSocket();
-    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
-
-    await handler.handleMessage(
-      asWs(incoming),
-      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_native_retirement', {
-        nativeRuntimeRetirement: true,
-      })
-    );
-
-    expect(handler.supportsNativeRuntimeRetirement()).toBe(true);
-  });
-
   it('reads the working branch capability from the wrapper handshake', async () => {
     const incoming = createFakeWebSocket();
     const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
@@ -425,21 +479,46 @@ describe('sandbox control socket handler', () => {
     expect(handler.supportsWorkingBranches?.()).toBe(true);
   });
 
-  it('grants scoped cleanup results only to a reader that offers the capability', async () => {
+  it('reads the git author capability from the wrapper handshake', async () => {
     const incoming = createFakeWebSocket();
     const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
 
     await handler.handleMessage(
       asWs(incoming),
-      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_scoped_cleanup', {
-        scopedCleanupResult: true,
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_git_author', {
+        gitAuthor: true,
       })
     );
 
-    expect(handler.supportsScopedCleanupResult?.()).toBe(true);
-    expect(incoming.send).toHaveBeenCalledWith(
-      expect.stringContaining('"scopedCleanupResult":true')
+    expect(handler.supportsGitAuthor?.()).toBe(true);
+  });
+
+  it('reads the native runtime id capture capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_native_runtime_id', {
+        nativeRuntimeIdCapture: true,
+      })
     );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(true);
+  });
+
+  it('reports no native runtime id capture capability when the wrapper hello omits it', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_native_runtime_id_absent', {
+        workingBranches: true,
+      })
+    );
+
+    expect(handler.supportsNativeRuntimeIdCapture()).toBe(false);
   });
 
   it('rejects duplicate hellos without replacing the current connection', async () => {
@@ -1113,6 +1192,164 @@ describe('sandbox control socket handler', () => {
       requestId: 'event-receipt',
       ok: true,
       result: { receiptId, applied: true },
+    });
+  });
+
+  it('returns per-item outcomes for a negotiated event batch', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      capabilities: { eventBatches: true, eventReceipts: true },
+    });
+    const firstReceipt = '123e4567-e89b-42d3-a456-426614174199';
+    const secondReceipt = '223e4567-e89b-42d3-a456-426614174199';
+    const outcomes = [
+      { receiptId: firstReceipt, status: 'applied' },
+      { receiptId: secondReceipt, status: 'rejected', retryable: true },
+    ];
+    const onSessionEventBatch = vi.fn().mockResolvedValue({ outcomes });
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_1',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: firstReceipt,
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+            {
+              event: 'session.event',
+              receiptId: secondReceipt,
+              sequence: 2,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_2' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).toHaveBeenCalledTimes(1);
+    expect(ws.send).toHaveBeenLastCalledWith(
+      JSON.stringify({
+        type: 'response',
+        requestId: 'batch_1',
+        ok: true,
+        result: { outcomes },
+      })
+    );
+  });
+
+  it('rejects a batch frame when batching was not negotiated', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    const onSessionEventBatch = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_unnegotiated',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: '123e4567-e89b-42d3-a456-426614174199',
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).not.toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'response',
+      requestId: 'batch_unnegotiated',
+      ok: false,
+      error: { code: 'protocol_error', message: 'Event batching is not negotiated' },
+    });
+  });
+
+  it('rejects a batch frame when event receipts are not negotiated', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      capabilities: { eventBatches: true },
+    });
+    const onSessionEventBatch = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onSessionEventBatch,
+      }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'batch_without_receipts',
+        operation: 'sandbox.event.publishBatch',
+        payload: {
+          items: [
+            {
+              event: 'session.event',
+              receiptId: '123e4567-e89b-42d3-a456-426614174199',
+              sequence: 1,
+              session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+              payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(onSessionEventBatch).not.toHaveBeenCalled();
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toMatchObject({
+      type: 'response',
+      requestId: 'batch_without_receipts',
+      ok: false,
+      error: { code: 'protocol_error', message: 'Event batching is not negotiated' },
     });
   });
 
@@ -2130,5 +2367,39 @@ describe('connection-local sandbox observations', () => {
     expect(readTestConnection(state, 'inst_1')).toEqual({ state: 'unknown' });
     await handler.handleMessage(asWs(ws), readyFrame);
     expect(attachmentOf(ws).observation?.ready).toBe(true);
+  });
+});
+
+describe('bounded heartbeat idle summaries', () => {
+  const idleHeartbeat: SandboxHeartbeatPayload = {
+    state: 'idle',
+    pendingMessages: 0,
+    kilo: { ready: true },
+    sessions: [{ kiloSessionId: 'kilo_1', state: 'idle', idleForMs: 0 }],
+  };
+
+  it.each([
+    { state: 'active' },
+    { state: 'finalizing' },
+    { pendingMessages: undefined },
+    { pendingMessages: 1 },
+    { activeKiloSessions: 1 },
+    { kilo: { ready: false } },
+    { sessions: [{ kiloSessionId: 'kilo_1', state: 'active', idleForMs: 180_000 }] },
+    { sessions: [{ kiloSessionId: 'kilo_1', state: 'finalizing', idleForMs: 0 }] },
+    { sessions: [{ kiloSessionId: 'kilo_1', state: 'idle', idleForMs: 0, waitingOn: 'tool' }] },
+    { sessions: [...idleHeartbeat.sessions, ...idleHeartbeat.sessions] },
+  ] satisfies Partial<SandboxHeartbeatPayload>[])(
+    'rejects busy or incomplete sandbox-wide evidence: %j',
+    async patch => {
+      expect(await summarizeHeartbeatIdle({ ...idleHeartbeat, ...patch })).toBeNull();
+    }
+  );
+
+  it('summarizes a fully idle sandbox-wide heartbeat', async () => {
+    await expect(summarizeHeartbeatIdle(idleHeartbeat)).resolves.toEqual({
+      sessionCount: 1,
+      sessionIdsHash: expect.any(String),
+    });
   });
 });

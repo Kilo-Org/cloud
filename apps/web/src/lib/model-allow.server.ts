@@ -1,5 +1,5 @@
 import 'server-only';
-import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/models';
+import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/kilo-exclusive-models';
 import {
   CUSTOM_LLM_PREFIX,
   KILO_AUTO_MODEL_PREFIX,

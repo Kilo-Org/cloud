@@ -8,8 +8,14 @@
  */
 
 import {
+  isEligibleGlanceableWork,
+  isStartableGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
   type GlanceableLiveActivityContentState,
   type PushData,
+  agentNotificationKindForGlanceableSnapshot,
+  androidChannelIdForAgentKind,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -31,17 +37,33 @@ export type GlanceableApnsContentState = {
   props: string;
 };
 
-export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push_to_start' };
+export type IosActivityToken = {
+  token: string;
+  kind: 'ios_activity' | 'ios_push_to_start';
+  /**
+   * True when a newer registration replaced this row. A superseded row is not
+   * the live target, so it gets `end` and is retired once that end is confirmed.
+   * Optional so literals written before the singleton rule keep compiling.
+   */
+  superseded?: boolean;
+};
 export type ExpoPushToken = { token: string; locale: string | null };
 
 /**
- * Update eligible activities or end zero-count activities. Never start empty work.
- * A push-to-start token is used only when no activity target remains, avoiding
- * duplicate activities while allowing fresh work after terminal target retirement.
+ * Update the single live activity target or end zero-count activities. Never
+ * start empty work. A push-to-start token is used only when no activity target
+ * remains, avoiding duplicate activities while allowing fresh work after
+ * terminal target retirement.
  *
- * `startable` is the narrower rule the iOS sink starts on: an agent working or
- * waiting on the user. Idle work keeps a card alive but must never raise one,
- * or a push-to-start resurrects the card the sink just retired for idleness.
+ * `tokens` arrives newest-first (`updated_at DESC, id DESC`), so the first
+ * `ios_activity` row that is not superseded is the one live card target. Every
+ * other activity row is an abandoned card: it gets `end` and its row is retired
+ * once that end is confirmed, so two rows can never leave two stacked cards.
+ *
+ * `startable` is the narrower rule the iOS sink starts on: an agent working,
+ * waiting on the user, or scheduled to wake. Idle work keeps a card alive but
+ * must never raise one, or a push-to-start resurrects the card the sink just
+ * retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
@@ -50,7 +72,13 @@ export function apnsSendsForTokens(
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
-    return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
+    // The first non-superseded row is the live target; `-1` (every row
+    // superseded) ends them all and lets the next pass raise fresh work.
+    const survivor = activityTokens.findIndex(token => token.superseded !== true);
+    return activityTokens.map(({ token }, index) => ({
+      token,
+      event: index === survivor && eligible ? 'update' : 'end',
+    }));
   }
   return startable
     ? tokens
@@ -66,8 +94,11 @@ export function toGlanceableContentState(
     status: snapshot.status,
     running: snapshot.running,
     needsInput: snapshot.needsInput,
+    needsApproval: snapshot.needsApproval ?? 0,
     idle: snapshot.idle,
     needsInputSince: snapshot.needsInputSince,
+    scheduled: snapshot.scheduled,
+    scheduledAt: snapshot.scheduledAt,
   };
   return {
     name: ACTIVE_AGENTS_LIVE_ACTIVITY_NAME,
@@ -77,8 +108,10 @@ export function toGlanceableContentState(
 
 export function buildGlanceableExpoMessages(
   tokens: readonly ExpoPushToken[],
-  snapshot: ActiveAgentsGlanceable
+  snapshot: ActiveAgentsGlanceable,
+  priority: 'default' | 'high'
 ): ExpoPushMessage[] {
+  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
   return tokens.map(
     ({ token }) =>
       ({
@@ -91,8 +124,16 @@ export function buildGlanceableExpoMessages(
         // `applyGlanceablePushData` path, so the push never rings or interrupts.
         _contentAvailable: true,
         sound: null,
-        priority: 'default',
-        channelId: 'active-agents',
+        // FCM defers normal-priority data messages while Android is
+        // backgrounded/Doze, so the Android wake must be `high` to reach the
+        // ongoing notification and widget without waiting for the app to open.
+        // iOS stays `default`: APNs background `content-available` pushes use
+        // priority 5, and Live Activity freshness rides the direct APNs path.
+        priority,
+        // The wake names the kind's channel because the ongoing card is posted
+        // locally on that same channel; the legacy `active-agents` id is deleted
+        // on startup and no client creates it, so posting to it would be dropped.
+        channelId: androidChannelIdForAgentKind(kind),
         // Android collapse key = the opaque scope key, so every aggregate update
         // for one user+org collapses into the same ongoing notification.
         tag: snapshot.scopeKey,
@@ -163,12 +204,8 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
-  const iosSends = apnsSendsForTokens(
-    iosTokens,
-    eligible,
-    snapshot.running + snapshot.needsInput > 0
-  );
+  const eligible = isEligibleGlanceableWork(snapshot);
+  const iosSends = apnsSendsForTokens(iosTokens, eligible, isStartableGlanceableWork(snapshot));
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,
@@ -194,14 +231,20 @@ export async function deliverGlanceableSnapshot(
   // timeline through the background task while the app is not foregrounded.
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
-    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);
+    await deps.sendExpoPush(
+      buildGlanceableExpoMessages(iosExpoTokens, snapshot, 'default'),
+      deps.isCurrent
+    );
   }
 
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
     if (deps.isCurrent && !(await deps.isCurrent())) return;
     if (expoTokens.length > 0) {
-      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot), deps.isCurrent);
+      await deps.sendExpoPush(
+        buildGlanceableExpoMessages(expoTokens, snapshot, 'high'),
+        deps.isCurrent
+      );
     }
   }
 }

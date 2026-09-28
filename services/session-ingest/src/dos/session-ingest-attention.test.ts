@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
   extractTextFromPartItemData,
@@ -132,5 +133,21 @@ describe('isNeedsInputStatus', () => {
   it('returns false for null and undefined', () => {
     expect(isNeedsInputStatus(null)).toBe(false);
     expect(isNeedsInputStatus(undefined)).toBe(false);
+  });
+});
+
+describe('attentionKindForNeedsInputStatus', () => {
+  it('maps a question status to the question kind', () => {
+    expect(attentionKindForNeedsInputStatus('question')).toBe('question');
+  });
+
+  it('maps a permission status to the permission kind', () => {
+    expect(attentionKindForNeedsInputStatus('permission')).toBe('permission');
+  });
+
+  it('falls back to permission for an unrecognized status', () => {
+    expect(attentionKindForNeedsInputStatus('busy')).toBe('permission');
+    expect(attentionKindForNeedsInputStatus(null)).toBe('permission');
+    expect(attentionKindForNeedsInputStatus(undefined)).toBe('permission');
   });
 });

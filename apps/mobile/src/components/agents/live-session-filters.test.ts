@@ -28,6 +28,12 @@ const VSCODE = {
   associatedPr: { number: 42, title: 'Harden live search' },
 };
 const BARE = { id: 'bare', title: '', gitUrl: null, createdOnPlatform: 'unknown' };
+const PLACEHOLDER = {
+  id: 'placeholder',
+  title: 'New session - 2026-09-21T15:44:47.176Z',
+  gitUrl: null,
+  createdOnPlatform: 'cli',
+};
 
 describe('liveSessionPlatformBucket', () => {
   it('folds platform variants into the filter bucket', () => {
@@ -50,6 +56,27 @@ describe('buildLiveFilterOptions', () => {
     expect(projectOptions).toEqual([
       { gitUrl: 'git@github.com:kilo/app.git', displayName: 'kilo/app' },
       { gitUrl: 'https://github.com/kilo/cloud.git', displayName: 'kilo/cloud' },
+    ]);
+  });
+
+  it('merges repositories that render to one label into a single option', () => {
+    const ssh = {
+      id: 'ssh',
+      title: 'ssh clone',
+      gitUrl: 'git@github.com:kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const https = {
+      id: 'https',
+      title: 'https clone',
+      gitUrl: 'https://github.com/kilo/cloud.git',
+      createdOnPlatform: 'cli',
+    };
+    const { projectOptions } = buildLiveFilterOptions([ssh, https]);
+
+    // First-seen git URL wins, so the option stays stable across renders.
+    expect(projectOptions).toEqual([
+      { gitUrl: 'git@github.com:kilo/cloud.git', displayName: 'kilo/cloud' },
     ]);
   });
 
@@ -98,6 +125,35 @@ describe('filterLiveSessions', () => {
     ).toEqual(['vscode']);
   });
 
+  it('matches a persisted variant selection as the bucket row the sheet checks', () => {
+    // A legacy record can hold `cloud-agent-web`; the badge and the sheet
+    // collapse it to the single `cloud-agent` row, so the list must too.
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['cloud-agent-web'] })).map(s => s.id)
+    ).toEqual(['cloud']);
+    expect(
+      filterLiveSessions(sessions, query({ platformFilter: ['agent-manager'] })).map(s => s.id)
+    ).toEqual(['vscode']);
+  });
+
+  it('matches every alias of a merged repository from one stored URL', () => {
+    const aliases = [
+      { id: 'ssh', gitUrl: 'git@github.com:kilo/cloud.git', createdOnPlatform: 'cli' },
+      { id: 'https', gitUrl: 'https://github.com/kilo/cloud.git', createdOnPlatform: 'cli' },
+    ];
+    expect(
+      filterLiveSessions(
+        aliases,
+        query({ projectFilter: ['https://github.com/kilo/cloud.git'] })
+      ).map(s => s.id)
+    ).toEqual(['ssh', 'https']);
+    expect(
+      filterLiveSessions(aliases, query({ projectFilter: ['git@github.com:kilo/cloud.git'] })).map(
+        s => s.id
+      )
+    ).toEqual(['ssh', 'https']);
+  });
+
   it('combines every dimension with AND', () => {
     expect(
       filterLiveSessions(
@@ -143,5 +199,23 @@ describe('filterLiveSessions', () => {
     expect(
       filterLiveSessions([BARE], query({ projectFilter: ['https://github.com/kilo/cloud.git'] }))
     ).toHaveLength(0);
+  });
+
+  it('does not index the raw creation-default title', () => {
+    // The row paints the generic "Untitled session" label for this title (or
+    // whatever the platform default is), so searching for the placeholder's
+    // ISO timestamp must never surface the row.
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: '2026-09-21' }))
+    ).toHaveLength(0);
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'new session' }))
+    ).toHaveLength(0);
+  });
+
+  it('still indexes the resolved title of a real session alongside a placeholder row', () => {
+    expect(
+      filterLiveSessions([PLACEHOLDER, CLOUD], query({ searchQuery: 'LOGIN REDI' })).map(s => s.id)
+    ).toEqual(['cloud']);
   });
 });

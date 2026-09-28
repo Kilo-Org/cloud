@@ -1,7 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native provider without a device. */
 /* eslint-disable max-lines -- real connection lifetime cases share the socket and credential fixture. */
 import { createElement, StrictMode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type UserWebConnection } from '@kilocode/cloud-agent-sdk/user-web-connection';
 

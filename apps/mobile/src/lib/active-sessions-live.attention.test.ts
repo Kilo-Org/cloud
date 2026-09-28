@@ -84,23 +84,46 @@ describe('sticky attention on snapshot / heartbeat merge', () => {
 describe('applySessionStatusUpdated', () => {
   it('applies a transition out of attention', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    expect(applySessionStatusUpdated(current, 'a', 'idle')[0]?.status).toBe('idle');
+    expect(applySessionStatusUpdated(current, { sessionId: 'a', status: 'idle' })[0]?.status).toBe(
+      'idle'
+    );
   });
 
   it('applies a transition into attention', () => {
     const current = [makeCached({ id: 'a', status: 'busy' })];
-    expect(applySessionStatusUpdated(current, 'a', 'permission')[0]?.status).toBe('permission');
+    expect(
+      applySessionStatusUpdated(current, { sessionId: 'a', status: 'permission' })[0]?.status
+    ).toBe('permission');
   });
 
   it('ignores unknown session ids', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    const result = applySessionStatusUpdated(current, 'other', 'idle');
+    const result = applySessionStatusUpdated(current, { sessionId: 'other', status: 'idle' });
     expect(result).toEqual(current);
     expect(result[0]?.status).toBe('question');
   });
 
   it('accepts an empty status string to clear attention', () => {
     const current = [makeCached({ id: 'a', status: 'question' })];
-    expect(applySessionStatusUpdated(current, 'a', '')[0]?.status).toBe('');
+    expect(applySessionStatusUpdated(current, { sessionId: 'a', status: '' })[0]?.status).toBe('');
+  });
+
+  it('sets a scheduled wake time and clears it when the session leaves scheduled', () => {
+    const current = [makeCached({ id: 'a', status: 'idle' })];
+    const scheduled = applySessionStatusUpdated(current, {
+      sessionId: 'a',
+      status: 'scheduled',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    expect(scheduled[0]?.status).toBe('scheduled');
+    expect(scheduled[0]?.scheduledAt).toBe('2026-09-24T09:00:00.000Z');
+
+    const noTime = applySessionStatusUpdated(scheduled, { sessionId: 'a', status: 'scheduled' });
+    expect(noTime[0]?.status).toBe('scheduled');
+    expect(noTime[0]?.scheduledAt).toBeUndefined();
+
+    const busy = applySessionStatusUpdated(scheduled, { sessionId: 'a', status: 'busy' });
+    expect(busy[0]?.status).toBe('busy');
+    expect(busy[0]?.scheduledAt).toBeUndefined();
   });
 });

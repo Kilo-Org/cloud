@@ -1,0 +1,182 @@
+diff --git a/android/src/debug/java/expo/modules/devlauncher/compose/ui/AppHeader.kt b/android/src/debug/java/expo/modules/devlauncher/compose/ui/AppHeader.kt
+index e1b597d..bafec6c 100644
+--- a/android/src/debug/java/expo/modules/devlauncher/compose/ui/AppHeader.kt
++++ b/android/src/debug/java/expo/modules/devlauncher/compose/ui/AppHeader.kt
+@@ -7,10 +7,19 @@ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.text.BasicText
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.text.AnnotatedString
+ import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.rememberTextMeasurer
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.tooling.preview.Preview
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+@@ -67,6 +76,7 @@ fun AppHeader(
+   currentAccount: MeQuery.Account? = null,
+   onProfileClick: () -> Unit = {}
+ ) {
++  var headerWidthPx by remember { mutableStateOf(0) }
+   Row(
+     horizontalArrangement = Arrangement.spacedBy(NewAppTheme.spacing.`3`),
+     verticalAlignment = Alignment.CenterVertically,
+@@ -76,13 +86,42 @@ fun AppHeader(
+ 
+     Column(
+       verticalArrangement = Arrangement.spacedBy(NewAppTheme.spacing.`1`),
+-      modifier = Modifier.weight(1f)
++      // The copy column's laid-out width. Not BoxWithConstraints: an intrinsic
++      // measurement of a SubcomposeLayout throws "Asking for intrinsic
++      // measurements of SubcomposeLayout layouts is not supported" and takes
++      // the launcher down (e1 round, 2026-09-21).
++      modifier = Modifier
++        .weight(1f)
++        .onSizeChanged { headerWidthPx = it.width }
+     ) {
+-      NewText(
+-        appName,
+-        style = NewAppTheme.font.lg.merge(
+-          fontWeight = FontWeight.SemiBold
++      // One line, shrunk to fit: in a narrow window the header column is too
++      // small for the app name at its normal size and Compose broke it one
++      // character per line ("K/i/l/o"). Ellipsize only below the 0.75 floor.
++      val headerStyle = NewAppTheme.font.md.merge(
++        color = NewAppTheme.colors.text.default,
++        fontFamily = NewAppTheme.font.inter,
++        fontWeight = FontWeight.Normal
++      ).merge(
++        NewAppTheme.font.lg.merge(fontWeight = FontWeight.SemiBold)
++      )
++      val textMeasurer = rememberTextMeasurer()
++      val measuredWidthPx = remember(appName, headerStyle) {
++        textMeasurer.measure(AnnotatedString(appName), headerStyle, maxLines = 1).size.width
++      }
++      val factor = if (headerWidthPx > 0 && measuredWidthPx > headerWidthPx) {
++        maxOf(
++          0.75f,
++          headerWidthPx.toFloat() / measuredWidthPx.toFloat()
+         )
++      } else {
++        1f
++      }
++      BasicText(
++        appName,
++        maxLines = 1,
++        softWrap = false,
++        overflow = TextOverflow.Ellipsis,
++        style = headerStyle.copy(fontSize = headerStyle.fontSize * factor)
+       )
+ 
+       NewText(
+diff --git a/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt b/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt
+index 232bdcf..f5b77e8 100644
+--- a/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt
++++ b/android/src/debug/java/expo/modules/devlauncher/compose/ui/BottomTabButton.kt
+@@ -6,16 +6,28 @@ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.BasicText
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.text.AnnotatedString
+ import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.rememberTextMeasurer
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
+ import expo.modules.devmenu.compose.newtheme.NewAppTheme
+-import expo.modules.devmenu.compose.primitives.NewText
++
++/** Floor for a label's shrink-to-fit: 8 sp (the sm style is 12 sp), the scale
++ * where the widest stock label, 'Updates', still fits the 32 dp tab. */
++private const val LABEL_MIN_FONT_SCALE = 0.667f
+ 
+ @Composable
+ fun BottomTabButton(
+@@ -25,10 +37,17 @@ fun BottomTabButton(
+   modifier: Modifier = Modifier,
+   onClick: () -> Unit
+ ) {
++  var tabWidthPx by remember { mutableStateOf(0) }
+   Column(
+     horizontalAlignment = Alignment.CenterHorizontally,
+     verticalArrangement = Arrangement.spacedBy(NewAppTheme.spacing.`1`),
+     modifier = modifier
++      // The tab's laid-out width. Not BoxWithConstraints: BottomTabBar measures
++      // its row with IntrinsicSize.Max, and an intrinsic measurement of a
++      // SubcomposeLayout throws "Asking for intrinsic measurements of
++      // SubcomposeLayout layouts is not supported", taking the launcher down
++      // (e1 round, 2026-09-21).
++      .onSizeChanged { tabWidthPx = it.width }
+       .clip(
+         RoundedCornerShape(NewAppTheme.borderRadius.md)
+       )
+@@ -53,16 +72,40 @@ fun BottomTabButton(
+       }
+     )
+ 
+-    NewText(
++    // Keep the tab label to one line: in a narrow window the tab is too small
++    // for the label at its normal size, and Compose then broke it mid-word
++    // into a second line the pill clipped ("Upda tes", "Settin gs"). Shrink
++    // the label to fit instead, and ellipsize only below the 8 sp floor.
++    val labelColor = if (isSelected) {
++      NewAppTheme.colors.icon.info
++    } else {
++      NewAppTheme.colors.icon.quaternary
++    }
++    val labelStyle = NewAppTheme.font.md.merge(
++      color = labelColor,
++      fontFamily = NewAppTheme.font.inter,
++      fontWeight = FontWeight.Normal
++    ).merge(
++      NewAppTheme.font.sm.merge(fontWeight = FontWeight.Medium)
++    )
++    val textMeasurer = rememberTextMeasurer()
++    val measuredWidthPx = remember(label, labelStyle) {
++      textMeasurer.measure(AnnotatedString(label), labelStyle, maxLines = 1).size.width
++    }
++    val factor = if (tabWidthPx > 0 && measuredWidthPx > tabWidthPx) {
++      maxOf(
++        LABEL_MIN_FONT_SCALE,
++        tabWidthPx.toFloat() / measuredWidthPx.toFloat()
++      )
++    } else {
++      1f
++    }
++    BasicText(
+       label,
+-      style = NewAppTheme.font.sm.merge(
+-        fontWeight = FontWeight.Medium
+-      ),
+-      color = if (isSelected) {
+-        NewAppTheme.colors.icon.info
+-      } else {
+-        NewAppTheme.colors.icon.quaternary
+-      }
++      maxLines = 1,
++      softWrap = false,
++      overflow = TextOverflow.Ellipsis,
++      style = labelStyle.copy(fontSize = labelStyle.fontSize * factor)
+     )
+   }
+ }

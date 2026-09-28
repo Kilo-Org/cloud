@@ -427,7 +427,8 @@ function createDeletionProviderMockState(): {
       json(res, 202, {
         id: 'deletion-mock',
         persons_found: matched.length,
-        persons_deleted: matched.length,
+        persons_deleted: 0,
+        persons_queued_for_deletion: matched.length,
         events_queued_for_deletion: true,
         recordings_queued_for_deletion: true,
         deletion_errors: [],

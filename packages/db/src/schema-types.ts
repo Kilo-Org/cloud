@@ -939,18 +939,6 @@ export const ContributorChampionTier = {
 export type ContributorChampionTier =
   (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
 
-// --- Repository customization enums ---
-
-// Per-repository override of automatic PR review dispatch. Manual/@mention
-// review triggers are a separate, later change; for now this only gates
-// automatic reviews on `pull_request` webhook events.
-export const RepositoryReviewMode = {
-  On: 'on',
-  Off: 'off',
-} as const;
-
-export type RepositoryReviewMode = (typeof RepositoryReviewMode)[keyof typeof RepositoryReviewMode];
-
 // =============================================================================
 // B. Type-Only Definitions (used in $type<T>())
 // =============================================================================
@@ -1248,11 +1236,13 @@ export type AuthProviderId =
   | 'apple'
   | 'email'
   | 'google'
+  | 'passkey'
   | 'anaconda'
   | 'github'
   | 'gitlab'
   | 'linkedin'
   | 'discord'
+  | 'openai'
   | 'fake-login'
   | 'workos';
 
@@ -1276,6 +1266,7 @@ export const GatewayApiKindSchema = z.enum([
   'messages',
   'responses',
   'audio_transcriptions',
+  'systemone',
 ]);
 
 export type GatewayApiKind = z.infer<typeof GatewayApiKindSchema>;
@@ -2199,8 +2190,9 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
 export const CustomLlmApiConfigSchema = z.object({
-  internal_id: z.string().min(1),
+  internal_id: z.string().min(1).optional(),
   base_url: z.url(),
+  disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
   sanitize_ref_fields: z.boolean().optional(),
   extra_headers: CustomLlmExtraHeadersSchema.optional(),
@@ -2266,6 +2258,12 @@ export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
   type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  alias_target: z
+    .object({
+      slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
   reasoning: z
     .object({
       mandatory: z.boolean(),
@@ -2365,6 +2363,14 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_rate_limited_byok',
   'assistant_rate_limited_managed',
   'assistant_unavailable',
+  // `assistant_unavailable` collapsed two different gateway outcomes under one
+  // label: a real upstream provider connection failure, and the gateway's own
+  // `temporarily_unavailable` (our over-limit guard or our managed-provider
+  // payment failure). The gateway tags the origin in `error_type` on the
+  // response body; cloud-agent-next now maps it to a distinct reason so the
+  // admin split reflects which component actually failed.
+  'assistant_provider_disconnect',
+  'assistant_gateway_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',

@@ -54,17 +54,17 @@ type CopyState = {
   displayName: string;
   internalId: string;
   validationError: {
-    field: 'publicId' | 'displayName' | 'internalId' | null;
+    field: 'publicId' | 'displayName' | null;
     message: string;
   } | null;
 };
 
 const INITIAL_DEFINITION: CustomLlmDefinition = {
-  internal_id: '',
   display_name: '',
   context_length: 0,
   max_completion_tokens: 0,
   base_url: '',
+  disable_url_suffix: false,
   organization_ids: [],
   group_ids: [],
 };
@@ -118,12 +118,12 @@ export function CustomLlmsContent() {
   }, []);
 
   const openCopy = useCallback(
-    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string) => {
+    (sourcePublicId: string, sourceDisplayName: string, sourceInternalId: string | undefined) => {
       setCopy({
         sourcePublicId,
         publicId: sourcePublicId,
         displayName: sourceDisplayName,
-        internalId: sourceInternalId,
+        internalId: sourceInternalId ?? '',
         validationError: null,
       });
     },
@@ -180,24 +180,12 @@ export function CustomLlmsContent() {
       return;
     }
 
-    if (!internalId) {
-      setCopy(prev =>
-        prev
-          ? {
-              ...prev,
-              validationError: { field: 'internalId', message: 'New internal ID is required' },
-            }
-          : prev
-      );
-      return;
-    }
-
     try {
       await copyMutation.mutateAsync({
         source_public_id: copy.sourcePublicId,
         public_id: publicId,
         display_name: displayName,
-        internal_id: internalId,
+        internal_id: internalId || undefined,
       });
       toast.success('Custom LLM copied');
       closeCopy();
@@ -339,7 +327,9 @@ export function CustomLlmsContent() {
               <TableRow key={item.public_id}>
                 <TableCell className="font-mono text-sm">{item.public_id}</TableCell>
                 <TableCell>{item.definition.display_name}</TableCell>
-                <TableCell className="font-mono text-sm">{item.definition.internal_id}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {item.definition.internal_id ?? 'Not set'}
+                </TableCell>
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-2">
                     <Button
@@ -485,9 +475,17 @@ export function CustomLlmsContent() {
                     automaticLayout: true,
                     tabSize: 2,
                     formatOnPaste: true,
+                    ariaLabel: 'Custom LLM definition JSON',
                   }}
                 />
               </div>
+              <p className="text-muted-foreground mt-1 text-xs">
+                Set <code>disable_url_suffix</code> to <code>true</code> to use{' '}
+                <code>base_url</code> exactly, without suffixes such as <code>/messages</code>. Add{' '}
+                <code>&quot;internal_id&quot;: &quot;provider-model&quot;</code> to send an upstream{' '}
+                <code>model</code>; omit <code>internal_id</code> to remove <code>model</code> from
+                the outbound request body.
+              </p>
             </div>
 
             {editor.validationError && (
@@ -567,7 +565,7 @@ export function CustomLlmsContent() {
             </div>
 
             <div>
-              <Label htmlFor="copy-internal-id">New Internal ID</Label>
+              <Label htmlFor="copy-internal-id">New Internal ID (optional)</Label>
               <Input
                 id="copy-internal-id"
                 value={copy?.internalId ?? ''}
@@ -578,13 +576,12 @@ export function CustomLlmsContent() {
                 }
                 placeholder="e.g. copied-model"
                 className="font-mono"
-                aria-invalid={copy?.validationError?.field === 'internalId'}
-                aria-describedby={
-                  copy?.validationError?.field === 'internalId'
-                    ? 'copy-validation-error'
-                    : undefined
-                }
+                aria-describedby="copy-internal-id-help"
               />
+              <p id="copy-internal-id-help" className="text-muted-foreground mt-1 text-xs">
+                Leave blank to omit <code>model</code> from the outbound request body instead of
+                keeping the source internal ID.
+              </p>
             </div>
 
             {copy?.validationError && (

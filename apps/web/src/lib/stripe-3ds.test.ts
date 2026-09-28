@@ -19,6 +19,8 @@ jest.mock('@/lib/kilo-pass-org/stripe-adapter', () => ({
   handleOrganizationKiloPassInvoicePaid: jest.fn().mockResolvedValue(true),
   handleOrganizationKiloPassPaymentAdverseForInvoice: jest.fn(),
   handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
+  stagePreparedOrganizationKiloPassServiceFeeItem: jest.fn().mockResolvedValue(null),
+  discardStagedOrganizationKiloPassServiceFeeItem: jest.fn().mockResolvedValue(undefined),
 }));
 
 // Mock organization-seats to avoid DB calls
@@ -246,10 +248,13 @@ describe('handleUpdateSeatCount with 3DS', () => {
       expect.objectContaining({ success: true })
     );
 
-    expect(mockHandleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith({
-      invoice: paidInvoice,
-      paidSeatCount: 10,
-    });
+    expect(mockHandleOrganizationKiloPassInvoicePaid).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invoice: paidInvoice,
+        paidSeatCount: 10,
+        serviceFee: expect.any(Object),
+      })
+    );
   });
 
   it('does not eagerly reconcile an organization Kilo Pass seat decrease', async () => {

@@ -70,6 +70,49 @@ export function normalizeMissingPartText(part: Part): Part {
 }
 
 /**
+ * Settle time a stored tool part carries into the lifecycle merge. Snapshot,
+ * history and cached-transcript replays deliver bare parts with no wire event
+ * time, so a settled tool state is ordered by the `time.end` it stamped when it
+ * settled. An unsettled part carries no ordering evidence.
+ *
+ * `state.time` is read defensively: ingest-frame compaction persists a part
+ * with only `state.status` (`services/cloud-agent-next/src/shared/ingest-frame.ts`
+ * `compactMessagePart`), so a replayed terminal can arrive with no time at all.
+ * It then carries no ordering evidence rather than throwing.
+ */
+export function partSettledAt(part: Part): number | undefined {
+  if (part.type !== 'tool') return undefined;
+  const state = part.state;
+  if (state.status === 'completed' || state.status === 'error') {
+    return state.time?.end;
+  }
+  return undefined;
+}
+
+/**
+ * The generated `Part` types declare `files: Array<string>` on patch parts, but
+ * the wire can omit the field (the per-event schemas are `.passthrough()`), and
+ * a files-less part stored verbatim crashes every mobile reader
+ * (`part.files.length` — Sentry KILO-APP-BZ). Normalize once at the
+ * chat-processor seam — the single funnel every part write goes through — so
+ * all downstream readers see an array. A missing list and an empty one mean the
+ * same thing to a reader: the standalone patch part carries only file paths, so
+ * there is nothing to draw.
+ *
+ * Identity-preserving: when nothing needs fixing the SAME object is returned
+ * so memoized stored messages keep their reference.
+ */
+export function normalizeMissingPatchFiles(part: Part): Part {
+  if (part.type !== 'patch') {
+    return part;
+  }
+  if (Array.isArray(part.files)) {
+    return part;
+  }
+  return { ...part, files: [] };
+}
+
+/**
  * The concrete routed model stamped by the CLI onto step-finish parts for
  * kilo-auto turns (`{ providerID, modelID }`). Preserved at runtime on both
  * the live-stream path (`messagePartUpdatedDataSchema` uses `.passthrough()`)

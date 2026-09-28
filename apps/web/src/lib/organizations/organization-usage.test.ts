@@ -126,7 +126,6 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createOrganization('Test Org', user.id);
 
-      // Organization starts with 0 balance by default
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
 
       expect(result.balance).toBe(0);
@@ -148,14 +147,11 @@ describe('Organization Usage Functions', () => {
 
       await addUserToOrganization(organization.id, member.id, 'member');
 
-      // Verify member can see balance
       let result = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(result.balance).toBe(0.03); // 30000 microdollars = 0.03 USD
 
-      // Remove member
       await removeUserFromOrganization(organization.id, member.id);
 
-      // Verify member can no longer see balance
       result = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(result.balance).toBe(0);
     });
@@ -181,7 +177,6 @@ describe('Organization Usage Functions', () => {
       const usage = await createOrganizationUsage(5000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Verify balance was reduced
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.045); // 45000 microdollars = 0.045 USD (50000 - 5000)
     });
@@ -193,7 +188,6 @@ describe('Organization Usage Functions', () => {
       const usage = await createOrganizationUsage(0, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Verify balance unchanged
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.04); // 40000 microdollars = 0.04 USD (unchanged)
     });
@@ -412,7 +406,6 @@ describe('Organization Usage Functions', () => {
       const usage = await createOrganizationUsage(500000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Verify balance was reduced by large amount
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.5); // 500000 microdollars = 0.5 USD (1000000 - 500000)
     });
@@ -424,7 +417,6 @@ describe('Organization Usage Functions', () => {
       const usage = await createOrganizationUsage(10000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Verify balance went negative
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(-0.005); // -5000 microdollars = -0.005 USD (5000 - 10000)
     });
@@ -440,7 +432,6 @@ describe('Organization Usage Functions', () => {
       await ingestOrganizationTokenUsage(usage2Record);
       await ingestOrganizationTokenUsage(usage3Record);
 
-      // Verify cumulative deduction
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
       expect(result.balance).toBe(0.07); // 70000 microdollars = 0.07 USD (100000 - 10000 - 15000 - 5000)
     });
@@ -461,7 +452,6 @@ describe('Organization Usage Functions', () => {
       const member2UsageRecord = await createOrganizationUsage(8000, member2.id, organization.id);
       await ingestOrganizationTokenUsage(member2UsageRecord);
 
-      // Verify total deduction from all members
       const result = await getBalanceForOrganizationUser(organization.id, owner.id);
       expect(result.balance).toBe(0.05); // 50000 microdollars = 0.05 USD (80000 - 10000 - 12000 - 8000)
     });
@@ -471,15 +461,12 @@ describe('Organization Usage Functions', () => {
       const org1 = await createTestOrganization('Org 1', user.id, 50000);
       const org2 = await createTestOrganization('Org 2', user.id, 60000);
 
-      // Ingest usage for org1 only
       const usage = await createOrganizationUsage(10000, user.id, org1.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Verify org1 balance was reduced
       const result1 = await getBalanceForOrganizationUser(org1.id, user.id);
       expect(result1.balance).toBe(0.04); // 40000 microdollars = 0.04 USD (50000 - 10000)
 
-      // Verify org2 balance was unchanged
       const result2 = await getBalanceForOrganizationUser(org2.id, user.id);
       expect(result2.balance).toBe(0.06); // 60000 microdollars = 0.06 USD (unchanged)
     });
@@ -488,7 +475,6 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const nonExistentOrgId = '00000000-0000-0000-0000-000000000000';
 
-      // Should complete without error even for non-existent organization (new behavior)
       const usage = await createOrganizationUsage(5000, user.id, nonExistentOrgId);
       await ingestOrganizationTokenUsage(usage);
     });
@@ -497,7 +483,6 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 30000);
 
-      // Get initial updated_at
       const [orgBefore] = await db
         .select({ updated_at: organizations.updated_at })
         .from(organizations)
@@ -509,13 +494,11 @@ describe('Organization Usage Functions', () => {
       const usage = await createOrganizationUsage(5000, user.id, organization.id);
       await ingestOrganizationTokenUsage(usage);
 
-      // Get updated updated_at
       const [orgAfter] = await db
         .select({ updated_at: organizations.updated_at })
         .from(organizations)
         .where(eq(organizations.id, organization.id));
 
-      // Verify timestamp was updated
       expect(new Date(orgAfter.updated_at).getTime()).toBeGreaterThan(
         new Date(orgBefore.updated_at).getTime()
       );
@@ -530,7 +513,6 @@ describe('Organization Usage Functions', () => {
         initialBalance
       );
 
-      // Create 20 small usage records
       const costPerUsage = 5000; // 5k microdollars each
       const numberOfUsages = 20;
       const expectedTotalCost = costPerUsage * numberOfUsages; // 100k total
@@ -540,10 +522,8 @@ describe('Organization Usage Functions', () => {
         return ingestOrganizationTokenUsage(usage);
       });
 
-      // Execute all usage ingestions concurrently
       await Promise.all(usagePromises);
 
-      // Verify that all usages were properly accounted for
       const finalBalance = await getBalanceForOrganizationUser(organization.id, user.id);
       const expectedFinalBalance = initialBalance - expectedTotalCost;
 
@@ -560,38 +540,31 @@ describe('Organization Usage Functions', () => {
 
       await addUserToOrganization(organization.id, member.id, 'member');
 
-      // Verify initial balance
       let ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
       let memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(ownerBalance.balance).toBe(0.1); // 100000 microdollars = 0.1 USD
       expect(memberBalance.balance).toBe(0.1); // Same organization balance
 
-      // Owner uses tokens
       const ownerUsageRecord = await createOrganizationUsage(20000, owner.id, organization.id);
       await ingestOrganizationTokenUsage(ownerUsageRecord);
 
-      // Verify balance after owner usage
       ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
       memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(ownerBalance.balance).toBe(0.08); // 80000 microdollars = 0.08 USD
       expect(memberBalance.balance).toBe(0.08); // Same organization balance
 
-      // Member uses tokens
       const memberUsageRecord = await createOrganizationUsage(15000, member.id, organization.id);
       await ingestOrganizationTokenUsage(memberUsageRecord);
 
-      // Verify final balance
       ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
       memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(ownerBalance.balance).toBe(0.065); // 65000 microdollars = 0.065 USD (100000 - 20000 - 15000)
       expect(memberBalance.balance).toBe(0.065); // Same organization balance
 
-      // Remove member and verify they can no longer see balance
       await removeUserFromOrganization(organization.id, member.id);
       memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
       expect(memberBalance.balance).toBe(0); // No longer a member
 
-      // Owner should still see the balance
       ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
       expect(ownerBalance.balance).toBe(0.065); // 65000 microdollars = 0.065 USD (Unchanged)
     });
@@ -612,7 +585,6 @@ describe('Organization Usage Functions', () => {
     test('should return remaining allowance when limit exists but no usage recorded', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createTestOrganization('Test Org', user.id, 100000, {}, false);
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
@@ -627,7 +599,6 @@ describe('Organization Usage Functions', () => {
     test('should return remaining allowance when usage is below limit', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
@@ -639,7 +610,6 @@ describe('Organization Usage Functions', () => {
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add some usage below the limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -658,7 +628,6 @@ describe('Organization Usage Functions', () => {
     test('should return zero when usage equals limit', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
@@ -670,7 +639,6 @@ describe('Organization Usage Functions', () => {
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add usage equal to the limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -689,7 +657,6 @@ describe('Organization Usage Functions', () => {
     test('should return negative balance when usage exceeds limit', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
@@ -701,7 +668,6 @@ describe('Organization Usage Functions', () => {
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add usage that exceeds the limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -715,12 +681,77 @@ describe('Organization Usage Functions', () => {
       });
 
       expect(result.balance).toBe(-0.025); // -25000 microdollars = -0.025 USD (50000 - 75000)
+      expect(result.balanceLimitedByUserAllowance).toBe(true);
+    });
+
+    test('marks the block as allowance-limited when the allowance is exhausted even if the org balance is lower', async () => {
+      const user = await insertTestUser();
+
+      const organization = await createOrganization('Test Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          require_seats: false,
+          total_microdollars_acquired: 0,
+          microdollars_used: 5_000_000,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 60000, // $0.06 usage (exceeds limit)
+      });
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id, {
+        limitType: 'daily',
+      });
+
+      // The org balance is the lower bound (-$5), but the member allowance is
+      // also exhausted, so an org top-up cannot clear the member block.
+      expect(result.balance).toBe(-5);
+      expect(result.balanceLimitedByUserAllowance).toBe(true);
+    });
+
+    test('does not mark the block as allowance-limited while the member still has allowance', async () => {
+      const user = await insertTestUser();
+
+      const organization = await createOrganization('Test Org', user.id);
+      await db
+        .update(organizations)
+        .set({
+          require_seats: false,
+          total_microdollars_acquired: 0,
+          microdollars_used: 10_000,
+        })
+        .where(eq(organizations.id, organization.id));
+
+      await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
+
+      await db.insert(organization_user_usage).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        usage_date: sql`CURRENT_DATE`, // Today
+        limit_type: 'daily',
+        microdollar_usage: 10000, // $0.01 usage (allowance remains)
+      });
+
+      const result = await getBalanceForOrganizationUser(organization.id, user.id, {
+        limitType: 'daily',
+      });
+
+      // The org balance is the lower bound, so a top-up can clear the block.
+      expect(result.balance).toBe(-0.01);
+      expect(result.balanceLimitedByUserAllowance).toBe(false);
     });
 
     test("should only check today's usage, not previous days", async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createOrganization('Test Org', user.id);
       await db
         .update(organizations)
@@ -732,7 +763,6 @@ describe('Organization Usage Functions', () => {
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add usage from yesterday that would exceed limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -741,7 +771,6 @@ describe('Organization Usage Functions', () => {
         microdollar_usage: 100000, // $0.10 usage (exceeds limit, but from yesterday)
       });
 
-      // Add small usage for today
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -761,7 +790,6 @@ describe('Organization Usage Functions', () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createOrganization('Test Org', user1.id);
       await db
         .update(organizations)
@@ -773,11 +801,9 @@ describe('Organization Usage Functions', () => {
 
       await addUserToOrganization(organization.id, user2.id, 'member');
 
-      // Set limits for both users
       await updateOrganizationUserLimit(organization.id, user1.id, 0.05); // $0.05 limit
       await updateOrganizationUserLimit(organization.id, user2.id, 0.03); // $0.03 limit
 
-      // Add usage for user1 that exceeds their limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user1.id,
@@ -786,7 +812,6 @@ describe('Organization Usage Functions', () => {
         microdollar_usage: 60000, // $0.06 usage (exceeds user1's limit)
       });
 
-      // Add usage for user2 that's below their limit
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user2.id,
@@ -809,15 +834,12 @@ describe('Organization Usage Functions', () => {
     test('should handle different organizations separately', async () => {
       const user = await insertTestUser();
 
-      // Create organizations with require_seats: false to test limit functionality
       const org1 = await createTestOrganization('Org 1', user.id, 100000, {}, false);
       const org2 = await createTestOrganization('Org 2', user.id, 200000, {}, false);
 
-      // Set limits for both organizations
       await updateOrganizationUserLimit(org1.id, user.id, 0.05); // $0.05 limit
       await updateOrganizationUserLimit(org2.id, user.id, 0.03); // $0.03 limit
 
-      // Add usage for org1 that exceeds limit
       await db.insert(organization_user_usage).values({
         organization_id: org1.id,
         kilo_user_id: user.id,
@@ -826,7 +848,6 @@ describe('Organization Usage Functions', () => {
         microdollar_usage: 60000, // $0.06 usage (exceeds org1's limit)
       });
 
-      // Add usage for org2 that's below limit
       await db.insert(organization_user_usage).values({
         organization_id: org2.id,
         kilo_user_id: user.id,
@@ -845,12 +866,10 @@ describe('Organization Usage Functions', () => {
     test('should handle zero usage correctly', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createTestOrganization('Test Org', user.id, 100000, {}, false);
 
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add zero usage
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -869,19 +888,15 @@ describe('Organization Usage Functions', () => {
     test('should handle zero limit correctly', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createTestOrganization('Test Org', user.id, 100000, {}, false);
 
-      // Set a zero daily limit using the updated function
       await updateOrganizationUserLimit(organization.id, user.id, 0);
 
-      // Verify the limit is set correctly in getOrganizationMembers
       const members = await getOrganizationMembers(organization.id);
       const userMember = members.find(m => m.status === 'active' && m.id === user.id);
       expect(userMember).toBeDefined();
       expect(userMember!.dailyUsageLimitUsd).toBe(0); // Should be exactly 0, not null
 
-      // Add any usage (even 1 microdollar should result in negative balance)
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -901,10 +916,8 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 100000);
 
-      // Set unlimited usage (null limit)
       await updateOrganizationUserLimit(organization.id, user.id, null);
 
-      // Add some usage
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -917,7 +930,6 @@ describe('Organization Usage Functions', () => {
         limitType: 'daily',
       });
 
-      // Should return organization balance since no limit is set
       expect(result.balance).toBe(0.1); // 100000 microdollars = 0.1 USD (organization balance)
     });
 
@@ -925,18 +937,14 @@ describe('Organization Usage Functions', () => {
       const user1 = await insertTestUser();
       const user2 = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createTestOrganization('Test Org', user1.id, 100000, {}, false);
 
       await addUserToOrganization(organization.id, user2.id, 'member');
 
-      // Set zero limit for user1
       await updateOrganizationUserLimit(organization.id, user1.id, 0);
 
-      // Set unlimited (null) for user2
       await updateOrganizationUserLimit(organization.id, user2.id, null);
 
-      // Verify the limits are set correctly in getOrganizationMembers
       const members = await getOrganizationMembers(organization.id);
       const user1Member = members.find(m => m.status === 'active' && m.id === user1.id);
       const user2Member = members.find(m => m.status === 'active' && m.id === user2.id);
@@ -961,22 +969,18 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 0);
 
-      // Try to set a limit above $2000
       await expect(updateOrganizationUserLimit(organization.id, user.id, 2001)).rejects.toThrow(
         'Daily usage limit must be between $0 and $2000'
       );
 
-      // Try to set a negative limit
       await expect(updateOrganizationUserLimit(organization.id, user.id, -1)).rejects.toThrow(
         'Daily usage limit must be between $0 and $2000'
       );
 
-      // Verify that exactly $2000 is allowed
       await expect(
         updateOrganizationUserLimit(organization.id, user.id, 2000)
       ).resolves.not.toThrow();
 
-      // Verify the limit was set correctly
       const members = await getOrganizationMembers(organization.id);
       const userMember = members.find(m => m.status === 'active' && m.id === user.id);
       expect(userMember).toBeDefined();
@@ -1010,14 +1014,12 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 20000); // $0.02
 
-      // Set a daily limit that exceeds the organization balance
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit (exceeds org balance)
 
       const result = await getBalanceForOrganizationUser(organization.id, user.id, {
         limitType: 'daily',
       });
 
-      // Should return organization balance, not the full limit
       expect(result.balance).toBe(0.02); // 20000 microdollars = 0.02 USD (org balance, not 0.05 limit)
     });
 
@@ -1025,10 +1027,8 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, 15000); // $0.015
 
-      // Set a daily limit
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
-      // Add some usage, but remaining allowance still exceeds org balance
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -1042,7 +1042,6 @@ describe('Organization Usage Functions', () => {
       });
 
       // Remaining allowance would be $0.04 (50000 - 10000), but org only has $0.015
-      // Should return organization balance
       expect(result.balance).toBe(0.015); // 15000 microdollars = 0.015 USD (org balance, not 0.04 allowance)
     });
 
@@ -1050,27 +1049,22 @@ describe('Organization Usage Functions', () => {
       const user = await insertTestUser();
       const organization = await createTestOrganization('Test Org', user.id, -10000); // -$0.01
 
-      // Set a daily limit
       await updateOrganizationUserLimit(organization.id, user.id, 0.05); // $0.05 limit
 
       const result = await getBalanceForOrganizationUser(organization.id, user.id, {
         limitType: 'daily',
       });
 
-      // Should return the negative organization balance, not the positive limit
       expect(result.balance).toBe(-0.01); // -10000 microdollars = -0.01 USD
     });
 
     test('should return user allowance when it is less than organization balance', async () => {
       const user = await insertTestUser();
 
-      // Create organization with require_seats: false to test limit functionality
       const organization = await createTestOrganization('Test Org', user.id, 100000, {}, false);
 
-      // Set a small daily limit
       await updateOrganizationUserLimit(organization.id, user.id, 0.02); // $0.02 limit
 
-      // Add some usage
       await db.insert(organization_user_usage).values({
         organization_id: organization.id,
         kilo_user_id: user.id,
@@ -1084,7 +1078,6 @@ describe('Organization Usage Functions', () => {
       });
 
       // Remaining allowance is $0.015 (20000 - 5000), org has $0.10
-      // Should return the smaller remaining allowance
       expect(result.balance).toBe(0.015); // 15000 microdollars = 0.015 USD (allowance < org balance)
     });
   });
@@ -1250,7 +1243,6 @@ describe('microdollars_used tracking', () => {
       initialBalance
     );
 
-    // Create 20 small usage records
     const costPerUsage = 5000; // 5k microdollars each
     const numberOfUsages = 20;
     const expectedTotalUsed = costPerUsage * numberOfUsages; // 100k total
@@ -1260,10 +1252,8 @@ describe('microdollars_used tracking', () => {
       return ingestOrganizationTokenUsage(usage);
     });
 
-    // Execute all usage ingestions concurrently
     await Promise.all(usagePromises);
 
-    // Verify that all usages were properly tracked
     const [org] = await db
       .select({
         total_microdollars_acquired: organizations.total_microdollars_acquired,
@@ -1282,11 +1272,9 @@ describe('microdollars_used tracking', () => {
     const user = await insertTestUser();
     const nonExistentOrgId = '00000000-0000-0000-0000-000000000000';
 
-    // Should complete without error even for non-existent organization
     const usage = await createOrganizationUsage(5000, user.id, nonExistentOrgId);
     await expect(ingestOrganizationTokenUsage(usage)).resolves.not.toThrow();
 
-    // Verify that trying to query the non-existent organization returns nothing
     const nonExistentOrg = await db
       .select()
       .from(organizations)

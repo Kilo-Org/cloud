@@ -9,7 +9,7 @@ export default async function SignInPage({
 }: {
   searchParams: Promise<Record<string, string>>;
 }) {
-  const { params, error } = await getAuthPageProps(searchParams);
+  const { params, error, accountMismatch } = await getAuthPageProps(searchParams);
   const ssoMode = params['sso'] === 'true' || !!params['domain'];
   const isSignUp = params['signup'] === 'true';
 
@@ -31,6 +31,7 @@ export default async function SignInPage({
           }
           ssoMode={ssoMode}
           emailOnly={ssoMode}
+          accountMismatch={accountMismatch}
         />
       </div>
     </AuthPageLayout>

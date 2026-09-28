@@ -1,13 +1,11 @@
 import { type Href } from 'expo-router';
 
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
+import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
 
 export type SessionPrNavigationInput = Readonly<{
-  /** PR HTML URL, e.g. `https://github.com/org/repo/pull/123`. */
+  /** PR/MR HTML URL, e.g. `https://github.com/org/repo/pull/123`. */
   url: string | null | undefined;
-  /** PR number. */
-  number: number;
 }>;
 
 export type SessionPrNavigationResult =
@@ -17,18 +15,21 @@ export type SessionPrNavigationResult =
 /**
  * Decide where tapping a session's PR badge navigates.
  *
- * GitHub PRs open the in-app review screen; everything else opens the browser.
- * The in-app route needs `owner` and `repo`, which only a parseable
- * `github.com` URL carries.
+ * A GitHub pull request, a GitLab merge request (gitlab.com or a
+ * self-managed host) and a Bitbucket pull request all open the in-app
+ * provider review route through the one URL resolver — the badge's own
+ * platform decides the route, so a GitLab MR never lands on a GitHub-shaped
+ * identity. Only a genuinely unparseable URL (GitHub Enterprise, a docs
+ * link, a bare number) falls back to the browser.
  */
 export function resolveSessionPrTapTarget(
   input: SessionPrNavigationInput
 ): SessionPrNavigationResult {
   const url = input.url;
-  const parsed = url ? parseGitHubPrUrl(url) : null;
+  const ref = url ? parseProviderPrUrl(url) : null;
 
-  if (parsed) {
-    return { kind: 'in-app', href: getPrReviewPath(parsed.owner, parsed.repo, input.number) };
+  if (ref) {
+    return { kind: 'in-app', href: providerPrRoutePath(ref) };
   }
   return { kind: 'browser', url: url ?? '' };
 }

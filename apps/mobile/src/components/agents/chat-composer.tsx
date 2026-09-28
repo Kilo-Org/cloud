@@ -5,7 +5,11 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type SlashCommandInfo, type StandaloneSuggestion } from '@kilocode/cloud-agent-sdk';
+import {
+  type SlashCommandCatalogStatus,
+  type SlashCommandInfo,
+  type StandaloneSuggestion,
+} from '@kilocode/cloud-agent-sdk';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import {
@@ -48,7 +52,9 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
+  getSlashCommandCatalogNotice,
   getSlashCommandSuggestions,
+  isGoalCommandDraft,
   parseChatComposerSubmission,
 } from '@/components/agents/chat-composer-slash-commands';
 import { executeChatComposerSubmission } from '@/components/agents/chat-composer-submission';
@@ -100,6 +106,7 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type ModeOption } from '@/components/agents/mode-normalize';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { resolveMessageInputAppStateTransition } from '@/lib/message-input-app-state';
 import { createFrameCoalescer, type FrameCoalescer } from '@/lib/coalesce-frame';
 import { clearDraft as clearStoredDraft, saveDraft } from '@/lib/persist/drafts';
@@ -162,6 +169,15 @@ type ChatComposerProps = {
   ) => Promise<void>;
   onStop?: () => void | Promise<void>;
   disabled?: boolean;
+  /**
+   * Session-level send gate, separate from `disabled`. True while the active
+   * session cannot accept a message (a failed turn, a dropped remote owner, an
+   * unresolved open). It locks sending, the toolbar and the attachment picker
+   * exactly as `disabled` does, but keeps the text input editable, so a failed
+   * turn leaves the reader able to type the next message beside the error's
+   * Retry instead of only Retry.
+   */
+  sendDisabled?: boolean;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -183,6 +199,12 @@ type ChatComposerProps = {
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
   /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
   commands?: SlashCommandInfo[];
+  /**
+   * Bound status the wrapper reported for `commands`. Present when the wrapper
+   * bounded the catalog, so the open slash menu says that rows are missing or
+   * that the catalog is over its size limit instead of looking complete.
+   */
+  commandCatalogStatus?: SlashCommandCatalogStatus | null;
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
   /** Share-gate delivery id; composer takes the payload and clears the route param. */
@@ -222,6 +244,7 @@ export function ChatComposer({
   onExitSession,
   onStop,
   disabled = false,
+  sendDisabled = false,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -237,6 +260,7 @@ export function ChatComposer({
   attachmentsEnabled = true,
   activeSessionType = null,
   commands = [],
+  commandCatalogStatus = null,
   commandState = null,
   shareId,
   autoSend,
@@ -249,6 +273,7 @@ export function ChatComposer({
   controlRef,
 }: Readonly<ChatComposerProps>) {
   const colors = useThemeColors();
+  const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
   const { height: windowHeight, fontScale } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -281,6 +306,17 @@ export function ChatComposer({
   const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
+  // Inline validation feedback for a rejected slash-command submission. A
+  // transient toast (sonner-native) renders outside the accessibility /
+  // automation tree and floats over the composer, so the reader cannot see
+  // the message and a device round cannot assert it. Rendering the rejection
+  // inline keeps it visible above the input row, announced, and out of the
+  // send control's way.
+  const [slashCommandFeedback, setSlashCommandFeedback] = useState<string | null>(null);
+  // True after a bare `/goal` submission: the composer is collecting the goal
+  // objective. Keeps the `/goal ` draft and surfaces the objective hint so the
+  // next step is explicit instead of the send silently doing nothing.
+  const [goalComposeActive, setGoalComposeActive] = useState(false);
   const [inputWidth, setInputWidth] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -367,7 +403,7 @@ export function ChatComposer({
   const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
   const lineHeight = TEXT_INPUT_LINE_HEIGHT * fontScale;
   const inputMinHeight = lineHeight + TEXT_INPUT_VERTICAL_PADDING;
-  const inputMaxHeight = resolveComposerMaxHeight({
+  const rawInputMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
     safeAreaInsetBottom: insets.bottom,
@@ -394,15 +430,26 @@ export function ChatComposer({
     };
   }, []);
 
+  // The row reports the real input's content height (dp, padding included) on
+  // every content change. `useTextHeight` reads the line pitch that input
+  // lays out at from it, so the capped height it publishes lands on a whole
+  // rendered line.
+  const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
   const measure = useTextHeight({
     minHeight: inputMinHeight,
-    maxHeight: inputMaxHeight,
+    maxHeight: rawInputMaxHeight,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
     textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
     fontScale,
+    nativeContentHeight: inputContentHeight,
   });
+  // The cap snapped to the input's own rendered line pitch (see
+  // `useTextHeight`). A capped multiline input must be a whole number of that
+  // pitch: Android's `TextInput` scrolls to the caret by a partial line
+  // otherwise, which cuts the first visible line against the input's top edge.
+  const inputMaxHeight = measure.maxHeight;
   // useTextHeight() returns a new object every render.  Hold the latest
   // measure in a ref so the draft-restore effect only runs after an
   // inputEpoch bump (remount), never on a stray measure identity change.
@@ -457,6 +504,9 @@ export function ChatComposer({
     setHasText(draft.trim().length > 0);
     setCharacterCount(draft.length);
     setSlashCommandInput(getSlashCommandCandidate(draft));
+    if (!isGoalCommandDraft(draft)) {
+      setGoalComposeActive(false);
+    }
     measureRef.current.setText(draft);
   }, []);
 
@@ -515,7 +565,7 @@ export function ChatComposer({
   // `isStreaming` is intentionally NOT a composer gate (see
   // `chat-composer-input-state.ts`); the user must remain able to type and
   // send while the agent runs.
-  const toolbarDisabled = disabled || isSending;
+  const toolbarDisabled = disabled || sendDisabled || isSending;
   const voiceDisabled = toolbarDisabled;
 
   // One place text is written into the live input from an external caller
@@ -532,6 +582,9 @@ export function ChatComposer({
     setHasText(value.trim().length > 0);
     setCharacterCount(value.length);
     setSlashCommandInput(null);
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     inputRef.current?.setNativeProps({
       text: value,
       selection: { start: value.length, end: value.length },
@@ -574,6 +627,15 @@ export function ChatComposer({
 
   function handleChangeText(value: string) {
     textRef.current = value;
+    // Any edit clears a stale slash-command rejection: the reader is fixing
+    // the input the message is about.
+    setSlashCommandFeedback(null);
+    // A draft that is no longer the `/goal` command ends goal compose mode, so
+    // the objective hint never outlives the text it describes. A no-op when the
+    // mode is already off.
+    if (!isGoalCommandDraft(value)) {
+      setGoalComposeActive(false);
+    }
     // Derived state (measure node, hasText, slash command) is coalesced to one
     // publication per frame; the live submit-time ref and the debounced draft
     // write stay synchronous so neither can lag a keystroke.
@@ -666,6 +728,7 @@ export function ChatComposer({
     ).length,
     attachmentMax: AGENT_ATTACHMENT_MAX_FILES,
     disabled,
+    sendDisabled,
     hasText,
     isFocused,
     isSending,
@@ -709,6 +772,10 @@ export function ChatComposer({
   );
   const slashCommandSuggestions =
     slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
+  // The bound notice belongs beside the open slash menu: that is where the
+  // reader expects to see every command, and a dropped row is otherwise
+  // invisible.
+  const slashCommandCatalogNotice = getSlashCommandCatalogNotice(commandCatalogStatus);
 
   // The strip must show share-prefilled files before the session resolves.
   const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
@@ -860,6 +927,7 @@ export function ChatComposer({
     setHasText(false);
     setCharacterCount(0);
     setSlashCommandInput(null);
+    setGoalComposeActive(false);
     measure.reset();
     inputRef.current?.clear();
     // Clear the persisted draft only on successful send / explicit clear,
@@ -878,7 +946,12 @@ export function ChatComposer({
     const sendableAttachmentsCount = upload.attachments.filter(
       attachment => !(attachment.status === 'error' && attachment.terminal === true)
     ).length;
-    if ((trimmed.length === 0 && sendableAttachmentsCount === 0) || disabled || isSending) {
+    if (
+      (trimmed.length === 0 && sendableAttachmentsCount === 0) ||
+      disabled ||
+      sendDisabled ||
+      isSending
+    ) {
       return;
     }
     if (upload.hasFailedAttachments) {
@@ -893,17 +966,35 @@ export function ChatComposer({
     });
 
     if (submission.type === 'attachment-error') {
-      toast.error(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
+      setSlashCommandFeedback(i18n.t('agentChat.composer.attachmentsWithSlashCommands'));
       return;
     }
     if (submission.type === 'argument-error') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
     if (submission.type === 'upgrade-required') {
-      toast.error(submission.message);
+      setSlashCommandFeedback(submission.message);
       return;
     }
+    // Valid submission: drop a rejection left over from an earlier attempt.
+    setSlashCommandFeedback(null);
+
+    if (submission.type === 'goal-compose') {
+      // Bare `/goal` is a compose mode: keep the draft, mark the composer so the
+      // objective hint appears, and focus the input so the user can type the
+      // objective. Normalize the retained draft to `/goal ` first — a bare
+      // `/goal` with no separator would put the next keystroke directly after
+      // `goal` (`/goalShip it`), which is no longer a goal command and would be
+      // sent as an ordinary prompt. `applyComposerText` moves the caret to the
+      // end and focuses the input. The next send parses as `/goal <objective>`
+      // and forwards to the CLI.
+      setGoalComposeActive(true);
+      applyComposerText(`${trimmed} `);
+      return;
+    }
+    // Any other submission leaves goal compose mode.
+    setGoalComposeActive(false);
 
     // The admission lock is owned by `settleVoiceInputBeforeSubmit` for the
     // full settle + submit sequence, so `handleSend` performs validation and
@@ -1101,20 +1192,24 @@ export function ChatComposer({
     // and the composer's send flow consults `upload.isUploading` /
     // `upload.hasFailedAttachments` to gate admission.
     void addCandidates(
-      await pickAgentAttachments(showActionSheetWithOptions, {
-        userId,
-        surface: 'agent-chat',
-        sessionId: sessionId ?? null,
-      })
+      await pickAgentAttachments(
+        showActionSheetWithOptions,
+        {
+          userId,
+          surface: 'agent-chat',
+          sessionId: sessionId ?? null,
+        },
+        themedSheet
+      )
     );
-  }, [addCandidates, showActionSheetWithOptions, userId, sessionId]);
+  }, [addCandidates, showActionSheetWithOptions, userId, sessionId, themedSheet]);
 
   const textInputStyle: TextStyle = {
     color: colors.foreground,
     fontSize,
-    height: measure.height,
     includeFontPadding: false,
     lineHeight,
+    height: measure.height,
     paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
@@ -1193,6 +1288,14 @@ export function ChatComposer({
           />
         ) : null}
 
+        {slashCommandInput !== null && slashCommandCatalogNotice !== null && !isSending ? (
+          <AccessibleStatus
+            tone="status"
+            message={slashCommandCatalogNotice}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+
         {slashCommandSuggestions.length > 0 && !isSending ? (
           <Animated.View
             entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
@@ -1205,6 +1308,12 @@ export function ChatComposer({
           </Animated.View>
         ) : null}
 
+        <AccessibleStatus
+          message={slashCommandFeedback}
+          tone="error"
+          className="mb-2 px-4 text-xs"
+        />
+
         <View
           className={cn(
             'px-3',
@@ -1216,8 +1325,17 @@ export function ChatComposer({
           <VoiceInputStatus status={voiceInput.status} />
         </View>
 
+        {goalComposeActive ? (
+          <AccessibleStatus
+            message={i18n.t('agentChat.goal.editPlaceholder')}
+            tone="status"
+            className="px-4 pb-1 text-xs"
+          />
+        ) : null}
+
         {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
           <View className="flex-row justify-end px-4 pb-1">
+            {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
@@ -1235,10 +1353,13 @@ export function ChatComposer({
               key={inputEpoch}
               attachmentsEnabled={attachmentsEnabled}
               canSend={control.canSend}
-              disabled={disabled}
+              // The row's `disabled` only gates the Stop control, which keeps
+              // the merged gate it had before the send gate was split out.
+              disabled={disabled || sendDisabled}
               hasSendableContent={control.hasSendableContent}
               inputAccessibilityDisabled={control.inputAccessibilityDisabled}
               inputEditable={control.inputEditable}
+              inputEmpty={characterCount === 0}
               inputRef={inputRef}
               isSending={isSending}
               isStreaming={isStreaming}
@@ -1257,6 +1378,7 @@ export function ChatComposer({
                 setIsFocused(true);
               }}
               onInputLayout={handleInputLayout}
+              onInputContentSizeChange={setInputContentHeight}
               onInsertNewline={handleInsertNewline}
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}

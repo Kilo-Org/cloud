@@ -162,10 +162,6 @@ export async function findWrapperForSession(
   return findWrapperContainerForSession(sandbox, sessionId);
 }
 
-// ---------------------------------------------------------------------------
-// Docker-label discovery (devcontainer flow)
-// ---------------------------------------------------------------------------
-
 /**
  * `docker ps --format` rows for wrapper containers tagged with
  * `kilo.agentSession=<id>`. The published port we want is buried in the

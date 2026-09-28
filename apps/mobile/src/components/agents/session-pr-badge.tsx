@@ -60,7 +60,9 @@ export type SessionPrBadgeProps = Readonly<{
  * Shows `#N` with an icon/accent derived from the PR state and review
  * decision. While `loading` is true it reserves a fixed-width skeleton; after
  * the fetch it renders the badge or nothing (never a guess from `git_branch`).
- * Tapping navigates in-app for GitHub PRs and opens the browser otherwise.
+ * Tapping routes through the one provider URL resolver: a GitHub pull request,
+ * a GitLab merge request (any host) and a Bitbucket pull request all open the
+ * in-app review route, and anything else opens the browser.
  */
 export function SessionPrBadge(props: SessionPrBadgeProps) {
   const { loading } = props;
@@ -93,7 +95,6 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
     }
     const target = resolveSessionPrTapTarget({
       url: pr.url,
-      number: pr.number,
     });
     if (target.kind === 'in-app') {
       router.push(target.href);

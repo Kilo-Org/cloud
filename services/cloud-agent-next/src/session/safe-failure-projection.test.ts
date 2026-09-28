@@ -5,6 +5,7 @@ import {
   CloudAgentSafeFailureSchema,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
+import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
@@ -18,6 +19,46 @@ import {
 } from './safe-failure-projection.js';
 
 describe('projectSafeAssistantError', () => {
+  it.each([
+    [
+      'string',
+      'Rate limit exceeded',
+      'Rate limit exceeded',
+      'rate_limited',
+      'Assistant request was rate limited',
+    ],
+    [
+      'nested message ahead of top-level message',
+      { data: { message: 'deadline exceeded' }, message: 'Unknown model' },
+      'deadline exceeded',
+      'timeout',
+      'Assistant request timed out',
+    ],
+    [
+      'top-level message',
+      { message: 'Unknown model' },
+      'Unknown model',
+      'model_unavailable',
+      'Assistant request failed: model not found',
+    ],
+    ['null', null, undefined, 'unknown', undefined],
+    ['undefined', undefined, undefined, 'unknown', undefined],
+    [
+      'unrecognized non-null value',
+      { code: 'future-error' },
+      'Assistant message failed',
+      'unknown',
+      'Assistant request failed',
+    ],
+  ] as const)(
+    'keeps recognition and classification/raw fallbacks distinct for %s',
+    (_name, source, rawDetail, reason, safeProjection) => {
+      expect(assistantErrorDetail(source)).toBe(rawDetail);
+      expect(classifyAssistantFailure(source).reason).toBe(reason);
+      expect(projectSafeAssistantError(source)).toBe(safeProjection);
+    }
+  );
+
   it.each([
     'Payment required: insufficient credits',
     'Unknown model',
@@ -70,7 +111,7 @@ describe('projectSafeAssistantError', () => {
     ['APIError', undefined, 'Assistant request failed'],
     ['FutureError', 402, 'Assistant request failed'],
     ['ContextOverflowError', 402, 'The model context limit was exceeded'],
-  ] as const)('does not inspect or retain private fields from %s', (name, statusCode, expected) => {
+  ] as const)('does not retain private fields from %s', (name, statusCode, expected) => {
     const error = {
       name,
       message: 'outer poison-message',
@@ -116,6 +157,87 @@ describe('projectSafeAssistantError', () => {
       'The message was interrupted by the user'
     );
     expect(projectSafeAssistantError(safeError)).toBe(safeError);
+  });
+
+  it.each([
+    ['upstream_disconnect', 'provider_disconnect', 'Assistant provider connection was lost'],
+    [
+      'temporarily_unavailable',
+      'gateway_unavailable',
+      'Assistant gateway was temporarily unavailable',
+    ],
+  ] as const)(
+    'classifies a gateway error_type=%s as %s without retaining the raw body',
+    (errorType, reason, safeMessage) => {
+      const error = {
+        name: 'APIError',
+        data: {
+          message: 'gateway failure',
+          statusCode: 503,
+          responseBody: JSON.stringify({
+            error: 'upstream-down',
+            error_type: errorType,
+            message: 'poison-provider-detail',
+          }),
+        },
+      };
+
+      expect(classifyAssistantFailure(error)).toMatchObject({ reason, safeMessage });
+      expect(projectSafeAssistantError(error)).toBe(safeMessage);
+      expect(projectSafeAssistantError(error)).not.toContain('poison');
+    }
+  );
+
+  it('reads the gateway origin ahead of the descriptive body text it produces', () => {
+    const timeoutBody = {
+      error: 'The upstream provider did not send response headers before the gateway timeout.',
+      error_type: 'upstream_disconnect',
+      message: 'The upstream provider did not send response headers before the gateway timeout.',
+    };
+    const error = {
+      name: 'APIError',
+      data: {
+        // What the SDK builds from the response body. It contains "timeout",
+        // which the text classifier would otherwise read as a provider timeout.
+        message: `Service Unavailable: ${timeoutBody.message}`,
+        statusCode: 503,
+        responseBody: JSON.stringify(timeoutBody),
+      },
+    };
+
+    expect(classifyAssistantFailure(error)).toMatchObject({
+      reason: 'provider_disconnect',
+      safeMessage: 'Assistant provider connection was lost',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant provider connection was lost');
+  });
+
+  it('leaves a non-gateway body to status-based classification', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        statusCode: 503,
+        responseBody: JSON.stringify({ error: { message: 'upstream exploded' } }),
+      },
+    };
+
+    expect(classifyAssistantFailure(error).reason).toBe('provider_unavailable');
+  });
+
+  it('lets the gateway origin tag outrank a specific-looking message from its own body', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        message: '[BYOK] insufficient credits',
+        statusCode: 503,
+        responseBody: JSON.stringify({ error_type: 'temporarily_unavailable' }),
+      },
+    };
+
+    expect(classifyAssistantFailure(error)).toMatchObject({
+      reason: 'gateway_unavailable',
+      providerOwnership: 'byok',
+    });
   });
 
   it.each([null, undefined])('omits absent errors: %s', error => {
@@ -579,6 +701,157 @@ describe('classifyAssistantFailure', () => {
   it('does not guess ownership for an unmarked provider outage', () => {
     expect(classifyAssistantFailure('503 Service Unavailable')).toMatchObject({
       reason: 'provider_unavailable',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  // A provider reports an over-long request as an APIError 400. The SDK status
+  // fallback used to call every unrecognized 4xx "invalid request", so the
+  // transcript told the reporter their request was invalid instead of over the
+  // model's context window. Observed in production wrapper logs as
+  // `error.error.code=400 error.error.metadata.provider_code=context_length_exceeded`
+  // and persisted as `failure_reason=assistant_invalid_request`.
+  it.each([
+    "The request is 280913 tokens long and exceeds this model's context length of 262144 tokens.",
+    "[Nex AGI] The request is 282364 tokens long and exceeds this model's context length of 262144 tokens.",
+    "This endpoint's maximum context length is 204800 tokens. However, you requested about 300000 tokens",
+    'prompt is too long: 300000 tokens > 200000 maximum',
+    'context_length_exceeded',
+  ])('classifies an over-long provider request as context_limit: %s', message => {
+    for (const source of [
+      { name: 'APIError', data: { message, statusCode: 400 } },
+      { name: 'APIError', data: { message } },
+      message,
+    ]) {
+      const failure = classifyAssistantFailure(source);
+
+      expect(failure).toEqual({
+        reason: 'context_limit',
+        safeMessage: 'The model context limit was exceeded',
+        providerOwnership: 'unknown',
+      });
+      expect(projectSafeAssistantError(source)).toBe('The model context limit was exceeded');
+      expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
+    }
+  });
+
+  // A per-minute rate limit can be phrased with the same "too many tokens"
+  // words as a context overflow. The explicit rate-limit wording must win, or
+  // the transcript blames the model's context window for a request the user can
+  // simply retry.
+  it.each([
+    'Rate limit reached: too many tokens per minute',
+    '429 Too Many Requests: too many tokens',
+    'rate limit exceeded: too many tokens per minute',
+  ])('classifies rate-limit wording containing "too many tokens" as rate_limited: %s', message => {
+    const source = { name: 'APIError', data: { message, statusCode: 429 } };
+
+    expect(classifyAssistantFailure(source)).toEqual({
+      reason: 'rate_limited',
+      safeMessage: 'Assistant request was rate limited',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(source)).toBe('Assistant request was rate limited');
+  });
+
+  // A 4xx that merely mentions "context_length" (a field-name validation error)
+  // and a 413 payload-size rejection are not context-window overflows. They must
+  // keep the invalid-request wording instead of claiming the model's context
+  // limit was exceeded.
+  it.each([
+    ["Invalid value for 'context_length'", 400, 'invalid_request'],
+    ['Request Entity Too Large', 413, 'invalid_request'],
+  ] as const)(
+    'does not classify non-overflow 4xx wording as context_limit: %s',
+    (message, statusCode, reason) => {
+      const source = { name: 'APIError', data: { message, statusCode } };
+      const failure = classifyAssistantFailure(source);
+
+      expect(failure.reason).toBe(reason);
+      expect(projectSafeAssistantError(source)).toBe(assistantFailureMessage(reason));
+      expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
+    }
+  );
+
+  // Observed in production on 2026-09-28: the SDK `APIError` carried no
+  // `statusCode`, only the provider `responseBody`. Without reading it these
+  // known provider failures collapsed into "Assistant request failed".
+  it.each([
+    {
+      label: 'a 502 provider body',
+      responseBody:
+        '{"code":502,"message":"Network connection lost.","metadata":{"error_type":"provider_unavailable"}}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'a 502 empty-response body',
+      responseBody:
+        '{"code":502,"message":"Provider returned an empty response","metadata":{"error_type":"provider_unavailable"}}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'an invalid stream name',
+      responseBody:
+        '{"code":"error","message":"Stream error occurred","name":"AI_InvalidResponseDataError"}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'a bodyless context-overflow token',
+      responseBody: '{"metadata":{"error_type":"context_length_exceeded"}}',
+      reason: 'context_limit',
+    },
+    {
+      label: 'a top-level error_type token',
+      responseBody: '{"error_type":"rate_limit_exceeded"}',
+      reason: 'rate_limited',
+    },
+  ] as const)('classifies $label in the provider response body', ({ responseBody, reason }) => {
+    const error = { name: 'APIError', data: { message: 'opaque provider failure', responseBody } };
+    const failure = classifyAssistantFailure(error);
+
+    expect(failure).toEqual({
+      reason,
+      safeMessage: assistantFailureMessage(reason),
+      providerOwnership: 'unknown',
+    });
+    const safeError = projectSafeAssistantError(error);
+    expect(safeError).toBe(assistantFailureMessage(reason));
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it('keeps a valid error_type when a sibling field is malformed', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        message: 'opaque provider failure',
+        responseBody: '{"error_type":"rate_limit_exceeded","status":"weird"}',
+      },
+    };
+
+    expect(classifyAssistantFailure(error).reason).toBe('rate_limited');
+  });
+
+  it('prefers the explicit statusCode over the response body', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 429,
+          responseBody: '{"code":502,"metadata":{"error_type":"provider_unavailable"}}',
+        },
+      }).reason
+    ).toBe('rate_limited');
+  });
+
+  it.each(['not json', '', '[]', 'null'])('ignores an unusable response body: %j', responseBody => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
       providerOwnership: 'unknown',
     });
   });

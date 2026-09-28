@@ -18,20 +18,30 @@ export function requireNumericPlatformRepositories(
 }
 
 /**
- * Finds a cached repository's numeric ID by its "owner/repo" full name.
- * Comparison is case-insensitive: GitHub repo full names are effectively
- * case-insensitive, and callers get `fullName` from sources (stored review
- * rows, LLM-echoed tool arguments) that aren't guaranteed to match the
- * cached casing exactly.
+ * Whether a provider repository read must go back to the provider instead of
+ * answering from the integration's cached snapshot.
+ *
+ * A snapshot is the answer for a non-force read even when it is empty: a
+ * connected provider that reports no repositories is the connected-empty
+ * state, and re-fetching on every read turns a provider hiccup into a load
+ * error instead of that state. An integration that has never synced (no
+ * repositories and no `repositories_synced_at`) still syncs here, as does an
+ * explicit `forceRefresh` from the section's refresh affordance.
+ *
+ * When this returns `false`, `cachedRepositories` is a list (never `null`).
  */
-export function findRepositoryIdByFullName(
-  repositories: PlatformRepository[] | null,
-  fullName: string
-): number | null {
-  const match = repositories?.find(
-    repository => repository.full_name.toLowerCase() === fullName.toLowerCase()
-  );
-  return match?.id ?? null;
+export function shouldSyncProviderRepositories({
+  forceRefresh,
+  cachedRepositories,
+  repositoriesSyncedAt,
+}: {
+  forceRefresh: boolean;
+  cachedRepositories: PlatformRepository[] | null;
+  repositoriesSyncedAt: string | null;
+}): boolean {
+  if (forceRefresh) return true;
+  if (cachedRepositories === null) return true;
+  return cachedRepositories.length === 0 && repositoriesSyncedAt === null;
 }
 
 /**

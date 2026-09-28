@@ -34,7 +34,7 @@
   },
   "logpush": true,
   "triggers": {
-    "crons": ["17 2 * * *"],
+    "crons": ["17 2 * * *", "*/3 * * * *"],
   },
   "routes": [
     {
@@ -60,6 +60,7 @@
     "CREDENTIAL_CONTAINMENT_ENABLED": "true",
     "TOOL_CGROUP_RESERVE_MB": "2048",
     "TOOL_CGROUP_CPU_WEIGHT": "50",
+    "TOOL_CGROUP_SERVER_CPU_WEIGHT": "75",
     "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "true",
     "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "f1a848ca-bade-48d8-a5ad-1042d08651e6",
     "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "9d278969-5453-4ae3-a51f-a8d2274a7b56",
@@ -178,7 +179,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 200,
       "rollout_active_grace_period": 1800,
@@ -192,7 +193,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 150,
       "rollout_active_grace_period": 1800,
@@ -206,7 +207,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 20,
       "rollout_active_grace_period": 1800,
@@ -220,7 +221,7 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 500,
       "rollout_active_grace_period": 1800,
@@ -234,7 +235,7 @@
         "disk_mb": 20000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 750,
       "rollout_active_grace_period": 1800,
@@ -248,7 +249,7 @@
         "disk_mb": 10000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 300,
       "rollout_active_grace_period": 1800,
@@ -262,10 +263,20 @@
         "disk_mb": 8000,
       },
       "image_vars": {
-        "KILOCODE_CLI_VERSION": "7.4.20",
+        "KILOCODE_CLI_VERSION": "7.6.2",
       },
       "max_instances": 1500,
       "rollout_active_grace_period": 1800,
+    },
+    {
+      "class_name": "SandboxContainers",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "app": {
+          "dockerfile": "./Dockerfile.containers",
+          "build_vars": { "KILOCODE_CLI_VERSION": "7.6.2" },
+        },
+      },
     },
   ],
   "durable_objects": {
@@ -318,6 +329,10 @@
         "class_name": "SandboxSession",
         "name": "SANDBOX_SESSION",
       },
+      {
+        "class_name": "SandboxContainers",
+        "name": "SANDBOX_CONTAINERS",
+      },
     ],
   },
   "migrations": [
@@ -364,6 +379,10 @@
     {
       "new_sqlite_classes": ["SandboxSession"],
       "tag": "v10",
+    },
+    {
+      "new_sqlite_classes": ["SandboxContainers"],
+      "tag": "v11",
     },
   ],
   /**
@@ -420,7 +439,7 @@
     "dev": {
       "name": "cloud-agent-next-dev",
       "triggers": {
-        "crons": ["17 2 * * *"],
+        "crons": ["17 2 * * *", "*/3 * * * *"],
       },
       "hyperdrive": [
         {
@@ -454,9 +473,13 @@
         "CREDENTIAL_CONTAINMENT_ENABLED": "false",
         "REPO_SNAPSHOT_ORG_IDS": "",
         "CONTAINER_BILLING_HEARTBEAT_SECONDS": "60",
+        "CLOUD_AGENT_CONTAINER_BILLING_ENABLED": "false",
+        "CLOUD_AGENT_CONTAINER_BILLING_USER_IDS": "",
+        "CLOUD_AGENT_CONTAINER_BILLING_ORG_IDS": "",
         "CONTROL_PLANE_IDS": "*",
         "WORKTREE_CREATION_ENABLED_IDS": "*",
         "RUNTIME_ISOLATION_ENABLED": "true",
+        "SANDBOX_SELECTION_IDS": "*",
         "VERCEL_SANDBOX_ORG_IDS": "",
         "VERCEL_PROJECT_ID": "",
         "VERCEL_TEAM_ID": "",
@@ -511,7 +534,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -521,7 +544,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -531,7 +554,7 @@
           "image": "./Dockerfile.dind",
           "instance_type": "standard-3",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -545,7 +568,7 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -555,7 +578,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 10,
           "rollout_active_grace_period": 60,
@@ -565,7 +588,7 @@
           "image": "./Dockerfile.dev",
           "instance_type": "standard-4",
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
@@ -579,10 +602,20 @@
             "disk_mb": 8000,
           },
           "image_vars": {
-            "KILOCODE_CLI_VERSION": "7.4.20",
+            "KILOCODE_CLI_VERSION": "7.6.2",
           },
           "max_instances": 2,
           "rollout_active_grace_period": 60,
+        },
+        {
+          "class_name": "SandboxContainers",
+          "scheduling_policy": "durable_object",
+          "images": {
+            "app": {
+              "dockerfile": "./Dockerfile.containers",
+              "build_vars": { "KILOCODE_CLI_VERSION": "7.6.2" },
+            },
+          },
         },
       ],
       "durable_objects": {
@@ -634,6 +667,10 @@
           {
             "class_name": "SandboxSession",
             "name": "SANDBOX_SESSION",
+          },
+          {
+            "class_name": "SandboxContainers",
+            "name": "SANDBOX_CONTAINERS",
           },
         ],
       },

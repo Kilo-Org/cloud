@@ -7,12 +7,16 @@ import {
 
 import {
   _resetGlanceablePersistForTests,
+  _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
+  isGlanceableRestoreSettled,
+  isGlanceableRestoreUnavailable,
   persistGlanceableSink,
   restorePersistedGlanceable,
+  whenGlanceableRestoresSettle,
 } from './persist';
 
 const NOW = 1_750_000_000_000;
@@ -136,6 +140,140 @@ describe('restorePersistedGlanceable', () => {
     await restorePersistedGlanceable();
 
     expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getLocalScopeKey()).toBe(stored.scopeKey);
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  it('flags an unreadable mirror so a caller can tell it from an absent record', async () => {
+    // A locked keychain (expo-secure-store's default WHEN_UNLOCKED access): the
+    // record may exist but cannot be read.
+    secureStoreMock.getItemAsync.mockRejectedValueOnce(new Error('keychain locked'));
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toBeNull();
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('does not report a restore settled until the first read finishes', async () => {
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+
+    const restore = restorePersistedGlanceable();
+
+    // A caller that reads a null snapshot must not treat it as "nothing
+    // persisted" until the read that could fill it has settled.
+    expect(isGlanceableRestoreSettled()).toBe(false);
+
+    gate.resolve();
+    await restore;
+
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('reports a later in-flight read as unsettled, not only the first', async () => {
+    // The first read settles with nothing on disk, so a caller would read the
+    // null snapshot as "nothing persisted". A later read re-opens that window:
+    // the record it is about to consult may still name a card owner.
+    await restorePersistedGlanceable();
+    expect(isGlanceableRestoreSettled()).toBe(true);
+
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+
+    const restore = restorePersistedGlanceable();
+
+    expect(isGlanceableRestoreSettled()).toBe(false);
+
+    gate.resolve();
+    await restore;
+
+    expect(isGlanceableRestoreSettled()).toBe(true);
+  });
+
+  it('resumes a waiter when the last in-flight read lands', async () => {
+    await restorePersistedGlanceable();
+    // Nothing in flight: a waiter parked after the fact resumes at once.
+    await whenGlanceableRestoresSettle();
+
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      return null;
+    });
+    const restore = restorePersistedGlanceable();
+
+    let resumed = false;
+    const waiting = (async () => {
+      await whenGlanceableRestoresSettle();
+      resumed = true;
+    })();
+    await Promise.resolve();
+    expect(resumed).toBe(false);
+
+    gate.resolve();
+    await restore;
+    await waiting;
+
+    expect(resumed).toBe(true);
+  });
+
+  it('resumes a waiter when a read that fails settles', async () => {
+    const gate = deferred();
+    secureStoreMock.getItemAsync.mockImplementationOnce(async () => {
+      await gate.promise;
+      throw new Error('keychain locked');
+    });
+    const restore = restorePersistedGlanceable();
+
+    let resumed = false;
+    const waiting = (async () => {
+      await whenGlanceableRestoresSettle();
+      resumed = true;
+    })();
+
+    gate.resolve();
+    await restore;
+    await waiting;
+
+    // The failure still settles the read, so the waiter resumes and reads the
+    // unreadable flag itself.
+    expect(resumed).toBe(true);
+    expect(isGlanceableRestoreUnavailable()).toBe(true);
+  });
+
+  it('clears the unreadable flag after a read that succeeds', async () => {
+    _setGlanceableRestoreUnavailableForTests(true);
+
+    await restorePersistedGlanceable();
+
+    expect(isGlanceableRestoreUnavailable()).toBe(false);
+  });
+
+  // The mirror written by the previous release at schema version 1 carries no
+  // newest-result keys. Rejecting it would drop the last counts and scope key
+  // of a widget that survived the app upgrade, so it restores with the fact
+  // absent.
+  it('restores a record written before the newest-result fields existed', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    const { newestResultKind: _kind, newestResultAt: _at, ...previousRelease } = stored;
+    store.set(SNAPSHOT_KEY, JSON.stringify(previousRelease));
+    store.set(SCOPE_KEY, stored.scopeKey);
+
+    await restorePersistedGlanceable();
+
+    expect(getLastGlanceableSnapshot()).toEqual({
+      ...previousRelease,
+      newestResultKind: null,
+      newestResultAt: null,
+    });
     expect(getLocalScopeKey()).toBe(stored.scopeKey);
   });
 });

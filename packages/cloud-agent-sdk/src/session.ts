@@ -94,6 +94,11 @@ type CloudAgentSessionConfig = {
     state: Extract<MessageDeliveryState, { status: 'failed' }>
   ) => void;
   /**
+   * True when the user already retried this message's delivery failure, so a
+   * replayed `cloud.message.failed` must not restore the cleared footer.
+   */
+  isDeliveryFailureResolved?: (messageId: string) => boolean;
+  /**
    * Optional sink for tool attachment bytes, called just before the chat
    * processor strips a completed tool part's attachment data URLs for storage.
    * Receives the raw data URL exactly once per processor pass; consumers use
@@ -121,11 +126,11 @@ type CloudAgentSessionSendInput = {
   images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
-   * Ready file parts to forward to a CAPABLE remote CLI session. The
-   * session-manager gate already enforces that this is only non-empty for
-   * a `remote` session whose CLI has advertised `capabilities.attachments:
-   * true`; transports that don't support the path (cloud-agent, read-only,
-   * non-capable remote) simply ignore it.
+   * Ready file parts to forward to a remote CLI session. The session-manager
+   * gate already enforces that this is only non-empty for a `remote` session
+   * the CLI has not reported as incapable (unknown capabilities are
+   * optimistic); transports that don't support the path (cloud-agent,
+   * read-only, a CLI that reported `attachments: false`) simply ignore it.
    */
   attachmentParts?: RemoteAttachmentPart[] | undefined;
 };
@@ -246,6 +251,7 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     onMessageCanceled: config.onMessageCanceled,
     onMessageCompleted: config.onMessageCompleted,
     onMessageFailed: config.onMessageFailed,
+    isDeliveryFailureResolved: config.isDeliveryFailureResolved,
   });
 
   let transport: Transport | null = null;

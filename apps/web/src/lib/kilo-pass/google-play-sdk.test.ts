@@ -12,6 +12,10 @@ const mockSubscriptionsV2Get = jest.fn().mockImplementation(() => ({
 
 const mockAcknowledge = jest.fn<(request: unknown) => Promise<void>>().mockResolvedValue(undefined);
 
+const mockSubscriptionsV2Revoke = jest
+  .fn<(request: unknown) => Promise<void>>()
+  .mockResolvedValue(undefined);
+
 const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
 
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
@@ -21,6 +25,7 @@ const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) =
     subscriptions: { acknowledge: mockAcknowledge },
     subscriptionsv2: {
       get: mockSubscriptionsV2Get,
+      revoke: mockSubscriptionsV2Revoke,
     },
   },
 }));
@@ -92,7 +97,7 @@ describe('google-play-sdk', () => {
       packageName: 'com.kilocode.kiloapp',
       orderId: 'paid-order',
       fields:
-        'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+        'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
     });
     mockOrdersGet.mockImplementationOnce(() => {
       throw new Error('provider unavailable');
@@ -130,6 +135,47 @@ describe('google-play-sdk', () => {
     ).rejects.toThrow('provider unavailable');
   });
 
+  it('revokes with a full refund and tolerates an already revoked subscription', async () => {
+    const { revokeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
+
+    await revokeGooglePlaySubscriptionPurchase('test-token');
+    expect(mockSubscriptionsV2Revoke).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      token: 'test-token',
+      requestBody: { revocationContext: { fullRefund: {} } },
+    });
+
+    // A retried notification finds the subscription revoked and Play rejects the
+    // repeat call; a subscription that no longer renews means success.
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('already revoked'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).resolves.toBeUndefined();
+  });
+
+  it('propagates a failed revoke unless the subscription is expired', async () => {
+    const { revokeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
+
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('provider unavailable'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
+      'provider unavailable'
+    );
+
+    // CANCELED is still entitled and still charged, so a failed revoke must not
+    // be mistaken for a reversal.
+    mockSubscriptionsV2Revoke.mockRejectedValueOnce(new Error('provider unavailable'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { subscriptionState: 'SUBSCRIPTION_STATE_CANCELED' },
+    });
+    await expect(revokeGooglePlaySubscriptionPurchase('test-token')).rejects.toThrow(
+      'provider unavailable'
+    );
+  });
+
   it('throws when the service account JSON is not set', () => {
     delete process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON;
 
@@ -148,6 +194,33 @@ describe('google-play-sdk', () => {
     const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
 
     expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('throws when the service account value is not JSON', () => {
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+
+    const { createGooglePlayAndroidPublisherClient } = loadGooglePlaySdk();
+
+    expect(() => createGooglePlayAndroidPublisherClient()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
+    );
+  });
+
+  it('asserts the service account without building a client', () => {
+    const { assertGooglePlayServiceAccountConfigured } = loadGooglePlaySdk();
+
+    expect(() => assertGooglePlayServiceAccountConfigured()).not.toThrow();
+    expect(mockAndroidPublisher).not.toHaveBeenCalled();
+
+    delete process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON;
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
+      'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is not set'
+    );
+
+    process.env.GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON = 'not-json';
+    expect(() => assertGooglePlayServiceAccountConfigured()).toThrow(
       'GOOGLE_PLAY_PUBLISHER_SERVICE_ACCOUNT_JSON is invalid'
     );
   });

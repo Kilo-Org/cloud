@@ -1,11 +1,14 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import type { CloudAgentSessionId, KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
+import { getSandboxAllocationRequest } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   isSandboxStatusEligible,
   observeSandboxStatus,
   sandboxStatusPresentation,
+  sandboxTypeCapacity,
 } from './sandbox-status';
+import { formatSandboxCapacity } from './sandbox-selection';
 
 const now = 1_800_000_000_000;
 const snapshot: SandboxStatusSnapshot = {
@@ -196,6 +199,7 @@ describe('sandbox status presentation', () => {
     ['stopping', 'sandbox_stopping', 'Stopping'],
     ['error', 'sandbox_failed', 'Error'],
     ['unreachable', 'connection_unavailable', 'Unreachable'],
+    ['unreachable', 'check_needed', 'Unreachable'],
     ['unknown', 'insufficient_evidence', 'Unknown'],
   ] as const)(
     'presents authoritative %s lifecycle without raw diagnostics',
@@ -221,7 +225,7 @@ describe('sandbox status presentation', () => {
     }
   );
 
-  it.each(['Cloudflare', 'Vercel', 'Unknown'] as const)(
+  it.each(['Cloudflare', 'Cloudflare Containers', 'Vercel', 'Unknown'] as const)(
     'uses the bounded %s provider',
     provider => {
       expect(
@@ -504,7 +508,7 @@ describe('sandbox status presentation', () => {
     });
     expect(view).toMatchObject({
       provider: 'Cloudflare',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       kiloCliVersion: '7.4.20',
       wrapperVersion: '2.4.0',
       startedAt: now - 600_000,
@@ -569,7 +573,7 @@ describe('sandbox status presentation', () => {
     ).toMatchObject({
       ...versions,
       status: 'active',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       startedAt: now - 600_000,
       stoppedAt: null,
     });
@@ -590,7 +594,7 @@ describe('sandbox status presentation', () => {
     ).toMatchObject({
       status: 'unknown',
       provider: 'Cloudflare',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       kiloCliVersion: '7.4.20',
       wrapperVersion: '2.4.0',
       startedAt: now - 600_000,
@@ -648,5 +652,109 @@ describe('sandbox status presentation', () => {
       sleepMinutesRemaining: null,
     });
     expect(JSON.stringify(view)).not.toContain('PRIVATE_SENTINEL');
+  });
+});
+
+describe('sandboxTypeCapacity', () => {
+  it.each([
+    ['shared', '4 vCPU / 12 GiB'],
+    ['isolated-standard', '4 vCPU / 12 GiB'],
+    ['isolated-small', '2 vCPU / 6 GiB'],
+    ['code-review', '1 vCPU / 4 GiB'],
+    ['devcontainer', '2 vCPU / 6 GiB'],
+    ['containers-standard-3', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', '4 vCPU / 12 GiB'],
+  ] as const)('reports the container capacity behind %s', (sandboxType, capacity) => {
+    expect(sandboxTypeCapacity(sandboxType)).toBe(capacity);
+  });
+
+  it.each([undefined, null, 'unknown'] as const)(
+    'reports no capacity for an unidentified sandbox: %j',
+    sandboxType => {
+      expect(sandboxTypeCapacity(sandboxType)).toBeNull();
+    }
+  );
+
+  it('agrees with the destination picker wherever both name the same container', () => {
+    expect(sandboxTypeCapacity('isolated-standard')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-shared'))
+    );
+    expect(sandboxTypeCapacity('isolated-small')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-single'))
+    );
+    expect(sandboxTypeCapacity('devcontainer')).toBe(
+      formatSandboxCapacity({
+        provider: { id: 'cloudflare', account: 'kilo' },
+        instanceType: 'devcontainer',
+      })
+    );
+    expect(sandboxTypeCapacity('containers-standard-3')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-3'))
+    );
+    expect(sandboxTypeCapacity('containers-standard-4')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-4'))
+    );
+  });
+});
+
+describe('sandbox status capacity', () => {
+  it('reports the capacity of the observed sandbox, not the requested one', () => {
+    expect(
+      sandboxStatusPresentation({
+        ...observation,
+        data: { ...snapshot, runtime: { ...runtime, sandboxType: 'isolated-small' } },
+      }).capacity
+    ).toBe('2 vCPU / 6 GiB');
+  });
+
+  it.each([
+    ['containers-standard-3', 'Medium', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', 'Large', '4 vCPU / 12 GiB'],
+  ] as const)(
+    'presents the containers instance %s as its type and capacity',
+    (sandboxType, typeLabel, capacity) => {
+      expect(
+        sandboxStatusPresentation({
+          ...observation,
+          data: {
+            ...snapshot,
+            provider: 'Cloudflare Containers',
+            runtime: { ...runtime, sandboxType },
+          },
+        })
+      ).toMatchObject({
+        provider: 'Cloudflare Containers',
+        sandboxType: typeLabel,
+        capacity,
+      });
+    }
+  );
+
+  it('keeps the capacity of a sleeping sandbox, which still names its container', () => {
+    expect(
+      sandboxStatusPresentation({
+        ...observation,
+        data: {
+          ...snapshot,
+          status: 'sleeping',
+          detailCode: 'sandbox_stopped',
+          estimatedSleepAt: null,
+          runtime: { ...runtime, startedAt: null, stoppedAt: now - 60_000 },
+        },
+      }).capacity
+    ).toBe('4 vCPU / 12 GiB');
+  });
+
+  it.each(['paused', 'unavailable', 'checking'] as const)(
+    'reports no capacity without a usable observation: %s',
+    observationState => {
+      expect(
+        sandboxStatusPresentation({ ...observation, observation: observationState }).capacity
+      ).toBeNull();
+    }
+  );
+
+  it('reports no capacity when the snapshot carries no runtime', () => {
+    expect(sandboxStatusPresentation(observation).capacity).toBeNull();
   });
 });

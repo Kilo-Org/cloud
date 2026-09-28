@@ -3,9 +3,14 @@
  *
  * The wire format is protocol v1. The CLI may send at most 256 commands,
  * 32 hints each, 2,000 characters per string, and a serialized payload of
- * 512 KiB measured in UTF-8 bytes. Skill-sourced commands are filtered
- * defensively; the resulting catalog is the existing `SlashCommandInfo`
- * shape consumed by the chat composer.
+ * 512 KiB measured in UTF-8 bytes. Skill-sourced commands are kept by both
+ * paths: this parser hands them to the remote CLI composer, and the cloud-agent
+ * wrapper keeps them in its own catalog before `commands.available`, applying
+ * the same 256-command / 512 KiB limits on a best-effort basis: it drops
+ * non-skill rows first and never drops a skill row, so a catalog whose skill
+ * rows alone exceed a bound is returned over that bound and would not satisfy
+ * this parser's `.max(256)` / 512 KiB schema. The resulting catalog is the
+ * existing `SlashCommandInfo` shape consumed by the chat composer.
  */
 import type { SlashCommandInfo } from './schemas';
 import { remoteCommandCatalogV1Schema } from './schemas';
@@ -61,9 +66,9 @@ export type RemoteCommandState = {
  * oversized payload from a transport-level failure.
  *
  * The remote schema is `.strict()` and outputs a shape that is already
- * structurally identical to `SlashCommandInfo` (the transform only filters
- * skill-sourced entries and re-emits the rest verbatim), so no per-entry
- * re-parse is needed.
+ * structurally identical to `SlashCommandInfo` (the transform re-emits every
+ * entry verbatim, normalising an omitted `hints` to an empty array), so no
+ * per-entry re-parse is needed.
  */
 export function parseRemoteCommandCatalog(raw: unknown): RemoteCommandParseResult {
   const parsed = remoteCommandCatalogV1Schema.safeParse(raw);

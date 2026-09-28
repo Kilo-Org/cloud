@@ -1,4 +1,4 @@
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapResolvedModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
@@ -20,7 +20,7 @@ export function injectExtraProviderModels(
     }
   }
   for (const model of openRouterModels.values()) {
-    const vercelModel = vercelModels[mapModelIdToVercel(model.slug)];
+    const vercelModel = vercelModels[mapResolvedModelIdToVercel(model.slug)];
     if (!vercelModel) continue;
 
     const vercelInferenceProviders = new Set(

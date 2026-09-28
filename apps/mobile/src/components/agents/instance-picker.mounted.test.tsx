@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts the native tree without a DOM. */
+/* eslint-disable max-lines -- the full react-native mock harness (FlatList, Platform for SheetHeader) stays inline so the picker contract reads as one screen */
 import { createElement, type EffectCallback, Fragment, type ReactNode, useEffect } from 'react';
-import { act } from 'react-test-renderer';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { type UseQueryOptions } from '@tanstack/react-query';
 
@@ -27,6 +27,8 @@ type ListProps<T> = {
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  StatusBar: { currentHeight: 0 },
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(
       'FlatList',
@@ -41,6 +43,21 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+}));
+// The picker list renders through FlashList, whose rows/header/empty content
+// come through this mock exactly as the real list renders them (the real
+// module is not loadable under the react-native mock above).
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: <T,>(props: ListProps<T>) =>
+    createElement(
+      'FlashList',
+      props,
+      props.ListHeaderComponent,
+      props.data.map(item =>
+        createElement(Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))
+      ),
+      props.data.length > 0 ? null : props.ListEmptyComponent
+    ),
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({

@@ -6,20 +6,14 @@
  * page-flattening without pulling in the native bridge.
  */
 
+import { dedupeBy } from '@/lib/query/dedupe-by-id';
+
 /**
  * Dedupe sessions by `session_id`, keeping the first occurrence.
  * Does not mutate the input array.
  */
 export function dedupeBySessionId<T extends { session_id: string }>(sessions: T[]): T[] {
-  const seen = new Set<string>();
-  const result: T[] = [];
-  for (const session of sessions) {
-    if (!seen.has(session.session_id)) {
-      seen.add(session.session_id);
-      result.push(session);
-    }
-  }
-  return result;
+  return dedupeBy(sessions, session => session.session_id);
 }
 
 /**

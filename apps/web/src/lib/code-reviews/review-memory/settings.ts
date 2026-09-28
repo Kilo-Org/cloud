@@ -5,6 +5,7 @@ import { db } from '@/lib/drizzle';
 import { agent_configs } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 const ReviewMemorySettingsSchema = z.object({
   review_memory_enabled: z.boolean().optional(),
@@ -45,43 +46,52 @@ export async function setReviewMemoryEnabled(input: {
     updated_at: now,
   };
 
-  if (input.owner.type === 'org') {
-    await db
-      .insert(agent_configs)
-      .values({
-        owned_by_organization_id: input.owner.id,
-        owned_by_user_id: null,
-        agent_type: 'code_review',
-        platform: input.platform,
-        config,
-        is_enabled: false,
-        created_by: input.createdBy,
-      })
-      .onConflictDoUpdate({
-        target: [
-          agent_configs.owned_by_organization_id,
-          agent_configs.agent_type,
-          agent_configs.platform,
-        ],
-        set: updateSet,
-      });
-  } else {
-    await db
-      .insert(agent_configs)
-      .values({
-        owned_by_organization_id: null,
-        owned_by_user_id: input.owner.id,
-        agent_type: 'code_review',
-        platform: input.platform,
-        config,
-        is_enabled: false,
-        created_by: input.createdBy,
-      })
-      .onConflictDoUpdate({
-        target: [agent_configs.owned_by_user_id, agent_configs.agent_type, agent_configs.platform],
-        set: updateSet,
-      });
-  }
+  await db.transaction(async tx => {
+    if (input.platform === 'github' && input.enabled) {
+      await assertGitHubAutomationCanBeEnabled(input.owner, tx);
+    }
+    if (input.owner.type === 'org') {
+      await tx
+        .insert(agent_configs)
+        .values({
+          owned_by_organization_id: input.owner.id,
+          owned_by_user_id: null,
+          agent_type: 'code_review',
+          platform: input.platform,
+          config,
+          is_enabled: false,
+          created_by: input.createdBy,
+        })
+        .onConflictDoUpdate({
+          target: [
+            agent_configs.owned_by_organization_id,
+            agent_configs.agent_type,
+            agent_configs.platform,
+          ],
+          set: updateSet,
+        });
+    } else {
+      await tx
+        .insert(agent_configs)
+        .values({
+          owned_by_organization_id: null,
+          owned_by_user_id: input.owner.id,
+          agent_type: 'code_review',
+          platform: input.platform,
+          config,
+          is_enabled: false,
+          created_by: input.createdBy,
+        })
+        .onConflictDoUpdate({
+          target: [
+            agent_configs.owned_by_user_id,
+            agent_configs.agent_type,
+            agent_configs.platform,
+          ],
+          set: updateSet,
+        });
+    }
+  });
 
   return input.enabled;
 }

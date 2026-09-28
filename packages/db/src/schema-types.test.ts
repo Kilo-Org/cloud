@@ -127,6 +127,39 @@ describe('ModelsSchema', () => {
 
     expect(result.data[0].reasoning).toBeUndefined();
   });
+
+  it('preserves an OpenRouter alias target slug', () => {
+    const result = ModelsSchema.parse({
+      data: [
+        {
+          id: '~deepseek/deepseek-pro-latest',
+          name: 'DeepSeek: DeepSeek V4 Pro 0813',
+          alias_target: {
+            name: 'DeepSeek: DeepSeek V4 Pro 0813',
+            slug: 'deepseek/deepseek-v4-pro-0813',
+          },
+        },
+      ],
+    });
+
+    expect(result.data[0].alias_target).toEqual({
+      slug: 'deepseek/deepseek-v4-pro-0813',
+    });
+  });
+
+  it('drops malformed optional alias metadata', () => {
+    const result = ModelsSchema.parse({
+      data: [
+        {
+          id: 'vendor/model',
+          name: 'Vendor Model',
+          alias_target: { slug: '' },
+        },
+      ],
+    });
+
+    expect(result.data[0].alias_target).toBeUndefined();
+  });
 });
 
 describe('OpenRouterPricing', () => {

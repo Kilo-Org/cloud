@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { INJECTED_FAULT_ERROR_NAME } from '@/lib/telemetry/e2e-fault';
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
 const getItemAsync = vi.hoisted(() =>
   vi.fn<(key: string, options?: unknown) => Promise<string | null>>()
 );
@@ -21,12 +24,27 @@ async function rejectedRead(message: string): Promise<string | null> {
   throw new Error(message);
 }
 
+/** A handed-over read that already resolved `null`, built without
+ *  `Promise.resolve` so the promise rule stays satisfied. */
+// eslint-disable-next-line require-await -- an async return is the resolved promise under test
+async function resolvedNullRead(): Promise<string | null> {
+  return null;
+}
+
 async function loadHelper() {
   const mod = await import('./secure-store-read');
   return mod.readStoredValueWithRetry;
 }
 
-describe('readStoredValueWithRetry', () => {
+async function loadNullRetryHelper() {
+  const mod = await import('./secure-store-read');
+  return mod.readStoredValueRetryingNull;
+}
+
+// Runs before `readStoredValueWithRetry`: the fault-window cases in that suite
+// unmock `@/lib/config` and reset the module registry, so this suite must see
+// the file-scope config mock above.
+describe('readStoredValueRetryingNull', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -38,11 +56,97 @@ describe('readStoredValueWithRetry', () => {
 
   it('returns the value on a healthy first read without waiting', async () => {
     getItemAsync.mockResolvedValue('stored-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    await expect(readStoredValueRetryingNull('auth-token')).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a null and returns the value a later attempt resolves', async () => {
+    getItemAsync
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue('stored-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns null after four null resolutions on the 250/500/1000 ms cadence', async () => {
+    getItemAsync.mockResolvedValue(null);
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token');
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(getItemAsync).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(getItemAsync).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+
+    // Four attempts is the whole budget: the last null is the answer, and no
+    // further read is issued.
+    await expect(read).resolves.toBeNull();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('propagates a rejection after the budget', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const settled = expect(readStoredValueRetryingNull('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await settled;
+    expect(getItemAsync).toHaveBeenCalledTimes(4);
+  });
+
+  it('retries a null first attempt with a fresh read', async () => {
+    getItemAsync.mockResolvedValue('fresh-token');
+    const readStoredValueRetryingNull = await loadNullRetryHelper();
+
+    const read = readStoredValueRetryingNull('auth-token', undefined, resolvedNullRead());
+    await vi.advanceTimersByTimeAsync(250);
+
+    await expect(read).resolves.toBe('fresh-token');
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('readStoredValueWithRetry', () => {
+  let events: TelemetryEvent[] = [];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    events = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    setTelemetrySink(null);
+  });
+
+  it('returns the value on a healthy first read without waiting', async () => {
+    getItemAsync.mockResolvedValue('stored-token');
     const readStoredValueWithRetry = await loadHelper();
 
     await expect(readStoredValueWithRetry('auth-token')).resolves.toBe('stored-token');
     expect(getItemAsync).toHaveBeenCalledTimes(1);
-    expect(getItemAsync).toHaveBeenCalledWith('auth-token', undefined);
+    expect(getItemAsync).toHaveBeenCalledWith('auth-token');
   });
 
   it('passes a null resolution straight through and never retries it', async () => {
@@ -92,6 +196,40 @@ describe('readStoredValueWithRetry', () => {
     expect(getItemAsync).toHaveBeenCalledTimes(4);
   });
 
+  it('reports the exhausted read exactly once at warning level with the stable fingerprint', async () => {
+    getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    const readStoredValueWithRetry = await loadHelper();
+
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
+      'keychain unavailable'
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    await settled;
+
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
+    // The key is never attached to the report.
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
+  });
+
+  it('reports nothing when a retry recovers the read', async () => {
+    getItemAsync
+      .mockRejectedValueOnce(new Error('keychain unavailable'))
+      .mockResolvedValue('stored-token');
+    const readStoredValueWithRetry = await loadHelper();
+
+    const read = readStoredValueWithRetry('auth-token');
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(read).resolves.toBe('stored-token');
+    expect(events).toHaveLength(0);
+  });
+
   it('uses the handed-over first attempt and issues fresh reads for the retries', async () => {
     getItemAsync.mockResolvedValue('fresh-token');
     const readStoredValueWithRetry = await loadHelper();
@@ -134,16 +272,29 @@ describe('readStoredValueWithRetry', () => {
     vi.resetModules();
     vi.doMock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 60_000 }));
     getItemAsync.mockResolvedValue('stored-token');
+    // `resetModules` gives the reloaded helper its own error-sink registry, so
+    // the sink is re-installed on the fresh module before the read runs.
+    const { setTelemetrySink: setFreshTelemetrySink } = await import('@/lib/telemetry/error-sink');
+    setFreshTelemetrySink(event => {
+      events.push(event);
+    });
     const readStoredValueWithRetry = await loadHelper();
 
-    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toThrow(
-      'E2E secure-store fault window is open: read of auth-token rejected'
-    );
+    const settled = expect(readStoredValueWithRetry('auth-token')).rejects.toMatchObject({
+      name: INJECTED_FAULT_ERROR_NAME,
+      message: 'E2E secure-store fault window is open: read rejected',
+    });
     await vi.advanceTimersByTimeAsync(2000);
 
     await settled;
     // The fault is the reason: the real store is never asked.
     expect(getItemAsync).not.toHaveBeenCalled();
+    // The exhausted-read report attaches the fault error, so that error must
+    // carry no key — the same invariant the real store's error keeps.
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(JSON.stringify(events[0])).not.toContain('auth-token');
 
     vi.doUnmock('@/lib/config');
     vi.resetModules();

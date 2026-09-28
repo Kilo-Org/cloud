@@ -16,6 +16,7 @@ export const TOKEN_KEYS = [
   ['foreground', '--foreground'],
   ['primary', '--primary'],
   ['primaryForeground', '--primary-foreground'],
+  ['primaryDisabled', '--primary-disabled'],
   ['secondary', '--secondary'],
   ['secondaryForeground', '--secondary-foreground'],
   ['muted', '--muted'],
@@ -39,6 +40,12 @@ export const TOKEN_KEYS = [
   ['agentKilocode', '--agent-kilocode'],
   ['agentCoral', '--agent-coral'],
   ['agentSky', '--agent-sky'],
+  ['rowHoney', '--row-honey'],
+  ['rowGold', '--row-gold'],
+  ['rowLime', '--row-lime'],
+  ['rowSage', '--row-sage'],
+  ['rowMoss', '--row-moss'],
+  ['rowFern', '--row-fern'],
 ];
 
 function collectDeclarations(rule) {

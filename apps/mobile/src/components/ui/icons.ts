@@ -18,6 +18,7 @@ export { default as Bot } from 'lucide-react-native/icons/bot';
 export { default as Brain } from 'lucide-react-native/icons/brain';
 export { default as Bug } from 'lucide-react-native/icons/bug';
 export { default as Building2 } from 'lucide-react-native/icons/building-2';
+export { default as Camera } from 'lucide-react-native/icons/camera';
 export { default as Check } from 'lucide-react-native/icons/check';
 export { default as CheckCheck } from 'lucide-react-native/icons/check-check';
 export { default as CheckCircle2 } from 'lucide-react-native/icons/circle-check';

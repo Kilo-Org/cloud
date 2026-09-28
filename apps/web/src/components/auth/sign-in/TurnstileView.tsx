@@ -100,7 +100,7 @@ export function TurnstileView({
           <button
             type="button"
             onClick={onRetry}
-            className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring mx-auto block rounded-md px-4 py-2 text-sm focus-visible:ring-[3px] focus-visible:outline-none"
+            className="bg-primary text-primary-foreground hover:bg-primary-hover focus-visible:ring-ring mx-auto block rounded-md px-4 py-2 text-sm focus-visible:ring-[3px] focus-visible:outline-none pointer-coarse:min-h-11 pointer-coarse:content-center"
           >
             Try Again
           </button>

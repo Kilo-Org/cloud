@@ -1,6 +1,10 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
-import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from '@/lib/tokens';
+import {
+  validateAuthorizationHeader,
+  JWT_TOKEN_VERSION,
+  isRejectedCredentialReason,
+} from '@/lib/tokens';
 import {
   CloudAgentNextRuntimeAuthorizationClaimSchema,
   RuntimeProxyAttestationAudienceSchema,
@@ -22,6 +26,7 @@ import type {
 } from 'next-auth';
 import NextAuth, { getServerSession } from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
+import type { OAuthConfig } from 'next-auth/providers/oauth';
 import GoogleProvider from 'next-auth/providers/google';
 import GithubProvider from 'next-auth/providers/github';
 import GitlabProvider from 'next-auth/providers/gitlab';
@@ -33,6 +38,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { allow_fake_login, IS_DEVELOPMENT, ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
+import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { redirect } from 'next/navigation';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact/affiliate-utils';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -51,14 +57,17 @@ import type { AuthProviderId } from '@kilocode/db/schema-types';
 import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
+  getOrganizationById,
   getProfileOrganizations,
   getSingleUserOrganization,
+  getUserOrgMemberships,
   getUserOrganizationsWithSeats,
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
@@ -71,12 +80,27 @@ import { hosted_domain_specials } from '@/lib/auth/constants';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
+  OPENAI_DISCOVERY_URL,
+  OPENAI_IDENTITY_SCOPE,
+  OPENAI_ISSUER,
+  OPENAI_REDIRECT_URI,
+  OPENAI_RESOURCE,
+  isOpenAiTokenSharingGrant,
+} from '@/lib/auth/openai/config';
+import {
+  openAiChatGptSharedServicesOwner,
+  saveOpenAiChatGptConnection,
+} from '@/lib/ai-gateway/openai-chatgpt/store';
+import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
+import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   ANACONDA_CLIENT_ID,
   ANACONDA_CLIENT_SECRET,
+  OPENAI_CLIENT_ID,
+  OPENAI_CLIENT_SECRET,
   LINKEDIN_CLIENT_ID,
   LINKEDIN_CLIENT_SECRET,
   WORKOS_API_KEY,
@@ -183,6 +207,28 @@ export function parseAnacondaProfile(profile: unknown) {
   };
 }
 
+const openAiProfileSchema = z.object({
+  sub: z.string().trim().min(1),
+  email: z.string().email(),
+  name: z.string().nullish(),
+  picture: z.string().nullish(),
+});
+
+/**
+ * Maps the verified OpenAI ID-token claims to a NextAuth user. `sub` is the
+ * stable external identity: it is the only claim used to bind the account, so
+ * a missing or empty subject is rejected rather than coerced.
+ */
+export function parseOpenAiProfile(profile: unknown) {
+  const parsedProfile = openAiProfileSchema.parse(profile);
+  return {
+    id: parsedProfile.sub,
+    email: parsedProfile.email,
+    name: parsedProfile.name?.trim() || parsedProfile.email.split('@')[0],
+    image: parsedProfile.picture ?? null,
+  };
+}
+
 function createGoogleAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -221,6 +267,124 @@ function createAnacondaAccountInfo(
     provider_account_id: account.providerAccountId,
     display_name: null,
   };
+}
+
+function createOpenAiAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser,
+  profile: Profile | undefined
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'openai') return null;
+  assert(user.email, 'User email is required for OpenAI auth');
+
+  const sub = (profile as { sub?: unknown } | undefined)?.sub;
+  if (typeof sub !== 'string' || sub.trim() === '') {
+    throw new Error('OpenAI auth profile is missing the subject');
+  }
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    hosted_domain: hosted_domain_specials.openai,
+    provider: account.provider,
+    // Issuer-qualified subject: a `sub` from any other issuer or client can
+    // never collide with an OpenAI account.
+    provider_account_id: `${OPENAI_ISSUER}#${sub}`,
+    display_name: null,
+  };
+}
+
+/**
+ * Persists the delegated tokens a completed ChatGPT authorization issued, so
+ * the same consent that signs a person in also connects OpenAI BYOK. Only a
+ * grant that carries the delegated scopes is stored: a plain identity-only
+ * sign-in cannot invoke the API resource and cannot be refreshed, so storing it
+ * would route eligible requests through a credential OpenAI rejects and would
+ * overwrite a working token-sharing connection. A storage failure is reported to
+ * Sentry without any token value and never fails the sign-in: the person is
+ * still signed in and can connect again from BYOK.
+ */
+async function persistOpenAiChatGptConnection(
+  userId: string,
+  account: Account,
+  profile: Profile | undefined
+): Promise<void> {
+  try {
+    const accessToken = account.access_token;
+    const subject = (profile as { sub?: unknown } | undefined)?.sub;
+    if (!accessToken || typeof subject !== 'string' || subject.trim() === '') return;
+    if (!isOpenAiTokenSharingGrant(account)) return;
+
+    const email = (profile as { email?: unknown } | undefined)?.email;
+    const extendedProfile = profile as ExtendedProfile | undefined;
+    const organizationId = extendedProfile?.openAiChatGptOrganizationId;
+    // A shared-services link stores the organization's single row instead of the
+    // linking person's own connection.
+    const owner: OpenAiChatGptOwner =
+      organizationId && extendedProfile?.openAiChatGptSharedServices === true
+        ? openAiChatGptSharedServicesOwner(organizationId)
+        : { kiloUserId: userId, organizationId: organizationId ?? null };
+    await saveOpenAiChatGptConnection(
+      owner,
+      {
+        access_token: accessToken,
+        ...(account.refresh_token ? { refresh_token: account.refresh_token } : {}),
+        expires_at: account.expires_at ?? Math.floor(Date.now() / 1000) + 3600,
+        ...(account.scope ? { scope: account.scope } : {}),
+        ...(account.token_type ? { token_type: account.token_type } : {}),
+        issuer: OPENAI_ISSUER,
+        client_id: OPENAI_CLIENT_ID,
+        subject,
+        ...(typeof email === 'string' && email ? { email } : {}),
+        connected_at: new Date().toISOString(),
+        status: 'connected',
+      },
+      userId
+    );
+  } catch (error) {
+    captureException(error, {
+      tags: { operation: 'openai_chatgpt_connection_persist' },
+    });
+  }
+}
+
+/**
+ * Whether the person completing a shared-services authorization may still
+ * connect the organization's connection. The link start authorized the role,
+ * but the consent round-trip can outlive it, so the callback re-reads the
+ * current membership: an owner or admin of the organization, an owner or admin
+ * of the parent organization whose access it inherits, or a Kilo platform admin
+ * (elevated and audited by the link start's own access check) may persist the
+ * connection. `canManageOrganization` is the rule every other organization
+ * management surface uses.
+ */
+async function mayConnectOpenAiChatGptSharedServices(
+  user: Pick<User, 'id' | 'is_admin'>,
+  organizationId: string
+): Promise<boolean> {
+  if (user.is_admin) return true;
+
+  const memberships = await getUserOrgMemberships(user.id);
+  const organization = await getOrganizationById(organizationId);
+  const roleIn = (id: string | null | undefined) =>
+    memberships.find(membership => membership.orgId === id)?.role;
+
+  return (
+    canManageOrganization(roleIn(organizationId)) ||
+    canManageOrganization(roleIn(organization?.parent_organization_id))
+  );
+}
+
+/**
+ * Where a refused shared-services authorization returns: the organization's
+ * BYOK page, whose card renders the `openai_error` code. The generic
+ * account-linking failure page cannot carry the organization, so the refusal
+ * would land on a page with no card to show it.
+ */
+function openAiChatGptConnectFailureUrl(organizationId: string, error: AuthErrorType): string {
+  const query = new URLSearchParams({ openai_error: error });
+  return `/organizations/${organizationId}/byok?${query.toString()}`;
 }
 
 function createAppleAccountInfo(
@@ -417,6 +581,33 @@ function createEmailAccountInfo(
   };
 }
 
+/**
+ * A passkey sign-in is resolved by its ticket, so the credentials `authorize`
+ * returns the Kilo user id as the account id and this is the identity the
+ * provider carries. A passkey never owns a `user_auth_provider` row: the
+ * credential lives in `passkey_credentials`, keyed by user id.
+ */
+function createPasskeyAccountInfo(
+  account: Account,
+  user: NextUser | AdapterUser
+): CreateOrUpdateUserArgs | null {
+  if (account.provider !== 'passkey') return null;
+  assert(user.email, 'User email is required for passkey auth');
+
+  return {
+    google_user_email: user.email,
+    google_user_name: user.name || user.email.split('@')[0],
+    google_user_image_url: user.image || '',
+    // Never used for a passkey: the sign-in callback returns before user
+    // settlement and the jwt callback resolves the account by user id without
+    // rewriting its hosted domain.
+    hosted_domain: getLowerDomainFromEmail(user.email) ?? null,
+    provider: 'passkey',
+    provider_account_id: account.providerAccountId,
+    display_name: null,
+  };
+}
+
 function createAccountInfo(
   account: Account,
   user: NextUser | AdapterUser,
@@ -425,12 +616,14 @@ function createAccountInfo(
   const accountInfo =
     createGoogleAccountInfo(account, user, profile) ??
     createAnacondaAccountInfo(account, user) ??
+    createOpenAiAccountInfo(account, user, profile) ??
     createAppleAccountInfo(account, user) ??
     createGitHubAccountInfo(account, user, profile) ??
     createGitlabAccountInfo(account, user) ??
     createLinkedInAccountInfo(account, user) ??
     createDiscordAccountInfo(account, user) ??
     createEmailAccountInfo(account, user) ??
+    createPasskeyAccountInfo(account, user) ??
     createFakeAccountInfo(account, user) ??
     createSSOAccountInfo(account, user, profile);
 
@@ -572,6 +765,9 @@ async function getImpactTrackingContextFromAuthFlow(requestHeaders?: Headers): P
 
 type ExtendedProfile = Profile & {
   isNewUser?: boolean; // Add isNewUser to the user type
+  openAiChatGptOrganizationId?: string;
+  /** Set when the authorization connected the organization's shared services. */
+  openAiChatGptSharedServices?: boolean;
 };
 
 const posthogClient = PostHogClient();
@@ -587,6 +783,47 @@ const logger: LoggerInstance = {
 
 const useSecureCookies = NEXTAUTH_URL?.startsWith('https://') ?? false;
 const cookiePrefix = useSecureCookies ? '__Secure-' : '';
+
+/**
+ * OpenAI ("Sign in with ChatGPT") provider.
+ *
+ * The OAuth client's registered callback path is `/auth/openai/callback`
+ * (`OPENAI_REDIRECT_PATH`). NextAuth rewrites a provider's `callbackUrl` to its
+ * own `/api/auth/callback/<id>` at request time, so the registered path is
+ * declared on the openid-client metadata (`client.redirect_uris`) for the
+ * authorization request and repeated explicitly when the code is exchanged.
+ * `callbackUrl` is kept because it names the registered path the route serves.
+ */
+const openAiProvider: OAuthConfig<Profile> & { callbackUrl: string } = {
+  id: 'openai',
+  name: 'ChatGPT',
+  type: 'oauth',
+  wellKnown: OPENAI_DISCOVERY_URL,
+  issuer: OPENAI_ISSUER,
+  idToken: true,
+  checks: ['pkce', 'state', 'nonce'],
+  client: {
+    token_endpoint_auth_method: 'client_secret_basic',
+    redirect_uris: [OPENAI_REDIRECT_URI],
+  },
+  clientId: OPENAI_CLIENT_ID,
+  clientSecret: OPENAI_CLIENT_SECRET,
+  callbackUrl: OPENAI_REDIRECT_URI,
+  authorization: { params: { scope: OPENAI_IDENTITY_SCOPE, resource: OPENAI_RESOURCE } },
+  token: {
+    params: { resource: OPENAI_RESOURCE },
+    // openid-client builds the code exchange from a fixed field set and drops
+    // the resource, so an authorization that requested a resource is redeemed
+    // without one and OpenAI rejects it with `invalid_grant`. `exchangeBody`
+    // merges the resource back into the same token request.
+    request: async ({ params, checks, client }) => ({
+      tokens: await client.callback(OPENAI_REDIRECT_URI, params, checks, {
+        exchangeBody: { resource: OPENAI_RESOURCE },
+      }),
+    }),
+  },
+  profile: parseOpenAiProfile,
+};
 
 export const authOptions: NextAuthOptions = {
   secret: NEXTAUTH_SECRET,
@@ -609,6 +846,7 @@ export const authOptions: NextAuthOptions = {
       clientId: GOOGLE_CLIENT_ID,
       clientSecret: GOOGLE_CLIENT_SECRET,
     }),
+    openAiProvider,
     {
       id: 'anaconda',
       name: 'Anaconda',
@@ -709,6 +947,40 @@ export const authOptions: NextAuthOptions = {
         };
       },
     }),
+    // Passkey sign-in. The authenticate route verifies the WebAuthn assertion
+    // against a server-stored challenge and mints a one-time ticket; redeeming
+    // that ticket here is the identity proof, so `authorize` only exchanges it.
+    CredentialsProvider({
+      id: 'passkey',
+      name: 'Passkey',
+      credentials: {
+        ticket: { label: 'Ticket', type: 'text' },
+      },
+      async authorize(credentials) {
+        if (!credentials?.ticket) {
+          return null;
+        }
+
+        const ticket = await consumeSignInTicket(credentials.ticket);
+        if (!ticket) {
+          // Unknown, expired, or already redeemed: a replayed ticket yields no
+          // user, so NextAuth mints no session for it.
+          return null;
+        }
+
+        const user = await findUserById(ticket.kilo_user_id);
+        if (!user) {
+          return null;
+        }
+
+        return {
+          id: user.id,
+          email: user.google_user_email,
+          name: user.google_user_name || user.google_user_email.split('@')[0],
+          image: user.google_user_image_url,
+        };
+      },
+    }),
     // Fake login provider for development and testing
     ...(allow_fake_login
       ? [
@@ -779,6 +1051,22 @@ export const authOptions: NextAuthOptions = {
 
         isAccountLinking = linkingSession && linkingSession.targetProvider === accountInfo.provider;
 
+        // The linking session is consumed here, so it carries the organization
+        // through to the jwt callback on the profile, the same way `isNewUser`
+        // travels. Only an OpenAI link stores an organization-scoped
+        // connection, so the session must have targeted OpenAI.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.organizationId &&
+          profile
+        ) {
+          (profile as ExtendedProfile).openAiChatGptOrganizationId = linkingSession.organizationId;
+          if (linkingSession.chatGptScope === 'shared_services') {
+            (profile as ExtendedProfile).openAiChatGptSharedServices = true;
+          }
+        }
+
         // if a user's email domain matches any organization's SSO domain and they are not logging in with SSO, force them to use SSO immediately
         const domain = getLowerDomainFromEmail(accountInfo.google_user_email);
 
@@ -818,7 +1106,13 @@ export const authOptions: NextAuthOptions = {
 
         // we don't need to check gmail domains for SSO for now.
         // This is mostly an optimization so we don't hit the DB on every gmail login since they defacto aren't using SSO
-        if (domainToCheck !== 'gmail.com') {
+        //
+        // Account linking is not a sign-in: the person is already
+        // authenticated and is only attaching another provider. Enforcing the
+        // domain SSO policy here would redirect them to the sign-in page and
+        // abort the link, so a BYOK connection (for example "Sign in with
+        // ChatGPT") would never be stored for an SSO-protected domain.
+        if (domainToCheck !== 'gmail.com' && !isAccountLinking) {
           // Fake login is intentionally exempt in supported non-production environments.
           if (accountInfo.provider !== 'workos' && accountInfo.provider !== 'fake-login') {
             const ssoAuthority = await resolveSsoAuthorityForDomain(domainToCheck);
@@ -832,6 +1126,15 @@ export const authOptions: NextAuthOptions = {
               return ssoSignInRedirectUrl(domainToCheck);
             }
           }
+        }
+
+        // A redeemed passkey ticket already proved identity, so a passkey skips
+        // both Turnstile and user settlement. This return sits after the domain
+        // blacklist and SSO-authority checks above, so a passkey can never
+        // bypass a domain that enforces SSO. No `user_auth_provider` row is
+        // written for a passkey: the jwt callback resolves it by user id.
+        if (accountInfo.provider === 'passkey') {
+          return true;
         }
 
         const requestHeaders = await headers();
@@ -964,6 +1267,21 @@ export const authOptions: NextAuthOptions = {
           return redirectUrlForCode(`BLOCKED`);
         }
 
+        // The link start authorized the connect, but the authorization can be
+        // consented to after that role is revoked: the callback re-reads the
+        // current membership before the jwt callback stores the organization's
+        // shared-services connection, and a refusal returns to the card that
+        // started the connect instead of failing silently.
+        if (
+          account.provider === 'openai' &&
+          linkingSession?.targetProvider === 'openai' &&
+          linkingSession.chatGptScope === 'shared_services' &&
+          linkingSession.organizationId &&
+          !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
+        ) {
+          return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
+        }
+
         if (!isAccountLinking && autoLinkToExistingUser) {
           await ensureVerifiedDomainOrganizationMembership(result.user.id);
         }
@@ -1018,6 +1336,12 @@ export const authOptions: NextAuthOptions = {
         assert(existingUser, `TRAP: No existing user found for ${accountInfo.google_user_email}`);
 
         token.kiloUserId = existingUser.id;
+
+        // The ChatGPT authorization carries the delegated tokens that are the
+        // OpenAI BYOK credential; store them on the same flow that signs in.
+        if (account.provider === 'openai' && account.access_token) {
+          await persistOpenAiChatGptConnection(existingUser.id, account, profile);
+        }
 
         token.version = JWT_TOKEN_VERSION;
         token.exp = Math.floor(Date.now() / 1000) + secondsInDay * 30;
@@ -1089,6 +1413,16 @@ export const authOptions: NextAuthOptions = {
 
 export const nextAuthHttpHandler = NextAuth(authOptions);
 
+/**
+ * Returns the signed-in user id when the request carries a valid NextAuth
+ * session, or null when it does not. This performs no authorization checks and
+ * never redirects; it is used to decide where an OAuth callback error lands.
+ */
+export async function getUserFromSession(): Promise<{ id: string } | null> {
+  const session = await getServerSession(authOptions);
+  return session?.kiloUserId ? { id: session.kiloUserId } : null;
+}
+
 export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
@@ -1099,6 +1433,16 @@ type GetAuthResponse =
   | {
       user: null;
       authFailedResponse: NextResponse<FailureResult<string>>;
+      /**
+       * True when the request presented a credential that failed verification,
+       * rather than presenting none. Such a request must not be downgraded to
+       * an anonymous identity; see `isRejectedCredentialReason`.
+       *
+       * `authError` always sets this. It is optional only so existing callers
+       * that construct a failure result directly keep compiling; absent means
+       * false.
+       */
+      credentialsRejected?: boolean;
       isNewUser?: undefined;
       organizationId?: undefined;
       internalApiUse?: undefined;
@@ -1109,6 +1453,7 @@ type GetAuthResponse =
   | {
       user: User;
       authFailedResponse: null;
+      credentialsRejected?: undefined;
       isNewUser?: boolean;
       organizationId?: Organization['id'];
       internalApiUse?: boolean;
@@ -1230,7 +1575,7 @@ async function resolveUserFromAuth(
     try {
       decoded = bearer ? jwt.decode(bearer) : null;
     } catch {
-      return authError(401, 'Invalid API token', '?');
+      return authError(401, 'Invalid API token', '?', { credentialsRejected: true });
     }
     const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
     const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
@@ -1260,7 +1605,9 @@ async function resolveUserFromAuth(
       runtimeProxyAttestationVerified,
     });
     if (authorizationValidationResult.error != undefined) {
-      return authError(401, authorizationValidationResult.error, '?');
+      return authError(401, authorizationValidationResult.error, '?', {
+        credentialsRejected: isRejectedCredentialReason(authorizationValidationResult.reason),
+      });
     }
 
     const user = await findUserById(authorizationValidationResult.kiloUserId, readDb);
@@ -1269,7 +1616,7 @@ async function resolveUserFromAuth(
       user?.api_token_pepper &&
       user.api_token_pepper !== authorizationValidationResult.apiTokenPepper
     ) {
-      return authError(401, 'Invalid API token', user.id);
+      return authError(401, 'Invalid API token', user.id, { credentialsRejected: true });
     }
     // A token-bound organization is signed; the request header is mutable.
     // Legacy and personal tokens intentionally continue to use the header.
@@ -1362,17 +1709,27 @@ async function appendCallbackPath(url: string): Promise<string> {
   const headersList = await headers();
   const pathname = headersList.get('x-pathname');
   if (pathname && pathname !== '/') {
+    // Keep the request's query in the callback so a resume link does not lose
+    // its `?at=` anchor across sign-in (see the `/cloud/sessions/<id>` route,
+    // whose layout redirects before the page can build its own callbackPath).
+    const search = headersList.get('x-search') ?? '';
     const separator = url.includes('?') ? '&' : '?';
-    return `${url}${separator}callbackPath=${encodeURIComponent(pathname)}`;
+    return `${url}${separator}callbackPath=${encodeURIComponent(`${pathname}${search}`)}`;
   }
   return url;
 }
 
-function authError(status: number, error: string, kiloUserId: string) {
+function authError(
+  status: number,
+  error: string,
+  kiloUserId: string,
+  options?: { credentialsRejected?: boolean }
+) {
   console.warn(`AUTH-FAIL ${status} (${kiloUserId}): ${error}`);
   return {
     user: null,
     authFailedResponse: NextResponse.json(failureResult(error), { status }),
+    credentialsRejected: options?.credentialsRejected ?? false,
   };
 }
 

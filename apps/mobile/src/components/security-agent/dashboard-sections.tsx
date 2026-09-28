@@ -36,6 +36,7 @@ function repoTrailingLabel(
   slaEnabled: boolean
 ): string {
   if (!slaEnabled) {
+    // i18n-dup-ok: 'securityAgent.dashboard.findingsCount_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
     return i18n.t('securityAgent.dashboard.findingsCount', {
       count: repo.needsAction,
       displayCount: formatNumber(repo.needsAction, i18n.language),
@@ -115,6 +116,7 @@ function PriorityFindingSection({ scope, data, slaEnabled }: SectionProps) {
           {finding.repoFullName}
           {isOverdue &&
             ` · ${
+              // i18n-dup-ok: 'securityAgent.dashboard.daysOverdue_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
               daysOverdue === 0
                 ? t('securityAgent.dashboard.deadlineToday')
                 : t('securityAgent.dashboard.daysOverdue', {

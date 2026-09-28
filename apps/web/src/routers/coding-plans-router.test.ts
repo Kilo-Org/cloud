@@ -7,6 +7,7 @@ import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { uploadKeysToInventory } from '@/lib/coding-plans';
 import { getBytePlusUsage } from '@/lib/coding-plans/byteplus-usage';
+import { CodingPlanUsageError } from '@/lib/coding-plans/usage-contract';
 import { CODING_PLAN_IDS } from '@/lib/coding-plans/pricing';
 import { redisClient } from '@/lib/redis';
 import { createCallerForUser } from '@/routers/test-utils';
@@ -47,7 +48,7 @@ const ULTRA_PLAN_ID = 'minimax-token-plan-ultra';
 const BYTEPLUS_PLAN_ID = 'byteplus-coding-plan-team-lite';
 const BYTEPLUS_PRO_PLAN_ID = 'byteplus-coding-plan-team-pro';
 const COST_MICRODOLLARS = 20_000_000;
-const MAX_COST_MICRODOLLARS = 50_000_000;
+const BYTEPLUS_PRO_COST_MICRODOLLARS = 100_000_000;
 const mockedGenerateText = jest.mocked(generateText);
 const mockedGetBytePlusUsage = jest.mocked(getBytePlusUsage);
 const mockedRedisGet = jest.mocked(redisClient.get);
@@ -196,6 +197,7 @@ describe('coding plans router', () => {
         features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
+        purchasable: false,
       },
       {
         planId: MAX_PLAN_ID,
@@ -210,6 +212,7 @@ describe('coding plans router', () => {
         ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
+        purchasable: false,
       },
       {
         planId: ULTRA_PLAN_ID,
@@ -224,6 +227,7 @@ describe('coding plans router', () => {
         ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
+        purchasable: false,
       },
       {
         planId: BYTEPLUS_PLAN_ID,
@@ -238,6 +242,7 @@ describe('coding plans router', () => {
         ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
+        purchasable: true,
       },
       {
         planId: BYTEPLUS_PRO_PLAN_ID,
@@ -253,26 +258,77 @@ describe('coding plans router', () => {
         ]),
         availabilityStatus: 'sold_out',
         notificationRequested: false,
+        purchasable: true,
       },
     ]);
+  });
+
+  it('flags MiniMax plans as closed to new signups while BytePlus remains purchasable', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+
+    const catalog = await caller.codingPlans.catalog();
+    const purchasableByPlan = Object.fromEntries(
+      catalog.map(plan => [plan.planId, plan.purchasable])
+    );
+
+    expect(purchasableByPlan).toEqual({
+      [PLAN_ID]: false,
+      [MAX_PLAN_ID]: false,
+      [ULTRA_PLAN_ID]: false,
+      [BYTEPLUS_PLAN_ID]: true,
+      [BYTEPLUS_PRO_PLAN_ID]: true,
+    });
+  });
+
+  it('rejects new MiniMax subscribe and notify requests, and reports non-purchasable catalog entries', async () => {
+    const user = await insertTestUser({
+      total_microdollars_acquired: COST_MICRODOLLARS,
+      microdollars_used: 0,
+    });
+    const caller = await createCallerForUser(user.id);
+    await uploadKeysToInventory(
+      'minimax',
+      PLAN_ID,
+      [inventoryEntry(`minimax-disabled-${crypto.randomUUID()}`)],
+      { validateCredential: async () => true }
+    );
+
+    await expect(
+      caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'disabled-signup' })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'MiniMax Token Plan Plus is not currently accepting new signups.',
+    });
+    await expect(
+      caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'MiniMax Token Plan Plus is not currently accepting new signups.',
+    });
+    expect(await db.select().from(coding_plan_subscriptions)).toHaveLength(0);
+    expect(await db.select().from(coding_plan_availability_intents)).toHaveLength(0);
   });
 
   it('reports available capacity without exposing inventory and rejects notify requests while in stock', async () => {
     const user = await insertTestUser();
     const caller = await createCallerForUser(user.id);
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`catalog-available-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({
+          valid: true,
+          upstreamUsageId: 'seat-catalog-available',
+        }),
       }
     );
 
     await expect(caller.codingPlans.catalog()).resolves.toEqual([
       expect.objectContaining({
         planId: PLAN_ID,
-        availabilityStatus: 'available',
+        availabilityStatus: 'sold_out',
         notificationRequested: false,
       }),
       expect.objectContaining({
@@ -287,7 +343,7 @@ describe('coding plans router', () => {
       }),
       expect.objectContaining({
         planId: BYTEPLUS_PLAN_ID,
-        availabilityStatus: 'sold_out',
+        availabilityStatus: 'available',
         notificationRequested: false,
       }),
       expect.objectContaining({
@@ -297,7 +353,7 @@ describe('coding plans router', () => {
       }),
     ]);
     await expect(
-      caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID })
+      caller.codingPlans.requestAvailabilityNotification({ planId: BYTEPLUS_PLAN_ID })
     ).rejects.toThrow('currently available');
   });
 
@@ -306,20 +362,20 @@ describe('coding plans router', () => {
     const caller = await createCallerForUser(user.id);
 
     await expect(
-      caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID })
+      caller.codingPlans.requestAvailabilityNotification({ planId: BYTEPLUS_PRO_PLAN_ID })
     ).resolves.toEqual({ requested: true });
     await expect(
-      caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID })
+      caller.codingPlans.requestAvailabilityNotification({ planId: BYTEPLUS_PRO_PLAN_ID })
     ).resolves.toEqual({ requested: true });
 
     const intents = await db.select().from(coding_plan_availability_intents);
     expect(intents).toHaveLength(1);
-    expect(intents[0]).toMatchObject({ user_id: user.id, plan_id: PLAN_ID });
+    expect(intents[0]).toMatchObject({ user_id: user.id, plan_id: BYTEPLUS_PRO_PLAN_ID });
     await expect(caller.codingPlans.catalog()).resolves.toEqual([
       expect.objectContaining({
         planId: PLAN_ID,
         availabilityStatus: 'sold_out',
-        notificationRequested: true,
+        notificationRequested: false,
       }),
       expect.objectContaining({
         planId: MAX_PLAN_ID,
@@ -339,7 +395,7 @@ describe('coding plans router', () => {
       expect.objectContaining({
         planId: BYTEPLUS_PRO_PLAN_ID,
         availabilityStatus: 'sold_out',
-        notificationRequested: false,
+        notificationRequested: true,
       }),
     ]);
   });
@@ -350,42 +406,51 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     const caller = await createCallerForUser(user.id);
-    await caller.codingPlans.requestAvailabilityNotification({ planId: PLAN_ID });
+    await caller.codingPlans.requestAvailabilityNotification({ planId: BYTEPLUS_PLAN_ID });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`notify-activation-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({
+          valid: true,
+          upstreamUsageId: 'seat-notify-activation',
+        }),
       }
     );
 
-    await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'notify-activation' });
+    await caller.codingPlans.subscribe({
+      planId: BYTEPLUS_PLAN_ID,
+      idempotencyKey: 'notify-activation',
+    });
 
     expect(await db.select().from(coding_plan_availability_intents)).toHaveLength(0);
   });
 
-  it('rejects purchase while a disabled personal MiniMax BYOK key occupies setup', async () => {
+  it('rejects purchase while a disabled personal BytePlus BYOK key occupies setup', async () => {
     const user = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
     });
     const caller = await createCallerForUser(user.id);
-    const key = await caller.byok.create({ provider_id: 'minimax', api_key: 'existing-key' });
+    const key = await caller.byok.create({
+      provider_id: 'byteplus-coding',
+      api_key: 'existing-key',
+    });
     await caller.byok.setEnabled({ id: key.id, is_enabled: false });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`unused-router-key-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-unused-router' }),
       }
     );
 
     await expect(
-      caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'blocked-slot' })
+      caller.codingPlans.subscribe({ planId: BYTEPLUS_PLAN_ID, idempotencyKey: 'blocked-slot' })
     ).rejects.toThrow(
-      'Remove your existing MiniMax BYOK key from /byok before subscribing to a MiniMax Coding Plan'
+      'Remove your existing BytePlus BYOK key from /byok before subscribing to a BytePlus Coding Plan'
     );
     const [savedUser] = await db.select().from(kilocode_users);
     const subscriptions = await db.select().from(coding_plan_subscriptions);
@@ -403,18 +468,18 @@ describe('coding plans router', () => {
     });
     const otherUser = await insertTestUser();
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`router-managed-key-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-router-managed' }),
       }
     );
     const ownerCaller = await createCallerForUser(owner.id);
     const otherCaller = await createCallerForUser(otherUser.id);
 
     const activation = await ownerCaller.codingPlans.subscribe({
-      planId: PLAN_ID,
+      planId: BYTEPLUS_PLAN_ID,
       idempotencyKey: 'router-activation-request',
     });
     const subscriptions = await ownerCaller.codingPlans.listSubscriptions();
@@ -429,12 +494,14 @@ describe('coding plans router', () => {
     expect(subscriptions[0]).toMatchObject({ canQueryUsage: true });
     expect(detail).toMatchObject({
       id: activation.subscriptionId,
-      planId: PLAN_ID,
-      planName: 'Token Plan Plus',
-      providerName: 'MiniMax',
-      providerId: 'minimax',
-      routeLabel: 'MiniMax via Kilo Gateway',
-      features: expect.arrayContaining(['~1.7B tokens per month of M3 usage.']),
+      planId: BYTEPLUS_PLAN_ID,
+      planName: 'Enterprise Coding Plan Lite',
+      providerName: 'BytePlus',
+      providerId: 'byteplus-coding',
+      routeLabel: 'BytePlus via Kilo Gateway',
+      features: expect.arrayContaining([
+        'Kilo automatically configures BytePlus in your BYOK settings.',
+      ]),
       canQueryUsage: true,
       hasInstalledByokKey: true,
       status: 'active',
@@ -450,7 +517,7 @@ describe('coding plans router', () => {
           id: expect.any(String),
           date: expect.stringContaining('T'),
           amountMicrodollars: COST_MICRODOLLARS,
-          description: 'Coding plan: MiniMax Token Plan Plus',
+          description: 'Coding plan: BytePlus Enterprise Coding Plan Lite',
         },
       ],
       hasMore: false,
@@ -477,32 +544,70 @@ describe('coding plans router', () => {
     ).rejects.toThrow('Coding Plan subscription not found.');
   });
 
-  it('returns owner-scoped managed usage without exposing the credential', async () => {
+  it('returns owner-scoped managed usage for a grandfathered MiniMax subscriber without exposing the credential', async () => {
+    // MiniMax Token Plans are closed to new signups (see pricing.ts), so this
+    // seeds a pre-existing MiniMax subscription directly rather than through
+    // codingPlans.subscribe, to confirm the MiniMax usage integration still
+    // works for a subscriber who purchased before the plan was disabled.
     const managedKey = `sk-cp-managed-${crypto.randomUUID()}`;
     const owner = await insertTestUser({
       total_microdollars_acquired: COST_MICRODOLLARS,
       microdollars_used: 0,
     });
     const otherUser = await insertTestUser();
-    await uploadKeysToInventory('minimax', PLAN_ID, [inventoryEntry(managedKey)], {
-      validateCredential: async () => true,
-    });
+    const [inventory] = await db
+      .insert(coding_plan_key_inventory)
+      .values({
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        upstream_plan_id: `minimax-grandfathered-${crypto.randomUUID()}`,
+        encrypted_api_key: encryptApiKey(managedKey, BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: crypto.randomUUID(),
+        status: 'assigned',
+        assigned_to_user_id: owner.id,
+        assigned_at: new Date().toISOString(),
+      })
+      .returning();
+    const [installedByok] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: owner.id,
+        provider_id: 'minimax',
+        encrypted_api_key: encryptApiKey(managedKey, BYOK_ENCRYPTION_KEY),
+        management_source: 'coding_plan',
+        created_by: owner.id,
+      })
+      .returning();
+    const periodStart = new Date().toISOString();
+    const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const [subscription] = await db
+      .insert(coding_plan_subscriptions)
+      .values({
+        user_id: owner.id,
+        plan_id: PLAN_ID,
+        provider_id: 'minimax',
+        key_inventory_id: inventory.id,
+        installed_byok_key_id: installedByok.id,
+        status: 'active',
+        cost_microdollars: COST_MICRODOLLARS,
+        billing_period_days: 30,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+        credit_renewal_at: periodEnd,
+      })
+      .returning();
     const ownerCaller = await createCallerForUser(owner.id);
     const otherCaller = await createCallerForUser(otherUser.id);
-    const activation = await ownerCaller.codingPlans.subscribe({
-      planId: PLAN_ID,
-      idempotencyKey: 'managed-usage',
-    });
     const request = jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
 
     const active = await ownerCaller.codingPlans.getUsage({
-      subscriptionId: activation.subscriptionId,
+      subscriptionId: subscription.id,
     });
     expect(active).toEqual({
       schemaVersion: 1,
       fetchedAt: expect.stringContaining('T'),
       subscription: {
-        id: activation.subscriptionId,
+        id: subscription.id,
         planId: PLAN_ID,
         planName: 'Token Plan Plus',
         providerId: 'minimax',
@@ -527,7 +632,7 @@ describe('coding plans router', () => {
     });
     expect(JSON.stringify(active)).not.toContain(managedKey);
     await expect(
-      otherCaller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
+      otherCaller.codingPlans.getUsage({ subscriptionId: subscription.id })
     ).rejects.toMatchObject({
       code: 'NOT_FOUND',
       message: 'Coding Plan subscription not found.',
@@ -603,19 +708,18 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-state-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-usage-states' }),
       }
     );
     const caller = await createCallerForUser(owner.id);
     const activation = await caller.codingPlans.subscribe({
-      planId: PLAN_ID,
+      planId: BYTEPLUS_PLAN_ID,
       idempotencyKey: 'usage-states',
     });
-    jest.spyOn(global, 'fetch').mockImplementation(async () => usageResponse());
     const past = new Date(Date.now() - 60_000).toISOString();
 
     // A period deadline that already passed does not end usage early; the
@@ -659,16 +763,16 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-corrupt-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-corrupt' }),
       }
     );
     const caller = await createCallerForUser(owner.id);
     const activation = await caller.codingPlans.subscribe({
-      planId: PLAN_ID,
+      planId: BYTEPLUS_PLAN_ID,
       idempotencyKey: 'corrupt-assignment',
     });
     const [subscription] = await db
@@ -680,7 +784,6 @@ describe('coding plans router', () => {
       .update(coding_plan_key_inventory)
       .set({ assigned_to_user_id: null })
       .where(eq(coding_plan_key_inventory.id, subscription.inventoryId));
-    const request = jest.spyOn(global, 'fetch');
 
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
@@ -688,7 +791,7 @@ describe('coding plans router', () => {
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Coding Plan usage is unavailable.',
     });
-    expect(request).not.toHaveBeenCalled();
+    expect(mockedGetBytePlusUsage).not.toHaveBeenCalled();
     await expect(caller.codingPlans.listSubscriptions()).resolves.toHaveLength(1);
     await expect(
       caller.codingPlans.getSubscriptionDetail({ subscriptionId: activation.subscriptionId })
@@ -705,21 +808,19 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`sk-cp-upstream-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-upstream' }),
       }
     );
     const caller = await createCallerForUser(owner.id);
     const activation = await caller.codingPlans.subscribe({
-      planId: PLAN_ID,
+      planId: BYTEPLUS_PLAN_ID,
       idempotencyKey: 'upstream-failure',
     });
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue(new Response('raw provider failure', { status: 503 }));
+    mockedGetBytePlusUsage.mockRejectedValueOnce(new CodingPlanUsageError('http'));
 
     await expect(
       caller.codingPlans.getUsage({ subscriptionId: activation.subscriptionId })
@@ -739,49 +840,58 @@ describe('coding plans router', () => {
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
       [inventoryEntry(`second-purchase-key-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-second-purchase' }),
       }
     );
     const caller = await createCallerForUser(owner.id);
-    await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'first-purchase' });
+    await caller.codingPlans.subscribe({
+      planId: BYTEPLUS_PLAN_ID,
+      idempotencyKey: 'first-purchase',
+    });
 
     await expect(
-      caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'new-purchase' })
+      caller.codingPlans.subscribe({ planId: BYTEPLUS_PLAN_ID, idempotencyKey: 'new-purchase' })
     ).rejects.toThrow('already has a live subscription');
     expect(await db.select().from(coding_plan_terms)).toHaveLength(1);
   });
 
-  it('rejects subscribing to another MiniMax token plan while one is live', async () => {
+  it('rejects subscribing to another BytePlus coding plan while one is live', async () => {
     const owner = await insertTestUser({
-      total_microdollars_acquired: COST_MICRODOLLARS + MAX_COST_MICRODOLLARS,
+      total_microdollars_acquired: COST_MICRODOLLARS + BYTEPLUS_PRO_COST_MICRODOLLARS,
       microdollars_used: 0,
     });
     await uploadKeysToInventory(
-      'minimax',
-      PLAN_ID,
-      [inventoryEntry(`provider-plus-key-${crypto.randomUUID()}`)],
+      'byteplus-coding',
+      BYTEPLUS_PLAN_ID,
+      [inventoryEntry(`provider-lite-key-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-provider-lite' }),
       }
     );
     await uploadKeysToInventory(
-      'minimax',
-      MAX_PLAN_ID,
-      [inventoryEntry(`provider-max-key-${crypto.randomUUID()}`)],
+      'byteplus-coding',
+      BYTEPLUS_PRO_PLAN_ID,
+      [inventoryEntry(`provider-pro-key-${crypto.randomUUID()}`)],
       {
-        validateCredential: async () => true,
+        validateCredential: async () => ({ valid: true, upstreamUsageId: 'seat-provider-pro' }),
       }
     );
     const caller = await createCallerForUser(owner.id);
-    await caller.codingPlans.subscribe({ planId: PLAN_ID, idempotencyKey: 'first-provider-plan' });
+    await caller.codingPlans.subscribe({
+      planId: BYTEPLUS_PLAN_ID,
+      idempotencyKey: 'first-provider-plan',
+    });
 
     await expect(
-      caller.codingPlans.subscribe({ planId: MAX_PLAN_ID, idempotencyKey: 'second-provider-plan' })
-    ).rejects.toThrow('MiniMax Coding Plan already has a live subscription');
+      caller.codingPlans.subscribe({
+        planId: BYTEPLUS_PRO_PLAN_ID,
+        idempotencyKey: 'second-provider-plan',
+      })
+    ).rejects.toThrow('BytePlus Coding Plan already has a live subscription');
     expect(await db.select().from(coding_plan_terms)).toHaveLength(1);
   });
 
@@ -836,6 +946,107 @@ describe('coding plans router', () => {
       code: 'BAD_REQUEST',
       message: expect.stringContaining('<api key>::<upstream plan id>'),
     });
+  });
+
+  it('queues available inventory for manual revocation by the requested count and returns their upstream plan IDs', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+    const items = await Promise.all([insertInventory(), insertInventory(), insertInventory()]);
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 2 });
+
+    expect(result.queued).toHaveLength(2);
+    const queuedIds = result.queued.map(item => item.id);
+    expect(new Set(queuedIds).size).toBe(2);
+    expect(items.map(item => item.upstream_plan_id)).toEqual(
+      expect.arrayContaining(result.queued.map(item => item.upstreamPlanId))
+    );
+
+    const rows = await db.select().from(coding_plan_key_inventory);
+    expect(rows).toHaveLength(3);
+    for (const row of rows) {
+      const wasQueued = queuedIds.includes(row.id);
+      expect(row.status).toBe(wasQueued ? 'revocation_pending' : 'available');
+      expect(row.encrypted_api_key).toEqual(wasQueued ? null : expect.anything());
+      if (wasQueued) {
+        expect(row.revocation_requested_at).not.toBeNull();
+        expect(row.upstream_plan_id).toBe(
+          result.queued.find(item => item.id === row.id)?.upstreamPlanId
+        );
+      }
+    }
+
+    const queue = await caller.codingPlans.adminRevocationQueue({});
+    expect(queue.map(item => item.inventoryKeyId).sort()).toEqual(queuedIds.sort());
+  });
+
+  it('queues fewer than requested when not enough available inventory exists for the plan', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const caller = await createCallerForUser(admin.id);
+    await insertInventory();
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 5 });
+
+    expect(result.queued).toHaveLength(1);
+    const [row] = await db.select().from(coding_plan_key_inventory);
+    expect(row.status).toBe('revocation_pending');
+  });
+
+  it('never queues assigned inventory or inventory referenced by a live subscription', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+    const assigned = await insertInventory({
+      status: 'assigned',
+      assigned_to_user_id: user.id,
+      assigned_at: new Date().toISOString(),
+    });
+    const pendingRevocation = await insertInventory({
+      status: 'revocation_pending',
+      revocation_requested_at: new Date().toISOString(),
+    });
+    await db
+      .insert(coding_plan_subscriptions)
+      .values(subscriptionValues(user.id, { key_inventory_id: assigned.id, status: 'active' }));
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 5 });
+
+    expect(result.queued).toHaveLength(0);
+    const rowsById = new Map(
+      (await db.select().from(coding_plan_key_inventory)).map(row => [row.id, row])
+    );
+    expect(rowsById.get(assigned.id)?.status).toBe('assigned');
+    expect(rowsById.get(pendingRevocation.id)?.status).toBe('revocation_pending');
+  });
+
+  it('queues an available credential even when a canceled subscription still references it via a stale key_inventory_id', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(admin.id);
+    // Simulates a credential that was assigned, revoked, and manually
+    // recycled back to "available" via replaceManualCredentialRevocation.
+    // The original (now canceled) subscription's key_inventory_id is never
+    // cleared, so this row is still "available" but has a stale FK pointing
+    // at it from a subscription that is no longer live.
+    const recycled = await insertInventory({ status: 'available' });
+    await db
+      .insert(coding_plan_subscriptions)
+      .values(subscriptionValues(user.id, { key_inventory_id: recycled.id, status: 'canceled' }));
+
+    const result = await caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 1 });
+
+    expect(result.queued).toHaveLength(1);
+    expect(result.queued[0].id).toBe(recycled.id);
+  });
+
+  it('rejects non-admin callers reducing inventory', async () => {
+    const user = await insertTestUser();
+    const caller = await createCallerForUser(user.id);
+    await insertInventory();
+
+    await expect(
+      caller.codingPlans.adminReduceInventory({ planId: PLAN_ID, count: 1 })
+    ).rejects.toThrow();
   });
 
   it('restricts manual remediation and returns the upstream identifier needed to deprovision', async () => {

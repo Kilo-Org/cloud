@@ -14,7 +14,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import type { BYOKResult } from '@/lib/ai-gateway/providers/types';
 import { getVercelModelsMetadataFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { isKiloExclusiveModel } from '@/lib/ai-gateway/models';
+import { isKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
 
 export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
@@ -24,7 +24,7 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   }
   const providers: UserByokProviderId[] = [
     ...new Set(
-      vercelModelMetadata[mapModelIdToVercel(modelId)]?.endpoints
+      vercelModelMetadata[await mapModelIdToVercel(modelId)]?.endpoints
         .map(ep => getVercelUserByokProviderIdForEndpoint(ep.provider_name ?? ep.tag))
         .filter(providerId => providerId !== undefined) ?? []
     ),
@@ -48,7 +48,7 @@ export async function getUserByokProviderIds(
     .from(byok_api_keys)
     .where(and(eq(byok_api_keys.kilo_user_id, userId), eq(byok_api_keys.is_enabled, true)));
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return parseUserByokProviderIds(rows);
 }
 
 export async function getOrganizationByokProviderIds(
@@ -62,7 +62,14 @@ export async function getOrganizationByokProviderIds(
       and(eq(byok_api_keys.organization_id, organizationId), eq(byok_api_keys.is_enabled, true))
     );
 
-  return rows.map(row => UserByokProviderIdSchema.parse(row.provider_id));
+  return parseUserByokProviderIds(rows);
+}
+
+function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProviderId[] {
+  return rows.flatMap(row => {
+    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return providerId.success ? [providerId.data] : [];
+  });
 }
 
 export async function addUserByokAvailability(

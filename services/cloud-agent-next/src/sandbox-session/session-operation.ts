@@ -28,20 +28,33 @@ import {
   completeSessionOperationAttachment,
   recordSessionOperationDispatch,
   recordSessionOperationExecutionDeadline,
-  type SessionMessageRecord,
+  releaseUnconfirmedAttach,
+  type SessionMessage,
 } from './session-message-queue.js';
+import type { SessionAggregate } from '../sandbox-state/model/session.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
+import { logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import {
   ControlRequestError,
   controlRequestResult,
+  isUnconfirmedReachabilityFailure,
   withDeliveryDeadline,
 } from './control-dispatch.js';
 import { persistSessionOperationDelivery } from './session-delivery.js';
 
-type OperationMessages = {
-  read: () => SessionMessageRecord[];
-  commit: (messages: SessionMessageRecord[]) => boolean;
+type OperationMessageStore = {
+  read: () => SessionMessage[];
+  commit: (messages: SessionMessage[]) => boolean;
+};
+
+/**
+ * The message store plus the caller's aggregate projection, so a result
+ * application never invents a binding: the aggregate passed to the reducer is
+ * the caller's, with the same binding that will be persisted.
+ */
+type OperationMessages = OperationMessageStore & {
+  aggregate: () => SessionAggregate;
 };
 
 export type SessionOperationEffects = {
@@ -89,7 +102,12 @@ function rejectedOrUncertain(
   return error instanceof ControlRequestError
     ? {
         state: 'rejected',
-        error: { code: error.code, message: error.message, retryable: error.retryable },
+        error: {
+          code: error.code,
+          message: error.message,
+          retryable: error.retryable,
+          ...(error.subtype === undefined ? {} : { subtype: error.subtype }),
+        },
         ...(captureRejection && error.rejectionReceived ? { rejectionReceived: true } : {}),
       }
     : { state: 'uncertain', reason: 'transport', error };
@@ -130,26 +148,40 @@ export async function reconcileSessionOperation(
     effects.assertScope();
     if (Date.now() >= operationDeadlineAt) throw new Error('Operation observation expired');
     const lookup = sessionOperationLookupResultSchema.parse(controlRequestResult(response));
-    if (lookup.state === 'missing') return { state: 'uncertain', reason: 'missing' };
+    const unconfirmed = (reason: 'missing' | 'unverified'): UncertainOperation => {
+      logControlDiagnostic('session_operation_reconcile', {
+        sessionId: authorization.session.sessionId,
+        messageId: authorization.messageId,
+        operation: authorization.operation,
+        operationId: authorization.operationId,
+        reason,
+        lookupState: lookup.state,
+      });
+      return { state: 'uncertain', reason };
+    };
+    if (lookup.state === 'missing') return unconfirmed('missing');
     const observed =
       lookup.state === 'completed' ? lookup.delivery.authorization : lookup.authorization;
     if (!sameSessionOperation(observed, authorization))
       throw new Error('Operation observation identity changed');
     if (
+      authorization.operation === 'session.prompt' &&
       lookup.state === 'running' &&
       lookup.executionDeadlineAt !== undefined &&
       effects.recordExecutionDeadline?.(authorization, lookup.executionDeadlineAt) === false
     )
-      return { state: 'uncertain', reason: 'unverified' };
+      return unconfirmed('unverified');
     if (lookup.state === 'completed') {
       if (
         (await persistSessionOperationDelivery(lookup.delivery, operationDeadlineAt, effects)) ===
         'unverified'
       )
-        return { state: 'uncertain', reason: 'unverified' };
+        return unconfirmed('unverified');
     }
     return lookup;
   } catch (error) {
+    if (isUnconfirmedReachabilityFailure(error))
+      return { state: 'uncertain', reason: 'transport', error };
     return rejectedOrUncertain(error);
   }
 }
@@ -160,7 +192,7 @@ export async function dispatchSessionOperation(
     payload: unknown;
     expectedConnection?: SandboxControlConnectionIdentity;
   },
-  messages: OperationMessages,
+  messages: OperationMessageStore,
   effects: SessionOperationEffects & { isCurrent: () => boolean }
 ): Promise<SessionOperationDispatch> {
   const authorization = sessionOperationAuthorizationSchema.parse(input.authorization);
@@ -182,7 +214,7 @@ export async function dispatchSessionOperation(
   };
   try {
     const message = messages.read().find(item => item.messageId === authorization.messageId);
-    const proof = message?.operations?.[kind];
+    const proof = message?.proofs?.[kind];
     if (proof && !sameSessionOperation(proof.authorization, authorization))
       throw new Error('Original operation authorization changed');
     if (proof?.dispatched) {
@@ -202,19 +234,28 @@ export async function dispatchSessionOperation(
           },
         }
       );
-      if (lookup.state !== 'completed') return lookup;
-      if (!lookup.delivery.result.ok)
-        return {
-          state: 'rejected',
-          error: lookup.delivery.result.error,
-          rejectionReceived: true,
-        };
-      if (kind === 'attach') {
-        const completed = completeSessionOperationAttachment(messages.read(), authorization);
-        if (!completed || !messages.commit(completed))
-          return { state: 'uncertain', reason: 'unverified' };
+      if (lookup.state === 'completed') {
+        if (!lookup.delivery.result.ok)
+          return {
+            state: 'rejected',
+            error: lookup.delivery.result.error,
+            rejectionReceived: true,
+          };
+        if (kind === 'attach') {
+          const completed = completeSessionOperationAttachment(messages.read(), authorization);
+          if (!completed || !messages.commit(completed))
+            return { state: 'uncertain', reason: 'unverified' };
+        }
+        return { state: 'completed', result: lookup.delivery.result.result };
       }
-      return { state: 'completed', result: lookup.delivery.result.result };
+      // A dispatched attach the current runtime has no record of never executed
+      // there. Retire that unconfirmed proof and fall through to dispatch a fresh
+      // attach rather than failing preparation on an outcome it cannot confirm.
+      // A dispatched prompt is never recovered this way: it may already have run.
+      if (kind !== 'attach' || lookup.state !== 'uncertain' || lookup.reason !== 'missing')
+        return lookup;
+      const released = releaseUnconfirmedAttach(messages.read(), authorization);
+      if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
     const payload = structuredClone(
@@ -319,10 +360,15 @@ export function commitSessionOperationResult(input: {
     const message = current.find(item => item.messageId === authorization.messageId);
     if (
       Date.now() >= input.deadlineAt &&
-      (message?.state === 'queued' || message?.state === 'accepted')
+      (message?.state.kind === 'queued' || message?.state.kind === 'accepted')
     )
       return;
-    const applied = applySessionOperationResult(current, delivery, input.hash, Date.now());
+    const applied = applySessionOperationResult(
+      messages.aggregate(),
+      delivery,
+      input.hash,
+      Date.now()
+    );
     if (!applied) return;
     if (applied.disposition === 'applied') {
       if (input.eventQueries) {

@@ -1,7 +1,7 @@
-import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
+import { withRestTiming } from '@/lib/observability/request-timing';
 
 const requestSchema = z.object({
   refreshToken: z.string().min(1),
@@ -18,7 +18,7 @@ const requestSchema = z.object({
  *   401 { error: 'USER_BLOCKED' }           — the user's account is blocked
  *   400                                      — invalid request body
  */
-export async function POST(request: NextRequest) {
+export const POST = withRestTiming('/api/auth/native/refresh', async (request: Request) => {
   const body = await request.json().catch(() => undefined);
   const validation = requestSchema.safeParse(body);
 
@@ -42,4 +42,4 @@ export async function POST(request: NextRequest) {
     },
     { status: 200 }
   );
-}
+});

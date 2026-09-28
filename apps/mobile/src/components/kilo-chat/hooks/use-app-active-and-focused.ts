@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState } from 'react-native';
+import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+
+import { useAppStateActive } from '@/lib/hooks/use-app-state-active';
 
 /**
  * True only when the app is in the foreground AND the current expo-router
@@ -8,17 +9,8 @@ import { useFocusEffect } from 'expo-router';
  * while the user is genuinely on a surface.
  */
 export function useAppActiveAndFocused(): boolean {
-  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  const appActive = useAppStateActive();
   const [focused, setFocused] = useState(false);
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', state => {
-      setAppActive(state === 'active');
-    });
-    return () => {
-      sub.remove();
-    };
-  }, []);
 
   useFocusEffect(
     useCallback(() => {

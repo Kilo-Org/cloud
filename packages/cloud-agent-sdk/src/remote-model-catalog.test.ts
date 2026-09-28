@@ -1,5 +1,3 @@
-import { z } from 'zod';
-
 import {
   REMOTE_MODEL_CATALOG_MAX_SERIALIZED_BYTES,
   REMOTE_MODEL_IDENTITY_MAX_LENGTH,
@@ -151,16 +149,6 @@ function createUtf8OversizedCatalog() {
 }
 
 describe('remoteModelCatalogV1Schema', () => {
-  it('reproduces the old interleaved enum rejecting CLI catalogs', () => {
-    const oldInterleaved = z.union([
-      z.boolean(),
-      z.object({ field: z.enum(['reasoning_content', 'reasoning_details']) }).strict(),
-    ]);
-
-    expect(oldInterleaved.safeParse({ field: 'reasoning_text' }).success).toBe(false);
-    expect(oldInterleaved.safeParse({ field: 'reasoning' }).success).toBe(false);
-  });
-
   it('accepts CLI interleaved field names the picker does not use', () => {
     const fields = ['reasoning', 'reasoning_content', 'reasoning_details', 'reasoning_text'];
 

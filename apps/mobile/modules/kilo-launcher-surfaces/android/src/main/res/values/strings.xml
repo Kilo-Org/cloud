@@ -1,0 +1,6 @@
+<resources>
+  <!-- Fallback label for the quick-settings tile. onStartListening replaces it
+       with the cached action label; this is only shown before the first
+       setSurfaces call (for example inside the tile picker). -->
+  <string name="kilo_launcher_surfaces_tile_label">Kilo agent</string>
+</resources>

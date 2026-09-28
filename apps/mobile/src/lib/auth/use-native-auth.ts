@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the hook owns the Apple, Google, passkey, and email-OTP paths in one place so they share the busy guard and the error mapping */
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { CryptoDigestAlgorithm, digestStringAsync, getRandomBytesAsync } from 'expo-crypto';
 import { useCallback, useRef, useState } from 'react';
@@ -18,6 +19,10 @@ import {
   parseTokenPair,
   selectChallengeId,
 } from '@/lib/auth/native-auth-contract';
+import {
+  passkeyFailureKey,
+  signInWithPasskey as runPasskeySignIn,
+} from '@/lib/auth/passkey-client';
 import { resolveAdmission } from '@/lib/auth/resolve-admission';
 import { type SsoRecovery, useSsoRecovery } from '@/lib/auth/use-sso-recovery';
 
@@ -38,13 +43,16 @@ function ensureGoogleConfigured() {
   googleSignInConfigured = true;
 }
 
-type BusyAction = 'apple' | 'google' | 'otp-send' | 'otp-verify' | undefined;
+type BusyAction = 'apple' | 'google' | 'passkey' | 'otp-send' | 'otp-verify' | undefined;
 
 type NativeAuthResult = {
   busy: BusyAction;
+  emailError: string | undefined;
+  clearEmailError: () => void;
   googleConfigured: boolean;
   signInWithApple: () => Promise<void>;
   signInWithGoogle: () => Promise<void>;
+  signInWithPasskey: () => Promise<void>;
   requestEmailCode: (email: string) => Promise<boolean>;
   verifyEmailCode: (email: string, code: string) => Promise<boolean>;
   ssoRecovery: SsoRecovery | null;
@@ -55,9 +63,14 @@ type NativeAuthResult = {
 export function useNativeAuth(): NativeAuthResult {
   const { signIn } = useAuth();
   const [busy, setBusy] = useState<BusyAction>(undefined);
+  const [emailError, setEmailError] = useState<string | undefined>(undefined);
   const busyRef = useRef<BusyAction>(undefined);
   const challengeRef = useRef<{ email: string; challengeId: string } | null>(null);
   const { ssoRecovery, clearSsoRecovery, handleSsoError } = useSsoRecovery();
+
+  const clearEmailError = useCallback(() => {
+    setEmailError(undefined);
+  }, []);
 
   const startAction = useCallback(
     (action: Exclude<BusyAction, undefined>) => {
@@ -66,10 +79,11 @@ export function useNativeAuth(): NativeAuthResult {
       }
       busyRef.current = action;
       setBusy(action);
+      clearEmailError();
       clearSsoRecovery();
       return true;
     },
-    [clearSsoRecovery]
+    [clearEmailError, clearSsoRecovery]
   );
 
   const finishAction = useCallback((action: Exclude<BusyAction, undefined>) => {
@@ -222,15 +236,56 @@ export function useNativeAuth(): NativeAuthResult {
     }
   }, [finishAction, handleSsoError, signIn, startAction]);
 
+  const signInWithPasskey = useCallback(async () => {
+    if (!startAction('passkey')) {
+      return;
+    }
+    try {
+      const result = await runPasskeySignIn();
+      if (result.status === 'ok') {
+        await signIn(result.token, result.refreshToken, result.expiresIn);
+        if (result.created === true) {
+          announcingToast.success(i18n.t('login.accountCreated'));
+        }
+        return;
+      }
+      if (result.reported) {
+        // The failure already showed its own message; a second toast would only
+        // repeat it.
+        return;
+      }
+      if (result.errorCode === 'SSO_ERROR') {
+        // A forced-SSO refusal is the same gate Apple, Google, and the email
+        // code take: offer the SSO recovery block instead of a toast. The
+        // usernameless ceremony names no address, so the block is seeded with
+        // the empty email Apple's credential omits on a later sign-in.
+        handleSsoError('', result.ssoOrganizationId);
+        return;
+      }
+      toast.error(
+        result.errorCode ? mapError(result.errorCode) : i18n.t(passkeyFailureKey(result.failure))
+      );
+    } catch (error) {
+      // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
+      console.error('[native-auth] signInWithPasskey failed:', error);
+      toast.error(defaultErrorMessage());
+    } finally {
+      finishAction('passkey');
+    }
+  }, [finishAction, handleSsoError, signIn, startAction]);
+
   const requestEmailCode = useCallback(
     async (rawEmail: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!email) {
-        toast.error(i18n.t('login.pleaseEnterEmail'));
+        setEmailError(i18n.t('login.pleaseEnterEmail'));
         return false;
       }
 
       if (!startAction('otp-send')) {
+        // Refused because another auth action is in flight. Tell the user why
+        // instead of returning a silent false that leaves the button dead.
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -238,6 +293,11 @@ export function useNativeAuth(): NativeAuthResult {
         if (!result.ok) {
           if (result.errorCode === 'SSO_ERROR') {
             handleSsoError(email, result.ssoOrganizationId);
+          } else if (
+            result.errorCode === 'INVALID_REQUEST' ||
+            result.errorCode === 'INVALID_EMAIL'
+          ) {
+            setEmailError(mapError(result.errorCode));
           } else {
             toast.error(mapError(result.errorCode));
           }
@@ -265,6 +325,7 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string, code: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!startAction('otp-verify')) {
+        toast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -323,9 +384,12 @@ export function useNativeAuth(): NativeAuthResult {
 
   return {
     busy,
+    emailError,
+    clearEmailError,
     googleConfigured,
     signInWithApple,
     signInWithGoogle,
+    signInWithPasskey,
     requestEmailCode,
     verifyEmailCode,
     ssoRecovery,

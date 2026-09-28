@@ -242,6 +242,40 @@ describe('fetchMobileSessionSnapshotPage', () => {
     expect(call.limit).toBeUndefined();
   });
 
+  it('projects the session goal from the messages page into the snapshot info', async () => {
+    const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_123',
+      history: historyPage({ nextCursor: null }),
+      sessionGoal: goal,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_123'), {});
+
+    // The transport replays this `info` as `session.created`, so the goal
+    // must be present or the fixed goal section is lost on open/reconnect.
+    expect(result).toMatchObject({ kind: 'success', info: { id: 'ses_123', goal } });
+  });
+
+  it('carries the goal into an empty (history:null) snapshot page', async () => {
+    const goal = { text: 'Ship p7 objective', status: 'paused' as const };
+    mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
+      kiloSessionId: 'ses_empty',
+      history: null,
+      sessionGoal: goal,
+    });
+
+    const { fetchMobileSessionSnapshotPage } = await importAdapter();
+    const result = await fetchMobileSessionSnapshotPage(kiloSessionId('ses_empty'), {});
+
+    expect(result).toMatchObject({
+      kind: 'success',
+      info: { id: 'ses_empty', goal },
+      messages: [],
+    });
+  });
+
   it('carries watermarkEventId through when the web router includes it', async () => {
     mocks.getSessionMessagesPageQuery.mockResolvedValueOnce({
       kiloSessionId: 'ses_123',

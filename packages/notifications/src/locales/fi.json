@@ -7,6 +7,7 @@
       "instanceLifecycle": "Instanssissasi on päivitys",
       "scheduledAction": "Ajoitetussa toiminnossa on päivitys",
       "lowBalance": "Saldosi vaatii huomiota",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Tietoturvalöydös vaatii huomiota",
       "activeAgentsGlanceable": "Aktiivisilla agenteilla on päivitys"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Matalan saldon hälytys",
       "body": "{{organizationName}} saldo laski alle ${{minimumBalanceUsd}}"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Uusi tietoturvalöydös ({{severity}})",

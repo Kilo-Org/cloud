@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'next/navigation';
 import { LoginMethodsCard } from './LoginMethodsCard';
 import { ConnectedAccountsCard } from './ConnectedAccountsCard';
+import { PasskeysCard } from './PasskeysCard';
 import { AuthErrorNotification } from '@/components/auth/AuthErrorNotification';
 import { X } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
@@ -117,6 +118,22 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
             </div>
           </CardContent>
         </Card>
+
+        {/* Passkeys Card Skeleton */}
+        <Card className="h-full w-full rounded-xl shadow-sm">
+          <CardContent className="space-y-6 pt-6">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="h-[62px] w-full rounded-lg" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -157,6 +174,7 @@ export function LoginMethodsWrapper({ primaryEmail }: LoginMethodsWrapperProps) 
           onRefetch={refetchProviders}
           onError={setErrorMessage}
         />
+        <PasskeysCard />
       </div>
 
       <DiscordGuildStatus hasDiscordLinked={hasDiscordLinked} />

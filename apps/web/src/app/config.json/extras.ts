@@ -56,8 +56,14 @@ export const kiloExtras = {
       type: 'boolean',
     },
     auto_collapse_reasoning: {
-      description: 'Automatically collapse reasoning blocks after the agent finishes writing them',
+      description:
+        "@deprecated Use 'reasoning_display' field instead. Automatically collapse reasoning blocks after the agent finishes writing them",
       type: 'boolean',
+    },
+    reasoning_display: {
+      description: 'Controls how reasoning blocks are displayed in the VS Code chat UI',
+      type: 'string',
+      enum: ['expanded', 'preview', 'headline'],
     },
     terminal_command_display: {
       description:
@@ -93,6 +99,28 @@ export const kiloExtras = {
           description:
             'Custom system prompt for AI commit message generation. When set, replaces the default conventional commits prompt entirely.',
           type: 'string',
+        },
+      },
+      additionalProperties: false,
+    },
+    retention: {
+      // Effect Schema models maxAgeDays as number|'NaN'|'Infinity'|'-Infinity',
+      // but JSON config can only carry plain numbers, so the editor schema
+      // accepts number only.
+      description:
+        'Machine-wide session retention. Evaluated by the backend; clients only trigger runs.',
+      type: 'object',
+      properties: {
+        enabled: {
+          description:
+            'Enable automatic deletion of old sessions across all projects and every Kilo client on this machine. Defaults to false; deletion is permanent.',
+          type: 'boolean',
+        },
+        maxAgeDays: {
+          description:
+            'Days a session is kept before retention deletes it. Defaults to 30, minimum 1.',
+          type: 'number',
+          minimum: 1,
         },
       },
       additionalProperties: false,

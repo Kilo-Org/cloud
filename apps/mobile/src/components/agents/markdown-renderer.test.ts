@@ -1,10 +1,9 @@
 /* eslint-disable max-lines -- renderer host-key, image, link interaction, and empty-fence mount suites stay in one cohesive unit test file */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount RN trees under vitest (same pattern as code-block.test.ts) */
 // eslint-disable-next-line import/no-nodejs-modules -- patching the CJS loader is the only way to stub react-native for the externalized react-native-marked; the library under test stays real
 import Module from 'node:module';
 import { createElement, type ReactElement, type ReactNode } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, TestRenderer } from '@/test/renderer';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 
@@ -28,6 +27,8 @@ const rnStub = {
   ScrollView: 'ScrollView',
   TouchableHighlight: 'TouchableHighlight',
   Image: 'Image',
+  // CodeBlock reads the color scheme to pick its syntax palette.
+  useColorScheme: () => 'light',
   StyleSheet: {
     create: (styles: Record<string, unknown>) => styles,
     hairlineWidth: 1,
@@ -140,7 +141,7 @@ function propOf(instance: TestRenderer.ReactTestInstance | undefined, key: strin
   if (!instance) {
     return undefined;
   }
-  /* eslint-disable typescript-eslint/no-unsafe-member-access -- react-test-renderer props are an index signature */
+  /* eslint-disable typescript-eslint/no-unsafe-member-access -- renderer props are an index signature */
   return instance.props[key];
   /* eslint-enable typescript-eslint/no-unsafe-member-access */
 }
@@ -566,6 +567,48 @@ describe('MarkdownRenderer code override', () => {
     >;
     expect((inner(element).props as { maxLength?: unknown }).maxLength).toBe(cap);
   });
+
+  it('passes an onCopyCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onCopyCode = vi.fn<(code: string) => void>();
+    const copyable = new RendererClass(palette, true, { onCopyCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect((inner(plainElement).props as { onCopyCode?: unknown }).onCopyCode).toBeUndefined();
+  });
+
+  it('passes an onLongPressCode handler through to CodeBlock and omits it otherwise', async () => {
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const onLongPressCode = vi.fn<() => void>();
+    const copyable = new RendererClass(palette, true, { onLongPressCode });
+    const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
+      onLongPressCode
+    );
+
+    const plain = new RendererClass(palette, true, {});
+    const plainElement = plain.code(
+      'const x = 1;',
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+    expect(
+      (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
+    ).toBeUndefined();
+  });
 });
 
 describe('MarkdownRenderer empty fence mounting', () => {
@@ -608,6 +651,62 @@ describe('MarkdownRenderer empty fence mounting', () => {
       { deep: true }
     );
     expect(codeTexts).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      mounted.unmount();
+    });
+    // Restore the stubbed module graph for any dynamic import that follows.
+    vi.resetModules();
+  });
+
+  it('renders a transcript (non-selectable) fence as a chunk of lines per Text', async () => {
+    // TextPartRenderer renders the chat transcript with selectable={false}.
+    // Android builds one SpannableStringBuilder per ReactTextView on the UI
+    // thread, so the transcript fence must split into chunks instead of putting
+    // the whole fence into one Text (the SetSpanOperation.execute ANR) — and
+    // not one Text per source line either, which would scale the native view
+    // count with the file.
+    vi.doUnmock('./code-block');
+    vi.resetModules();
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const renderer = new RendererClass(palette, false, {});
+    const sourceLines = Array.from({ length: 80 }, (_, index) => `const value${index} = ${index};`);
+    const element = renderer.code(
+      sourceLines.join('\n'),
+      'ts',
+      containerStyle,
+      undefined
+    ) as ReactElement<Record<string, unknown>>;
+
+    const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    await act(async () => {
+      await Promise.resolve();
+      rendererRef.current = TestRenderer.create(element);
+    });
+    const mounted = rendererRef.current;
+    if (!mounted) {
+      throw new Error('renderer was not created');
+    }
+
+    const codeTexts = mounted.root.findAll(
+      node => {
+        const className = propOf(node, 'className');
+        return (
+          typeof node.type === 'string' &&
+          typeof className === 'string' &&
+          className.includes('font-mono text-xs')
+        );
+      },
+      { deep: true }
+    );
+    expect(codeTexts.length).toBeGreaterThan(1);
+    expect(codeTexts.length).toBeLessThan(sourceLines.length);
+    for (const codeText of codeTexts) {
+      expect(propOf(codeText, 'selectable')).toBe(false);
+    }
 
     await act(async () => {
       await Promise.resolve();
@@ -755,6 +854,50 @@ describe('MarkdownRenderer list marker alignment', () => {
     await unmountMarkdown(mounted);
   });
 
+  it('keeps a wrapped bullet item under its own first line, not under the marker', async () => {
+    // The finding's own shape: one tight bullet whose text wraps over several
+    // lines with an inline code span and an em-dash continuation. The row is a
+    // row — a fixed-width marker box beside a content View that shrinks — so
+    // every wrapped line lays out inside that content View and starts at the
+    // first line's left edge, never at the marker's. A change that moved the
+    // item text out of the shrinking View, or stopped the View shrinking, would
+    // let a continuation line start at the marker and must fail this test.
+    const mounted = await mountMarkdown(
+      '- Current branch `kilo/breezy-engine-kdc` has **no CLI** — only `src/strategies/120-ema.ts` (a top-level-await script that simulates and console.logs trades), db.ts, batch-db.ts, tickers.ts, base-url.ts.'
+    );
+    assertAlignedList(mounted, 1);
+    assertItemTextMetrics(mounted, ['Current']);
+
+    const row = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item')[0];
+    if (!row) {
+      throw new Error('list item row missing');
+    }
+    const contentView = viewChildren(row)[0];
+    if (!contentView) {
+      throw new Error('list item content View missing');
+    }
+    const textNodes = (phrase: string) =>
+      mounted.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as unknown) === 'Text' &&
+          node.children.some(child => typeof child === 'string' && child.includes(phrase))
+      );
+    // The first line and its wrapped continuation are separate inline Text
+    // nodes; both must be descendants of the one shrinking content View.
+    const firstLine = textNodes('Current branch');
+    const continuation = textNodes('— only');
+    expect(firstLine).toHaveLength(1);
+    expect(continuation).toHaveLength(1);
+    for (const text of [firstLine[0], continuation[0]]) {
+      if (!text) {
+        throw new Error('item text node missing');
+      }
+      expect(contentView.findAll(node => node === text)).toHaveLength(1);
+    }
+    await unmountMarkdown(mounted);
+  });
+
   it('keeps a leading blockquote margin in a list item', async () => {
     const mounted = await mountMarkdown('- > quoted text');
     const rows = mounted.root.findAll(node => propOf(node, 'testID') === 'marked-list-item');
@@ -819,5 +962,57 @@ describe('MarkdownRenderer nested table fallback', () => {
       await Promise.resolve();
       mounted.unmount();
     });
+  });
+});
+
+/**
+ * Proof for the explorer's `session-tools-ar` finding: in the Arabic interface
+ * the assistant body and its bullet list read as centre-aligned, with the
+ * marker detached at the right edge (`session-tools-ar.png`). React Native only
+ * centres a paragraph through `textAlign`, so the renderer's contract is that
+ * the RTL path names the base direction (`writingDirection: 'rtl'`, from
+ * `lib/rtl-text.ts`) and no paragraph or marker style carries a `textAlign` at
+ * all. The marker box is the library's own; the renderer never gives it one.
+ */
+describe('MarkdownRenderer RTL paragraph direction (explorer session-tools-ar)', () => {
+  afterEach(() => {
+    rnStub.I18nManager.isRTL = false;
+  });
+
+  function elementStyle(element: ReactElement): Record<string, unknown> {
+    return flattenStyle((element.props as { style?: unknown }).style);
+  }
+
+  it('names the paragraph base direction without centring it', async () => {
+    rnStub.I18nManager.isRTL = true;
+    const renderer = await createRenderer();
+    const heading = renderer.heading('Why fork PRs can fail', { fontSize: 20 }) as ReactElement;
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const link = renderer.link('catalog.json', 'https://example.com', {
+      fontSize: 16,
+    }) as ReactElement;
+    for (const element of [heading, body, link]) {
+      const style = elementStyle(element);
+      expect(style.writingDirection).toBe('rtl');
+      expect(style.textAlign).toBeUndefined();
+    }
+  });
+
+  it('leaves the LTR path without a writing direction or alignment', async () => {
+    const renderer = await createRenderer();
+    const body = renderer.escape('Secrets are withheld.', { fontSize: 16 }) as ReactElement;
+    const style = elementStyle(body);
+    expect(style.writingDirection).toBeUndefined();
+    expect(style.textAlign).toBeUndefined();
+  });
+
+  it('has no centring style on the paragraph or list marker box', async () => {
+    const { getMarkdownStyles } = await import('./markdown-palette');
+    const styles = getMarkdownStyles(palette);
+    for (const key of ['text', 'paragraph', 'list', 'li'] as const) {
+      const style = flattenStyle(styles[key]);
+      expect(style.textAlign).toBeUndefined();
+      expect(style.alignItems).toBeUndefined();
+    }
   });
 });

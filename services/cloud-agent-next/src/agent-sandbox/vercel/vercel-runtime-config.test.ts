@@ -3,6 +3,7 @@ import {
   parseVercelSandboxCredentials,
   parseVercelSandboxEnrollment,
   parseVercelSandboxRuntimeConfig,
+  resolveVercelSandboxRuntimeConfig,
 } from './vercel-runtime-config.js';
 
 const completeRuntimeEnv = {
@@ -65,6 +66,49 @@ describe('parseVercelSandboxRuntimeConfig', () => {
       parseVercelSandboxRuntimeConfig({ ...completeRuntimeEnv, [key]: value })
     ).toBeUndefined();
   });
+});
+
+describe('resolveVercelSandboxRuntimeConfig', () => {
+  const persisted = {
+    projectId: 'old-project',
+    snapshotId: 'old-snapshot',
+    runtimeBuildId: 'old-build',
+    runtime: 'node24',
+  };
+
+  it.each([
+    { vcpus: 2, memory: 4096 },
+    { vcpus: 4, memory: 8192 },
+  ] as const)(
+    'preserves persisted $vcpus vCPU resources across operational configuration changes',
+    resources => {
+      expect(
+        resolveVercelSandboxRuntimeConfig(completeRuntimeEnv, { ...persisted, resources })
+      ).toMatchObject({
+        ...persisted,
+        resources,
+        accessToken: completeRuntimeEnv.VERCEL_TOKEN,
+      });
+    }
+  );
+
+  it('does not add sizing to older persisted runtime identities', () => {
+    expect(resolveVercelSandboxRuntimeConfig(completeRuntimeEnv, persisted)).not.toHaveProperty(
+      'resources'
+    );
+    expect(resolveVercelSandboxRuntimeConfig(completeRuntimeEnv)).not.toHaveProperty('resources');
+  });
+
+  it.each([{ vcpus: 2, memory: 8192 }, { vcpus: 8, memory: 16384 }, null])(
+    'rejects invalid persisted resources even when operational configuration is unavailable: %j',
+    resources => {
+      const input = { ...persisted, resources } as Parameters<
+        typeof resolveVercelSandboxRuntimeConfig
+      >[1];
+      expect(() => resolveVercelSandboxRuntimeConfig(completeRuntimeEnv, input)).toThrow();
+      expect(() => resolveVercelSandboxRuntimeConfig({}, input)).toThrow();
+    }
+  );
 });
 
 describe('parseVercelSandboxEnrollment', () => {

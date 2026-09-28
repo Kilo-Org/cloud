@@ -3,7 +3,8 @@ import {
   getEmbeddingProvider,
   getTranscriptionProvider,
 } from '@/lib/ai-gateway/providers/get-provider';
-import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
 import { createAnonymousContext } from '@/lib/anonymous';
 import {
   getModelUserByokProviders,

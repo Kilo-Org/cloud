@@ -175,3 +175,33 @@ export function hasActiveWork(table: Map<string, SessionRoute>): boolean {
   }
   return false;
 }
+
+export function pinsEnvironment(
+  state: SessionActivityState | null,
+  waitingOn: SessionRoute['waitingOn']
+): boolean {
+  if (state === 'finalizing') return true;
+  if (waitingOn === 'input') return false;
+  return state === 'active';
+}
+
+export function hasEnvironmentPinningWork(
+  table: Map<string, SessionRoute>,
+  payload: {
+    state: SessionActivityState;
+    pendingMessages?: number;
+    sessions: ReadonlyArray<{
+      state: SessionActivityState;
+      waitingOn?: SessionRoute['waitingOn'];
+    }>;
+  }
+): boolean {
+  for (const session of payload.sessions) {
+    if (pinsEnvironment(session.state, session.waitingOn ?? null)) return true;
+  }
+  for (const route of table.values()) {
+    if (pinsEnvironment(route.lastState, route.waitingOn)) return true;
+  }
+  if (payload.sessions.some(session => session.waitingOn === 'input')) return false;
+  return payload.state !== 'idle' || (payload.pendingMessages ?? 0) > 0;
+}

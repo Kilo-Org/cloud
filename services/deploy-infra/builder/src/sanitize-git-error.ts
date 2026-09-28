@@ -8,7 +8,6 @@ export function sanitizeGitError(error: unknown, accessToken: string | undefined
   }
 
   const errorMessage = error instanceof Error ? error.message : String(error);
-  // Replace the access token with [REDACTED] in the error message
   // Using replaceAll instead of regex to avoid issues with special characters in tokens
   const sanitizedMessage = errorMessage.replaceAll(accessToken, '[REDACTED]');
 

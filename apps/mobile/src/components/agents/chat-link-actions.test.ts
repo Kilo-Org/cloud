@@ -94,7 +94,16 @@ describe('chat link actions', () => {
     await performChatLinkAction('copy', 'https://kilo.ai/docs');
 
     expect(Clipboard.setStringAsync).toHaveBeenCalledWith('https://kilo.ai/docs');
-    expect(toast.success).toHaveBeenCalledWith('Link copied');
+    // Longer than the Sonner default: on Android the system clipboard preview
+    // covers the bottom-center toast for its full default life.
+    expect(toast.success).toHaveBeenCalledWith('Link copied', {
+      duration: expect.any(Number),
+    });
+    const options = vi.mocked(toast.success).mock.calls[0]?.[1];
+    if (!options || typeof options.duration !== 'number') {
+      throw new Error('Expected a toast duration');
+    }
+    expect(options.duration).toBeGreaterThan(6000);
   });
 
   it('retries only copying after a clipboard failure', async () => {

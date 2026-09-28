@@ -2,7 +2,7 @@
 import { type Part, type StoredMessage, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import * as React from 'react';
 import { Pressable } from 'react-native';
-import { type ReactTestInstance } from 'react-test-renderer';
+import { type ReactTestInstance } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
@@ -187,7 +187,6 @@ function makeTaskState(status: ToolPart['state']['status']): ToolPart['state'] {
   return taskCompletedState;
 }
 
-// eslint-disable-next-line typescript-eslint/no-deprecated -- the existing harness uses this DOM-free React renderer
 function textContent(node: ReactTestInstance | string): string {
   return typeof node === 'string' ? node : node.children.map(textContent).join('');
 }
@@ -244,8 +243,8 @@ const toolActivities: [string, Record<string, unknown>, string][] = [
   ].map(tool => [tool, {}, tool] satisfies [string, Record<string, unknown>, string]),
 ];
 const activityHistories: [string, StoredMessage[], string][] = [
-  ['empty history', [], 'Waiting for activity'],
-  ['incomplete history', [makeStoredMessage()], 'Waiting for activity'],
+  ['empty history', [], 'Thinking'],
+  ['incomplete history', [makeStoredMessage()], 'Thinking'],
   [
     'delayed latest parts',
     [makeStoredMessage([textPart]), makeStoredMessage()],
@@ -380,57 +379,64 @@ describe('ToolPartRenderer routing', () => {
 });
 
 describe('ToolPartRenderer child navigation seam', () => {
-  it('routes a task part with all child handlers to ChildSessionSection with resolved messages', () => {
+  it('routes a task part with all child handlers to ChildSessionSection with resolved messages', async () => {
     const childMessage = makeStoredMessage();
     const getChildMessages = vi.fn((id: string) => (id === 'child-1' ? [childMessage] : []));
     const renderPart = vi.fn();
     const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
     const part = makeToolPart('task', taskCompletedState);
 
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartRenderer({ part, getChildMessages, renderPart, onOpenChildSession });
-
-    expect(getChildMessages).toHaveBeenCalledWith('child-1');
-    const sections = findByType(root, ChildSessionSection);
-    expect(sections).toHaveLength(1);
-    const section = sections[0];
-    if (!section) {
-      throw new Error('expected ChildSessionSection');
+    // No session manager scope here, so the live card resolves the accessor it
+    // was handed once — the same child data the card subscribed for in the app.
+    const { renderer, unmount } = await renderWithProviders(
+      React.createElement(ToolPartRenderer, {
+        part,
+        getChildMessages,
+        renderPart,
+        onOpenChildSession,
+      })
+    );
+    try {
+      expect(getChildMessages).toHaveBeenCalledWith('child-1');
+      const sections = renderer.root.findAllByType(ChildSessionSection);
+      expect(sections).toHaveLength(1);
+      expect(sections[0]?.props).toMatchObject({
+        part,
+        childMessages: [childMessage],
+        onOpenChildSession,
+      });
+      expect(renderPart).not.toHaveBeenCalled();
+    } finally {
+      unmount();
     }
-    expect(section.props).toMatchObject({
-      part,
-      childMessages: [childMessage],
-      onOpenChildSession,
-    });
-    expect(renderPart).not.toHaveBeenCalled();
   });
 
-  it('routes a task part without a session id to ChildSessionSection with empty messages', () => {
+  it('routes a task part without a session id to ChildSessionSection with empty messages', async () => {
     const getChildMessages = vi.fn<() => StoredMessage[]>(() => []);
     const renderPart = vi.fn();
     const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
 
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartRenderer({
-      part: makeToolPart('task', completedState),
-      getChildMessages,
-      renderPart,
-      onOpenChildSession,
-    });
-
-    expect(getChildMessages).not.toHaveBeenCalled();
-    const sections = findByType(root, ChildSessionSection);
-    expect(sections).toHaveLength(1);
-    const section = sections[0];
-    if (!section) {
-      throw new Error('expected ChildSessionSection');
+    const { renderer, unmount } = await renderWithProviders(
+      React.createElement(ToolPartRenderer, {
+        part: makeToolPart('task', completedState),
+        getChildMessages,
+        renderPart,
+        onOpenChildSession,
+      })
+    );
+    try {
+      expect(getChildMessages).not.toHaveBeenCalled();
+      const sections = renderer.root.findAllByType(ChildSessionSection);
+      expect(sections).toHaveLength(1);
+      expect(sections[0]?.props).toMatchObject({
+        part: expect.objectContaining({ tool: 'task' }),
+        childMessages: [],
+        onOpenChildSession,
+      });
+      expect(renderPart).not.toHaveBeenCalled();
+    } finally {
+      unmount();
     }
-    expect(section.props).toMatchObject({
-      part: expect.objectContaining({ tool: 'task' }),
-      childMessages: [],
-      onOpenChildSession,
-    });
-    expect(renderPart).not.toHaveBeenCalled();
   });
 
   it('routes a task part without handlers to TaskToolCard', () => {
@@ -439,28 +445,28 @@ describe('ToolPartRenderer child navigation seam', () => {
     expect(findByType(root, TaskToolCard)).toHaveLength(1);
   });
 
-  it('passes modelOptions through to ChildSessionSection for a task part', () => {
+  it('passes modelOptions through to ChildSessionSection for a task part', async () => {
     const childMessage = makeStoredMessage();
     const getChildMessages = vi.fn((id: string) => (id === 'child-1' ? [childMessage] : []));
     const renderPart = vi.fn();
     const onOpenChildSession = vi.fn<(sessionId: string, title: string) => void>();
     const part = makeToolPart('task', taskCompletedState);
 
-    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartRenderer({
-      part,
-      getChildMessages,
-      renderPart,
-      onOpenChildSession,
-      modelOptions,
-    });
-
-    const sections = findByType(root, ChildSessionSection);
-    expect(sections).toHaveLength(1);
-    const section = sections[0];
-    if (!section) {
-      throw new Error('expected ChildSessionSection');
+    const { renderer, unmount } = await renderWithProviders(
+      React.createElement(ToolPartRenderer, {
+        part,
+        getChildMessages,
+        renderPart,
+        onOpenChildSession,
+        modelOptions,
+      })
+    );
+    try {
+      const sections = renderer.root.findAllByType(ChildSessionSection);
+      expect(sections).toHaveLength(1);
+      expect(sections[0]?.props).toMatchObject({ modelOptions });
+    } finally {
+      unmount();
     }
-    expect(section.props).toMatchObject({ modelOptions });
   });
 });

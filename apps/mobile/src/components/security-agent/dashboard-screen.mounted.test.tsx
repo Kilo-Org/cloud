@@ -1,4 +1,3 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom); its React 19 deprecation notice points to the DOM-based Testing Library, which cannot render this app's non-DOM tree. */
 /* eslint-disable max-lines -- the sync-control, dismiss-card, and reconcile-card suites share one mock harness in this file */
 
 // Dashboard sync-control terminal-state contract: a non-retryable sync outcome
@@ -11,7 +10,7 @@
 // same hoisted key.
 
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -80,6 +79,18 @@ const outbox = vi.hoisted(() => ({
 const sharedMetrics = vi.hoisted(() => ({
   build: vi.fn(),
 }));
+// The themed base the dashboard spreads into every sheet, and the sheet call
+// captured by the repository-filter test.
+const themedSheetOptions = vi.hoisted(() => ({
+  autoFocus: true,
+  useModal: true,
+  containerStyle: { backgroundColor: '#17171A', paddingBottom: 34 },
+  textStyle: { color: '#F2F0EB' },
+  titleTextStyle: { color: '#8A8680' },
+  messageTextStyle: { color: '#8A8680' },
+  destructiveColor: '#F28B7A',
+}));
+const sheet = vi.hoisted(() => ({ show: vi.fn() }));
 
 // Captures the useFocusEffect callback so a test can simulate a focus event.
 const focusEffect = vi.hoisted(() => ({
@@ -114,11 +125,14 @@ vi.mock('expo-router', () => ({
   },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
+  useActionSheet: () => ({ showActionSheetWithOptions: sheet.show }),
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ foreground: '#000', mutedForeground: '#666', primary: '#000' }),
+}));
+vi.mock('@/lib/hooks/use-themed-action-sheet', () => ({
+  useThemedActionSheetOptions: () => themedSheetOptions,
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
@@ -330,6 +344,43 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(triggerSync.mutate).toHaveBeenCalledWith(
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+});
+
+describe('DashboardScreen repository filter sheet', () => {
+  beforeEach(() => {
+    repositories.isLoading = false;
+    repositories.isError = false;
+    repositories.data = [];
+    config.data = { slaEnabled: true };
+    sheet.show.mockClear();
+  });
+
+  it('opens the themed sheet with the repository options from the filter control', () => {
+    const root = renderScreen();
+    const filter = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        n.props.accessibilityLabel === 'Filter by repository'
+    )[0];
+    if (!filter) {
+      throw new Error('filter control not found');
+    }
+
+    act(() => {
+      (filter.props.onPress as () => void)();
+    });
+
+    expect(sheet.show).toHaveBeenCalledTimes(1);
+    expect(sheet.show).toHaveBeenCalledWith(
+      {
+        ...themedSheetOptions,
+        options: ['All repositories', 'Cancel'],
+        cancelButtonIndex: 1,
+      },
+      expect.any(Function)
     );
   });
 });

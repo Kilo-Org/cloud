@@ -47,10 +47,6 @@ import * as appsClient from '../fly/apps';
 import * as secretsClient from '../fly/secrets';
 import { FlyApiError } from '../fly/client';
 
-// ============================================================================
-// Test harness
-// ============================================================================
-
 function createFakeStorage() {
   const store = new Map<string, unknown>();
   let alarmTime: number | null = null;
@@ -101,10 +97,6 @@ function createAppDO(
   );
   return { appDO, storage };
 }
-
-// ============================================================================
-// Tests
-// ============================================================================
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -84,6 +84,7 @@ export function normalizeAttachmentSelection(
 }
 
 export function buildAttachmentLimitToast(): string {
+  // i18n-dup-ok: 'chat.attachment.limit_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules.
   return i18n.t('chat.attachment.limit', {
     count: MESSAGE_ATTACHMENT_MAX_COUNT,
     displayCount: formatNumber(MESSAGE_ATTACHMENT_MAX_COUNT, i18n.language),

@@ -9,6 +9,7 @@ import {
   buildAgentSessionSearchQueryOptions,
   buildStoredSessionsQueryOptions,
 } from '@/lib/hooks/use-agent-sessions';
+import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
 
 // The hook module transitively imports react-native (via the user-web-
 // connection lifecycle) and the real tRPC client (via `@/lib/trpc`), which the
@@ -33,6 +34,7 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
 
 vi.mock('react-native', () => ({
   InteractionManager: { runAfterInteractions: vi.fn() },
+  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
 }));
 
 function createTrpcStub(infiniteQueryOptions: unknown) {
@@ -183,23 +185,28 @@ describe('buildAgentSessionSearchInput', () => {
 });
 
 describe('buildStoredSessionsQueryOptions', () => {
-  it('keeps the native window-focus refetch by default (Home and Share Gate)', () => {
+  it('leaves the native window-focus refetch off by default so the hook owns the foreground reconcile', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
+    // The hook registers its own `useAppLifecycle` foreground edge and
+    // reconciles page one; React Query's native window-focus refetch would
+    // instead re-request every retained page.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
-      expect.objectContaining({ refetchOnWindowFocus: true })
+      expect.objectContaining({ refetchOnWindowFocus: false })
     );
-    expect(result.refetchOnWindowFocus).toBe(true);
+    expect(result.refetchOnWindowFocus).toBe(false);
   });
 
-  it('disables the native window-focus refetch only for the Agents list configuration', () => {
+  it('keeps the native window-focus refetch off when the caller opts out of the hook edge', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
       refetchOnWindowFocus: false,
     });
 
+    // The Agents list drives foreground through its own callback, so the
+    // native fan-out stays off there too.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
       expect.objectContaining({ refetchOnWindowFocus: false })
@@ -221,6 +228,31 @@ describe('buildStoredSessionsQueryOptions', () => {
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
     expect(result.maxPages).toBeTypeOf('number');
+  });
+
+  it('retains the browsable history past the shared front-eviction bound', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    // The history browser pages forward and scrolls back over everything it
+    // loaded. The shared 5-page bound front-evicts the oldest page on every
+    // later fetch (`addToEnd` slices index 0), so past five pages the top of
+    // the history disappears and the list cannot scroll back to it. The
+    // signed-in e2e history needs 8 pages of 30 sessions.
+    expect(result.maxPages).toBeGreaterThan(INFINITE_QUERY_MAX_PAGES);
+    expect(result.maxPages).toBeGreaterThanOrEqual(8);
+  });
+
+  it('caps retention so one focus/foreground refetch stays bounded', () => {
+    const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
+    const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
+
+    // React Query re-requests every page retained in the cache on `refetch()`
+    // (see the fan-out test in `infinite-retention.test.ts`), and the history
+    // list refetches on focus return and app foreground. `maxPages` is
+    // therefore also the refetch fan-out, so it stays near the browsable
+    // requirement instead of letting one refetch issue 100 page requests.
+    expect(result.maxPages).toBeLessThanOrEqual(20);
   });
 });
 

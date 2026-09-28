@@ -5,14 +5,20 @@ import {
   sessionOperationAckSchema,
   sessionOperationExpiresAt,
   type SessionOperationAuthorization,
+  type SessionPromptPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
 import { rootForSession } from './session-directories.js';
-import type { WorktreeKiloRuntime, WorktreeKiloRuntimes } from './worktree-runtime.js';
+import type {
+  NativeRuntimeControl,
+  WorktreeKiloRuntime,
+  WorktreeKiloRuntimes,
+} from './worktree-runtime.js';
 import type {
   NativeOperationTarget,
   NativeRetirement,
+  RetireDirectoryResult,
   RootScopedCleanupResult,
 } from './session-operation-cleanup.js';
 import {
@@ -23,28 +29,19 @@ import {
 } from './session-operation.js';
 
 type OperationRegistryDependencies = {
-  native: {
+  native: NativeRuntimeControl & {
     get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
     getEntryRuntimeId?(directory: string, root: string): string | undefined;
-    getRetained(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
+    getRetained(
+      identity: SessionRequestIdentity | string,
+      runtimeId?: string
+    ): WorktreeKiloRuntime | undefined;
     prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,
       deadlineAt: number,
       target?: NativeOperationTarget
     ): Promise<NativeRetirement>;
-    retireRuntimeIfUnshared?(
-      directory: string,
-      target: NativeOperationTarget,
-      retiringRoot: string,
-      deadlineAt: number,
-      reason?: string
-    ): Promise<NativeRetirement | 'shared'>;
-    rootRetirementScope?(
-      directory: string,
-      target: NativeOperationTarget,
-      retiringRoot: string
-    ): 'shared' | 'sole' | 'stale';
     verifyQuiescence(
       directory: string,
       target: NativeOperationTarget,
@@ -58,7 +55,7 @@ type OperationRegistryDependencies = {
 
 type OperationEffects = Pick<
   SessionOperationDependencies,
-  'signal' | 'emitSessionEvent' | 'sendOperationResult' | 'onDiagnostic'
+  'signal' | 'emitSessionEvent' | 'sendOperationResult' | 'consumeGateResult' | 'onDiagnostic'
 >;
 
 type Admission =
@@ -609,24 +606,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     }
   }
 
-  function publicationFailureBlocks(operation: string, session: SessionRequestIdentity): boolean {
-    if (!ROOT_SCOPED_WORK.has(operation)) return false;
-    clearStaleScopedFailures();
-    const root = rootForSession(session.kiloSessionId, session.directory);
-    if (!root) return false;
-    const runtime = deps.native.get(session);
-    for (const failure of scopedFailures.values()) {
-      if (
-        failure.directory === session.directory &&
-        failure.root === root &&
-        failure.result !== 'confirmed' &&
-        (runtime === undefined || runtime.runtimeId === failure.nativeRuntimeId)
-      )
-        return true;
-    }
-    return false;
-  }
-
   function prune(now = Date.now()): void {
     for (const [id, operation] of retained) {
       if (!operation.canPrune(now)) continue;
@@ -658,11 +637,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
   ): Admission {
     clearStaleScopedFailures();
     if (operation !== 'session.operation.get' && !authorization) {
-      if (publicationFailureBlocks(operation, session))
-        return {
-          kind: 'reply',
-          result: rejectBeforeAdmission('not_ready', 'Native runtime cleanup is unconfirmed', true),
-        };
       return { kind: 'continue' };
     }
     const reply = (result: ControlHandlerResult | Promise<ControlHandlerResult>): Admission => ({
@@ -693,7 +667,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
           rejectBeforeAdmission('idempotency_conflict', 'Operation identity mismatch', false)
         );
       if (operation === 'session.operation.get') {
-        const delivery = existing.deliveryResult();
+        const delivery = existing.deliveryResult(target);
         return reply(
           ok(
             delivery
@@ -709,7 +683,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         );
       }
       try {
-        if (!existing.matchesIntent(payload))
+        if (!existing.matchesIntent(payload, target))
           return reply(
             rejectBeforeAdmission('idempotency_conflict', 'Operation intent mismatch', false)
           );
@@ -727,10 +701,6 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       );
     }
     if (operation === 'session.operation.get') return reply(ok({ state: 'missing' }));
-    if (publicationFailureBlocks(operation, session))
-      return reply(
-        rejectBeforeAdmission('not_ready', 'Native runtime cleanup is unconfirmed', true)
-      );
     if (Date.now() >= target.dispatchDeadlineAt)
       return reply(
         rejectBeforeAdmission('not_ready', 'Operation dispatch authorization expired', false)
@@ -762,7 +732,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     reason: string,
     deadlineAt: number,
     target?: NativeOperationTarget
-  ): Promise<NativeRetirement> {
+  ): Promise<RetireDirectoryResult> {
     const matching = [...active.values()].filter(operation => {
       if (operation.session.directory !== directory) return false;
       const operationTarget = operation.nativeTarget();
@@ -774,7 +744,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         Boolean
       )
     )
-      return 'unconfirmed';
+      return 'operation_process_stop_unconfirmed';
     const retirement = await deps.native.retireRuntime(directory, deadlineAt, target);
     for (const operation of matching)
       operation.confirmCleanup(retirement === 'retired' || retirement === 'stale', deadlineAt);
@@ -803,28 +773,38 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         }
         const retiringRoot =
           rootForSession(identity.kiloSessionId, identity.directory) ?? identity.kiloSessionId;
-        const retirement = deps.native.retireRuntimeIfUnshared
-          ? deps.native.retireRuntimeIfUnshared(
+        const retirement = deps.native.deferRuntimeRetirementIfShared
+          ? deps.native.deferRuntimeRetirementIfShared(
               identity.directory,
               target,
               retiringRoot,
               deadlineAt,
               reason
             )
-          : deps.native.rootRetirementScope?.(identity.directory, target, retiringRoot) === 'shared'
-            ? Promise.resolve<'shared'>('shared')
-            : retireDirectory(identity.directory, reason, deadlineAt, target);
-        void retirement.then(retirement => {
-          if (retirement === 'unconfirmed') deps.retireRuntime(reason);
-        });
+          : deps.native.retireRuntimeIfUnshared
+            ? deps.native.retireRuntimeIfUnshared(
+                identity.directory,
+                target,
+                retiringRoot,
+                deadlineAt,
+                reason
+              )
+            : deps.native.rootRetirementScope?.(identity.directory, target, retiringRoot) ===
+                'shared'
+              ? Promise.resolve<'shared'>('shared')
+              : retireDirectory(identity.directory, reason, deadlineAt, target);
+        void retirement;
       },
       onLocalCompletion: retain => {
         if (active.get(identity.kiloSessionId) === operation) {
           active.delete(identity.kiloSessionId);
           deps.onCompleted(identity);
         }
-        if (authorization && !retain && retained.get(key(authorization)) === operation)
-          retained.delete(key(authorization));
+        if (!retain) {
+          for (const [id, current] of retained) {
+            if (current === operation) retained.delete(id);
+          }
+        }
         removeOrphanedArchivedClaims();
       },
       onCleanupConfirmed: () => undefined,
@@ -839,6 +819,38 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
   return {
     admission,
     acknowledge,
+    admitFollowUp(
+      session: SessionRequestIdentity,
+      authorization: SessionOperationAuthorization | undefined,
+      payload: SessionPromptPayload,
+      runtime: WorktreeKiloRuntime
+    ): ControlHandlerResult {
+      const operation = active.get(session.kiloSessionId);
+      if (!operation || !isDeepStrictEqual(operation.session, session))
+        return fail('not_ready', 'Session has no running operation', true);
+      prune();
+      if (
+        authorization &&
+        !retained.has(key(authorization)) &&
+        retained.size >= SANDBOX_CONTROL_OPERATION_LIMIT
+      )
+        return rejectBeforeAdmission(
+          'session_busy',
+          'Operation receipt capacity is unavailable',
+          true
+        );
+      const result = operation.admitFollowUp(payload, runtime, authorization);
+      if (result.ok && authorization) retained.set(key(authorization), operation);
+      return result;
+    },
+    observeRootEvent(event: {
+      type: string;
+      sessionID?: string;
+      rootKiloSessionId?: string;
+      properties?: unknown;
+    }): void {
+      for (const operation of active.values()) operation.observeRootEvent(event);
+    },
     retireRootPublication,
     escalateRootPublication,
     settleRootPublication,
@@ -852,14 +864,15 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       if (
         current &&
         isDeepStrictEqual(current.session, session) &&
-        (messageId === undefined || current.messageId === messageId)
+        (messageId === undefined || current.admittedMessageIds().includes(messageId))
       ) {
         return current;
       }
       if (messageId === undefined) return undefined;
       const matches = [...retained.values()].filter(
         operation =>
-          operation.messageId === messageId && isDeepStrictEqual(operation.session, session)
+          operation.admittedMessageIds().includes(messageId) &&
+          isDeepStrictEqual(operation.session, session)
       );
       return matches.find(operation => operation.kind !== 'preparation') ?? matches[0];
     },

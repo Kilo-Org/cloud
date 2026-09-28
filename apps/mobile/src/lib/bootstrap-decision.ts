@@ -92,6 +92,31 @@ function resolveBootstrapTag(input: BootstrapDecisionInput): BootstrapDecisionTa
   return 'settle-app';
 }
 
+/**
+ * Whether the tree needs the loading surface painted over it.
+ *
+ * `hidden` is true during the initial launch too, but the native splash and
+ * `AnimatedSplashOverlay` cover that window. Once startup has settled (the
+ * splash has handed over), a hidden tree is an exposed empty background: the
+ * post-sign-in redirect/consent window is the reported case
+ * (app-blank-after-oauth). `startupFinished` is the splash handover signal, so
+ * the surface is only requested for the windows the splash no longer covers.
+ *
+ * `signingOut` covers the teardown before that redirect: the session revoke,
+ * push unregister and credential deletes run over the network for seconds,
+ * while the token — and so the whole signed-in tree — is still published. The
+ * screen being left is already stale (the account is being revoked) and the
+ * window ended on a bare background or the previous screen (explorer
+ * signout-loading), so the wait surface owns it until the login screen mounts.
+ */
+export function shouldShowBootstrapLoading(input: {
+  readonly startupFinished: boolean;
+  readonly hidden: boolean;
+  readonly signingOut: boolean;
+}): boolean {
+  return input.startupFinished && (input.hidden || input.signingOut);
+}
+
 export function resolveBootstrapDecision(input: BootstrapDecisionInput): BootstrapDecision {
   const hasUserBootstrapError = input.hasToken && input.userIdError;
   const hasConsentBootstrapError = input.hasToken && input.consentCheckError;

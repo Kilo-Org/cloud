@@ -259,6 +259,18 @@ describe('getHeaderPillContent', () => {
 });
 
 describe('getContextSheetContent', () => {
+  it('does not invent usage before the first completed model step', () => {
+    expect(getContextSheetContent(undefined, null)).toMatchObject({
+      usedTokens: '-',
+      windowTokens: null,
+      capacityKnown: false,
+      percentage: null,
+      remainingTokens: null,
+      cost: null,
+      tone: 'neutral',
+    });
+  });
+
   it('describes exact usage and remaining when capacity is known', () => {
     const content = getContextSheetContent(
       info({ contextTokens: 84_000, contextWindow: 200_000, percentage: 42 }),

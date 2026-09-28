@@ -33,14 +33,19 @@ export type WorktreeKiloCleanupClient = {
   disposeDirectory(directory: string): Promise<void>;
 };
 
-function requireData<T>(result: { data?: T; error?: unknown; response: Response }): T {
-  if (!result.response.ok || result.error !== undefined || result.data === undefined) {
+function requireData<T>(result: { data?: T; error?: unknown; response?: Response }): T {
+  if (
+    result.response === undefined ||
+    !result.response.ok ||
+    result.error !== undefined ||
+    result.data === undefined
+  ) {
     throw new Error('Kilo worktree cleanup was not confirmed');
   }
   return result.data;
 }
 
-function requireTrue(result: { data?: boolean; error?: unknown; response: Response }): void {
+function requireTrue(result: { data?: boolean; error?: unknown; response?: Response }): void {
   if (requireData(result) !== true) throw new Error('Kilo worktree cleanup was not confirmed');
 }
 
@@ -66,7 +71,7 @@ export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKilo
     },
     async getSession(directory, sessionId) {
       const result = await client.session.get({ sessionID: sessionId, directory }, options());
-      if (result.response.status === 404) return null;
+      if (result.response?.status === 404) return null;
       return sessionSchema.parse(requireData(result));
     },
     async children(directory, sessionId) {
@@ -78,7 +83,7 @@ export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKilo
     },
     async abortSession(directory, sessionId) {
       const result = await client.session.abort({ sessionID: sessionId, directory }, options());
-      if (result.response.status !== 404) requireTrue(result);
+      if (result.response?.status !== 404) requireTrue(result);
     },
     async stopSessionProcesses(directory, sessionId) {
       requireTrue(
@@ -87,30 +92,14 @@ export function createWorktreeKiloCleanupClient(serverUrl: string): WorktreeKilo
     },
     async deleteSession(directory, sessionId) {
       const result = await client.session.delete({ sessionID: sessionId, directory }, options());
-      if (result.response.status !== 404) requireTrue(result);
+      if (result.response?.status !== 404) requireTrue(result);
     },
     async closeTerminals(directory) {
-      const terminals = requireData(
-        await client.interactiveTerminal.list({ directory }, options())
-      );
-      for (const terminal of terminals) {
-        requireTrue(
-          await client.interactiveTerminal.close(
-            { terminalID: terminal.info.id, directory },
-            options()
-          )
-        );
-      }
       const ptys = requireData(await client.pty.list({ directory }, options()));
       for (const pty of ptys) {
         requireTrue(await client.pty.remove({ ptyID: pty.id, directory }, options()));
       }
-      if (
-        requireData(await client.pty.list({ directory }, options())).length > 0 ||
-        requireData(await client.interactiveTerminal.list({ directory }, options())).some(
-          terminal => terminal.info.status === 'running'
-        )
-      ) {
+      if (requireData(await client.pty.list({ directory }, options())).length > 0) {
         throw new Error('Kilo terminal cleanup was not confirmed');
       }
     },

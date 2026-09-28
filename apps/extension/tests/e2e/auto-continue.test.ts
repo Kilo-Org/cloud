@@ -22,10 +22,10 @@ test('conversation automatically continues through another eval request', async 
                 tool_calls: [
                   {
                     function: {
-                      arguments: JSON.stringify({ code: 'return document.title;' }),
-                      name: 'eval',
+                      arguments: JSON.stringify({ function: '() => document.title' }),
+                      name: 'kilo_browser_evaluate',
                     },
-                    id: 'call_eval_2',
+                    id: 'call_evaluate_2',
                     index: 0,
                     type: 'function',
                   },
@@ -57,8 +57,8 @@ test('conversation automatically continues through another eval request', async 
     await expect(
       sidePanel.getByText('Second round finished and final answer ready.')
     ).toBeVisible();
-    await expect(sidePanel.getByText('eval completed')).toHaveCount(2);
-    await expect(sidePanel.getByText(/requested another eval/u)).toBeHidden();
+    await expect(sidePanel.getByText('Evaluate JavaScript completed')).toHaveCount(2);
+    await expect(sidePanel.getByText(/requested another tool/u)).toBeHidden();
   } finally {
     await context.close();
     await fixture.close();

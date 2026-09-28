@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Android-only by capability: the receivers and the timeout/boot
+       permission behind the Live Update notification. iOS has no promoted
+       ongoing notification; its counterpart is the ActivityKit Live Activity
+       rendered through expo-widgets (src/glanceable-ios/). -->
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
   <application>
     <receiver
@@ -9,5 +13,17 @@
         <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
       </intent-filter>
     </receiver>
+    <!-- Explicit broadcast from the ongoing notification's Approve action, so
+         the receiver is not exported and needs no intent filter. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsActionReceiver"
+      android:exported="false" />
+    <!-- The headless-task-service chain the same Approve action can take. -->
+    <receiver
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveReceiver"
+      android:exported="false" />
+    <service
+      android:name="com.kilocode.activeagentsliveupdate.ActiveAgentsApproveTaskService"
+      android:exported="false" />
   </application>
 </manifest>

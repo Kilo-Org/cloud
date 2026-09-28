@@ -61,6 +61,7 @@ function createTestFetch(overrides?: {
   deleteCalls?: string[];
   runtimeEnvironmentUpdates?: Array<Record<string, string>>;
   resizeError?: Error;
+  interactions?: { questions: unknown[]; permissions: unknown[] };
 }) {
   const ptyCalls = overrides?.ptyCalls ?? [];
   const resizeCalls = overrides?.resizeCalls ?? [];
@@ -91,8 +92,11 @@ function createTestFetch(overrides?: {
       deleteCalls.push(ptyId);
       return true;
     },
+    getQuestions: async () => overrides?.interactions?.questions ?? [],
+    getPermissions: async () => overrides?.interactions?.permissions ?? [],
   } as unknown as WrapperKiloClient;
 
+  const state = createTestState();
   const fetchHandler = createFetchHandler(
     {
       port: 5000,
@@ -105,7 +109,7 @@ function createTestFetch(overrides?: {
       wrapperInstanceGeneration: 8,
     },
     {
-      state: createTestState(),
+      state,
       kiloClient,
       openConnection: async () => {},
       closeConnection: async () => {},
@@ -117,7 +121,7 @@ function createTestFetch(overrides?: {
     },
     () => {}
   );
-  return { fetchHandler, ptyCalls, resizeCalls, deleteCalls, runtimeEnvironmentUpdates };
+  return { fetchHandler, state, ptyCalls, resizeCalls, deleteCalls, runtimeEnvironmentUpdates };
 }
 
 afterEach(async () => {
@@ -570,6 +574,53 @@ describe('wrapper Kilo proxy route', () => {
       await wrapper.server.stop(true);
       await upstream.stop(true);
     }
+  });
+});
+
+describe('wrapper pending interactions route', () => {
+  const sessionBinding = {
+    kiloSessionId: 'kilo_sess_test',
+    ingestUrl: 'ws://worker.test/ingest',
+    workerAuthToken: 'worker-token',
+    wrapperRunId: 'run_1',
+    wrapperGeneration: 1,
+    wrapperConnectionId: 'conn_1',
+    agentSessionId: 'agent_00000000-0000-0000-0000-000000000000',
+  };
+
+  it("returns this session's pending interactions only", async () => {
+    const question = { id: 'q_1', sessionID: 'kilo_sess_test' };
+    const childQuestion = { id: 'q_2', sessionID: 'kilo_child' };
+    const permission = { id: 'p_1', sessionID: 'kilo_sess_test' };
+    const { fetchHandler, state } = createTestFetch({
+      interactions: { questions: [question, childQuestion], permissions: [permission] },
+    });
+    state.bindSession(sessionBinding);
+
+    // A legacy `agent_*` session stores no pending set of its own, so this read
+    // is what the Worker's `getPendingInteractions` has for that plane.
+    const response = await fetchHandler(
+      new Request('http://wrapper.test/job/pending-interactions')
+    );
+    if (!response) throw new Error('Expected pending interactions response');
+
+    expect(response.status).toBe(200);
+    // Another session's wait — a child session's question — is not this
+    // session's to answer.
+    expect(await response.json()).toEqual({ questions: [question], permissions: [permission] });
+  });
+
+  it('refuses the read for a wrapper with no session context', async () => {
+    const { fetchHandler } = createTestFetch({
+      interactions: { questions: [{ id: 'q_1', sessionID: 'kilo_sess_test' }], permissions: [] },
+    });
+    const response = await fetchHandler(
+      new Request('http://wrapper.test/job/pending-interactions')
+    );
+    if (!response) throw new Error('Expected pending interactions response');
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'NO_SESSION' });
   });
 });
 

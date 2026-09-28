@@ -1,6 +1,7 @@
 import { AuthPageLayout } from '@/components/auth/AuthPageLayout';
 import { SignInForm } from '@/components/auth/SignInForm';
 import { allow_fake_login, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import { useMemo } from 'react';
 
 type GetStartedPageProps = {
@@ -9,6 +10,7 @@ type GetStartedPageProps = {
   searchParams: Record<string, string>;
   error?: string;
   signUpText?: string;
+  accountMismatch?: SsoAccountMismatch;
 };
 
 export function GetStartedPage({
@@ -17,6 +19,7 @@ export function GetStartedPage({
   searchParams,
   error,
   signUpText,
+  accountMismatch,
 }: GetStartedPageProps) {
   const searchParamsWithCallback = useMemo(
     () => ({ ...searchParams, callbackPath }),
@@ -32,6 +35,7 @@ export function GetStartedPage({
           isSignUp={true}
           allowFakeLogin={allow_fake_login}
           title={title}
+          accountMismatch={accountMismatch}
           subtitle={
             signUpText ??
             (FIRST_TOPUP_BONUS_AMOUNT > 0

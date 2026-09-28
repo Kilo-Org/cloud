@@ -180,6 +180,7 @@ describe('mergeProfileConfiguration', () => {
       setupCommands: undefined,
       encryptedSecrets: undefined,
     });
+    expect(result.resolvedProfileId).toBeUndefined();
   });
 
   test('passes through manual envVars only', async () => {
@@ -265,6 +266,7 @@ describe('mergeProfileConfiguration', () => {
 
     expect(result.envVars).toEqual({ REPO_VAR: 'bound' });
     expect(result.setupCommands).toEqual(['repo-setup']);
+    expect(result.resolvedProfileId).toBe(profileId);
   });
 
   test('merges repo binding (base) with explicit override and manual args', async () => {
@@ -302,6 +304,7 @@ describe('mergeProfileConfiguration', () => {
     });
     // Commands: base, override, manual (concatenated)
     expect(result.setupCommands).toEqual(['base-cmd', 'override-cmd', 'manual-cmd']);
+    expect(result.resolvedProfileId).toBe(overrideProfileId);
   });
 
   test('repo binding (base) and effective default (top) are co-applied; default wins on collision', async () => {
@@ -329,6 +332,7 @@ describe('mergeProfileConfiguration', () => {
       DEFAULT_ONLY: 'default-val',
       FROM: 'default',
     });
+    expect(result.resolvedProfileId).toBe(defaultProfileId);
   });
 
   test('explicit pick suppresses the default (default is only a fallback)', async () => {
@@ -344,6 +348,7 @@ describe('mergeProfileConfiguration', () => {
     const result = await mergeProfileConfiguration(db, { owner, profileId: pickedProfileId });
 
     expect(result.envVars).toEqual({ FROM: 'picked' });
+    expect(result.resolvedProfileId).toBe(pickedProfileId);
   });
 
   test('deduplicates when explicit override equals the repo binding', async () => {
@@ -364,6 +369,7 @@ describe('mergeProfileConfiguration', () => {
     // Should not duplicate vars/commands
     expect(result.envVars).toEqual({ KEY: 'val' });
     expect(result.setupCommands).toEqual(['cmd']);
+    expect(result.resolvedProfileId).toBe(profileId);
   });
 
   test('handles secret vars as encryptedSecrets', async () => {

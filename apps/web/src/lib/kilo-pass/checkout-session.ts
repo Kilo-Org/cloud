@@ -10,7 +10,7 @@ type CreateOrReuseKiloPassCheckoutSessionParams = {
   userId: string;
   stripeCustomerId: string;
   metadata: Stripe.MetadataParam;
-  createSession: () => Promise<Stripe.Checkout.Session>;
+  createSession: () => Promise<{ url?: string | null }>;
 };
 
 const STRIPE_CHECKOUT_TIMEOUT_MS = 10_000;

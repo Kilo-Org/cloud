@@ -1,0 +1,319 @@
+import { type TFunction } from 'i18next';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { FlatList, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { EmptyState } from '@/components/empty-state';
+import { PickerSheet } from '@/components/picker-sheet';
+import { QueryError } from '@/components/query-error';
+import { ChoiceRow } from '@/components/ui/choice-row';
+import { Mic, Search, SearchX } from '@/components/ui/icons';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import { foldForSearch } from '@/i18n/fold-for-search';
+import { languageRows } from '@/i18n/language-rows';
+import { SUPPORTED_LANGUAGES } from '@/i18n/languages';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import {
+  reconcileVoiceInputLanguageTag,
+  voiceInputLanguageDisplayName,
+  voiceInputLanguageEnglishName,
+} from '@/lib/voice-input/voice-input-language';
+import {
+  useVoiceInputLanguage,
+  useVoiceInputLanguageLoaded,
+  writeVoiceInputLanguage,
+} from '@/lib/voice-input/voice-input-language-preference';
+import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
+import { useVoiceRecognitionLanguages } from '@/lib/voice-input/use-voice-recognition-languages';
+
+// Static skeleton rows: count and shape match the real ChoiceRow rows (name
+// line + caption; the trailing check is transparent unless selected, so the
+// skeleton carries no trailing control) so the swap never moves layout and
+// never shows a shape the loaded row will not have.
+const SKELETON_ROW_COUNT = 6;
+
+function SkeletonRows() {
+  return (
+    <View className="px-4 pb-4 pt-1">
+      {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+        // eslint-disable-next-line react/no-array-index-key -- static skeleton rows, no reordering
+        <View key={index} className="min-h-11 flex-row items-center justify-between py-3">
+          <View className="flex-1 gap-1.5 pr-3">
+            <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-3 w-28" />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+type VoiceLanguageOption = {
+  /** `null` is the Automatic row: resolve the tag from the app and device. */
+  tag: string | null;
+  label: string;
+  description: string;
+  /** Extra terms the search matches, e.g. the English name in device mode. */
+  searchTerms: readonly string[];
+};
+
+function automaticOption(t: TFunction): VoiceLanguageOption {
+  return {
+    tag: null,
+    label: t('voiceLanguage.automatic'),
+    // Automatic resolves from the active app language and the device's
+    // locales, so the device wording names what the row actually does.
+    description: t('language.deviceLanguage'),
+    searchTerms: [],
+  };
+}
+
+function matchesQuery(option: VoiceLanguageOption, query: string): boolean {
+  // Fold like the app language picker so "espanol" finds "Español".
+  const needle = foldForSearch(query.trim());
+  if (needle.length === 0) {
+    return true;
+  }
+  return [option.label, option.description, ...option.searchTerms].some(value =>
+    foldForSearch(value).includes(needle)
+  );
+}
+
+function VoiceLanguageList({
+  options,
+  chosen,
+  query,
+  onSelect,
+}: Readonly<{
+  options: VoiceLanguageOption[];
+  chosen: string | null;
+  query: string;
+  onSelect: (tag: string | null) => void;
+}>) {
+  const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  // `matchesQuery` folds the label, the description and every search term of
+  // every option, so the filter only reruns when the option array or the query
+  // changes. An unrelated parent re-render then hands the list the same `data`
+  // identity and no mounted row re-renders.
+  const filtered = useMemo(
+    () => options.filter(option => matchesQuery(option, query)),
+    [options, query]
+  );
+
+  if (filtered.length === 0) {
+    return (
+      <EmptyState
+        icon={SearchX}
+        title={t('language.noMatches')}
+        description={t('agents.sessionList.tryDifferentSearch')}
+      />
+    );
+  }
+
+  return (
+    <FlatList
+      className="flex-1 bg-background"
+      data={filtered}
+      keyExtractor={option => option.tag ?? 'automatic'}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      contentContainerClassName="px-4 pb-4"
+      ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
+      renderItem={({ item, index }) => (
+        <ChoiceRow
+          label={item.label}
+          description={item.description}
+          className={index < filtered.length - 1 ? 'border-b-[0.5px] border-hair-soft' : undefined}
+          selected={chosen === item.tag}
+          onPress={() => {
+            onSelect(item.tag);
+          }}
+        />
+      )}
+    />
+  );
+}
+
+/**
+ * Device-mode body. Split from the sheet so `useVoiceRecognitionLanguages` —
+ * and therefore the locale fetch — only runs while the gateway transcription
+ * switch is off. The gateway list is static and must not trigger a fetch.
+ */
+function DeviceVoiceLanguages({
+  chosen,
+  query,
+  onSelect,
+}: Readonly<{
+  chosen: string | null;
+  query: string;
+  onSelect: (tag: string | null) => void;
+}>) {
+  const { t } = useTranslation();
+  const { languages, isLoading, isError, refetch } = useVoiceRecognitionLanguages();
+
+  // The fetched locale list is stable while the result stands, so the row
+  // objects (endonyms plus the English search terms) are built once per list
+  // instead of on every render. Built above the early returns so the hook order
+  // is identical in every state.
+  const options = useMemo<VoiceLanguageOption[]>(
+    () => [
+      automaticOption(t),
+      ...languages.map(tag => {
+        const englishName = voiceInputLanguageEnglishName(tag);
+        return {
+          tag,
+          label: voiceInputLanguageDisplayName(tag),
+          description: tag,
+          // The endonym and the tag are already searchable; the English name is
+          // what a user who does not read the native name will type.
+          searchTerms: englishName ? [englishName] : [],
+        };
+      }),
+    ],
+    [t, languages]
+  );
+
+  if (isLoading) {
+    return <SkeletonRows />;
+  }
+  if (isError) {
+    // Retryable: the service call failed, so a retry can succeed.
+    return <QueryError title={t('voiceLanguage.loadFailed')} onRetry={refetch} />;
+  }
+  if (languages.length === 0) {
+    // Non-retryable: the service answered with zero supported languages, and
+    // retrying cannot make it report languages it does not have.
+    return (
+      <EmptyState
+        icon={Mic}
+        title={t('voiceLanguage.emptyTitle')}
+        description={t('voiceLanguage.emptyDescription')}
+      />
+    );
+  }
+
+  // The stored tag may have been chosen in gateway mode (an app language), so
+  // map it onto the device's locales before checking a row: otherwise no row
+  // is checked while the settings row still names a language.
+  return (
+    <VoiceLanguageList
+      options={options}
+      chosen={reconcileVoiceInputLanguageTag(chosen, languages)}
+      query={query}
+      onSelect={onSelect}
+    />
+  );
+}
+
+/**
+ * Picks the voice-input language. In gateway mode the choices are the app's
+ * supported languages with no fetch; in device mode they are the recognition
+ * service's locales. Writes the SecureStore-backed store directly — no picker
+ * bridge — and dismisses on selection, mirroring the model picker's route
+ * shell.
+ */
+export function VoiceLanguagePickerSheet() {
+  const { t } = useTranslation();
+  const router = useRouter();
+  const colors = useThemeColors();
+  const { gatewayTranscriptionEnabled, hasLoaded: gatewayTranscriptionLoaded } =
+    useGatewayTranscriptionPreference();
+  const chosen = useVoiceInputLanguage();
+  const chosenLoaded = useVoiceInputLanguageLoaded();
+  const [query, setQuery] = useState('');
+
+  const onSelect = useCallback(
+    (tag: string | null) => {
+      writeVoiceInputLanguage(tag);
+      router.back();
+    },
+    [router]
+  );
+
+  // The canonical app language picker's list: every supported language collated
+  // by endonym, with the English name as the secondary line. `languageRows('')`
+  // copies, collates and maps the whole catalog, so it is built once per
+  // translation function instead of on every sheet render. Memoized above the
+  // branch because a hook cannot be called conditionally; the device branch
+  // builds its own list from the fetched locales.
+  const gatewayOptions = useMemo<VoiceLanguageOption[]>(
+    () => [
+      automaticOption(t),
+      ...languageRows('').map(row => ({
+        tag: row.tag,
+        label: row.endonym,
+        description: row.englishName,
+        // The row already shows the endonym and English name; the tag is
+        // searchable too, so "zh-Hant" finds a language whose endonym the
+        // user cannot type.
+        searchTerms: [row.tag],
+      })),
+    ],
+    [t]
+  );
+
+  // The SecureStore reads resolve after mount; until both settle the mode and
+  // the current check are unknown, so hold the skeletons (same row height as
+  // ChoiceRow) and render the rows once, correctly checked. The device-mode
+  // body is only mounted when the gateway switch is off, so the locale fetch
+  // never runs in gateway mode.
+  let content: ReactNode = <SkeletonRows />;
+  if (gatewayTranscriptionLoaded && chosenLoaded) {
+    content = gatewayTranscriptionEnabled ? (
+      <VoiceLanguageList
+        options={gatewayOptions}
+        chosen={reconcileVoiceInputLanguageTag(chosen, SUPPORTED_LANGUAGES)}
+        query={query}
+        onSelect={onSelect}
+      />
+    ) : (
+      <DeviceVoiceLanguages chosen={chosen} query={query} onSelect={onSelect} />
+    );
+  }
+
+  return (
+    <PickerSheet
+      title={t('voiceLanguage.title')}
+      doneLabel={t('common.done')}
+      onDone={() => {
+        router.back();
+      }}
+      onCancel={() => {
+        router.back();
+      }}
+      scrollable={false}
+      headerContent={
+        // Same filled pill as the account language picker and the repository
+        // and share pickers: one search-field shape for the same control. The
+        // field itself is the shared single-line `Input`, so the pill owns only
+        // the chrome while the field owns the height floor, the one line box for
+        // the placeholder and the value, and the RTL content alignment.
+        <View className="mx-4 mb-3 mt-3 flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2">
+          <Search size={18} color={colors.mutedForeground} />
+          <Input
+            accessibilityLabel={t('language.search')}
+            // The pill supplies the horizontal inset, so the field zeroes the
+            // shared box's `px-3` — the same `flex-1 px-0` the share and model
+            // pickers give the field in this pill.
+            className="flex-1 px-0 text-base text-foreground"
+            placeholder={t('language.search')}
+            placeholderTextColor={colors.mutedForeground}
+            // Uncontrolled: iOS drops keystrokes when state drives `value`;
+            // `onChangeText` only feeds the filter.
+            onChangeText={setQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+            returnKeyType="search"
+          />
+        </View>
+      }
+    >
+      {content}
+    </PickerSheet>
+  );
+}

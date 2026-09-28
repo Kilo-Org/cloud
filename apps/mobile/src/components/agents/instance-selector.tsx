@@ -1,10 +1,11 @@
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown } from '@/components/ui/icons';
-import { Pressable } from 'react-native';
+import { Keyboard, Pressable } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { cloudAgentTargetLabel, formatInstanceTarget } from '@/lib/instance-target-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
 import { instancePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -36,12 +37,12 @@ function selectorLabel({
   isLoading: boolean;
 }): string {
   if (value) {
-    return `${value.name} · ${value.projectName}`;
+    return formatInstanceTarget(value);
   }
   if (isLoading) {
     return i18n.t('common.loading');
   }
-  return i18n.t('agentChat.instancePicker.cloudAgent');
+  return cloudAgentTargetLabel();
 }
 
 export function InstanceSelector({
@@ -69,6 +70,9 @@ export function InstanceSelector({
       currentValue: value,
       onSelect: onChange,
     });
+    // See ModelSelector: the sheet never re-anchors after the keyboard hides,
+    // so the keyboard must be down before this push.
+    Keyboard.dismiss();
     router.push('/(app)/agent-chat/instance-picker' as Href);
   }
 

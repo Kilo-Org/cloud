@@ -20,9 +20,6 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
-vi.mock('@/lib/external-auth/use-external-auth-return', () => ({
-  useExternalAuthReturn: () => ({ markLaunched: vi.fn(), clearLaunch: vi.fn() }),
-}));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: authorization,
 }));
@@ -30,7 +27,7 @@ vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
 let mounted: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  authorization.mockReset().mockResolvedValue('sheet-close');
+  authorization.mockReset().mockResolvedValue(undefined);
 });
 afterEach(() => {
   mounted?.unmount();
@@ -39,7 +36,7 @@ afterEach(() => {
 });
 
 it('centers setup, disables Connect while authorizing, and refreshes on return', async () => {
-  const result = Promise.withResolvers<'sheet-close'>();
+  const result = Promise.withResolvers<undefined>();
   authorization.mockReturnValueOnce(result.promise);
   const onConnected = vi.fn().mockResolvedValue(undefined);
   mounted = await renderWithProviders(
@@ -56,10 +53,10 @@ it('centers setup, disables Connect while authorizing, and refreshes on return',
   expect(button.props.disabled).toBe(false);
   act(button.props.onPress as () => void);
   expect(button.props.disabled).toBe(true);
-  expect(authorization).toHaveBeenCalledWith('ios', 'https://github.com/apps/kilo');
+  expect(authorization).toHaveBeenCalledWith('https://github.com/apps/kilo');
   expect(onConnected).not.toHaveBeenCalled();
   await act(async () => {
-    result.resolve('sheet-close');
+    result.resolve(undefined);
     await result.promise;
   });
   expect(onConnected).toHaveBeenCalledOnce();

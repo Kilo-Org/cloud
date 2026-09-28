@@ -7,6 +7,7 @@
       "instanceLifecycle": "Zure instantziak eguneratze bat du",
       "scheduledAction": "Programatutako ekintza batek eguneratze bat du",
       "lowBalance": "Zure saldoak arreta behar du",
+      "spendAlert": "Your spend needs attention",
       "securityFinding": "Aurkitutako segurtasun-arazo batek arreta behar du",
       "activeAgentsGlanceable": "Agente aktiboek eguneratze bat dute"
     }
@@ -41,6 +42,10 @@
     "lowBalance": {
       "title": "Saldo baxuko alerta",
       "body": "{{organizationName}} saldoa ${{minimumBalanceUsd}} azpitik jaitsi da"
+    },
+    "spendAlert": {
+      "title": "Spend alert",
+      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Aurkitutako segurtasun-arazo berria ({{severity}})",

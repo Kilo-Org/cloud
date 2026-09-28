@@ -27,9 +27,11 @@ import {
 } from './google-play-sdk';
 import {
   completeStoreKiloPassPurchase,
+  isActiveKiloPassSubscriptionError,
   isStorePurchaseMismatchError,
   type CompleteStoreKiloPassPurchaseResult,
 } from './store-subscription-completion';
+import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from './dayjs';
@@ -767,10 +769,18 @@ export async function processGooglePlayKiloPassNotification(params: {
 
     let completionResult: CompleteStoreKiloPassPurchaseResult | null = null;
     let purchaseMismatch = false;
+    let duplicateSubscription = false;
     await db.transaction(async tx => {
       try {
         completionResult = await completeStoreKiloPassPurchase({ dbOrTx: tx, user, purchase });
       } catch (error) {
+        // A user holds at most one Kilo Pass, so this paid order is a duplicate
+        // purchase. Reverse it after the transaction closes instead of
+        // acknowledging it here, which would drop the charge.
+        if (isActiveKiloPassSubscriptionError(error)) {
+          duplicateSubscription = true;
+          return;
+        }
         // A permanent provider/user mismatch settles `failed` inside the
         // completion, so this event must be marked processed and never retried.
         if (isStorePurchaseMismatchError(error)) {
@@ -802,6 +812,21 @@ export async function processGooglePlayKiloPassNotification(params: {
       });
     });
     if (purchaseMismatch) {
+      return { processed: true };
+    }
+    if (duplicateSubscription) {
+      await reverseDuplicateGooglePlaySubscription({
+        kiloUserId: user.id,
+        productId: purchase.productId,
+        purchaseToken,
+        providerSubscriptionId: purchase.providerSubscriptionId,
+        providerTransactionId: purchase.providerTransactionId,
+        amountChargedMinorUnits: purchase.amountChargedMinorUnits ?? null,
+        currency: purchase.currency ?? null,
+        taxMinorUnits: purchase.taxMinorUnits ?? null,
+        messageId: messageId ?? null,
+        eventId,
+      });
       return { processed: true };
     }
     if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {

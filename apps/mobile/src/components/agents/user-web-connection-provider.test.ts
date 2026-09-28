@@ -1,6 +1,6 @@
-/* eslint-disable typescript-eslint/no-deprecated, react/no-children-prop -- the .ts fixture uses react-test-renderer without JSX. */
+/* eslint-disable react/no-children-prop -- the .ts fixture uses test-renderer without JSX. */
 import { createElement } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';

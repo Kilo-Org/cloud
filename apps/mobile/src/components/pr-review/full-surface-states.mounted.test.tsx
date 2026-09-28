@@ -4,6 +4,7 @@ import { RefreshControl } from '@/components/ui/refresh-control';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
+import { type ProviderPrScope, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 import { PrReviewOverview } from './pr-review-overview';
 import { PrReviewCommentComposerScreen } from './pr-review-comment-composer-screen';
 import { PrReviewReviewSubmitScreen } from './pr-review-review-submit-screen';
@@ -24,16 +25,22 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
-  useLocalSearchParams: () => ({
+// Mutable so one suite can hand the composer route a malformed param set
+// without re-mocking `expo-router` per test.
+const routeParams = vi.hoisted(() => {
+  const current: Record<string, string> = {
     owner: 'org',
     repo: 'repo',
     number: '1',
     path: 'src/a.ts',
     line: '1',
     side: 'RIGHT',
-  }),
+  };
+  return { current };
+});
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  useLocalSearchParams: () => routeParams.current,
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -62,6 +69,9 @@ vi.mock('@/components/pr-review/diff/pr-diff-file-navigator', () => ({
 }));
 vi.mock('@/components/pr-review/merge/pr-merge-section', () => ({
   PrMergeSection: 'PrMergeSection',
+}));
+vi.mock('@/components/pr-review/merge/pr-merge-section-provider', () => ({
+  PrMergeSectionProvider: 'PrMergeSectionProvider',
 }));
 vi.mock('@/components/pr-review/pr-review-checks-section', () => ({
   PrReviewChecksSection: 'PrReviewChecksSection',
@@ -102,6 +112,14 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: { getPullRequest: { queryOptions: () => ({}) } },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
+    // s6: the submit/merge screens build the provider seam's capability and
+    // merge-state options even on the GitHub arm (the queries register
+    // disabled and never fetch), so the router mock carries the namespace.
+    providerReview: {
+      getCapabilities: { queryOptions: () => ({}) },
+      getMergeState: { queryOptions: () => ({}) },
+      getPullRequest: { queryOptions: () => ({}) },
+    },
   }),
 }));
 
@@ -110,6 +128,14 @@ beforeEach(() => {
   query.isError = true;
   query.isLoading = false;
   query.error.data.code = 'INTERNAL_SERVER_ERROR';
+  routeParams.current = {
+    owner: 'org',
+    repo: 'repo',
+    number: '1',
+    path: 'src/a.ts',
+    line: '1',
+    side: 'RIGHT',
+  };
   vi.clearAllMocks();
 });
 
@@ -145,6 +171,35 @@ describe('PR Overview full-body states', () => {
       unmount();
     }
   );
+
+  it('gives a provider reconnect its own notice and recovery CTA instead of the GitHub empty state', async () => {
+    query.error.data.code = 'PRECONDITION_FAILED';
+    const scope: ProviderPrScope = {
+      ref: { platform: 'gitlab', projectPath: 'group/repo', mrIid: 1 },
+      organizationId: null,
+    };
+    const { renderer, unmount } = await renderWithProviders(
+      <ProviderPrScopeProvider value={scope}>
+        {createElement(PrReviewOverview, overviewProps)}
+      </ProviderPrScopeProvider>
+    );
+
+    // Not the GitHub-only centered empty state.
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    const texts = renderer.root
+      .findAllByType('Text' as never)
+      .flatMap(node => node.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(texts).toContain('GitLab connection expired');
+    // The recovery CTA is present, not hidden behind the GitHub-only arm.
+    expect(
+      renderer.root.findAll(
+        node =>
+          String(node.type) === 'Button' && node.props.accessibilityLabel === 'Check connection'
+      )
+    ).toHaveLength(1);
+    unmount();
+  });
 
   it('keeps cached overview content and its refresh control after a transient failure', async () => {
     query.data = {
@@ -196,6 +251,25 @@ describe.each([
     const { renderer, unmount } = await renderWithProviders(createElement(Screen));
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+    unmount();
+  });
+});
+
+describe('composer malformed route', () => {
+  it('renders the terminal invalid state without the Add-comment chrome', async () => {
+    // A hand-built or restored composer link with no valid comment target
+    // failed at the ROUTE, not at the comment: the sheet must not announce
+    // "Add comment" over a "Page not found" body.
+    routeParams.current = { owner: 'org', repo: 'repo', number: '1' };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewCommentComposerScreen)
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'InvalidRouteState')).toHaveLength(
+      1
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'PrFormSheetHeader')).toHaveLength(
+      0
+    );
     unmount();
   });
 });

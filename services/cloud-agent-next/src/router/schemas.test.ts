@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  getSandboxAllocationRequest,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
+import {
   ExecutionResponse,
   GetMessageResultInput,
   GetMessageResultOutput,
@@ -222,6 +226,91 @@ describe('grouped unified session input contracts', () => {
         },
       }).success
     ).toBe(false);
+  });
+});
+
+describe('sandbox preset input boundaries', () => {
+  const prepare = { ...basePromptInput, githubRepo: 'acme/repo' };
+
+  it.each(sandboxAllocationSchema.options)(
+    'normalizes structured %s requests to the existing canonical allocation',
+    allocation => {
+      const sandboxAllocation = getSandboxAllocationRequest(allocation);
+      expect(PrepareSessionInput.parse({ ...prepare, sandboxAllocation })).toEqual(
+        PrepareSessionInput.parse({ ...prepare, sandboxAllocation: allocation })
+      );
+      expect(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation } })
+      ).toEqual(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation: allocation } })
+      );
+    }
+  );
+
+  it.each(['small', 'large'] as const)(
+    'rejects unsupported BYOC %s rather than allocating Kilo compute',
+    instanceType => {
+      const sandboxAllocation = { provider: { id: 'vercel', account: 'byoc' }, instanceType };
+      for (const result of [
+        PrepareSessionInput.safeParse({ ...prepare, sandboxAllocation }),
+        StartSessionInput.safeParse({ ...baseStartInput, runtime: { sandboxAllocation } }),
+      ]) {
+        expect(result.success).toBe(false);
+        if (!result.success) expect(result.error.message).toContain('BYOC');
+      }
+    }
+  );
+
+  it('keeps omitted allocations omitted', () => {
+    expect(PrepareSessionInput.parse(prepare).sandboxAllocation).toBeUndefined();
+    expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+  });
+
+  it.each(['devcontainer', 'code-review'] as const)(
+    'rejects structured allocation combined with %s routing',
+    routing => {
+      const sandboxAllocation = getSandboxAllocationRequest('vercel-small');
+      expect(
+        PrepareSessionInput.safeParse({
+          ...prepare,
+          sandboxAllocation,
+          ...(routing === 'devcontainer' ? { devcontainer: true } : { createdOnPlatform: routing }),
+        }).success
+      ).toBe(false);
+    }
+  );
+
+  it.each(['cloudflare-single', 'cloudflare-shared', 'vercel-small', 'vercel-large'] as const)(
+    'preserves the finite %s preset in both prepare and grouped start',
+    sandboxAllocation => {
+      expect(PrepareSessionInput.parse({ ...prepare, sandboxAllocation }).sandboxAllocation).toBe(
+        sandboxAllocation
+      );
+      expect(
+        StartSessionInput.parse({ ...baseStartInput, runtime: { sandboxAllocation } }).runtime
+      ).toEqual({ sandboxAllocation });
+    }
+  );
+
+  it('rejects invalid allocations and specialized prepare allocation combinations', () => {
+    for (const override of [
+      { sandboxAllocation: 'custom' },
+      { sandboxAllocation: 'vercel-large', devcontainer: true },
+      { sandboxAllocation: 'vercel-medium' },
+      { sandboxAllocation: 'isolated-standard', devcontainer: true },
+      { sandboxAllocation: 'cloudflare-single', createdOnPlatform: 'code-review' },
+      { sandboxAllocation: 'isolated-standard', createdOnPlatform: 'code-review' },
+    ]) {
+      expect(PrepareSessionInput.safeParse({ ...prepare, ...override }).success).toBe(false);
+    }
+    for (const runtime of [
+      { sandboxAllocation: 'custom' },
+      { sandboxAllocation: 'vercel-small', resources: { vcpus: 8, memory: 16384 } },
+      { sandboxAllocation: 'cloudflare-single', devcontainer: true },
+      { sandboxAllocation: 'vercel-medium' },
+    ]) {
+      expect(StartSessionInput.safeParse({ ...baseStartInput, runtime }).success).toBe(false);
+    }
   });
 });
 

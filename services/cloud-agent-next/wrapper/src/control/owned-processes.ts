@@ -22,6 +22,25 @@ import { lstat, readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 import { Writable } from 'node:stream';
 import { setTimeout as delay } from 'node:timers/promises';
+import { pidStillMatches, readProcessTable } from '../tool-cgroup.js';
+import {
+  applyManagedWorkloadLimits,
+  CGROUP_FS_MAGIC,
+  classifyWorkloadMembers,
+  createWorkloadReporter,
+  readWorkloadStats,
+  WORKLOAD_SERVER_NAME,
+  WORKLOAD_SWEEP_INTERVAL_MS,
+  WORKLOAD_TOOLS_NAME,
+  type WorkloadPlacement,
+  type WorkloadProcessEntry,
+} from './workload-cgroup.js';
+
+export type DirectProcessState = 'absent' | 'reused' | 'alive' | 'unknown';
+
+export type DirectProcessObserver = {
+  observe(deadlineAt?: number): Promise<DirectProcessState>;
+};
 
 export type OwnedProcessScope = {
   spawn(
@@ -29,6 +48,8 @@ export type OwnedProcessScope = {
     args: string[],
     options: SpawnOptionsWithoutStdio
   ): ChildProcessWithoutNullStreams;
+  observeChild(process: ChildProcessWithoutNullStreams): DirectProcessObserver | undefined;
+  releaseAbandoned(): void;
   run<T>(operation: () => T): T;
   seal(): void;
   dispose(): boolean;
@@ -49,6 +70,7 @@ type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
   exited: boolean;
+  gate?: Writable;
 };
 type Cgroup = {
   directory: string;
@@ -57,7 +79,15 @@ type Cgroup = {
   ino: number;
   descriptors: number[];
   procs: number;
+  procsReference: string;
   kill?: number;
+  managed?: {
+    serverReference: string;
+    toolsReference: string;
+    toolsProcs: number;
+    serverProcs: number;
+    cpuController: boolean;
+  };
 };
 
 export const OWNED_PROCESS_OBSERVATION_TIMEOUT_MS = 1_000;
@@ -170,6 +200,32 @@ function isLiveProcessState(state: string): boolean {
   return state !== 'Z' && state !== 'X' && state !== 'x';
 }
 
+export function classifyDirectProcessState(input: {
+  exited: boolean;
+  pid: number | undefined;
+  platform: NodeJS.Platform;
+  storedIdentity: string | undefined;
+  statText?: string;
+  probeError?: NodeJS.ErrnoException;
+}): DirectProcessState {
+  if (input.exited || input.pid === undefined) return 'absent';
+  if (input.platform !== 'linux') {
+    if (!input.probeError) return 'alive';
+    return input.probeError.code === 'ESRCH' ? 'absent' : 'unknown';
+  }
+  if (input.probeError) {
+    return input.probeError.code === 'ENOENT' ? 'absent' : 'unknown';
+  }
+  try {
+    const fresh = processIdentity(input.pid, input.statText ?? '');
+    if (!isLiveProcessState(fresh.state)) return 'absent';
+    if (!input.storedIdentity) return 'unknown';
+    return fresh.identity === input.storedIdentity ? 'alive' : 'reused';
+  } catch {
+    return 'unknown';
+  }
+}
+
 function closeDescriptors(descriptors: number[]): void {
   for (const descriptor of descriptors.splice(0)) {
     try {
@@ -178,6 +234,28 @@ function closeDescriptors(descriptors: number[]): void {
       console.warn('Owned process descriptor close failed; continuing descriptor cleanup');
     }
   }
+}
+
+function releaseChildStreams(child: OwnedChild): void {
+  for (const stream of [child.process.stdin, child.process.stdout, child.process.stderr]) {
+    try {
+      stream.destroy();
+    } catch {
+      console.warn('Owned process child stream release failed; continuing stream cleanup');
+    }
+  }
+  if (child.gate) {
+    try {
+      child.gate.destroy();
+    } catch {
+      console.warn('Owned process child stream release failed; continuing stream cleanup');
+    }
+  }
+}
+
+function releaseGate(gate: Writable): void {
+  gate.on('error', () => undefined);
+  gate.end('start\n');
 }
 
 function isErofs(error: unknown): boolean {
@@ -263,7 +341,7 @@ function createCgroup(): Cgroup | undefined {
       console.warn('Owned process cgroup.kill unavailable; using verified child signals');
     }
     closeDescriptors(descriptors.splice(0, 2));
-    return { directory, reference, dev, ino, descriptors, procs, kill };
+    return { directory, reference, dev, ino, descriptors, procs, procsReference: reference, kill };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'unknown';
     console.warn(`Owned process containment unavailable: ${message}`);
@@ -282,6 +360,155 @@ function createCgroup(): Cgroup | undefined {
 
 function sameDirectory(group: Cgroup, value: { dev: number; ino: number }): boolean {
   return value.dev === group.dev && value.ino === group.ino;
+}
+
+export type WorkloadMigrationOutcome =
+  | 'migrated'
+  | 'pid_changed'
+  | 'write_failed'
+  | 'membership_unconfirmed';
+
+export async function migrateWorkloadProcess(input: {
+  pid: number;
+  entry: WorkloadProcessEntry | undefined;
+  procRoot: string;
+  write: (pid: number) => void;
+  confirmMembership: () => Promise<boolean>;
+  identityMatches?: (procRoot: string, entry: WorkloadProcessEntry) => Promise<boolean>;
+}): Promise<WorkloadMigrationOutcome> {
+  const matches = input.identityMatches ?? pidStillMatches;
+  if (!input.entry || !(await matches(input.procRoot, input.entry))) return 'pid_changed';
+  try {
+    input.write(input.pid);
+  } catch {
+    return 'write_failed';
+  }
+  try {
+    return (await input.confirmMembership()) ? 'migrated' : 'membership_unconfirmed';
+  } catch {
+    return 'membership_unconfirmed';
+  }
+}
+
+function removeDirectories(directory: string): void {
+  let entries;
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (!entry.isDirectory() || entry.isSymbolicLink()) continue;
+    removeDirectories(path.join(directory, entry.name));
+  }
+  try {
+    rmdirSync(directory);
+  } catch {
+    console.warn('Owned process containment creation cleanup failed');
+  }
+}
+
+function createManagedCgroup(placement: WorkloadPlacement): Cgroup | undefined {
+  const descriptors: number[] = [];
+  let created: { directory: string; dev: number; ino: number } | undefined;
+  try {
+    if (process.platform !== 'linux') return undefined;
+    if (statfsSync(placement.parentReference).type !== CGROUP_FS_MAGIC) {
+      throw new Error('Workload parent is not a cgroup');
+    }
+    const parent = fstatSync(placement.parentFd);
+    if (parent.dev !== placement.parentDev || parent.ino !== placement.parentIno) {
+      throw new Error('Workload parent changed');
+    }
+    const name = `kilo-control-${crypto.randomUUID()}`;
+    try {
+      mkdirSync(path.join(placement.parentReference, name));
+    } catch (error) {
+      if (!isErofs(error)) throw error;
+      remountCgroupWritable(placement.parentDirectory);
+      mkdirSync(path.join(placement.parentReference, name));
+    }
+    const directory = path.join(placement.parentDirectory, name);
+    const descriptor = openSync(
+      path.join(placement.parentReference, name),
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
+    );
+    descriptors.push(descriptor);
+    const { dev, ino } = fstatSync(descriptor);
+    created = { directory, dev, ino };
+    const reference = `/proc/self/fd/${descriptor}`;
+    if (population(readFileSync(path.join(reference, 'cgroup.events'), 'utf8')) !== 0) {
+      throw new Error('Owned process containment is occupied');
+    }
+
+    mkdirSync(path.join(reference, WORKLOAD_SERVER_NAME));
+    mkdirSync(path.join(reference, WORKLOAD_TOOLS_NAME));
+    const serverFd = openSync(
+      path.join(reference, WORKLOAD_SERVER_NAME),
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
+    );
+    descriptors.push(serverFd);
+    const toolsFd = openSync(
+      path.join(reference, WORKLOAD_TOOLS_NAME),
+      constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW
+    );
+    descriptors.push(toolsFd);
+    const serverReference = `/proc/self/fd/${serverFd}`;
+    const toolsReference = `/proc/self/fd/${toolsFd}`;
+
+    const { cpuController } = applyManagedWorkloadLimits({
+      parentReference: reference,
+      serverReference,
+      toolsReference,
+      aggregateMaxBytes: placement.aggregateMaxBytes,
+    });
+
+    const procs = openSync(
+      path.join(serverReference, 'cgroup.procs'),
+      constants.O_WRONLY | constants.O_NOFOLLOW
+    );
+    descriptors.push(procs);
+    const toolsProcs = openSync(
+      path.join(toolsReference, 'cgroup.procs'),
+      constants.O_WRONLY | constants.O_NOFOLLOW
+    );
+    descriptors.push(toolsProcs);
+    let kill: number | undefined;
+    try {
+      kill = openSync(
+        path.join(reference, 'cgroup.kill'),
+        constants.O_WRONLY | constants.O_NOFOLLOW
+      );
+      descriptors.push(kill);
+    } catch {
+      console.warn('Owned process cgroup.kill unavailable; using verified child signals');
+    }
+    return {
+      directory,
+      reference,
+      dev,
+      ino,
+      descriptors,
+      procs,
+      procsReference: serverReference,
+      managed: { serverReference, toolsReference, toolsProcs, serverProcs: procs, cpuController },
+      ...(kill !== undefined ? { kill } : {}),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown';
+    console.warn(`Owned process workload containment unavailable: ${message}`);
+    if (created) {
+      try {
+        const fresh = lstatSync(created.directory);
+        if (fresh.dev === created.dev && fresh.ino === created.ino)
+          removeDirectories(created.directory);
+      } catch {
+        console.warn('Owned process containment creation cleanup failed');
+      }
+    }
+    closeDescriptors(descriptors);
+    return undefined;
+  }
 }
 
 async function assertDirectory(group: Cgroup, deadline: Deadline): Promise<void> {
@@ -385,8 +612,9 @@ function removeCgroup(group: Cgroup, deadlineAt: number): boolean {
   }
 }
 
-export function createOwnedProcessScope(): OwnedProcessScope {
+export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedProcessScope {
   let group: Cgroup | undefined;
+  let activePlacement = placement;
   let attempted = false;
   let contained = true;
   let sealed = false;
@@ -396,14 +624,143 @@ export function createOwnedProcessScope(): OwnedProcessScope {
   let stopResult: boolean | undefined;
   let stopDeadline: Deadline | undefined;
   let stopped = false;
+  let abandoned = false;
   let cgroupRemoval: Promise<boolean> | undefined;
+  let sweepTimer: ReturnType<typeof setInterval> | undefined;
+  let sweeping = false;
+  let lastOomKills = 0;
+  let lastOomGroupKills = 0;
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
+  const workloadReporter = placement?.report ? createWorkloadReporter(placement.report) : undefined;
   const live = (child: OwnedChild): boolean => !child.exited && child.process.pid !== undefined;
   const occupancyGroup = (): Cgroup | undefined =>
     group !== undefined && contained ? group : undefined;
   const occupancyObservable = (): boolean => occupancyGroup() !== undefined;
+
+  const stopSweep = (): void => {
+    if (sweepTimer !== undefined) {
+      clearInterval(sweepTimer);
+      sweepTimer = undefined;
+    }
+  };
+
+  const sweepManaged = async (): Promise<void> => {
+    const managed = group?.managed;
+    if (sweeping || !managed || !group || removed || stopped) return;
+    sweeping = true;
+    const deadline = createDeadline(Date.now() + OBSERVATION_TIMEOUT_MS);
+    observations.add(deadline);
+    try {
+      const root = [...children].find(live)?.process.pid;
+      if (root === undefined) return;
+      const scopeId = path.basename(group.directory);
+      const table = await readProcessTable('/proc');
+      const snapshot = await snapshotCgroup(group, deadline);
+      const { serverPids, toolPids } = classifyWorkloadMembers(snapshot.pids, table, root);
+      const migrateInto = async (
+        pids: number[],
+        members: Set<number>,
+        procs: number,
+        reference: string
+      ): Promise<number> => {
+        let moved = 0;
+        for (const pid of pids) {
+          if (members.has(pid)) continue;
+          deadline.check();
+          const outcome = await migrateWorkloadProcess({
+            pid,
+            entry: table.get(pid),
+            procRoot: '/proc',
+            write: value => writeSync(procs, String(value), 0, 'utf8'),
+            confirmMembership: async () => {
+              const after = new Set(
+                parsePids(await readText(path.join(reference, 'cgroup.procs'), deadline))
+              );
+              return after.has(pid);
+            },
+          });
+          if (outcome === 'migrated') {
+            moved += 1;
+            continue;
+          }
+          workloadReporter?.emit(scopeId, {
+            phase: 'failed',
+            workloadPhase: 'migration',
+            workloadFailure: outcome,
+          });
+        }
+        return moved;
+      };
+      const serverMembers = new Set(
+        parsePids(await readText(path.join(managed.serverReference, 'cgroup.procs'), deadline))
+      );
+      const toolsMembers = new Set(
+        parsePids(await readText(path.join(managed.toolsReference, 'cgroup.procs'), deadline))
+      );
+      const migrated =
+        (await migrateInto(
+          serverPids,
+          serverMembers,
+          managed.serverProcs,
+          managed.serverReference
+        )) +
+        (await migrateInto(toolPids, toolsMembers, managed.toolsProcs, managed.toolsReference));
+      if (migrated > 0) {
+        workloadReporter?.emit(scopeId, {
+          phase: 'completed',
+          workloadPhase: 'migration',
+          migratedCount: migrated,
+        });
+      }
+      const stats = readWorkloadStats(group.reference);
+      if (stats.oomKills > lastOomKills || stats.oomGroupKills > lastOomGroupKills) {
+        lastOomKills = Math.max(lastOomKills, stats.oomKills);
+        lastOomGroupKills = Math.max(lastOomGroupKills, stats.oomGroupKills);
+        workloadReporter?.emit(scopeId, {
+          phase: 'failed',
+          workloadPhase: 'oom',
+          oomKills: stats.oomKills,
+          oomGroupKills: stats.oomGroupKills,
+        });
+      }
+      workloadReporter?.emit(scopeId, {
+        phase: 'completed',
+        workloadPhase: 'stats',
+        toolCount: toolPids.length,
+        serverCount: serverPids.length,
+        migratedCount: migrated,
+        oomKills: stats.oomKills,
+        oomGroupKills: stats.oomGroupKills,
+        cpuController: managed.cpuController,
+        ...(stats.currentBytes !== undefined ? { currentBytes: stats.currentBytes } : {}),
+        ...(stats.peakBytes !== undefined ? { peakBytes: stats.peakBytes } : {}),
+        ...(stats.pressureSomeTotal !== undefined
+          ? { pressureSomeTotal: stats.pressureSomeTotal }
+          : {}),
+        ...(stats.pressureFullTotal !== undefined
+          ? { pressureFullTotal: stats.pressureFullTotal }
+          : {}),
+      });
+    } catch {
+      workloadReporter?.emit(path.basename(group.directory), {
+        phase: 'failed',
+        workloadPhase: 'migration',
+        workloadFailure: 'unavailable',
+      });
+    } finally {
+      sweeping = false;
+      observations.delete(deadline);
+      deadline.close();
+    }
+  };
+
+  const startSweep = (): void => {
+    if (sweepTimer !== undefined || !activePlacement) return;
+    sweepTimer = setInterval(() => void sweepManaged(), WORKLOAD_SWEEP_INTERVAL_MS);
+    sweepTimer.unref?.();
+  };
 
   const verify = async (allowBaseline: boolean, deadline: Deadline): Promise<boolean> => {
     try {
@@ -471,89 +828,181 @@ export function createOwnedProcessScope(): OwnedProcessScope {
   const scope: OwnedProcessScope = {
     spawn(command, args, options) {
       if (sealed) throw new Error('Owned process admission is closed');
+      if (activePlacement && options.shell !== undefined && options.shell !== false) {
+        throw new Error('Owned process placement rejects shell spawn');
+      }
       if (!attempted) {
         attempted = true;
-        group = createCgroup();
+        group = activePlacement ? createManagedCgroup(activePlacement) : createCgroup();
+      }
+      if (activePlacement && !group) {
+        workloadReporter?.emit(undefined, {
+          phase: 'failed',
+          workloadPhase: 'failed',
+          workloadFailure: 'unavailable',
+        });
+        activePlacement = undefined;
       }
       const gated =
         group !== undefined && options.shell !== true && typeof options.shell !== 'string';
-      const child = gated
-        ? spawn(
-            '/bin/sh',
-            [
-              '-c',
-              'IFS= read -r start <&3 && [ "$start" = start ] && exec 3<&- && exec "$@"',
-              'kilo-owned',
-              command,
-              ...args,
-            ],
-            { ...options, detached: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
-          )
-        : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
-      const record: OwnedChild = { process: child, exited: false };
-      children.add(record);
-      child.once('exit', () => {
-        record.exited = true;
-      });
-      child.once('error', () => {
-        if (child.pid === undefined) record.exited = true;
-      });
-      if (child.pid !== undefined) {
-        used = true;
-        try {
-          const fresh = processIdentity(child.pid, readFileSync(`/proc/${child.pid}/stat`, 'utf8'));
-          if (fresh.parent === process.pid) record.identity = fresh.identity;
-        } catch {
-          console.warn('Owned process child identity unavailable; group signals remain disabled');
-        }
-        if (!gated) contained = false;
-      }
-      if (gated) {
-        const gate = child.stdio[3];
-        try {
-          if (
-            !(gate instanceof Writable) ||
-            !group ||
-            child.pid === undefined ||
-            !record.identity ||
-            !sameDirectory(group, lstatSync(group.directory))
-          ) {
-            throw new Error('Owned child identity unavailable');
-          }
-          const fresh = processIdentity(child.pid, readFileSync(`/proc/${child.pid}/stat`, 'utf8'));
-          if (fresh.identity !== record.identity || fresh.parent !== process.pid) {
-            throw new Error('Owned child changed');
-          }
-          writeSync(group.procs, String(child.pid), 0, 'utf8');
-          if (
-            !sameDirectory(group, lstatSync(group.directory)) ||
-            !parsePids(readFileSync(path.join(group.reference, 'cgroup.procs'), 'utf8')).includes(
-              child.pid
+
+      const spawnChild = (gatedChild: boolean): OwnedChild => {
+        const child = gatedChild
+          ? spawn(
+              '/bin/sh',
+              [
+                '-c',
+                'IFS= read -r start <&3 && [ "$start" = start ] && exec 3<&- && exec "$@"',
+                'kilo-owned',
+                command,
+                ...args,
+              ],
+              { ...options, detached: true, stdio: ['pipe', 'pipe', 'pipe', 'pipe'] }
             )
-          ) {
-            throw new Error('Owned child containment unavailable');
+          : spawn(command, args, { ...options, detached: true, stdio: 'pipe' });
+        const record: OwnedChild = { process: child, exited: false };
+        children.add(record);
+        child.once('exit', () => {
+          record.exited = true;
+        });
+        child.once('error', () => {
+          if (child.pid === undefined) record.exited = true;
+        });
+        if (child.pid !== undefined) {
+          used = true;
+          try {
+            const fresh = processIdentity(
+              child.pid,
+              readFileSync(`/proc/${child.pid}/stat`, 'utf8')
+            );
+            if (fresh.parent === process.pid) record.identity = fresh.identity;
+          } catch {
+            console.warn('Owned process child identity unavailable; group signals remain disabled');
           }
-          const activated = processIdentity(
-            child.pid,
-            readFileSync(`/proc/${child.pid}/stat`, 'utf8')
-          );
-          if (activated.identity !== record.identity || activated.parent !== process.pid) {
-            throw new Error('Owned child changed');
-          }
-          gate.on('error', () => {
-            contained = false;
-          });
-          gate.end('start\n');
-        } catch {
-          contained = false;
-          sealed = true;
-          if (gate instanceof Writable) {
-            gate.on('error', () => undefined);
-            gate.end();
-          }
+          if (!gatedChild) contained = false;
         }
+        return record;
+      };
+
+      const record = spawnChild(gated);
+      if (!gated) {
+        startSweep();
+        return record.process;
       }
-      return child;
+      const gate = record.process.stdio[3];
+      if (gate instanceof Writable) record.gate = gate;
+      try {
+        const pid = record.process.pid;
+        if (
+          !(gate instanceof Writable) ||
+          !group ||
+          pid === undefined ||
+          !record.identity ||
+          !sameDirectory(group, lstatSync(group.directory))
+        ) {
+          throw new Error('Owned child identity unavailable');
+        }
+        const fresh = processIdentity(pid, readFileSync(`/proc/${pid}/stat`, 'utf8'));
+        if (fresh.identity !== record.identity || fresh.parent !== process.pid) {
+          throw new Error('Owned child changed');
+        }
+        writeSync(group.procs, String(pid), 0, 'utf8');
+        if (
+          !sameDirectory(group, lstatSync(group.directory)) ||
+          !parsePids(
+            readFileSync(path.join(group.procsReference, 'cgroup.procs'), 'utf8')
+          ).includes(pid)
+        ) {
+          throw new Error('Owned child containment unavailable');
+        }
+        const activated = processIdentity(pid, readFileSync(`/proc/${pid}/stat`, 'utf8'));
+        if (activated.identity !== record.identity || activated.parent !== process.pid) {
+          throw new Error('Owned child changed');
+        }
+        releaseGate(gate);
+      } catch {
+        contained = false;
+        if (gate instanceof Writable) {
+          gate.on('error', () => undefined);
+          gate.end();
+        }
+        activePlacement = undefined;
+        workloadReporter?.emit(group ? path.basename(group.directory) : undefined, {
+          phase: 'failed',
+          workloadPhase: 'failed',
+          workloadFailure: 'unavailable',
+        });
+        try {
+          record.process.kill('SIGKILL');
+        } catch {
+          console.warn('Owned process gated child kill failed; continuing unmanaged');
+        }
+        return spawnChild(false).process;
+      }
+      startSweep();
+      return record.process;
+    },
+    observeChild(child) {
+      const record = [...children].find(candidate => candidate.process === child);
+      if (!record) return undefined;
+      return {
+        observe(deadlineAt = Date.now() + OBSERVATION_TIMEOUT_MS) {
+          const deadline = createDeadline(deadlineAt);
+          observations.add(deadline);
+          return (async (): Promise<DirectProcessState> => {
+            if (record.exited || record.process.pid === undefined) return 'absent';
+            const pid = record.process.pid;
+            if (process.platform !== 'linux') {
+              try {
+                process.kill(pid, 0);
+                return classifyDirectProcessState({
+                  exited: false,
+                  pid,
+                  platform: process.platform,
+                  storedIdentity: record.identity,
+                });
+              } catch (error) {
+                return classifyDirectProcessState({
+                  exited: false,
+                  pid,
+                  platform: process.platform,
+                  storedIdentity: record.identity,
+                  probeError: error as NodeJS.ErrnoException,
+                });
+              }
+            }
+            try {
+              const text = await readText(`/proc/${pid}/stat`, deadline);
+              return classifyDirectProcessState({
+                exited: false,
+                pid,
+                platform: process.platform,
+                storedIdentity: record.identity,
+                statText: text,
+              });
+            } catch (error) {
+              return classifyDirectProcessState({
+                exited: false,
+                pid,
+                platform: process.platform,
+                storedIdentity: record.identity,
+                probeError: error as NodeJS.ErrnoException,
+              });
+            }
+          })().finally(() => {
+            observations.delete(deadline);
+            deadline.close();
+          });
+        },
+      };
+    },
+    // Call only after stop() has settled; it releases streams for an unproven scope.
+    releaseAbandoned() {
+      if (stopped || removed || abandoned) return;
+      abandoned = true;
+      stopSweep();
+      for (const child of children) releaseChildStreams(child);
+      if (group) closeDescriptors(group.descriptors);
     },
     run: operation => current.run(scope, operation),
     observesOccupancy: occupancyObservable,
@@ -562,8 +1011,10 @@ export function createOwnedProcessScope(): OwnedProcessScope {
     },
     dispose() {
       sealed = true;
+      stopSweep();
       if (removed) return true;
       if (stopped) return true;
+      if (abandoned) return false;
       if (used && (!occupancyObservable() || [...children].some(live))) return false;
       if (
         group &&
@@ -643,6 +1094,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
     },
     stop(deadlineAt) {
       sealed = true;
+      stopSweep();
       for (const observation of observations) observation.shorten(deadlineAt);
       if (stopping) {
         if (!stopped) stopDeadline?.shorten(deadlineAt);

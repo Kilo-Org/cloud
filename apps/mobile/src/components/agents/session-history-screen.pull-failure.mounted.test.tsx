@@ -1,6 +1,7 @@
-/* eslint-disable max-lines, typescript-eslint/no-deprecated -- DOM-free mounted repro: the live Agents history screen exercises the REAL AgentSessionListContent and SessionListSearchHeader (pull state, Updating status, inline retry) over a mocked data hook with a controlled failing refetch, mirroring the live-tab pull-failure mount test. */
+/* eslint-disable max-lines -- DOM-free mounted repro: the live Agents history screen exercises the REAL AgentSessionListContent and SessionListSearchHeader (pull state, Updating status, inline retry) over a mocked data hook with a controlled failing refetch, mirroring the live-tab pull-failure mount test. */
 import { createElement, type ReactNode } from 'react';
-import { act, type ReactTestRenderer } from 'react-test-renderer';
+import { type QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, type ReactTestRenderer } from '@/test/renderer';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
@@ -15,6 +16,7 @@ type MockStoredSession = Pick<StoredSession, 'session_id' | 'organization_id'> &
 const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isError: false,
+  storedIsPending: false,
   storedIsFetching: false,
 }));
 
@@ -64,6 +66,7 @@ vi.mock('react-native', () => ({
     },
   },
   Platform: { OS: 'ios' },
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
   Modal: 'Modal',
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
@@ -73,21 +76,41 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   useWindowDimensions: () => ({ fontScale: 1 }),
   AppState: appState,
-  SectionList: (props: {
-    sections: { data: MockStoredSession[] }[];
-    renderItem: (entry: { item: MockStoredSession }) => ReactNode;
-    keyExtractor: (item: MockStoredSession) => string;
-  }) =>
-    createElement(
-      'SectionList',
-      props,
-      props.sections.flatMap(section =>
-        section.data.map(item =>
-          createElement('View', { key: props.keyExtractor(item) }, props.renderItem({ item }))
-        )
-      )
-    ),
 }));
+vi.mock('@shopify/flash-list', async () => {
+  const React = await import('react');
+  type Row = { key: string };
+  // The real FlashList pulls in `react-native` internals the DOM-free mock
+  // does not provide; render the flattened rows as a plain host so this test
+  // still mounts the real AgentSessionListContent.
+  return {
+    FlashList: ({
+      data,
+      renderItem,
+      keyExtractor,
+      ListEmptyComponent,
+      ListFooterComponent,
+      ref: _ref,
+      ...props
+    }: {
+      data: readonly Row[];
+      renderItem: (entry: { item: Row }) => ReactNode;
+      keyExtractor: (item: Row) => string;
+      ListEmptyComponent?: ReactNode;
+      ListFooterComponent?: ReactNode;
+      ref?: unknown;
+    }) =>
+      React.createElement(
+        'FlashList',
+        props,
+        data.flatMap(item =>
+          React.createElement('View', { key: keyExtractor(item) }, renderItem({ item }))
+        ),
+        data.length === 0 ? ListEmptyComponent : null,
+        ListFooterComponent
+      ),
+  };
+});
 vi.mock('react-native-reanimated', () => ({
   __esModule: true,
   default: { View: 'AnimatedView', createAnimatedComponent: (component: unknown) => component },
@@ -188,7 +211,9 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       dateGroups: storedSessions.length > 0 ? [{ label: 'Today', sessions: storedSessions }] : [],
       activeIsError: false,
       storedIsError: listState.isError,
+      storedIsPending: listState.storedIsPending,
       storedIsFetching: listState.storedIsFetching,
+      storedFetchedSinceMount: true,
       storedLoadedPageCount: 1,
       hasNextPage: false,
       isFetchingNextPage: false,
@@ -211,12 +236,32 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
 }));
 
 let mountedRenderer: ReactTestRenderer | undefined = undefined;
+let mountedQueryClient: QueryClient | undefined = undefined;
 
 function root() {
   if (!mountedRenderer) {
     throw new Error('Missing live history list');
   }
   return mountedRenderer.root;
+}
+
+/**
+ * Force the screen to re-read the data-hook mock. The update must carry the
+ * same provider root `renderWithProviders` mounted: updating with the bare
+ * screen element would swap the root's component type, unmount the live tree,
+ * and mount a fresh screen (loading state) instead of re-rendering this one.
+ */
+function rerenderScreen() {
+  if (!mountedRenderer || !mountedQueryClient) {
+    throw new Error('Missing live history list');
+  }
+  mountedRenderer.update(
+    createElement(
+      QueryClientProvider,
+      { client: mountedQueryClient },
+      createElement(SessionHistoryScreen)
+    )
+  );
 }
 
 function nodes(type: string) {
@@ -230,7 +275,7 @@ function text() {
 }
 
 function refreshControl() {
-  const list = nodes('SectionList')[0]?.props.refreshControl as
+  const list = nodes('FlashList')[0]?.props.refreshControl as
     | { props: { refreshing: boolean; onRefresh: () => void } }
     | undefined;
   if (!list) {
@@ -240,10 +285,12 @@ function refreshControl() {
 }
 
 async function renderScreen() {
+  const queryClient = createTestQueryClient();
   const { renderer } = await renderWithProviders(createElement(SessionHistoryScreen), {
-    queryClient: createTestQueryClient(),
+    queryClient,
   });
   mountedRenderer = renderer;
+  mountedQueryClient = queryClient;
   return renderer;
 }
 
@@ -261,6 +308,7 @@ beforeEach(() => {
     },
   ];
   listState.isError = false;
+  listState.storedIsPending = false;
   listState.storedIsFetching = false;
 });
 
@@ -272,7 +320,7 @@ afterEach(() => {
 describe('SessionHistoryScreen pull-to-refresh with the API down', () => {
   it('keeps rows, announces Updating in flight, then shows the inline failure with Retry', async () => {
     await renderScreen();
-    expect(nodes('SectionList')).toHaveLength(1);
+    expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('StoredSessionRow')).toHaveLength(1);
     expect(text()).not.toContain("Couldn't refresh");
 
@@ -301,7 +349,7 @@ describe('SessionHistoryScreen pull-to-refresh with the API down', () => {
     act(() => {
       listState.isError = true;
       refetchControl.settle?.();
-      mountedRenderer?.update(createElement(SessionHistoryScreen));
+      rerenderScreen();
     });
     await vi.waitFor(
       () => {
@@ -322,7 +370,7 @@ describe('SessionHistoryScreen pull-to-refresh with the API down', () => {
 
   it('retires the pull failure when a later app-foreground refresh settles', async () => {
     await renderScreen();
-    expect(nodes('SectionList')).toHaveLength(1);
+    expect(nodes('FlashList')).toHaveLength(1);
     expect(nodes('StoredSessionRow')).toHaveLength(1);
     expect(text()).not.toContain("Couldn't refresh");
 

@@ -1,4 +1,3 @@
-import * as SecureStore from 'expo-secure-store';
 import { type Query, type QueryClient } from '@tanstack/react-query';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
 import {
@@ -10,6 +9,7 @@ import { z } from 'zod';
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
 import * as encryptedKv from '@/lib/persist/encrypted-kv';
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
@@ -229,31 +229,28 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
       if (!isPublicationAllowed()) {
         return;
       }
+      // The budget is enforced here, on the string the library already
+      // serialized for this throttled save, so the un-throttled per-change
+      // path never serializes the blob or scans it for its byte length.
+      if (utf8ByteLength(v) > READ_CACHE_MAX_BYTES) {
+        // Oversized blobs are never written partially: the previous blob for
+        // this scope is removed so a stale snapshot cannot survive the write
+        // that replaced it.
+        await encryptedKv.removeItem(scope, k);
+        return;
+      }
       await encryptedKv.setItem(scope, k, v);
     },
     removeItem: async k => {
       await encryptedKv.removeItem(scope, k);
     },
   };
-  const base = createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 
-  return {
-    ...base,
-    persistClient: async client => {
-      if (!isPublicationAllowed()) {
-        return;
-      }
-      const serialized = JSON.stringify(client);
-      if (utf8ByteLength(serialized) > READ_CACHE_MAX_BYTES) {
-        // Oversized blobs are never written partially: the previous blob for
-        // this scope is removed so a stale snapshot cannot survive the write
-        // that replaced it.
-        await base.removeClient();
-        return;
-      }
-      await base.persistClient(client);
-    },
-  };
+  // The library's `persistClient` is the throttle itself and is the only
+  // serializer: it serializes once per save and hands that string to `setItem`,
+  // which holds the publication fence and the 2 MB budget. No wrapper may
+  // serialize on the un-throttled per-change path.
+  return createAsyncStoragePersister({ storage, key: READ_CACHE_KEY });
 }
 
 // ── Cold-start restore ─────────────────────────────────────────────────────
@@ -274,13 +271,17 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
   // this restore immediately after scheduling it.
   coldStartGeneration += 1;
   const generation = coldStartGeneration;
-  // Capture the epoch before the first SecureStore read: a sign-in or sign-out
+  // Capture the epoch before the first stored-value read: a sign-in or sign-out
   // that lands while the hint read or the KV read is in flight fences the
   // whole restore, so it can never hydrate (or claim a scope) after the auth
   // epoch moved — including after a logout that cleared the query client.
   const epoch = currentAuthEpoch();
   try {
-    const hintUserId = await SecureStore.getItemAsync(ACTIVE_USER_ID_KEY);
+    // The identity hint read is retried on a transient keychain rejection: a
+    // rejected read must not abandon the restore, or the profile's cached
+    // identity is never hydrated and the first foreground refetch has nothing
+    // to render.
+    const hintUserId = await readStoredValueWithRetry(ACTIVE_USER_ID_KEY);
     if (generation !== coldStartGeneration || !hintUserId || !isCurrentAuthEpoch(epoch)) {
       return;
     }

@@ -1,11 +1,21 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/lib/auth/secure-store';
 import * as z from 'zod';
 
 import { PICKER_LAUNCH_CONTEXT_KEY } from '@/lib/storage-keys';
 
+/**
+ * The composer surfaces that can launch an image picker. One named union so the
+ * stored launch context, the picker entry points, and the Android recovery hook
+ * cannot drift; a surface missing here is a pending result the recovery hook
+ * can never match.
+ */
+const ATTACHMENT_SURFACES = ['agent-new', 'agent-chat', 'agent-picture'] as const;
+
+export type AttachmentSurface = (typeof ATTACHMENT_SURFACES)[number];
+
 export type PickerLaunchContext = {
   userId: string;
-  surface: 'agent-new' | 'agent-chat';
+  surface: AttachmentSurface;
   sessionId: string | null;
   launchedAt: number;
 };
@@ -17,7 +27,7 @@ export async function writePickerLaunchContext(context: PickerLaunchContext): Pr
 
 const pickerLaunchContextSchema = z.object({
   userId: z.string(),
-  surface: z.enum(['agent-new', 'agent-chat']),
+  surface: z.enum(ATTACHMENT_SURFACES),
   sessionId: z.string().nullable(),
   launchedAt: z.number(),
 });

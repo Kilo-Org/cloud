@@ -681,7 +681,10 @@ export function formatValidationEvidenceEntry(
 // from this table's own keys rather than importing
 // SecurityRemediationAdmissionRejectionReason — this table is still the only
 // copy in the mobile tree (use-security-findings.ts imports it from here).
-const REMEDIATION_UNAVAILABLE_COPY = {
+// Exported so the mobile security-agent copy test derives its expected reasons
+// from this table instead of a hand-maintained fixture that cannot notice a
+// reason added here.
+export const REMEDIATION_UNAVAILABLE_COPY = {
   finding_not_found: 'Security finding no longer exists.',
   approval_required:
     'Auto Remediation requires approval. Start remediation manually to approve it.',

@@ -252,6 +252,25 @@ describe('createSessionForCloudAgent', () => {
     );
   });
 
+  it('persists the resolved profileId on the created root', async () => {
+    const profileId = '22222222-2222-4222-8222-222222222222';
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent({ ...params, profileId });
+
+    expect(fake.values).toHaveBeenCalledWith(expect.objectContaining({ profile_id: profileId }));
+  });
+
+  it('writes a null profile_id when the caller sends none', async () => {
+    const fake = makeRootWriteDb({ created: { session_id: params.sessionId } });
+    const rpc = makeRpc(fake.db as never);
+
+    await rpc.createSessionForCloudAgent(params);
+
+    expect(fake.values).toHaveBeenCalledWith(expect.objectContaining({ profile_id: null }));
+  });
+
   it('persists the worktree ID when creating a grouped root', async () => {
     const cloudAgentWorktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
     const row = {

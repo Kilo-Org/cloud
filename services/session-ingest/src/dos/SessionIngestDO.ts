@@ -22,6 +22,7 @@ import {
   extractStatusFromItem,
 } from './session-ingest-extractors';
 import {
+  attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
   isCompletedStatus,
@@ -731,6 +732,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       attentionSignals.push({
         signalId: `status:${statusChange.value}:${ingestedAt ?? Date.now()}`,
         kind: 'needs_input',
+        attentionKind: attentionKindForNeedsInputStatus(statusChange.value),
         messageExcerpt: '',
       });
     }
@@ -876,7 +878,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     return new ReadableStream<Uint8Array>({
       async start(controller) {
         try {
-          // --- session info ---
           controller.enqueue(encoder.encode('{"info":'));
           const sessionRow = db
             .select({
@@ -893,7 +894,6 @@ export class SessionIngestDO extends DurableObject<Env> {
             controller.enqueue(encoder.encode('{}'));
           }
 
-          // --- messages ---
           const CURSOR_BATCH = 10;
           controller.enqueue(encoder.encode(',"messages":['));
           let msgCursor: IngestOrderCursor | undefined;
@@ -926,7 +926,6 @@ export class SessionIngestDO extends DurableObject<Env> {
               if (!firstMsg) controller.enqueue(encoder.encode(','));
               firstMsg = false;
 
-              // message info
               controller.enqueue(encoder.encode('{"info":'));
               await enqueueItemData(controller, msgRow, r2, encoder);
 
@@ -1090,7 +1089,6 @@ export class SessionIngestDO extends DurableObject<Env> {
     });
 
     if (this.isDeleted()) return false;
-    // Mark metrics as emitted to prevent duplicates
     this.db
       .insert(ingestMeta)
       .values({ key: 'metricsEmitted', value: 'true' })

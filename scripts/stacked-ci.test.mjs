@@ -9,18 +9,26 @@ const rootPath = '.github/workflows/ci.yml';
 const mobilePath = '.github/workflows/kilo-app-ci.yml';
 const checkPath = 'scripts/stacked-ci.test.mjs';
 const command = `node --test ${checkPath}`;
-const originalMobilePaths = [
-  'apps/mobile/**',
-  'packages/trpc/**',
-  'apps/web/src/routers/**',
-  'packages/app-shared/**',
-  'packages/kilo-chat/**',
-  'packages/kilo-chat-hooks/**',
-  'packages/event-service/**',
-  'packages/notifications/**',
-  'packages/cloud-agent-sdk/**',
-  'pnpm-lock.yaml',
-  mobilePath,
+// The path families the mobile change-detection grep must recognise. The PR
+// admission and the `push` trigger carry no filter, so this grep is the only
+// thing that gates the suite; a dropped or mistyped family silently reports
+// `mobile=false` and skips every required check, so it must be pinned.
+const mobilePathFragments = [
+  /apps\/mobile\//,
+  /packages\/trpc\//,
+  /apps\/web\/src\/routers\//,
+  /packages\/app-shared\//,
+  /packages\/kilo-chat\//,
+  /packages\/kilo-chat-hooks\//,
+  /packages\/event-service\//,
+  /packages\/notifications\//,
+  /packages\/cloud-agent-sdk\//,
+  /pnpm-lock\\?\.yaml/,
+  /kilo-app-ci\\?\.yml/,
+  // Path-qualified: a bare `/ci\\?\.yml/` also matches the `kilo-app-ci.yml`
+  // alternative above, so dropping the root-workflow family would go unnoticed.
+  /\.github\/workflows\/ci\\?\.yml/,
+  /stacked-ci\\?\.test\\?\.mjs/,
 ];
 
 function readWorkflows() {
@@ -76,6 +84,18 @@ function validateCheck(workflow, jobName) {
     const filterIndex = steps.findIndex(item => item.id === 'filter');
     assert.ok(filterIndex > checkIndex, 'changes: check before filtering');
   }
+  if (jobName === 'mobile-changes') {
+    const detectIndex = steps.findIndex(item => item.id === 'detect');
+    assert.ok(detectIndex > checkIndex, 'mobile-changes: check before change detection');
+    const detect = steps[detectIndex];
+    for (const fragment of mobilePathFragments) {
+      assert.match(
+        detect.run ?? '',
+        fragment,
+        `mobile change-detection step must recognise ${fragment}`
+      );
+    }
+  }
 }
 
 function validate(root, mobile) {
@@ -89,15 +109,23 @@ function validate(root, mobile) {
   }
   assert.equal(root.on.pull_request?.paths, undefined, 'root admission must not filter paths');
   assert.equal(root.on.pull_request?.['paths-ignore'], undefined);
+  assert.equal(
+    mobile.on.pull_request?.paths,
+    undefined,
+    'mobile admission must not filter paths: a required suite check must report on every PR'
+  );
+  assert.equal(mobile.on.pull_request?.['paths-ignore'], undefined);
   assert.deepEqual(root.permissions, { contents: 'read', 'pull-requests': 'read' });
   assert.deepEqual(mobile.permissions, { contents: 'read' });
   assert.ok('workflow_call' in mobile.on, 'mobile release caller must remain enabled');
-  for (const event of ['push', 'pull_request']) {
-    assert.deepEqual(mobile.on[event].paths, [...originalMobilePaths, rootPath, checkPath]);
-    assert.equal(mobile.on[event]['paths-ignore'], undefined);
-  }
+  assert.equal(
+    mobile.on.push.paths,
+    undefined,
+    'push must not filter by path: the required suite checks must report on every main push'
+  );
+  assert.equal(mobile.on.push['paths-ignore'], undefined);
   validateCheck(root, 'changes');
-  validateCheck(mobile, 'test');
+  validateCheck(mobile, 'mobile-changes');
 }
 
 test('both live workflows validate triggers and unconditional check invocations', () => {
@@ -114,16 +142,14 @@ for (const base of ['main', 'stack/level-one', 'arbitrary/parent-42']) {
   }
 }
 
-test('mobile keeps every existing path and main-only pushes', () => {
+test('mobile admits every PR and every main push, stays main-only on push', () => {
   const [root, mobile] = readWorkflows();
-  for (const pattern of originalMobilePaths) {
-    const file = pattern.replace('**', 'fixture.ts');
+  for (const file of [mobilePath, 'apps/mobile/src/app/_layout.tsx', 'README.md']) {
     assert.equal(admits(mobile, 'pull_request', 'stack/parent', [file]), true);
     assert.equal(admits(mobile, 'push', 'main', [file]), true);
     assert.equal(admits(mobile, 'push', 'stack/parent', [file]), false);
   }
   assert.equal(admits(root, 'push', 'stack/parent', [rootPath]), false);
-  assert.equal(admits(mobile, 'pull_request', 'stack/parent', ['README.md']), false);
 });
 
 test('mobile catches an isolated root main-only regression on a stacked base', () => {
@@ -136,7 +162,7 @@ test('mobile catches an isolated root main-only regression on a stacked base', (
 
 for (const [index, jobName] of [
   [0, 'changes'],
-  [1, 'test'],
+  [1, 'mobile-changes'],
 ]) {
   for (const defect of [
     'missing',
@@ -161,3 +187,13 @@ for (const [index, jobName] of [
     });
   }
 }
+
+test('mobile change detection pins the root workflow path family', () => {
+  const workflows = readWorkflows();
+  const detect = workflows[1].jobs['mobile-changes'].steps.find(step => step.id === 'detect');
+  // The root-workflow family must be pinned by its own path: a bare `ci.yml`
+  // fragment also matches the `kilo-app-ci.yml` alternative, so its removal
+  // would otherwise pass.
+  detect.run = detect.run.replace('|^\\.github/workflows/ci\\.yml$', '');
+  assert.throws(() => validate(...workflows), /must recognise/);
+});

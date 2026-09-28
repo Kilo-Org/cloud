@@ -462,6 +462,65 @@ describe('applySessionAttach', () => {
     }
   });
 
+  it('classifies a probe request timeout as session_probe_timeout', async () => {
+    const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
+    const result = await applySessionAttach(
+      session,
+      { kilo },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        sessionExists: async () => {
+          throw new Error('Kilo request timed out');
+        },
+      }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        phase: 'failed',
+        stage: 'session_probe',
+        reason: 'session_probe_timeout',
+        timedOut: true,
+        errorCode: 'not_ready',
+      })
+    );
+  });
+
+  it('classifies an aborted attach as attachment_cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
+    const result = await applySessionAttach(
+      session,
+      { kilo },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        onDiagnostic: (_event, fields) => diagnostics.push(fields),
+        signal: controller.signal,
+      }
+    );
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        retryable: true,
+        message: 'Session attachment cancelled',
+      },
+    });
+    expect(diagnostics).toContainEqual(
+      expect.objectContaining({
+        phase: 'failed',
+        stage: 'runtime_attach',
+        reason: 'attachment_cancelled',
+        aborted: true,
+      })
+    );
+  });
+
   it('clones and checks out a non-default branch without mutating process.env', async () => {
     const gitCalls: string[][] = [];
     const mkdirCalls: string[] = [];
@@ -539,6 +598,56 @@ describe('applySessionAttach', () => {
     if (result.ok) throw new Error('Expected clone failure');
     expect(JSON.stringify(result.error.message)).not.toContain(token);
     expect(JSON.stringify(result.error.message)).not.toContain('\u001b[');
+  });
+
+  it.each([
+    {
+      name: 'clone rate limit',
+      operation: 'clone',
+      stderr: 'remote: HTTP 429 Too Many Requests',
+      subtype: 'git_rate_limited',
+    },
+    {
+      name: 'clone network failure',
+      operation: 'clone',
+      stderr: 'fatal: unable to access: Could not resolve host: github.com',
+      subtype: 'git_network_failed',
+    },
+    {
+      name: 'checkout timeout',
+      operation: 'checkout',
+      stderr: '',
+      terminationReason: 'timeout' as const,
+      subtype: 'git_checkout_timeout',
+    },
+  ])('carries the git workspace subtype on a $name attach failure', async testCase => {
+    const result = await applySessionAttach(
+      session,
+      { kilo, git: { url: 'https://github.com/acme/demo.git' } },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => undefined,
+        hasGit: async () => testCase.operation === 'checkout',
+        runGit: async args =>
+          args[0] === testCase.operation
+            ? {
+                stdout: '',
+                stderr: testCase.stderr,
+                exitCode: 128,
+                ...(testCase.terminationReason === undefined
+                  ? {}
+                  : { terminationReason: testCase.terminationReason }),
+              }
+            : { stdout: '', stderr: '', exitCode: 0 },
+      }
+    );
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true, subtype: testCase.subtype },
+    });
   });
 
   it('preserves generic repository authentication and checks out only the requested upstream branch', async () => {
@@ -742,6 +851,73 @@ describe('applySessionAttach', () => {
     expect(result.ok).toBe(true);
     expect(gitCalls).toEqual([]);
     expect(setupCalls).toEqual([]);
+  });
+
+  it('applies the resolved git author on a fresh clone', async () => {
+    const gitCalls: string[][] = [];
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        branch: 'topic/author',
+        git: {
+          url: 'https://github.com/acme/demo.git',
+          author: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+        },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => {},
+        hasGit: async () => false,
+        runGit: async args => {
+          gitCalls.push(args);
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['clone', 'https://github.com/acme/demo.git', session.directory],
+      ['checkout', '-B', 'topic/author', 'origin/topic/author'],
+      ['config', 'user.name', 'octocat'],
+      ['config', 'user.email', '1+octocat@users.noreply.github.com'],
+    ]);
+  });
+
+  it('refreshes the git author when the worktree was already bootstrapped', async () => {
+    const gitCalls: string[][] = [];
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        git: {
+          url: 'https://github.com/acme/demo.git',
+          author: {
+            name: 'kiloconnect[bot]',
+            email: '42+kiloconnect[bot]@users.noreply.github.com',
+          },
+        },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        sessionExists: async () => true,
+        hasBootstrapMarker: async () => true,
+        writeBootstrapMarker: async () => undefined,
+        mkdir: async () => undefined,
+        hasGit: async () => true,
+        runGit: async args => {
+          gitCalls.push(args);
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['config', 'user.name', 'kiloconnect[bot]'],
+      ['config', 'user.email', '42+kiloconnect[bot]@users.noreply.github.com'],
+    ]);
   });
 
   it.each([undefined, 'main'])(
@@ -1495,6 +1671,75 @@ describe('applySessionAttach', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe('not_ready');
     expect(ensured).toBe(false);
+  });
+
+  it('reports an incomplete restore as a named outcome when a snapshot diff is skipped', async () => {
+    const runtimes = fakeKiloRuntimes();
+    const events: PreparingEventDataV2[] = [];
+    const previousLogPath = process.env.WRAPPER_LOG_PATH;
+    const logPath = path.join(homeRoot, 'wrapper-restore.log');
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const result = await applySessionAttach(
+        session,
+        { kilo, preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' } },
+        {
+          kiloRuntimes: runtimes,
+          sessionExists: async () => false,
+          restoreSession: async () => ({
+            ok: true,
+            downloaded: true,
+            imported: true,
+            diffs: {
+              applied: 1,
+              skipped: 1,
+              total: 2,
+              skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+            },
+          }),
+          emitPreparing: event => events.push(event),
+          ...noFs,
+        }
+      );
+
+      expect(result).toEqual({
+        ok: true,
+        result: {
+          attached: true,
+          restore: {
+            path: 'backup',
+            diffs: {
+              applied: 1,
+              skipped: 1,
+              total: 2,
+              skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
+            },
+          },
+        },
+      });
+      const home = runtimes.get(session)?.env.HOME;
+      if (!home) throw new Error('Expected worktree runtime home');
+      const rules = fs.readFileSync(
+        path.join(home, '.kilocode/rules/restore-incomplete.md'),
+        'utf8'
+      );
+      expect(rules).toContain('1 of 2 files could not be restored');
+      expect(rules).toContain('the patch did not apply');
+      expect(rules).toContain('- src/index.ts');
+      expect(fs.readFileSync(logPath, 'utf8')).toContain(
+        'bootstrap restore incomplete kiloSessionId=kilo_1 skipped=1 total=2 reasons=patch_apply_failed paths=src/index.ts'
+      );
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          action: 'step_failed',
+          step: 'restore_incomplete',
+          stepId: 'phase:restore_incomplete',
+        })
+      );
+    } finally {
+      if (previousLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = previousLogPath;
+    }
   });
 
   it('does not restore when Kilo already has the session', async () => {

@@ -73,23 +73,30 @@ describe('classifyDeviceSessionsState', () => {
   it.each([
     {
       name: 'loading ahead of stale data',
-      args: { isLoading: true, isError: false, data: rows },
+      args: { isPending: true, isError: false, data: rows },
+      expected: 'loading',
+    },
+    {
+      // Cold open, first render: the observer has not started fetching yet so
+      // React Query's `isLoading` would be false, but `isPending` is true.
+      name: 'the first render before the request settles as loading, not empty',
+      args: { isPending: true, isError: false, data: undefined },
       expected: 'loading',
     },
     {
       name: 'a query error as retryable error',
-      args: { isLoading: false, isError: true, data: undefined },
+      args: { isPending: false, isError: true, data: undefined },
       expected: 'error',
     },
     {
       name: 'zero rows as empty',
-      args: { isLoading: false, isError: false, data: [] },
+      args: { isPending: false, isError: false, data: [] },
       expected: 'empty',
     },
     {
       name: 'rows with a current row as happy',
       args: {
-        isLoading: false,
+        isPending: false,
         isError: false,
         data: [makeSession({ id: 'b', isCurrent: true }), ...rows],
       },
@@ -97,7 +104,7 @@ describe('classifyDeviceSessionsState', () => {
     },
     {
       name: 'rows without a current row as no-current, never empty',
-      args: { isLoading: false, isError: false, data: rows },
+      args: { isPending: false, isError: false, data: rows },
       expected: 'no-current',
     },
   ])('classifies $name', ({ args, expected }) => {

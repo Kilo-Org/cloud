@@ -764,7 +764,13 @@ describe('AgentRuntime', () => {
       nextInstanceGeneration: 3,
       instance: { instanceGeneration: 2 },
     });
-    await expect(getWrapperRuntimeState(storage)).resolves.not.toMatchObject({
+    const runtimeState = await getWrapperRuntimeState(storage);
+    const physicalLease = await getWrapperLease(storage);
+    if (physicalLease.state !== 'owns_wrapper') {
+      throw new Error('expected owned wrapper after restart allocation');
+    }
+    expect(runtimeState.wrapperGeneration).toBe(physicalLease.instance.instanceGeneration);
+    expect(runtimeState).not.toMatchObject({
       wrapperRunId: 'wr_stale',
       wrapperConnectionId: 'conn_stale',
     });
@@ -796,7 +802,7 @@ describe('AgentRuntime', () => {
       target: { kind: 'instance', instance: { instanceGeneration: 1 } },
       reason: 'startup-failed',
     });
-    await expect(getWrapperRuntimeState(storage)).resolves.toEqual({ wrapperGeneration: 2 });
+    await expect(getWrapperRuntimeState(storage)).resolves.toEqual({ wrapperGeneration: 1 });
   });
 
   it('stores cleanup obligation when a newly leased wrapper readies but its initial dispatch fails', async () => {

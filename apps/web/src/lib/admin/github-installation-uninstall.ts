@@ -7,7 +7,12 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
 import { observeGitHubInstallationLifecycle } from '@/lib/integrations/db/github-installations';
-import { kilocode_users, platform_integrations, user_admin_notes } from '@kilocode/db/schema';
+import {
+  github_app_installations,
+  kilocode_users,
+  platform_integrations,
+  user_admin_notes,
+} from '@kilocode/db/schema';
 import type { GitHubInstallationUninstallInput } from './github-installation-uninstall-input';
 
 const RETRY_MESSAGE =
@@ -21,6 +26,7 @@ type LocalRecord = {
   appType: 'standard' | 'lite';
   installationId: string;
   accountId: string;
+  canonicalId: string | null;
 };
 
 function uninstallError(code: 'BAD_REQUEST' | 'FORBIDDEN' | 'CONFLICT' = 'CONFLICT') {
@@ -94,19 +100,29 @@ async function lockRecord(tx: DrizzleTransaction, input: GitHubInstallationUnins
       platform: platform_integrations.platform,
       userId: platform_integrations.owned_by_user_id,
       organizationId: platform_integrations.owned_by_organization_id,
-      appType: platform_integrations.github_app_type,
-      installationId: platform_integrations.platform_installation_id,
-      accountId: platform_integrations.platform_account_id,
+      associationAppType: platform_integrations.github_app_type,
+      associationInstallationId: platform_integrations.platform_installation_id,
+      associationAccountId: platform_integrations.platform_account_id,
+      associationCanonicalId: platform_integrations.github_installation_id,
+      canonicalAppType: github_app_installations.github_app_type,
+      canonicalInstallationId: github_app_installations.installation_id,
+      canonicalAccountId: github_app_installations.account_id,
+      canonicalId: github_app_installations.id,
     })
     .from(platform_integrations)
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
     .where(eq(platform_integrations.id, input.integrationId))
-    .for('update');
+    .for('update', { of: platform_integrations });
   const row = rows[0];
   if (
     !row ||
     row.platform !== 'github' ||
-    !row.installationId ||
-    !row.accountId ||
+    !(row.canonicalInstallationId ?? row.associationInstallationId) ||
+    !(row.canonicalAccountId ?? row.associationAccountId) ||
+    (row.associationCanonicalId !== null && row.canonicalId === null) ||
     (!row.userId && !row.organizationId) ||
     (row.userId && row.organizationId)
   ) {
@@ -116,15 +132,17 @@ async function lockRecord(tx: DrizzleTransaction, input: GitHubInstallationUnins
     id: row.id,
     ownerType: row.userId ? 'user' : 'organization',
     ownerId: row.userId ?? row.organizationId ?? '',
-    appType: row.appType ?? 'standard',
-    installationId: row.installationId,
-    accountId: row.accountId,
+    appType: row.canonicalAppType ?? row.associationAppType ?? 'standard',
+    installationId: row.canonicalInstallationId ?? row.associationInstallationId ?? '',
+    accountId: row.canonicalAccountId ?? row.associationAccountId ?? '',
+    canonicalId: row.canonicalId,
   };
   if (!recordMatchesInput(record, input)) throw uninstallError();
   return record;
 }
 
-async function rejectEffectiveDuplicates(tx: DrizzleTransaction, record: LocalRecord) {
+async function rejectAmbiguousLegacyTarget(tx: DrizzleTransaction, record: LocalRecord) {
+  if (record.canonicalId) return;
   const rows = await tx
     .select({ id: platform_integrations.id })
     .from(platform_integrations)
@@ -142,6 +160,29 @@ async function rejectEffectiveDuplicates(tx: DrizzleTransaction, record: LocalRe
     )
     .limit(2);
   if (rows.length !== 1 || rows[0]?.id !== record.id) throw uninstallError();
+}
+
+async function lockAffectedRecords(
+  tx: DrizzleTransaction,
+  record: LocalRecord
+): Promise<LocalRecord[]> {
+  if (!record.canonicalId) return [record];
+  const rows = await tx
+    .select({
+      id: platform_integrations.id,
+      userId: platform_integrations.owned_by_user_id,
+      organizationId: platform_integrations.owned_by_organization_id,
+    })
+    .from(platform_integrations)
+    .where(eq(platform_integrations.github_installation_id, record.canonicalId))
+    .for('update');
+  if (!rows.some(row => row.id === record.id)) throw uninstallError();
+  return rows.map(row => ({
+    ...record,
+    id: row.id,
+    ownerType: row.userId ? 'user' : 'organization',
+    ownerId: row.userId ?? row.organizationId ?? '',
+  }));
 }
 
 async function requireFreshActiveAdmin(tx: DrizzleTransaction, actorId: string) {
@@ -186,7 +227,8 @@ export async function uninstallGitHubOrganizationInstallation(params: {
       );
       await requireFreshActiveAdmin(tx, params.actor.id);
       const locked = await lockRecord(tx, params.input);
-      await rejectEffectiveDuplicates(tx, locked);
+      await rejectAmbiguousLegacyTarget(tx, locked);
+      const affectedRecords = await lockAffectedRecords(tx, locked);
       await verifyAndDeleteGitHubOrganizationInstallation({
         installationId: locked.installationId,
         accountId: locked.accountId,
@@ -197,7 +239,9 @@ export async function uninstallGitHubOrganizationInstallation(params: {
         { installationId: locked.installationId, appType: locked.appType, state: 'deleted' },
         tx
       );
-      await writeAudit(tx, params.actor, locked, 'confirmed');
+      for (const affected of affectedRecords) {
+        await writeAudit(tx, params.actor, affected, 'confirmed');
+      }
     });
     return { status: 'uninstalled', localCleanup: 'complete' };
   } catch (error) {

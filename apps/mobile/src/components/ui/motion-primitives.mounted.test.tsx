@@ -1,6 +1,5 @@
-/* eslint-disable typescript-eslint/no-deprecated -- The motion primitives need a DOM-free mounted contract test. */
 import { createElement, type ElementType } from 'react';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ActivityIndicator } from './activity-indicator';

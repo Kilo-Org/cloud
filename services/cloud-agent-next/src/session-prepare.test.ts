@@ -1,6 +1,10 @@
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 import type * as SandboxIdModule from './sandbox-id.js';
 import { TRPCError } from '@trpc/server';
+import {
+  getSandboxAllocationRequest,
+  sandboxAllocationSchema,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schemas from './router/schemas.js';
 
@@ -123,7 +127,7 @@ vi.mock('./session-service.js', () => ({
 }));
 
 import { appRouter } from './router.js';
-import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
+import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-creation-preflight.js';
 import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
@@ -226,6 +230,8 @@ function createInternalApiContext(options: {
       R2_BUCKET: {} as TRPCContext['env']['R2_BUCKET'],
       CLOUD_AGENT_REPORT_QUEUE: {} as TRPCContext['env']['CLOUD_AGENT_REPORT_QUEUE'],
       GIT_TOKEN_SERVICE: {
+        authorizeCloudAgentGitHubRepo:
+          options.getTokenForRepo ?? vi.fn().mockResolvedValue({ success: true }),
         getTokenForRepo:
           options.getTokenForRepo ??
           vi.fn().mockResolvedValue({
@@ -246,6 +252,276 @@ function createInternalApiContext(options: {
     },
   } as TRPCContext;
 }
+
+describe('sandbox selection Worker API', () => {
+  const orgId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+  const prepareInput = {
+    prompt: 'Test prompt',
+    mode: 'code',
+    model: 'claude-3',
+    githubRepo: 'acme/repo',
+    kilocodeOrganizationId: orgId,
+    sandboxAllocation: 'cloudflare-single' as const,
+  };
+  const startInput = {
+    message: { prompt: 'Test prompt' },
+    agent: { mode: 'code', model: 'claude-3' },
+    repository: { type: 'github' as const, repo: 'acme/repo' },
+    options: { kilocodeOrganizationId: orgId },
+    runtime: { sandboxAllocation: 'cloudflare-single' as const },
+  };
+  const allocationInputs = sandboxAllocationSchema.options.flatMap(allocation => [
+    { name: allocation, sandboxAllocation: allocation },
+    {
+      name: `structured ${allocation}`,
+      sandboxAllocation: getSandboxAllocationRequest(allocation),
+    },
+  ]);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    organizationMembershipLimitMock.mockResolvedValue([{ id: 'membership' }]);
+    mergeProfileConfigurationMock.mockResolvedValue({});
+    assertKiloModelAvailableMock.mockResolvedValue(undefined);
+  });
+
+  it('requires authentication for capability discovery', async () => {
+    const caller = appRouter.createCaller(
+      createInternalApiContext({ userId: null, authToken: null })
+    );
+    await expect(
+      caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(organizationMembershipLimitMock).not.toHaveBeenCalled();
+  });
+
+  it.each(allocationInputs)(
+    'requires membership for $name even for disabled options and skip-balance callers',
+    async ({ sandboxAllocation }) => {
+      organizationMembershipLimitMock.mockResolvedValue([]);
+      const caller = appRouter.createCaller(createInternalApiContext({ skipBalanceCheck: true }));
+      await expect(
+        caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('exposes only authoritative capability options and keeps the disabled result empty', async () => {
+    const ctx = createInternalApiContext({});
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId })
+    ).resolves.toEqual({ enabled: false, options: [] });
+    ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    ctx.env.CONTROL_PLANE_IDS = orgId;
+    const result = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(result.enabled).toBe(true);
+    expect(result.options.map(option => option.allocation)).toEqual([
+      getSandboxAllocationRequest('cloudflare-single'),
+      getSandboxAllocationRequest('cloudflare-shared'),
+    ]);
+  });
+
+  it.each(allocationInputs)(
+    'rejects $name in prepare and public start when selection is disabled',
+    async ({ sandboxAllocation }) => {
+      const caller = appRouter.createCaller(createInternalApiContext({ skipBalanceCheck: true }));
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it('exposes personal capabilities without membership when the user is enrolled', async () => {
+    const ctx = createInternalApiContext({});
+    ctx.env.SANDBOX_SELECTION_IDS = 'test-user-123';
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.getSandboxSelectionOptions({});
+    expect(result.enabled).toBe(true);
+    expect(organizationMembershipLimitMock).not.toHaveBeenCalled();
+  });
+
+  it.each(allocationInputs)(
+    'rejects personal $name when only an organization is enrolled',
+    async ({ sandboxAllocation }) => {
+      const ctx = createInternalApiContext({ skipBalanceCheck: true });
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      const caller = appRouter.createCaller(ctx);
+      await expect(
+        caller.prepareSession({
+          ...prepareInput,
+          kilocodeOrganizationId: undefined,
+          sandboxAllocation,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(
+        caller.start({ ...startInput, options: {}, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['*', 'test-user-123'] as const)(
+    'authorizes personal Cloudflare allocation when SANDBOX_SELECTION_IDS is %s',
+    async allowlist => {
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub, skipBalanceCheck: true });
+      ctx.env.SANDBOX_SELECTION_IDS = allowlist;
+      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+      const caller = appRouter.createCaller(ctx);
+      await caller.prepareSession({
+        ...prepareInput,
+        kilocodeOrganizationId: undefined,
+        sandboxAllocation: 'cloudflare-single',
+      });
+      await caller.start({
+        ...startInput,
+        options: {},
+        runtime: { sandboxAllocation: 'cloudflare-single' },
+      });
+      expect(doStub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+        })
+      );
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+        })
+      );
+    }
+  );
+
+  it('returns default destination metadata without allocating, including devcontainer context', async () => {
+    const ctx = createInternalApiContext({});
+    ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    ctx.env.PER_SESSION_SANDBOX_ORG_IDS = orgId;
+    const caller = appRouter.createCaller(ctx);
+    const normal = await caller.getSandboxSelectionOptions({ kilocodeOrganizationId: orgId });
+    expect(normal.defaultDestination).toEqual(getSandboxAllocationRequest('cloudflare-single'));
+    const devcontainer = await caller.getSandboxSelectionOptions({
+      kilocodeOrganizationId: orgId,
+      devcontainer: true,
+    });
+    expect(devcontainer.defaultDestination).toEqual({
+      provider: { id: 'cloudflare', account: 'kilo' },
+      instanceType: 'devcontainer',
+    });
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    expect(createSessionReportMock).not.toHaveBeenCalled();
+    expect(createCliSessionMock).not.toHaveBeenCalled();
+  });
+
+  it.each(['small', 'large'] as const)(
+    'rejects BYOC %s before allocation side effects',
+    async instanceType => {
+      const ctx = createInternalApiContext({ skipBalanceCheck: true });
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      const caller = appRouter.createCaller(ctx);
+      const sandboxAllocation = {
+        provider: { id: 'vercel', account: 'byoc' },
+        instanceType,
+      } as const;
+      await expect(
+        caller.prepareSession({ ...prepareInput, sandboxAllocation })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('BYOC'),
+      });
+      await expect(
+        caller.start({ ...startInput, runtime: { sandboxAllocation } })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('BYOC'),
+      });
+      expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      expect(createSessionReportMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(generateSandboxRoutingTargetMock).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each(['webhook', 'scheduled'])(
+    'authorizes Dedicated Standard for an enrolled organization %s trigger',
+    async createdOnPlatform => {
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+      await appRouter.createCaller(ctx).prepareSession({
+        ...prepareInput,
+        sandboxAllocation: 'isolated-standard',
+        createdOnPlatform,
+      });
+      expect(doStub.registerSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ orgId, createdOnPlatform }),
+          workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+        })
+      );
+    }
+  );
+
+  it('authorizes Dedicated Standard in public start without an internal API key', async () => {
+    const doStub = createMockDOStub();
+    const ctx = createInternalApiContext({ doStub, requestInternalApiKey: null });
+    ctx.env.SANDBOX_SELECTION_IDS = orgId;
+    generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
+    await appRouter.createCaller(ctx).start({
+      ...startInput,
+      runtime: { sandboxAllocation: 'isolated-standard' },
+    });
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ orgId }),
+        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+      })
+    );
+  });
+
+  it.each(['legacy', 'structured'] as const)(
+    'keeps canonical workspace metadata for authorized %s starts and prepares',
+    async format => {
+      const doStub = createMockDOStub();
+      const ctx = createInternalApiContext({ doStub });
+      ctx.env.SANDBOX_SESSION = ctx.env
+        .CLOUD_AGENT_SESSION as unknown as typeof ctx.env.SANDBOX_SESSION;
+      ctx.env.SANDBOX_SELECTION_IDS = orgId;
+      ctx.env.CONTROL_PLANE_IDS = orgId;
+      generateSessionIdMock.mockReturnValue('workspace_12345678-1234-1234-1234-123456789abc');
+      const sandboxAllocation =
+        format === 'legacy'
+          ? 'cloudflare-single'
+          : getSandboxAllocationRequest('cloudflare-single');
+      const caller = appRouter.createCaller(ctx);
+      await caller.start({ ...startInput, runtime: { sandboxAllocation } });
+      await caller.prepareSession({ ...prepareInput, sandboxAllocation });
+      const metadata = expect.objectContaining({
+        workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
+      });
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(metadata);
+      expect(doStub.registerSession).toHaveBeenCalledWith(metadata);
+    }
+  );
+});
 
 describe('effective session profile policy', () => {
   it.each([
@@ -500,6 +776,7 @@ describe('prepareSession endpoint', () => {
       'test-user-123',
       expect.any(Object),
       'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      undefined,
       'code-review',
       expect.stringMatching(/^New session - /),
       'https://github.com/acme/repo',
@@ -538,6 +815,7 @@ describe('prepareSession endpoint', () => {
           type: 'github',
           repo: 'acme/repo',
           branch: 'feature/test-branch',
+          githubAccessPurpose: 'workflow',
         },
         profile: {
           envVars: { API_KEY: 'secret' },
@@ -565,6 +843,34 @@ describe('prepareSession endpoint', () => {
       })
     );
     expect(selectSandboxForNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('persists the resolved profile id on the created session, not the requested one', async () => {
+    mergeProfileConfigurationMock.mockResolvedValue({ resolvedProfileId: 'profile-abc123' });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.prepareSession({
+      prompt: 'Test prompt',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      profileId: 'a1111111-1111-4111-8111-111111111111',
+      createdOnPlatform: 'cloud-agent-web',
+    });
+
+    expect(createCliSessionMock).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      'test-user-123',
+      expect.any(Object),
+      undefined,
+      'profile-abc123',
+      'cloud-agent-web',
+      expect.stringMatching(/^New session - /),
+      'https://github.com/acme/repo',
+      undefined
+    );
   });
 
   it('rejects organization attribution when the internal caller user is not a member', async () => {
@@ -1022,6 +1328,7 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('devcontainer sessions must use autoInitiate');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('auto-initiates command-valued initialPayload through grouped canonical admission', async () => {
@@ -1091,6 +1398,7 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('returns a prepared session when post-registration fact persistence fails', async () => {
@@ -1378,16 +1686,51 @@ describe('start endpoint', () => {
     });
 
     expect(getTokenForRepo).toHaveBeenCalledWith({
+      accessPurpose: 'workflow',
       githubRepo: 'acme/repo',
       userId: 'test-user-123',
       expectedIntegrationId: githubIntegrationId,
     });
     expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
       expect.objectContaining({
-        repository: { type: 'github', repo: 'acme/repo', githubIntegrationId },
+        repository: {
+          type: 'github',
+          repo: 'acme/repo',
+          githubIntegrationId,
+          githubAccessPurpose: 'workflow',
+        },
       })
     );
   });
+
+  it.each(['slack', 'cloud-agent-web'])(
+    'does not grant agent access from public origin %s',
+    async createdOnPlatform => {
+      const doStub = createMockDOStub();
+      const authorize = vi
+        .fn()
+        .mockResolvedValue({ success: false, reason: 'integration_mismatch' });
+      const caller = appRouter.createCaller(
+        createInternalApiContext({ doStub, getTokenForRepo: authorize })
+      );
+      await expect(
+        caller.start({
+          message: { prompt: 'Access secondary repository' },
+          agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
+          options: { createdOnPlatform },
+          repository: {
+            type: 'github',
+            repo: 'acme/repo',
+            githubIntegrationId: '123e4567-e89b-12d3-a456-426614174022',
+          },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({ accessPurpose: 'workflow' })
+      );
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    }
+  );
 
   it('persists default containment for standard GitLab grouped starts', async () => {
     const doStub = createMockDOStub();
@@ -1471,6 +1814,38 @@ describe('start endpoint', () => {
       );
     }
   );
+
+  it('passes resolved profile output into grouped start registration', async () => {
+    const runtimeAgent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { prompt: 'Review the diff', mode: 'subagent' as const },
+    };
+    mergeProfileConfigurationMock.mockResolvedValueOnce({
+      envVars: { PROFILE_VALUE: 'resolved' },
+      agents: [runtimeAgent],
+    });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Use the resolved profile' },
+      agent: { mode: 'reviewer', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: '123e4567-e89b-12d3-a456-426614174011' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ mode: 'reviewer' }),
+        profile: expect.objectContaining({
+          envVars: { PROFILE_VALUE: 'resolved' },
+          runtimeAgents: [runtimeAgent],
+        }),
+      })
+    );
+  });
 
   it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));

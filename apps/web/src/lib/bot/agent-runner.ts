@@ -92,7 +92,12 @@ async function buildSystemPrompt(
   const owner = ownerFromIntegration(platformIntegration);
 
   const [githubContext, gitlabContext, conversationContext] = await Promise.all([
-    getGitHubRepositoryContext(owner),
+    getGitHubRepositoryContext(
+      owner,
+      thread.adapter.name === 'slack' && platformIntegration.platform === 'slack'
+        ? 'agent'
+        : 'workflow'
+    ),
     getGitLabRepositoryContext(owner),
     botPlatform.getConversationContext({ thread, triggerMessage, platformIntegration }),
   ]);
@@ -136,7 +141,7 @@ ${conversationContext}`;
 }
 
 async function pickSummaryModel(modelSlug: string): Promise<string> {
-  return (await isFreeModel(modelSlug)) ? modelSlug : SUMMARY_MODEL;
+  return isFreeModel(modelSlug) ? modelSlug : SUMMARY_MODEL;
 }
 
 async function summarizePrompt(

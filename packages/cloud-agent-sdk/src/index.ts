@@ -39,7 +39,7 @@ export type {
   PermissionResponse,
 } from './session';
 
-export { normalize, normalizeCliEvent, isChatEvent } from './normalizer';
+export { normalize, normalizeCliEvent, isChatEvent, projectSessionGoal } from './normalizer';
 export type { NormalizedEvent, ChatEvent, ServiceEvent } from './normalizer';
 
 export { reduce } from './reducer';
@@ -153,13 +153,16 @@ export type {
   SessionPhase,
   SessionActivity,
   AgentStatus,
+  SdkStatusMessageCode,
   CloudStatus,
   QuestionState,
   PermissionState,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   SuggestionAction,
   SuggestionState,
   MessageDeliveryState,
+  SessionCommit,
   PreparationAttempt,
   PreparationAttemptStatus,
   PreparationStepKind,
@@ -167,6 +170,8 @@ export type {
   PreparationStepStatus,
   ServiceStateSnapshot,
   SessionInfo,
+  SessionGoal,
+  SessionGoalStatus,
   KiloSessionId,
   CloudAgentSessionId,
   ResolvedSession,
@@ -192,3 +197,9 @@ export type {
   QuestionInfo,
   SendMessagePayload,
 } from './types';
+
+// Canonical default-title contract from the ingest package, surfaced for app
+// clients: a session created before auto-titling carries a
+// `New session - <ISO>` placeholder that no display surface should show as
+// the session's title.
+export { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';

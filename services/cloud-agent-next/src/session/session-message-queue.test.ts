@@ -12,12 +12,14 @@ import { buildCloudMessageFailedPayload } from './message-settlement-outbox.js';
 import {
   createSessionMessageQueue,
   flushNextPendingSessionMessage,
+  requeueAcceptedMessageForRecovery,
   type SessionMessageQueueDependencies,
   type SessionMessageQueueStorage,
 } from './session-message-queue.js';
 import {
   createPendingSessionMessage,
   createPendingSessionMessageFromIntent,
+  findPendingSessionMessageByMessageId,
   listPendingSessionMessages,
   PENDING_FLUSH_RETRY_BASE_DELAY_MS,
   PENDING_SESSION_MESSAGE_LIMIT,
@@ -29,6 +31,7 @@ import {
   createQueuedSessionMessageState,
   getSessionMessageState,
   putSessionMessageState,
+  type SessionMessageState,
   type TerminalizeParams,
 } from './session-message-state.js';
 import {
@@ -2558,4 +2561,88 @@ describe('SessionMessageQueue', () => {
       ).resolves.toMatchObject({ status });
     }
   );
+});
+
+describe('requeueAcceptedMessageForRecovery', () => {
+  const attachments = {
+    path: '11111111-1111-4111-8111-111111111111',
+    files: ['22222222-2222-4222-8222-222222222222.txt'],
+  };
+
+  function legacyAcceptedState(): SessionMessageState {
+    return {
+      messageId: FIRST_MESSAGE_ID,
+      status: 'accepted',
+      prompt: 'review these files',
+      createdAt: 1,
+      queuedAt: 2,
+      acceptedAt: 5,
+      dispatchAcceptanceKind: 'observed',
+      wrapperRunId: 'wrapper_run_1',
+      callbackRequired: false,
+      legacyAdmissionConstraints: {
+        turn: {
+          type: 'prompt',
+          messageId: FIRST_MESSAGE_ID,
+          prompt: 'review these files',
+          attachments,
+        },
+        agent: { mode: 'code', model: 'default-model' },
+      },
+    };
+  }
+
+  it('re-queues a predecessor prompt turn with its attachments intact', async () => {
+    const storage = createMemoryStorage();
+    const state = legacyAcceptedState();
+    await putSessionMessageState(storage, state);
+
+    await expect(requeueAcceptedMessageForRecovery(storage, state)).resolves.toBe(true);
+
+    await expect(getSessionMessageState(storage, FIRST_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'queued',
+      recoveryAttempts: 1,
+    });
+    const pending = await listPendingSessionMessages(storage);
+    expect(pending).toHaveLength(1);
+    // The legacy pending shape cannot encode prompt attachments, so the
+    // recovered turn must be rebuilt from the immutable constraints.
+    expect(pending[0]?.intent?.turn).toEqual({
+      type: 'prompt',
+      messageId: FIRST_MESSAGE_ID,
+      prompt: 'review these files',
+      attachments,
+    });
+    expect(pending[0]?.intent?.agent).toEqual({ mode: 'code', model: 'default-model' });
+  });
+
+  it('writes the pending row before committing the queued state', async () => {
+    const storage = createMemoryStorage([], { failPutPrefix: 'pending_message:' });
+    const state = legacyAcceptedState();
+    await putSessionMessageState(storage, state);
+
+    await expect(requeueAcceptedMessageForRecovery(storage, state)).rejects.toThrow(
+      'failed to put pending_message:'
+    );
+
+    // A failed pending write must not leave a `queued` record that neither the
+    // pending drain nor the accepted-only repair can find: the message stays
+    // accepted, so the next detection retries the recovery.
+    await expect(getSessionMessageState(storage, FIRST_MESSAGE_ID)).resolves.toMatchObject({
+      status: 'accepted',
+    });
+  });
+
+  it('drops the pending row when the accepted state no longer applies', async () => {
+    const storage = createMemoryStorage();
+    const state = legacyAcceptedState();
+    await putSessionMessageState(storage, state);
+    await putSessionMessageState(storage, { ...state, status: 'completed', terminalAt: 9 });
+
+    await expect(requeueAcceptedMessageForRecovery(storage, state)).resolves.toBe(false);
+
+    await expect(
+      findPendingSessionMessageByMessageId(storage, FIRST_MESSAGE_ID)
+    ).resolves.toBeUndefined();
+  });
 });

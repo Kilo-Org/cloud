@@ -1,1 +1,4 @@
-export { GET } from '@/app/api/openrouter/models/route';
+import { handleModelsRequest } from '@/lib/ai-gateway/handlers/models';
+import { withRestTiming } from '@/lib/observability/request-timing';
+
+export const GET = withRestTiming('/api/gateway/models', handleModelsRequest);

@@ -1,14 +1,12 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import { QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
-  QWEN37_MAX_MODEL_ID,
-  QWEN37_PLUS_MODEL_ID,
 } from './custom-pricing';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
@@ -16,9 +14,9 @@ jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 function makeModel(id: string): OpenRouterModel {
   return {
     id,
-    name: 'Qwen: Qwen3.7 Max',
+    name: 'Test model',
     created: 0,
-    description: 'Qwen model',
+    description: 'Test model',
     architecture: {
       input_modalities: ['text'],
       output_modalities: ['text'],
@@ -67,123 +65,50 @@ describe('custom model pricing', () => {
     ).toBe(Math.round(100 * 0.75));
   });
 
-  test('replaces upstream Qwen3.7 Max pricing in the model list', () => {
-    const model = applyCustomPricingToModel(makeModel(QWEN37_MAX_MODEL_ID));
+  test.each([QWEN37_MAX_MODEL_ID, QWEN37_PLUS_MODEL_ID])(
+    'does not apply custom pricing to %s',
+    modelId => {
+      const model = makeModel(modelId);
 
-    expect(model.name).toBe('Qwen: Qwen3.7 Max (50% off)');
-    expect(model.pricing).toEqual({
-      prompt: '0.000001250000',
-      completion: '0.000003750000',
-      input_cache_read: '0.000000125000',
-      input_cache_write: '0.000001562500',
-    });
-  });
+      expect(applyCustomPricingToModel(model)).toBe(model);
+      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(model.id, makeUsage())).toBeUndefined();
+    }
+  );
 
-  test('replaces upstream Qwen3.7 Plus pricing in the model list', () => {
-    const model = applyCustomPricingToModel({
-      ...makeModel(QWEN37_PLUS_MODEL_ID),
-      name: 'Qwen: Qwen3.7 Plus',
-    });
+  test.each(['z-ai/glm-5.2', 'moonshotai/kimi-k3'])(
+    'does not apply custom pricing to %s',
+    modelId => {
+      const model = makeModel(modelId);
+      const usage = makeUsage({
+        inputTokens: 100,
+        outputTokens: 10,
+        cacheHitTokens: 20,
+        cacheWriteTokens: 30,
+      });
 
-    expect(model.name).toBe('Qwen: Qwen3.7 Plus (20% off)');
-    expect(model.pricing).toEqual({
-      prompt: '0.000000320000',
-      completion: '0.000001280000',
-      input_cache_read: '0.000000032000',
-      input_cache_write: '0.000000400000',
-    });
-  });
-
-  test('calculates Qwen3.7 Max usage without relying on upstream cost', () => {
-    expect(
-      calculateCustomCost_mUsd(
-        QWEN37_MAX_MODEL_ID,
-        makeUsage({
-          inputTokens: 100_000,
-          outputTokens: 10_000,
-          cacheHitTokens: 20_000,
-          cacheWriteTokens: 30_000,
-          cost_mUsd: 999,
-        })
-      )
-    ).toBe(Math.round(50_000 * 1.25 + 10_000 * 3.75 + 20_000 * 0.125 + 30_000 * 1.5625));
-  });
-
-  test('starts Qwen3.7 Plus long-context pricing at exactly 262,144 input tokens', () => {
-    expect(
-      calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_143 }))
-    ).toBe(Math.round(262_143 * 0.32));
-    expect(
-      calculateCustomCost_mUsd(QWEN37_PLUS_MODEL_ID, makeUsage({ inputTokens: 262_144 }))
-    ).toBe(Math.round(262_144 * 0.96));
-  });
-
-  test('uses Kimi K3 custom pricing only when market cost is missing', () => {
-    const usage = makeUsage({
-      inputTokens: 100,
-      outputTokens: 10,
-      cacheHitTokens: 20,
-      cacheWriteTokens: 30,
-    });
-
-    expect(calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, usage)).toBe(
-      Math.round(50 * 3 + 10 * 15 + 20 * 0.3 + 30 * 3)
-    );
-    expect(
-      calculateCustomCost_mUsd(PERPLEXITY_KIMI_PUBLIC_ID, { ...usage, cost_mUsd: 123 })
-    ).toBeUndefined();
-  });
-
-  test('does not apply custom pricing to GLM 5.2', () => {
-    const model = makeModel('z-ai/glm-5.2');
-    const usage = makeUsage({
-      inputTokens: 100,
-      outputTokens: 10,
-      cacheHitTokens: 20,
-      cacheWriteTokens: 30,
-    });
-
-    expect(applyCustomPricingToModel(model)).toBe(model);
-    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-    expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
-    expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
-  });
-
-  test('uses fallback-only custom pricing in the model list', () => {
-    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
-
-    expect(applyCustomPricingToModel(model)).toEqual({
-      ...model,
-      pricing: {
-        prompt: '0.000003000000',
-        completion: '0.000015000000',
-        input_cache_read: '0.000000300000',
-        input_cache_write: undefined,
-      },
-    });
-  });
-
-  test('preserves endpoint pricing for fallback-only custom pricing', () => {
-    const model = makeModel(PERPLEXITY_KIMI_PUBLIC_ID);
-
-    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
-  });
+      expect(applyCustomPricingToModel(model)).toBe(model);
+      expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
+      expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
+      expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
+    }
+  );
 
   test('reports invalid negative uncached token counts', () => {
     const captureMessageMock = jest.mocked(captureMessage);
     captureMessageMock.mockClear();
 
     const cost_mUsd = calculateCustomCost_mUsd(
-      QWEN37_MAX_MODEL_ID,
+      GEMINI_FLASH_CURRENT_MODEL_ID,
       makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
     );
 
-    expect(cost_mUsd).toBe(Math.round(20 * 0.125));
+    expect(cost_mUsd).toBe(Math.round(20 * 0.075));
     expect(captureMessageMock).toHaveBeenCalledWith(
       'SUSPICIOUS: negative uncached input tokens for custom pricing',
       expect.objectContaining({
         level: 'error',
-        extra: expect.objectContaining({ model: QWEN37_MAX_MODEL_ID }),
+        extra: expect.objectContaining({ model: GEMINI_FLASH_CURRENT_MODEL_ID }),
       })
     );
   });

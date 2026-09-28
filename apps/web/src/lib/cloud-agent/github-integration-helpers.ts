@@ -19,6 +19,7 @@ import {
 } from '@/lib/integrations/core/health';
 import {
   requireNumericPlatformRepositories,
+  shouldSyncProviderRepositories,
   type PlatformRepository,
 } from '@/lib/integrations/core/types';
 
@@ -31,6 +32,7 @@ type GitHubRepositoriesResult = {
     private: boolean;
     platformIntegrationId?: string;
     platformAccountLogin?: string;
+    githubAppType?: 'standard' | 'lite';
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
@@ -38,7 +40,11 @@ type GitHubRepositoriesResult = {
 
 const mapRepositories = (
   repositories: PlatformRepository[],
-  integration?: { id: string; platform_account_login: string | null }
+  integration?: {
+    id: string;
+    platform_account_login: string | null;
+    github_app_type: 'standard' | 'lite' | null;
+  }
 ): GitHubRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
@@ -49,9 +55,30 @@ const mapRepositories = (
       ? {
           platformIntegrationId: integration.id,
           platformAccountLogin: integration.platform_account_login ?? undefined,
+          githubAppType: integration.github_app_type ?? 'standard',
         }
       : {}),
   }));
+};
+
+// Repositories are intentionally listed once per granting installation: two
+// installations that both grant access to the same repo resolve to different
+// tokens/permissions at session start, so the UI (NewSessionPanel) keys and
+// selects rows by `(platformIntegrationId, id)`, not by repo id alone. This
+// only removes exact duplicate entries within the same installation's own
+// repository list (for example, a corrupted or duplicated cache), which would
+// otherwise silently double-count that installation's repo count in callers
+// like `hasGitHubRepository`.
+const dedupeRepositories = (
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] => {
+  const seen = new Set<string>();
+  return repositories.filter(repo => {
+    const key = `${repo.platformIntegrationId ?? ''}:${repo.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 };
 
 const missingIntegrationResponse = (message: string): GitHubRepositoriesResult => ({
@@ -60,23 +87,6 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   syncedAt: null,
   errorMessage: message,
 });
-
-/**
- * A repository can be reachable from more than one installation. Keep the
- * first occurrence: integrations arrive oldest-first, matching the primary
- * installation a session resolves by default.
- */
-const dedupeRepositories = (
-  repositories: GitHubRepositoriesResult['repositories']
-): GitHubRepositoriesResult['repositories'] => {
-  const seen = new Set<string>();
-  return repositories.filter(repo => {
-    const key = repo.fullName.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
 
 export async function getGitHubTokenForOrganization(
   organizationId: string
@@ -181,10 +191,20 @@ export async function fetchGitHubRepositoriesForOrganization(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitHub on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
-        integration.github_app_type || 'standard'
+        integration.github_app_type || 'standard',
+        integration.id
       );
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
@@ -195,7 +215,7 @@ export async function fetchGitHubRepositoriesForOrganization(
     }
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? []),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {
@@ -208,17 +228,19 @@ export async function fetchGitHubRepositoriesForOrganization(
 
 export async function fetchAllGitHubRepositoriesForOrganization(
   organizationId: string,
-  forceRefresh: boolean = false
+  forceRefresh: boolean = false,
+  purpose: 'workflow' | 'agent' = 'workflow'
 ): Promise<GitHubRepositoriesResult> {
   const integrations = (
-    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB)
+    await getIntegrationsByOrganization(organizationId, PLATFORM.GITHUB, purpose)
   ).filter(isPlatformIntegrationHealthy);
-  return fetchRepositoriesForIntegrations(integrations, forceRefresh);
+  return fetchRepositoriesForIntegrations(integrations, forceRefresh, purpose);
 }
 
 async function fetchRepositoriesForIntegrations(
   integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
-  forceRefresh: boolean
+  forceRefresh: boolean,
+  purpose: 'workflow' | 'agent'
 ): Promise<GitHubRepositoriesResult> {
   if (integrations.length === 0) {
     return missingIntegrationResponse('No GitHub integration found for this organization');
@@ -229,10 +251,18 @@ async function fetchRepositoriesForIntegrations(
       integrations.map(async integration => {
         if (!integration.platform_installation_id) return { repositories: [], syncedAt: null };
         const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-        if (forceRefresh || !cachedRepositories?.length) {
+        if (
+          shouldSyncProviderRepositories({
+            forceRefresh,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at,
+          })
+        ) {
           const repositories = await fetchGitHubRepositories(
             integration.platform_installation_id,
-            integration.github_app_type || 'standard'
+            integration.github_app_type || 'standard',
+            integration.id,
+            purpose
           );
           await updateRepositoriesForIntegration(integration.id, repositories);
           return {
@@ -241,7 +271,7 @@ async function fetchRepositoriesForIntegrations(
           };
         }
         return {
-          repositories: mapRepositories(cachedRepositories, integration),
+          repositories: mapRepositories(cachedRepositories ?? [], integration),
           syncedAt: integration.repositories_synced_at,
         };
       })
@@ -302,17 +332,26 @@ export async function fetchGitHubRepositoriesForUser(
 
   try {
     const cachedRepositories = requireNumericPlatformRepositories(integration.repositories);
-    // If forceRefresh or no cached repos, fetch from GitHub and update cache
-    if (forceRefresh || !cachedRepositories?.length) {
+    // Answer from the cached snapshot unless the caller forces a sync or the
+    // integration has never synced: a synced empty snapshot is the
+    // connected-empty state, not a reason to re-query GitHub on every read.
+    if (
+      shouldSyncProviderRepositories({
+        forceRefresh,
+        cachedRepositories,
+        repositoriesSyncedAt: integration.repositories_synced_at,
+      })
+    ) {
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
-        appType
+        appType,
+        integration.id
       );
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
         integrationInstalled: true,
-        repositories: mapRepositories(repositories),
+        repositories: mapRepositories(repositories, integration),
         syncedAt: new Date().toISOString(),
       };
     }
@@ -320,7 +359,7 @@ export async function fetchGitHubRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories ?? [], integration),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {

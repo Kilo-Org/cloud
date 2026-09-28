@@ -1,7 +1,7 @@
 import { GitBranch, GitMerge } from '@/components/ui/icons';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
-import { useExternalAuthReturn } from '@/lib/external-auth/use-external-auth-return';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
@@ -47,11 +46,6 @@ export function ProviderConnectCard<T>({
   const [connecting, setConnecting] = useState(false);
   const { icon: Icon, label, buttonLabel, getUrl, errorMessage } = PLATFORM_CONFIG[platform];
 
-  const handleConnected = useCallback(() => {
-    void onConnected();
-  }, [onConnected]);
-  const { markLaunched, clearLaunch } = useExternalAuthReturn(handleConnected);
-
   const connect = async () => {
     setConnecting(true);
     try {
@@ -64,17 +58,9 @@ export function ProviderConnectCard<T>({
         });
         url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, result.token);
       }
-      markLaunched();
-      const trigger = await openAuthorizationAndWaitForReturn(Platform.OS, url);
-      if (trigger === 'sheet-close') {
-        // iOS: the auth session resolves on sheet close — refresh right here.
-        clearLaunch();
-        await onConnected();
-      }
-      // Android: onConnected runs from the foreground handler once the app
-      // returns from the plain browser.
+      await openAuthorizationAndWaitForReturn(url);
+      await onConnected();
     } catch {
-      clearLaunch();
       toast.error(t(errorMessage));
     } finally {
       setConnecting(false);

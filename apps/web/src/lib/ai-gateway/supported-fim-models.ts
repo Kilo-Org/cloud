@@ -2,7 +2,6 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { INCEPTION_PROMO_MODEL } from '@/lib/constants';
 
 export type FimProvider = 'mistral' | 'inception';
 
@@ -19,7 +18,7 @@ type ProviderModels = Array<{
 }>;
 
 export const CODESTRAL_FIM_MODEL_ID = 'mistralai/codestral-2508';
-export const MERCURY_EDIT_FIM_MODEL_ID = INCEPTION_PROMO_MODEL;
+export const MERCURY_EDIT_FIM_MODEL_ID = 'inception/mercury-edit-2';
 
 /** Exact public IDs accepted by Kilo's FIM and edit routes. Aliases are intentionally omitted. */
 export const SUPPORTED_FIM_MODELS = [

@@ -1,10 +1,9 @@
-/* eslint-disable typescript-eslint/no-deprecated -- DOM-free React Native section tests */
 import { type ComponentProps, createElement } from 'react';
 import * as ReactQuery from '@tanstack/react-query';
-import TestRenderer, { act } from 'react-test-renderer';
+import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
@@ -70,6 +69,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/organization-context', () => ({
@@ -125,13 +125,18 @@ function session(id: string): ActiveSession {
   return { id, status: 'running', title: id, connectionId: 'c1' };
 }
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
+// `RemoteSessionRow` is a `memo()` component, and the test renderer reports the
+// wrapped function (not the memo object) as an instance's `type`, so the row
+// matches either identity.
+const RemoteSessionRowInner = (RemoteSessionRow as unknown as { type: unknown }).type;
 function nodes(type: string) {
   if (!renderer) {
     throw new Error('Missing renderer');
   }
   return renderer.root.findAll(
     candidate =>
-      (type === 'RemoteSessionRow' && candidate.type === RemoteSessionRow) ||
+      (type === 'RemoteSessionRow' &&
+        (candidate.type === RemoteSessionRow || candidate.type === RemoteSessionRowInner)) ||
       (typeof candidate.type === 'string' && candidate.type === type)
   );
 }
@@ -142,9 +147,9 @@ function node(type: string, index = 0) {
   }
   return result;
 }
-async function render(sessions = settled) {
+async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
-    const tree = createElement(AgentSessionsSection, { context, sessions });
+    const tree = createElement(AgentSessionsSection, { context: contextOverride, sessions });
     if (renderer) {
       renderer.update(tree);
     } else {
@@ -174,7 +179,10 @@ describe('Home live section', () => {
       'a1',
       'a4',
     ]);
-    (node('RemoteSessionRow', 1).props.onPress as () => void)();
+    const secondRow = node('RemoteSessionRow', 1);
+    (secondRow.props.onPress as (session: ActiveSession) => void)(
+      secondRow.props.session as ActiveSession
+    );
     expect(sessionDestination.id).toBe('a1');
   });
 
@@ -185,8 +193,51 @@ describe('Home live section', () => {
     await render({ ...sessions, isFetching: true });
     expect(node('RemoteSessionRow')).toBe(row);
     expect(nodes('Skeleton')).toHaveLength(0);
-    (row.props.onPress as () => void)();
+    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
     expect(sessionDestination.id).toBe('a1');
+  });
+
+  it('renders the pending state as a row-shaped skeleton inside the reserved frame', async () => {
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    const skeletons = nodes('Skeleton');
+    expect(skeletons.length).toBeGreaterThan(0);
+    expect(
+      skeletons.some(skeleton => String(skeleton.props.className ?? '').includes('w-full'))
+    ).toBe(false);
+    expect(
+      nodes('View').some(view => {
+        const className = String(view.props.className ?? '');
+        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+      })
+    ).toBe(true);
+    expect(nodes('Text').some(text => text.children.includes(i18n.t('home.noLiveSessions')))).toBe(
+      false
+    );
+  });
+
+  it('places the pending placeholder on the real row geometry so the arriving row cannot reflow it', async () => {
+    await render({ ...settled, activeSessions: [session('a1')] });
+    const rowGeometry = String(
+      nodes('View').find(view => String(view.props.className ?? '').includes('py-[13px]'))?.props
+        .className
+    );
+    expect(rowGeometry).toContain('py-[13px]');
+
+    await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
+    const placeholderRow = nodes('View').find(view =>
+      String(view.props.className ?? '').includes('py-[13px]')
+    );
+    expect(placeholderRow).toBeDefined();
+    // The same row box the incoming SessionRow draws: the copy lands on the
+    // same x-offset, so swapping the placeholder for the row cannot shift it.
+    expect(String(placeholderRow?.props.className)).toBe(rowGeometry);
+    // The leading mark is the row's own 3px edge strip, not a 32px circle.
+    expect(
+      nodes('Skeleton').some(skeleton => {
+        const className = String(skeleton.props.className ?? '');
+        return className.includes('absolute') && className.includes('w-[3px]');
+      })
+    ).toBe(true);
   });
 
   it.each([
@@ -210,8 +261,16 @@ describe('Home live section', () => {
     }
   );
 
-  it('switches to the Agents index and dismisses the history subpage', async () => {
+  it('renders no live-sessions header when the accepted live list is empty', async () => {
     await render();
+    expect(nodes('SectionHeader')).toHaveLength(0);
+    expect(nodes('Text').some(text => text.children.includes('Nothing running right now'))).toBe(
+      true
+    );
+  });
+
+  it('switches to the Agents index and dismisses the history subpage', async () => {
+    await render({ ...settled, activeSessions: [session('a1')] });
     (node('SectionHeader').props.onActionPress as () => void)();
     expect(navigateSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');
     expect(dismissToSpy).toHaveBeenCalledWith('/(app)/(tabs)/(2_agents)/');

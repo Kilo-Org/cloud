@@ -38,11 +38,21 @@ export async function fetchMobileSessionSnapshotPage(
     ...(options.cursor ? { cursor: options.cursor } : {}),
   });
 
+  // The goal lives in the session metadata, which the messages page carries
+  // alongside the bounded history. Rebuilding `info` from the page (instead
+  // of `{ id }`) keeps the fixed goal section across open and reconnect: the
+  // transport replays this `info` as `session.created`, which otherwise
+  // clobbers the goal held in the live session state.
+  const info: SessionSnapshotPage['info'] = {
+    id: result.kiloSessionId,
+    ...(result.sessionGoal ? { goal: result.sessionGoal } : {}),
+  };
+
   const history = result.history as KiloSdkMessageHistory | null;
   if (history === null) {
     return {
       kind: 'success',
-      info: { id: result.kiloSessionId },
+      info,
       messages: [],
       nextCursor: null,
       omittedItemCount: 0,
@@ -53,7 +63,7 @@ export async function fetchMobileSessionSnapshotPage(
   if (isHistoryPage(history)) {
     return {
       kind: 'success',
-      info: { id: result.kiloSessionId },
+      info,
       messages: history.messages as SessionSnapshotPage['messages'],
       nextCursor: history.nextCursor,
       omittedItemCount: history.omittedItemCount,

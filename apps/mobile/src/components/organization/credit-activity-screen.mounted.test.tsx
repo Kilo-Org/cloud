@@ -1,5 +1,4 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the credit-activity screen state contract */
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
 
 // Credit-activity screen state contract: loading skeleton, first-page error
 // (retryable vs. permanent NOT_FOUND/FORBIDDEN/UNAUTHORIZED no-retry), the empty
@@ -7,8 +6,8 @@
 // loading), and the later-page failure footer (rows kept + Retry). The query layer
 // is mocked so each state is driven directly through the screen JSX.
 
-import { createElement, type ReactElement } from 'react';
-import { act } from 'react-test-renderer';
+import { createElement, Fragment, type ReactElement } from 'react';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -153,7 +152,10 @@ vi.mock('react-native-reanimated', () => ({
 
 vi.mock('react-native', () => ({
   View: 'View',
-  FlatList: (props: {
+}));
+
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: (props: {
     data?: unknown[];
     renderItem?: (info: { item: unknown; index: number }) => ReactElement;
     ListEmptyComponent?: ReactElement;
@@ -161,12 +163,14 @@ vi.mock('react-native', () => ({
   }) => {
     const data = props.data ?? [];
     if (data.length === 0) {
-      return createElement('FlatList', null, props.ListEmptyComponent, props.ListFooterComponent);
+      return createElement('FlashList', null, props.ListEmptyComponent, props.ListFooterComponent);
     }
     return createElement(
-      'View',
+      'FlashList',
       null,
-      data.map((item, index) => props.renderItem?.({ item, index })),
+      data.map((item, index) =>
+        createElement(Fragment, { key: index }, props.renderItem?.({ item, index }))
+      ),
       props.ListFooterComponent ?? null
     );
   },
@@ -279,7 +283,7 @@ describe('OrganizationCreditActivityScreen empty', () => {
     );
 
     expect(collectText(renderer.toJSON())).toContain('EMPTY_STATE:No credit activity');
-    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(0);
     expect(
       (
         renderer.root.find(node => String(node.type) === 'EmptyState').props as {
@@ -293,6 +297,18 @@ describe('OrganizationCreditActivityScreen empty', () => {
 });
 
 describe('OrganizationCreditActivityScreen pagination', () => {
+  it('renders the loaded rows through the FlashList mock', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    const lists = renderer.root.findAll(node => String(node.type) === 'FlashList');
+    expect(lists).toHaveLength(1);
+    expect(collectText(renderer.toJSON())).toContain('Top-up');
+  });
+
   it('keeps pagination available when a loaded page has no visible entries', async () => {
     pageQuery.data = { pages: [{ entries: [], nextCursor: 1, hasMore: true }] };
     pageHook.hasMore = true;
@@ -370,6 +386,18 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     const retry = buttons.rendered.find(button => button.accessibilityLabel === 'Retry');
     expect(retry).toBeDefined();
     expect(retry?.loading).toBe(true);
+  });
+
+  it('restores the 12px gap between the last row and the pagination footer', async () => {
+    pageQuery.data = { pages: [{ entries: [TRANSACTION], nextCursor: 1, hasMore: true }] };
+    pageHook.entries = [TRANSACTION];
+    pageHook.hasMore = true;
+
+    const { renderer } = await renderWithProviders(createElement(OrganizationCreditActivityScreen));
+
+    // FlashList's item separator only spans rows, so the footer carries the
+    // 12px the old content-container `gap-3` placed between it and the last row.
+    expect(renderer.root.findAll(node => node.props.className === 'pt-3')).toHaveLength(1);
   });
 
   it('keeps Load more when a background refetch fails after pages loaded', async () => {

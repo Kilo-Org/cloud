@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Container } from '@cloudflare/containers';
-import { ContainerUsageClient } from './client';
+import { ContainerUsageAdmissionError, ContainerUsageClient } from './client';
 import {
   getBillingContext,
   setBillingContext,
   updateBillingContext,
+  type BillingContext,
   type BillingContextStorage,
 } from './context';
 import type { ContainerUsageRpcMethods, HeartbeatAck, RecordAck } from './contracts';
@@ -1247,5 +1248,363 @@ describe('installBillingHeartbeat', () => {
 
     expect(await getBillingContext(storage)).toEqual(replacement);
     expect(deleteSchedules).not.toHaveBeenCalled();
+  });
+
+  it('abandons a pending-stop generation when heartbeat delivery is rejected with sku_not_found', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const context = await getBillingContext(storage);
+    if (!context) throw new Error('Expected billing context');
+    await updateBillingContext(storage, {
+      ...context,
+      pendingHeartbeat: { seq: 1, usageSinceLast: 4, measuredAtMs: 5_000 },
+    });
+    const schedule = vi.fn();
+    const deleteSchedules = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_not_found', 'Billing SKU not found');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      await controller.persistStop({ reason: 'exit', exitCode: 0 }, 7_000);
+      schedule.mockClear();
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(onGenerationClosed).toHaveBeenCalledOnce();
+      expect(onGenerationClosed).toHaveBeenCalledWith(
+        expect.objectContaining({ generation: context.generation }),
+        { nonRetryableSkuAdmissionCode: 'sku_not_found' }
+      );
+      expect(schedule).not.toHaveBeenCalled();
+      expect(deleteSchedules).toHaveBeenCalledWith(BILLING_HEARTBEAT_CALLBACK);
+      expect(warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'sku_not_found' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('abandons a pending-stop generation when stop delivery is rejected with sku_unit_mismatch', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const schedule = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeStopDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_unit_mismatch', 'SKU unit is not seconds');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      await controller.persistStop({ reason: 'exit', exitCode: 0 }, 7_000);
+      schedule.mockClear();
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(onGenerationClosed).toHaveBeenCalledOnce();
+      expect(onGenerationClosed).toHaveBeenCalledWith(expect.anything(), {
+        nonRetryableSkuAdmissionCode: 'sku_unit_mismatch',
+      });
+      expect(schedule).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'sku_unit_mismatch' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('abandons a stopped-state generation when the stop attempt is rejected with a terminal SKU code', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const schedule = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'stopped' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeStopDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_not_accepting_new_usage', 'SKU is retired');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      schedule.mockClear();
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(onGenerationClosed).toHaveBeenCalledOnce();
+      expect(onGenerationClosed).toHaveBeenCalledWith(expect.anything(), {
+        nonRetryableSkuAdmissionCode: 'sku_not_accepting_new_usage',
+      });
+      expect(schedule).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'sku_not_accepting_new_usage' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('abandons a running generation when heartbeat delivery is rejected with sku_not_found', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const schedule = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: schedule as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_not_found', 'Billing SKU not found');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+      schedule.mockClear();
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(onGenerationClosed).toHaveBeenCalledOnce();
+      expect(onGenerationClosed).toHaveBeenCalledWith(expect.anything(), {
+        nonRetryableSkuAdmissionCode: 'sku_not_found',
+      });
+      expect(schedule).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ code: 'sku_not_found' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('logs and swallows a close-callback rejection after a terminal SKU abandon', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const deleteSchedules = vi.fn();
+    const onGenerationClosed = vi.fn(async () => {
+      throw new Error('close callback unavailable');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules,
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_not_found', 'Billing SKU not found');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      await expect(controller.billingHeartbeatTick()).resolves.toBeUndefined();
+
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(deleteSchedules).toHaveBeenCalledWith(BILLING_HEARTBEAT_CALLBACK);
+      expect(warn).toHaveBeenCalledWith(
+        'Billing generation close notification failed',
+        expect.objectContaining({ error: 'close callback unavailable' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('logs and swallows a close-callback rejection after a successful stop', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const onGenerationClosed = vi.fn(async () => {
+      throw new Error('close callback unavailable');
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      const ack = await controller.recordStop({ reason: 'exit', exitCode: 0 });
+
+      expect(ack).toBeDefined();
+      expect(await getBillingContext(storage)).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        'Billing generation close notification failed',
+        expect.objectContaining({ error: 'close callback unavailable' })
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('does not swallow a billing-context storage failure during a terminal SKU abandon', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const deleteSpy = vi
+      .spyOn(storage, 'delete')
+      .mockRejectedValue(new Error('storage delete failed'));
+    const onGenerationClosed = vi.fn();
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      const controller = installBillingHeartbeat(
+        {
+          deleteSchedules: vi.fn(),
+          getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+          schedule: vi.fn() as Container['schedule'],
+        },
+        {
+          client: usageClient('continue'),
+          storage,
+          beforeHeartbeatDelivery: async () => {
+            throw new ContainerUsageAdmissionError('sku_not_found', 'Billing SKU not found');
+          },
+          onGenerationClosed,
+          enforceBudgetStop: vi.fn(),
+        }
+      );
+
+      await expect(controller.billingHeartbeatTick()).rejects.toThrow('storage delete failed');
+
+      expect(onGenerationClosed).not.toHaveBeenCalled();
+      expect(deleteSpy).toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+      deleteSpy.mockRestore();
+    }
+  });
+
+  it('reschedules, rethrows, and keeps a retryable running heartbeat failure retryable', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    const schedule = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+        schedule: schedule as Container['schedule'],
+      },
+      {
+        client: usageClient('continue'),
+        storage,
+        beforeHeartbeatDelivery: async () => {
+          throw new Error('meter unavailable');
+        },
+        onGenerationClosed,
+        enforceBudgetStop: vi.fn(),
+      }
+    );
+    schedule.mockClear();
+
+    await expect(controller.billingHeartbeatTick()).rejects.toThrow('meter unavailable');
+
+    expect(await getBillingContext(storage)).toBeDefined();
+    expect(onGenerationClosed).not.toHaveBeenCalled();
+    expect(schedule).toHaveBeenCalledWith(300, BILLING_HEARTBEAT_CALLBACK, expect.any(String));
+  });
+
+  it('rethrows a retryable running heartbeat failure even when a replacement generation was installed', async () => {
+    const storage = memoryStorage();
+    await storedContext(storage);
+    let replacement: BillingContext | undefined;
+    const schedule = vi.fn();
+    const onGenerationClosed = vi.fn();
+    const controller = installBillingHeartbeat(
+      {
+        deleteSchedules: vi.fn(),
+        getState: vi.fn(async () => ({ status: 'healthy' as const, lastChange: Date.now() })),
+        schedule: schedule as Container['schedule'],
+      },
+      {
+        client: usageClient('continue'),
+        storage,
+        beforeHeartbeatDelivery: async () => {
+          replacement = await setBillingContext(storage, {
+            service: 'cloud-agent-next',
+            instanceId: 'instance-1',
+            startEpochMs: 456,
+            sku: 'cloud-agent-next:Sandbox',
+            subject: { type: 'user', id: 'user-1' },
+            actor: { type: 'user', id: 'user-1' },
+          });
+          throw new Error('meter unavailable');
+        },
+        onGenerationClosed,
+        enforceBudgetStop: vi.fn(),
+      }
+    );
+    schedule.mockClear();
+
+    await expect(controller.billingHeartbeatTick()).rejects.toThrow('meter unavailable');
+
+    expect(await getBillingContext(storage)).toEqual(replacement);
+    expect(onGenerationClosed).not.toHaveBeenCalled();
+    expect(schedule).not.toHaveBeenCalled();
   });
 });

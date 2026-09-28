@@ -109,4 +109,41 @@ describe('createNativeUserWebConnectionLifecycleHooks', () => {
     expect(onOnline).not.toHaveBeenCalled();
     expect(native.removeConnectivityListener).toHaveBeenCalledTimes(1);
   });
+
+  it('ignores the connectivity replay on subscribe and resumes only on a later offline → online', () => {
+    const native = createSources();
+    const hooks = createNativeUserWebConnectionLifecycleHooks(native.sources);
+    const onOnline = vi.fn();
+    const cleanup = hooks.onOnline?.(() => {
+      onOnline();
+    });
+
+    // NetInfo replays the current state to every new listener. An online replay
+    // is a baseline, not a recovery: firing it re-entered the SDK
+    // metadata-recovery retry in a loop on every failed session open, so the
+    // terminal load error never surfaced (p6).
+    native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    expect(onOnline).not.toHaveBeenCalled();
+
+    native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    expect(onOnline).toHaveBeenCalledTimes(1);
+    cleanup?.();
+  });
+
+  it('treats an offline replay as the baseline and resumes when connectivity returns', () => {
+    const native = createSources();
+    const hooks = createNativeUserWebConnectionLifecycleHooks(native.sources);
+    const onOnline = vi.fn();
+    const cleanup = hooks.onOnline?.(() => {
+      onOnline();
+    });
+
+    native.setConnectivity({ isConnected: false, isInternetReachable: false });
+    expect(onOnline).not.toHaveBeenCalled();
+
+    native.setConnectivity({ isConnected: true, isInternetReachable: true });
+    expect(onOnline).toHaveBeenCalledTimes(1);
+    cleanup?.();
+  });
 });

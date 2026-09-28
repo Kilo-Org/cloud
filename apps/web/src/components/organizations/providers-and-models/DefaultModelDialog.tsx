@@ -6,7 +6,7 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useConfigureOrganizationDefaultBehavior } from '@/app/api/organizations/hooks';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { LockableContainer } from '../LockableContainer';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

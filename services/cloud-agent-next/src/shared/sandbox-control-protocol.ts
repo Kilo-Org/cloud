@@ -306,6 +306,7 @@ export const sandboxHelloPayloadSchema = z.object({
       runtimeRecovery: z.literal(true).optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      gitAuthor: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })
@@ -458,6 +459,13 @@ export const worktreeDeleteResultSchema = z
 export type WorktreeDeletePayload = z.infer<typeof worktreeDeletePayloadSchema>;
 export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
+export const gitAuthorSchema = z
+  .object({
+    name: z.string().min(1).max(256),
+    email: z.string().min(1).max(320),
+  })
+  .strict();
+
 export const sessionAttachPayloadSchema = z
   .object({
     captureNativeRuntimeId: z.literal(true).optional(),
@@ -489,6 +497,7 @@ export const sessionAttachPayloadSchema = z
         url: z.string().min(1).max(2048),
         token: z.string().min(1).max(4096).optional(),
         platform: z.enum(['github', 'gitlab', 'bitbucket']).optional(),
+        author: gitAuthorSchema.optional(),
       })
       .strict()
       .optional(),
@@ -1128,6 +1137,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       eventReceipts: z.boolean().optional(),
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
+      gitAuthor: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })

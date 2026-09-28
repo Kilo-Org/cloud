@@ -1,1 +1,1 @@
-export { handleEmbeddingsRequest as POST } from '@/lib/ai-gateway/handlers/embeddings';
+export { POST } from '@/app/api/openrouter/embeddings/route';

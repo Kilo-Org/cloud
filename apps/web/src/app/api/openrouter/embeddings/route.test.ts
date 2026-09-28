@@ -106,8 +106,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
-    const { handleEmbeddingsRequest } = await import('./embeddings');
-    const response = await handleEmbeddingsRequest(makeRequest({ provider }));
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ provider }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
@@ -116,8 +116,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
   it.each([undefined, { only: ['openai'] }])(
     'does not add privacy when none is set: %j',
     async provider => {
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const response = await handleEmbeddingsRequest(makeRequest({ provider }));
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest({ provider }));
 
       expect(response.status).toBe(200);
       expect(getUpstreamBody().provider).toEqual(provider);
@@ -131,8 +131,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     'denies collection for organization=$organization and request=$request',
     async ({ organization, request }) => {
       setUserAuth({ data_collection: organization, provider_allow_list: ['openai'] });
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const response = await handleEmbeddingsRequest(
+      const { POST } = await import('./route');
+      const response = await POST(
         makeRequest({ provider: { data_collection: request, only: ['azure'] } })
       );
 
@@ -147,10 +147,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       ...allowedModelDecision,
       decision: { allowed: true, eligibleProviderRoutes: new Set(['openai']) },
     });
-    const { handleEmbeddingsRequest } = await import('./embeddings');
-    const response = await handleEmbeddingsRequest(
-      makeRequest({ provider: { zdr: false, only: ['azure'] } })
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ provider: { zdr: false, only: ['azure'] } }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual({
@@ -163,8 +161,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
     'rejects malformed provider privacy before proxying: %j',
     async provider => {
-      const { handleEmbeddingsRequest } = await import('./embeddings');
-      const response = await handleEmbeddingsRequest(makeRequest({ provider }));
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest({ provider }));
 
       expect(response.status).toBe(400);
       expect(mockedFetch).not.toHaveBeenCalled();
@@ -189,8 +187,8 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
     });
-    const { handleEmbeddingsRequest } = await import('./embeddings');
-    const response = await handleEmbeddingsRequest(makeRequest({ provider: testCase.privacy }));
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ provider: testCase.privacy }));
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().providerOptions).toEqual({

@@ -135,8 +135,8 @@ describe('POST /api/fim/completions', () => {
     setOrganizationAuth(1000);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest() as never);
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
@@ -156,8 +156,8 @@ describe('POST /api/fim/completions', () => {
   it('rejects an exhausted balance for the Inception model', async () => {
     setOrganizationAuth(0);
 
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest() as never);
 
     expect(response.status).toBe(402);
     expect(await response.json()).toMatchObject({
@@ -169,10 +169,8 @@ describe('POST /api/fim/completions', () => {
   it('rejects an exhausted balance for other FIM models', async () => {
     setOrganizationAuth(0);
 
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(
-      makeRequest('mistralai/codestral-2508') as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest('mistralai/codestral-2508') as never);
 
     expect(response.status).toBe(402);
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -186,8 +184,8 @@ describe('POST /api/fim/completions', () => {
   ])('rejects unknown FIM model or alias %s', async model => {
     setOrganizationAuth(1000);
 
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest(model) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(model) as never);
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
@@ -203,8 +201,8 @@ describe('POST /api/fim/completions', () => {
     ] as never);
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-    const { handleFimCompletionsRequest } = await import('./fim-completions');
-    const response = await handleFimCompletionsRequest(makeRequest() as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest() as never);
 
     expect(response.status).toBe(200);
     const [, init] = mockedFetch.mock.calls[0];

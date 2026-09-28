@@ -5,7 +5,7 @@ import {
   useOpenRouterModels,
   useOpenRouterModelsAndProviders,
   useOpenRouterProviders,
-} from '@/lib/ai-gateway/hooks';
+} from '@/app/api/openrouter/hooks';
 import type { OpenRouterProvider } from '@/lib/organizations/organization-types';
 
 export type ConfigurationData = {

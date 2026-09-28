@@ -1,5 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import { handleEmbeddingModelsRequest } from './embedding-models';
+import { GET } from './route';
 import {
   KILO_DEFAULT_EMBEDDING_MODEL,
   KILO_EMBEDDING_MODEL_CATALOG,
@@ -9,7 +9,7 @@ import {
 
 describe('GET /api/gateway/embedding-models', () => {
   test('returns the Kilo embedding model catalog', async () => {
-    const response = await handleEmbeddingModelsRequest();
+    const response = await GET();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual(KILO_EMBEDDING_MODEL_CATALOG);

@@ -241,6 +241,7 @@ vi.mock('react-i18next', async importOriginal => {
 // ── jotai + session provider ───────────────────────────────────────────────
 vi.mock('jotai', () => ({
   useAtomValue: (atom: { value: unknown }) => atom.value,
+  useAtomValueRawSync: (atom: { value: unknown }) => atom.value,
   useSetAtom: () => vi.fn(),
   useStore: () => ({ get: (atom: { value: unknown }) => atom.value, sub: vi.fn(() => vi.fn()) }),
 }));

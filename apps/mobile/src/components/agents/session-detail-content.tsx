@@ -6,7 +6,7 @@ import {
 } from '@kilocode/cloud-agent-sdk';
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type Href, useFocusEffect, useIsFocused, useRouter } from 'expo-router';
-import { useAtomValue, useSetAtom, useStore } from 'jotai';
+import { useAtomValue, useAtomValueRawSync, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
@@ -915,8 +915,15 @@ export function SessionDetailContent({
   // the re-send is awaited, so the user can switch sessions while it is in
   // flight, and the row must stay hidden when the transcript is opened again —
   // by another screen instance, or after a relaunch.
-  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
-  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  //
+  // `manager.switchSession` (the mount effect above) re-projects both records
+  // for the opened session before these hooks subscribe. jotai 3's
+  // `useAtomValue` misses a write that lands between render and subscription;
+  // `useAtomValueRawSync` re-reads on subscribe, so a remount picks it up.
+  const resolvedDeliveryFailures = useAtomValueRawSync(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValueRawSync(
+    manager.atoms.supersededInFlightMessageIds
+  );
   const supersededMessageIds = useMemo(() => {
     if (supersededInFlightMessageIds.size === 0) {
       return resolvedDeliveryFailures;

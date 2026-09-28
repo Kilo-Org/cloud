@@ -1373,6 +1373,60 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    // cloud-agent-next projects the raw provider body down to 'Assistant request
+    // was not authorized' before the callback, so the message-based BYOK
+    // detection can never fire. Ownership on the structured failure is the only
+    // signal that routes this onto the actionable disable + email path.
+    it('routes a structured BYOK provider-authentication failure to the actionable path', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was not authorized',
+          failure: {
+            code: 'assistant_error',
+            assistantReason: 'provider_authentication',
+            providerOwnership: 'byok',
+            message: 'Assistant request was not authorized',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'byok_invalid_key' })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ reason: 'byok_invalid_key' })
+      );
+    });
+
+    it('keeps a managed provider-authentication failure generic and non-actionable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      await POST(
+        makeRequest({
+          cloudAgentSessionId: 'agent_1',
+          status: 'failed',
+          errorMessage: 'Assistant request was not authorized',
+          failure: {
+            code: 'assistant_error',
+            assistantReason: 'provider_authentication',
+            providerOwnership: 'managed',
+            message: 'Assistant request was not authorized',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'failed', terminalReason: 'assistant_unauthorized' })
+      );
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+    });
+
     // model_missing arrives with the generic message 'No model was selected',
     // which the message-based model-not-found check cannot match. Without the
     // structured path re-applying normalization the row would stay 'failed' and

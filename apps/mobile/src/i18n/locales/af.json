@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gaan terug",
     "idle": "Onaktief",
+    "scheduled": "Geskeduleer",
     "keepEditing": "Gaan voort met wysiging",
     "keepRunning": "Laat voortgaan",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "geskrapte gebruiker",
       "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
       "moreLinesAbove_one": "… nog {{displayCount}} reël hierbo",
-      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo"
+      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo",
+      "deleteComment": "Vee kommentaar uit",
+      "deleteCommentTitle": "Vee kommentaar uit?",
+      "deleteCommentMessage": "Hierdie kommentaar sal uit die trekversoek verwyder word.",
+      "commentEditFailed": "Kon nie jou kommentaar stoor nie. Kontroleer jou verbinding en probeer weer.",
+      "commentEditUnavailable": "Hierdie kommentaar kan nie gewysig word nie. Dit is dalk uitgevee.",
+      "commentDeleteFailed": "Kon nie jou kommentaar uitvee nie. Kontroleer jou verbinding en probeer weer.",
+      "commentDeleteUnavailable": "Hierdie kommentaar kan nie uitgevee word nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
+      "commentUpdated": "Kommentaar opgedateer",
+      "commentDeleted": "Kommentaar uitgevee",
       "reviewSubmitted": "Hersiening ingedien",
       "autoMergeEnabled": "Outomatiese samevoeging geaktiveer"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Kon nie die aktiewe sessies laai nie.",
       "couldNotRefresh": "Kon nie verfris nie",
       "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon. Jou sessies sal hier verskyn.",
+      "viewHistory": "Sessiegeskiedenis",
       "noMatches": "Geen ooreenstemmende sessies nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "tryAdjustFilters": "Probeer jou filters aanpas of verwyder.",
       "couldNotSearch": "Kon nie die sessies deursoek nie.",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
+      "pastSessions": "Vorige sessies",
       "live": "REGSTREEKS",
       "updating": "Besig om op te dateer"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Gaan terug en maak hierdie kieser weer vanaf die vorige skerm oop."
   },
   "sessionRow": {
-    "needsInput": "WAG OP INVOER"
+    "needsInput": "WAG OP INVOER",
+    "scheduled": "GESKEDULEER"
   },
   "voiceInput": {
     "listening": "Luister...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "Geen vertroude gashere nie",
     "emptyDescription": "As jy 'n skakel se gasheer vertrou, maak skakels na daardie gasheer oop sonder om weer toestemming te vra.",
     "revoke": "Herroep vertroue in {{host}}",
+    "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
     "backToPreferences": "Terug na voorkeure"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
-    "newestResult": "Nuutste resultaat"
+    "newestResult": "Nuutste resultaat",
+    "scheduledWakes": "word wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",

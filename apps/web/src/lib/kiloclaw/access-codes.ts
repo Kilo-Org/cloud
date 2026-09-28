@@ -1,5 +1,6 @@
 import 'server-only';
 import { db } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import { kiloclaw_access_codes } from '@kilocode/db/schema';
 import { eq, and, lt, ne, or } from 'drizzle-orm';
 import { randomInt } from 'node:crypto';
@@ -16,16 +17,6 @@ function generateCode(): string {
     code += CODE_CHARS.charAt(randomInt(CODE_CHARS.length));
   }
   return `${code.slice(0, 5)}-${code.slice(5)}`;
-}
-
-/** Postgres unique violation error code */
-function isUniqueViolation(err: unknown): boolean {
-  return (
-    err !== null &&
-    typeof err === 'object' &&
-    'code' in err &&
-    (err as { code: string }).code === '23505'
-  );
 }
 
 /**

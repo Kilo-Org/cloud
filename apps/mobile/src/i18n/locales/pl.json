@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozytoria",
     "securityAgent": "Agent bezpieczeństwa",
     "unknown": "Brak danych",
@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Wróć",
     "idle": "W gotowości",
+    "scheduled": "Zaplanowano",
     "keepEditing": "Kontynuuj edycję",
     "keepRunning": "Nie przerywaj",
     "kiloclaw": "KiloClaw",
@@ -1531,12 +1532,14 @@
       "couldNotLoadActive": "Nie udało się wczytać aktywnych sesji.",
       "couldNotRefresh": "Nie udało się odświeżyć",
       "noSessionsYetDescription": "Rozpocznij zadanie programistyczne na telefonie. Twoje sesje pojawią się tutaj.",
+      "viewHistory": "Historia sesji",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Wpisz inne hasło wyszukiwania.",
       "tryAdjustFilters": "Zmień lub wyczyść filtry.",
       "couldNotSearch": "Nie udało się wyszukać sesji.",
       "completedWillAppear": "Zakończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
+      "pastSessions": "Poprzednie sesje",
       "live": "NA ŻYWO",
       "updating": "Aktualizowanie"
     },
@@ -1564,7 +1567,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -2306,7 +2309,8 @@
     "optionsExpiredDescription": "Wróć do poprzedniego ekranu i ponownie otwórz okno wyboru."
   },
   "sessionRow": {
-    "needsInput": "CZEKA NA ODPOWIEDŹ"
+    "needsInput": "CZEKA NA ODPOWIEDŹ",
+    "scheduled": "ZAPLANOWANO"
   },
   "voiceInput": {
     "listening": "Nasłuchiwanie...",
@@ -2680,7 +2684,14 @@
       "moreLinesAbove_one": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_other": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_few": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}"
+      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
+      "deleteComment": "Usuń komentarz",
+      "deleteCommentTitle": "Usunąć komentarz?",
+      "deleteCommentMessage": "Ten komentarz zostanie usunięty z PR-a.",
+      "commentEditFailed": "Nie udało się zapisać twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentEditUnavailable": "Tego komentarza nie można edytować. Mógł zostać usunięty.",
+      "commentDeleteFailed": "Nie udało się usunąć twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentDeleteUnavailable": "Tego komentarza nie można usunąć."
     },
     "entry": {
       "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
@@ -2945,7 +2956,7 @@
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "staleHint": "pR zmienił się od czasu napisania tego komentarza.",
+      "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
       "summaryPlaceholder": "Opcjonalne podsumowanie przeglądu"
@@ -3017,6 +3028,8 @@
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
+      "commentUpdated": "Komentarz zaktualizowany",
+      "commentDeleted": "Komentarz usunięty",
       "reviewSubmitted": "Wysłano przegląd",
       "autoMergeEnabled": "Włączono automatyczne scalanie"
     },
@@ -3252,6 +3265,7 @@
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
     "revoke": "Cofnij zaufanie do {{host}}",
+    "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {
@@ -3281,7 +3295,8 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
-    "newestResult": "Najnowszy wynik"
+    "newestResult": "Najnowszy wynik",
+    "scheduledWakes": "budzi się {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",

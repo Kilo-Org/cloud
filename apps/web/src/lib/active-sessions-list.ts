@@ -2,6 +2,7 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { db } from '@/lib/drizzle';
@@ -41,6 +42,14 @@ export const activeSessionSchema = z.object({
    * has needed input, and Hermes only parses the ISO form.
    */
   statusUpdatedAt: z.string().optional(),
+  /**
+   * Wake time for a `scheduled` session, as an ISO 8601 string relayed on the
+   * live worker row. `z.object` strips undeclared keys, so the field must be
+   * declared here or the worker's value never reaches the client or the
+   * server-built glanceable snapshot. The cloud-agent candidate path has no
+   * wake time and omits the key; a `scheduled` row without one omits it too.
+   */
+  scheduledAt: z.string().optional(),
   /**
    * Capabilities advertised by the CLI connection that owns this session.
    * Omitted when the owning connection's latest heartbeat did not include a
@@ -371,7 +380,11 @@ export async function listActiveSessions({
     const url = `${SESSION_INGEST_WORKER_URL}/api/sessions/active`;
 
     try {
-      const response = await fetch(url, {
+      // Bounded: a session-ingest worker that never answers aborts inside
+      // `CONTROL_PLANE_UPSTREAM_BUDGET_MS` and rejects with
+      // `ServiceFetchTimeoutError`, which the catch below already degrades
+      // exactly as any other upstream failure does.
+      const response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

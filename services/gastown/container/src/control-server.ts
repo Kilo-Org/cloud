@@ -77,12 +77,10 @@ export const RESERVED_ENV_KEYS = new Set([
   'GASTOWN_RIG_ID',
 ]);
 
-/** Get the latest town config delivered via X-Town-Config header. */
 export function getCurrentTownConfig(): Record<string, unknown> | null {
   return lastKnownTownConfig;
 }
 
-/** Get the set of custom env var keys applied in the last sync. */
 export function getLastAppliedEnvVarKeys(): Set<string> {
   return lastAppliedEnvVarKeys;
 }
@@ -905,7 +903,6 @@ app.delete('/agents/:agentId/pty/:ptyId', c => {
 // Note: GET /agents/:agentId/pty/:ptyId/connect (WebSocket) is handled
 // in the Bun.serve fetch handler below, not through Hono.
 
-// Catch-all
 app.notFound(c => c.json({ error: 'Not found' }, 404));
 
 app.onError((err, c) => {
@@ -923,7 +920,6 @@ app.onError((err, c) => {
 export function startControlServer(): void {
   const PORT = 8080;
 
-  // Start heartbeat if env vars are configured.
   // Prefer container secret (no expiry) over session token (8h JWT).
   const apiUrl = process.env.GASTOWN_API_URL;
   const authToken = process.env.GASTOWN_CONTAINER_TOKEN ?? process.env.GASTOWN_SESSION_TOKEN;
@@ -1113,7 +1109,7 @@ export function startControlServer(): void {
             console.log(`[control-server] WebSocket subscribed to agent=${rec.agentId}`);
           }
         } catch {
-          // Ignore
+          // Ignore non-JSON client messages
         }
       },
       close(ws) {

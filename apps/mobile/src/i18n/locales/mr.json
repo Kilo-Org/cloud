@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "मागे जा",
     "idle": "निष्क्रिय",
+    "scheduled": "नियोजित",
     "keepEditing": "संपादन सुरू ठेवा",
     "keepRunning": "चालू ठेवा",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "हटवलेला वापरकर्ता",
       "replyForbiddenTerm": "तुम्हाला या {{term}}ला उत्तर देण्याची परवानगी नाही.",
       "moreLinesAbove_one": "… वर आणखी {{displayCount}} ओळ आहे.",
-      "moreLinesAbove_other": "… वर आणखी {{displayCount}} ओळी आहेत."
+      "moreLinesAbove_other": "… वर आणखी {{displayCount}} ओळी आहेत.",
+      "deleteComment": "टिप्पणी हटवा",
+      "deleteCommentTitle": "टिप्पणी हटवायची?",
+      "deleteCommentMessage": "ही टिप्पणी पुल रिक्वेस्टमधून हटवली जाईल.",
+      "commentEditFailed": "तुमची टिप्पणी जतन करता आली नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "commentEditUnavailable": "ही टिप्पणी संपादित करता येत नाही. ती हटवली गेली असू शकते.",
+      "commentDeleteFailed": "तुमची टिप्पणी हटवता आली नाही. इंटरनेट कनेक्शन तपासा आणि पुन्हा प्रयत्न करा.",
+      "commentDeleteUnavailable": "ही टिप्पणी हटवता येत नाही."
     },
     "couldNotOpenGitHubAppSettings": "GitHub अॅपच्या सेटिंग्ज उघडता आल्या नाहीत.",
     "installKiloGitHubApp": "Kilo GitHub अॅप इन्स्टॉल करा",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ही पुल रिक्वेस्ट किंवा मर्ज रिक्वेस्टची लिंक नाही",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट केली",
+      "commentUpdated": "टिप्पणी अपडेट केली",
+      "commentDeleted": "टिप्पणी हटवली",
       "reviewSubmitted": "पुनरावलोकन सादर केले",
       "autoMergeEnabled": "ऑटो-मर्ज चालू केले"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
       "couldNotRefresh": "रीफ्रेश करता आले नाही",
       "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा. तुमची सत्रे येथे दिसतील.",
+      "viewHistory": "सत्रांचा इतिहास",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",
       "tryAdjustFilters": "तुमचे फिल्टर बदलून किंवा काढून पहा.",
       "couldNotSearch": "सत्रे शोधता आली नाहीत.",
       "completedWillAppear": "पूर्ण झालेली सत्रे येथे दिसतील.",
       "noPastSessions": "मागील सत्रे नाहीत",
+      "pastSessions": "मागील सत्रे",
       "live": "थेट",
       "updating": "अपडेट होत आहे"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "मागे जा आणि मागील स्क्रीनवरून पर्याय निवडण्याची ही यादी पुन्हा उघडा."
   },
   "sessionRow": {
-    "needsInput": "प्रतिसाद आवश्यक"
+    "needsInput": "प्रतिसाद आवश्यक",
+    "scheduled": "नियोजित"
   },
   "voiceInput": {
     "listening": "ऐकत आहे...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "विश्वासार्ह होस्ट नाहीत",
     "emptyDescription": "जेव्हा तुम्ही लिंकच्या होस्टवर विश्वास ठेवता, तेव्हा ती पुन्हा न विचारता उघडते.",
     "revoke": "{{host}} वरील विश्वास रद्द करा",
+    "revokeMessage": "या होस्टच्या लिंक पुन्हा पुष्टी मागतील.",
     "backToPreferences": "प्राधान्यांवर परत जा"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "लॉक स्क्रीनवर सक्रिय एजंट्स पाहण्यासाठी सेटिंग्जमध्ये लाइव्ह अॅक्टिव्हिटी चालू करा.",
     "openSession": "उघडा",
     "approveFailed": "मंजूर करता आले नाही. पुन्हा प्रयत्न करण्यासाठी $t(common.approve) वर टॅप करा.",
-    "newestResult": "नवीनतम निकाल"
+    "newestResult": "नवीनतम निकाल",
+    "scheduledWakes": "{{time}} जागेल"
   },
   "transcriptionModel": {
     "title": "लिप्यंतरण मॉडेल",

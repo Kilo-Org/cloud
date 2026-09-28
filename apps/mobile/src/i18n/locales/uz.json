@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Orqaga qaytish",
     "idle": "Kutmoqda",
+    "scheduled": "Rejalashtirilgan",
     "keepEditing": "Tahrirlashni davom ettirish",
     "keepRunning": "To‘xtatmaslik",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "o'chirilgan foydalanuvchi",
       "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
       "moreLinesAbove_one": "… yuqorida yana {{displayCount}} ta qator bor.",
-      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor."
+      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor.",
+      "deleteComment": "Izohni o'chirish",
+      "deleteCommentTitle": "Izoh o'chirilsinmi?",
+      "deleteCommentMessage": "Bu izoh PRdan o'chiriladi.",
+      "commentEditFailed": "Izohingizni saqlab bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentEditUnavailable": "Bu izohni tahrirlab bo'lmaydi. U o'chirilgan bo'lishi mumkin.",
+      "commentDeleteFailed": "Izohingizni o'chirib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentDeleteUnavailable": "Bu izohni o'chirib bo'lmaydi."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
+      "commentUpdated": "Izoh yangilandi",
+      "commentDeleted": "Izoh o'chirildi",
       "reviewSubmitted": "Ko'rib chiqish natijasi yuborildi",
       "autoMergeEnabled": "Avtomatik birlashtirish yoqildi"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "couldNotRefresh": "Yangilab bo'lmadi",
       "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
+      "viewHistory": "Sessiyalar tarixi",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
       "tryAdjustFilters": "Filtrlarni o'zgartirib yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi.",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "Oldingi sessiyalar yo'q",
+      "pastSessions": "Oldingi sessiyalar",
       "live": "JONLI",
       "updating": "Yangilanmoqda"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Oldingi ekranga qayting va tanlash oynasini qayta oching."
   },
   "sessionRow": {
-    "needsInput": "JAVOB KUTILMOQDA"
+    "needsInput": "JAVOB KUTILMOQDA",
+    "scheduled": "REJALASHTIRILGAN"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "Ishonchli saytlar yo'q",
     "emptyDescription": "Saytni ishonchli deb belgilasangiz, uning havolalari qayta tasdiq so'ramasdan ochiladi.",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
+    "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
-    "newestResult": "Eng yangi natija"
+    "newestResult": "Eng yangi natija",
+    "scheduledWakes": "{{time}} uyg'onadi"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",

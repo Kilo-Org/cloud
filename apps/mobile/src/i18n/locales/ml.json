@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "തിരികെ പോകുക",
     "idle": "നിഷ്ക്രിയം",
+    "scheduled": "ഷെഡ്യൂൾ ചെയ്തത്",
     "keepEditing": "തിരുത്തുന്നത് തുടരുക",
     "keepRunning": "പ്രവർത്തനം തുടരുക",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ഇല്ലാതാക്കിയ ഉപയോക്താവ്",
       "replyForbiddenTerm": "ഈ {{term}}-ന് മറുപടി നൽകാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "moreLinesAbove_one": "… മുകളിൽ {{displayCount}} വരി കൂടിയുണ്ട്.",
-      "moreLinesAbove_other": "… മുകളിൽ {{displayCount}} വരികൾ കൂടിയുണ്ട്."
+      "moreLinesAbove_other": "… മുകളിൽ {{displayCount}} വരികൾ കൂടിയുണ്ട്.",
+      "deleteComment": "അഭിപ്രായം ഇല്ലാതാക്കുക",
+      "deleteCommentTitle": "അഭിപ്രായം ഇല്ലാതാക്കണോ?",
+      "deleteCommentMessage": "ഈ അഭിപ്രായം പുൾ റിക്വസ്റ്റിൽ നിന്ന് ഇല്ലാതാക്കും.",
+      "commentEditFailed": "നിങ്ങളുടെ അഭിപ്രായം സംരക്ഷിക്കാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "commentEditUnavailable": "ഈ അഭിപ്രായം തിരുത്താൻ കഴിയില്ല. അത് ഇല്ലാതാക്കിയിരിക്കാം.",
+      "commentDeleteFailed": "നിങ്ങളുടെ അഭിപ്രായം ഇല്ലാതാക്കാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+      "commentDeleteUnavailable": "ഈ അഭിപ്രായം ഇല്ലാതാക്കാൻ കഴിയില്ല."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ആപ്പിന്റെ ക്രമീകരണങ്ങൾ തുറക്കാനായില്ല.",
     "installKiloGitHubApp": "Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ഇത് പുൾ റിക്വസ്റ്റിന്റെയോ മെർജ് റിക്വസ്റ്റിന്റെയോ ലിങ്ക് അല്ല",
     "announce": {
       "commentPosted": "അഭിപ്രായം പോസ്റ്റ് ചെയ്തു",
+      "commentUpdated": "അഭിപ്രായം അപ്ഡേറ്റ് ചെയ്തു",
+      "commentDeleted": "അഭിപ്രായം ഇല്ലാതാക്കി",
       "reviewSubmitted": "അവലോകനം സമർപ്പിച്ചു",
       "autoMergeEnabled": "ഓട്ടോ-മെർജ് ഓണാക്കി"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
       "couldNotRefresh": "പുതുക്കാനായില്ല",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
+      "viewHistory": "സെഷൻ ചരിത്രം",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
       "tryDifferentSearch": "മറ്റൊരു പദം ഉപയോഗിച്ച് തിരയുക.",
       "tryAdjustFilters": "നിങ്ങളുടെ ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
       "couldNotSearch": "സെഷനുകൾ തിരയാനായില്ല.",
       "completedWillAppear": "പൂർത്തിയായ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noPastSessions": "മുൻകാല സെഷനുകളൊന്നുമില്ല",
+      "pastSessions": "മുൻകാല സെഷനുകൾ",
       "live": "തത്സമയം",
       "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "മുമ്പത്തെ സ്ക്രീനിലേക്ക് മടങ്ങി ഈ തിരഞ്ഞെടുപ്പ് ജാലകം വീണ്ടും തുറക്കുക."
   },
   "sessionRow": {
-    "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം"
+    "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
+    "scheduled": "ഷെഡ്യൂൾ ചെയ്തത്"
   },
   "voiceInput": {
     "listening": "കേൾക്കുന്നു...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "വിശ്വസനീയ ഹോസ്റ്റുകളൊന്നുമില്ല",
     "emptyDescription": "നിങ്ങൾ ഒരു ലിങ്കിന്റെ ഹോസ്റ്റിനെ വിശ്വസിച്ചാൽ, അത് വീണ്ടും ചോദിക്കാതെ തുറക്കും.",
     "revoke": "{{host}}-നുള്ള വിശ്വാസം പിൻവലിക്കുക",
+    "revokeMessage": "ഈ ഹോസ്റ്റിലേക്കുള്ള ലിങ്കുകൾ വീണ്ടും സ്ഥിരീകരണം ആവശ്യപ്പെടും.",
     "backToPreferences": "മുൻഗണനകളിലേക്ക് മടങ്ങുക"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക.",
     "openSession": "തുറക്കുക",
     "approveFailed": "അംഗീകരിക്കാനായില്ല. വീണ്ടും ശ്രമിക്കാൻ $t(common.approve) ടാപ്പ് ചെയ്യുക.",
-    "newestResult": "ഏറ്റവും പുതിയ ഫലം"
+    "newestResult": "ഏറ്റവും പുതിയ ഫലം",
+    "scheduledWakes": "{{time}} ഉണരും"
   },
   "transcriptionModel": {
     "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",

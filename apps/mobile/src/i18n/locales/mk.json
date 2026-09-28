@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Врати се назад",
     "idle": "Во мирување",
+    "scheduled": "Закажано",
     "keepEditing": "Продолжи со уредување",
     "keepRunning": "Остави да работи",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "избришан корисник",
       "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
       "moreLinesAbove_one": "… уште {{displayCount}} ред погоре",
-      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре"
+      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре",
+      "deleteComment": "Избриши коментар",
+      "deleteCommentTitle": "Да се избрише коментарот?",
+      "deleteCommentMessage": "Овој коментар ќе биде избришан од барањето за спојување.",
+      "commentEditFailed": "Не успеа да се зачува твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentEditUnavailable": "Овој коментар не може да се уреди. Можеби е избришан.",
+      "commentDeleteFailed": "Не успеа да се избрише твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentDeleteUnavailable": "Овој коментар не може да се избрише."
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
     "announce": {
       "commentPosted": "Коментарот е објавен",
+      "commentUpdated": "Коментарот е ажуриран",
+      "commentDeleted": "Коментарот е избришан",
       "reviewSubmitted": "Прегледот е испратен",
       "autoMergeEnabled": "Автоматското спојување е овозможено"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
       "couldNotRefresh": "Не успеа освежувањето",
       "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
+      "viewHistory": "Историја на сесиите",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",
       "tryAdjustFilters": "Обиди се да ги прилагодиш или исчистиш филтрите.",
       "couldNotSearch": "Не успеа пребарувањето на сесиите.",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема претходни сесии",
+      "pastSessions": "Претходни сесии",
       "live": "ВО ЖИВО",
       "updating": "Се ажурира"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Врати се на претходниот екран и повторно отвори го овој избирач."
   },
   "sessionRow": {
-    "needsInput": "ЧЕКА ВНЕС"
+    "needsInput": "ЧЕКА ВНЕС",
+    "scheduled": "ЗАКАЖАНО"
   },
   "voiceInput": {
     "listening": "Се слуша...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "Нема доверливи хостови",
     "emptyDescription": "Кога ќе додадеш хост во доверливи, линковите до него ќе се отвораат без повторна потврда.",
     "revoke": "Отстрани го {{host}} од доверливите хостови",
+    "revokeMessage": "Линковите до овој хост повторно ќе бараат потврда.",
     "backToPreferences": "Назад на поставките"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
     "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
-    "newestResult": "Најнов резултат"
+    "newestResult": "Најнов резултат",
+    "scheduledWakes": "се буди {{time}}"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",

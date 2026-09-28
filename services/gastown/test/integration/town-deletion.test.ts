@@ -22,8 +22,6 @@ describe('Town deletion (#1182)', () => {
     town = getTownStub(townName);
   });
 
-  // ── TownDO.destroy() ──────────────────────────────────────────────────
-
   describe('TownDO.destroy()', () => {
     it('should clear all storage so beads are no longer retrievable', async () => {
       await town.createBead({ type: 'issue', title: 'Doomed bead' });
@@ -35,7 +33,6 @@ describe('Town deletion (#1182)', () => {
 
       await town.destroy();
 
-      // After destroy, the same stub should find no data (storage was cleared)
       const beads = await town.listBeads({});
       expect(beads).toHaveLength(0);
     });
@@ -82,7 +79,6 @@ describe('Town deletion (#1182)', () => {
         identity: `del-agentdo-${townName}`,
       });
 
-      // Write events to the AgentDO
       const agentDO = getAgentStub(agent.id);
       await agentDO.appendEvents([{ type: 'session.start', data: JSON.stringify({ test: true }) }]);
 
@@ -91,13 +87,10 @@ describe('Town deletion (#1182)', () => {
 
       await town.destroy();
 
-      // AgentDO should have been destroyed — events cleared
       const eventsAfter = await agentDO.getEvents();
       expect(eventsAfter).toHaveLength(0);
     });
   });
-
-  // ── Alarm exit condition ────────────────────────────────────────────────
 
   describe('alarm exit condition', () => {
     it('should not re-arm alarm on a destroyed DO', async () => {
@@ -111,7 +104,6 @@ describe('Town deletion (#1182)', () => {
         userId: 'test-user',
       });
 
-      // Arm alarm
       await town.slingBead({ type: 'issue', title: 'Active bead', rigId: 'test-rig' });
       const ranBefore = await runDurableObjectAlarm(town);
       expect(ranBefore).toBe(true);
@@ -134,13 +126,10 @@ describe('Town deletion (#1182)', () => {
       const beads = await town.listBeads({});
       expect(beads).toHaveLength(0);
 
-      // Alarm should NOT have been re-armed
       const ran = await runDurableObjectAlarm(town);
       expect(ran).toBe(false);
     });
   });
-
-  // ── GastownUserDO.deleteTown() ─────────────────────────────────────────
 
   describe('GastownUserDO.deleteTown()', () => {
     it('should remove the town from the user list', async () => {
@@ -163,8 +152,6 @@ describe('Town deletion (#1182)', () => {
       expect(townsAfter).toHaveLength(0);
     });
   });
-
-  // ── Full deletion flow (tRPC-equivalent) ─────────────────────────────────
 
   describe('full deletion flow', () => {
     it('should clean up TownDO storage and user records', async () => {
@@ -194,17 +181,14 @@ describe('Town deletion (#1182)', () => {
       // 2. Remove from user's list
       await userStub.deleteTown(townId);
 
-      // Verify user-side cleanup
       const towns = await userStub.listTowns();
       expect(towns).toHaveLength(0);
 
-      // Verify TownDO-side cleanup
       const beads = await townStub.listBeads({});
       expect(beads).toHaveLength(0);
       const agents = await townStub.listAgents();
       expect(agents).toHaveLength(0);
 
-      // Verify alarm is dead
       const ran = await runDurableObjectAlarm(townStub);
       expect(ran).toBe(false);
     });

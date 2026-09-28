@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Վերադառնալ",
     "idle": "Սպասում է",
+    "scheduled": "Պլանավորված",
     "keepEditing": "Շարունակել խմբագրել",
     "keepRunning": "Շարունակել կատարումը",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ջնջված օգտատեր",
       "replyForbiddenTerm": "Այս {{term}}-ին պատասխանելու թույլտվություն չունես։",
       "moreLinesAbove_one": "… վերևում կա ևս {{displayCount}} տող։",
-      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։"
+      "moreLinesAbove_other": "… վերևում կա ևս {{displayCount}} տող։",
+      "deleteComment": "Ջնջել մեկնաբանությունը",
+      "deleteCommentTitle": "Ջնջե՞լ մեկնաբանությունը։",
+      "deleteCommentMessage": "Այս մեկնաբանությունը կջնջվի միավորման հարցումից։",
+      "commentEditFailed": "Չհաջողվեց պահպանել քո մեկնաբանությունը։ Ստուգիր կապդ և կրկին փորձիր։",
+      "commentEditUnavailable": "Այս մեկնաբանությունը հնարավոր չէ խմբագրել։ Այն կարող է ջնջված լինել։",
+      "commentDeleteFailed": "Չհաջողվեց ջնջել քո մեկնաբանությունը։ Ստուգիր կապդ և կրկին փորձիր։",
+      "commentDeleteUnavailable": "Այս մեկնաբանությունը հնարավոր չէ ջնջել։"
     },
     "couldNotOpenGitHubAppSettings": "Չհաջողվեց բացել GitHub հավելվածի կարգավորումները։",
     "installKiloGitHubApp": "Տեղադրել Kilo GitHub հավելվածը",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Սա միավորման կամ միաձուլման հարցման հղում չէ",
     "announce": {
       "commentPosted": "Մեկնաբանությունը հրապարակվել է",
+      "commentUpdated": "Մեկնաբանությունը թարմացվել է",
+      "commentDeleted": "Մեկնաբանությունը ջնջվել է",
       "reviewSubmitted": "Վերանայումն ուղարկվել է",
       "autoMergeEnabled": "Ավտոմատ միավորումը միացված է"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը։",
       "couldNotRefresh": "Չհաջողվեց թարմացնել",
       "noSessionsYetDescription": "Հեռախոսիցդ սկսիր ծրագրավորման առաջադրանք։ Քո նիստերը կհայտնվեն այստեղ։",
+      "viewHistory": "Նիստերի պատմություն",
       "noMatches": "Համապատասխան նիստեր չկան",
       "tryDifferentSearch": "Փորձիր որոնել այլ բառով։",
       "tryAdjustFilters": "Փորձիր փոխել կամ մաքրել զտիչները։",
       "couldNotSearch": "Չհաջողվեց որոնել նիստերը։",
       "completedWillAppear": "Ավարտված նիստերը կհայտնվեն այստեղ։",
       "noPastSessions": "Նախորդ նիստեր չկան",
+      "pastSessions": "Նախորդ նիստեր",
       "live": "ԱԿՏԻՎ",
       "updating": "Թարմացվում է"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Վերադարձեք նախորդ էկրան և կրկին բացեք այս ընտրիչը։"
   },
   "sessionRow": {
-    "needsInput": "ՍՊԱՍՈՒՄ Է ՊԱՏԱՍԽԱՆԻ"
+    "needsInput": "ՍՊԱՍՈՒՄ Է ՊԱՏԱՍԽԱՆԻ",
+    "scheduled": "ՊԼԱՆԱՎՈՐՎԱԾ"
   },
   "voiceInput": {
     "listening": "Լսում ենք...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "Վստահելի կայքեր չկան",
     "emptyDescription": "Երբ վստահում եք հղման կայքին, այդ կայքի հղումները բացվում են առանց կրկին հաստատում խնդրելու։",
     "revoke": "Չեղարկել վստահությունը {{host}} կայքի նկատմամբ",
+    "revokeMessage": "Այս կայքի հղումները կրկին հաստատում կպահանջեն։",
     "backToPreferences": "Վերադառնալ կարգավորումներին"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "Կարգավորումներում միացրու ընթացիկ գործողությունների ցուցադրումը՝ ակտիվ գործակալներին կողպման էկրանին տեսնելու համար։",
     "openSession": "Բացիր",
     "approveFailed": "Չհաջողվեց հաստատել։ Կրկին փորձելու համար հպեք $t(common.approve)-ին։",
-    "newestResult": "Նորագույն արդյունքը"
+    "newestResult": "Նորագույն արդյունքը",
+    "scheduledWakes": "արթնանում է {{time}}"
   },
   "transcriptionModel": {
     "title": "Տեքստի վերածման մոդել",

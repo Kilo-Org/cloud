@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Hoki whakamuri",
     "idle": "Kore mahi",
+    "scheduled": "Kua whakaritea",
     "keepEditing": "Whakatika tonu",
     "keepRunning": "Whakahaere tonu",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "kaiwhakamahi kua mukua",
       "replyForbiddenTerm": "Kāore koe e whakaaetia kia whakautu ki tēnei {{term}}.",
       "moreLinesAbove_one": "… he {{displayCount}} anō ngā rārangi kei runga.",
-      "moreLinesAbove_other": "… he {{displayCount}} anō ngā rārangi kei runga."
+      "moreLinesAbove_other": "… he {{displayCount}} anō ngā rārangi kei runga.",
+      "deleteComment": "Mukua te kōrero",
+      "deleteCommentTitle": "Mukua te kōrero?",
+      "deleteCommentMessage": "Ka mukua tēnei kōrero mai i te tono kume.",
+      "commentEditFailed": "Kāore i taea tō kōrero te tiaki. Tirohia tō hononga, ka whakamātau anō.",
+      "commentEditUnavailable": "Kāore e taea tēnei kōrero te whakatika. Kua mukua pea.",
+      "commentDeleteFailed": "Kāore i taea tō kōrero te muku. Tirohia tō hononga, ka whakamātau anō.",
+      "commentDeleteUnavailable": "Kāore e taea tēnei kōrero te muku."
     },
     "couldNotOpenGitHubAppSettings": "Kāore i taea te whakatuwhera i ngā tautuhinga o te taupānga GitHub.",
     "installKiloGitHubApp": "Tāutatia te taupānga Kilo GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ehara tēnei i te hono tono kume, tono whakakotahi rānei",
     "announce": {
       "commentPosted": "Kua tukuna te kōrero",
+      "commentUpdated": "Kua whakahōungia te kōrero",
+      "commentDeleted": "Kua mukua te kōrero",
       "reviewSubmitted": "Kua tukuna te arotake",
       "autoMergeEnabled": "Kua whakahohea te whakakotahi aunoa"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Kāore i taea te uta i ngā wātū e haere ana.",
       "couldNotRefresh": "Kāore i taea te whakahou",
       "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea. Ka puta ō wātū ki konei.",
+      "viewHistory": "Hītori wātū",
       "noMatches": "Kāore he wātū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
       "tryAdjustFilters": "Whakamātauhia te whakatika, te whakakore rānei i ō tātari.",
       "couldNotSearch": "Kāore i taea te rapu i ngā wātū.",
       "completedWillAppear": "Ka puta ngā wātū kua oti ki konei.",
       "noPastSessions": "Kāore he wātū o mua",
+      "pastSessions": "Ngā wātū o mua",
       "live": "MATAORA",
       "updating": "Kei te whakahou"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Hoki ki te mata o mua, kātahi ka whakatuwhera anō i tēnei pūkōwhiri."
   },
   "sessionRow": {
-    "needsInput": "ME WHAI URUPARE"
+    "needsInput": "ME WHAI URUPARE",
+    "scheduled": "KUA WHAKARITEA"
   },
   "voiceInput": {
     "listening": "E whakarongo ana...",
@@ -3166,6 +3179,7 @@
     "emptyTitle": "Kāore he paetukutuku whirinaki",
     "emptyDescription": "Ina whakawhirinaki koe ki te paetukutuku o tētahi hononga, ka tuwhera taua hononga me te kore pātai anō.",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
+    "revokeMessage": "Ka pātai anō ngā hononga ki tēnei paetukutuku mō te whakaaetanga.",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
   "quickChat": {
@@ -3195,7 +3209,8 @@
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati.",
     "openSession": "Tuwhera",
     "approveFailed": "Kāore i taea te whakaae. Pāwhiria $t(common.approve) hei whakamātau anō.",
-    "newestResult": "Te hua hou rawa"
+    "newestResult": "Te hua hou rawa",
+    "scheduledWakes": "ka oho {{time}}"
   },
   "transcriptionModel": {
     "title": "Tauira tuhi ā-reo",

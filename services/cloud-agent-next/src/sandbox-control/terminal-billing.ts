@@ -1,4 +1,5 @@
 import { billingContextSchema } from '@kilocode/container-usage';
+import type * as z from 'zod';
 import {
   SANDBOX_USAGE_SKUS,
   isContainersBillingClassName,
@@ -60,26 +61,93 @@ function expectedSandboxClassName(
   }
 }
 
-export function validateTerminalBillingRuntime(
-  input: TerminalBillingRuntimeInput
-): SandboxTerminalAccessResult {
-  const runtime = input.runtime;
-  if (!runtime) return { allowed: false, reason: 'billing_runtime_unavailable' };
+type BillingContext = z.infer<typeof billingContextSchema>;
+
+type BillingRuntimeGuard =
+  | { ok: true; runtime: SandboxBillingRuntimeStatus; context: BillingContext }
+  | { ok: false; reason: string };
+
+function guardBillingRuntime(
+  runtime: SandboxBillingRuntimeStatus | undefined
+): BillingRuntimeGuard {
+  if (!runtime) return { ok: false, reason: 'billing_runtime_unavailable' };
   if (runtime.running !== true) {
-    return { allowed: false, reason: 'billing_runtime_not_running' };
+    return { ok: false, reason: 'billing_runtime_not_running' };
   }
-  if (runtime.blocked !== false) return { allowed: false, reason: 'billing_blocked' };
+  if (runtime.blocked !== false) return { ok: false, reason: 'billing_blocked' };
 
   const parsed = billingContextSchema.safeParse(runtime.context);
-  if (!parsed.success) return { allowed: false, reason: 'billing_context_unavailable' };
+  if (!parsed.success) return { ok: false, reason: 'billing_context_unavailable' };
 
   const context = parsed.data;
   if (!context.measurementStarted) {
-    return { allowed: false, reason: 'billing_context_unmeasured' };
+    return { ok: false, reason: 'billing_context_unmeasured' };
   }
   if (context.pendingStop || context.stoppedObservedAtMs !== undefined) {
-    return { allowed: false, reason: 'billing_generation_inactive' };
+    return { ok: false, reason: 'billing_generation_inactive' };
   }
+
+  return { ok: true, runtime, context };
+}
+
+function matchesBillingContext(
+  context: BillingContext,
+  sandboxClassName: SandboxClassName,
+  sandboxId: string,
+  sandboxDurableObjectId: string
+): boolean {
+  return (
+    context.instanceId === sandboxId &&
+    context.service === usageServiceForSandboxClass(sandboxClassName) &&
+    context.sku === SANDBOX_USAGE_SKUS[sandboxClassName] &&
+    context.metadata?.container_class === sandboxClassName &&
+    context.metadata.durable_object_id === sandboxDurableObjectId
+  );
+}
+
+function billingAccessFailure(
+  context: BillingContext,
+  access: SandboxTerminalAccessInput,
+  sandboxId: string
+): string | undefined {
+  const expectedSubject = access.organizationId
+    ? { type: 'org' as const, id: access.organizationId }
+    : { type: 'user' as const, id: access.ownerId };
+  if (context.subject.type !== expectedSubject.type || context.subject.id !== expectedSubject.id) {
+    return 'billing_payer_mismatch';
+  }
+
+  const expectedActor = access.botId
+    ? { type: 'bot' as const, id: access.botId }
+    : { type: 'user' as const, id: access.ownerId };
+  if (context.actor.type !== expectedActor.type || context.actor.id !== expectedActor.id) {
+    return 'billing_actor_mismatch';
+  }
+  if (
+    expectedActor.type === 'bot' &&
+    (context.onBehalfOf?.type !== expectedSubject.type ||
+      context.onBehalfOf.id !== expectedSubject.id)
+  ) {
+    return 'billing_actor_mismatch';
+  }
+
+  const shared = !isIsolatedSandboxId(sandboxId);
+  if (
+    (shared && context.sessionId !== undefined) ||
+    (!shared && context.sessionId !== access.sessionId)
+  ) {
+    return 'billing_session_mismatch';
+  }
+
+  return undefined;
+}
+
+export function validateTerminalBillingRuntime(
+  input: TerminalBillingRuntimeInput
+): SandboxTerminalAccessResult {
+  const guard = guardBillingRuntime(input.runtime);
+  if (!guard.ok) return { allowed: false, reason: guard.reason };
+  const { runtime, context } = guard;
 
   const providerRef = decodeCloudflareProviderRef(input.providerInstanceId);
   if (providerRef?.sandboxId !== input.sandboxId) {
@@ -89,43 +157,13 @@ export function validateTerminalBillingRuntime(
   if (
     sandboxClassName === undefined ||
     runtime.sandboxClassName !== sandboxClassName ||
-    context.instanceId !== input.sandboxId ||
-    context.service !== usageServiceForSandboxClass(sandboxClassName) ||
-    context.sku !== SANDBOX_USAGE_SKUS[sandboxClassName] ||
-    context.metadata?.container_class !== sandboxClassName ||
-    context.metadata.durable_object_id !== input.sandboxDurableObjectId
+    !matchesBillingContext(context, sandboxClassName, input.sandboxId, input.sandboxDurableObjectId)
   ) {
     return { allowed: false, reason: 'billing_runtime_mismatch' };
   }
 
-  const expectedSubject = input.access.organizationId
-    ? { type: 'org' as const, id: input.access.organizationId }
-    : { type: 'user' as const, id: input.access.ownerId };
-  if (context.subject.type !== expectedSubject.type || context.subject.id !== expectedSubject.id) {
-    return { allowed: false, reason: 'billing_payer_mismatch' };
-  }
-
-  const expectedActor = input.access.botId
-    ? { type: 'bot' as const, id: input.access.botId }
-    : { type: 'user' as const, id: input.access.ownerId };
-  if (context.actor.type !== expectedActor.type || context.actor.id !== expectedActor.id) {
-    return { allowed: false, reason: 'billing_actor_mismatch' };
-  }
-  if (
-    expectedActor.type === 'bot' &&
-    (context.onBehalfOf?.type !== expectedSubject.type ||
-      context.onBehalfOf.id !== expectedSubject.id)
-  ) {
-    return { allowed: false, reason: 'billing_actor_mismatch' };
-  }
-
-  const shared = !isIsolatedSandboxId(input.sandboxId);
-  if (
-    (shared && context.sessionId !== undefined) ||
-    (!shared && context.sessionId !== input.access.sessionId)
-  ) {
-    return { allowed: false, reason: 'billing_session_mismatch' };
-  }
+  const accessFailure = billingAccessFailure(context, input.access, input.sandboxId);
+  if (accessFailure) return { allowed: false, reason: accessFailure };
 
   return { allowed: true };
 }
@@ -133,73 +171,25 @@ export function validateTerminalBillingRuntime(
 export function validateContainersTerminalBillingRuntime(
   input: ContainersTerminalBillingRuntimeInput
 ): SandboxTerminalAccessResult {
-  const runtime = input.runtime;
-  if (!runtime) return { allowed: false, reason: 'billing_runtime_unavailable' };
-  if (runtime.running !== true) {
-    return { allowed: false, reason: 'billing_runtime_not_running' };
-  }
-  if (runtime.blocked !== false) return { allowed: false, reason: 'billing_blocked' };
-
-  const parsed = billingContextSchema.safeParse(runtime.context);
-  if (!parsed.success) return { allowed: false, reason: 'billing_context_unavailable' };
-
-  const context = parsed.data;
-  if (!context.measurementStarted) {
-    return { allowed: false, reason: 'billing_context_unmeasured' };
-  }
-  if (context.pendingStop || context.stoppedObservedAtMs !== undefined) {
-    return { allowed: false, reason: 'billing_generation_inactive' };
-  }
+  const guard = guardBillingRuntime(input.runtime);
+  if (!guard.ok) return { allowed: false, reason: guard.reason };
+  const { runtime, context } = guard;
 
   const providerRef = decodeCloudflareProviderRef(input.providerInstanceId);
-  if (
-    providerRef === null ||
-    providerRef.containment ||
-    classifySandboxId(providerRef.sandboxId) !== 'isolated-small'
-  ) {
+  if (providerRef === null || classifySandboxId(providerRef.sandboxId) !== 'isolated-small') {
     return { allowed: false, reason: 'billing_runtime_mismatch' };
   }
 
   const sandboxClassName = runtime.sandboxClassName;
   if (
     !isContainersBillingClassName(sandboxClassName) ||
-    context.instanceId !== input.sandboxId ||
-    context.service !== usageServiceForSandboxClass(sandboxClassName) ||
-    context.sku !== SANDBOX_USAGE_SKUS[sandboxClassName] ||
-    context.metadata?.container_class !== sandboxClassName ||
-    context.metadata.durable_object_id !== input.sandboxDurableObjectId
+    !matchesBillingContext(context, sandboxClassName, input.sandboxId, input.sandboxDurableObjectId)
   ) {
     return { allowed: false, reason: 'billing_runtime_mismatch' };
   }
 
-  const expectedSubject = input.access.organizationId
-    ? { type: 'org' as const, id: input.access.organizationId }
-    : { type: 'user' as const, id: input.access.ownerId };
-  if (context.subject.type !== expectedSubject.type || context.subject.id !== expectedSubject.id) {
-    return { allowed: false, reason: 'billing_payer_mismatch' };
-  }
-
-  const expectedActor = input.access.botId
-    ? { type: 'bot' as const, id: input.access.botId }
-    : { type: 'user' as const, id: input.access.ownerId };
-  if (context.actor.type !== expectedActor.type || context.actor.id !== expectedActor.id) {
-    return { allowed: false, reason: 'billing_actor_mismatch' };
-  }
-  if (
-    expectedActor.type === 'bot' &&
-    (context.onBehalfOf?.type !== expectedSubject.type ||
-      context.onBehalfOf.id !== expectedSubject.id)
-  ) {
-    return { allowed: false, reason: 'billing_actor_mismatch' };
-  }
-
-  const shared = !isIsolatedSandboxId(input.sandboxId);
-  if (
-    (shared && context.sessionId !== undefined) ||
-    (!shared && context.sessionId !== input.access.sessionId)
-  ) {
-    return { allowed: false, reason: 'billing_session_mismatch' };
-  }
+  const accessFailure = billingAccessFailure(context, input.access, input.sandboxId);
+  if (accessFailure) return { allowed: false, reason: accessFailure };
 
   return { allowed: true };
 }

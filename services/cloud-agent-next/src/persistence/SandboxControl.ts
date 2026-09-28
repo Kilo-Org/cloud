@@ -34,6 +34,7 @@ import {
 import { getSandbox } from '@cloudflare/sandbox';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationInstance,
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -184,6 +185,7 @@ import {
   loadAllocation,
   loadAllocationSync,
   initialRuntimeMetadata,
+  sandboxTypeForContainersInstance,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
   saveRuntimeMetadataSync,
@@ -238,6 +240,29 @@ import {
   vercelProviderLocatorSchema,
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
+import {
+  DEFAULT_BILLING_HEARTBEAT_SECONDS,
+  clearBillingContext,
+  createContainerUsageClient,
+  getBillingContext,
+  installBillingHeartbeat,
+  type BillingContext,
+  type BillingHeartbeatController,
+} from '@kilocode/container-usage';
+import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
+import {
+  BillingScheduleTable,
+  type DueBillingSchedule,
+} from '../sandbox-control/billing-schedule.js';
+import {
+  VERCEL_BILLING_SETTLEMENT_CALLBACK,
+  VercelBilling,
+  deleteVercelBillingBinding,
+  loadVercelBillingBinding,
+  saveVercelBillingBinding,
+  type VercelBillingBinding,
+} from '../sandbox-control/vercel-billing.js';
+import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   parseVercelSandboxRuntimeConfig,
@@ -248,6 +273,7 @@ import {
   forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
   parseSandboxBillingInput,
+  vercelBillingIdentity,
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
@@ -286,6 +312,29 @@ const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
 const TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS = 60 * 60 * 1000;
+/** The lifecycle schedules this callback; the control alarm dispatches it. */
+const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
+const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
+
+/**
+ * A Vercel billing admission that may succeed once the outstanding generation
+ * settles. The caller's `isRetryableDeliveryError` accepts it because its own
+ * `retryable === true` field survives the DO RPC: the Worker's compatibility
+ * date is after enhanced error serialization. `reconstructControlRequestError`
+ * is not involved here; it only reconstructs `control.request` rejections, not
+ * `ensureReady`. The definite rejection keeps `AgentSandboxUnavailableError`,
+ * which is not retryable.
+ */
+class VercelBillingRetryableError extends Error {
+  readonly code = 'billing_blocked';
+  readonly retryable = true;
+  readonly admission = 'not-admitted';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'VercelBillingRetryableError';
+  }
+}
 
 const sandboxAcquisitionSchema = z.object({
   id: z.string().min(1).max(128),
@@ -656,10 +705,30 @@ export class SandboxControl extends DurableObject<Env> {
   private readonly lifecycleOperations = new Set<Promise<unknown>>();
   private worktreeDeletionChain: Promise<unknown> = Promise.resolve();
   private operationalInitialization: Promise<void> | null = null;
+  /**
+   * The Vercel billing continuation table. It is constructed eagerly (storage and
+   * compose only) so `scheduleAlarm` can read its snapshot, and hydrated in
+   * `ensureOperationalInitialized` before any compose.
+   */
+  private readonly billingSchedule: BillingScheduleTable;
+  private vercelBilling:
+    | {
+        identity: BillingIdentity | undefined;
+        lifecycle: MeteredBillingLifecycle;
+        heartbeat: BillingHeartbeatController;
+        billing: VercelBilling;
+      }
+    | undefined;
+  private vercelBillingBuild: Promise<void> | undefined;
+  private readonly vercelDeliveriesInFlight = new Set<string>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
+    this.billingSchedule = new BillingScheduleTable({
+      storage: ctx.storage,
+      recompose: () => this.scheduleAlarm(),
+    });
     this.provider = this.createProviderAdapter('cloudflare');
     this.ctx.setWebSocketAutoResponse(
       new WebSocketRequestResponsePair(SANDBOX_CONTROL_AUTO_PING, SANDBOX_CONTROL_AUTO_PONG)
@@ -689,6 +758,7 @@ export class SandboxControl extends DurableObject<Env> {
       resumable: this.provider.resumable,
       shouldDeferRecovery: () => this.shouldDeferRecovery(),
       onTransition: transition => this.recordAllocationTransition(transition),
+      afterDrain: () => this.afterAllocationDrain(),
     });
     this.healthController = createHealthController({
       dispatch: (event, now) => this.allocationOrchestrator.dispatch(event, now),
@@ -771,6 +841,8 @@ export class SandboxControl extends DurableObject<Env> {
       // One-time pre-cutover import, owned by the alarm module and run before
       // any anchor mutation at this boot boundary.
       await importLegacyControlAlarmAnchors(ctx.storage, Date.now());
+      // Hydrate the billing continuation before any compose reads its snapshot.
+      await this.billingSchedule.load();
       this.vercelLocator = vercelProviderLocatorSchema
         .optional()
         .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
@@ -853,7 +925,18 @@ export class SandboxControl extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.ensureOperationalInitialized();
-    if (this.runtimeDeleted) return;
+    if (this.runtimeDeleted) {
+      // The provider runtime is gone, but a billing continuation may still be
+      // unsettled. Run the settlement-only path: no provider, no getSession, no
+      // driveCanonicalStop. Rearm a retained continuation before returning.
+      await this.trackLifecycleOperation(
+        (async () => {
+          await this.runBillingAlarm(true);
+          await this.scheduleAlarm();
+        })()
+      );
+      return;
+    }
     await this.trackLifecycleOperation(this.runAlarm());
   }
 
@@ -889,6 +972,7 @@ export class SandboxControl extends DurableObject<Env> {
       });
     }
     await this.driveCanonicalDeadline(now);
+    await this.runBillingAlarm(false);
     await this.scheduleAlarm();
   }
 
@@ -1222,7 +1306,8 @@ export class SandboxControl extends DurableObject<Env> {
             payload: {
               ...adaptSessionAttachPayloadForWrapper(
                 sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true
+                this.socketHandler.supportsWorkingBranches?.() === true,
+                this.socketHandler.supportsGitAuthor?.() === true
               ),
               ...(this.supportsNativeRuntimeIdCapture()
                 ? { captureNativeRuntimeId: true as const }
@@ -1758,6 +1843,12 @@ export class SandboxControl extends DurableObject<Env> {
         record.state.kind === 'creating' ? record.state.target.allocationName : undefined;
       let timedOut = false;
       const startedAt = Date.now();
+      if (this.providerKind === 'vercel') {
+        // The owner of `createCommands` admits before the effect that calls
+        // `createSandbox`. The preflight is deliberately outside the try below,
+        // which maps an error to `CREATE_UNKNOWN`.
+        await this.runVercelCreatePreflight(record, billing);
+      }
       try {
         this.assertWorktreeAdmission(worktreeId);
         if (acquisition) assertAcquisitionDeadline(acquisition);
@@ -2080,6 +2171,27 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   /**
+   * The containers instance whose type the stored runtime metadata should project.
+   * `undefined` for every other provider, whose sandbox type is not an instance.
+   */
+  private containersInstanceForMetadata(): CloudflareContainersInstance | undefined {
+    return this.providerKind === 'cloudflare-containers'
+      ? (this.containersInstance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
+      : undefined;
+  }
+
+  /**
+   * Projects the containers instance type onto a stored runtime so storage
+   * converges with the launched instance. Other providers pass through unchanged.
+   */
+  private withContainersSandboxType(runtime: SandboxRuntimeMetadata): SandboxRuntimeMetadata {
+    const instance = this.containersInstanceForMetadata();
+    return instance === undefined
+      ? runtime
+      : { ...runtime, sandboxType: sandboxTypeForContainersInstance(instance) };
+  }
+
+  /**
    * Side effects of a canonical allocation commit: reset runtime metadata on a
    * fresh create, tear down the socket for an unavailable target, and re-arm the
    * control alarm. The committed transition itself is reported from the single
@@ -2102,7 +2214,10 @@ export class SandboxControl extends DurableObject<Env> {
         unavailable && (sameCanonicalAllocation(from, current) || current.state.kind === 'stopped');
       const cleanupCreating = creatingCleanup && sameCanonicalAllocation(to, current);
       if (cleanupCreating) {
-        saveRuntimeMetadataSync(kv, initialRuntimeMetadata(this.sandboxId));
+        saveRuntimeMetadataSync(
+          kv,
+          initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        );
       }
       if (cleanupCreating || cleanupUnavailable) {
         for (const key of [
@@ -2135,6 +2250,522 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     await this.scheduleAlarm();
+    await this.afterVercelBillingTransition({ deliver: false });
+  }
+
+  /**
+   * The Vercel pre-create admission. A caller that owns `createCommands` opens
+   * the billing interval before `createSandbox`, arms the durable continuation
+   * and `scheduleControlAlarm` first, then either proceeds or releases the
+   * canonical create. Shadow continues with no interval; enforcement fails
+   * closed. It never issues `createCommands` itself.
+   */
+  private async runVercelCreatePreflight(
+    record: AllocationRecord,
+    billing: SandboxBillingInput | undefined
+  ): Promise<void> {
+    if (billing === undefined) return;
+    const enforced = billing.enforcementRequested === true;
+    const existing = await getBillingContext(this.ctx.storage);
+    if (existing !== undefined) {
+      // A fresh create demand cannot coexist with an open generation. Retain it,
+      // ensure its continuation is armed and settlement-due, release this create,
+      // and let the caller retry once the generation closes. Do not gate on
+      // `pendingStop` alone: prepare marks the continuation due first.
+      await this.ensureVercelContinuation(existing.generation);
+      await this.prepareVercelSettlement(existing.generation);
+      await this.scheduleAlarm();
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new VercelBillingRetryableError(
+        'A previous Vercel sandbox generation is still settling'
+      );
+    }
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined || runtime.identity === undefined) {
+      // Unsized Vercel resources: fail closed under enforcement, record nothing in shadow.
+      if (!enforced) return;
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox billing requires a sized resource allocation',
+        'billing_blocked'
+      );
+    }
+    const outcome = await runtime.lifecycle.openIntervalBeforeCreate(runtime.identity, billing);
+    await this.armVercelContinuation(outcome.generation);
+    if (outcome.kind === 'acked') return;
+    if (outcome.kind === 'definite_rejection') {
+      await this.clearVercelBillingGeneration(outcome.generation);
+      if (!enforced) return;
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox billing requires additional credits',
+        'billing_blocked'
+      );
+    }
+    if (!enforced) return;
+    await this.failCanonicalCreate(record, 'billing_blocked');
+    await this.prepareVercelSettlement(outcome.generation);
+    throw new VercelBillingRetryableError(
+      'Vercel sandbox billing admission is temporarily unavailable'
+    );
+  }
+
+  private async armVercelContinuation(generation: string): Promise<void> {
+    await this.ensureVercelContinuation(generation);
+    await this.scheduleAlarm();
+  }
+
+  /**
+   * Arm the continuation only when the generation has no entry. The no-clobber
+   * decision is owned by the schedule table, so it cannot overwrite a concurrent
+   * `markDue`/`deferRetry`.
+   */
+  private async ensureVercelContinuation(generation: string): Promise<void> {
+    await this.billingSchedule.ensure(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
+      generation
+    );
+  }
+
+  private async clearVercelBillingGeneration(generation: string): Promise<void> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context?.generation === generation) await clearBillingContext(this.ctx.storage);
+    await deleteVercelBillingBinding(this.ctx.storage, generation);
+    await this.billingSchedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, generation);
+  }
+
+  private async recordVercelBillingLifetime(evidence: {
+    providerRef: string;
+    createdAtMs?: number;
+    terminalAtMs?: number;
+  }): Promise<void> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return;
+    const existing = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+    // Never overwrite an existing binding with a different provider ref: delayed
+    // evidence for an older generation must not rebind the current one.
+    if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
+    const allocation = await this.readCanonicalAllocation();
+    const liveRef =
+      allocation.state.kind === 'stopped' ? null : (allocation.state.target?.providerRef ?? null);
+    if (liveRef !== null) {
+      if (evidence.providerRef !== liveRef) return;
+    } else {
+      // No live target ref: only an initial lifetime discovery (the create
+      // response or an adoption) may bind. A stopped allocation or an already
+      // bound generation must not be (re)written from stale evidence, and the
+      // evidence must belong to this allocation, not a predecessor's overlap.
+      if (allocation.state.kind === 'stopped') return;
+      if (existing !== undefined) return;
+      if (evidence.createdAtMs === undefined) return;
+      const allocationName = allocation.state.target?.allocationName ?? this.sandboxId;
+      const decoded = decodeVercelProviderRef(evidence.providerRef);
+      if (decoded === null || decoded.sandboxName !== allocationName) return;
+    }
+    const createdAtMs = evidence.createdAtMs ?? existing?.createdAtMs;
+    if (createdAtMs === undefined) return;
+    const terminalAtMs = evidence.terminalAtMs ?? existing?.terminalAtMs;
+    if (
+      existing !== undefined &&
+      existing.providerRef === evidence.providerRef &&
+      existing.createdAtMs === createdAtMs &&
+      existing.terminalAtMs === terminalAtMs
+    ) {
+      return;
+    }
+    const binding: VercelBillingBinding = {
+      generation: context.generation,
+      providerRef: evidence.providerRef,
+      createdAtMs,
+      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
+    };
+    await saveVercelBillingBinding(this.ctx.storage, binding);
+  }
+
+  /** Runs after every orchestrator drain; see `afterVercelBillingTransition`. */
+  private async afterAllocationDrain(): Promise<void> {
+    await this.afterVercelBillingTransition();
+  }
+
+  /**
+   * The drain-side reconcile. A terminal allocation settles the open generation
+   * (prepare, then launch deliver after the prepare returns); an allocated
+   * generation with a create-response lifetime pins the measurement cursor.
+   * `deliver: false` is the commit-side variant used when no drain ran: it only
+   * prepares and rearms, and the alarm launches the delivery.
+   */
+  private async afterVercelBillingTransition(options?: { deliver?: boolean }): Promise<void> {
+    if (this.providerKind !== 'vercel' && !this.runtimeDeleted) return;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return;
+    const generation = context.generation;
+    const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
+    const allocation = await this.readCanonicalAllocation();
+    if (!this.isVercelSettlementDue(context, binding, allocation)) {
+      if (
+        allocation.state.kind === 'allocated' &&
+        binding !== undefined &&
+        !context.measurementStarted
+      ) {
+        const runtime = await this.ensureVercelBillingRuntime();
+        if (runtime !== undefined) {
+          await runtime.lifecycle.pinMeasurementCursor(generation, binding.createdAtMs);
+        }
+      }
+      return;
+    }
+    await this.prepareVercelSettlement(generation);
+    if (options?.deliver === false) {
+      await this.scheduleAlarm();
+      return;
+    }
+    await this.launchVercelSettlement(generation);
+  }
+
+  /**
+   * The single settlement-state decision: a retained stop, retained terminal
+   * evidence, or a stopped allocation means the open generation must settle.
+   */
+  private isVercelSettlementDue(
+    context: BillingContext,
+    binding: VercelBillingBinding | undefined,
+    allocation: AllocationRecord
+  ): boolean {
+    return (
+      context.pendingStop !== undefined ||
+      binding?.terminalAtMs !== undefined ||
+      allocation.state.kind === 'stopped'
+    );
+  }
+
+  /** Persist terminal evidence and mark the generation's continuation due. */
+  private async prepareVercelSettlement(generation: string): Promise<void> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) return;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) return;
+    // `VercelBilling.prepareSettlement` reloads the binding, so pass no snapshot:
+    // a caller-held one could overwrite a newer `terminalAtMs`.
+    await runtime.billing.prepareSettlement({ generation });
+  }
+
+  /**
+   * Launch a settlement delivery only when the generation's continuation is
+   * eligible and no delivery is already in flight. It always rearms a retained
+   * continuation. Returns whether a delivery started.
+   */
+  private async launchVercelSettlement(generation: string): Promise<boolean> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) return false;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) return false;
+    if (this.vercelDeliveriesInFlight.has(generation)) {
+      // A delivery is already running. Defer so the continuation is not left due:
+      // `runAlarm` always re-arms, so a due entry would re-enter this method on
+      // every wake and spin until the delivery settles.
+      await this.billingSchedule.deferRetry(
+        VERCEL_BILLING_SETTLEMENT_CALLBACK,
+        generation,
+        Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
+      );
+      return false;
+    }
+    await this.scheduleAlarm();
+    const eligible = (await this.billingSchedule.dueEntries()).some(
+      entry => entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK && entry.payload === generation
+    );
+    if (!eligible) return false;
+    this.vercelDeliveriesInFlight.add(generation);
+    this.ctx.waitUntil(
+      runtime.billing
+        .deliverSettlement(generation)
+        .catch(error => this.deferVercelDelivery(generation, error))
+        .finally(() => this.vercelDeliveriesInFlight.delete(generation))
+    );
+    return true;
+  }
+
+  private async deferVercelDelivery(generation: string, error: unknown): Promise<void> {
+    await this.billingSchedule.deferRetry(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      generation,
+      Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
+    );
+    this.logDiagnostic(
+      'vercel_billing_delivery',
+      {
+        generation,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'warn'
+    );
+  }
+
+  /**
+   * Remove a continuation whose generation no longer has an owning context, and
+   * the generation's binding with it. Used where the context is missing or
+   * mismatched; no provider calls.
+   */
+  private async dropOrphanVercelContinuation(
+    entry: DueBillingSchedule,
+    generation: string
+  ): Promise<void> {
+    await this.billingSchedule.completeDue(entry);
+    await deleteVercelBillingBinding(this.ctx.storage, generation);
+  }
+
+  /** The billing-only alarm body for a deleted runtime, and the normal dispatch. */
+  private async runBillingAlarm(settlementOnly: boolean): Promise<void> {
+    const due = await this.billingSchedule.dueEntries();
+    if (settlementOnly) {
+      const context = await getBillingContext(this.ctx.storage);
+      for (const entry of due) {
+        const entryGeneration = typeof entry.payload === 'string' ? entry.payload : undefined;
+        if (entry.callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        if (entryGeneration === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        if (context === undefined || context.generation !== entryGeneration) {
+          // A close callback failed: the context is gone but the continuation
+          // (and maybe the binding) survived. Reconcile the orphan without any
+          // provider calls.
+          await this.dropOrphanVercelContinuation(entry, entryGeneration);
+        }
+      }
+      if (context !== undefined) {
+        const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+        const allocation = await this.readCanonicalAllocation();
+        if (this.isVercelSettlementDue(context, binding, allocation)) {
+          await this.launchVercelSettlement(context.generation);
+        }
+      }
+      return;
+    }
+    for (const entry of due) {
+      const generation = typeof entry.payload === 'string' ? entry.payload : undefined;
+      if (entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK) {
+        if (generation === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        await this.dispatchVercelContinuation(generation, entry);
+      } else if (entry.callback === VERCEL_BILLING_FORCE_STOP_CALLBACK) {
+        if (generation === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        await this.dispatchVercelForceStop(generation, entry);
+      } else {
+        await this.billingSchedule.completeDue(entry);
+      }
+    }
+  }
+
+  private async dispatchVercelContinuation(
+    generation: string,
+    entry: DueBillingSchedule
+  ): Promise<void> {
+    // Ownership first: only a missing or mismatched context proves the entry is
+    // orphaned. A missing runtime does not.
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) {
+      await this.dropOrphanVercelContinuation(entry, generation);
+      return;
+    }
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) {
+      // The generation still owns an open context and binding; the runtime just
+      // cannot be built (e.g. provider config is gone). Retain both and wake
+      // later instead of dropping valid lifetime evidence.
+      await this.deferVercelContinuation(generation);
+      return;
+    }
+    const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
+    const allocation = await this.readCanonicalAllocation();
+    if (this.isVercelSettlementDue(context, binding, allocation)) {
+      await this.launchVercelSettlement(generation);
+      return;
+    }
+    // Never measure before a real lifetime is pinned. Keep the generation but
+    // move the continuation off its expired timestamp so compose does not arm an
+    // immediate alarm on every wake.
+    if (context.measurementStarted !== true) {
+      await this.deferVercelContinuation(generation);
+      return;
+    }
+    try {
+      await runtime.heartbeat.billingHeartbeatTick(generation);
+    } catch (error) {
+      await this.deferVercelDelivery(generation, error);
+    }
+  }
+
+  /** Retain the generation's continuation and move its wake to a bounded future time. */
+  private async deferVercelContinuation(generation: string): Promise<void> {
+    await this.billingSchedule.schedule(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
+      generation
+    );
+  }
+
+  private async dispatchVercelForceStop(
+    generation: string,
+    entry: DueBillingSchedule
+  ): Promise<void> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    try {
+      if (runtime !== undefined && runtime.identity !== undefined) {
+        await runtime.lifecycle.billingForceStop(runtime.identity, generation);
+      }
+    } catch (error) {
+      this.logDiagnostic(
+        'vercel_billing_force_stop',
+        { generation, error: error instanceof Error ? error.message : String(error) },
+        'warn'
+      );
+    } finally {
+      await this.billingSchedule.completeDue(entry);
+    }
+  }
+
+  /**
+   * Build the Vercel billing runtime on first use. It needs a usage service: the
+   * sized identity supplies it, or, on a deleted runtime settling stored state,
+   * the open billing context does. A runtime with no service is not constructed.
+   */
+  private async ensureVercelBillingRuntime(): Promise<
+    | {
+        identity: BillingIdentity | undefined;
+        lifecycle: MeteredBillingLifecycle;
+        billing: VercelBilling;
+        heartbeat: BillingHeartbeatController;
+      }
+    | undefined
+  > {
+    if (this.vercelBilling !== undefined) return this.vercelBilling;
+    if (this.vercelBillingBuild !== undefined) {
+      await this.vercelBillingBuild;
+      return this.vercelBilling;
+    }
+    const sized = this.providerKind === 'vercel' && this.vercelResources !== undefined;
+    if (!sized && !this.runtimeDeleted) return undefined;
+    if (!sized && (await getBillingContext(this.ctx.storage)) === undefined) return undefined;
+    const build = this.buildVercelBillingRuntime();
+    this.vercelBillingBuild = build;
+    try {
+      await build;
+    } finally {
+      if (this.vercelBillingBuild === build) this.vercelBillingBuild = undefined;
+    }
+    return this.vercelBilling;
+  }
+
+  private async buildVercelBillingRuntime(): Promise<void> {
+    const vercelIdentity =
+      this.providerKind === 'vercel' && this.vercelResources !== undefined
+        ? vercelBillingIdentity(this.vercelResources)
+        : undefined;
+    const service = vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
+    if (service === undefined) return;
+    const identity: BillingIdentity | undefined =
+      vercelIdentity === undefined ? undefined : { sandboxClassName: vercelIdentity.className };
+    const usageClient = createContainerUsageClient(this.env.CONTAINER_USAGE_METER, { service });
+    const schedule = (delaySeconds: number, callback: string, payload?: unknown) =>
+      this.billingSchedule.schedule(callback, Date.now() + delaySeconds * 1_000, payload);
+    const deleteSchedules = (callback: string) => {
+      // Cancelling the heartbeat must not durably delete the shared settlement
+      // continuation: a reschedule replaces it. Only non-continuation callbacks
+      // (force stop) are removed here. The generation-close callback and a
+      // definite rejection own continuation removal.
+      if (callback === VERCEL_BILLING_SETTLEMENT_CALLBACK) return;
+      void this.billingSchedule.remove(callback).catch(() => undefined);
+    };
+    const getState = () => this.vercelBillingContainerState();
+    const lifecycle = new MeteredBillingLifecycle({
+      storage: this.ctx.storage,
+      usageClient,
+      schedule,
+      deleteSchedules,
+      getState,
+      isContainerRunning: () => !this.runtimeDeleted,
+      stopContainer: () => this.driveVercelBillingStop(),
+      destroyContainer: () => this.driveVercelBillingStop(),
+      durableObjectId: this.sandboxId,
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
+    const heartbeat = installBillingHeartbeat(
+      {
+        schedule,
+        deleteSchedules,
+        getState,
+      } as unknown as Parameters<typeof installBillingHeartbeat>[0],
+      {
+        client: usageClient,
+        storage: this.ctx.storage,
+        stopOnStoppedState: false,
+        deferBudgetStopFinalSettlement: true,
+        beforeHeartbeatDelivery: context => lifecycle.ensureStartAcknowledged(context),
+        beforeStopDelivery: context => lifecycle.ensureStartAcknowledged(context),
+        onGenerationClosed: context => this.vercelBilling?.billing.onGenerationClosed(context),
+        enforceBudgetStop: async (budget, expected) => {
+          if (identity === undefined) throw new Error('Vercel billing identity is unavailable');
+          await lifecycle.enforceBudgetStop(identity, budget, expected);
+        },
+        onBudgetWarning: async budget => {
+          if (identity !== undefined) await lifecycle.onBudgetWarning(identity, budget);
+        },
+      }
+    );
+    lifecycle.attachHeartbeat(heartbeat);
+    const billing = new VercelBilling({
+      storage: this.ctx.storage,
+      lifecycle,
+      heartbeat,
+      schedule: this.billingSchedule,
+    });
+    this.vercelBilling = { identity, lifecycle, heartbeat, billing };
+  }
+
+  /**
+   * The heartbeat's container state. A terminal binding is stopped at its
+   * retained terminal time; otherwise the observed session status decides. It
+   * never observes a deleted runtime.
+   */
+  private async vercelBillingContainerState(): Promise<{
+    status: string;
+    lastChange?: number;
+    exitCode?: number;
+  }> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return { status: 'running' };
+    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+    if (binding?.terminalAtMs !== undefined) {
+      return { status: 'stopped', lastChange: binding.terminalAtMs };
+    }
+    if (this.runtimeDeleted || this.providerKind !== 'vercel' || binding === undefined) {
+      return { status: 'running' };
+    }
+    try {
+      const observed = await this.provider.observe(binding.providerRef);
+      if (observed.status !== 'terminal') return { status: 'running' };
+      const refreshed = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+      const lastChange =
+        refreshed?.terminalAtMs ?? context.usageMeasuredAtMs ?? binding.createdAtMs;
+      return { status: 'stopped', lastChange };
+    } catch {
+      return { status: 'running' };
+    }
+  }
+
+  private async driveVercelBillingStop(): Promise<void> {
+    if (this.runtimeDeleted) return;
+    await this.beginStop('billing_budget');
   }
 
   async updateNetworkPolicy(input: {
@@ -3138,14 +3769,16 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     provider: AgentSandboxProvider;
   }): Promise<SandboxStatusSnapshot> {
-    const [allocation, ownerId, provider, wrapperRuntime, routes, runtime] = await Promise.all([
-      loadAllocationResult(this.ctx.storage, this.provider.resumable),
-      this.readOwner(),
-      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
-      this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
-      loadRouteTable(this.ctx.storage),
-      loadRuntimeMetadata(this.ctx.storage),
-    ]);
+    const [allocation, ownerId, provider, providerConfiguration, wrapperRuntime, routes, runtime] =
+      await Promise.all([
+        loadAllocationResult(this.ctx.storage, this.provider.resumable),
+        this.readOwner(),
+        this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+        this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
+        this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
+        loadRouteTable(this.ctx.storage),
+        loadRuntimeMetadata(this.ctx.storage),
+      ]);
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
@@ -3155,11 +3788,28 @@ export class SandboxControl extends DurableObject<Env> {
     // canonical initial record must not read as a real sleeping allocation.
     const record =
       matches && allocation.ok && allocation.source !== 'initial' ? allocation.value : null;
+    // Observation must not persist metadata. The containers instance lives on
+    // `provider_configuration`, so project its type on read; a stored
+    // `isolated-small` from the id classification never reaches the client.
+    let projectedRuntime = runtime;
+    const configuration = sandboxProviderConfigurationSchema.safeParse(providerConfiguration);
+    if (
+      projectedRuntime !== undefined &&
+      configuration.success &&
+      configuration.data.provider === 'cloudflare-containers'
+    ) {
+      projectedRuntime = {
+        ...projectedRuntime,
+        sandboxType: sandboxTypeForContainersInstance(
+          configuration.data.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+        ),
+      };
+    }
     return projectStatusSnapshot({
       allocation: record,
       ownerId,
       provider: matches ? provider : undefined,
-      runtime,
+      runtime: projectedRuntime,
       routes: [...routes.values()],
       connection: readSandboxControlConnection(
         this.ctx,
@@ -3418,6 +4068,7 @@ export class SandboxControl extends DurableObject<Env> {
       return createVercelProviderAdapter({
         sandboxName: allocationName,
         config: config && locator ? { ...config, teamId: locator.teamId } : config,
+        billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
       });
     }
     if (kind === 'cloudflare-containers') {
@@ -3669,7 +4320,10 @@ export class SandboxControl extends DurableObject<Env> {
       )
         return false;
       await saveRuntimeMetadata(this.ctx.storage, {
-        ...(storedRuntime ?? initialRuntimeMetadata(this.sandboxId)),
+        ...this.withContainersSandboxType(
+          storedRuntime ??
+            initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        ),
         wrapperVersion: safeSandboxRuntimeVersion(runtime?.wrapperVersion),
         kiloCliVersion: null,
       });
@@ -3815,8 +4469,10 @@ export class SandboxControl extends DurableObject<Env> {
         )
           return undefined;
         if (payload.kilo.version !== undefined) {
-          const runtime =
-            (await loadRuntimeMetadata(this.ctx.storage)) ?? initialRuntimeMetadata(this.sandboxId);
+          const runtime = this.withContainersSandboxType(
+            (await loadRuntimeMetadata(this.ctx.storage)) ??
+              initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+          );
           const kiloCliVersion = safeSandboxRuntimeVersion(payload.kilo.version);
           if (!this.isCurrentConnection(identity)) return undefined;
           if (runtime.kiloCliVersion !== kiloCliVersion) {
@@ -5701,6 +6357,11 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async scheduleAlarm(): Promise<void> {
+    // A not-loaded snapshot is not empty: load it so compose never drops a
+    // continuation. A load failure propagates and leaves the alarm untouched.
+    if (this.billingSchedule.snapshotEarliestDue() === undefined) {
+      await this.billingSchedule.load();
+    }
     const record = await this.readCanonicalAllocation();
     const anchors = await loadControlAlarmAnchors(this.ctx.storage);
     await scheduleControlAlarm(
@@ -5712,6 +6373,7 @@ export class SandboxControl extends DurableObject<Env> {
         allocation: record,
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
+        billingDueAt: this.billingSchedule.snapshotEarliestDue() ?? null,
       }
     );
   }

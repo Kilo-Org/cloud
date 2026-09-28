@@ -39,7 +39,7 @@ file, for current detail.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**862 procedures** — **368 queries**, **494 mutations** — under **51 prefixes**.
+**865 procedures** — **369 queries**, **496 mutations** — under **52 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -81,6 +81,7 @@ each row's `summary` and `tags` are what the search matches.
 | `discord` | 4 | 1 | 3 |
 | `securityAuditLog` | 4 | 3 | 1 |
 | `slack` | 4 | 1 | 3 |
+| `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
 | `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |

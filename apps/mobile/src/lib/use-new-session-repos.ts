@@ -36,7 +36,7 @@ type UseNewSessionReposResult = {
   recents: NewSessionRepository[];
   groups: RepositoryGroup[];
   isRetrying: boolean;
-  /** True once every provider query has settled and at least one repo is visible. */
+  /** True once every provider query has settled without error and at least one repo is visible. */
   reposSettled: boolean;
   openIntegration: (platform: RepositoryPlatform) => void;
   refreshReposForceFresh: () => Promise<void>;
@@ -365,6 +365,9 @@ export function useNewSessionRepos({
     !githubQuery.isLoading &&
     !gitlabQuery.isLoading &&
     !bitbucketQuery.isLoading &&
+    !githubQuery.isError &&
+    !gitlabQuery.isError &&
+    !bitbucketQuery.isError &&
     repositories.length > 0;
 
   return {

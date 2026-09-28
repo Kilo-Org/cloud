@@ -101,6 +101,7 @@ import {
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -303,6 +304,7 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -5911,6 +5913,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
+    previous_summary_observed: boolean(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
@@ -6082,6 +6085,7 @@ export const cloud_agent_code_review_attempts = pgTable(
     terminal_reason: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    publication_status: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6104,6 +6108,11 @@ export const cloud_agent_code_review_attempts = pgTable(
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
+    ),
+    enumCheck(
+      'cloud_agent_code_review_attempts_publication_status_check',
+      table.publication_status,
+      CodeReviewPublicationStatus
     ),
   ]
 );

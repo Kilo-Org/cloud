@@ -1,0 +1,3 @@
+ALTER TABLE "cloud_agent_code_review_attempts" ADD COLUMN "publication_status" text;--> statement-breakpoint
+ALTER TABLE "cloud_agent_code_reviews" ADD COLUMN "previous_summary_observed" boolean;--> statement-breakpoint
+ALTER TABLE "cloud_agent_code_review_attempts" ADD CONSTRAINT "cloud_agent_code_review_attempts_publication_status_check" CHECK ("cloud_agent_code_review_attempts"."publication_status" IN ('published', 'unchanged', 'missing', 'unknown', 'not_applicable'));

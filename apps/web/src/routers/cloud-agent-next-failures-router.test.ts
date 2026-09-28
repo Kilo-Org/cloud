@@ -15,10 +15,11 @@ const OTHER_USER_ID = 'oauth/failures-history-other';
 
 const PERSONAL_SESSION_ID = 'agent_failures_history_personal';
 const OTHER_SESSION_ID = 'agent_failures_history_other';
+const ORG_SESSION_ID = 'agent_failures_history_org';
 
 const DIAGNOSTIC_EXPIRES_AT = '2035-02-01T00:00:00.000Z';
 
-const SESSION_IDS = [PERSONAL_SESSION_ID, OTHER_SESSION_ID];
+const SESSION_IDS = [PERSONAL_SESSION_ID, OTHER_SESSION_ID, ORG_SESSION_ID];
 
 describe('cloudAgentNextFailuresRouter', () => {
   let owner: User;
@@ -49,13 +50,13 @@ describe('cloudAgentNextFailuresRouter', () => {
         cloud_agent_session_id: PERSONAL_SESSION_ID,
         kilo_user_id: owner.id,
         created_on_platform: 'cloud-agent-web',
-        title: 'Failure history session',
+        title: '=Failures report',
         git_url: 'https://github.com/example/repo',
         created_at: '2035-01-09 23:00:00+00',
       },
       {
         session_id: 'ses_failures_history_org',
-        cloud_agent_session_id: PERSONAL_SESSION_ID,
+        cloud_agent_session_id: ORG_SESSION_ID,
         organization_id: organization.id,
         kilo_user_id: otherUser.id,
         created_on_platform: 'cloud-agent-web',
@@ -151,9 +152,13 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(result.session.createdAt).toBe('2035-01-10T00:00:00.000Z');
       expect(result.session.sandboxId).toBe('usr_failures_history_sandbox');
       expect(result.session.organizationId).toBeNull();
-      expect(result.session.title).toBe('Failure history session');
+      expect(result.session.title).toBe('=Failures report');
       expect(result.session.gitUrl).toBe('https://github.com/example/repo');
-      expect(result.retention).toEqual({ runWindowDays: 90, diagnosticDays: 30 });
+      expect(result.retention).toEqual({
+        runWindowDays: 90,
+        diagnosticDays: 30,
+        historyRunLimit: 50,
+      });
 
       expect(result.setupFailure).toEqual({
         occurredAt: '2035-01-10T00:06:00.000Z',
@@ -178,6 +183,7 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(failed.userVisibleError).toBe('Agent wrapper stopped responding');
       expect(failed.diagnostic).toBe('Agent wrapper stopped responding after 30s');
       expect(failed.terminalAt).toBe('2035-01-10T00:05:00.000Z');
+      expect(failed.wrapperRunId).toBe('wrapper_failures_history');
 
       const expired = result.runs[0];
       expect(expired.diagnostic).toBeNull();
@@ -188,11 +194,17 @@ describe('cloudAgentNextFailuresRouter', () => {
       expect(completed.diagnostic).toBeNull();
     });
 
-    it('hides a foreign session', async () => {
+    it('denies a session owned by another user, even inside a shared organization', async () => {
       const otherCaller = await createCallerForUser(otherUser.id);
       await expect(
         otherCaller.cloudAgentNextFailures.getSessionFailureHistory({
           cloudAgentSessionId: PERSONAL_SESSION_ID,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      await expect(
+        caller.cloudAgentNextFailures.getSessionFailureHistory({
+          cloudAgentSessionId: ORG_SESSION_ID,
         })
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
@@ -240,9 +252,12 @@ describe('cloudAgentNextFailuresRouter', () => {
 
       const lines = file.content.trimEnd().split('\n');
       expect(lines[0]).toContain('source,occurred_at,status,stage,code');
-      expect(lines).toHaveLength(4);
+      expect(lines).toHaveLength(5);
       expect(lines[1]).toContain('setup');
+      expect(lines[1]).toContain("'=Failures report");
       expect(lines[2]).toContain('run');
+      expect(lines[3]).toContain('run');
+      expect(lines[3]).toContain('wrapper_failures_history');
     });
   });
 });

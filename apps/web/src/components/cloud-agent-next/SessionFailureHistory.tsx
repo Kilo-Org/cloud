@@ -26,7 +26,7 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
 
-  const enabled = cloudAgentSessionId.startsWith('agent_');
+  const enabled = /^(agent|workspace)_/.test(cloudAgentSessionId);
 
   const historyQuery = useQuery({
     ...trpc.cloudAgentNextFailures.getSessionFailureHistory.queryOptions(
@@ -146,7 +146,7 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
             {isDownloading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                Preparing file...
+                Preparing diagnostics...
               </>
             ) : (
               <>
@@ -175,8 +175,9 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
           </p>
         )}
         <p className="text-muted-foreground text-xs">
-          Diagnostics are stored for {history.retention.diagnosticDays} days. Failure records are
-          kept for {history.retention.runWindowDays} days.
+          The list shows the latest {history.retention.historyRunLimit} runs. Diagnostics are stored
+          for {history.retention.diagnosticDays} days. Failure records are kept for{' '}
+          {history.retention.runWindowDays} days from session creation.
         </p>
       </div>
     </section>

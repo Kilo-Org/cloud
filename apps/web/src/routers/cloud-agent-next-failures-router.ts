@@ -49,6 +49,7 @@ const failureRunSchema = z.object({
   userVisibleError: z.string().nullable(),
   diagnostic: z.string().nullable(),
   diagnosticExpiresAt: nullableIsoTimestampSchema,
+  wrapperRunId: z.string().nullable(),
 });
 
 const setupFailureSchema = z.object({
@@ -79,6 +80,7 @@ const failureHistoryOutputSchema = z.object({
   retention: z.object({
     runWindowDays: z.number().int(),
     diagnosticDays: z.number().int(),
+    historyRunLimit: z.number().int(),
   }),
 });
 
@@ -221,6 +223,7 @@ async function loadSessionFailureDetail(
       failureReason: cloud_agent_session_runs.failure_reason,
       errorMessageRedacted: cloud_agent_session_runs.error_message_redacted,
       errorExpiresAt: cloud_agent_session_runs.error_expires_at,
+      wrapperRunId: cloud_agent_session_runs.wrapper_run_id,
     })
     .from(cloud_agent_session_runs)
     .where(eq(cloud_agent_session_runs.cloud_agent_session_id, cloudAgentSessionId))
@@ -266,6 +269,7 @@ async function loadSessionFailureDetail(
       failureReason: run.failureReason ?? null,
       userVisibleError: runUserVisibleError(run.failureCode ?? null),
       ...retainedDiagnostic(run.errorMessageRedacted, run.errorExpiresAt),
+      wrapperRunId: run.wrapperRunId ?? null,
     })),
   };
 }
@@ -296,10 +300,11 @@ const CSV_HEADERS = [
 function csvEscape(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
-  if (/[",\n\r]/.test(text)) {
-    return `"${text.replaceAll('"', '""')}"`;
+  const guarded = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  if (/[",\n\r]/.test(guarded)) {
+    return `"${guarded.replaceAll('"', '""')}"`;
   }
-  return text;
+  return guarded;
 }
 
 function buildCsv(detail: SessionFailureDetail): string {
@@ -341,7 +346,7 @@ function buildCsv(detail: SessionFailureDetail): string {
       run.userVisibleError,
       run.diagnostic,
       run.messageId,
-      '',
+      run.wrapperRunId,
       run.queuedAt,
       run.dispatchAcceptedAt,
       run.agentActivityObservedAt,
@@ -383,7 +388,11 @@ export const cloudAgentNextFailuresRouter = createTRPCRouter({
       );
       return {
         ...detail,
-        retention: { runWindowDays: RUN_RETENTION_DAYS, diagnosticDays: DIAGNOSTIC_RETENTION_DAYS },
+        retention: {
+          runWindowDays: RUN_RETENTION_DAYS,
+          diagnosticDays: DIAGNOSTIC_RETENTION_DAYS,
+          historyRunLimit: RUN_HISTORY_LIMIT,
+        },
       };
     }),
 

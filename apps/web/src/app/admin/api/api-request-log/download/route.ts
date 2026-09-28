@@ -5,7 +5,7 @@ import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
-import { type ApiRequestLogR2Region, getApiRequestLogBlob } from '@/lib/r2/api-request-log';
+import { getApiRequestLogBlob } from '@/lib/r2/api-request-log';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -52,18 +52,14 @@ function isJson(value: unknown): boolean {
 
 type LoadedBody = { value: unknown } | { loadError: string };
 
-async function loadBody(
-  region: ApiRequestLogR2Region | null,
-  key: string | null,
-  legacyInlineValue: unknown
-): Promise<LoadedBody> {
-  if (region === null || key === null) {
+async function loadBody(key: string | null, legacyInlineValue: unknown): Promise<LoadedBody> {
+  if (key === null) {
     return { value: legacyInlineValue };
   }
   try {
-    return { value: await getApiRequestLogBlob(region, key) };
+    return { value: await getApiRequestLogBlob(key) };
   } catch (error) {
-    return { loadError: `Failed to load ${key} from the ${region} R2 bucket: ${String(error)}` };
+    return { loadError: `Failed to load ${key} from R2: ${String(error)}` };
   }
 }
 
@@ -203,8 +199,8 @@ export async function GET(request: NextRequest) {
       const bodies = await Promise.all(
         rows.map(async row => {
           const [request, response] = await Promise.all([
-            loadBody(row.r2_region, row.request_r2_key, row.request),
-            loadBody(row.r2_region, row.response_r2_key, row.response),
+            loadBody(row.request_r2_key, row.request),
+            loadBody(row.response_r2_key, row.response),
           ]);
           return { request, response };
         })

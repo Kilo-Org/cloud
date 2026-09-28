@@ -32,8 +32,7 @@ const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';
 const BATCH_SIZE = 25;
-const US_BUCKET = 'test-api-request-log-us';
-const EU_BUCKET = 'test-api-request-log-eu';
+const BUCKET = 'test-api-request-log';
 
 function createRequest() {
   const params = new URLSearchParams({
@@ -83,16 +82,14 @@ describe('GET /admin/api/api-request-log/download', () => {
     // keeps page two blocked until the test starts consuming the response.
     const payload = randomBytes(128 * 1024).toString('base64');
     const values = Array.from({ length: BATCH_SIZE + 1 }, (_, index) => {
-      const r2_region = index % 2 === 0 ? ('us' as const) : ('eu' as const);
-      const bucket = r2_region === 'us' ? US_BUCKET : EU_BUCKET;
       const request_r2_key = `2026-08-01/row-${index}/request.json`;
       const response_r2_key = `2026-08-01/row-${index}/response.txt`;
-      fakeR2.objects.set(`${bucket}/${request_r2_key}`, JSON.stringify({ index }));
+      fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ index }));
       fakeR2.objects.set(
-        `${bucket}/${response_r2_key}`,
+        `${BUCKET}/${response_r2_key}`,
         JSON.stringify({ output: index, payload })
       );
-      return { ...baseRow, r2_region, request_r2_key, response_r2_key };
+      return { ...baseRow, request_r2_key, response_r2_key };
     });
     const rows = await db
       .insert(api_request_log)
@@ -142,13 +139,11 @@ describe('GET /admin/api/api-request-log/download', () => {
       .values([
         {
           ...baseRow,
-          r2_region: 'eu',
           request_r2_key: 'missing/request.json',
           response_r2_key: 'missing/response.txt',
         },
         {
           ...baseRow,
-          r2_region: 'us',
           request_r2_key: 'failing/request.json',
           response_r2_key: null,
           error: { response_body_read_error: 'upstream disconnected' },
@@ -167,7 +162,7 @@ describe('GET /admin/api/api-request-log/download', () => {
 
     expect(Object.keys(entries).filter(name => name.includes(`_${missing.id}_`))).toEqual([]);
     expect(readEntry(entries, `_${failing.id}_request_load-error.txt`)).toBe(
-      'Failed to load failing/request.json from the us R2 bucket: Error: R2 unavailable'
+      'Failed to load failing/request.json from R2: Error: R2 unavailable'
     );
     expect(JSON.parse(readEntry(entries, `_${failing.id}_error.json`))).toEqual({
       response_body_read_error: 'upstream disconnected',

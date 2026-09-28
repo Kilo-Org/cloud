@@ -1,5 +1,5 @@
 {
-  "id": "0980733e-ff7e-4e5a-942e-2213a363160c",
+  "id": "20bd1b87-c2c0-4b10-9e7e-1aabec220778",
   "prevId": "4f59fcf1-5a4f-4cf5-8003-8059a1993a99",
   "version": "7",
   "dialect": "postgresql",
@@ -1586,12 +1586,6 @@
         "error": {
           "name": "error",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "r2_region": {
-          "name": "r2_region",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         },

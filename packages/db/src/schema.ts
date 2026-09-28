@@ -2822,7 +2822,6 @@ export const api_request_log = pgTable(
     /** Legacy inline response body; new rows store it in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
-    r2_region: text().$type<'us' | 'eu'>(),
     request_r2_key: text(),
     response_r2_key: text(),
   },

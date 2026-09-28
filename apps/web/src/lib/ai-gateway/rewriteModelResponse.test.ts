@@ -1475,7 +1475,7 @@ describe('rewriteModelResponse', () => {
 describe('api_request_log storage', () => {
   const fakeR2 = r2Client as unknown as FakeR2Client;
   const vercelRequestId = 'api-request-log-r2-storage-test';
-  const originalVercelRegion = process.env.VERCEL_REGION;
+  const bucket = 'test-api-request-log';
 
   async function runScheduledLogInsert() {
     expect(mockedAfter).toHaveBeenCalledTimes(1);
@@ -1519,17 +1519,10 @@ describe('api_request_log storage', () => {
 
   afterEach(async () => {
     jest.restoreAllMocks();
-    if (originalVercelRegion === undefined) {
-      delete process.env.VERCEL_REGION;
-    } else {
-      process.env.VERCEL_REGION = originalVercelRegion;
-    }
     await db.delete(api_request_log).where(eq(api_request_log.vercel_request_id, vercelRequestId));
   });
 
-  test('stores redacted request and raw response in the EU bucket outside SFO', async () => {
-    process.env.VERCEL_REGION = 'fra1';
-
+  test('stores the redacted request and raw response in R2', async () => {
     await logUpstreamError();
 
     const row = await selectLoggedRow();
@@ -1539,31 +1532,17 @@ describe('api_request_log storage', () => {
       request: null,
       response: null,
       error: null,
-      r2_region: 'eu',
     });
     expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/request\.json$/);
     expect(row.response_r2_key).toBe(row.request_r2_key?.replace('request.json', 'response.txt'));
-    expect(
-      JSON.parse(fakeR2.objects.get(`test-api-request-log-eu/${row.request_r2_key}`) ?? '')
-    ).toEqual({
+    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
       model: 'kilo-internal/my-model',
       messages: [{ role: 'user', content: 'hello' }],
       providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
     });
-    expect(fakeR2.objects.get(`test-api-request-log-eu/${row.response_r2_key}`)).toBe(
+    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
       JSON.stringify({ error: 'upstream error' })
     );
-  });
-
-  test('stores bodies in the US bucket in SFO', async () => {
-    process.env.VERCEL_REGION = 'sfo1';
-
-    await logUpstreamError();
-
-    const row = await selectLoggedRow();
-    expect(row.r2_region).toBe('us');
-    expect(fakeR2.objects.has(`test-api-request-log-us/${row.request_r2_key}`)).toBe(true);
-    expect(fakeR2.objects.has(`test-api-request-log-us/${row.response_r2_key}`)).toBe(true);
   });
 
   test('keeps the log row and records the failure when the R2 upload fails', async () => {
@@ -1574,7 +1553,6 @@ describe('api_request_log storage', () => {
     const row = await selectLoggedRow();
     expect(row).toMatchObject({
       status_code: 400,
-      r2_region: null,
       request_r2_key: null,
       response_r2_key: null,
       error: {
@@ -1584,7 +1562,6 @@ describe('api_request_log storage', () => {
   });
 
   test('records the key of a body that was uploaded when the other upload fails', async () => {
-    process.env.VERCEL_REGION = 'fra1';
     const send = fakeR2.send.bind(fakeR2);
     jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
       if (command instanceof PutObjectCommand && command.input.Key?.endsWith('/response.txt')) {
@@ -1597,11 +1574,10 @@ describe('api_request_log storage', () => {
 
     const row = await selectLoggedRow();
     expect(row).toMatchObject({
-      r2_region: 'eu',
       response_r2_key: null,
       error: { r2_upload_error: 'response: Error: R2 unavailable' },
     });
-    expect(fakeR2.objects.has(`test-api-request-log-eu/${row.request_r2_key}`)).toBe(true);
+    expect(fakeR2.objects.has(`${bucket}/${row.request_r2_key}`)).toBe(true);
   });
 });
 

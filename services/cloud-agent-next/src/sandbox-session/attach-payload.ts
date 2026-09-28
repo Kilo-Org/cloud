@@ -84,10 +84,17 @@ export function buildSessionAttachPayload(
 
 export function adaptSessionAttachPayloadForWrapper(
   payload: SessionAttachPayload,
-  supportsWorkingBranches: boolean
+  supportsWorkingBranches: boolean,
+  supportsGitAuthor = false
 ): SessionAttachPayload {
-  if (supportsWorkingBranches || payload.branchMode !== 'working') return payload;
-
-  const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = payload;
-  return legacyPayload;
+  let adapted = payload;
+  if (!supportsWorkingBranches && adapted.branchMode === 'working') {
+    const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = adapted;
+    adapted = legacyPayload;
+  }
+  if (!supportsGitAuthor && adapted.git?.author) {
+    const { author: _author, ...git } = adapted.git;
+    adapted = { ...adapted, git };
+  }
+  return adapted;
 }

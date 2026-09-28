@@ -402,7 +402,7 @@ function sendHeartbeat(
     status: string;
     title: string;
     platform?: string;
-    scheduledAt?: string;
+    scheduledAt?: string | null;
     prLink?: { platform: string; prUrl: string; prNumber: number };
   }>,
   options: {
@@ -4366,6 +4366,26 @@ describe('UserConnectionDO', () => {
         { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
       ]);
       expect(result[0]).not.toHaveProperty('scheduledAt');
+    });
+
+    it('keeps the session when the CLI sends an explicit null scheduledAt', () => {
+      const { doInstance, mockCtx } = setup();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+
+      sendHeartbeat(doInstance, cliWs, [
+        { id: 's1', status: 'scheduled', title: 'Wake later', scheduledAt: null },
+        { id: 's2', status: 'busy', title: 'Working', scheduledAt: null },
+      ]);
+
+      const result = doInstance.getActiveSessions();
+      expect(result).toEqual([
+        { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
+        { id: 's2', status: 'busy', title: 'Working', connectionId: 'cli-1' },
+      ]);
+      // The explicit null reads as no wake time. JSON drops the undefined
+      // value, so the row on the wire matches the omitted-field case.
+      expect(result[0].scheduledAt).toBeUndefined();
+      expect(result[1].scheduledAt).toBeUndefined();
     });
 
     it('accepts an unrecognized status without dropping the session', () => {

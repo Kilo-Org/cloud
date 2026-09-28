@@ -59,6 +59,25 @@ describe('CLIOutboundMessageSchema', () => {
     }
   });
 
+  it('parses a heartbeat session whose producer sends an explicit null wake time', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        { id: 'ses_busy', status: 'busy', title: 'Working', scheduledAt: null },
+        { id: 'ses_scheduled', status: 'scheduled', title: 'Wake later', scheduledAt: null },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions.map(session => session.scheduledAt)).toEqual([
+        undefined,
+        undefined,
+      ]);
+      expect(result.data.sessions.map(session => session.status)).toEqual(['busy', 'scheduled']);
+    }
+  });
+
   it('parses heartbeat with instance and per-session platform (kilo remote CLI)', () => {
     const msg = {
       type: 'heartbeat',

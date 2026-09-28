@@ -50,8 +50,12 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
         id: z.string(),
         status: z.string(),
         // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
-        // absent for every other status and on legacy CLIs that predate scheduling.
-        scheduledAt: z.string().optional(),
+        // absent for every other status and on legacy CLIs that predate
+        // scheduling. A producer that serializes the absent field as an explicit
+        // null, or a value that is not a time at all, reads as absent: rejecting
+        // the value would fail `CLIOutboundMessageSchema` and drop the whole
+        // heartbeat, so the session would never reach `sessions.list`.
+        scheduledAt: z.string().optional().catch(undefined),
         title: z.string(),
         gitUrl: z.string().optional(),
         gitBranch: z.string().optional(),

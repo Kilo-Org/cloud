@@ -251,10 +251,35 @@ describe('cloudflare containers provider launch', () => {
       instance: CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
       env: {
         FOO: 'bar',
+        CONTROL_WORKLOAD_LIMIT_MB: '12288',
         PROVIDER_INSTANCE_ID: REF_A,
         WRAPPER_LOG_PATH: '/tmp/kilocode-control-wrapper.log',
       },
     });
+  });
+
+  it('derives the workload limit from the selected container instance', async () => {
+    const { adapter, stub } = setup({ instance: 'standard-3' });
+
+    await adapter.launch(REF_A, {});
+
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({ CONTROL_WORKLOAD_LIMIT_MB: '8192' }),
+      })
+    );
+  });
+
+  it('keeps a caller-supplied workload limit', async () => {
+    const { adapter, stub } = setup();
+
+    await adapter.launch(REF_A, { CONTROL_WORKLOAD_LIMIT_MB: '4096' });
+
+    expect(stub.launchWrapper).toHaveBeenCalledWith(
+      expect.objectContaining({
+        env: expect.objectContaining({ CONTROL_WORKLOAD_LIMIT_MB: '4096' }),
+      })
+    );
   });
 
   it('launches the selected container instance when one is configured', async () => {

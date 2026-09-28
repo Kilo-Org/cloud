@@ -176,13 +176,18 @@ describe('repository picker Bitbucket scope note', () => {
       throw new Error('Picker search input did not mount');
     }
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('org/repo');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Pressable')).toHaveLength(1);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
   });
@@ -387,8 +392,12 @@ describe.each([
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('no matching choice');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost)).toHaveLength(0);
     if (!hasShellScrollView) {
@@ -399,8 +408,9 @@ describe.each([
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
 
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);

@@ -9,6 +9,10 @@ type StylesXml = { resources: { style: StyleGroup[] } };
 const require = createRequire(import.meta.url);
 const {
   LAUNCH_SURFACE_HAND_BACK_DELAY_MS,
+  LIGHT_NAVIGATION_BAR_ITEM,
+  LIGHT_NAVIGATION_BAR_VALUE,
+  LIGHT_STATUS_BAR_ITEM,
+  LIGHT_STATUS_BAR_VALUE,
   ON_CREATE_INJECTION,
   ON_CREATE_SUPER_CALL,
   POST_SPLASH_THEME_ITEM,
@@ -23,6 +27,10 @@ const {
   splashWindowDrawable,
 } = require('./android-splash-window-background.js') as {
   LAUNCH_SURFACE_HAND_BACK_DELAY_MS: number;
+  LIGHT_NAVIGATION_BAR_ITEM: string;
+  LIGHT_NAVIGATION_BAR_VALUE: string;
+  LIGHT_STATUS_BAR_ITEM: string;
+  LIGHT_STATUS_BAR_VALUE: string;
   ON_CREATE_INJECTION: string;
   ON_CREATE_SUPER_CALL: string;
   POST_SPLASH_THEME_ITEM: string;
@@ -115,12 +123,72 @@ describe('applySplashWindowBackground', () => {
     expect(itemsNamed(appTheme, WINDOW_BACKGROUND_ITEM)[0]?._).toBe('@color/app_background');
   });
 
+  it('requests dark status-bar icons on the launch theme', () => {
+    const styles = applySplashWindowBackground(splashStyles());
+
+    // No JS runs while the pre-React launch surface is up, so the theme itself
+    // has to ask for dark icons; the DayNight default draws them light over the
+    // light brand drawable in night mode.
+    const lightStatusBar = itemsNamed(styleNamed(styles, THEME_NAME), LIGHT_STATUS_BAR_ITEM);
+    expect(lightStatusBar).toHaveLength(1);
+    expect(lightStatusBar[0]?._).toBe(LIGHT_STATUS_BAR_VALUE);
+  });
+
+  it('requests dark status-bar icons on the post-splash theme', () => {
+    const styles = applySplashWindowBackground(splashStyles());
+
+    const lightStatusBar = itemsNamed(
+      styleNamed(styles, POST_SPLASH_THEME_NAME),
+      LIGHT_STATUS_BAR_ITEM
+    );
+    expect(lightStatusBar).toHaveLength(1);
+    expect(lightStatusBar[0]?._).toBe(LIGHT_STATUS_BAR_VALUE);
+  });
+
+  it('leaves the post-splash AppTheme status-bar appearance to the app', () => {
+    const styles = applySplashWindowBackground(splashStyles());
+
+    // expo-status-bar owns the app's own status-bar appearance; the plugin only
+    // covers the launch surface, so AppTheme must not carry the item.
+    expect(itemsNamed(styleNamed(styles, 'AppTheme'), LIGHT_STATUS_BAR_ITEM)).toHaveLength(0);
+  });
+
+  it('requests dark navigation-bar icons on both launch themes', () => {
+    const styles = applySplashWindowBackground(splashStyles());
+
+    // The 3-button navigation bar is the same light brand surface (AppTheme
+    // pins navigationBarColor transparent), and no JS sets the navigation-bar
+    // appearance, so the DayNight default drew light icons over it in night
+    // mode (explorer e4-brand-1).
+    for (const name of [THEME_NAME, POST_SPLASH_THEME_NAME]) {
+      const items = itemsNamed(styleNamed(styles, name), LIGHT_NAVIGATION_BAR_ITEM);
+      expect(items, `${name} must carry the navigation-bar item`).toHaveLength(1);
+      expect(items[0]?._).toBe(LIGHT_NAVIGATION_BAR_VALUE);
+    }
+  });
+
+  it('leaves the post-splash AppTheme navigation-bar appearance to the app', () => {
+    const styles = applySplashWindowBackground(splashStyles());
+
+    // The running app draws its own background under the transparent bar; the
+    // hand-back restores the theme default rather than pinning it here.
+    expect(itemsNamed(styleNamed(styles, 'AppTheme'), LIGHT_NAVIGATION_BAR_ITEM)).toHaveLength(0);
+  });
+
   it('is idempotent: re-applying does not duplicate style items', () => {
     const styles = applySplashWindowBackground(applySplashWindowBackground(splashStyles()));
 
     expect(itemsNamed(styleNamed(styles, THEME_NAME), WINDOW_BACKGROUND_ITEM)).toHaveLength(1);
+    expect(itemsNamed(styleNamed(styles, THEME_NAME), LIGHT_STATUS_BAR_ITEM)).toHaveLength(1);
+    expect(itemsNamed(styleNamed(styles, THEME_NAME), LIGHT_NAVIGATION_BAR_ITEM)).toHaveLength(1);
     expect(
       styles.resources.style.filter(group => group.$?.name === POST_SPLASH_THEME_NAME)
+    ).toHaveLength(1);
+    expect(
+      itemsNamed(styleNamed(styles, POST_SPLASH_THEME_NAME), LIGHT_STATUS_BAR_ITEM)
+    ).toHaveLength(1);
+    expect(
+      itemsNamed(styleNamed(styles, POST_SPLASH_THEME_NAME), LIGHT_NAVIGATION_BAR_ITEM)
     ).toHaveLength(1);
   });
 
@@ -153,6 +221,23 @@ describe('injectMainActivityLaunchSurface', () => {
     // there is exactly the bare frame this plugin exists to remove.
     expect(contents).toContain('window.decorView.postDelayed({');
     expect(contents).toContain(`${LAUNCH_SURFACE_HAND_BACK_DELAY_MS}L`);
+    // The navigation-bar appearance is restored at the same hand-back: the
+    // launch theme pins dark icons but nothing in JS restores them, and the
+    // app's own dark chrome needs light icons back in night mode.
+    expect(contents).toContain('fun restoreNavigationBarIconAppearance() {');
+    expect(contents).toContain('restoreNavigationBarIconAppearance()');
+    expect(contents).toContain(
+      'android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS'
+    );
+    expect(contents).toContain('android.content.res.Configuration.UI_MODE_NIGHT_YES');
+    // Below API 30 there is no WindowInsetsController: the same appearance bit
+    // is the legacy window flag the `windowLightNavigationBar` theme item is
+    // implemented with. Pinning that item on the post-splash theme without this
+    // path left dark icons over the near-black night-mode app background on
+    // API 27-29.
+    expect(contents).toContain('android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR');
+    expect(contents).toContain('decorView.systemUiVisibility');
+    expect(contents).toContain('android.os.Build.VERSION_CODES.R');
     // The window must never be held: the system dismisses its splash ~1 s in.
     expect(contents).not.toContain('addOnPreDrawListener');
   });

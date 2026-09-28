@@ -2242,6 +2242,65 @@ describe('moved queue scenario run isolation', () => {
   }, 15_000);
 });
 
+describe('queue-while-busy settlement contract', () => {
+  /**
+   * #6660 settles each batched follow-up through its own delivery, so completion
+   * frames can reach the client out of order. The scenario waits for every
+   * expected terminal instead of snapshotting the buffer at the last one, and
+   * asserts FIFO on `cloud.message.sent` (in-order delivery), which the DO emits
+   * head-first.
+   */
+  it('passes when completion frames arrive out of order but delivery is FIFO', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_held'),
+      sentEvent('message_second'),
+      sentEvent('message_third'),
+      completedEvent('message_third'),
+      completedEvent('message_second'),
+      completedEvent('message_held'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' });
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      api: 'unified',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.message).toContain('successful FIFO');
+  }, 15_000);
+
+  it('fails when the delivered order is not FIFO', async () => {
+    installPacedHold('message_boot', 'message_held', [
+      sentEvent('message_second'),
+      sentEvent('message_held'),
+      sentEvent('message_third'),
+      completedEvent('message_held'),
+      completedEvent('message_second'),
+      completedEvent('message_third'),
+    ]);
+    mocks.sendMessage
+      .mockResolvedValueOnce({ messageId: 'message_second', delivery: 'queued' })
+      .mockResolvedValueOnce({ messageId: 'message_third', delivery: 'queued' });
+
+    const result = await runSharedScenario(SHARED_SCENARIOS['queue-while-busy'], {
+      config,
+      conversation: '_',
+      api: 'unified',
+      timeoutMs: 5_000,
+      env: queueHttpEnvironment(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('delivery order');
+  }, 15_000);
+});
+
 describe('queue-interrupt-clears settlement contract', () => {
   it('accepts an observed sent frame whose failure reports sent', async () => {
     const result = await runInterruptClearsWith([

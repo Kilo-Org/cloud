@@ -217,13 +217,13 @@ export function MessageDetailsSheet({
                     disabled: !canCancelQueued || isCancelingQueued,
                     busy: isCancelingQueued,
                   }}
-                  className="mb-6 min-h-12 flex-row items-center justify-center gap-2 rounded-md border border-border px-4 py-3 active:opacity-70 disabled:opacity-50"
+                  className="mb-6 min-h-12 flex-row items-center justify-center gap-2 rounded-md border border-destructive px-4 py-3 active:opacity-70 disabled:opacity-50"
                   testID="message-details-cancel-queued"
                 >
                   {isCancelingQueued ? (
                     <ActivityIndicator size="small" color={colors.mutedForeground} />
                   ) : null}
-                  <Text className="text-center text-base font-medium text-foreground">
+                  <Text className="text-center text-base font-medium text-destructive">
                     {t('agentChat.messageBubble.cancelQueued')}
                   </Text>
                 </Pressable>

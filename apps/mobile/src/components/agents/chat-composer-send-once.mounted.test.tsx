@@ -254,17 +254,20 @@ async function mountComposer(
 type SendControl = { disabled: boolean; press: () => void };
 
 function sendControl(root: TestRenderer.ReactTestInstance, label = 'Send message'): SendControl {
+  // The composer input carries the same text as an accessibility label for the
+  // field whose native hint now lives in an overlay, so the send control is the
+  // matching node that also carries the press handler.
   const matches = root.findAll(
-    node => typeof node.type === 'string' && node.props.accessibilityLabel === label
+    node =>
+      typeof node.type === 'string' &&
+      node.props.accessibilityLabel === label &&
+      typeof (node.props as { onPress?: unknown }).onPress === 'function'
   );
   const node = matches[0];
   if (node === undefined) {
     throw new Error(`pressable "${label}" not found`);
   }
-  const props = node.props as { disabled?: boolean; onPress?: () => void };
-  if (props.onPress === undefined) {
-    throw new Error(`pressable "${label}" has no onPress`);
-  }
+  const props = node.props as { disabled?: boolean; onPress: () => void };
   return { disabled: props.disabled === true, press: props.onPress };
 }
 

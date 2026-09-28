@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { readStoredValue } from '@/lib/auth/secure-store-value';
+import { __resetSessionAttentionForTests, isAttentionAcked } from '@/lib/session-attention';
 
 import {
   type GlanceableSink,
@@ -32,12 +33,19 @@ const mocks = vi.hoisted(() => {
     trpc,
     loadDraft: vi.fn(),
     clearDraft: vi.fn(),
+    // The raise's app-owned notification, retired by an approve. Mocked because
+    // the real module loads expo-notifications, which this pure suite cannot.
+    dismissNeedsInputNotification: vi.fn(),
     // The publication gate `lib/glanceable/cleanup` owns: a terminal blank bump
     // and the lost-org latch, driven per case.
     blankEpoch: 0,
     orgLost: false,
   };
 });
+
+vi.mock('@/lib/needs-input-notification', () => ({
+  dismissNeedsInputNotification: mocks.dismissNeedsInputNotification,
+}));
 
 vi.mock('./cleanup', () => ({
   getTerminalBlankEpoch: () => mocks.blankEpoch,
@@ -139,16 +147,23 @@ function wireTrpc(options: {
 
 function collectSink() {
   const snapshots: GlanceableAgentsSnapshot[] = [];
+  // The start/update write, which is what raises the ongoing card in a fresh
+  // headless process: a republish that only published would leave the shade on
+  // the pre-action snapshot.
+  const started: GlanceableAgentsSnapshot[] = [];
   const sink: GlanceableSink = {
     publish: snapshot => {
       snapshots.push(snapshot);
     },
-    startOrUpdate: () => undefined,
+    startOrUpdate: snapshot => {
+      started.push(snapshot);
+    },
     endImmediate: () => undefined,
   };
   registerGlanceableSink(sink);
   return {
     snapshots,
+    started,
     release: () => {
       unregisterGlanceableSink(sink);
     },
@@ -242,10 +257,15 @@ describe('runWidgetAction', () => {
     mocks.secure.set(USER_KEY, 'user-1');
     mocks.loadDraft.mockReset();
     mocks.clearDraft.mockReset();
+    mocks.dismissNeedsInputNotification.mockReset();
     // A clear that succeeds: the failure cases override it per test.
     mocks.clearDraft.mockResolvedValue(true);
     mocks.blankEpoch = 0;
     mocks.orgLost = false;
+    // An approve records the same session-attention ack the other answer paths
+    // do, and the store is module-level: drop it so one case's answer cannot
+    // resolve another case's raise.
+    __resetSessionAttentionForTests();
     setSurfaceExtras({ newestSessionTitle: null, actionFeedback: null });
   });
 
@@ -336,7 +356,7 @@ describe('runWidgetAction', () => {
       cloudAgentSessionId: 'workspace_agent_1',
       permissions: [{ id: 'perm-1' }, { id: 'perm-2' }],
     });
-    const { snapshots, release } = collectSink();
+    const { snapshots, started, release } = collectSink();
 
     await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'approved' });
 
@@ -348,11 +368,35 @@ describe('runWidgetAction', () => {
       permissionId: 'perm-1',
       response: 'once',
     });
-    // The redraw reads the tray again: the approved wait is gone.
+    // The redraw reads the tray again: the approved wait is gone. The fixture
+    // still reports the row as `permission` — `cli_sessions_v2.status` syncs
+    // asynchronously after an answer — so the ack the press recorded is what
+    // makes the redraw count it as answered instead of showing the pre-action
+    // counts.
     expect(rpc.activeSessions.list.query).toHaveBeenCalledTimes(2);
+    expect(isAttentionAcked('waiting', 'permission')).toBe(true);
     expect(snapshots).toHaveLength(1);
-    expect(snapshots[0]).toMatchObject({ needsInput: 1, status: 'happy' });
+    expect(snapshots[0]).toMatchObject({ needsInput: 0, status: 'happy' });
+    // The card outlives the JS process, so the republish must start/update it,
+    // not only publish: a bare publish leaves a fresh headless process's shade
+    // on the pre-action snapshot.
+    expect(started).toEqual(snapshots);
+    // The answered raise's app-owned notification goes with it: nothing else
+    // retires it on this headless path.
+    expect(mocks.dismissNeedsInputNotification).toHaveBeenCalledWith('waiting');
     release();
+  });
+
+  it('leaves the raise notification alone when the approve never landed', async () => {
+    const rpc = wireTrpc({
+      sessions: [{ id: 'waiting', status: 'permission' }],
+      cloudAgentSessionId: 'workspace_agent_1',
+      permissions: [{ id: 'perm-1' }],
+    });
+    rpc.answerPermission.mutate.mockRejectedValueOnce(new Error('network'));
+
+    await expect(runWidgetAction('approve')).resolves.toEqual({ kind: 'failed' });
+    expect(mocks.dismissNeedsInputNotification).not.toHaveBeenCalled();
   });
 
   it('reports no-permission when the wait asks a free-form question', async () => {

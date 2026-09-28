@@ -261,11 +261,12 @@ export function useRemoteSpawnDispatch({
       toast.error(admission.toast);
       return;
     }
-    // Clone entry: the selected instance must advertise `sessionClone` before
-    // we send the source id. Fail before spawn (and before admitting the
-    // attempt) when the flag is missing, so the route shows the inline
-    // "cannot continue" note instead of firing a spawn that the CLI rejects.
-    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone !== true) {
+    // Clone entry: only an instance the picker reported as explicitly
+    // incapable (`sessionClone: false`) is refused before we send the source
+    // id; an unknown capability is optimistic. Fail before spawn (and before
+    // admitting the attempt) so the route shows the inline "cannot continue"
+    // note instead of firing a spawn the CLI rejects.
+    if (fields.cloneFromKiloSessionId && runOnInstance.capabilities?.sessionClone === false) {
       onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
       return;
     }
@@ -298,6 +299,26 @@ export function useRemoteSpawnDispatch({
           // the name + projectName pair). Surface the retryable copy and let
           // the next Start tap re-resolve against a refreshed list.
           toast.error(remoteSpawnRetryableToast());
+          onSpawnFailedRef.current?.();
+          return;
+        }
+        // The live row can differ from the press-time row (a rebooted host
+        // comes back on a new connectionId), and it can report an explicit
+        // refusal the press-time row did not. Re-run both admission checks
+        // against it, so a file payload or a clone source is never spawned on
+        // an instance that now refuses it. The attempt was already admitted at
+        // press time, so a refusal here fails it and re-arms the abandon guard.
+        const liveAdmission = resolveRemoteSpawnAdmission({
+          instance: live,
+          payload: submitPayload,
+        });
+        if (!liveAdmission.allowed) {
+          toast.error(liveAdmission.toast);
+          onSpawnFailedRef.current?.();
+          return;
+        }
+        if (fields.cloneFromKiloSessionId && live.capabilities?.sessionClone === false) {
+          onCloneImportFailureRef.current?.('agentChat.newSession.cliCannotContinue');
           onSpawnFailedRef.current?.();
           return;
         }

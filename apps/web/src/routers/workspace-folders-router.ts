@@ -24,6 +24,7 @@ const uuidSchema = z.uuid().transform(id => id.toLowerCase());
 const scopeInputSchema = z.object({ organizationId: uuidSchema.nullable() });
 const folderInputSchema = z.object({ folderId: uuidSchema });
 const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
+const sessionIdSchema = z.string().min(1);
 const folderOutputSchema = z.object({
   id: z.uuid(),
   name: workspaceFolderNameSchema,

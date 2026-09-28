@@ -1,4 +1,7 @@
-import { GLANCEABLE_SNAPSHOT_EXPIRY_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
+  isEligibleGlanceableWork,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { z } from 'zod';
 
 import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glanceable-delivery';
@@ -320,7 +323,7 @@ export async function refreshGlanceableSnapshot(
     needsApproval: committed.needsApproval ?? 0,
   });
 
-  const eligible = committed.running + committed.needsInput + committed.idle > 0;
+  const eligible = isEligibleGlanceableWork(committed);
   try {
     await deliverGlanceableSnapshot(scope, {
       ...deps,

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one pure helper module: payload parsing, the enrichment-preserving merges, and the status/ordering helpers share the cached-row contracts their callers and tests read together */
 /**
  * Pure helpers for the app-level active-sessions live-sync owner.
  *
@@ -62,6 +63,12 @@ type IncomingWsSession = {
   parentSessionId?: string;
   connectionId?: string;
   capabilities?: { attachments?: boolean };
+  /**
+   * ISO-8601 wake time. Only a `scheduled` row carries one, and even then the
+   * CLI may omit it. Declared so a heartbeat / sessions.list cannot drop the
+   * field the glanceable snapshot reads for the soonest wake.
+   */
+  scheduledAt?: string;
 };
 
 /** Cached active session (tRPC output); enrichment fields preserved across WS. */
@@ -141,7 +148,7 @@ export function parseCliConnectionPayload(value: unknown): CliConnectionData | n
  */
 export function parseSessionStatusUpdatedPayload(
   value: unknown
-): { sessionId: string; status: string } | null {
+): { sessionId: string; status: string; scheduledAt?: string | null } | null {
   const parsed = sessionStatusUpdatedPayloadSchema.safeParse(value);
   if (!parsed.success) {
     return null;
@@ -151,12 +158,10 @@ export function parseSessionStatusUpdatedPayload(
     return {
       sessionId: data.session.sessionId,
       status: data.status ?? data.session.status ?? '',
+      scheduledAt: data.scheduledAt ?? data.session.scheduledAt,
     };
   }
-  return {
-    sessionId: data.sessionId,
-    status: data.status ?? '',
-  };
+  return { sessionId: data.sessionId, status: data.status ?? '', scheduledAt: data.scheduledAt };
 }
 
 // ── Enrichment-preserving merge helpers ──────────────────────────────
@@ -231,6 +236,9 @@ function withEnrichmentAndConnectionId(
     // only when the WS row omits the field (legacy payloads).
     capabilities: row.capabilities ?? current?.capabilities,
     ...enrichment,
+    // Wire wins, including omission: a CLI that reports `scheduled` with no
+    // wake time must show scheduled with no time, not a cached timestamp.
+    ...(row.scheduledAt === undefined ? {} : { scheduledAt: row.scheduledAt }),
   };
 }
 
@@ -315,12 +323,24 @@ export function mergeHeartbeatForActiveSessions(
  */
 export function applySessionStatusUpdated(
   current: readonly CachedActiveSession[],
-  sessionId: string,
-  status: string
+  update: { sessionId: string; status: string; scheduledAt?: string | null }
 ): CachedActiveSession[] {
-  return current.map(row =>
-    row.id === sessionId && row.status !== status ? { ...row, status } : row
-  );
+  const scheduledAt = update.status === 'scheduled' ? (update.scheduledAt ?? undefined) : undefined;
+  return current.map(row => {
+    if (row.id !== update.sessionId) {
+      return row;
+    }
+    if (row.status === update.status && row.scheduledAt === scheduledAt) {
+      return row;
+    }
+    const next: CachedActiveSession = { ...row, status: update.status };
+    if (scheduledAt === undefined) {
+      delete next.scheduledAt;
+    } else {
+      next.scheduledAt = scheduledAt;
+    }
+    return next;
+  });
 }
 
 /**
@@ -446,7 +466,7 @@ export function planLiveSystemEventActions(event: {
     return [
       {
         type: 'write',
-        updater: current => applySessionStatusUpdated(current, payload.sessionId, payload.status),
+        updater: current => applySessionStatusUpdated(current, payload),
       },
     ];
   }

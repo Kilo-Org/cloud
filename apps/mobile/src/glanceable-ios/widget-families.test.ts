@@ -64,6 +64,34 @@ describe('ActiveAgentsWidget families', () => {
     expect(footer.indexOf('statusLine')).toBeLessThan(footer.indexOf('newestResultKind'));
   });
 
+  it('draws the scheduled row and its wake in every family that draws counts', () => {
+    const layout = read(__dirname, 'active-agents-widget.tsx');
+    // One row builder draws every count line, and both families that draw the
+    // rows map their counts through it: the Lock Screen rectangle with the
+    // compact flag, the Home Screen families through `systemRows`. So the
+    // scheduled row appears wherever needs-input, running and idle do.
+    expect(layout).toContain("scheduled: { icon: 'clock'");
+    expect(layout).toMatch(/line\.kind === 'scheduled'[\s\S]*?date=\{new Date\(timeAt\)\}/);
+    // The wake is an absolute clock time; the wait above it stays the relative
+    // duration. The medium card draws the wait and the wake, and the large card
+    // draws the wake beside its scheduled row too; the small square has room
+    // for neither. `wakeRow` is what both Home Screen cards that draw a wake
+    // share, and the `Spacer` reserves the trailing slot in every state.
+    expect(layout).toContain("let timeStyle: 'relative' | 'time' = 'relative';");
+    expect(layout).toContain("timeStyle = 'time';");
+    expect(layout).toContain("const wakeRow = wide || family === 'systemLarge';");
+    expect(layout).toMatch(/else if \(wakeRow && line\.kind === 'scheduled'\)/);
+    expect(layout).toContain('{wakeRow ? <Spacer /> : null}');
+    expect(layout).toContain('dateStyle={timeStyle}');
+    expect(layout).toContain('const scheduledAt = props.scheduledAt ?? null;');
+    expect(layout).toContain(
+      '{counts.map(line => countRow(line, line.kind === primaryKind, true))}'
+    );
+    expect(layout).toContain(
+      '{counts.map(line => countRow(line, line.kind === primaryKind, false))}'
+    );
+  });
+
   it('bakes the newestResult copy slot into the layout map', () => {
     expect(read(__dirname, 'layout-copy.ts')).toContain("i18n.t('glanceable.newestResult')");
     expect(glanceableLayoutCopy()).toHaveProperty('newestResult');

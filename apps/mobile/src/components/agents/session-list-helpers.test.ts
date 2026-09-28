@@ -14,6 +14,7 @@ import {
   composeSessionProvenanceSubtitle,
   expandPlatformFilter,
   formatMeta,
+  formatScheduledWake,
   knownPlatformBucket,
   normalisePlatformSelection,
   PLATFORM_FILTERS,
@@ -187,6 +188,28 @@ describe('formatMeta (moved helper, regression guard)', () => {
     expect(formatMeta('2024-01-01T00:00:00.000Z')).toBe(
       timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
     );
+  });
+});
+
+describe('formatScheduledWake', () => {
+  it('returns null when the timestamp does not parse', () => {
+    expect(formatScheduledWake('not-a-timestamp')).toBeNull();
+    expect(formatScheduledWake('')).toBeNull();
+    expect(formatScheduledWake('2026-13-45T99:99:99Z')).toBeNull();
+  });
+
+  it('formats a valid ISO wake as a clock time with an hour and a minute', () => {
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).toMatch(/\d/);
+    expect(wake).toContain(':');
+  });
+
+  it('follows the active language (German uses a 24-hour clock)', async () => {
+    await i18n.changeLanguage('de');
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).not.toMatch(/AM|PM/);
   });
 });
 

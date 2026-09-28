@@ -1,3 +1,7 @@
+## 1.0.12 (build 333)
+
+- fix(kilo-app): push release tags with a token that has Workflows: write (#6741)
+
 ## 1.0.12 (build 331 iOS, 332 Android)
 
 - perf(mobile): cache native manifests and cut per-frame and JS-thread work (#6626)

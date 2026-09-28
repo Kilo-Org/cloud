@@ -546,7 +546,6 @@ async function queueOverflowBody(
       );
       fillAttempt += waveSize;
       for (const result of results) {
-        if (overflowOk) break;
         if (result.kind === 'admitted') {
           if (result.ack.delivery !== 'queued') {
             return fail(
@@ -556,6 +555,10 @@ async function queueOverflowBody(
           queuedIds.push(result.ack.messageId);
           continue;
         }
+        // Keep scanning admitted results after a rejection so every message this
+        // wave enqueued is tracked by the cleanup barrier; a later after-budget
+        // rejection must not overwrite the success message either.
+        if (overflowOk) continue;
         const msg = errorMessage(result.err);
         const is429 = msg.includes('429') || /TOO_MANY_REQUESTS|PENDING_QUEUE_FULL/.test(msg);
         if (!is429) throw result.err;

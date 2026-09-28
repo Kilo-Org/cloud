@@ -1417,8 +1417,10 @@ export class SessionService {
         [`/tmp/${sessionId}/**`]: 'allow',
         [`/tmp/attachments/${sessionId}/**`]: 'allow',
         // The bundled shell tool advertises /tmp/kilo as the pre-approved temp
-        // directory for work outside the workspace. Allow it here so sessions
-        // that follow the tool guidance don't hit an external_directory deny.
+        // directory for work outside the workspace (Kilo-Org/kilocode#14189
+        // tracks rendering it session-scoped instead). Accepted cross-session
+        // exposure while shared sandboxes (org-/usr- prefixes) host multiple
+        // sessions: any session in the sandbox can read files another left here.
         '/tmp/kilo/**': 'allow',
         [`${workspacePath}/**`]: 'allow',
         [`${sessionHome}/.kilocode/skills/**`]: 'allow',

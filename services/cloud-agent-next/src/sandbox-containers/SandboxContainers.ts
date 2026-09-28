@@ -602,6 +602,7 @@ export class SandboxContainers extends DurableObject<Env> {
           if (probe === 'ambiguous') throw new WrapperExecTimeoutError();
           await this.markWrapperAttempt('not_started');
           if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
+          await this.sleepWithinDeadline(deadlineAt);
           break;
         }
         if (probe === 'found') return;

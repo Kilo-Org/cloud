@@ -477,9 +477,56 @@ describe('SandboxContainers launch', () => {
     expect(container.execCalls[0]?.cmd[0]).toBe('bun');
 
     await vi.advanceTimersByTimeAsync(1_000);
+    expect(buns).toBe(1);
+    await vi.advanceTimersByTimeAsync(999);
+    expect(buns).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
     await expect(pending).resolves.toEqual({ started: true });
     expect(buns).toBe(2);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('bun');
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('waits one poll interval before retrying a fast terminal wrapper exit', async () => {
+    vi.useFakeTimers();
+    const startedAt = Date.now();
+    const { instance, container, readRecord } = setup();
+    let resolveFirstProbe!: (proc: ExecProcess) => void;
+    let pgrepCalls = 0;
+    let buns = 0;
+    const bunStarts: number[] = [];
+    container.execHandler = cmd => {
+      if (cmd[0] === 'pgrep') {
+        pgrepCalls += 1;
+        if (pgrepCalls === 1) {
+          return new Promise<ExecProcess>(resolve => {
+            resolveFirstProbe = resolve;
+          });
+        }
+        return makeExecProcess({ exitCode: 1 });
+      }
+      buns += 1;
+      bunStarts.push(Date.now() - startedAt);
+      return buns === 1 ? makeExecProcess({ pid: 0, exitCode: 1 }) : makeExecProcess({ pid: 2 });
+    };
+
+    const pending = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(buns).toBe(1);
+    expect(pgrepCalls).toBe(1);
+
+    resolveFirstProbe(makeExecProcess({ exitCode: 1 }));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pgrepCalls).toBe(2);
+    expect(buns).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(999);
+    expect(buns).toBe(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(pending).resolves.toEqual({ started: true });
+
+    expect(buns).toBe(2);
+    expect(bunStarts).toEqual([0, 1_000]);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 

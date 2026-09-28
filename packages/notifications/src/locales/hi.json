@@ -45,7 +45,7 @@
     },
     "spendAlert": {
       "title": "खर्च अलर्ट",
-      "body": "{{scopeName}} का खर्च ${{amountUsd}} से आगे बढ़ गया"
+      "body": "{{scopeName}} का खर्च ${{amountUsd}} से अधिक हो गया"
     },
     "securityFindingNew": {
       "title": "नया सुरक्षा निष्कर्ष ({{severity}})",

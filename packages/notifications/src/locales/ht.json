@@ -45,7 +45,7 @@
     },
     "spendAlert": {
       "title": "Alèt depans",
-      "body": "Depans {{scopeName}} depase ${{amountUsd}}"
+      "body": "Depans {{scopeName}} te depase ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nouvo rezilta sekirite ({{severity}})",

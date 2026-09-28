@@ -650,6 +650,77 @@ describe('classifyAssistantFailure', () => {
       expect(classifyAssistantFailure(projectSafeAssistantError(source))).toEqual(failure);
     }
   );
+
+  // Observed in production on 2026-09-28: the SDK `APIError` carried no
+  // `statusCode`, only the provider `responseBody`. Without reading it these
+  // known provider failures collapsed into "Assistant request failed".
+  it.each([
+    {
+      label: 'a 502 provider body',
+      responseBody:
+        '{"code":502,"message":"Network connection lost.","metadata":{"error_type":"provider_unavailable"}}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'a 502 empty-response body',
+      responseBody:
+        '{"code":502,"message":"Provider returned an empty response","metadata":{"error_type":"provider_unavailable"}}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'an invalid stream name',
+      responseBody:
+        '{"code":"error","message":"Stream error occurred","name":"AI_InvalidResponseDataError"}',
+      reason: 'provider_unavailable',
+    },
+    {
+      label: 'a bodyless context-overflow token',
+      responseBody: '{"metadata":{"error_type":"context_length_exceeded"}}',
+      reason: 'context_limit',
+    },
+    {
+      label: 'a top-level error_type token',
+      responseBody: '{"error_type":"rate_limit_exceeded"}',
+      reason: 'rate_limited',
+    },
+  ] as const)('classifies $label in the provider response body', ({ responseBody, reason }) => {
+    const error = { name: 'APIError', data: { message: 'opaque provider failure', responseBody } };
+    const failure = classifyAssistantFailure(error);
+
+    expect(failure).toEqual({
+      reason,
+      safeMessage: assistantFailureMessage(reason),
+      providerOwnership: 'unknown',
+    });
+    const safeError = projectSafeAssistantError(error);
+    expect(safeError).toBe(assistantFailureMessage(reason));
+    expect(classifyAssistantFailure(safeError)).toEqual(failure);
+  });
+
+  it('prefers the explicit statusCode over the response body', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 429,
+          responseBody: '{"code":502,"metadata":{"error_type":"provider_unavailable"}}',
+        },
+      }).reason
+    ).toBe('rate_limited');
+  });
+
+  it.each(['not json', '', '[]', 'null'])('ignores an unusable response body: %j', responseBody => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+  });
 });
 
 describe('isAssistantInterrupt', () => {

@@ -15,10 +15,7 @@ import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@/lib/debugUtils';
-import type {
-  OrganizationSettings,
-  OrganizationPlan,
-} from '@/lib/organizations/organization-types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -27,7 +24,6 @@ import type {
 import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
@@ -47,7 +43,6 @@ import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.share
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -585,56 +580,18 @@ export async function captureProxyError(params: {
 // Shared Helper Functions
 // ============================================================================
 
-export type OrganizationRestrictionResult = {
-  error: NextResponse | null;
-  providerConfig?: OpenRouterProviderConfig;
-};
-
 /**
- * Checks organization-level restrictions for model and provider access.
- *
- * Provider allow list and model deny list restrictions only apply to Enterprise plans.
- * Data collection settings apply to all organization plans.
- *
- * @param params.modelId - The model ID being requested
- * @param params.settings - Organization settings (may be undefined for non-org users)
- * @param params.organizationPlan - The organization's plan type (undefined for non-org users)
- * @returns Object with error response (if blocked) and provider config to apply
+ * The organization's data collection setting as an upstream provider config.
+ * Enterprise model and provider restrictions are not applied here: the member
+ * model-access decision enforces them, including group grants that extend the
+ * organization baseline.
  */
-export function checkOrganizationModelRestrictions(params: {
-  modelId: string;
-  settings?: OrganizationSettings;
-  organizationPlan?: OrganizationPlan;
-}): OrganizationRestrictionResult {
-  if (!params.settings) return { error: null };
-
-  const normalizedModelId = normalizeModelId(params.modelId);
-
-  // Model/provider access restrictions only apply to Enterprise plans.
-  if (params.organizationPlan === 'enterprise') {
-    const modelDenyList = params.settings.model_deny_list;
-    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
-      return { error: modelNotAllowedResponse() };
-    }
-  }
-
-  const providerAllowList = params.settings.provider_allow_list;
-
-  const providerConfig: OpenRouterProviderConfig = getEffectiveProviderPrivacy(
-    undefined,
-    params.settings.data_collection
-  );
-
-  if (params.organizationPlan === 'enterprise') {
-    if (providerAllowList !== undefined) {
-      providerConfig.only = withoutVirtualProvider(providerAllowList);
-    }
-  }
-
-  return {
-    error: null,
-    providerConfig: Object.keys(providerConfig).length > 0 ? providerConfig : undefined,
-  };
+export function getOrganizationProviderPrivacy(
+  settings: OrganizationSettings | undefined
+): OpenRouterProviderConfig | undefined {
+  if (!settings) return undefined;
+  const providerConfig = getEffectiveProviderPrivacy(undefined, settings.data_collection);
+  return Object.keys(providerConfig).length > 0 ? providerConfig : undefined;
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {

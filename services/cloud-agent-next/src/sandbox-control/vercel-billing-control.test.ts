@@ -194,6 +194,7 @@ type FakeMeter = ContainerUsageRpcMethods & {
     reason: string;
   }>;
   heartbeatInputs: unknown[];
+  stopGate?: Promise<void>;
 };
 
 function billingInput(enforced: boolean) {
@@ -360,6 +361,7 @@ async function harness(
       reason: string;
     }>,
     heartbeatInputs: [] as unknown[],
+    stopGate: undefined as Promise<void> | undefined,
     async recordStart(input: { instanceId: string; startEpochMs: number }) {
       meter.startInputs.push(input);
       mocks.vercel.order.push('recordStart');
@@ -395,6 +397,7 @@ async function harness(
       reason: string;
     }) {
       meter.stopInputs.push(input);
+      if (meter.stopGate !== undefined) await meter.stopGate;
       if (meter.stopFailures > 0) {
         meter.stopFailures -= 1;
         throw new Error('meter stop unavailable');
@@ -895,6 +898,46 @@ describe('SandboxControl Vercel billing settlement', () => {
     vi.setSystemTime(retryAt);
     await h.rawAlarm();
     expect(h.meter.heartbeatInputs.length).toBeGreaterThan(before);
+  });
+
+  it('defers the continuation while a settlement delivery is in flight', async () => {
+    const h = await harness();
+    await h.create();
+    await h.flush();
+    const generation = (await billingState(h.storage)).context?.generation;
+    if (generation === undefined) throw new Error('expected an open generation');
+
+    // Settle once with a failing stop, so the continuation is retained and
+    // deferred to a bounded retry wake. The meter client makes three transport
+    // attempts per delivery, so fail all three.
+    h.meter.stopFailures = 3;
+    await h.control.beginStop('idle');
+    await h.flush();
+    expect(h.meter.stopInputs).toHaveLength(3);
+    expect((await billingState(h.storage)).context?.pendingStop).toBeDefined();
+    const retryAt = h.alarmAt;
+    if (retryAt === null) throw new Error('expected a deferred continuation');
+
+    // Retry at the deferred wake, but hold the retry delivery in flight.
+    const gate = deferred();
+    h.meter.stopGate = gate.promise;
+    vi.setSystemTime(retryAt);
+    await h.rawAlarm();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(h.meter.stopInputs).toHaveLength(4);
+
+    // A second alarm while the delivery is in flight must neither start another
+    // delivery nor leave the entry due. Leaving it due would re-arm the expired
+    // continuation on every wake, spinning the alarm until the delivery settles.
+    const startedAt = Date.now();
+    await h.rawAlarm();
+    expect(h.meter.stopInputs).toHaveLength(4);
+    expect(h.alarmAt).not.toBeNull();
+    expect(h.alarmAt as number).toBeGreaterThan(startedAt);
+
+    gate.resolve();
+    await h.flush();
+    expect((await billingState(h.storage)).context).toBeUndefined();
   });
 
   it('arms the alarm at the earliest of the allocation, credential, and billing candidates', async () => {

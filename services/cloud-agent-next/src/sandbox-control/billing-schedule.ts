@@ -177,7 +177,8 @@ export class BillingScheduleTable {
   async ensure(callback: string, dueAtMs: number, payload?: unknown): Promise<void> {
     await this.run(async () => {
       const table = await this.loadedTable();
-      if (table[callback]?.payload === payload) return;
+      const current = table[callback];
+      if (current !== undefined && current.payload === payload) return;
       const next: BillingScheduleEntries = { ...table };
       next[callback] = payload === undefined ? { dueAtMs } : { dueAtMs, payload };
       await this.deps.storage.put(VERCEL_BILLING_SCHEDULE_KEY, next);

@@ -240,6 +240,19 @@ describe('BillingScheduleTable mutations', () => {
     expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 3_000, payload: 'other' } });
   });
 
+  it('ensure arms an absent callback even without a payload', async () => {
+    const storage = memoryStorage();
+    const table = new BillingScheduleTable({ storage, recompose: async () => undefined });
+    await table.load();
+
+    await table.ensure('a', T0 + 1_000);
+    expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 1_000 } });
+
+    // A matching absent-payload entry is not clobbered.
+    await table.ensure('a', T0 + 500);
+    expect(entries(storage)).toEqual({ a: { dueAtMs: T0 + 1_000 } });
+  });
+
   it('propagates a storage write failure without marking the mutation complete', async () => {
     const storage = memoryStorage();
     let composeCalls = 0;

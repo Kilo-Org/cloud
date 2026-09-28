@@ -2459,8 +2459,18 @@ export class SandboxControl extends DurableObject<Env> {
     if (runtime === undefined) return false;
     const context = await getBillingContext(this.ctx.storage);
     if (context === undefined || context.generation !== generation) return false;
+    if (this.vercelDeliveriesInFlight.has(generation)) {
+      // A delivery is already running. Defer so the continuation is not left due:
+      // `runAlarm` always re-arms, so a due entry would re-enter this method on
+      // every wake and spin until the delivery settles.
+      await this.billingSchedule.deferRetry(
+        VERCEL_BILLING_SETTLEMENT_CALLBACK,
+        generation,
+        Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
+      );
+      return false;
+    }
     await this.scheduleAlarm();
-    if (this.vercelDeliveriesInFlight.has(generation)) return false;
     const eligible = (await this.billingSchedule.dueEntries()).some(
       entry => entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK && entry.payload === generation
     );

@@ -289,14 +289,8 @@ type RunFailureFacts = {
 
 type SetupFailureFacts = {
   source: 'setup';
-  stage: 'sandbox_identity' | 'registration' | 'initial_admission' | 'transport';
-  code:
-    | 'sandbox_id_derivation_failed'
-    | 'do_registration_rejected'
-    | 'initial_admission_rejected'
-    | 'initial_queue_full'
-    | 'invalid_initial_intent'
-    | 'do_rpc_outcome_unknown';
+  stage: CloudAgentSessionFailureStage;
+  code: CloudAgentSessionFailureCode;
   admissionCode?: CloudAgentAdmissionFailureCode;
 };
 

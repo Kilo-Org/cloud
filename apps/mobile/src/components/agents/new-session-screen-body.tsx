@@ -12,6 +12,10 @@ import { NewSessionConfigureForm } from '@/components/agents/new-session-configu
 import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
+  type NewSessionPromptSeed,
+  resolveNewSessionPromptSeedDecision,
+} from '@/components/agents/new-session-prompt-seed';
+import {
   type CloudCreateFailure,
   useNewSessionCreator,
 } from '@/components/agents/use-new-session-creator';
@@ -462,43 +466,40 @@ export function NewSessionScreenBody() {
   // the uncontrolled input, which only a remount can do. Only `restore`
   // changes the form key, so the settled path never remounts and never
   // destroys typing.
-  const [promptSeed, setPromptSeed] = useState<'pending' | 'settled' | 'restore'>('pending');
+  const [promptSeed, setPromptSeed] = useState<NewSessionPromptSeed>('pending');
+  // A prompt the user edited before the identity (and its draft load) resolved,
+  // including one they cleared back to empty. The input is uncontrolled, so
+  // this edit is already its visible text; the seed decision below and the
+  // identity-arrival persist both honor it over any stored draft.
+  const promptEditedRef = useRef(false);
   useEffect(() => {
-    if (!draftState.settled) {
-      if (promptSeed === 'pending') {
-        return;
-      }
-      // The identity or entity changed. A `restore` seed is a stored draft the
-      // input remounts away, so clear the route-owned prompt with it. A
-      // `settled` seed that still holds text is the user's own typing: the
-      // remount key stays `empty`, so the input keeps showing that text and
-      // clearing the route-owned prompt (which Start and the create body read)
-      // would desync it from the visible field. Preserve it instead — the
-      // persist effect below then saves the pre-identity prompt under the
-      // settled identity.
-      if (promptSeed === 'settled' && promptRef.current !== '') {
-        return;
-      }
+    const decision = resolveNewSessionPromptSeedDecision({
+      draftSettled: draftState.settled,
+      seed: promptSeed,
+      prompt: promptRef.current,
+      initialPrompt,
+      sharePrefillText,
+      userEdited: promptEditedRef.current,
+    });
+    if (decision.type === 'keep') {
+      return;
+    }
+    if (decision.type === 'reset') {
       promptRef.current = '';
       setHasPrompt(false);
       setPromptSeed('pending');
       return;
     }
-    if (promptSeed !== 'pending') {
-      return;
-    }
-    if (promptRef.current !== '' || !initialPrompt) {
+    if (decision.type === 'settle') {
       setPromptSeed('settled');
       return;
     }
     // `hasPrompt` is exactly what `resolveNewSessionPromptForCreate` re-derives
     // on submit, so seeding both from one value keeps the Start gate and the
     // submitted text in agreement.
-    promptRef.current = initialPrompt;
-    setHasPrompt(initialPrompt.trim().length > 0);
-    // A share prefill already seeded the first render; only a stored draft
-    // needs the remount.
-    setPromptSeed(initialPrompt === sharePrefillText ? 'settled' : 'restore');
+    promptRef.current = decision.prompt;
+    setHasPrompt(decision.hasPrompt);
+    setPromptSeed(decision.seed);
   }, [draftState.settled, initialPrompt, promptRef, promptSeed, sharePrefillText]);
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
@@ -564,6 +565,7 @@ export function NewSessionScreenBody() {
   );
 
   function handlePromptChange(text: string) {
+    promptEditedRef.current = true;
     promptRef.current = text;
     const nextHasPrompt = text.trim().length > 0;
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
@@ -576,13 +578,15 @@ export function NewSessionScreenBody() {
   // window has no account to write under and `handlePromptChange` skips the
   // save. Persist the current prompt once the identity arrives (and if it
   // changes), so text typed before the query settled survives a background or
-  // kill rather than waiting for the next keystroke.
+  // kill rather than waiting for the next keystroke. An explicit edit is
+  // persisted even when it left the prompt empty, so a pre-identity clear
+  // replaces the stored draft instead of letting it resurface later.
   useEffect(() => {
     if (isCloneEntry || !userId) {
       return;
     }
     const text = promptRef.current;
-    if (text.trim().length > 0) {
+    if (text.trim().length > 0 || promptEditedRef.current) {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
     }
   }, [userId, isCloneEntry, promptRef]);

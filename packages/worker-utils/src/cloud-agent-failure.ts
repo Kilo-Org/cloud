@@ -58,6 +58,90 @@ export const WORKSPACE_FAILURE_SUBTYPES = [
 export const WorkspaceFailureSubtypeSchema = z.enum(WORKSPACE_FAILURE_SUBTYPES);
 export type WorkspaceFailureSubtype = z.infer<typeof WorkspaceFailureSubtypeSchema>;
 
+const USER_FAILURE_MESSAGES = {
+  sandbox_connect_failed: 'Could not connect to the sandbox',
+  workspace_setup_failed: 'Workspace setup failed',
+  kilo_server_failed: 'Kilo server failed to start',
+  wrapper_start_failed: 'Agent wrapper failed to start',
+  invalid_delivery_request: 'The message could not be delivered',
+  session_metadata_missing: 'Session metadata is unavailable',
+  model_missing: 'No model was selected',
+  delivery_failure_unknown: 'The message could not be delivered',
+  wrapper_disconnected: 'Agent wrapper disconnected',
+  wrapper_no_output: 'Agent wrapper made no execution progress during the watchdog window',
+  wrapper_ping_timeout: 'Agent wrapper stopped responding',
+  wrapper_error_before_activity: 'Agent wrapper failed before processing the message',
+  assistant_error: 'Assistant request failed',
+  wrapper_error_after_activity: 'Agent wrapper failed while processing the message',
+  missing_assistant_reply: 'No assistant reply was produced',
+  payment_required: 'Assistant request failed: insufficient credits',
+  admission_billing_unavailable: 'Sandbox billing is unavailable',
+  user_interrupt: 'The message was interrupted by the user',
+  container_shutdown: 'The agent container shut down',
+  system_interrupt: 'The message was interrupted',
+  unclassified: 'The message failed',
+} as const satisfies Record<CloudAgentFailureCode, string>;
+
+const WORKSPACE_FAILURE_MESSAGES = {
+  git_clone_timeout: 'Repository clone timed out',
+  git_checkout_timeout: 'Repository checkout timed out',
+  git_authentication_failed: 'Repository authentication failed',
+  git_rate_limited: 'Repository request was rate limited',
+  git_network_failed: 'Repository network request failed',
+  git_pack_corrupt: 'Repository data is corrupt',
+  git_checkout_conflict: 'Repository checkout conflict',
+  git_branch_missing: 'Requested repository branch was not found',
+  sandbox_storage_full: 'Workspace setup failed: sandbox storage full',
+  kilo_import_timeout: 'Session import timed out',
+  kilo_import_failed: 'Session import failed',
+  setup_command_timeout: 'Setup command timed out',
+  setup_command_failed: 'Setup command failed',
+  workspace_setup_unknown: 'Workspace setup failed',
+} as const satisfies Record<WorkspaceFailureSubtype, string>;
+
+export function userVisibleFailureMessage(code: CloudAgentFailureCode): string {
+  return USER_FAILURE_MESSAGES[code];
+}
+
+export function workspaceFailureUserMessage(subtype: WorkspaceFailureSubtype): string {
+  return WORKSPACE_FAILURE_MESSAGES[subtype];
+}
+
+export const CLOUD_AGENT_SESSION_FAILURE_CODES = [
+  'sandbox_id_derivation_failed',
+  'do_registration_rejected',
+  'initial_admission_rejected',
+  'initial_queue_full',
+  'invalid_initial_intent',
+  'do_rpc_outcome_unknown',
+] as const;
+
+export const CloudAgentSessionFailureCodeSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_CODES);
+export type CloudAgentSessionFailureCode = z.infer<typeof CloudAgentSessionFailureCodeSchema>;
+
+export const CLOUD_AGENT_SESSION_FAILURE_STAGES = [
+  'sandbox_identity',
+  'registration',
+  'initial_admission',
+  'transport',
+] as const;
+
+export const CloudAgentSessionFailureStageSchema = z.enum(CLOUD_AGENT_SESSION_FAILURE_STAGES);
+export type CloudAgentSessionFailureStage = z.infer<typeof CloudAgentSessionFailureStageSchema>;
+
+export const SESSION_FAILURE_MESSAGES = {
+  sandbox_id_derivation_failed: 'Could not create the session (sandbox identity)',
+  do_registration_rejected: 'Could not create the session (registration rejected)',
+  initial_admission_rejected: 'Environment preparation failed (admission rejected)',
+  initial_queue_full: 'Environment preparation failed (queue full)',
+  invalid_initial_intent: 'Environment preparation failed (invalid initial request)',
+  do_rpc_outcome_unknown: 'Session creation outcome is unknown (transport failure)',
+} as const satisfies Record<CloudAgentSessionFailureCode, string>;
+
+export function userVisibleSessionFailureMessage(code: CloudAgentSessionFailureCode): string {
+  return SESSION_FAILURE_MESSAGES[code];
+}
+
 /**
  * Bounded admission-result codes carried across the setup failure boundary so
  * the classifier can attribute an `initial_admission` rejection. `UNKNOWN` is a

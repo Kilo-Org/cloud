@@ -26,7 +26,8 @@ jobs:
 
   check-production-db-startup:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -59,7 +60,8 @@ jobs:
 
   run-migrations:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -92,7 +94,8 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -103,7 +106,8 @@ jobs:
 
   stage-global-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -125,6 +129,7 @@ jobs:
 
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -135,25 +140,16 @@ jobs:
 
   promote-global-app:
     needs: [stage-global-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-  promote-ai-gateway:
     needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
-    uses: ./.github/workflows/promote-vercel-deployment.yml
-    with:
-      deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
-      # The gateway has no dedicated Axiom dataset. Its logs reach Axiom through
-      # the Axiom Vercel integration's drain, which feeds the shared `vercel`
-      # dataset, so annotate promotes there.
-      axiom_annotation_dataset: vercel
-      axiom_expected_project: kilocode-ai-gateway
-    secrets:
-      AXIOM_ANNOTATION_TOKEN: ${{ secrets.AXIOM_ANNOTATION_TOKEN }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
 
   deploy-workers:
     needs:
@@ -170,6 +166,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -205,7 +202,8 @@ jobs:
 
   detect-gastown-wasteland-changes:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -280,6 +278,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -339,44 +338,8 @@ jobs:
         continue-on-error: true
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
-  # The KiloClaw image and worker deploy (deploy-kiloclaw.yml) is not part of
-  # the scheduled pipeline. It runs manually via workflow_dispatch from the
-  # Actions tab.
-
-  record-deployment:
-    needs:
-      [
-        check-changes,
-        check-production-db-startup,
-        run-migrations,
-        stage-app,
-        stage-global-app,
-        stage-ai-gateway,
-        promote-app,
-        promote-global-app,
-        promote-ai-gateway,
-        deploy-workers,
-        detect-gastown-wasteland-changes,
-        deploy-gastown-wasteland,
-      ]
-    if: >-
-      ${{
-        !cancelled() &&
-        needs.check-changes.outputs.should_deploy == 'true' &&
-        needs.check-production-db-startup.result == 'success' &&
-        needs.run-migrations.result == 'success' &&
-        needs.stage-app.result == 'success' &&
-        needs.stage-global-app.result == 'success' &&
-        needs.stage-ai-gateway.result == 'success' &&
-        needs.promote-app.result == 'success' &&
-        needs.promote-global-app.result == 'success' &&
-        needs.promote-ai-gateway.result == 'success' &&
-        needs.deploy-workers.result == 'success' &&
-        needs.detect-gastown-wasteland-changes.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result)
-      }}
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # Guard: privileged workflow — only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     permissions:
       deployments: write
     steps:

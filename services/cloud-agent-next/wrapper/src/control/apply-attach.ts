@@ -614,7 +614,7 @@ async function executeSessionAttach(
             );
           }
         }
-        if (alreadyBootstrapped && attach.git) {
+        if (alreadyBootstrapped && attach.git?.author) {
           stage = 'git_setup';
           await configureWorkspaceGitAuthor(
             directory,

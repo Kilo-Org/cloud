@@ -343,7 +343,18 @@ export function isContainedSessionCredentialGrant(
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
-  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET' | 'WORKER_URL'>> &
+  Partial<
+    Pick<
+      Env,
+      | 'GIT_TOKEN_SERVICE'
+      | 'NEXTAUTH_SECRET'
+      | 'WORKER_URL'
+      | 'GITHUB_APP_SLUG'
+      | 'GITHUB_LITE_APP_SLUG'
+      | 'GITHUB_APP_BOT_USER_ID'
+      | 'GITHUB_LITE_APP_BOT_USER_ID'
+    >
+  > &
   KiloTargetEnv;
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {

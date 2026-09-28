@@ -849,10 +849,7 @@ describe('applySessionAttach', () => {
       }
     );
     expect(result.ok).toBe(true);
-    expect(gitCalls).toEqual([
-      ['config', 'user.name', 'Kilo Code Cloud'],
-      ['config', 'user.email', 'agent@kilocode.ai'],
-    ]);
+    expect(gitCalls).toEqual([]);
     expect(setupCalls).toEqual([]);
   });
 

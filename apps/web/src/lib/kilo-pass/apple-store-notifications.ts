@@ -2,6 +2,7 @@ import {
   DeliveryStatus,
   NotificationTypeV2,
   RefundPreference,
+  RevocationType,
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
@@ -43,7 +44,9 @@ import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pas
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
 import {
+  getStoreCreditConsumptionMilliunits,
   reverseStoreCreditPurchase,
+  STORE_FULL_MILLIUNITS,
   type StoreCreditReversalResult,
 } from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
@@ -113,11 +116,34 @@ async function sendAppleStoreConsumptionInformation(
   await createAppleStoreServerApiClient().sendConsumptionInformation(transactionId, request);
 }
 
-function getAppStoreKiloPassRefundConsumptionRequest(): ConsumptionRequest {
+/**
+ * Kilo Pass refunds are always declined. A credit pack asks Apple to refund
+ * only its unspent share: `consumptionPercentage` is the pack's consumed share
+ * (see `getStoreCreditConsumptionMilliunits`). A pack Kilo never granted has no
+ * share to prorate, so it is declined like a Kilo Pass.
+ */
+async function getAppStoreRefundConsumptionRequest(
+  transaction: AppleStoreDecodedTransaction
+): Promise<ConsumptionRequest> {
+  const consumptionPercentage = getStoreCreditProductByAppleProductId(transaction.productId)
+    ? await getStoreCreditConsumptionMilliunits(db, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId: transaction.transactionId,
+      })
+    : null;
+  if (consumptionPercentage === null) {
+    return {
+      customerConsented: true,
+      deliveryStatus: DeliveryStatus.DELIVERED,
+      refundPreference: RefundPreference.DECLINE,
+      sampleContentProvided: false,
+    };
+  }
   return {
     customerConsented: true,
     deliveryStatus: DeliveryStatus.DELIVERED,
-    refundPreference: RefundPreference.DECLINE,
+    consumptionPercentage,
+    refundPreference: RefundPreference.GRANT_PRORATED,
     sampleContentProvided: false,
   };
 }
@@ -783,7 +809,7 @@ export async function processAppStoreKiloPassNotification(params: {
   }
 
   if (transaction && notification.notificationType === NotificationTypeV2.CONSUMPTION_REQUEST) {
-    const consumptionRequest = getAppStoreKiloPassRefundConsumptionRequest();
+    const consumptionRequest = await getAppStoreRefundConsumptionRequest(transaction);
     await sendConsumptionInformation(transaction.transactionId, consumptionRequest);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreNotificationReceived,
@@ -795,6 +821,7 @@ export async function processAppStoreKiloPassNotification(params: {
         providerTransactionId: transaction.transactionId,
         consumptionInformationSent: true,
         refundPreference: consumptionRequest.refundPreference,
+        consumptionPercentage: consumptionRequest.consumptionPercentage ?? null,
       },
     });
   }
@@ -846,12 +873,19 @@ export async function processAppStoreKiloPassNotification(params: {
       // credits still granted, and the App Store never redelivers a processed
       // event, so the clawback would be lost permanently. The reversal is
       // idempotent, so a redelivery retries it safely — the same contract as
-      // the Google Play one-time refund branch.
+      // the Google Play one-time refund branch. A prorated refund reverses the
+      // refunded share; a full refund, a family revoke, or a missing share
+      // reverses the whole pack.
       let storeCreditReversal: StoreCreditReversalResult | null = null;
       if (getStoreCreditProductByAppleProductId(transaction.productId)) {
         storeCreditReversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.AppStore,
           providerTransactionId: transaction.transactionId,
+          refundedMilliunits:
+            transaction.revocationType === RevocationType.REFUND_PRORATED &&
+            transaction.revocationPercentage != null
+              ? transaction.revocationPercentage
+              : STORE_FULL_MILLIUNITS,
         });
       }
       await endStoreSubscription(tx, transaction);

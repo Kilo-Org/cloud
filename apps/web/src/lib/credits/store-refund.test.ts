@@ -7,7 +7,11 @@ import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { toMicrodollars } from '@/lib/utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
-import { reverseStoreCreditPurchase } from './store-refund';
+import {
+  getStoreCreditConsumptionMilliunits,
+  reverseStoreCreditPurchase,
+  STORE_FULL_MILLIUNITS,
+} from './store-refund';
 import { storeCreditPaymentId } from './store-products';
 
 async function grantStoreCreditPack(params: {
@@ -53,6 +57,7 @@ describe('reverseStoreCreditPurchase', () => {
       reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
       })
     );
 
@@ -89,6 +94,7 @@ describe('reverseStoreCreditPurchase', () => {
       reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
         providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
       })
     );
 
@@ -103,27 +109,90 @@ describe('reverseStoreCreditPurchase', () => {
     });
   });
 
-  it('is a no-op on a second reversal of the same purchase', async () => {
+  it('reverses only the refunded share of a prorated refund', async () => {
     const user = await insertTestUser();
     const providerTransactionId = `tx-${crypto.randomUUID()}`;
-    const amountMicrodollars = toMicrodollars(100);
     await grantStoreCreditPack({
       userId: user.id,
       paymentProvider: KiloPassPaymentProvider.AppStore,
       providerTransactionId,
-      amountMicrodollars,
+      amountMicrodollars: toMicrodollars(10),
+    });
+
+    const result = await db.transaction(tx =>
+      reverseStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        refundedMilliunits: 30_000,
+      })
+    );
+
+    expect(result).toEqual({
+      reversed: true,
+      creditTransactionId: expect.any(String),
+      amountMicrodollars: toMicrodollars(3),
+    });
+    expect(await userBalance(user.id)).toBe(toMicrodollars(7));
+    const reversal = await db.query.credit_transactions.findFirst({
+      where: eq(credit_transactions.id, result.creditTransactionId ?? ''),
+    });
+    expect(reversal?.amount_microdollars).toBe(-toMicrodollars(3));
+  });
+
+  it.each([
+    { refundedMilliunits: 250_000, expectedUsd: 10 },
+    { refundedMilliunits: -5_000, expectedUsd: 0 },
+  ])(
+    'keeps the reversal within 0..granted for a refunded share of $refundedMilliunits',
+    async ({ refundedMilliunits, expectedUsd }) => {
+      const user = await insertTestUser();
+      const providerTransactionId = `tx-${crypto.randomUUID()}`;
+      await grantStoreCreditPack({
+        userId: user.id,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        amountMicrodollars: toMicrodollars(10),
+      });
+
+      const result = await db.transaction(tx =>
+        reverseStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId,
+          refundedMilliunits,
+        })
+      );
+
+      expect(result.amountMicrodollars).toBe(toMicrodollars(expectedUsd));
+      expect(await userBalance(user.id)).toBe(toMicrodollars(10 - expectedUsd));
+    }
+  );
+
+  it('keeps the first reversal amount when a replay arrives after more spend', async () => {
+    const user = await insertTestUser();
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    await grantStoreCreditPack({
+      userId: user.id,
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      providerTransactionId,
+      amountMicrodollars: toMicrodollars(10),
     });
 
     const first = await db.transaction(tx =>
       reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerTransactionId,
+        refundedMilliunits: 30_000,
       })
     );
+    await db
+      .update(kilocode_users)
+      .set({ microdollars_used: toMicrodollars(5) })
+      .where(eq(kilocode_users.id, user.id));
     const second = await db.transaction(tx =>
       reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
       })
     );
 
@@ -132,8 +201,7 @@ describe('reverseStoreCreditPurchase', () => {
       creditTransactionId: first.creditTransactionId,
       amountMicrodollars: 0,
     });
-    // The balance never goes below zero through double counting.
-    expect(await userBalance(user.id)).toBe(0);
+    expect(await userBalance(user.id)).toBe(toMicrodollars(7));
 
     const reversals = await db
       .select()
@@ -145,6 +213,7 @@ describe('reverseStoreCreditPurchase', () => {
         )
       );
     expect(reversals).toHaveLength(1);
+    expect(reversals[0]?.amount_microdollars).toBe(-toMicrodollars(3));
   });
 
   it('is a no-op for a purchase Kilo never granted against', async () => {
@@ -158,6 +227,7 @@ describe('reverseStoreCreditPurchase', () => {
       reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.AppStore,
         providerTransactionId: `tx-${crypto.randomUUID()}`,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
       })
     );
 
@@ -172,5 +242,52 @@ describe('reverseStoreCreditPurchase', () => {
       .from(credit_transactions)
       .where(eq(credit_transactions.kilo_user_id, user.id));
     expect(transactions).toHaveLength(0);
+  });
+});
+
+describe('getStoreCreditConsumptionMilliunits', () => {
+  it.each([
+    { case: 'partly spent', acquiredUsd: 10, usedUsd: 7, expected: 70_000 },
+    { case: 'fully unspent', acquiredUsd: 10, usedUsd: 0, expected: 0 },
+    // Lifetime spend before the purchase is not spend from this pack.
+    { case: 'untouched after $100 prior spend', acquiredUsd: 110, usedUsd: 100, expected: 0 },
+    { case: 'unspent with other credits on top', acquiredUsd: 40, usedUsd: 15, expected: 0 },
+    { case: 'fully spent', acquiredUsd: 10, usedUsd: 10, expected: STORE_FULL_MILLIUNITS },
+    { case: 'overdrawn', acquiredUsd: 10, usedUsd: 12, expected: STORE_FULL_MILLIUNITS },
+  ])(
+    'counts a $10 pack as consumed against the balance ($case)',
+    async ({ acquiredUsd, usedUsd, expected }) => {
+      const user = await insertTestUser();
+      const providerTransactionId = `tx-${crypto.randomUUID()}`;
+      await grantStoreCreditPack({
+        userId: user.id,
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId,
+        amountMicrodollars: toMicrodollars(10),
+      });
+      await db
+        .update(kilocode_users)
+        .set({
+          total_microdollars_acquired: toMicrodollars(acquiredUsd),
+          microdollars_used: toMicrodollars(usedUsd),
+        })
+        .where(eq(kilocode_users.id, user.id));
+
+      await expect(
+        getStoreCreditConsumptionMilliunits(db, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId,
+        })
+      ).resolves.toBe(expected);
+    }
+  );
+
+  it('returns null for a purchase Kilo never granted', async () => {
+    await expect(
+      getStoreCreditConsumptionMilliunits(db, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionId: `tx-${crypto.randomUUID()}`,
+      })
+    ).resolves.toBeNull();
   });
 });

@@ -17,6 +17,9 @@ export type AppleStoreDecodedTransaction = {
   expiresDate?: number;
   appAccountToken?: string;
   revocationDate?: number;
+  revocationType?: string;
+  /** Refunded share of the transaction in milliunits (100000 = 100%). */
+  revocationPercentage?: number;
   currency?: string;
   price?: number;
   environment: AppleStoreEnvironment;
@@ -33,6 +36,8 @@ const AppleStoreTransactionPayloadSchema = z
     expiresDate: z.number().optional(),
     appAccountToken: z.string().uuid().optional(),
     revocationDate: z.number().optional(),
+    revocationType: z.string().optional(),
+    revocationPercentage: z.number().optional(),
     currency: z.string().optional(),
     price: z.number().optional(),
     environment: z.string().optional(),
@@ -62,6 +67,8 @@ function decodeAppleStoreTransactionPayload(
     expiresDate: payload.expiresDate,
     appAccountToken: payload.appAccountToken,
     revocationDate: payload.revocationDate,
+    revocationType: payload.revocationType,
+    revocationPercentage: payload.revocationPercentage,
     currency: payload.currency,
     price: payload.price,
     environment: normalizeEnvironment(payload.environment),

@@ -3,6 +3,7 @@ import {
   DeliveryStatus,
   NotificationTypeV2,
   RefundPreference,
+  RevocationType,
   Subtype,
 } from '@apple/app-store-server-library';
 import { and, eq } from 'drizzle-orm';
@@ -1425,7 +1426,7 @@ describe('processAppStoreKiloPassNotification', () => {
     expect(updatedUser?.total_microdollars_acquired).toBe(0);
   });
 
-  it('reverses a refunded store credit pack and still records the event', async () => {
+  it('reverses the whole store credit pack on a full refund and still records the event', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0 });
     const transactionId = `tx-${crypto.randomUUID()}`;
     const amountMicrodollars = toMicrodollars(10);
@@ -1455,6 +1456,8 @@ describe('processAppStoreKiloPassNotification', () => {
           productId: 'credits.usd10.v1',
           appAccountToken: user.app_store_account_token,
           revocationDate: Date.parse('2026-05-16T00:00:00.000Z'),
+          revocationType: RevocationType.REFUND_FULL,
+          revocationPercentage: 100_000,
         }),
     });
 
@@ -1548,6 +1551,212 @@ describe('processAppStoreKiloPassNotification', () => {
       where: sql`${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'credit-pack-refund-fail'`,
     });
     expect(audit).toBeUndefined();
+  });
+
+  describe('credit pack proration', () => {
+    async function grantAppStoreCreditPack(params: { acquiredUsd: number; usedUsd: number }) {
+      const user = await insertTestUser({
+        total_microdollars_acquired: toMicrodollars(params.acquiredUsd),
+        microdollars_used: toMicrodollars(params.usedUsd),
+      });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+      await db.insert(credit_transactions).values({
+        kilo_user_id: user.id,
+        amount_microdollars: toMicrodollars(10),
+        is_free: false,
+        description: 'Credit purchase via App Store',
+        stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.AppStore, transactionId),
+      });
+      return { user, transactionId };
+    }
+
+    async function requestConsumption(transactionId: string, appAccountToken?: string) {
+      const consumptionRequests: Array<{ transactionId: string; request: unknown }> = [];
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'credit-pack-consumption-request',
+        decodeNotification: async () =>
+          notification({ notificationType: NotificationTypeV2.CONSUMPTION_REQUEST }),
+        decodeTransaction: async () =>
+          transaction({
+            transactionId,
+            productId: 'credits.usd10.v1',
+            expiresDate: undefined,
+            appAccountToken,
+          }),
+        sendConsumptionInformation: async (sentTransactionId, request) => {
+          consumptionRequests.push({ transactionId: sentTransactionId, request });
+        },
+      });
+      expect(result).toEqual({ processed: true });
+      return consumptionRequests;
+    }
+
+    async function refund(params: {
+      transactionId: string;
+      appAccountToken?: string;
+      revocationType: RevocationType;
+      revocationPercentage?: number;
+    }) {
+      return processAppStoreKiloPassNotification({
+        signedPayload: 'credit-pack-prorated-refund',
+        decodeNotification: async () =>
+          notification({
+            notificationType: NotificationTypeV2.REFUND,
+            signedTransactionInfo: 'credit-pack-prorated-refund-transaction',
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            transactionId: params.transactionId,
+            productId: 'credits.usd10.v1',
+            expiresDate: undefined,
+            appAccountToken: params.appAccountToken,
+            revocationDate: Date.parse('2026-05-16T00:00:00.000Z'),
+            revocationType: params.revocationType,
+            revocationPercentage: params.revocationPercentage,
+          }),
+      });
+    }
+
+    async function reversalsFor(transactionId: string) {
+      return db
+        .select()
+        .from(credit_transactions)
+        .where(
+          eq(
+            credit_transactions.credit_category,
+            `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+          )
+        );
+    }
+
+    it('asks Apple for a prorated refund of the unspent share of a partly spent pack', async () => {
+      // $10 granted, $3 left: $7 of the pack is spent.
+      const { user, transactionId } = await grantAppStoreCreditPack({
+        acquiredUsd: 10,
+        usedUsd: 7,
+      });
+
+      await expect(
+        requestConsumption(transactionId, user.app_store_account_token)
+      ).resolves.toEqual([
+        {
+          transactionId,
+          request: {
+            customerConsented: true,
+            deliveryStatus: DeliveryStatus.DELIVERED,
+            consumptionPercentage: 70_000,
+            refundPreference: RefundPreference.GRANT_PRORATED,
+            sampleContentProvided: false,
+          },
+        },
+      ]);
+    });
+
+    it('reports an untouched pack as unconsumed despite earlier account spend', async () => {
+      // $100 spent before the $10 pack was bought; none of the pack is used.
+      const { user, transactionId } = await grantAppStoreCreditPack({
+        acquiredUsd: 110,
+        usedUsd: 100,
+      });
+
+      const [sent] = await requestConsumption(transactionId, user.app_store_account_token);
+      expect(sent?.request).toMatchObject({
+        consumptionPercentage: 0,
+        refundPreference: RefundPreference.GRANT_PRORATED,
+      });
+    });
+
+    it('declines a consumption request for a credit pack Kilo never granted', async () => {
+      const [sent] = await requestConsumption(`tx-${crypto.randomUUID()}`);
+      expect(sent?.request).toEqual({
+        customerConsented: true,
+        deliveryStatus: DeliveryStatus.DELIVERED,
+        refundPreference: RefundPreference.DECLINE,
+        sampleContentProvided: false,
+      });
+    });
+
+    it('reverses only the refunded share of a prorated refund', async () => {
+      const { user, transactionId } = await grantAppStoreCreditPack({
+        acquiredUsd: 10,
+        usedUsd: 7,
+      });
+
+      await expect(
+        refund({
+          transactionId,
+          appAccountToken: user.app_store_account_token,
+          revocationType: RevocationType.REFUND_PRORATED,
+          revocationPercentage: 30_000,
+        })
+      ).resolves.toEqual({ processed: true });
+
+      const reversals = await reversalsFor(transactionId);
+      expect(reversals.map(row => row.amount_microdollars)).toEqual([-toMicrodollars(3)]);
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after?.total_microdollars_acquired).toBe(toMicrodollars(7));
+    });
+
+    it.each([
+      { revocationType: RevocationType.REFUND_FULL, revocationPercentage: 100_000 },
+      { revocationType: RevocationType.FAMILY_REVOKE, revocationPercentage: undefined },
+      { revocationType: RevocationType.REFUND_PRORATED, revocationPercentage: undefined },
+    ])(
+      'reverses the whole pack for $revocationType with percentage $revocationPercentage',
+      async ({ revocationType, revocationPercentage }) => {
+        const { user, transactionId } = await grantAppStoreCreditPack({
+          acquiredUsd: 10,
+          usedUsd: 0,
+        });
+
+        await refund({
+          transactionId,
+          appAccountToken: user.app_store_account_token,
+          revocationType,
+          revocationPercentage,
+        });
+
+        const reversals = await reversalsFor(transactionId);
+        expect(reversals.map(row => row.amount_microdollars)).toEqual([-toMicrodollars(10)]);
+      }
+    );
+
+    it('keeps the first reversal when a refund is redelivered after more spend', async () => {
+      const { user, transactionId } = await grantAppStoreCreditPack({
+        acquiredUsd: 10,
+        usedUsd: 7,
+      });
+      const appAccountToken = user.app_store_account_token;
+      await refund({
+        transactionId,
+        appAccountToken,
+        revocationType: RevocationType.REFUND_PRORATED,
+        revocationPercentage: 30_000,
+      });
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: toMicrodollars(9) })
+        .where(eq(kilocode_users.id, user.id));
+
+      // A fresh notification UUID bypasses the event claim, so only the
+      // reversal's own idempotency key protects the stored amount.
+      await expect(
+        refund({
+          transactionId,
+          appAccountToken,
+          revocationType: RevocationType.REFUND_FULL,
+        })
+      ).resolves.toEqual({ processed: true });
+
+      const reversals = await reversalsFor(transactionId);
+      expect(reversals.map(row => row.amount_microdollars)).toEqual([-toMicrodollars(3)]);
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after?.total_microdollars_acquired).toBe(toMicrodollars(7));
+    });
   });
 
   it('scopes App Store refund reversals to the refunded transaction after a same-month upgrade', async () => {

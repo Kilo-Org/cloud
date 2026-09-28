@@ -35,7 +35,7 @@ import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
-import { reverseStoreCreditPurchase } from '@/lib/credits/store-refund';
+import { reverseStoreCreditPurchase, STORE_FULL_MILLIUNITS } from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
@@ -696,11 +696,13 @@ export async function processGooglePlayKiloPassNotification(params: {
       let reversal = await reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
         providerTransactionId: orderId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
       });
       if (reversal.creditTransactionId === null) {
         reversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.GooglePlay,
           providerTransactionId: purchaseToken,
+          refundedMilliunits: STORE_FULL_MILLIUNITS,
         });
       }
       await appendKiloPassAuditLog(tx, {

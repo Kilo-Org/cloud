@@ -6487,6 +6487,8 @@ export type CloudAgentFailureReason =
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
   | 'provider_unavailable'
+  | 'provider_disconnect'
+  | 'gateway_unavailable'
   | 'request_timeout'
   | 'assistant_invalid_request'
   | 'assistant_context_limit'

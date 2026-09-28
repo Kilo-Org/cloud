@@ -2017,6 +2017,7 @@
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
       "couldNotRefresh": "Päivitys epäonnistui",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
+      "viewHistory": "Istuntojen historia",
       "noMatches": "Ei hakua vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "tryAdjustFilters": "Kokeile muuttaa tai tyhjentää suodattimet.",

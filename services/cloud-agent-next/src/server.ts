@@ -400,7 +400,10 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
       name.startsWith('x-forwarded-') ||
       name.startsWith('x-internal-') ||
       name.startsWith('x-kilo-') ||
-      name.startsWith('x-kilocode-') ||
+      // Feature is attribution, not a credential: the gateway's
+      // `validateFeatureHeader` owns value validation, so forward the
+      // sandbox-supplied value like any other client instead of restoring it.
+      (name.startsWith('x-kilocode-') && name !== 'x-kilocode-feature') ||
       name === 'forwarded' ||
       name === 'x-real-ip' ||
       name === 'x-kilocode-organizationid'

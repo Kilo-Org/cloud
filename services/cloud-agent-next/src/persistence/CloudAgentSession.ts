@@ -83,7 +83,7 @@ import {
 import type { AttentionEvent } from '../websocket/ingest-attention-classifier.js';
 import { dispatchCloudAgentAttentionPush } from '../websocket/ingest-attention-classifier.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { WrapperCommand, CloudStatusData } from '../shared/protocol.js';
+import type { WrapperCommand, CloudStatusData, CommandsAvailableData } from '../shared/protocol.js';
 import {
   isPublicCloudAgentExtensionSourceType,
   projectPublicCloudAgentExtensionEvent,
@@ -1256,7 +1256,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       const doContext: IngestDOContext = {
         updateKiloSessionId: (id: string) => this.updateKiloSessionId(id),
         updateUpstreamBranch: (branch: string) => this.updateUpstreamBranch(branch),
-        setAvailableCommands: (commands: SlashCommandInfo[]) => this.setAvailableCommands(commands),
+        setAvailableCommands: (data: CommandsAvailableData) => this.setAvailableCommands(data),
         wrapperSupervisor: this.getWrapperSupervisor(),
         handleWrapperTerminalEvent: params => this.handleWrapperTerminalEvent(params),
         keepContainerAlive: () => {
@@ -2270,19 +2270,31 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   /**
-   * Persist the slash-command catalog reported by the wrapper. Stored as a
-   * dedicated DO storage key (not part of session metadata) because the
-   * catalog is a runtime cache derived from the kilo server, not durable
+   * Persist the slash-command catalog the wrapper reported, with the bound
+   * status the client needs to know whether the catalog is missing rows.
+   * Stored as a dedicated DO storage key (not part of session metadata) because
+   * the catalog is a runtime cache derived from the kilo server, not durable
    * session config — keeping it separate avoids polluting MetadataSchema.
    */
-  async setAvailableCommands(commands: SlashCommandInfo[]): Promise<void> {
-    await this.ctx.storage.put('availableCommands', commands);
+  async setAvailableCommands(data: CommandsAvailableData): Promise<void> {
+    await this.ctx.storage.put('availableCommands', data);
   }
 
-  /** Read the cached slash-command catalog. Falls back to defaults if missing or empty. */
-  async getAvailableCommands(): Promise<SlashCommandInfo[]> {
-    const stored = await this.ctx.storage.get<SlashCommandInfo[]>('availableCommands');
-    return commandsOrDefault(stored);
+  /**
+   * Read the cached slash-command catalog and its bound status. Falls back to
+   * defaults if missing or empty. A catalog stored before the bound status
+   * existed is a bare array, which carries no status.
+   */
+  async getAvailableCommands(): Promise<CommandsAvailableData> {
+    const stored = await this.ctx.storage.get<CommandsAvailableData | SlashCommandInfo[]>(
+      'availableCommands'
+    );
+    const commands = Array.isArray(stored) ? stored : stored?.commands;
+    const catalogStatus = Array.isArray(stored) ? undefined : stored?.catalogStatus;
+    return {
+      commands: commandsOrDefault(commands),
+      ...(catalogStatus ? { catalogStatus } : {}),
+    };
   }
 
   /**

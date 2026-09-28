@@ -1,7 +1,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
@@ -16,6 +16,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { refreshActiveSessionsNow } from '@/lib/active-sessions-live-sync';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
@@ -55,14 +56,14 @@ import { useUserWebConnection } from './user-web-connection-provider';
 
 type RemoteSessionRowProps = {
   session: ActiveSession;
-  onPress: () => void;
+  onPress: (session: ActiveSession) => void;
   /** Container shape: see `RowVariant`. Defaults to `'list'`. */
   variant?: RowVariant;
   /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
   interactive?: boolean;
 };
 
-export function RemoteSessionRow({
+export const RemoteSessionRow = memo(function RemoteSessionRow({
   session,
   onPress,
   variant = 'list',
@@ -105,8 +106,7 @@ export function RemoteSessionRow({
   // title the user's own rename wrote, so the same label feeds the row, the
   // accessibility label, and the rename prompt. The subscription repaints the
   // row once the durable record hydrates after a cold start.
-  useUserSessionTitlesRevision();
-  const title = namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled');
+  const titlesRevision = useUserSessionTitlesRevision();
   // Same seeding as the stored row: a session the backend has not named yet
   // opens an empty rename field instead of the `New session - <ISO>` machine
   // string, and the save paths reject an unchanged or blank value. A title the
@@ -114,65 +114,97 @@ export function RemoteSessionRow({
   const renameInitialValue = namedSessionTitle(session.title, session.id) ?? '';
   const [renameVisible, setRenameVisible] = useState(false);
   const canManage = interactive;
-  const agentLabel = remoteSessionEyebrowLabel(session);
 
   const revision = useSessionAttentionRevision();
-  const raiseId = session.status;
-  const canExit = canExitSessionFromList(session);
-  const needsInput = shouldShowNeedsInput({
-    status: session.status,
-    raiseId,
-    isAcked: isAttentionAcked(session.id, raiseId),
-  });
+  // A live row's timestamp is minute-bucketed, so the clock is sampled at
+  // least twice per bucket. The tick re-renders this row from the inside:
+  // `memo` keeps the row out of a parent poll that changes no prop, so an
+  // unchanged session would otherwise keep the label it drew when its payload
+  // last changed. The shared interval means every row that reads the clock
+  // shares one timer (see `lib/hooks/now-ticker-store`).
+  const now = useNowTicker(10_000);
+  // The ack store is the one input to the row that is not `session`: an ack
+  // bumps the shared revision, so the flag re-derives when it ticks. A parent
+  // re-render with an unchanged payload and no ack reuses this result.
+  const needsInput = useMemo(
+    () =>
+      shouldShowNeedsInput({
+        status: session.status,
+        raiseId: session.status,
+        isAcked: isAttentionAcked(session.id, session.status),
+      }),
+    // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
+    [session, revision]
+  );
   useEffect(() => {
     reconcileSessionAttention(session.id, session.status, null);
   }, [session.id, session.status, revision]);
 
-  // Spoken meta mirrors the visible meta the row renders. When `needsInput`
-  // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-  // so the label omits it. Otherwise announce the same timestamp as
-  // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
-  const metaTimestamp = activeSessionMetaTimestamp(session);
-  const costSpoken = formatSpokenCost(session.totalCostMicrodollars);
-  const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp) : null;
-  const spokenMeta = selectRemoteRowSpokenMeta({
-    needsInput,
-    costSpoken,
-    timeSpoken,
-  });
-
-  // Provenance subtitle: list rows show "branch · #N", card rows keep the
-  // branch-only subtitle. The spoken label mirrors this, with the PR phrase
-  // only on the list variant.
-  const subtitle =
-    variant === 'card'
-      ? (session.gitBranch ?? null)
-      : composeSessionProvenanceSubtitle({
-          branch: session.gitBranch,
-          prNumber: session.associatedPr?.number,
-        });
-  const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
+  // Every derivation below depends only on the session, the row shape, the
+  // attention flag, the recorded-titles revision and the sampled clock, so an
+  // unchanged payload reuses them instead of redoing the Intl formatting per
+  // parent render. `t` changes identity with the language, which re-derives the
+  // localized strings.
+  const { title, agentLabel, canExit, statusKind, subtitle, spokenPrNumber, spokenMeta } =
+    useMemo(() => {
+      // Spoken meta mirrors the visible meta the row renders. When `needsInput`
+      // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
+      // so the label omits it. Otherwise announce the same timestamp as
+      // `remoteMeta` (prefer lastActivityAt, fall back to updatedAt).
+      const metaTimestamp = activeSessionMetaTimestamp(session);
+      const timeSpoken = metaTimestamp ? formatSpokenTimeAgo(metaTimestamp, now) : null;
+      return {
+        title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
+        agentLabel: remoteSessionEyebrowLabel(session),
+        canExit: canExitSessionFromList(session),
+        statusKind: glanceableStatusKind(session.status),
+        // Provenance subtitle: list rows show "branch · #N", card rows keep the
+        // branch-only subtitle. The spoken label mirrors this, with the PR phrase
+        // only on the list variant.
+        subtitle:
+          variant === 'card'
+            ? (session.gitBranch ?? null)
+            : composeSessionProvenanceSubtitle({
+                branch: session.gitBranch,
+                prNumber: session.associatedPr?.number,
+              }),
+        spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
+        spokenMeta: selectRemoteRowSpokenMeta({
+          needsInput,
+          costSpoken: formatSpokenCost(session.totalCostMicrodollars),
+          timeSpoken,
+        }),
+      };
+      // eslint-disable-next-line react/exhaustive-deps -- the titles revision and the sampled clock are real inputs: `namedSessionTitle` reads the recorded-titles store, and `formatSpokenTimeAgo` reads the clock, so both must re-derive when they tick.
+    }, [session, variant, needsInput, t, titlesRevision, now]);
 
   // Tray rows are always live: the eyebrow draws the status glyph from the
   // shared derivation, so the platform glyph has no slot beside it (and the
   // spoken label withholds the platform with the icon).
-  const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
-    platform: session.createdOnPlatform,
-    variant,
-    needsInput,
-    statusGlyph: true,
-    gitUrl: session.gitUrl,
-  });
-  const platformIcon =
-    platformIconKind != null ? (
-      <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
-        <SessionPlatformIcon
-          platform={session.createdOnPlatform}
-          size={12}
-          color={colors.mutedSoft}
-        />
-      </View>
-    ) : undefined;
+  const { iconKind: platformIconKind, spokenPlatform } = useMemo(
+    () =>
+      selectRowPlatformPresentation({
+        platform: session.createdOnPlatform,
+        variant,
+        needsInput,
+        statusGlyph: true,
+        gitUrl: session.gitUrl,
+      }),
+    [session, variant, needsInput]
+  );
+  const platformIcon = useMemo(
+    () =>
+      platformIconKind != null ? (
+        <View accessible={false} testID={`platform-icon-${platformIconKind}`}>
+          <SessionPlatformIcon
+            platform={session.createdOnPlatform}
+            size={12}
+            color={colors.mutedSoft}
+          />
+        </View>
+      ) : undefined,
+    [platformIconKind, session.createdOnPlatform, colors.mutedSoft]
+  );
 
   const refreshActiveList = async () => {
     const { queryKey } = refreshScope;
@@ -237,7 +269,9 @@ export function RemoteSessionRow({
   return (
     <>
       <Pressable
-        onPress={onPress}
+        onPress={() => {
+          onPress(session);
+        }}
         onLongPress={canManage ? handleLongPress : undefined}
         accessibilityRole="button"
         accessibilityLabel={sessionRowAccessibilityLabel({
@@ -246,7 +280,7 @@ export function RemoteSessionRow({
           // Tray rows are always live: the glyph below draws the shared
           // derivation's kind, and the spoken label names the same state.
           live: true,
-          statusKind: glanceableStatusKind(session.status),
+          statusKind,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.gitBranch ?? null,
@@ -261,10 +295,10 @@ export function RemoteSessionRow({
           subtitle={subtitle}
           meta={composeActiveSessionVisibleMeta(
             formatSessionTotalCost(session.totalCostMicrodollars),
-            remoteMeta(session)
+            remoteMeta(session, now)
           )}
           live
-          statusKind={glanceableStatusKind(session.status)}
+          statusKind={statusKind}
           needsInput={needsInput}
           metaWhileLive
           platformIcon={platformIcon}
@@ -293,4 +327,4 @@ export function RemoteSessionRow({
       )}
     </>
   );
-}
+});

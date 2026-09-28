@@ -513,6 +513,42 @@ describe('login-screen idle skeleton', () => {
   });
 });
 
+describe('login-screen approved wait surface', () => {
+  beforeEach(() => {
+    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+    deviceAuth.status = 'approved';
+    deviceAuth.token = 'tok';
+    deviceAuth.code = undefined;
+    deviceAuth.refreshToken = undefined;
+    deviceAuth.expiresIn = undefined;
+    deviceAuth.error = undefined;
+    deviceAuth.verificationUrl = undefined;
+    deviceAuth.resumed = false;
+  });
+
+  // The hold between the device approving and the root layout redirecting used
+  // to be a bare spinner on the app background: the explorer read it as an
+  // unbranded blank page (signin-language). It is now the shared branded wait
+  // surface, the same one the root layout paints over its hidden windows.
+  it('renders the branded wait surface while the approved token is written', async () => {
+    const renderer = await mountLoginScreen();
+
+    const progress = renderer.root.findAll(node => node.props.accessibilityRole === 'progressbar');
+    expect(progress).toHaveLength(1);
+    expect(progress[0]?.props.accessibilityLabel).toBe('Loading…');
+
+    const logo = findByType(renderer.root, 'Image').find(
+      node => node.props.accessibilityLabel === 'Kilo logo'
+    );
+    expect(logo).toBeDefined();
+    expect(findByType(renderer.root, 'Text').some(node => node.children[0] === 'Loading…')).toBe(
+      true
+    );
+
+    renderer.unmount();
+  });
+});
+
 describe('login-screen bottom-bar clearance', () => {
   beforeEach(() => {
     deviceAuth.status = 'idle';

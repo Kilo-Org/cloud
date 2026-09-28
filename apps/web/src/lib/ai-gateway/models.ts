@@ -45,11 +45,6 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
-  {
-    model: 'nex-agi/nex-n2.5-pro:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(

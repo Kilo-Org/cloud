@@ -30,6 +30,7 @@ import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-m
 import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
+import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -693,13 +694,24 @@ export function createConnectionManager(
    */
   async function sendCommandsAvailable(): Promise<void> {
     try {
-      const commands = await config.kiloClient.listCommands();
+      const catalog = await config.kiloClient.listCommands();
+      const catalogStatus = slashCommandCatalogStatus(catalog);
       sendToIngest({
         streamEventType: 'commands.available',
-        data: { commands },
+        // The status rides with the catalog: the DO caches it and hydrates
+        // clients with it, so a bounded catalog is never silent.
+        data: {
+          commands: catalog.commands,
+          ...(catalogStatus ? { catalogStatus } : {}),
+        },
         timestamp: new Date().toISOString(),
       });
-      logToFile(`commands.available sent: count=${commands.length}`);
+      logToFile(
+        `commands.available sent: count=${catalog.commands.length}` +
+          (catalogStatus
+            ? ` dropped=${catalogStatus.dropped} overLimit=${catalogStatus.overLimit}`
+            : '')
+      );
     } catch (err) {
       logToFile(
         `failed to send commands.available: ${err instanceof Error ? err.message : String(err)}`

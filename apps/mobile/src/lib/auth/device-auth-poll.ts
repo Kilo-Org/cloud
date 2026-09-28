@@ -1,8 +1,6 @@
-import { Platform } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-
 import { i18n } from '@/i18n';
 import { API_BASE_URL } from '@/lib/config';
+import { type AuthBrowserKind, dismissAuthBrowser } from '@/lib/auth/auth-browser';
 import { classifyPollResponse } from '@/lib/auth/poll-response';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
@@ -31,9 +29,14 @@ export function startDeviceAuthPoll(params: {
   signal: AbortSignal;
   setState: (updater: (prev: DeviceAuthState) => DeviceAuthState) => void;
   cleanup: () => void;
+  /**
+   * The API that opened the verification page. Approval ends the flow without
+   * waiting for the page, so the poll closes it with the matching dismissal.
+   */
+  browserKind: AuthBrowserKind;
   startedAt?: number;
 }): DeviceAuthPollHandle {
-  const { code, deviceCode, signal, setState, cleanup } = params;
+  const { code, deviceCode, signal, setState, cleanup, browserKind } = params;
 
   // A resumed transaction reuses the original start clock so its overall
   // budget does not restart from `Date.now()` and outlive the server code.
@@ -94,9 +97,7 @@ export function startDeviceAuthPoll(params: {
 
       if (parsed?.status === 'approved') {
         cleanup();
-        if (Platform.OS !== 'android') {
-          WebBrowser.dismissAuthSession();
-        }
+        dismissAuthBrowser(browserKind);
         setState(previous =>
           approvedDeviceAuthState({
             code,

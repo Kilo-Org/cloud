@@ -10,7 +10,10 @@
  * with bundletool, checks debug symbols, and prints a signed-artifact size
  * table (JS bundles, fonts, and grammar modules). The --select mode validates
  * the EAS build.json (every build FINISHED, one IOS and one ANDROID entry with
- * an applicationArchiveUrl) and prints the two archive URLs, one per line.
+ * an applicationArchiveUrl, and an IOS buildArtifactsUrl) and prints three
+ * lines: the iOS archive URL, the Android archive URL, and the iOS build
+ * artifacts URL (the archive eas.json `buildArtifactPaths` uploads, which
+ * carries the build's Podfile.lock).
  *
  * Exits 1 with a clear message on any contract violation.
  */
@@ -135,6 +138,10 @@ function artifactUrl(build) {
   return build?.artifacts?.applicationArchiveUrl ?? '';
 }
 
+function buildArtifactsUrl(build) {
+  return build?.artifacts?.buildArtifactsUrl ?? '';
+}
+
 function selectMode(buildJsonPath) {
   const builds = parseBuildJson(buildJsonPath);
   assertAllFinished(builds);
@@ -154,10 +161,16 @@ function selectMode(buildJsonPath) {
   if (!androidUrl) {
     failures.push('ANDROID build has no artifacts.applicationArchiveUrl');
   }
+  const iosBuildArtifactsUrl = buildArtifactsUrl(ios);
+  if (!iosBuildArtifactsUrl) {
+    failures.push(
+      'IOS build has no artifacts.buildArtifactsUrl (eas.json build.production.ios.buildArtifactPaths must upload ios/Podfile.lock)'
+    );
+  }
   if (failures.length > 0) {
     reportAndExit();
   }
-  process.stdout.write(`${iosUrl}\n${androidUrl}\n`);
+  process.stdout.write(`${iosUrl}\n${androidUrl}\n${iosBuildArtifactsUrl}\n`);
   process.exit(0);
 }
 

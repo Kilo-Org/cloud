@@ -482,7 +482,7 @@ describe('startOpenAiChatGptConnect', () => {
     expect(signIn).toHaveBeenCalledWith(
       'openai',
       { callbackUrl: '/byok' },
-      { scope: OPENAI_TOKEN_SHARING_SCOPE }
+      { scope: OPENAI_TOKEN_SHARING_SCOPE, force_reconsent: 'true' }
     );
     expect(createLinkingSession.mock.invocationCallOrder[0]).toBeLessThan(
       signIn.mock.invocationCallOrder[0]
@@ -498,7 +498,7 @@ describe('startOpenAiChatGptConnect', () => {
     expect(signIn).toHaveBeenCalledWith(
       'openai',
       { callbackUrl: '/organizations/00000000-0000-4000-8000-000000000001/byok' },
-      { scope: OPENAI_TOKEN_SHARING_SCOPE }
+      { scope: OPENAI_TOKEN_SHARING_SCOPE, force_reconsent: 'true' }
     );
   });
 

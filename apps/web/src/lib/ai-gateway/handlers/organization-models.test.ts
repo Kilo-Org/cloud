@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
-import { GET } from './route';
+import { handleOrganizationModelsRequest } from './organization-models';
 
 jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
@@ -67,7 +67,7 @@ describe('GET /api/organizations/[id]/models', () => {
       },
     } as never);
 
-    const response = await GET(request(), {
+    const response = await handleOrganizationModelsRequest(request(), {
       params: Promise.resolve({ id: 'org-1' }),
     });
 
@@ -84,7 +84,7 @@ describe('GET /api/organizations/[id]/models', () => {
     const model = makeModel('openai/gpt-5.4-mini');
     listAvailableModels.mockResolvedValue({ data: [model] });
 
-    const response = await GET(request(), {
+    const response = await handleOrganizationModelsRequest(request(), {
       params: Promise.resolve({ id: 'org-1' }),
     });
 

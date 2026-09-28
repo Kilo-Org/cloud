@@ -5,6 +5,7 @@ import type { ComputeBillingStatus } from '@/lib/cloud-agent-next/cloud-agent-cl
 import type { SessionCostBreakdown } from './session-cost-breakdown';
 
 jest.mock('./ShareSessionDialog', () => ({ ShareSessionDialog: () => null }));
+jest.mock('./SessionFailureHistory', () => ({ SessionFailureHistory: () => null }));
 
 jest.mock('@/components/ui/dialog', () => {
   const react = jest.requireActual<typeof React>('react');

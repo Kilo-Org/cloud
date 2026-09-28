@@ -1513,6 +1513,7 @@
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
       "couldNotRefresh": "更新できませんでした",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "viewHistory": "セッション履歴",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
       "tryAdjustFilters": "絞り込み条件を変更するか、解除してください。",

@@ -22,7 +22,9 @@ jobs:
 
   check-staging-db-startup:
     needs: check-changes
-    # Guard: privileged workflow — only the canonical repo may run it.
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # the web app to staging using repo secrets. Only the canonical repo may
+    # run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15

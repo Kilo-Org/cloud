@@ -34,6 +34,10 @@ permissions:
 
 jobs:
   check-changes:
+    # Guard: this workflow_dispatch/schedule is reachable from a fork, and it
+    # submits a mobile build to the App Store / Google Play using repo secrets.
+    # Only the canonical repo may run it. (For push: main, github.repository is
+    # already the canonical repo, so the guard is a no-op there.)
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

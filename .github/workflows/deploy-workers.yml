@@ -47,6 +47,10 @@ concurrency:
 
 jobs:
   deploy-manual:
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # Cloudflare Workers using repo secrets. Only the canonical repo may run
+    # it. (Also called as a reusable workflow from deploy-staging.yml, whose
+    # caller job is itself guarded.)
     if: inputs.worker != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25

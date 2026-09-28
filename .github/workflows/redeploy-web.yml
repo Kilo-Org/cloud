@@ -12,6 +12,10 @@ concurrency:
 
 jobs:
   verify-main:
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # the web app to production using repo secrets. Only the canonical repo
+    # may run it. (verify-main already enforces GITHUB_REF == refs/heads/main,
+    # so the guard is defense-in-depth for the dispatch path.)
     if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

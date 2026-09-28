@@ -224,6 +224,12 @@ export function createMobileAgentSessionManager({
     // answer: the open is stalled, not failed. The manager keeps the skeleton
     // (then the slow-load state with Retry) instead of a premature error
     // screen. Unwrapped from the TRPCClientError tRPC layers over it.
+    // The composer materializes presigned GET parts and sends them as
+    // `attachmentParts`, so the `supportsAttachments` gate may report a remote
+    // session supported before its CLI advertises the capability. Consumers
+    // that know only the cloud-only `attachments` field (web) omit this and
+    // keep remote sessions unsupported.
+    supportsRemoteAttachmentParts: true,
     isStalledTransportError,
     onToolAttachment: (partId, attachment) => {
       cacheToolAttachment(partId, attachment);

@@ -493,6 +493,48 @@ describe('gitlab-integration-helpers', () => {
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
     });
 
+    it('should return a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: [] }));
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('should sync an integration whose repository list was never synced', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({ repositories: [], repositories_synced_at: null })
+      );
+      mockGetValidGitLabToken.mockResolvedValue('valid-token');
+      mockFetchGitLabProjects.mockResolvedValue([]);
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123');
+
+      expect(mockFetchGitLabProjects).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([]);
+    });
+
+    it('should re-sync a synced empty list when forceRefresh is set', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: [] }));
+      mockGetValidGitLabToken.mockResolvedValue('valid-token');
+      mockFetchGitLabProjects.mockResolvedValue([
+        { id: 2, name: 'new', full_name: 'group/new', private: false },
+      ]);
+
+      const { fetchGitLabRepositoriesForUser } = await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForUser('user-123', true);
+
+      expect(mockFetchGitLabProjects).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([
+        { id: 2, name: 'new', fullName: 'group/new', private: false },
+      ]);
+    });
+
     it('should return no repositories when the integration is suspended', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(
         buildIntegration({
@@ -549,6 +591,51 @@ describe('gitlab-integration-helpers', () => {
         { id: 1, name: 'project', fullName: 'org/project', private: false },
       ]);
       expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+    });
+
+    it('should return a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(buildIntegration({ repositories: [] }));
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitLabProjects).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
+    it('should sync an integration whose repository list was never synced', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(
+        buildIntegration({ repositories: [], repositories_synced_at: null })
+      );
+      mockGetValidGitLabToken.mockResolvedValue('valid-token');
+      mockFetchGitLabProjects.mockResolvedValue([]);
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123');
+
+      expect(mockFetchGitLabProjects).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([]);
+    });
+
+    it('should re-sync a synced empty list when forceRefresh is set', async () => {
+      mockGetIntegrationForOrganization.mockResolvedValue(buildIntegration({ repositories: [] }));
+      mockGetValidGitLabToken.mockResolvedValue('valid-token');
+      mockFetchGitLabProjects.mockResolvedValue([
+        { id: 2, name: 'new', full_name: 'org/new', private: false },
+      ]);
+
+      const { fetchGitLabRepositoriesForOrganization } =
+        await import('./gitlab-integration-helpers');
+      const result = await fetchGitLabRepositoriesForOrganization('org-123', 'actor-123', true);
+
+      expect(mockFetchGitLabProjects).toHaveBeenCalledTimes(1);
+      expect(result.repositories).toEqual([
+        { id: 2, name: 'new', fullName: 'org/new', private: false },
+      ]);
     });
 
     it('should return no repositories when the integration is suspended', async () => {

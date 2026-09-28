@@ -7,6 +7,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 import { TourScreen } from './tour-screen';
+import { TourStepHeader } from './tour-step-header';
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
+vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   Cloud: 'Cloud',
@@ -199,6 +201,12 @@ describe('TourScreen', () => {
     expect(hasText(renderer, 'tour.cloudOptionTitle')).toBe(true);
     expect(hasText(renderer, 'tour.remoteOptionTitle')).toBe(true);
 
+    // The screen header keeps only the native modal spacing. The eyebrow sits
+    // in the centered step header, directly above the heading it names.
+    const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
+    expect(screenHeader.props).not.toHaveProperty('eyebrow');
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
+
     unmount();
   });
 
@@ -218,21 +226,13 @@ describe('TourScreen', () => {
     unmount();
   });
 
-  it('presents the header as a modal with a centred eyebrow and no back control', async () => {
+  it('keeps modal spacing without moving the eyebrow out of the step header', async () => {
     const { renderer, unmount } = await mountTour();
 
-    // The tour is presented `modal`, so the header must take the modal
-    // clearance rather than re-adding the status-bar inset the native sheet
-    // already owns (the dead band above the eyebrow the owner reported). The
-    // eyebrow is centred because every other element on the screen — the icon,
-    // the title, the cards and the Skip action — is centred, and a top-left
-    // eyebrow read as a stranded label beside that column (home-quick-tour
-    // finding). The fork keeps no back control.
     const header = renderer.root.findByProps({ modal: true });
-    expect(header.props.centerTitle).toBe(true);
     expect(header.props.showBackButton).toBe(false);
-    expect(header.props.onBack).toBeUndefined();
-    expect(header.props.eyebrow).toBe('tour.eyebrow');
+    expect(header.props.eyebrow).toBeUndefined();
+    expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
 
     unmount();
   });

@@ -219,6 +219,7 @@ describe('shared branded splash', () => {
                 _: '@drawable/splashscreen_window_background',
               },
               { $: { name: 'postSplashScreenTheme' }, _: '@style/Theme.App.Launch' },
+              { $: { name: 'android:windowLightStatusBar' }, _: 'true' },
             ]),
           }),
         ]),

@@ -105,6 +105,12 @@ describe('classifyCloudAgentFailure', () => {
     ['provider_unavailable', 'managed', 'provider', 'managed_provider_unavailable'],
     ['provider_unavailable', 'unknown', 'provider', 'provider_ownership_unknown'],
     ['provider_unavailable', undefined, 'provider', 'provider_ownership_unknown'],
+    ['provider_disconnect', 'managed', 'provider', 'provider_disconnect'],
+    ['provider_disconnect', 'byok', 'provider', 'provider_disconnect'],
+    ['provider_disconnect', 'unknown', 'provider', 'provider_disconnect'],
+    ['gateway_unavailable', 'managed', 'provider', 'gateway_unavailable'],
+    ['gateway_unavailable', 'byok', 'provider', 'gateway_unavailable'],
+    ['gateway_unavailable', 'unknown', 'provider', 'gateway_unavailable'],
   ] as const)(
     'classifies %s with %s ownership without losing the known cause',
     (assistantReason, providerOwnership, responsibility, reason) => {
@@ -493,6 +499,8 @@ const MODEL_MISSING_MODEL_REASONS = [
   'model_unavailable',
   'provider_authentication',
   'provider_unavailable',
+  'provider_disconnect',
+  'gateway_unavailable',
   'timeout',
   'invalid_request',
   'context_limit',
@@ -610,6 +618,18 @@ const ASSISTANT_FAILURE_CLASSIFICATIONS: ReadonlyArray<{
       providerOwnership: ['unknown', undefined],
     },
     expected: { responsibility: 'provider', reason: 'provider_ownership_unknown' },
+  },
+  {
+    // Gateway origin: the model-serving path failed to reach the provider.
+    match: { code: ['assistant_error'], assistantReason: ['provider_disconnect'] },
+    expected: { responsibility: 'provider', reason: 'provider_disconnect' },
+  },
+  {
+    // Gateway origin: our own gateway returned temporarily_unavailable. The
+    // model-serving path stays one provider bucket, so this is a distinct reason
+    // for visibility, not a responsibility change.
+    match: { code: ['assistant_error'], assistantReason: ['gateway_unavailable'] },
+    expected: { responsibility: 'provider', reason: 'gateway_unavailable' },
   },
   {
     match: {

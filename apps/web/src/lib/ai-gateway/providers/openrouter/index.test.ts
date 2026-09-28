@@ -311,6 +311,66 @@ describe('reasoning variants', () => {
   });
 });
 
+describe('virtual router tool support', () => {
+  afterEach(() => {
+    global.fetch = originalFetch;
+  });
+
+  function buildVirtualModel(overrides: Partial<OpenRouterModel>): OpenRouterModel {
+    return buildModel({
+      architecture: {
+        input_modalities: ['text'],
+        output_modalities: ['text'],
+        tokenizer: 'Router',
+      },
+      pricing: { prompt: '-1', completion: '-1' },
+      supported_parameters: [],
+      ...overrides,
+    });
+  }
+
+  async function supportedParametersById(models: OpenRouterModel[]) {
+    global.fetch = jest.fn(() =>
+      Promise.resolve(createMockResponse({ jsonData: { data: models } }))
+    ) as unknown as typeof fetch;
+    const catalog = await getEnhancedOpenRouterModels();
+    return new Map(catalog.data.map(model => [model.id, model.supported_parameters]));
+  }
+
+  it('adds tools to the allowlisted virtual routers', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'typesafe/jev-router', name: 'TypeSafe: Jev Router' }),
+      buildVirtualModel({
+        id: 'openrouter/pareto-code',
+        name: 'Pareto Code Router',
+        supported_parameters: undefined,
+      }),
+    ]);
+
+    expect(params.get('typesafe/jev-router')).toEqual(['tools']);
+    expect(params.get('openrouter/pareto-code')).toEqual(['tools']);
+  });
+
+  it('does not duplicate tools when upstream already lists it', async () => {
+    const upstream = ['max_tokens', 'tools'];
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'typesafe/jev-router', supported_parameters: upstream }),
+    ]);
+
+    expect(params.get('typesafe/jev-router')).toEqual(upstream);
+  });
+
+  it('does not add tools to other virtual models', async () => {
+    const params = await supportedParametersById([
+      buildVirtualModel({ id: 'openrouter/fusion', name: 'OpenRouter: Fusion' }),
+      buildVirtualModel({ id: 'vendor/other-router', name: 'Other Router' }),
+    ]);
+
+    expect(params.get('openrouter/fusion')).toEqual([]);
+    expect(params.get('vendor/other-router')).toEqual([]);
+  });
+});
+
 describe('mayTrainOnYourPrompts', () => {
   afterEach(() => {
     global.fetch = originalFetch;

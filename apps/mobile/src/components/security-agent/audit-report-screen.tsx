@@ -165,17 +165,18 @@ function AuditReportView({
     const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
       timeZone: 'UTC',
     });
-    // No `flex-1` here: CenteredState centers its child by measuring the
-    // child's intrinsic height, and a `flex-1` (flexBasis 0%) child inside its
-    // auto-height wrapper collapses to zero, which zeroes the height Yoga lets
-    // the title and description measure into. The screenshot then shows the
-    // icon bubble with no readable copy (explorer audit-report-empty).
+    // Explorer security-audit finding 3: CenteredState's measured path painted
+    // the icon bubble but collapsed the copy, so the screen owns the layout and
+    // EmptyState renders its plain content (`placement="static"`).
     return (
-      <EmptyState
-        icon={FileText}
-        title={t('securityAgent.auditReport.noActivity')}
-        description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
-      />
+      <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
+        <EmptyState
+          placement="static"
+          icon={FileText}
+          title={t('securityAgent.auditReport.noActivity')}
+          description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
+        />
+      </TabScreenScrollView>
     );
   }
 
@@ -217,11 +218,14 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
       {query.isLoading && <AuditReportSkeleton />}
 
       {forbidden && (
-        <EmptyState
-          icon={ShieldOff}
-          title={t('securityAgent.auditReport.unavailable')}
-          description={t('securityAgent.auditReport.unavailableDescription')}
-        />
+        <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
+          <EmptyState
+            placement="static"
+            icon={ShieldOff}
+            title={t('securityAgent.auditReport.unavailable')}
+            description={t('securityAgent.auditReport.unavailableDescription')}
+          />
+        </TabScreenScrollView>
       )}
 
       {!query.isLoading && query.isError && !forbidden && !hasReport && (

@@ -81,7 +81,7 @@ afterAll(async () => {
 });
 
 describe('AccountSettingsScreen in Arabic', () => {
-  it('renders the Arabic header title and every row title', async () => {
+  it('renders the Arabic header title and all four row titles', async () => {
     await i18n.changeLanguage('ar');
 
     const renderer = await mountAccount();

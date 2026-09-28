@@ -10,6 +10,9 @@ vi.mock('react-native', () => ({
   View: 'View',
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
+vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#71717a' }),
 }));
@@ -54,6 +57,27 @@ describe('BootstrapLoadingSurface', () => {
         node => typeof node.type === 'string' && (node.type as string) === 'ActivityIndicator'
       )
     ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('draws the Kilo brand mark and the loading label, not only a spinner', async () => {
+    const renderer = await mountSurface();
+
+    // The sign-in screen's mark: a bare spinner read as an unbranded blank
+    // page (explorer signin-language).
+    const logo = renderer.root.findByType('Image');
+    expect(logo.props.source).toBe(1);
+    expect(logo.props.accessibilityLabel).toBe('login.logo');
+
+    // The wait is named, not left to a wordless spinner.
+    const labels = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'Text' &&
+        node.props.children === 'common.loading'
+    );
+    expect(labels).toHaveLength(1);
 
     renderer.unmount();
   });

@@ -28,7 +28,7 @@ import {
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
-import { kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
+import { cloudAgentId, kiloId, stubTextPart } from '@kilocode/cloud-agent-sdk/test-helpers';
 
 import { ChildSessionSection } from '@/components/agents/child-session-section';
 import { ChildSessionModelLabel } from '@/components/agents/child-session-model-label';
@@ -49,8 +49,10 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import { SessionDetailContent } from '@/components/agents/session-detail-content';
+import { SessionContextMetrics } from '@/components/agents/session-context-metrics';
 import { SESSION_TITLE_MAX_LENGTH } from '@/components/agents/session-detail-rename-state';
 import { SessionContextSheet } from '@/components/agents/session-context-sheet';
+import { formatSessionTotalCost } from '@/components/agents/session-list-helpers';
 import { SessionGoalSection } from '@/components/agents/session-goal-section';
 import { SessionSkeletonMessages } from '@/components/agents/session-detail-skeleton';
 import { SESSION_SLOW_LOAD_MS } from '@/components/agents/session-slow-load';
@@ -360,8 +362,16 @@ vi.mock('@/components/agents/use-interaction-handlers', () => ({
     },
   }),
 }));
+// The selected model the mocked config-sync hook reports; the default '' keeps
+// every other test on the no-model path. A cloud-agent retry needs a Kilo model
+// for its transport payload to normalise.
+const sessionConfigSync = vi.hoisted(() => ({ currentModel: '' }));
 vi.mock('@/components/agents/use-session-config-sync', () => ({
-  useSessionConfigSync: () => ({ currentMode: 'code', currentModel: '', currentVariant: '' }),
+  useSessionConfigSync: () => ({
+    currentMode: 'code',
+    currentModel: sessionConfigSync.currentModel,
+    currentVariant: '',
+  }),
 }));
 const openRenameModal = vi.hoisted(() => vi.fn());
 // Mirrors the real hook's modal fields; a test opens the dialog by flipping
@@ -549,7 +559,10 @@ const PERSONAL_DISPLAY_SCOPE = { organizationId: null, isResolved: true };
  * Goal/type overrides for the goal-visibility tests. A module-level slot keeps
  * the shared `mountDetails` fixture at its existing three-parameter signature.
  */
-let goalMountOptions: { goal?: SessionGoal; resolvedType?: 'read-only' | 'remote' } = {};
+let goalMountOptions: {
+  goal?: SessionGoal;
+  resolvedType?: 'read-only' | 'remote' | 'cloud-agent';
+} = {};
 /** The PR `fetchSession` reports; `null` keeps the PR row off the screen. */
 let associatedPrMountOption: AssociatedPrData | null = null;
 const ASSOCIATED_PR: AssociatedPrData = {
@@ -676,6 +689,13 @@ let rootPageNextCursor: string | null = null;
 // reports this session title instead of the short default.
 let sessionTitleOverride: string | null = null;
 
+/**
+ * A gate the cloud-agent `api.send` mock awaits, so a retry's transport
+ * round-trip can be held open while its in-flight transcript is asserted.
+ * `null` resolves immediately.
+ */
+let pendingSend: Promise<unknown> | null = null;
+
 function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
@@ -713,8 +733,10 @@ beforeEach(() => {
   globalContext.setOrganizationId.mockClear();
   rootPageNextCursor = null;
   sessionTitleOverride = null;
+  pendingSend = null;
   condensePreference.value = false;
   currentUserId.value = 'test-user';
+  sessionConfigSync.currentModel = '';
   connectionHealth.isConnected = true;
   connectionHealth.reconnectExhausted = false;
   connectionHealth.retryConnection.mockClear();
@@ -769,10 +791,23 @@ async function mountDetails(
       if (goalMountOptions.resolvedType === 'remote') {
         return { type: 'remote', kiloSessionId: id };
       }
+      if (goalMountOptions.resolvedType === 'cloud-agent') {
+        // A cloud-agent session is the only harness type whose `api.send` the
+        // test can resolve, so a real `manager.send` materialises the retry's
+        // optimistic row instead of throwing for a missing transport.
+        return {
+          type: 'cloud-agent',
+          kiloSessionId: id,
+          cloudAgentSessionId: cloudAgentId('cag-1'),
+        };
+      }
       return { type: 'read-only', kiloSessionId: id };
     },
     getTicket: vi.fn(),
     fetchSnapshot: vi.fn(),
+    // Required by the cloud-agent transport factory; unused by read-only and
+    // remote sessions.
+    websocketBaseUrl: 'wss://example.test',
     fetchSnapshotPage: async id => {
       const response = Promise.withResolvers<SessionSnapshotPageOutcome | null>();
       requests.push({ id, response });
@@ -797,7 +832,9 @@ async function mountDetails(
         })
       : undefined,
     api: {
-      send: vi.fn(),
+      send: vi.fn(async () => {
+        await pendingSend;
+      }),
       interrupt: vi.fn(),
       answer: vi.fn(),
       reject: vi.fn(),
@@ -944,6 +981,11 @@ function renderedText(node: ReactTestInstance) {
     .findAll(child => typeof child.type === 'string' && (child.type as string) === 'Text')
     .flatMap(child => child.children.filter(value => typeof value === 'string'))
     .join('\n');
+}
+
+/** How many times `needle` occurs in the rendered transcript text. */
+function occurrencesOf(root: ReactTestInstance, needle: string): number {
+  return renderedText(root).split(needle).length - 1;
 }
 
 /**
@@ -1277,6 +1319,62 @@ describe('SessionDetailContent header title', () => {
   });
 });
 
+describe('session detail header right cluster', () => {
+  it('caps the right cluster inside the header slot and renders no copy control', async () => {
+    const { renderer } = await mountDetails([]);
+    const header = renderer.root.findByType(ScreenHeader);
+    // The copy-link action left the header in #6343 (7fad4e808) and now lives
+    // in the context sheet, so the sliced chain-link control the explorer
+    // captured cannot paint here any more.
+    expect(header.findAll(node => Object.is(node.type, 'Link2'))).toHaveLength(0);
+
+    // The header caps its right slot at half the row...
+    const slot = header.findAll(
+      node =>
+        typeof node.props.className === 'string' && node.props.className.includes('max-w-[50%]')
+    );
+    expect(slot).toHaveLength(1);
+    expect(slot[0]?.props.className).toContain('min-w-0');
+    expect(slot[0]?.props.className).toContain('shrink');
+
+    // ...and the cluster inside it shrinks into that cap, so it can never paint
+    // past the slot edge. It holds the context pill and nothing else: the PR
+    // badge now shares the goal row instead.
+    const cluster = slot[0]?.children[0] as ReactTestInstance | undefined;
+    expect(cluster?.props.className).toContain('min-w-0');
+    expect(cluster?.props.className).toContain('shrink');
+    expect(cluster?.findAllByType(SessionContextMetrics)).toHaveLength(1);
+    expect(cluster?.children).toHaveLength(1);
+
+    // The pill is the flexible part of the cluster: it shrinks into the cap
+    // with it, so the cluster can never paint past the slot edge.
+    const metrics = header.findByProps({ testID: 'session-context-metrics' });
+    expect(metrics.props.className).toContain('min-w-0');
+    expect(metrics.props.className).toContain('shrink');
+  });
+
+  // The cost is the only unbounded string in the cluster: a long total must
+  // truncate inside the capped pill instead of crossing the gutter.
+  it('truncates a long cost inside the capped pill', async () => {
+    const priced = assistantMessage('msg-priced');
+    if (priced.info.role !== 'assistant') {
+      throw new Error('expected an assistant message');
+    }
+    priced.info = { ...priced.info, sessionID: ROOT_ID, cost: 1234.56 };
+    const { renderer } = await mountDetails([priced]);
+    const expected = formatSessionTotalCost(1234.56 * 1_000_000);
+    expect(expected).not.toBeNull();
+    const metrics = renderer.root.findByProps({ testID: 'session-context-metrics' });
+    const cost = metrics.find(
+      node =>
+        Object.is(node.type, 'Text') &&
+        node.children.some(child => typeof child === 'string' && child === expected)
+    );
+    expect(cost.props.numberOfLines).toBe(1);
+    expect(cost.props.className).toContain('shrink');
+  });
+});
+
 describe('session detail status placement', () => {
   it.each(['progress', 'info'] as const)(
     'centers a %s status without transcript rows',
@@ -1349,6 +1447,252 @@ describe('session detail failed delivery retry', () => {
     // resolution is never recorded under a session the user switched to while
     // the re-send was in flight.
     expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('msg-failed', ROOT_ID);
+  });
+
+  it('shows the retried prompt once: the superseded failed row stops rendering', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    // The failed row is the prompt's only surface before the retry.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Wait for the re-send to materialise its own row; only then is the
+    // duplicate the retry used to leave observable.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+
+    // The retry's row carries the prompt; the superseded failed row must not
+    // render a second copy of it.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('hides the failed row in the same tap, while the re-send is still in flight', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    // A Kilo model is required to normalise a cloud-agent transport payload.
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open. The retry's own row lands before
+    // `api.send` settles, so the window the explorer captured is observable.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row is present while the send is unresolved, yet
+    // the prompt has a single surface: the original failed row was superseded
+    // with the same tap instead of waiting for the round-trip.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+  });
+
+  it('restores the failed row and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the original row is superseded, so the prompt is stated once.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's optimistic row is gone and the original
+    // failed row is back, so the transcript is again its single surface.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 1);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+
+  it('keeps the superseded row hidden across a session switch while the re-send is pending', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const base = userMessage('msg-failed');
+    const failed: StoredMessage = {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [
+        stubTextPart({
+          id: 'text-msg-failed',
+          sessionID: ROOT_ID,
+          messageID: 'msg-failed',
+          text: prompt,
+        }),
+      ],
+    };
+    const view = await mountDetails([failed]);
+    act(() => {
+      view.store.set<
+        ReadonlyMap<string, MessageDeliveryState>,
+        [ReadonlyMap<string, MessageDeliveryState>],
+        unknown
+      >(
+        view.manager.atoms.pendingMessages,
+        new Map<string, MessageDeliveryState>([
+          ['msg-failed', { status: 'failed', error: 'boom', reason: 'execution' }],
+        ])
+      );
+    });
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    // Hold the transport round-trip open: the retry is still in flight when the
+    // user leaves the session and comes straight back.
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The retry's optimistic row landed, and the row it superseded with the same
+    // tap is already hidden.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // What the second open of this session serves: the failed row the retry
+    // superseded beside the retry's own row.
+    const rows = [...view.store.get(view.manager.atoms.messagesList)];
+
+    await view.switchRoot(NEXT_ROOT_ID);
+    await view.switchRoot(ROOT_ID);
+    await view.respond(ROOT_ID, rows);
+
+    // The hide belongs to the session that owns the row, so coming back before
+    // the send settles still shows only the retry's copy of the prompt.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.resolve(undefined);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // The accepted re-send records the resolution for the same session, so the
+    // superseded row stays hidden after the round-trip lands.
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
   });
 });
 
@@ -3410,6 +3754,29 @@ describe('session detail duplicate failure state', () => {
     const className = String(footer?.props.className ?? '');
     expect(className).toContain('bg-background');
     expect(className).not.toContain('absolute');
+  });
+
+  it('renders the fixed footer error row without a position transition', async () => {
+    // A Reanimated layout transition on the footer wrapper animates its Y
+    // across the keyboard show/hide and blocking-card mount/unmount resizes.
+    // An entry measured inside that resize storm can strand the row at its
+    // pre-change position — floating mid-screen over the transcript, where
+    // the red error line drew on top of a transcript row (question-kb-down
+    // capture). The footer's position must always be plain layout.
+    const view = await mountFailedTurn({
+      type: 'error',
+      message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      timestamp: 0,
+    });
+    const node = indicatorNodes(view)[0];
+    if (!node) {
+      throw new Error('footer indicator did not render');
+    }
+    let wrapper = node.parent;
+    while (wrapper && wrapper.props.layout === undefined) {
+      wrapper = wrapper.parent;
+    }
+    expect(wrapper).toBeNull();
   });
 });
 

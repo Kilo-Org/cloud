@@ -283,7 +283,7 @@ export function MessageInputContent({
         sendDisabled={sendDisabled}
         showAttachmentButton={showAttachmentButton}
         showCounter={showCounter}
-        shouldScroll={resolveMessageInputShouldScroll(inputMeasure.height)}
+        shouldScroll={resolveMessageInputShouldScroll(inputMeasure.height, inputMeasure.maxHeight)}
         typingMembers={typingMembers}
         voiceInputActive={voiceInput.isActive}
         voiceInputAvailable={voiceInput.available}

@@ -5,7 +5,11 @@
  */
 import * as Haptics from 'expo-haptics';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { type SlashCommandInfo, type StandaloneSuggestion } from '@kilocode/cloud-agent-sdk';
+import {
+  type SlashCommandCatalogStatus,
+  type SlashCommandInfo,
+  type StandaloneSuggestion,
+} from '@kilocode/cloud-agent-sdk';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import {
@@ -48,6 +52,7 @@ import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
   createMobileSlashCommandList,
   getSlashCommandCandidate,
+  getSlashCommandCatalogNotice,
   getSlashCommandSuggestions,
   isGoalCommandDraft,
   parseChatComposerSubmission,
@@ -194,6 +199,12 @@ type ChatComposerProps = {
   activeSessionType?: 'cloud-agent' | 'remote' | 'read-only' | null;
   /** Wrapper commands; remote presentation adds /new and capability-gated /exit after stripping aliases. */
   commands?: SlashCommandInfo[];
+  /**
+   * Bound status the wrapper reported for `commands`. Present when the wrapper
+   * bounded the catalog, so the open slash menu says that rows are missing or
+   * that the catalog is over its size limit instead of looking complete.
+   */
+  commandCatalogStatus?: SlashCommandCatalogStatus | null;
   /** Remote command state — empty for non-remote sessions. */
   commandState?: RemoteCommandState | null;
   /** Share-gate delivery id; composer takes the payload and clears the route param. */
@@ -249,6 +260,7 @@ export function ChatComposer({
   attachmentsEnabled = true,
   activeSessionType = null,
   commands = [],
+  commandCatalogStatus = null,
   commandState = null,
   shareId,
   autoSend,
@@ -391,7 +403,7 @@ export function ChatComposer({
   const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
   const lineHeight = TEXT_INPUT_LINE_HEIGHT * fontScale;
   const inputMinHeight = lineHeight + TEXT_INPUT_VERTICAL_PADDING;
-  const inputMaxHeight = resolveComposerMaxHeight({
+  const rawInputMaxHeight = resolveComposerMaxHeight({
     windowHeight,
     safeAreaInsetTop: insets.top,
     safeAreaInsetBottom: insets.bottom,
@@ -418,15 +430,26 @@ export function ChatComposer({
     };
   }, []);
 
+  // The row reports the real input's content height (dp, padding included) on
+  // every content change. `useTextHeight` reads the line pitch that input
+  // lays out at from it, so the capped height it publishes lands on a whole
+  // rendered line.
+  const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
   const measure = useTextHeight({
     minHeight: inputMinHeight,
-    maxHeight: inputMaxHeight,
+    maxHeight: rawInputMaxHeight,
     verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
     textContentWidth: resolveComposerTextContentWidth(inputWidth),
     fontSize: TEXT_INPUT_FONT_SIZE,
     lineHeight: TEXT_INPUT_LINE_HEIGHT,
     fontScale,
+    nativeContentHeight: inputContentHeight,
   });
+  // The cap snapped to the input's own rendered line pitch (see
+  // `useTextHeight`). A capped multiline input must be a whole number of that
+  // pitch: Android's `TextInput` scrolls to the caret by a partial line
+  // otherwise, which cuts the first visible line against the input's top edge.
+  const inputMaxHeight = measure.maxHeight;
   // useTextHeight() returns a new object every render.  Hold the latest
   // measure in a ref so the draft-restore effect only runs after an
   // inputEpoch bump (remount), never on a stray measure identity change.
@@ -749,6 +772,10 @@ export function ChatComposer({
   );
   const slashCommandSuggestions =
     slashCommandInput === null ? [] : getSlashCommandSuggestions(slashCommandInput, commandList);
+  // The bound notice belongs beside the open slash menu: that is where the
+  // reader expects to see every command, and a dropped row is otherwise
+  // invisible.
+  const slashCommandCatalogNotice = getSlashCommandCatalogNotice(commandCatalogStatus);
 
   // The strip must show share-prefilled files before the session resolves.
   const showAttachments = attachmentsEnabled || upload.attachments.length > 0;
@@ -1180,9 +1207,9 @@ export function ChatComposer({
   const textInputStyle: TextStyle = {
     color: colors.foreground,
     fontSize,
-    height: measure.height,
     includeFontPadding: false,
     lineHeight,
+    height: measure.height,
     paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
@@ -1261,6 +1288,14 @@ export function ChatComposer({
           />
         ) : null}
 
+        {slashCommandInput !== null && slashCommandCatalogNotice !== null && !isSending ? (
+          <AccessibleStatus
+            tone="status"
+            message={slashCommandCatalogNotice}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+
         {slashCommandSuggestions.length > 0 && !isSending ? (
           <Animated.View
             entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
@@ -1324,6 +1359,7 @@ export function ChatComposer({
               hasSendableContent={control.hasSendableContent}
               inputAccessibilityDisabled={control.inputAccessibilityDisabled}
               inputEditable={control.inputEditable}
+              inputEmpty={characterCount === 0}
               inputRef={inputRef}
               isSending={isSending}
               isStreaming={isStreaming}
@@ -1342,6 +1378,7 @@ export function ChatComposer({
                 setIsFocused(true);
               }}
               onInputLayout={handleInputLayout}
+              onInputContentSizeChange={setInputContentHeight}
               onInsertNewline={handleInsertNewline}
               onSelectionChange={handleSelectionChange}
               onStop={handleStop}

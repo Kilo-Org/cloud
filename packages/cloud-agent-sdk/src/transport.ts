@@ -116,10 +116,10 @@ type TransportSendInput = {
   /**
    * Ready file parts to append to the remote CLI's `send_message` `parts`
    * array (after the text part). Distinct from the cloud-only `attachments`
-   * field: this path is for CAPABLE remote CLI sessions (the session
-   * advertised `capabilities.attachments: true` in its most recent
-   * heartbeat). Transports that don't support the path (cloud-agent, read-
-   * only, non-capable remote) ignore it.
+   * field: this path is for `remote` sessions whose CLI has not reported
+   * `capabilities.attachments: false` (unknown capabilities are optimistic).
+   * Transports that don't support the path (cloud-agent, read-only, a CLI
+   * that reported `attachments: false`) ignore it.
    */
   attachmentParts?: RemoteAttachmentPart[] | undefined;
 };

@@ -12,7 +12,7 @@
 // session, never the moderation sheet. Keeping the arithmetic in one place lets
 // the row's gap and the two tap areas be checked together (vr1, 2026-09-16).
 
-import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 /**
  * The pill's visual height in pt, read off its classes in
@@ -33,17 +33,17 @@ export const FIX_WITH_KILO_VISUAL_DP = 23;
 export const FIX_WITH_KILO_HIT_SLOP = { top: 11, bottom: 11, left: 2, right: 2 } as const;
 
 /** The overflow's frame: `h-11 w-11` measured on device. */
-export const COMMENT_ACTIONS_FRAME_DP = COMPACT_CONTROL_FRAME_DP;
+export const COMMENT_ACTIONS_FRAME_DP = COMPACT_H11_FRAME_DP;
 
 /** The overflow's visible circle, in explicit dp so rem cannot shrink it. */
 export const COMMENT_ACTIONS_VISUAL_DP = 28;
 
 /** The overflow's hit slop, which lifts its frame to the 44pt minimum. */
 export const COMMENT_ACTIONS_HIT_SLOP = {
-  top: COMPACT_CONTROL_HIT_SLOP_DP,
-  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
-  left: COMPACT_CONTROL_HIT_SLOP_DP,
-  right: COMPACT_CONTROL_HIT_SLOP_DP,
+  top: COMPACT_H11_HIT_SLOP_DP,
+  bottom: COMPACT_H11_HIT_SLOP_DP,
+  left: COMPACT_H11_HIT_SLOP_DP,
+  right: COMPACT_H11_HIT_SLOP_DP,
 } as const;
 
 /** The trailing group's `gap-3` class, in dp: 0.75rem at NativeWind's 14pt rem. */

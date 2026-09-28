@@ -95,11 +95,11 @@ function connectNoteKey(platform: RepositoryPlatform): string | undefined {
 
 /**
  * Provider-aware repository section. One group per provider renders its own
- * empty/error state independently, and the picker trigger lists every
- * repository plus the Recently used rows when any provider has rows. A
- * provider's expanded connect prompt renders only before a repository is
- * selected. Afterwards, compact actions keep other providers reachable without
- * contradicting the completed selection or requiring it to be cleared.
+ * empty/error state independently, and the picker trigger always renders,
+ * listing every repository plus the Recently used rows. A provider's expanded
+ * connect prompt renders only before a repository is selected. Afterwards,
+ * compact actions keep other providers reachable without contradicting the
+ * completed selection or requiring it to be cleared.
  */
 export function NewSessionRepositorySection({
   disabled,
@@ -135,17 +135,25 @@ export function NewSessionRepositorySection({
         {t('common.repository')}
       </Text>
 
-      {(hasRepos || anyLoading) && (
-        <RepoSelector
-          value={value}
-          repositories={repositories}
-          recents={recents}
-          isLoading={!hasRepos && anyLoading}
-          organizationId={organizationId ?? null}
-          onChange={onChange}
-          disabled={disabled}
-        />
-      )}
+      {/*
+        The picker renders unconditionally. Its trigger always reserves its
+        height and already covers loading ("Loading..."), empty ("Select
+        repository") and disabled states, so gating it off (the old
+        `hasRepos || anyLoading`) could leave the `Repository` heading as the
+        section's only child — a blank void above Start session — while a
+        provider query was paused (`isLoading === false`, no data) or a
+        connect card was waiting on the persisted-collapse read. The web panel
+        renders its repository trigger unconditionally too.
+      */}
+      <RepoSelector
+        value={value}
+        repositories={repositories}
+        recents={recents}
+        isLoading={!hasRepos && anyLoading}
+        organizationId={organizationId ?? null}
+        onChange={onChange}
+        disabled={disabled}
+      />
 
       {isCloneEntry ? null : (
         <RepositoryBranchSelector
@@ -275,6 +283,8 @@ export function NewSessionRepositorySection({
             the label the free space keeps its box wider than the text, and
             `numberOfLines` pins the line. The explorer captures
             new-session-filled and new-session-kb-down both showed that wrap.
+            The logical `me-[24px]` inset keeps the centered label clear of the
+            leading glyph in RTL as well, which the physical `mr-` would not.
           */}
           <Text className="me-[24px] flex-1 text-center" numberOfLines={1}>
             {t(selectedRepository === null ? copy.openLabel : copy.connectTitle)}

@@ -27,7 +27,7 @@ import { useKiloChatClient } from './hooks/use-kilo-chat-client';
 import { useConversationMarkRead } from './hooks/use-conversation-mark-read';
 import { useConversationMessageController } from './hooks/use-conversation-message-controller';
 import { useMessageCacheUpdater, useMessages } from './hooks/use-messages';
-import { useNowTicker } from './hooks/use-now-ticker';
+import { useNowTicker } from '@/lib/hooks/use-now-ticker';
 import { useCurrentUserId } from './hooks/use-current-user-id';
 import { useKiloChatTokenError } from './kilo-chat-provider';
 import { useAppActiveAndFocused } from './hooks/use-app-active-and-focused';

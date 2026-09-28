@@ -17,17 +17,17 @@ import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { r2Client } from '@/lib/r2/client';
-import type { FakeR2Client } from '@/tests/helpers/fake-r2.helper';
+import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
-jest.mock('@/lib/r2/client', () => {
-  const { createFakeR2Client } = jest.requireActual<{
-    createFakeR2Client: () => FakeR2Client;
-  }>('@/tests/helpers/fake-r2.helper');
-  return { r2Client: createFakeR2Client() };
-});
+jest.mock('@/lib/r2/client', () =>
+  jest
+    .requireActual<{
+      createFakeR2ClientModule: () => FakeR2ClientModule;
+    }>('@/tests/helpers/fake-r2.helper')
+    .createFakeR2ClientModule()
+);
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -1473,7 +1473,7 @@ describe('rewriteModelResponse', () => {
 });
 
 describe('api_request_log storage', () => {
-  const fakeR2 = r2Client as unknown as FakeR2Client;
+  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@/lib/r2/client');
   const vercelRequestId = 'api-request-log-r2-storage-test';
   const bucket = 'test-api-request-log';
 
@@ -1525,6 +1525,10 @@ describe('api_request_log storage', () => {
   test('stores the redacted request and raw response in R2', async () => {
     await logUpstreamError();
 
+    expect(fakeR2.credentials).toEqual({
+      accessKeyId: 'mock-test-api-request-log-access-key',
+      secretAccessKey: 'mock-test-api-request-log-secret-key',
+    });
     const row = await selectLoggedRow();
     expect(row).toMatchObject({
       status_code: 400,

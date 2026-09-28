@@ -1,10 +1,13 @@
 import { GetObjectCommand, NoSuchKey, PutObjectCommand } from '@aws-sdk/client-s3';
 
-/** In-memory stand-in for `r2Client` that supports string-bodied puts and gets. */
+type R2Credentials = { accessKeyId: string; secretAccessKey: string };
+
+/** In-memory stand-in for an R2 client that supports string-bodied puts and gets. */
 export function createFakeR2Client() {
   const objects = new Map<string, string>();
   return {
     objects,
+    credentials: null as R2Credentials | null,
     async send(command: unknown) {
       if (command instanceof PutObjectCommand) {
         const { Bucket, Key, Body } = command.input;
@@ -27,3 +30,21 @@ export function createFakeR2Client() {
 }
 
 export type FakeR2Client = ReturnType<typeof createFakeR2Client>;
+
+/**
+ * Replacement for `@/lib/r2/client` whose `createR2Client` always returns the
+ * same fake and records the credentials it was created with. Retrieve the fake
+ * with `jest.requireMock<FakeR2ClientModule>('@/lib/r2/client').fakeR2`.
+ */
+export function createFakeR2ClientModule() {
+  const fakeR2 = createFakeR2Client();
+  return {
+    fakeR2,
+    createR2Client(credentials: R2Credentials) {
+      fakeR2.credentials = credentials;
+      return fakeR2;
+    },
+  };
+}
+
+export type FakeR2ClientModule = ReturnType<typeof createFakeR2ClientModule>;

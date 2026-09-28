@@ -5,9 +5,8 @@ import { eq } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { r2Client } from '@/lib/r2/client';
 import { getUserFromAuth } from '@/lib/user/server';
-import type { FakeR2Client } from '@/tests/helpers/fake-r2.helper';
+import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { GET } from './route';
 
@@ -20,14 +19,15 @@ jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 
-jest.mock('@/lib/r2/client', () => {
-  const { createFakeR2Client } = jest.requireActual<{
-    createFakeR2Client: () => FakeR2Client;
-  }>('@/tests/helpers/fake-r2.helper');
-  return { r2Client: createFakeR2Client() };
-});
+jest.mock('@/lib/r2/client', () =>
+  jest
+    .requireActual<{
+      createFakeR2ClientModule: () => FakeR2ClientModule;
+    }>('@/tests/helpers/fake-r2.helper')
+    .createFakeR2ClientModule()
+);
 
-const fakeR2 = r2Client as unknown as FakeR2Client;
+const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@/lib/r2/client');
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const TEST_USER_ID = 'api-request-log-download-test-user';
 const TEST_MODEL = 'poolside/laguna-s-2.1:free';

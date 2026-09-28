@@ -1,24 +1,48 @@
-import { GetObjectCommand, NoSuchKey, PutObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, NoSuchKey, PutObjectCommand, type S3Client } from '@aws-sdk/client-s3';
 import { randomUUID } from 'node:crypto';
 import type { ApiRequestLog } from '@kilocode/db/schema';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { r2Client } from '@/lib/r2/client';
+import { createR2Client } from '@/lib/r2/client';
 
 export type ApiRequestLogBlobUpload = {
   columns: Pick<ApiRequestLog, 'request_r2_key' | 'response_r2_key'>;
   uploadError: string | null;
 };
 
-function getBucketName(): string {
-  const bucketName = getEnvVariable('R2_API_REQUEST_LOG_BUCKET_NAME');
-  if (!bucketName) {
-    throw new Error('R2_API_REQUEST_LOG_BUCKET_NAME environment variable is required');
+type ApiRequestLogStorage = { client: S3Client; bucket: string };
+
+let storage: ApiRequestLogStorage | undefined;
+
+function requireEnvVariable(name: string): string {
+  const value = getEnvVariable(name);
+  if (!value) {
+    throw new Error(`${name} environment variable is required`);
   }
-  return bucketName;
+  return value;
 }
 
-async function putBlob(bucket: string, key: string, body: string, contentType: string) {
-  await r2Client.send(
+/**
+ * Resolved on first use rather than at import, so missing configuration only
+ * affects request logging instead of every module importing the gateway.
+ */
+function getStorage(): ApiRequestLogStorage {
+  storage ??= {
+    bucket: requireEnvVariable('R2_API_REQUEST_LOG_BUCKET_NAME'),
+    client: createR2Client({
+      accessKeyId: requireEnvVariable('R2_API_REQUEST_LOG_ACCESS_KEY_ID'),
+      secretAccessKey: requireEnvVariable('R2_API_REQUEST_LOG_SECRET_ACCESS_KEY'),
+    }),
+  };
+  return storage;
+}
+
+async function putBlob(
+  { client, bucket }: ApiRequestLogStorage,
+  key: string,
+  body: string,
+  contentType: string
+) {
+  await client.send(
     new PutObjectCommand({ Bucket: bucket, Key: key, Body: body, ContentType: contentType })
   );
   return key;
@@ -36,9 +60,9 @@ export async function uploadApiRequestLogBlobs({
   request: string;
   response: string | undefined;
 }): Promise<ApiRequestLogBlobUpload> {
-  let bucket: string;
+  let resolvedStorage: ApiRequestLogStorage;
   try {
-    bucket = getBucketName();
+    resolvedStorage = getStorage();
   } catch (error) {
     return {
       columns: { request_r2_key: null, response_r2_key: null },
@@ -48,10 +72,10 @@ export async function uploadApiRequestLogBlobs({
 
   const prefix = `${new Date().toISOString().slice(0, 10)}/${randomUUID()}`;
   const [requestResult, responseResult] = await Promise.allSettled([
-    putBlob(bucket, `${prefix}/request.json`, request, 'application/json; charset=utf-8'),
+    putBlob(resolvedStorage, `${prefix}/request.json`, request, 'application/json; charset=utf-8'),
     response === undefined
       ? null
-      : putBlob(bucket, `${prefix}/response.txt`, response, 'text/plain; charset=utf-8'),
+      : putBlob(resolvedStorage, `${prefix}/response.txt`, response, 'text/plain; charset=utf-8'),
   ]);
 
   const uploadErrors = [
@@ -71,7 +95,8 @@ export async function uploadApiRequestLogBlobs({
 /** Returns null when the object does not exist. */
 export async function getApiRequestLogBlob(key: string): Promise<string | null> {
   try {
-    const result = await r2Client.send(new GetObjectCommand({ Bucket: getBucketName(), Key: key }));
+    const { client, bucket } = getStorage();
+    const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
     return (await result.Body?.transformToString('utf-8')) ?? null;
   } catch (error) {
     if (error instanceof NoSuchKey) {

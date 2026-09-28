@@ -44,6 +44,7 @@ import {
 import { ConversationMessages } from './ConversationMessages';
 import { CurrentTaskList } from './CurrentTaskList';
 import { getCurrentTodos } from './current-todos';
+import { isUserMessage, getUserTextContent } from './MessageBubble';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
@@ -277,6 +278,7 @@ export default function CloudChatPage({
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
+  const setFailedPrompt = useSetAtom(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);

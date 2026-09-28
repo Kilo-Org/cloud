@@ -129,7 +129,7 @@ jobs:
 
           echo "Deploying candidate \`$target_sha\`." >> "$GITHUB_STEP_SUMMARY"
           echo "should_deploy=true" >> "$GITHUB_OUTPUT"
-          if git diff --quiet "$base_sha" "$target_sha" -- services/kiloclaw pnpm-lock.yaml pnpm-workspace.yaml patches packages/worker-utils; then
+          if git diff --quiet "$base_sha" "$target_sha" -- services/kiloclaw pnpm-lock.yaml pnpm-workspace.yaml patches packages; then
             echo "deploy_kiloclaw=false" >> "$GITHUB_OUTPUT"
           else
             echo "deploy_kiloclaw=true" >> "$GITHUB_OUTPUT"

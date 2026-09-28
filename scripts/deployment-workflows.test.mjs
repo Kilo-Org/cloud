@@ -206,6 +206,11 @@ test('deployment gate only deploys changes since the last complete run', () => {
     writeFileSync(join(directory, 'services/kiloclaw/file'), 'worker');
     commit('worker');
     assert.equal(runGate(deployedSha).deploy_kiloclaw, 'true');
+    const kiloclawSha = git('rev-parse', 'HEAD');
+    mkdirSync(join(directory, 'packages/kiloclaw-secret-catalog'), { recursive: true });
+    writeFileSync(join(directory, 'packages/kiloclaw-secret-catalog/file'), 'shared package');
+    commit('shared package');
+    assert.equal(runGate(kiloclawSha).deploy_kiloclaw, 'true');
     const greenSha = git('rev-parse', 'HEAD');
     writeFileSync(join(directory, 'apps/web/file'), 'untested');
     commit('untested');

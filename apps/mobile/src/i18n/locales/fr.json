@@ -3222,6 +3222,7 @@
     "emptyTitle": "Aucun site de confiance",
     "emptyDescription": "Les liens vers les sites de confiance s'ouvrent sans nouvelle demande de confirmation.",
     "revoke": "Retirer {{host}} des sites de confiance",
+    "revokeMessage": "Les liens vers ce site demanderont à nouveau une confirmation.",
     "backToPreferences": "Retour aux préférences"
   },
   "quickChat": {

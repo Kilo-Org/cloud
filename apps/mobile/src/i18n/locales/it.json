@@ -3222,6 +3222,7 @@
     "emptyTitle": "Nessun sito attendibile",
     "emptyDescription": "Quando consideri attendibile un sito, i suoi link si aprono senza chiedere di nuovo conferma.",
     "revoke": "Revoca l'attendibilità di {{host}}",
+    "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
     "backToPreferences": "Torna alle preferenze"
   },
   "quickChat": {

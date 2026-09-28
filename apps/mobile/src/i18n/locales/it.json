@@ -2138,7 +2138,7 @@
       "open": "apri la PR",
       "closed": "pull request chiusa",
       "merged": "pull request integrata",
-      "draft": "pR in bozza",
+      "draft": "PR in bozza",
       "updating": "Aggiornamento in corso, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

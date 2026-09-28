@@ -110,6 +110,8 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     ['structured_output', 'assistant_structured_output'],
     ['timeout', 'assistant_timeout'],
     ['invalid_request', 'assistant_invalid_request'],
+    ['provider_disconnect', 'assistant_provider_disconnect'],
+    ['gateway_unavailable', 'assistant_gateway_unavailable'],
   ] as const)('maps assistant reason %s to %s', (assistantReason, expected) => {
     expect(
       terminalReasonFromCloudAgentFailure({

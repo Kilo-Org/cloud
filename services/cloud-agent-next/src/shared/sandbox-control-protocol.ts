@@ -17,6 +17,8 @@ export const CLOUD_AGENT_ASSISTANT_FAILURE_REASON_VALUES = [
   'model_unavailable',
   'provider_authentication',
   'provider_unavailable',
+  'provider_disconnect',
+  'gateway_unavailable',
   'timeout',
   'invalid_request',
   'context_limit',

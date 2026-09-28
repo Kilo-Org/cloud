@@ -566,7 +566,14 @@
       "deletedUser": "usuario eliminado",
       "replyForbiddenTerm": "Non tes permiso para responder a esta {{term}}.",
       "moreLinesAbove_one": "… hai {{displayCount}} liña máis arriba.",
-      "moreLinesAbove_other": "… hai {{displayCount}} liñas máis arriba."
+      "moreLinesAbove_other": "… hai {{displayCount}} liñas máis arriba.",
+      "deleteComment": "Eliminar o comentario",
+      "deleteCommentTitle": "Eliminar o comentario?",
+      "deleteCommentMessage": "Este comentario eliminarase da solicitude de integración.",
+      "commentEditFailed": "Non se puido gardar o teu comentario. Comproba a conexión e téntao de novo.",
+      "commentEditUnavailable": "Este comentario non se pode editar. Pode que se eliminase.",
+      "commentDeleteFailed": "Non se puido eliminar o teu comentario. Comproba a conexión e téntao de novo.",
+      "commentDeleteUnavailable": "Este comentario non se pode eliminar."
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da aplicación de GitHub.",
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",
+      "commentUpdated": "Comentario actualizado",
+      "commentDeleted": "Comentario eliminado",
       "reviewSubmitted": "Revisión enviada",
       "autoMergeEnabled": "Fusión automática activada"
     },

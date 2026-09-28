@@ -566,7 +566,14 @@
       "deletedUser": "የተሰረዘ ተጠቃሚ",
       "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
       "moreLinesAbove_one": "… ከላይ ተጨማሪ {{displayCount}} መስመር አለ።",
-      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።"
+      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።",
+      "deleteComment": "አስተያየት ሰርዝ",
+      "deleteCommentTitle": "አስተያየት ሰርዝ?",
+      "deleteCommentMessage": "ይህ አስተያየት ከዚህ የማዋሃድ ጥያቄ ይሰረዛል።",
+      "commentEditFailed": "አስተያየትህን ማስቀመጥ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+      "commentEditUnavailable": "ይህ አስተያየት ሊስተካከል አይችልም። ተሰርዞ ሊሆን ይችላል።",
+      "commentDeleteFailed": "አስተያየትህን መሰረዝ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+      "commentDeleteUnavailable": "ይህ አስተያየት ሊሰረዝ አይችልም።"
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም።",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
     "announce": {
       "commentPosted": "አስተያየት ተለጥፏል",
+      "commentUpdated": "አስተያየት ተዘምኗል",
+      "commentDeleted": "አስተያየት ተሰርዟል",
       "reviewSubmitted": "ግምገማ ቀርቧል",
       "autoMergeEnabled": "ራስ-ሰር ማዋሃድ ነቅቷል"
     },

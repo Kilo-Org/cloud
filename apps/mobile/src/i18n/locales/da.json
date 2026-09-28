@@ -566,7 +566,14 @@
       "deletedUser": "slettet bruger",
       "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}.",
       "moreLinesAbove_one": "… der er flere linjer ovenfor: {{displayCount}}.",
-      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}."
+      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}.",
+      "deleteComment": "Slet kommentar",
+      "deleteCommentTitle": "Slet kommentaren?",
+      "deleteCommentMessage": "Denne kommentar bliver slettet fra pull requesten.",
+      "commentEditFailed": "Kunne ikke gemme din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentEditUnavailable": "Denne kommentar kan ikke redigeres. Den er muligvis slettet.",
+      "commentDeleteFailed": "Kunne ikke slette din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentDeleteUnavailable": "Denne kommentar kan ikke slettes."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
+      "commentUpdated": "Kommentar opdateret",
+      "commentDeleted": "Kommentar slettet",
       "reviewSubmitted": "Gennemgang sendt",
       "autoMergeEnabled": "Automatisk fletning aktiveret"
     },

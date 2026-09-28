@@ -566,7 +566,14 @@
       "deletedUser": "slettet bruker",
       "replyForbiddenTerm": "Du har ikke tillatelse til å svare på denne {{term}}.",
       "moreLinesAbove_one": "… flere linjer ovenfor: {{displayCount}}",
-      "moreLinesAbove_other": "… flere linjer ovenfor: {{displayCount}}"
+      "moreLinesAbove_other": "… flere linjer ovenfor: {{displayCount}}",
+      "deleteComment": "Slett kommentar",
+      "deleteCommentTitle": "Slette kommentaren?",
+      "deleteCommentMessage": "Denne kommentaren blir slettet fra PR-en.",
+      "commentEditFailed": "Kunne ikke lagre kommentaren din. Sjekk tilkoblingen og prøv igjen.",
+      "commentEditUnavailable": "Denne kommentaren kan ikke redigeres. Den kan ha blitt slettet.",
+      "commentDeleteFailed": "Kunne ikke slette kommentaren din. Sjekk tilkoblingen og prøv igjen.",
+      "commentDeleteUnavailable": "Denne kommentaren kan ikke slettes."
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Dette er ikke en lenke til en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publisert",
+      "commentUpdated": "Kommentar oppdatert",
+      "commentDeleted": "Kommentar slettet",
       "reviewSubmitted": "Kodegjennomgang sendt inn",
       "autoMergeEnabled": "Automatisk fletting aktivert"
     },

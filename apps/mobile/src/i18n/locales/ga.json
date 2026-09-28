@@ -599,7 +599,14 @@
       "moreLinesAbove_other": "… {{displayCount}} líne eile thuas",
       "moreLinesAbove_two": "… {{displayCount}} líne eile thuas",
       "moreLinesAbove_few": "… {{displayCount}} líne eile thuas",
-      "moreLinesAbove_many": "… {{displayCount}} líne eile thuas"
+      "moreLinesAbove_many": "… {{displayCount}} líne eile thuas",
+      "deleteComment": "Scrios an trácht",
+      "deleteCommentTitle": "Scrios an trácht?",
+      "deleteCommentMessage": "Scriosfar an trácht seo ón iarratas tarraingthe.",
+      "commentEditFailed": "Níorbh fhéidir do thrácht a shábháil. Seiceáil do nasc agus bain triail as arís.",
+      "commentEditUnavailable": "Ní féidir an trácht seo a chur in eagar. Seans gur scriosadh é.",
+      "commentDeleteFailed": "Níorbh fhéidir do thrácht a scriosadh. Seiceáil do nasc agus bain triail as arís.",
+      "commentDeleteUnavailable": "Ní féidir an trácht seo a scriosadh."
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
@@ -795,6 +802,8 @@
     "linkPasteNotAPullRequest": "Ní nasc d’iarratas tarraingthe ná d’iarratas cumaisc é seo",
     "announce": {
       "commentPosted": "Trácht postáilte",
+      "commentUpdated": "Trácht nuashonraithe",
+      "commentDeleted": "Trácht scriosta",
       "reviewSubmitted": "Athbhreithniú seolta",
       "autoMergeEnabled": "Cumasc uathoibríoch cumasaithe"
     },

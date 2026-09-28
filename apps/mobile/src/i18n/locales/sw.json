@@ -566,7 +566,14 @@
       "deletedUser": "mtumiaji aliyefutwa",
       "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
       "moreLinesAbove_one": "… kuna mstari mwingine {{displayCount}} hapo juu.",
-      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu."
+      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu.",
+      "deleteComment": "Futa maoni",
+      "deleteCommentTitle": "Unataka kufuta maoni?",
+      "deleteCommentMessage": "Maoni haya yatafutwa kutoka kwa ombi la kuunganisha.",
+      "commentEditFailed": "Imeshindikana kuhifadhi maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentEditUnavailable": "Maoni haya hayawezi kuhaririwa. Huenda yamefutwa.",
+      "commentDeleteFailed": "Imeshindikana kufuta maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentDeleteUnavailable": "Maoni haya hayawezi kufutwa."
     },
     "couldNotOpenGitHubAppSettings": "Imeshindikana kufungua mipangilio ya programu ya GitHub.",
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",
+      "commentUpdated": "Maoni yamesasishwa",
+      "commentDeleted": "Maoni yamefutwa",
       "reviewSubmitted": "Ukaguzi umewasilishwa",
       "autoMergeEnabled": "Muunganisho wa kiotomatiki umewashwa"
     },

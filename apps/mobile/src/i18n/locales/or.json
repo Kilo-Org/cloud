@@ -566,7 +566,14 @@
       "deletedUser": "ବିଲୋପ ହୋଇଥିବା ବ୍ୟବହାରକାରୀ",
       "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "moreLinesAbove_one": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।",
-      "moreLinesAbove_other": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।"
+      "moreLinesAbove_other": "… ଉପରେ ଆହୁରି {{displayCount}} ଧାଡ଼ି ଅଛି।",
+      "deleteComment": "ମନ୍ତବ୍ୟ ବିଲୋପ କରନ୍ତୁ",
+      "deleteCommentTitle": "ମନ୍ତବ୍ୟ ବିଲୋପ କରିବେ?",
+      "deleteCommentMessage": "ଏହି ମନ୍ତବ୍ୟ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରୁ ବିଲୋପ କରାଯିବ।",
+      "commentEditFailed": "ଆପଣଙ୍କ ମନ୍ତବ୍ୟ ସଂରକ୍ଷଣ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "commentEditUnavailable": "ଏହି ମନ୍ତବ୍ୟ ସମ୍ପାଦନ କରିହେବ ନାହିଁ। ଏହା ବିଲୋପ ହୋଇଥାଇପାରେ।",
+      "commentDeleteFailed": "ଆପଣଙ୍କ ମନ୍ତବ୍ୟ ବିଲୋପ କରିହେଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+      "commentDeleteUnavailable": "ଏହି ମନ୍ତବ୍ୟ ବିଲୋପ କରିହେବ ନାହିଁ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍‌ର ସେଟିଂସ୍ ଖୋଲିହେଲା ନାହିଁ।",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
     "announce": {
       "commentPosted": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା",
+      "commentUpdated": "ମନ୍ତବ୍ୟ ଅଦ୍ୟତନ ହେଲା",
+      "commentDeleted": "ମନ୍ତବ୍ୟ ବିଲୋପ ହେଲା",
       "reviewSubmitted": "ସମୀକ୍ଷା ଦାଖଲ ହେଲା",
       "autoMergeEnabled": "ସ୍ୱୟଂଚାଳିତ ମର୍ଜ୍ ଚାଲୁ ହେଲା"
     },

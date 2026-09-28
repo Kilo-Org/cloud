@@ -515,6 +515,13 @@
       "fixWithKiloPrompt": "Please address the following PR comment: {{link}}",
       "commentBadRequest": "This comment can't be posted. The pull request may have changed.",
       "commentForbidden": "You don't have permission to comment on this pull request.",
+      "deleteComment": "Delete comment",
+      "deleteCommentTitle": "Delete comment?",
+      "deleteCommentMessage": "This comment will be deleted from the pull request.",
+      "commentEditFailed": "Couldn't save your comment. Check your connection and try again.",
+      "commentEditUnavailable": "This comment can't be edited. It may have been deleted.",
+      "commentDeleteFailed": "Couldn't delete your comment. Check your connection and try again.",
+      "commentDeleteUnavailable": "This comment can't be deleted.",
       "moderation": {
         "reportContent": {
           "terminal": "This comment can't be reported.",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",
+      "commentUpdated": "Comment updated",
+      "commentDeleted": "Comment deleted",
       "reviewSubmitted": "Review submitted",
       "autoMergeEnabled": "Auto-merge enabled"
     },

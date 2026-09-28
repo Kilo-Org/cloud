@@ -588,7 +588,14 @@
       "moreLinesAbove_one": "… ďalšie riadky vyššie: {{displayCount}}",
       "moreLinesAbove_other": "… ďalšie riadky vyššie: {{displayCount}}",
       "moreLinesAbove_few": "… ďalšie riadky vyššie: {{displayCount}}",
-      "moreLinesAbove_many": "… ďalšie riadky vyššie: {{displayCount}}"
+      "moreLinesAbove_many": "… ďalšie riadky vyššie: {{displayCount}}",
+      "deleteComment": "Odstrániť komentár",
+      "deleteCommentTitle": "Odstrániť komentár?",
+      "deleteCommentMessage": "Tento komentár sa vymaže zo žiadosti o zlúčenie.",
+      "commentEditFailed": "Tvoj komentár sa nepodarilo uložiť. Skontroluj pripojenie a skús to znova.",
+      "commentEditUnavailable": "Tento komentár sa nedá upraviť. Možno bol odstránený.",
+      "commentDeleteFailed": "Tvoj komentár sa nepodarilo odstrániť. Skontroluj pripojenie a skús to znova.",
+      "commentDeleteUnavailable": "Tento komentár sa nedá odstrániť."
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
@@ -779,6 +786,8 @@
     "linkPasteNotAPullRequest": "Nie je to odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentár bol odoslaný",
+      "commentUpdated": "Komentár aktualizovaný",
+      "commentDeleted": "Komentár odstránený",
       "reviewSubmitted": "Kontrola kódu bola odoslaná",
       "autoMergeEnabled": "Automatické zlúčenie je zapnuté"
     },

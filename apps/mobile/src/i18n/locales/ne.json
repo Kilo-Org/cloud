@@ -566,7 +566,14 @@
       "deletedUser": "खाता मेटिएको प्रयोगकर्ता",
       "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।",
       "moreLinesAbove_one": "… माथि थप {{displayCount}} पङ्क्ति छ।",
-      "moreLinesAbove_other": "… माथि थप {{displayCount}} पङ्क्ति छन्।"
+      "moreLinesAbove_other": "… माथि थप {{displayCount}} पङ्क्ति छन्।",
+      "deleteComment": "टिप्पणी हटाउनुहोस्",
+      "deleteCommentTitle": "टिप्पणी हटाउने?",
+      "deleteCommentMessage": "यो टिप्पणी पुल रिक्वेस्टबाट हटाइनेछ।",
+      "commentEditFailed": "तपाईंको टिप्पणी सुरक्षित गर्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "commentEditUnavailable": "यो टिप्पणी सम्पादन गर्न सकिँदैन। यो हटाइएको हुन सक्छ।",
+      "commentDeleteFailed": "तपाईंको टिप्पणी हटाउन सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "commentDeleteUnavailable": "यो टिप्पणी हटाउन सकिँदैन।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub एपको सेटिङ खोल्न सकिएन।",
     "installKiloGitHubApp": "Kilo GitHub एप स्थापना गर्नुहोस्",
@@ -747,6 +754,8 @@
     "linkPasteNotAPullRequest": "यो पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क होइन",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट गरियो",
+      "commentUpdated": "टिप्पणी अद्यावधिक गरियो",
+      "commentDeleted": "टिप्पणी हटाइयो",
       "reviewSubmitted": "समीक्षा पठाइयो",
       "autoMergeEnabled": "स्वचालित मर्ज चालू गरियो"
     },

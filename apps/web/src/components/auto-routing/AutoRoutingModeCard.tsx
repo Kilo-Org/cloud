@@ -17,7 +17,7 @@ import { Plus, Route, Trash2, X } from 'lucide-react';
 // slice's owned paths. Keep the default until Jest is switched to the automatic runtime.
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';

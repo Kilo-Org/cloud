@@ -21,7 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { VariantCombobox } from '@/components/shared/VariantCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileAgent } from '@/hooks/useCloudAgentProfiles';
 import type { AgentConfig, PermissionRule } from '@kilocode/db/schema-types';

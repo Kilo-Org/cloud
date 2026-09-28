@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT,
@@ -60,6 +60,10 @@ function coalescedEntry(
 }
 
 describe('createSessionForwarding', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('keeps later work behind an in-flight run for the same session', async () => {
     const forwarding = createSessionForwarding();
     const release = Promise.withResolvers<void>();
@@ -94,6 +98,180 @@ describe('createSessionForwarding', () => {
     expect(recovery).toHaveBeenCalledTimes(1);
   });
 
+  it('does not call a fenced delivery after its deadline', async () => {
+    const forwarding = createSessionForwarding();
+    const forward = vi.fn(async () => 'acknowledged');
+
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_1',
+        bytes: 1,
+        deadlineAt: Date.now() - 1,
+        fence: async () => true,
+        forward,
+      })
+    ).rejects.toMatchObject({ retryable: false });
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the deadline after a delayed fence', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const forwarding = createSessionForwarding();
+    const fence = Promise.withResolvers<boolean>();
+    const forward = vi.fn(async () => 'acknowledged');
+    const pending = forwarding.enqueueFenced({
+      sessionId: 'workspace_1',
+      bytes: 1,
+      deadlineAt: 1,
+      fence: async () => fence.promise,
+      forward,
+    });
+
+    await Promise.resolve();
+    vi.setSystemTime(2);
+    fence.resolve(true);
+    await expect(pending).rejects.toMatchObject({ retryable: false });
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('rechecks the deadline after forwarding before returning a result', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const forwarding = createSessionForwarding();
+    const finalFence = Promise.withResolvers<boolean>();
+    let fenceCalls = 0;
+    const pending = forwarding.enqueueFenced({
+      sessionId: 'workspace_1',
+      bytes: 1,
+      deadlineAt: 1,
+      fence: () => (++fenceCalls === 1 ? Promise.resolve(true) : finalFence.promise),
+      forward: async () => 'acknowledged',
+    });
+
+    await Promise.resolve();
+    vi.setSystemTime(2);
+    finalFence.resolve(true);
+    await expect(pending).rejects.toMatchObject({ retryable: false });
+  });
+
+  it('marks a fence rejection before forwarding as not delivered', async () => {
+    const forwarding = createSessionForwarding();
+    const forward = vi.fn(async () => 'unreachable');
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_1',
+        bytes: 1,
+        deadlineAt: Date.now() + 1_000,
+        fence: async () => false,
+        forward,
+      })
+    ).rejects.toMatchObject({ retryable: false, forwarded: false });
+    expect(forward).not.toHaveBeenCalled();
+  });
+
+  it('marks a fence rejection after forwarding as delivered so the frame is not replayed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const forwarding = createSessionForwarding();
+    const firstFence = Promise.withResolvers<boolean>();
+    const forwardGate = Promise.withResolvers<string>();
+    const forward = vi.fn(() => forwardGate.promise);
+    const pending = forwarding.enqueueFenced({
+      sessionId: 'workspace_1',
+      bytes: 1,
+      deadlineAt: 1_000,
+      fence: () => firstFence.promise,
+      forward,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    firstFence.resolve(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(forward).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(2_000);
+    forwardGate.resolve('acknowledged');
+    await expect(pending).rejects.toMatchObject({ retryable: false, forwarded: true });
+  });
+
+  it('keeps a fence rejection after a forward that never sent as not delivered', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const forwarding = createSessionForwarding();
+    const firstFence = Promise.withResolvers<boolean>();
+    const forwardGate = Promise.withResolvers<{ attempted?: boolean }>();
+    const forward = vi.fn(() => forwardGate.promise);
+    const pending = forwarding.enqueueFenced({
+      sessionId: 'workspace_1',
+      bytes: 1,
+      deadlineAt: 1_000,
+      fence: () => firstFence.promise,
+      forward,
+      delivered: result => result.attempted === true,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    firstFence.resolve(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(forward).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(2_000);
+    forwardGate.resolve({ attempted: false });
+    await expect(pending).rejects.toMatchObject({ retryable: false, forwarded: false });
+  });
+
+  it('marks a reported forward as delivered for the fence rejection that follows it', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const forwarding = createSessionForwarding();
+    const firstFence = Promise.withResolvers<boolean>();
+    const forwardGate = Promise.withResolvers<{ attempted?: boolean }>();
+    const forward = vi.fn(() => forwardGate.promise);
+    const pending = forwarding.enqueueFenced({
+      sessionId: 'workspace_1',
+      bytes: 1,
+      deadlineAt: 1_000,
+      fence: () => firstFence.promise,
+      forward,
+      delivered: result => result.attempted === true,
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    firstFence.resolve(true);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(forward).toHaveBeenCalledTimes(1);
+
+    vi.setSystemTime(2_000);
+    forwardGate.resolve({ attempted: true });
+    await expect(pending).rejects.toMatchObject({ retryable: false, forwarded: true });
+  });
+
+  it('releases capacity after a pre-start fence rejection', async () => {
+    const forwarding = createSessionForwarding();
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_1',
+        bytes: 1,
+        deadlineAt: Date.now() + 1_000,
+        fence: async () => false,
+        forward: async () => 'unreachable',
+      })
+    ).rejects.toMatchObject({ retryable: false });
+    expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
+
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_1',
+        bytes: 1,
+        deadlineAt: Date.now() + 1_000,
+        fence: async () => true,
+        forward: async () => 'acknowledged',
+      })
+    ).resolves.toBe('acknowledged');
+    expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
+  });
+
   it('admits up to the forward operation limit and rejects beyond it', async () => {
     const forwarding = createSessionForwarding();
     const release = Promise.withResolvers<void>();
@@ -112,6 +290,50 @@ describe('createSessionForwarding', () => {
     await expect(enqueueFrame(forwarding, async () => [undefined])).rejects.toMatchObject({
       retryable: true,
     });
+
+    release.resolve();
+    await Promise.allSettled(admitted);
+    expect(forwarding.stats()).toMatchObject({ waiting: 0, inFlight: 0, bufferedBytes: 0 });
+  });
+
+  it('admits an admission-exempt frame while the live budget is saturated', async () => {
+    const forwarding = createSessionForwarding();
+    const release = Promise.withResolvers<void>();
+    const admitted: Array<Promise<unknown>> = [];
+    for (let index = 0; index < SANDBOX_CONTROL_FORWARD_OPERATION_LIMIT; index++) {
+      admitted.push(
+        forwarding.enqueueFenced({
+          sessionId: 'workspace_1',
+          bytes: 1,
+          deadlineAt: Date.now() + 60_000,
+          fence: async () => true,
+          forward: async () => release.promise,
+        })
+      );
+    }
+    const liveBeyondBudget = () =>
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_3',
+        bytes: 1,
+        deadlineAt: Date.now() + 60_000,
+        fence: async () => true,
+        forward: async () => 'live',
+      });
+    await expect(liveBeyondBudget()).rejects.toMatchObject({ retryable: true });
+
+    // A replayed frame is already bounded by the retained-event queue, so it joins
+    // its session chain without consuming the saturated live budget.
+    await expect(
+      forwarding.enqueueFenced({
+        sessionId: 'workspace_2',
+        bytes: 1,
+        deadlineAt: Date.now() + 60_000,
+        fence: async () => true,
+        forward: async () => 'replayed',
+        admissionExempt: true,
+      })
+    ).resolves.toBe('replayed');
+    await expect(liveBeyondBudget()).rejects.toMatchObject({ retryable: true });
 
     release.resolve();
     await Promise.allSettled(admitted);

@@ -110,6 +110,22 @@ const RATE_LIMITED_BY_OWNERSHIP = {
 } as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
 
 /**
+ * A provider authentication failure split by whose key was rejected. A BYOK key
+ * the provider rejects is actionable by the owner — the existing action-required
+ * flow disables the reviewer and emails them to fix the key — whereas a managed
+ * or unattributed 401 is ours to investigate and stays the generic reason.
+ *
+ * The safe callback message is only ever the projected 'Assistant request was not
+ * authorized', so the raw '[BYOK]' sentence never reaches this receiver; ownership
+ * is the only signal that this is the customer's key and not ours.
+ */
+const PROVIDER_AUTHENTICATION_BY_OWNERSHIP = {
+  byok: 'byok_invalid_key',
+  managed: 'assistant_unauthorized',
+  unknown: 'assistant_unauthorized',
+} as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
+
+/**
  * Fallback for payloads sent before cloud-agent-next reported `assistantReason`.
  *
  * These are exact, whole-string matches against the constants produced by
@@ -149,13 +165,17 @@ export function terminalReasonFromCloudAgentFailure(
   }
 
   if (failure.code === 'assistant_error') {
-    // Structured reason wins. Rate limiting refines further by whose key was
-    // throttled, which is the difference between an actionable failure and one
-    // only the customer can resolve.
+    // Structured reason wins. Rate limiting and provider authentication refine
+    // further by whose key failed, which is the difference between an actionable
+    // failure and one only we can investigate.
     if (failure.assistantReason) {
-      return failure.assistantReason === 'rate_limited'
-        ? RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown']
-        : ASSISTANT_REASON_REASONS[failure.assistantReason];
+      if (failure.assistantReason === 'rate_limited') {
+        return RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      if (failure.assistantReason === 'provider_authentication') {
+        return PROVIDER_AUTHENTICATION_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      return ASSISTANT_REASON_REASONS[failure.assistantReason];
     }
 
     // Older payloads carry only the flattened text.

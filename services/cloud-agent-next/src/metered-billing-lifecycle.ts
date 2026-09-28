@@ -170,8 +170,16 @@ export class MeteredBillingLifecycle {
         return { success: true };
       }
 
-      if (active && !active.measurementStarted && !block) {
-        return { success: true };
+      // An unmeasured context is admitted only when its start is already acknowledged and it
+      // carries no stop waiting for delivery. A pending stop must fall through to the
+      // stop-delivery path instead of being skipped.
+      if (active && !active.measurementStarted && !block && !active.pendingStop) {
+        const acknowledgedGeneration = await this.host.storage.get<string>(
+          START_ACK_GENERATION_STORAGE_KEY
+        );
+        if (acknowledgedGeneration === active.generation) {
+          return { success: true };
+        }
       }
 
       if (active?.measurementStarted && this.host.isContainerRunning()) {
@@ -216,7 +224,11 @@ export class MeteredBillingLifecycle {
       try {
         await this.host.usageClient.recordStart(startInputFromContext(context));
       } catch (error) {
-        await clearBillingContext(this.host.storage);
+        // Only a definite rejection of this fresh generation means the interval cannot exist.
+        // An uncertain error must keep the generation so a later attempt can settle it.
+        if (isDefiniteAdmissionRejection(error)) {
+          await clearBillingContext(this.host.storage);
+        }
         return billingAdmissionFailureFromError(error);
       }
       await this.host.storage.put(START_ACK_GENERATION_STORAGE_KEY, context.generation);

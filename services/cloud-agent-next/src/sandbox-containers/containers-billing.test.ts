@@ -80,6 +80,7 @@ class FakeMeter implements ContainerUsageRpcMethods {
   recordHeartbeatInputs: MeterRecordHeartbeatInput[] = [];
   recordStopInputs: MeterRecordStopInput[] = [];
   startResult: RecordStartResult = { success: true, ack: recordAck() };
+  startBehavior: 'ok' | 'reject' = 'ok';
   heartbeatBudget: BudgetVerdict = { verdict: 'continue' };
   recordStopBehavior: 'ok' | 'reject' = 'ok';
   private heartbeatGate: Promise<void> | undefined;
@@ -108,6 +109,7 @@ class FakeMeter implements ContainerUsageRpcMethods {
 
   async recordStart(input: MeterRecordStartInput): Promise<RecordStartResult> {
     this.recordStartInputs.push(input);
+    if (this.startBehavior === 'reject') throw new Error('meter start unavailable');
     return this.startResult;
   }
 
@@ -354,6 +356,58 @@ describe('ContainersBilling identity and admission', () => {
     });
     expect(rejected.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
     expect(rejected.storage.map.get(START_ACK_KEY)).toBeUndefined();
+  });
+
+  it('keeps a freshly created generation when recordStart fails uncertainly', async () => {
+    const { instance, storage, meter } = setup();
+    meter.startBehavior = 'reject';
+
+    const admission = admit(instance, 'standard-4');
+    await vi.runAllTimersAsync();
+    await expect(admission).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
+
+    const context = storage.map.get(BILLING_CONTEXT_KEY) as
+      | { generation?: string; measurementStarted?: boolean }
+      | undefined;
+    expect(context).toBeDefined();
+    expect(context?.measurementStarted).toBe(false);
+    expect(storage.map.get(START_ACK_KEY)).toBeUndefined();
+  });
+
+  it('does not skip an unmeasured context that carries a pending stop', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-3');
+    await launch(instance, REF_A, 'standard-3');
+    await flushPending(pendingTasks);
+
+    vi.setSystemTime(T0 + 60_000);
+    container.running = false;
+    meter.recordStopBehavior = 'reject';
+    await instance.stop(REF_A);
+    await vi.runAllTimersAsync();
+    await flushPending(pendingTasks);
+    const failedStops = meter.recordStopInputs.length;
+    expect(failedStops).toBeGreaterThan(0);
+
+    const stopped = storage.map.get(BILLING_CONTEXT_KEY) as {
+      measurementStarted: boolean;
+      pendingStop?: unknown;
+    };
+    expect(stopped.pendingStop).toBeDefined();
+
+    // The start acknowledgement is gone and the run never measured. The retained
+    // pending stop must still be delivered instead of short-circuiting admission.
+    storage.map.set(BILLING_CONTEXT_KEY, { ...stopped, measurementStarted: false });
+    storage.map.delete(START_ACK_KEY);
+    meter.recordStopBehavior = 'ok';
+
+    const reconstructed = setup({ storage, container, meter });
+    await expect(
+      reconstructed.instance.ensureBillingAdmission(BILLING_INPUT, 'standard-3')
+    ).resolves.toEqual({ success: true });
+    await flushPending(reconstructed.pendingTasks);
+
+    expect(meter.recordStopInputs.length).toBe(failedStops + 1);
   });
 });
 

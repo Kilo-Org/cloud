@@ -110,7 +110,11 @@ export async function verifyGooglePlayCreditPurchase(params: {
 }): Promise<ValidatedStoreCreditPurchase> {
   const apiData = await getGooglePlayProductPurchase(params.productId, params.purchaseToken);
 
-  const responseProductId = apiData.productId ?? '';
+  // The Android Publisher API returns no `productId` for a one-time product
+  // purchase: the token endpoint already names the product, and the API answers
+  // 400 when the token belongs to a different product. A response that does carry
+  // a product id is still checked against the request.
+  const responseProductId = apiData.productId ?? params.productId;
   if (responseProductId !== params.productId) {
     throw new Error('Google Play purchase product is not a credit pack');
   }

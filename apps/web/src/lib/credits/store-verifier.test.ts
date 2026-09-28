@@ -244,6 +244,25 @@ describe('verifyGooglePlayCreditPurchase', () => {
     ).rejects.toThrow('Google Play purchase product is not a credit pack');
   });
 
+  // The live API omits `productId` for a one-time product purchase, so a response
+  // without it must resolve the product from the requested id.
+  it('maps a response that carries no product id', async () => {
+    const { verifyGooglePlayCreditPurchase } = loadVerifier();
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ productId: null }));
+
+    const result = await verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10',
+      purchaseToken: 'purchase-token',
+    });
+
+    expect(result).toMatchObject({
+      productId: 'credits_usd10',
+      quantity: 1,
+      amountUsd: 10,
+      amountMicrodollars: 10_000_000,
+    });
+  });
+
   it('rejects a response product id that differs from the request', async () => {
     const { verifyGooglePlayCreditPurchase } = loadVerifier();
     mockGetGooglePlayProductPurchase.mockResolvedValueOnce(

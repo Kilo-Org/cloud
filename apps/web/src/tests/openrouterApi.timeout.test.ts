@@ -239,7 +239,6 @@ describe('upstreamRequest timeout', () => {
       await expect(result.response.json()).resolves.toEqual({
         error: 'The upstream provider did not send response headers before the gateway timeout.',
         error_type: 'upstream_disconnect',
-        failure_family: 'request_timeout',
         message: 'The upstream provider did not send response headers before the gateway timeout.',
       });
     }
@@ -264,7 +263,7 @@ describe('upstreamRequest timeout', () => {
         family: 'read_timeout',
         error: new TypeError('fetch failed', { cause: { code: 'ETIMEDOUT' } }),
       },
-    ])('appends advice for $family before the request id', async ({ family, error }) => {
+    ])('appends advice for $family before the request id', async ({ error }) => {
       global.fetch = jest.fn().mockRejectedValue(error);
 
       const result = await upstreamRequest({
@@ -285,7 +284,6 @@ describe('upstreamRequest timeout', () => {
       await expect(result.response.json()).resolves.toEqual({
         error: message,
         error_type: 'upstream_disconnect',
-        failure_family: family,
         message,
         vercel_request_id: 'iad1::iad1::request-id',
       });
@@ -298,7 +296,7 @@ describe('upstreamRequest timeout', () => {
       },
       { family: 'unknown', error: new TypeError('fetch failed') },
       { family: 'abort', error: new DOMException('Aborted', 'AbortError') },
-    ])('does not append advice for $family', async ({ family, error }) => {
+    ])('does not append advice for $family', async ({ error }) => {
       global.fetch = jest.fn().mockRejectedValue(error);
 
       const result = await upstreamRequest({
@@ -317,7 +315,6 @@ describe('upstreamRequest timeout', () => {
       await expect(result.response.json()).resolves.toEqual({
         error: 'The upstream provider closed the connection before sending a response.',
         error_type: 'upstream_disconnect',
-        failure_family: family,
         message: 'The upstream provider closed the connection before sending a response.',
       });
     });
@@ -348,7 +345,6 @@ describe('upstreamRequest timeout', () => {
     await expect(result.response.json()).resolves.toEqual({
       error: 'The upstream provider closed the connection before sending a response.',
       error_type: 'upstream_disconnect',
-      failure_family: 'conn_reset',
       message: 'The upstream provider closed the connection before sending a response.',
     });
   });
@@ -379,7 +375,6 @@ describe('upstreamRequest timeout', () => {
       error:
         'The upstream provider closed the connection before sending a response. (request id: iad1::iad1::request-id)',
       error_type: 'upstream_disconnect',
-      failure_family: 'conn_reset',
       message:
         'The upstream provider closed the connection before sending a response. (request id: iad1::iad1::request-id)',
       vercel_request_id: 'iad1::iad1::request-id',

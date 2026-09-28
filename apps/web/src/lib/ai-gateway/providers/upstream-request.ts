@@ -197,11 +197,6 @@ function upstreamFetchFailureResponse(
     {
       error,
       error_type: ProxyErrorType.upstream_disconnect,
-      // Bounded sub-cause of the disconnect (headers/connect/read timeout,
-      // connection reset, ...). Carried on the body so downstream consumers can
-      // tell an upstream stall from a hard reset, which the coarse
-      // `upstream_disconnect` type alone does not.
-      failure_family: failureFamily,
       message: error,
       ...(vercelRequestId && { vercel_request_id: vercelRequestId }),
     },

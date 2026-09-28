@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import type * as MotionContextModule from '@/lib/a11y/motion-context';
 import type * as PlatformFilterModule from './platform-filter-modal';
+import type * as TextModule from '@/components/ui/text';
 import { AgentSessionListScreen } from './session-list-screen';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { FAB_MARGIN, FAB_SIZE } from './session-list-content';
@@ -64,6 +65,10 @@ const state = vi.hoisted(() => ({
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
+// Mutable so a case can put the tree in an RTL interface: the header action's
+// letterspaced capitals are LTR-only and must drop under RTL, keeping the
+// Arabic label's joins.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: readFilterRecord,
 }));
@@ -100,7 +105,7 @@ vi.mock('@shopify/flash-list', () => ({
     ),
 }));
 vi.mock('react-native', () => ({
-  I18nManager: { isRTL: false },
+  I18nManager: i18nManager,
   Platform: state.platform,
   Modal: 'Modal',
   Pressable: 'Pressable',
@@ -227,9 +232,13 @@ vi.mock('@/components/agents/use-agent-session-navigator', () => ({
 }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
-vi.mock('@/components/ui/text', async () => {
+vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('@/components/ui/text', async importOriginal => {
   const { createContext } = await import('react');
-  return { Text: 'Text', TextClassContext: createContext('') };
+  // The real constant, so the header action's LTR letterspacing is asserted
+  // against the same class string the eyebrow variant uses (it cannot drift).
+  const { EYEBROW_LATIN_DISPLAY } = await importOriginal<typeof TextModule>();
+  return { EYEBROW_LATIN_DISPLAY, Text: 'Text', TextClassContext: createContext('') };
 });
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => state.auth }));
 vi.mock('@/lib/organization-context', () => ({
@@ -492,6 +501,7 @@ beforeEach(() => {
   state.fontScale = 1;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
+  i18nManager.isRTL = false;
   state.topInset = 0;
   state.leftInset = 0;
   state.rightInset = 0;
@@ -637,7 +647,7 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text()).not.toContain(i18n.t('home.agentSessions'));
     expect(header().props.inlineActions).toBeUndefined();
     expect(header().props.eyebrow).toBe('0 LIVE');
-    // The body carries exactly one history control — the See-all that opens the
+    // The body carries exactly one history control — the one that opens the
     // stored history, which has no other entry point in the app (review
     // finding) — so the header cannot quietly grow a second one.
     expect(
@@ -655,15 +665,20 @@ describe('AgentSessionListScreen live presentation', () => {
     // The accepted-empty state withholds the header row, so the body's history
     // control is the app's only route to stored sessions. A bare See-all does
     // not say where it opens — the explorer's objectless See-all, now
-    // context-free — so the control names its destination instead of reusing
-    // the header's `home.seeAll` copy.
+    // context-free — so the control names its destination instead.
     const history = action('Session history');
     expect(history.props.testID).toBe('agents-view-history');
     expect(history.findByType(Text).children).toEqual(['Session history']);
-    // The non-empty live list keeps the header's shared See-all copy.
+    // The non-empty live list keeps the history route in the header, under its
+    // own destination copy instead of this body label.
     state.live.activeSessions = [row];
     await renderScreen();
-    expect(action(i18n.t('home.seeAll')).props.testID).toBe('agents-view-history');
+    expect(action(i18n.t('agents.sessionList.pastSessions')).props.testID).toBe(
+      'agents-view-history'
+    );
+    expect(
+      nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
+    ).toHaveLength(0);
   });
 
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
@@ -1253,7 +1268,7 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes(type)).toHaveLength(0);
     }
     expect(headerAction().type).toBe('Pressable');
-    // The trailing See-all label is an eyebrow-scale label, the same element the
+    // The trailing history label is an eyebrow-scale label, the same element the
     // row's section label uses.
     expect(headerAction().props.children.type).toBe(Eyebrow);
   });
@@ -1275,7 +1290,7 @@ describe('AgentSessionListScreen header and admission', () => {
       { ...row, gitUrl: test.filterable ? 'https://github.com/kilo/cloud.git' : undefined },
     ];
     await renderScreen();
-    const history = action('Összes megtekintése');
+    const history = action(i18n.t('agents.sessionList.pastSessions'));
     const label = history.findByType(Text);
     const actionsRow = history.parent;
     const actionsWrapper = actionsRow?.parent;
@@ -1316,8 +1331,45 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(
       nodes('Pressable').filter(node => node.props.testID === 'agents-open-filters')
     ).toHaveLength(test.filterable ? 1 : 0);
-    press('Összes megtekintése');
+    press(i18n.t('agents.sessionList.pastSessions'));
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+  });
+
+  // Finding live-now-all: the header link opened the stored-session list while
+  // reading "See all", so it named a longer live list that is not on screen. The
+  // label names the surface it opens instead. The accepted-empty state carries
+  // its own destination copy in the body, because that state withholds the
+  // header row (see the accepted-empty case above).
+  it('names the stored-session list it opens, with the LTR-only display treatment', async () => {
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const historyLabel = i18n.t('agents.sessionList.pastSessions');
+    const history = action(historyLabel);
+    // The live list's only history control is the header's: the body's copy
+    // belongs to the accepted-empty state.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.props.accessibilityLabel).toBe(historyLabel);
+    expect(history.props.accessibilityLabel).not.toBe(i18n.t('home.seeAll'));
+    const label = history.findByType(Text);
+    expect(label.children).toEqual([historyLabel]);
+    expect(label.props.className).toContain('text-primary');
+    expect(label.props.className).toContain('uppercase');
+    expect(label.props.className).toContain('tracking-[1.5px]');
+    press(historyLabel);
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+
+    // The letterspaced capitals are LTR-only: an RTL label drops them (the
+    // gaps break a cursive script's joins) and keeps the mono family, size and
+    // color, exactly as the eyebrow variant and SectionHeader do.
+    i18nManager.isRTL = true;
+    await renderScreen();
+    const rtlClasses = (action(historyLabel).findByType(Text).props.className as string).split(' ');
+    expect(rtlClasses).not.toContain('uppercase');
+    expect(rtlClasses.some(name => name.startsWith('tracking'))).toBe(false);
+    expect(rtlClasses).toContain('text-primary');
   });
 
   it('withholds cached rows and the live count until membership resolves', async () => {

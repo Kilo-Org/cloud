@@ -1521,6 +1521,7 @@
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
+      "pastSessions": "Eerdere sessies",
       "live": "ACTIEF",
       "updating": "Bijwerken"
     },

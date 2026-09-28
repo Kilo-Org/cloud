@@ -2034,6 +2034,7 @@
       "couldNotSearch": "Non se puideron buscar sesións.",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Non hai sesións anteriores",
+      "pastSessions": "Sesións anteriores",
       "live": "EN TEMPO REAL",
       "updating": "Actualizando"
     },

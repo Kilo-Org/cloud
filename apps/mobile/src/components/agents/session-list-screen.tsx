@@ -3,6 +3,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
   AppState,
+  I18nManager,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -38,12 +39,13 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { Text } from '@/components/ui/text';
+import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
+import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
@@ -203,11 +205,13 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useAgentSessionNavigator();
 
-  const seeAllLabel = t('home.seeAll');
-  // The accepted-empty body names where its history route goes instead of
-  // reusing the header's `home.seeAll`: a bare See-all on an empty live list
-  // does not say what it opens, and this is the only route to stored sessions
-  // there (UX repair, agents-empty).
+  // The header link opens the stored-session list, so it names that surface: a
+  // bare `home.seeAll` here claimed a longer live list that is not on screen
+  // (finding live-now-all).
+  const historyLabel = t('agents.sessionList.pastSessions');
+  // The accepted-empty body names where its history route goes for the same
+  // reason: a bare See-all on an empty live list does not say what it opens, and
+  // this is the only route to stored sessions there (UX repair, agents-empty).
   const viewHistoryLabel = t('agents.sessionList.viewHistory');
   // The list controls share the title's row through the header's `inlineActions`
   // slot, trailing the eyebrow + title heading. The heading keeps
@@ -228,8 +232,9 @@ export function AgentSessionListScreen() {
   // The history route is the app's only route to the stored-session history,
   // which exists independently of the live list, so it outlives the live
   // section: the accepted-empty state carries the same control in the body,
-  // labeled by its destination (`viewHistoryAction`) while the header keeps the
-  // `See all` copy over a non-empty live list.
+  // labeled by its destination (`viewHistoryAction`), while the header links to
+  // the same route with its own destination copy (`historyLabel`) over a
+  // non-empty live list.
   const historyControl = (label: string) => (
     <Pressable
       onPress={() => {
@@ -242,17 +247,26 @@ export function AgentSessionListScreen() {
       testID="agents-view-history"
       className="min-w-0 shrink justify-center active:opacity-70"
     >
-      <Eyebrow numberOfLines={1} className="shrink text-center text-[11px] text-primary">
+      {/* An eyebrow-scale label, with the same LTR-only treatment: the
+          letterspaced capitals break a cursive script's joins, so an RTL
+          label drops them (home-ar-loading) while the variant and
+          `SectionHeader` keep the identical class string. */}
+      <Eyebrow
+        numberOfLines={1}
+        className={cn(
+          'shrink text-center text-[11px] text-primary',
+          !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
+        )}
+      >
         {label}
       </Eyebrow>
     </Pressable>
   );
-  const seeAllAction = historyControl(seeAllLabel);
   const viewHistoryAction = historyControl(viewHistoryLabel);
   const headerActions = (
     <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
       <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
-      {seeAllAction}
+      {historyControl(historyLabel)}
       {query.canFilter ? (
         <SessionFilterButton
           activeCount={query.activeFilterCount}

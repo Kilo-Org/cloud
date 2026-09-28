@@ -1521,6 +1521,7 @@
       "couldNotSearch": "Die Sitzungen konnten nicht durchsucht werden.",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Noch keine früheren Sitzungen",
+      "pastSessions": "Frühere Sitzungen",
       "live": "IN ECHTZEIT",
       "updating": "Wird aktualisiert"
     },

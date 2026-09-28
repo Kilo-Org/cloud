@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import type {
   CloudAgentAssistantFailureReason,
   CloudAgentProviderOwnership,
@@ -127,35 +128,43 @@ function classifySdkErrorName(source: unknown): CloudAgentAssistantFailureReason
   }
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : undefined;
-}
-
 const MAX_RESPONSE_BODY_LENGTH = 64 * 1024;
+
+const httpStatusSchema = z.number().int().min(100).max(599);
 
 /**
  * The AI SDK's `APIError` often carries no `statusCode`, only the raw provider
- * `responseBody`. The gateway and upstream providers put a numeric status in
- * that body (`{"code":502,...}`) or a bounded `error_type` token, so it is
- * parsed here rather than left to collapse into the unknown bucket.
+ * `responseBody`. Providers emit loosely-typed bodies, so each field is parsed
+ * independently: an unexpected type on one field must not discard a valid
+ * `error_type` on another. `.catch(() => undefined)` makes a missing or
+ * malformed field read as absent rather than failing the whole body.
  */
-function parseResponseBody(value: unknown): Record<string, unknown> | undefined {
+const asOptional = <T extends z.ZodType>(schema: T) => schema.optional().catch(() => undefined);
+
+const optionalString = asOptional(z.string());
+const optionalHttpStatus = asOptional(httpStatusSchema);
+
+const providerErrorBodySchema = z.object({
+  error_type: optionalString,
+  metadata: asOptional(z.object({ error_type: optionalString })),
+  status: optionalHttpStatus,
+  statusCode: optionalHttpStatus,
+  code: optionalHttpStatus,
+  name: optionalString,
+});
+
+type ProviderErrorBody = z.infer<typeof providerErrorBodySchema>;
+
+function parseResponseBody(value: unknown): ProviderErrorBody | undefined {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_RESPONSE_BODY_LENGTH) {
     return undefined;
   }
   try {
-    return asRecord(JSON.parse(value));
+    const parsed = providerErrorBodySchema.safeParse(JSON.parse(value));
+    return parsed.success ? parsed.data : undefined;
   } catch {
     return undefined;
   }
-}
-
-function numericHttpStatus(value: unknown): number | undefined {
-  return typeof value === 'number' && Number.isInteger(value) && value >= 100 && value <= 599
-    ? value
-    : undefined;
 }
 
 function classifyHttpStatus(status: number): CloudAgentAssistantFailureReason | undefined {
@@ -208,9 +217,9 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
   }
   const data = source.data as Record<string, unknown>;
 
-  const directStatus = numericHttpStatus(data.statusCode);
-  if (directStatus !== undefined) {
-    const reason = classifyHttpStatus(directStatus);
+  const directStatus = httpStatusSchema.safeParse(data.statusCode);
+  if (directStatus.success) {
+    const reason = classifyHttpStatus(directStatus.data);
     if (reason !== undefined) return reason;
     // A well-formed but unmapped status (100–399) is authoritative: do not
     // fall through to a body-derived cause.
@@ -222,13 +231,10 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
 
   const errorType =
     classifyErrorType(responseBody.error_type) ??
-    classifyErrorType(asRecord(responseBody.metadata)?.error_type);
+    classifyErrorType(responseBody.metadata?.error_type);
   if (errorType !== undefined) return errorType;
 
-  const bodyStatus =
-    numericHttpStatus(responseBody.status) ??
-    numericHttpStatus(responseBody.statusCode) ??
-    numericHttpStatus(responseBody.code);
+  const bodyStatus = responseBody.status ?? responseBody.statusCode ?? responseBody.code;
   if (bodyStatus !== undefined) {
     const reason = classifyHttpStatus(bodyStatus);
     if (reason !== undefined) return reason;

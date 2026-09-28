@@ -697,6 +697,18 @@ describe('classifyAssistantFailure', () => {
     expect(classifyAssistantFailure(safeError)).toEqual(failure);
   });
 
+  it('keeps a valid error_type when a sibling field is malformed', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        message: 'opaque provider failure',
+        responseBody: '{"error_type":"rate_limit_exceeded","status":"weird"}',
+      },
+    };
+
+    expect(classifyAssistantFailure(error).reason).toBe('rate_limited');
+  });
+
   it('prefers the explicit statusCode over the response body', () => {
     expect(
       classifyAssistantFailure({

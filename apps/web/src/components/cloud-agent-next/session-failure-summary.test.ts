@@ -19,7 +19,10 @@ function history(overrides?: Partial<SessionFailureHistory>): SessionFailureHist
   };
 }
 
-function run(status: string, messageId = `msg_${status}`): SessionFailureHistory['runs'][number] {
+function run(
+  status: SessionFailureHistory['runs'][number]['status'],
+  messageId = `msg_${status}`
+): SessionFailureHistory['runs'][number] {
   return {
     messageId,
     status,
@@ -54,10 +57,7 @@ describe('summarizeSessionFailureHistory', () => {
 
     expect(summary.hasFailures).toBe(true);
     expect(summary.completedCount).toBe(1);
-    expect(summary.failedRuns.map(item => item.messageId)).toEqual([
-      'msg_failed',
-      'msg_failed_2',
-    ]);
+    expect(summary.failedRuns.map(item => item.messageId)).toEqual(['msg_failed', 'msg_failed_2']);
   });
 
   it('treats a setup failure as a failure even with no failed runs', () => {

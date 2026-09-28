@@ -189,21 +189,23 @@ async function loadSessionFailureDetail(
     });
   }
 
-  const sessionRow = (await db
-    .select({
-      sandboxId: cloud_agent_sessions.sandbox_id,
-      createdAt: cloud_agent_sessions.created_at,
-      failureAt: cloud_agent_sessions.failure_at,
-      failureStage: cloud_agent_sessions.failure_stage,
-      failureCode: cloud_agent_sessions.failure_code,
-      failureResponsibility: cloud_agent_sessions.failure_responsibility,
-      failureReason: cloud_agent_sessions.failure_reason,
-      errorMessageRedacted: cloud_agent_sessions.error_message_redacted,
-      errorExpiresAt: cloud_agent_sessions.error_expires_at,
-    })
-    .from(cloud_agent_sessions)
-    .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
-    .limit(1))[0];
+  const sessionRow = (
+    await db
+      .select({
+        sandboxId: cloud_agent_sessions.sandbox_id,
+        createdAt: cloud_agent_sessions.created_at,
+        failureAt: cloud_agent_sessions.failure_at,
+        failureStage: cloud_agent_sessions.failure_stage,
+        failureCode: cloud_agent_sessions.failure_code,
+        failureResponsibility: cloud_agent_sessions.failure_responsibility,
+        failureReason: cloud_agent_sessions.failure_reason,
+        errorMessageRedacted: cloud_agent_sessions.error_message_redacted,
+        errorExpiresAt: cloud_agent_sessions.error_expires_at,
+      })
+      .from(cloud_agent_sessions)
+      .where(eq(cloud_agent_sessions.cloud_agent_session_id, cloudAgentSessionId))
+      .limit(1)
+  )[0];
 
   const runRows = await db
     .select({

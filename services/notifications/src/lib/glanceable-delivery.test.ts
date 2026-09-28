@@ -731,6 +731,32 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     ]);
   });
 
+  it('holds the push-to-start fence across a rotated push-to-start token', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [{ token: 'scope-token', kind: 'ios_push_to_start' }],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['scope-token', 'start']]);
+
+    // The device registers a new push-to-start token while the card the first
+    // one raised is still on screen and unadopted. The fence belongs to the
+    // scope, so the new token must not raise a second card beside it: a
+    // push-to-start carries the alert APNs requires, and that alert is what
+    // lights the screen and expands the card.
+    activityRows.delete('scope-token');
+    activityRows.set('rotated-token', {
+      id: 'row-rotated',
+      kind: 'ios_push_to_start',
+      updated_at: '2026-08-27 10:00:01+00',
+    });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:20.000Z'));
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['scope-token', 'start']]);
+  });
+
   it('retires a token APNs rejects with 410 on an update, not only on an end', async () => {
     const pem = await generateTestPrivateKeyPem();
     const { service, activityRows } = setupService({

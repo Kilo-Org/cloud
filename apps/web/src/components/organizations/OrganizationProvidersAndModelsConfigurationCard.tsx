@@ -11,7 +11,7 @@ import { CondensedProviderAndModelsList } from '@/components/models/CondensedPro
 import { DefaultModelDialog } from './providers-and-models/DefaultModelDialog';
 import { AvailableModelsDialog } from './providers-and-models/AvailableModelsDialog';
 import { useOrganizationConfiguration } from './providers-and-models/useOrganizationConfiguration';
-import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
+import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
 import type { ProviderSelection } from '@/components/models/util';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 

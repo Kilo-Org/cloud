@@ -290,11 +290,15 @@ export function slimPersistedKilocodeEvent(data: unknown): unknown {
 function compactCommandsAvailable(data: Record<string, unknown>): Record<string, unknown> {
   const commands = data.commands;
   if (!Array.isArray(commands)) return { commands: [] };
-  return {
+  const compact: Record<string, unknown> = {
     commands: commands
       .filter((c): c is Record<string, unknown> => isRecord(c) && typeof c.name === 'string')
       .map(c => ({ name: c.name as string })),
   };
+  // The status is what tells the reader that rows are missing, so it survives
+  // the compaction that keeps the event inside the frame budget.
+  if (isRecord(data.catalogStatus)) compact.catalogStatus = data.catalogStatus;
+  return compact;
 }
 
 function buildTruncationSurrogate(

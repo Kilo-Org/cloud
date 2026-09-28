@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the extension, the target plugin and the app module are one contract read from three sources */
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
 import { readFileSync } from 'node:fs';
 // eslint-disable-next-line import/no-nodejs-modules -- vitest-only guard, runs in node, never bundled into the app
@@ -341,5 +342,224 @@ describe('artifacts provider iOS module contract', () => {
     expect(providerModuleSource).toContain('NSFileProviderManager.add(domain)');
     expect(providerModuleSource).not.toContain('domainAlreadyExists');
     expect(providerModuleSource).toContain('signalEnumerator(for: .rootContainer)');
+  });
+});
+
+// Memoization of the decoded mirror index.
+//
+// The system asks a File Provider for one item at a time, so browsing a session
+// folder with N files calls `ArtifactMirror` up to N times. Every lookup funnels
+// through `manifest()`, which used to read and decode the whole index on each
+// call, on the main thread of a memory-limited extension. The index is now
+// decoded once per rewrite and kept on the mirror, keyed by the manifest file's
+// own modification date and size. Xcode and a simulator are not available on
+// this host, so the shape is asserted against the Swift source and the same
+// algorithm is exercised in JS.
+
+/** One `... {` header's body, matched by brace depth so a clause is read from the function it belongs to. */
+function swiftFunctionBody(signature: string): string {
+  const start = extensionSource.indexOf(signature);
+  if (start === -1) {
+    throw new Error(`${TARGET_NAME}Extension.swift declares no "${signature}"`);
+  }
+  let depth = 0;
+  for (let index = start + signature.length - 1; index < extensionSource.length; index += 1) {
+    const character = extensionSource[index];
+    if (character === '{') {
+      depth += 1;
+    } else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return extensionSource.slice(start + signature.length, index);
+      }
+    }
+  }
+  throw new Error(`unterminated ${signature}`);
+}
+
+const manifestBody = swiftFunctionBody('func manifest() -> ArtifactManifest? {');
+const sessionBody = swiftFunctionBody('func session(id: String) -> ArtifactManifest.Session? {');
+const fileBody = swiftFunctionBody(
+  'func file(sessionId: String, fileId: String) -> ArtifactManifest.File? {'
+);
+const itemsBody = swiftFunctionBody(
+  'func items(in container: ArtifactItemIdentifier) -> [ArtifactItem] {'
+);
+
+type MemoFile = { id: string; name: string; mime: string; size: number };
+type MemoSession = { id: string; title: string; files: MemoFile[] };
+type MemoManifest = { version: number; sessions: MemoSession[] };
+/**
+ * What one read of the index file yields: its stamp and the decoded content. A
+ * file that is not there has no stamp at all, which is what an absent read
+ * reports.
+ */
+type MemoRead = { stamp: string | null; manifest: MemoManifest | null };
+
+/**
+ * `manifest()`'s memoization as a value: the decoded index is kept with the
+ * stamp of the file it came from, and a call that sees the same stamp answers
+ * from the cache without reading. A cache hit needs a stamp, so an absent read
+ * can never match one; an absent, undecodable or unknown-version index caches
+ * nothing and clears what was there, so it is re-read rather than pinning a
+ * stale decode.
+ */
+function createMemoizedManifest(read: () => MemoRead): {
+  reads: () => number;
+  manifest: () => MemoManifest | null;
+} {
+  let reads = 0;
+  let cached: MemoManifest | null = null;
+  let cachedStamp: string | null = null;
+  return {
+    reads: () => reads,
+    manifest: () => {
+      const { stamp, manifest } = read();
+      if (cached !== null && stamp !== null && cachedStamp === stamp) {
+        return cached;
+      }
+      reads += 1;
+      if (manifest === null) {
+        cached = null;
+        cachedStamp = null;
+        return null;
+      }
+      cached = manifest;
+      cachedStamp = stamp;
+      return manifest;
+    },
+  };
+}
+
+describe('artifacts File Provider manifest memoization', () => {
+  it('holds the cache on the mirror reference behind a lock', () => {
+    // A reference type so one decode survives the item callbacks that share one
+    // mirror, `@unchecked Sendable` like `KiloAppActionBridge` because the lock
+    // is the whole synchronization story.
+    expect(extensionSource).not.toMatch(/\bstruct ArtifactMirror\b/u);
+    expect(extensionSource).toMatch(/\bfinal class ArtifactMirror\b[^{]*\{/u);
+    expect(extensionSource).toContain('@unchecked Sendable');
+    expect(extensionSource).toContain('private let lock = NSLock()');
+    expect(manifestBody).toContain('lock.lock()');
+    expect(manifestBody).toContain('defer { lock.unlock() }');
+    expect(extensionSource).toContain('private var cachedManifest: ArtifactManifest?');
+    expect(extensionSource).toMatch(/private struct ManifestStamp: Equatable \{/u);
+  });
+
+  it('keys the cache on the manifest file stamp the mirror rewrites', () => {
+    // The app rewrites `manifest.json` wholesale, so its modification date and
+    // size together change whenever the content does.
+    expect(extensionSource).toContain('forKeys: [.contentModificationDateKey, .fileSizeKey]');
+    expect(extensionSource).toContain('.contentModificationDateKey');
+    expect(extensionSource).toContain('.fileSizeKey');
+    expect(manifestBody).toContain('cachedStamp = stamp');
+  });
+
+  it('returns the cached manifest when the stamp matches and re-reads when it changes', () => {
+    // The stamp comparison is the cache-hit return path and it sits before the
+    // read, so a matching stamp never touches the file.
+    const comparison = manifestBody.indexOf('cachedStamp == stamp');
+    const read = manifestBody.indexOf('Data(contentsOf: url)');
+    expect(comparison).toBeGreaterThan(-1);
+    expect(read).toBeGreaterThan(-1);
+    expect(comparison).toBeLessThan(read);
+
+    // The same algorithm as the Swift, so the contract is a behaviour and not
+    // only a shape.
+    const first: MemoManifest = {
+      version: 1,
+      sessions: [
+        {
+          id: 'sess_01HZ',
+          title: 'Fix',
+          files: [{ id: 'part_a1', name: 'summary.md', mime: 'text/markdown', size: 10 }],
+        },
+      ],
+    };
+    let current: MemoRead = { stamp: 'modified:1 size:100', manifest: first };
+    const mirror = createMemoizedManifest(() => current);
+    expect(mirror.manifest()).toBe(first);
+    expect(mirror.reads()).toBe(1);
+
+    // Same stamp: the system's next item callback decodes nothing.
+    expect(mirror.manifest()).toBe(first);
+    expect(mirror.reads()).toBe(1);
+
+    // A rewritten index has a new stamp, so the decode runs again.
+    const second: MemoManifest = { version: 1, sessions: [] };
+    current = { stamp: 'modified:2 size:2', manifest: second };
+    expect(mirror.manifest()).toBe(second);
+    expect(mirror.reads()).toBe(2);
+
+    // An absent or unknown-version index caches nothing: it reads as absent
+    // every time instead of pinning the last index.
+    current = { stamp: 'modified:3 size:0', manifest: null };
+    expect(mirror.manifest()).toBeNull();
+    expect(mirror.manifest()).toBeNull();
+    expect(mirror.reads()).toBe(4);
+  });
+
+  it('serves a decode only while a stamp backs it, and drops it otherwise', () => {
+    // The cache-hit guard binds a non-nil stamp first, so an absent read — which
+    // reports no stamp — can never compare equal to the stamp a decode was
+    // stored under. The unreachable container and the failed
+    // read/decode/version gate are the only other ways out, and both clear the
+    // entry: a missing, undecodable or unknown-version index holds nothing
+    // instead of leaving the last decode to be served when the stamp matches
+    // again.
+    expect(manifestBody).toContain(
+      'if let cached = cachedManifest, let stamp, cachedStamp == stamp'
+    );
+    expect(manifestBody.match(/cachedManifest = nil/gu)).toHaveLength(2);
+    expect(manifestBody.match(/cachedStamp = nil/gu)).toHaveLength(2);
+    expect(manifestBody).toMatch(
+      /guard let url = Self\.manifestURL\(\) else \{[\s\S]*?cachedManifest = nil[\s\S]*?cachedStamp = nil/u
+    );
+    expect(manifestBody).toMatch(
+      /guard let data = try\? Data\(contentsOf: url\),[\s\S]*?manifest\.version == Self\.supportedManifestVersion[\s\S]*?else \{[\s\S]*?cachedManifest = nil[\s\S]*?cachedStamp = nil/u
+    );
+
+    // The same algorithm as the Swift, so the invalidation is a behaviour and
+    // not only a shape: a file that went away is re-read when it comes back,
+    // even carrying the stamp it had before.
+    const restored: MemoManifest = { version: 1, sessions: [] };
+    let current: MemoRead = { stamp: 'modified:1 size:100', manifest: restored };
+    const mirror = createMemoizedManifest(() => current);
+    expect(mirror.manifest()).toBe(restored);
+    expect(mirror.reads()).toBe(1);
+
+    // The index is gone: the read reports no stamp and no manifest.
+    current = { stamp: null, manifest: null };
+    expect(mirror.manifest()).toBeNull();
+    expect(mirror.reads()).toBe(2);
+
+    // Back with the same stamp: the decode runs again, because the absent read
+    // left nothing to serve.
+    current = { stamp: 'modified:1 size:100', manifest: restored };
+    expect(mirror.manifest()).toBe(restored);
+    expect(mirror.reads()).toBe(3);
+  });
+
+  it('decodes ArtifactManifest at exactly one site', () => {
+    // One decode site is what makes the memoization the whole fix: a second
+    // `JSONDecoder().decode(ArtifactManifest...)` would decode per lookup again.
+    const decodeSites = [
+      ...extensionSource.matchAll(/JSONDecoder\(\)\.decode\(\s*ArtifactManifest\.self/gu),
+    ];
+    expect(decodeSites).toHaveLength(1);
+    expect(manifestBody).toContain('JSONDecoder().decode(ArtifactManifest.self');
+  });
+
+  it('resolves every lookup through the memoized manifest', () => {
+    // No lookup reads or decodes on its own; they all funnel through
+    // `manifest()`, so one enumeration decodes once.
+    for (const body of [sessionBody, fileBody, itemsBody]) {
+      expect(body).not.toContain('Data(contentsOf:');
+      expect(body).not.toContain('JSONDecoder()');
+    }
+    expect(sessionBody).toContain('manifest()?.sessions.first');
+    expect(fileBody).toContain('session(id: sessionId)?.files.first');
+    expect(itemsBody).toContain('manifest()?.sessions ?? []');
+    expect(itemsBody).toContain('session(id: sessionId)?.files ?? []');
   });
 });

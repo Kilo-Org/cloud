@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
-import { POST } from './route';
+import { handleOrganizationModelValidationRequest } from './organization-model-validation';
 
 jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
 
@@ -47,7 +47,7 @@ describe('POST /api/organizations/[id]/models/validate', () => {
   });
 
   test('validates against the authorized organization catalog', async () => {
-    const response = await POST(request('available/model'), {
+    const response = await handleOrganizationModelValidationRequest(request('available/model'), {
       params: Promise.resolve({ id: 'org-1' }),
     });
 
@@ -56,7 +56,7 @@ describe('POST /api/organizations/[id]/models/validate', () => {
   });
 
   test('reports an organization-unavailable model without policy details', async () => {
-    const response = await POST(request('missing/model'), {
+    const response = await handleOrganizationModelValidationRequest(request('missing/model'), {
       params: Promise.resolve({ id: 'org-1' }),
     });
 
@@ -64,7 +64,7 @@ describe('POST /api/organizations/[id]/models/validate', () => {
   });
 
   test('rejects an invalid body before invoking organization authorization', async () => {
-    const response = await POST(
+    const response = await handleOrganizationModelValidationRequest(
       new NextRequest('http://localhost:3000/api/organizations/org-1/models/validate', {
         method: 'POST',
         body: JSON.stringify({ modelId: '' }),

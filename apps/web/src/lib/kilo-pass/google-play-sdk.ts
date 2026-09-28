@@ -125,7 +125,7 @@ export async function getGooglePlaySubscriptionOrder(
     packageName: GOOGLE_PLAY_PACKAGE_NAME,
     orderId,
     fields:
-      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+      'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime),oneTimePurchaseDetails(quantity))',
   });
   return response.data;
 }

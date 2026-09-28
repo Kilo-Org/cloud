@@ -106,7 +106,7 @@ describe('google-play-sdk', () => {
       packageName: 'com.kilocode.kiloapp',
       orderId: 'paid-order',
       fields:
-        'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+        'orderId,purchaseToken,state,total,tax,lineItems(productId,total,tax,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime),oneTimePurchaseDetails(quantity))',
     });
     mockOrdersGet.mockImplementationOnce(() => {
       throw new Error('provider unavailable');

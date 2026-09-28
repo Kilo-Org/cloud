@@ -86,11 +86,15 @@ const PURCHASE_TYPES = new Set<number>([
   GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RESTARTED,
 ]);
 
-// Google Play VoidedPurchaseNotification.productType:
+// Google Play VoidedPurchaseNotification.productType and refundType:
 // https://developer.android.com/google/play/billing/rtdn-reference#voided
 const GOOGLE_PLAY_VOIDED_PRODUCT_TYPE = {
   SUBSCRIPTION: 1,
   ONE_TIME_PRODUCT: 2,
+} as const;
+const GOOGLE_PLAY_VOIDED_REFUND_TYPE = {
+  FULL_REFUND: 1,
+  QUANTITY_BASED_PARTIAL_REFUND: 2,
 } as const;
 
 const STORE_EVENT_CLAIM_STALE_AFTER_MS = 5 * 60 * 1000;
@@ -651,11 +655,30 @@ export async function processGooglePlayKiloPassNotification(params: {
 
   if (
     voided?.productType === GOOGLE_PLAY_VOIDED_PRODUCT_TYPE.ONE_TIME_PRODUCT &&
-    voided.refundType === 1
+    (voided.refundType === GOOGLE_PLAY_VOIDED_REFUND_TYPE.FULL_REFUND ||
+      voided.refundType === GOOGLE_PLAY_VOIDED_REFUND_TYPE.QUANTITY_BASED_PARTIAL_REFUND)
   ) {
     const { purchaseToken, orderId } = voided;
     if (!purchaseToken || !orderId) throw new Error('Google Play refund missing identifiers');
     const order = await getGooglePlaySubscriptionOrder(orderId);
+    const lineItem = order.lineItems?.[0];
+    if (!getStoreCreditProductByGoogleProductId(lineItem?.productId ?? '')) {
+      // A voided one-time product Kilo does not sell as a credit pack has
+      // nothing to reverse.
+      return { processed: true };
+    }
+    // A one-time product cannot be refunded pro rata: Play refunds the whole
+    // order or, for a multi-quantity purchase, whole units. Kilo sells credit
+    // packs one unit at a time, so a quantity-based refund of a single unit is
+    // the whole pack. A multi-quantity refund would need the refunded quantity,
+    // which the notification does not carry, so it is rejected rather than
+    // guessed.
+    if (
+      voided.refundType === GOOGLE_PLAY_VOIDED_REFUND_TYPE.QUANTITY_BASED_PARTIAL_REFUND &&
+      (lineItem?.oneTimePurchaseDetails?.quantity ?? 1) !== 1
+    ) {
+      throw new Error('Google Play multi-quantity credit pack refund is not supported');
+    }
     if (
       order.orderId !== orderId ||
       order.purchaseToken !== purchaseToken ||
@@ -663,12 +686,7 @@ export async function processGooglePlayKiloPassNotification(params: {
     ) {
       throw new Error('Google Play refund does not match a refunded order');
     }
-    const productId = order.lineItems?.[0]?.productId ?? '';
-    if (!getStoreCreditProductByGoogleProductId(productId)) {
-      // A voided one-time product Kilo does not sell as a credit pack has
-      // nothing to reverse.
-      return { processed: true };
-    }
+    const productId = lineItem?.productId ?? '';
     const eventId = computeGooglePlayEventId({
       messageId,
       purchaseToken,

@@ -147,6 +147,30 @@ describe('projectSafeAssistantError', () => {
     }
   );
 
+  it('reads the gateway origin ahead of the descriptive body text it produces', () => {
+    const timeoutBody = {
+      error: 'The upstream provider did not send response headers before the gateway timeout.',
+      error_type: 'upstream_disconnect',
+      message: 'The upstream provider did not send response headers before the gateway timeout.',
+    };
+    const error = {
+      name: 'APIError',
+      data: {
+        // What the SDK builds from the response body. It contains "timeout",
+        // which the text classifier would otherwise read as a provider timeout.
+        message: `Service Unavailable: ${timeoutBody.message}`,
+        statusCode: 503,
+        responseBody: JSON.stringify(timeoutBody),
+      },
+    };
+
+    expect(classifyAssistantFailure(error)).toMatchObject({
+      reason: 'provider_disconnect',
+      safeMessage: 'Assistant provider connection was lost',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant provider connection was lost');
+  });
+
   it('leaves a non-gateway body to status-based classification', () => {
     const error = {
       name: 'APIError',
@@ -159,7 +183,7 @@ describe('projectSafeAssistantError', () => {
     expect(classifyAssistantFailure(error).reason).toBe('provider_unavailable');
   });
 
-  it('keeps a specific message reason ahead of the gateway error_type', () => {
+  it('lets the gateway origin tag outrank a specific-looking message from its own body', () => {
     const error = {
       name: 'APIError',
       data: {
@@ -170,7 +194,7 @@ describe('projectSafeAssistantError', () => {
     };
 
     expect(classifyAssistantFailure(error)).toMatchObject({
-      reason: 'insufficient_credits',
+      reason: 'gateway_unavailable',
       providerOwnership: 'byok',
     });
   });

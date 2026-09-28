@@ -92,12 +92,17 @@ export function classifyAssistantFailure(
     messageReason !== 'unknown' &&
     messageReason !== 'invalid_request' &&
     messageReason !== 'provider_unavailable';
-  const reason = specificMessageReason
-    ? messageReason
-    : (classifySdkErrorName(source) ??
-      classifyGatewayOrigin(source) ??
-      (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
-      'unknown');
+  // `data.message` on a gateway APIError is built from the gateway's own
+  // response body, so its wording can accidentally match a provider-reason
+  // pattern (an `upstream_disconnect` body says "gateway timeout"). The
+  // structured `error_type` is the origin tag and is read before that text.
+  const reason =
+    classifyGatewayOrigin(source) ??
+    (specificMessageReason
+      ? messageReason
+      : (classifySdkErrorName(source) ??
+        (messageReason !== 'unknown' ? messageReason : classifySdkStatus(source)) ??
+        'unknown'));
   const terminalCode = assistantTerminalCode(reason);
 
   return {
@@ -154,10 +159,9 @@ function classifySdkStatus(source: unknown): CloudAgentAssistantFailureReason | 
 
 /**
  * The Kilo gateway tags its own non-2xx responses with a bounded `error_type`
- * (and, for upstream disconnects, a `failure_family`) in the JSON body. That is
- * the only place a gateway-shaped 5xx keeps its origin, and it is what separates
- * an upstream provider failure from the gateway's own `temporarily_unavailable`,
- * which the status code alone cannot.
+ * in the JSON body. That is the only place a gateway-shaped 5xx keeps its
+ * origin, and it is what separates an upstream provider failure from the
+ * gateway's own `temporarily_unavailable`, which the status code alone cannot.
  *
  * The body is provider-influenced on the passthrough path, so it is read only to
  * select a reason from a fixed set and is never retained or copied into a

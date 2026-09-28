@@ -39,7 +39,7 @@ file, for current detail.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**860 procedures** — **368 queries**, **492 mutations** — under **51 prefixes**.
+**862 procedures** — **368 queries**, **494 mutations** — under **51 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -50,8 +50,8 @@ each row's `summary` and `tags` are what the search matches.
 | `agentProfiles` | 30 | 4 | 26 |
 | `securityAgent` | 26 | 15 | 11 |
 | `kiloPass` | 22 | 11 | 11 |
+| `githubPrReview` | 20 | 6 | 14 |
 | `githubApps` | 19 | 9 | 10 |
-| `githubPrReview` | 18 | 6 | 12 |
 | `cliSessionsV2` | 17 | 9 | 8 |
 | `appBuilder` | 16 | 6 | 10 |
 | `cliSessions` | 16 | 7 | 9 |

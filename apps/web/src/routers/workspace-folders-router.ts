@@ -36,6 +36,7 @@ const workspaceSessionIdSchema = z.templateLiteral(['workspace_', z.uuid()]);
 const SCOPED_FOLDER_PROCEDURES = new Set([
   'workspaceFolders.list',
   'workspaceFolders.moveWorktree',
+  'workspaceFolders.moveSession',
 ]);
 const folderOutputSchema = z.object({
   id: z.uuid(),

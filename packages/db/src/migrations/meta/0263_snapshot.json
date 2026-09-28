@@ -1,5 +1,5 @@
 {
-  "id": "20bd1b87-c2c0-4b10-9e7e-1aabec220778",
+  "id": "1f5b0465-2490-405f-85aa-ffcb28e070b1",
   "prevId": "4f59fcf1-5a4f-4cf5-8003-8059a1993a99",
   "version": "7",
   "dialect": "postgresql",
@@ -1586,18 +1586,6 @@
         "error": {
           "name": "error",
           "type": "jsonb",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "request_r2_key": {
-          "name": "request_r2_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "response_r2_key": {
-          "name": "response_r2_key",
-          "type": "text",
           "primaryKey": false,
           "notNull": false
         }
@@ -25554,6 +25542,39 @@
           ],
           "isUnique": false,
           "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_microdollar_usage_created_at_rollup": {
+          "name": "idx_microdollar_usage_created_at_rollup",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "kilo_user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "organization_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "cost",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         },

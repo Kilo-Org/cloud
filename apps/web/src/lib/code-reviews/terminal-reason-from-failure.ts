@@ -86,6 +86,8 @@ const FAILURE_CODE_REASONS = {
 const ASSISTANT_REASON_REASONS = {
   rate_limited: 'assistant_rate_limited',
   provider_unavailable: 'assistant_unavailable',
+  provider_disconnect: 'assistant_provider_disconnect',
+  gateway_unavailable: 'assistant_gateway_unavailable',
   timeout: 'assistant_timeout',
   provider_authentication: 'assistant_unauthorized',
   invalid_request: 'assistant_invalid_request',

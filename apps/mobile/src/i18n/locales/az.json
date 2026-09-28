@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Geri qayıt",
     "idle": "Gözləmədə",
+    "scheduled": "Planlaşdırılıb",
     "keepEditing": "Redaktəyə davam et",
     "keepRunning": "İcranı davam etdir",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "silinmiş istifadəçi",
       "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
       "moreLinesAbove_one": "… yuxarıda daha {{displayCount}} sətir var.",
-      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var."
+      "moreLinesAbove_other": "… yuxarıda daha {{displayCount}} sətir var.",
+      "deleteComment": "Şərhi sil",
+      "deleteCommentTitle": "Şərh silinsin?",
+      "deleteCommentMessage": "Bu şərh birləşdirmə sorğusundan silinəcək.",
+      "commentEditFailed": "Şərhini yadda saxlamaq mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "commentEditUnavailable": "Bu şərh redaktə edilə bilməz. Silinmiş ola bilər.",
+      "commentDeleteFailed": "Şərhini silmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
+      "commentDeleteUnavailable": "Bu şərh silinə bilməz."
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
+      "commentUpdated": "Şərh yeniləndi",
+      "commentDeleted": "Şərh silindi",
       "reviewSubmitted": "Kod baxışı göndərildi",
       "autoMergeEnabled": "Avtomatik birləşdirmə aktivləşdirildi"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "couldNotRefresh": "Yeniləmək mümkün olmadı",
       "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
+      "viewHistory": "Sessiya tarixçəsi",
       "noMatches": "Uyğun sessiya yoxdur",
       "tryDifferentSearch": "Başqa sözlə axtar.",
       "tryAdjustFilters": "Filtrləri dəyiş və ya təmizlə.",
       "couldNotSearch": "Sessiyaları axtarmaq mümkün olmadı.",
       "completedWillAppear": "Tamamlanmış sessiyalar burada görünəcək.",
       "noPastSessions": "Keçmiş sessiya yoxdur",
+      "pastSessions": "Keçmiş sessiyalar",
       "live": "CANLI",
       "updating": "Yenilənir"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Geri qayıt və bu seçicini əvvəlki ekrandan yenidən aç."
   },
   "sessionRow": {
-    "needsInput": "CAVAB GÖZLƏYİR"
+    "needsInput": "CAVAB GÖZLƏYİR",
+    "scheduled": "PLANLAŞDIRILIB"
   },
   "voiceInput": {
     "listening": "Dinlənilir...",
@@ -3195,7 +3208,8 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir.",
     "openSession": "Aç",
     "approveFailed": "Təsdiqləmək mümkün olmadı. Yenidən cəhd etmək üçün $t(common.approve) üzərinə toxun.",
-    "newestResult": "Ən yeni nəticə"
+    "newestResult": "Ən yeni nəticə",
+    "scheduledWakes": "{{time}} oyanır"
   },
   "transcriptionModel": {
     "title": "Səsin mətnə çevrilməsi modeli",

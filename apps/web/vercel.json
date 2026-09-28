@@ -135,6 +135,14 @@
     {
       "path": "/api/cron/dispatch-spend-alerts",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/drain-spend-alert-deliveries",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/prune-spend-alert-hourly",
+      "schedule": "0 1 * * *"
     }
   ],
   "build": {

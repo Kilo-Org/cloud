@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Voltar",
     "idle": "Em espera",
+    "scheduled": "Agendada",
     "keepEditing": "Continuar a editar",
     "keepRunning": "Continuar em execução",
     "kiloclaw": "KiloClaw",
@@ -577,7 +578,14 @@
       "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
       "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
       "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
-      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima",
+      "deleteComment": "Eliminar comentário",
+      "deleteCommentTitle": "Eliminar o comentário?",
+      "deleteCommentMessage": "Este comentário será eliminado do PR.",
+      "commentEditFailed": "Não foi possível guardar o teu comentário. Verifica a tua ligação e tenta novamente.",
+      "commentEditUnavailable": "Este comentário não pode ser editado. Pode ter sido eliminado.",
+      "commentDeleteFailed": "Não foi possível eliminar o teu comentário. Verifica a tua ligação e tenta novamente.",
+      "commentDeleteUnavailable": "Este comentário não pode ser eliminado."
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -763,6 +771,8 @@
     "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
+      "commentUpdated": "Comentário atualizado",
+      "commentDeleted": "Comentário eliminado",
       "reviewSubmitted": "Revisão enviada",
       "autoMergeEnabled": "Integração automática ativada"
     },
@@ -2042,12 +2052,14 @@
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas.",
       "couldNotRefresh": "Não foi possível atualizar",
       "noSessionsYetDescription": "Inicia uma tarefa de programação no teu telemóvel. As tuas sessões aparecerão aqui.",
+      "viewHistory": "Histórico de sessões",
       "noMatches": "Nenhuma sessão encontrada",
       "tryDifferentSearch": "Experimenta outro termo de pesquisa.",
       "tryAdjustFilters": "Experimenta ajustar ou limpar os filtros.",
       "couldNotSearch": "Não foi possível pesquisar as sessões.",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Sem sessões anteriores",
+      "pastSessions": "Sessões anteriores",
       "live": "EM TEMPO REAL",
       "updating": "A atualizar"
     },
@@ -2801,7 +2813,8 @@
     "optionsExpiredDescription": "Volte ao ecrã anterior e abra novamente este seletor."
   },
   "sessionRow": {
-    "needsInput": "À ESPERA DE RESPOSTA"
+    "needsInput": "À ESPERA DE RESPOSTA",
+    "scheduled": "AGENDADA"
   },
   "voiceInput": {
     "listening": "A ouvir...",
@@ -3238,7 +3251,8 @@
     "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
     "openSession": "Abrir",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
-    "newestResult": "Resultado mais recente"
+    "newestResult": "Resultado mais recente",
+    "scheduledWakes": "acorda {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",

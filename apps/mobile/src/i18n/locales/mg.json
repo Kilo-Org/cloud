@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Miverena",
     "idle": "Tsy miasa",
+    "scheduled": "Voalahatra",
     "keepEditing": "Tohizo ny fanovana",
     "keepRunning": "Tohizo ny fampandehanana",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "mpampiasa voafafa",
       "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
       "moreLinesAbove_one": "… mbola misy andalana {{displayCount}} etsy ambony.",
-      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony."
+      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony.",
+      "deleteComment": "Hamafa ny hevitra",
+      "deleteCommentTitle": "Hamafa ny hevitra?",
+      "deleteCommentMessage": "Ho fafana amin'ny fangatahana fampiraisana ity hevitra ity.",
+      "commentEditFailed": "Tsy afaka nitahiry ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentEditUnavailable": "Tsy azo ovaina ity hevitra ity. Mety voafafa izy.",
+      "commentDeleteFailed": "Tsy afaka namafa ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentDeleteUnavailable": "Tsy azo fafana ity hevitra ity."
     },
     "couldNotOpenGitHubAppSettings": "Tsy voasokatra ny fikirana ho an'ny rindranasa GitHub.",
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",
+      "commentUpdated": "Nohavaozina ny hevitra",
+      "commentDeleted": "Voafafa ny hevitra",
       "reviewSubmitted": "Nalefa ny fandinihana",
       "autoMergeEnabled": "Navela ny fampiraisana mandeha ho azy"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Tsy tafiditra ny fotoam-piasana mandeha.",
       "couldNotRefresh": "Tsy vita ny fanavaozana",
       "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao. Hiseho eto ny fotoam-piasanao.",
+      "viewHistory": "Tantaran'ny fotoam-piasana",
       "noMatches": "Tsy misy fotoam-piasana mifanaraka",
       "tryDifferentSearch": "Andramo ny teny fikarohana hafa.",
       "tryAdjustFilters": "Andramo manitsy na manala ny sivanao.",
       "couldNotSearch": "Tsy vita ny fikarohana fotoam-piasana.",
       "completedWillAppear": "Hiseho eto ny fotoam-piasana vita.",
       "noPastSessions": "Tsy misy fotoam-piasana taloha",
+      "pastSessions": "Fotoam-piasana taloha",
       "live": "MIVANTANA",
       "updating": "Manavao"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "Miverena amin'ny efijery teo aloha ary sokafy indray ity mpisafidy ity."
   },
   "sessionRow": {
-    "needsInput": "MILA VALINY"
+    "needsInput": "MILA VALINY",
+    "scheduled": "VOALAHATRA"
   },
   "voiceInput": {
     "listening": "Mihaino...",
@@ -3195,7 +3208,8 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
-    "newestResult": "Vokatra vaovao indrindra"
+    "newestResult": "Vokatra vaovao indrindra",
+    "scheduledWakes": "mifoha {{time}}"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

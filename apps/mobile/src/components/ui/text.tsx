@@ -4,8 +4,9 @@ import * as React from 'react';
 import { I18nManager, Text as RNText, type Role } from 'react-native';
 
 import {
+  containsJoinedScript,
   hasRtlScript,
-  RTL_NO_LETTER_SPACING,
+  NATURAL_LETTER_SPACING,
   RTL_WRITING_DIRECTION,
   withoutMonoFamily,
 } from '@/lib/rtl-text';
@@ -59,7 +60,9 @@ const ARIA_LEVEL = {
  * ships Arabic-script languages and Hebrew): `letter-spacing` pulls a
  * cursive script apart — an Arabic eyebrow renders 'الجلسات' as 'ال جلسا ت'
  * — and that copy also drops the mono family (see `withoutMonoFamily`).
- * Latin copy, and RTL-script copy in an LTR interface, keep the treatment.
+ * Latin copy keeps the treatment in either direction, and in an LTR interface
+ * the class stays on a joined-script label while the letter-spacing reset
+ * draws it inert (`NATURAL_LETTER_SPACING`, `text.mounted.test.tsx`).
  *
  * Exported so the eyebrow-scale labels rendered outside the variant — the
  * `SectionHeader` action link — carry the identical treatment instead of a
@@ -82,7 +85,16 @@ function Text({
   const textClass = React.useContext(TextClassContext);
   const Component = asChild ? Slot.Text : RNText;
   const isRTL = I18nManager.isRTL;
+  // The font family is the script's, not the interface's: JetBrains Mono ships
+  // no Arabic or Hebrew glyphs, so the copy that uses either drops the family
+  // in both directions (`withoutMonoFamily`).
   const isRtlScript = hasRtlScript(props.children);
+  // Letter-spacing is the script's too. A joined script cannot take it in
+  // either direction: an Arabic label on an LTR screen keeps its joins. An RTL
+  // interface resets its RTL-script copy as well — a Hebrew label there would
+  // take a spacing no Hebrew reader asked for — while Latin copy, in either
+  // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
+  const resetsTracking = containsJoinedScript(props.children) || (isRTL && isRtlScript);
   const classes = cn(
     textVariants({ variant }),
     variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
@@ -91,13 +103,17 @@ function Text({
   );
   return (
     <Component
-      className={isRTL && isRtlScript ? withoutMonoFamily(classes) : classes}
+      className={isRtlScript ? withoutMonoFamily(classes) : classes}
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
       style={
-        isRTL
-          ? [RTL_WRITING_DIRECTION, isRtlScript ? RTL_NO_LETTER_SPACING : undefined, props.style]
+        isRTL || resetsTracking
+          ? [
+              isRTL ? RTL_WRITING_DIRECTION : undefined,
+              resetsTracking ? NATURAL_LETTER_SPACING : undefined,
+              props.style,
+            ]
           : props.style
       }
     />

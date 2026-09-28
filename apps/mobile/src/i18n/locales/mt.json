@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mur lura",
     "idle": "Bla attività",
+    "scheduled": "Ipprogrammat",
     "keepEditing": "Kompli editja",
     "keepRunning": "Ħallih għaddej",
     "kiloclaw": "KiloClaw",
@@ -599,7 +600,14 @@
       "moreLinesAbove_other": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_two": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_few": "… {{displayCount}} linji oħra 'l fuq.",
-      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq."
+      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq.",
+      "deleteComment": "Ħassar il-kumment",
+      "deleteCommentTitle": "Ħassar il-kumment?",
+      "deleteCommentMessage": "Dan il-kumment se jiġi mħassar mit-talba għall-għaqda.",
+      "commentEditFailed": "Ma setax jiġi ssejvjat il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentEditUnavailable": "Dan il-kumment ma jistax jiġi editjat. Jista' jkun li ġie mħassar.",
+      "commentDeleteFailed": "Ma setax jiġi mħassar il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentDeleteUnavailable": "Dan il-kumment ma jistax jiġi mħassar."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -795,6 +803,8 @@
     "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",
+      "commentUpdated": "Il-kumment ġie aġġornat",
+      "commentDeleted": "Il-kumment ġie mħassar",
       "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
       "autoMergeEnabled": "L-għaqda awtomatika ġiet attivata"
     },
@@ -2092,12 +2102,14 @@
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
       "couldNotRefresh": "Ma setax isir l-aġġornament",
       "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
+      "viewHistory": "Storja tas-sessjonijiet",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",
       "tryAdjustFilters": "Ipprova tibdel jew tneħħi l-filtri tiegħek.",
       "couldNotSearch": "Ma setgħetx issir it-tfittxija fis-sessjonijiet.",
       "completedWillAppear": "Is-sessjonijiet li tlestew se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni preċedenti",
+      "pastSessions": "Sessjonijiet preċedenti",
       "live": "F'ĦIN REALI",
       "updating": "Qed isir l-aġġornament"
     },
@@ -2883,7 +2895,8 @@
     "optionsExpiredDescription": "Mur lura u erġa' iftaħ din il-lista tal-għażliet mill-iskrin ta' qabel."
   },
   "sessionRow": {
-    "needsInput": "JISTENNA TWEĠIBA"
+    "needsInput": "JISTENNA TWEĠIBA",
+    "scheduled": "IPPROGRAMMAT"
   },
   "voiceInput": {
     "listening": "Qed nisimgħu…",
@@ -3324,7 +3337,8 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
-    "newestResult": "L-aħħar riżultat"
+    "newestResult": "L-aħħar riżultat",
+    "scheduledWakes": "iqum {{time}}"
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",

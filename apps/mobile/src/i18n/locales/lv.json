@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Atpakaļ",
     "idle": "Dīkstāvē",
+    "scheduled": "Ieplānota",
     "keepEditing": "Turpināt rediģēt",
     "keepRunning": "Turpināt izpildi",
     "kiloclaw": "KiloClaw",
@@ -577,7 +578,14 @@
       "replyForbiddenTerm": "Tev nav atļaujas atbildēt uz {{term}}.",
       "moreLinesAbove_one": "Augstāk ir vēl citas rindas: {{displayCount}}.",
       "moreLinesAbove_other": "Augstāk ir vēl citas rindas: {{displayCount}}.",
-      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}."
+      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}.",
+      "deleteComment": "Dzēst komentāru",
+      "deleteCommentTitle": "Dzēst komentāru?",
+      "deleteCommentMessage": "Šis komentārs tiks dzēsts no izmaiņu pieprasījuma.",
+      "commentEditFailed": "Neizdevās saglabāt tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentEditUnavailable": "Šo komentāru nevar rediģēt. Iespējams, tas ir dzēsts.",
+      "commentDeleteFailed": "Neizdevās dzēst tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentDeleteUnavailable": "Šo komentāru nevar dzēst."
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -763,6 +771,8 @@
     "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
+      "commentUpdated": "Komentārs atjaunināts",
+      "commentDeleted": "Komentārs dzēsts",
       "reviewSubmitted": "Vērtējums iesniegts",
       "autoMergeEnabled": "Automātiskā apvienošana iespējota"
     },
@@ -2042,12 +2052,14 @@
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
       "couldNotRefresh": "Neizdevās atsvaidzināt",
       "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
+      "viewHistory": "Sesiju vēsture",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",
       "tryAdjustFilters": "Mēģini mainīt vai notīrīt filtrus.",
       "couldNotSearch": "Neizdevās meklēt sesijas.",
       "completedWillAppear": "Pabeigtās sesijas parādīsies šeit.",
       "noPastSessions": "Nav iepriekšējo sesiju",
+      "pastSessions": "Iepriekšējās sesijas",
       "live": "REĀLLAIKĀ",
       "updating": "Notiek atjaunināšana"
     },
@@ -2801,7 +2813,8 @@
     "optionsExpiredDescription": "Atgriezies iepriekšējā ekrānā un vēlreiz atver šo izvēlni."
   },
   "sessionRow": {
-    "needsInput": "GAIDA IEVADI"
+    "needsInput": "GAIDA IEVADI",
+    "scheduled": "IEPLĀNOTA"
   },
   "voiceInput": {
     "listening": "Klausās…",
@@ -3238,7 +3251,8 @@
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
-    "newestResult": "Jaunākais rezultāts"
+    "newestResult": "Jaunākais rezultāts",
+    "scheduledWakes": "pamostas {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",

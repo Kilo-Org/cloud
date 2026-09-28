@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ກັບຄືນ",
     "idle": "ວ່າງ",
+    "scheduled": "ກຳນົດເວລາ",
     "keepEditing": "ແກ້ໄຂຕໍ່",
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
       "moreLinesAbove_one": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
-      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ."
+      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
+      "deleteComment": "ລຶບຄຳເຫັນ",
+      "deleteCommentTitle": "ລຶບຄຳເຫັນ?",
+      "deleteCommentMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄຳຂໍລວມໂຄດ.",
+      "commentEditFailed": "ບໍ່ສາມາດບັນທຶກຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentEditUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດແກ້ໄຂໄດ້. ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "commentDeleteFailed": "ບໍ່ສາມາດລຶບຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentDeleteUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດລຶບໄດ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
+      "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
+      "commentDeleted": "ລຶບຄຳເຫັນແລ້ວ",
       "reviewSubmitted": "ສົ່ງຜົນການກວດທານແລ້ວ",
       "autoMergeEnabled": "ເປີດການລວມອັດຕະໂນມັດແລ້ວ"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
       "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
       "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
+      "viewHistory": "ປະຫວັດເຊດຊັນ",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",
       "tryAdjustFilters": "ລອງປັບ ຫຼື ລ້າງຕົວກັ່ນຕອງຂອງທ່ານ.",
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນໄດ້.",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດແລ້ວຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
+      "pastSessions": "ເຊດຊັນທີ່ຜ່ານມາ",
       "live": "ສົດ",
       "updating": "ກຳລັງອັບເດດ"
     },
@@ -2760,7 +2772,8 @@
     "optionsExpiredDescription": "ກັບໄປທີ່ໜ້າຈໍກ່ອນໜ້າ ແລ້ວເປີດໜ້າເລືອກນີ້ອີກຄັ້ງ."
   },
   "sessionRow": {
-    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ"
+    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "scheduled": "ກຳນົດເວລາ"
   },
   "voiceInput": {
     "listening": "ກຳລັງຟັງ...",
@@ -3195,7 +3208,8 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "newestResult": "ຜົນຫຼ້າສຸດ"
+    "newestResult": "ຜົນຫຼ້າສຸດ",
+    "scheduledWakes": "ຕື່ນ {{time}}"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",

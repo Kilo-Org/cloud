@@ -27,12 +27,15 @@ export function isWidgetRtl(): boolean {
 }
 
 /**
- * The relative time the large cell's newest-result footer shows.
+ * The relative time an Android glanceable draws: the large cell's newest-result
+ * footer, and the wake time beside a scheduled count row.
  *
  * `timeAgo` already localizes through `Intl.RelativeTimeFormat` and falls back
  * to `common.justNow` for sub-minute ages, so the widget bakes no timer and no
- * second wording. `parseTimestamp` accepts both the ISO strings this app writes
- * and the PostgreSQL form Hermes cannot parse with `new Date`.
+ * second wording. It is direction-aware too, so a scheduled wake ahead of the
+ * clock reads "in 2 hours" rather than the "Just now" a past-only read would
+ * give. `parseTimestamp` accepts both the ISO strings this app writes and the
+ * PostgreSQL form Hermes cannot parse with `new Date`.
  */
 export function formatGlanceableAgo(at: string): string {
   return timeAgo(parseTimestamp(at));

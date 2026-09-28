@@ -4382,10 +4382,13 @@ describe('UserConnectionDO', () => {
         { id: 's1', status: 'scheduled', title: 'Wake later', connectionId: 'cli-1' },
         { id: 's2', status: 'busy', title: 'Working', connectionId: 'cli-1' },
       ]);
-      // The explicit null reads as no wake time. JSON drops the undefined
-      // value, so the row on the wire matches the omitted-field case.
+      // The explicit null reads as no wake time. `sessions.list` carries these
+      // rows as JSON, and JSON drops the undefined value, so the row the web
+      // `activeSessionsResponseSchema` strict-parses matches the omitted-field
+      // case instead of failing on a null.
       expect(result[0].scheduledAt).toBeUndefined();
       expect(result[1].scheduledAt).toBeUndefined();
+      expect(JSON.parse(JSON.stringify(result[0]))).not.toHaveProperty('scheduledAt');
     });
 
     it('accepts an unrecognized status without dropping the session', () => {

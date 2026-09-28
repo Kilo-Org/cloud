@@ -200,11 +200,10 @@ export function CommentRow({
           {relative}
         </Text>
         {/* `gap-3` (10.5pt at NativeWind's 14pt rem) exceeds the pill's 2pt
-            right hitSlop plus the overflow's 3pt left slop, leaving
-            commentTrailingControlsClearanceDp() dp between the two tap areas,
-            so a tap anywhere on the pill — including its right edge — opens the
-            session and never the moderation sheet (vr1). See
-            comment-trailing-controls.ts. */}
+            right hitSlop plus the overflow's 3pt left slop, leaving 5.5pt
+            between the two tap areas, so a tap anywhere on the pill — including
+            its right edge — opens the session and never the moderation sheet
+            (vr1). See comment-trailing-controls.ts and its test. */}
         <View className="ml-auto flex-row items-center gap-3">
           <PrCommentFixWithKilo
             owner={owner}

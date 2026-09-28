@@ -78,7 +78,7 @@ jest.mock('@/lib/trpc/utils', () => ({
     },
   }),
 }));
-jest.mock('@/app/api/openrouter/hooks', () => ({
+jest.mock('@/lib/ai-gateway/hooks', () => ({
   useModelSelectorList: () => ({ data: { data: [] } }),
 }));
 jest.mock('next/navigation', () => ({ useRouter: () => ({ push: jest.fn() }) }));

@@ -6,7 +6,7 @@ import {
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/app/api/openrouter/hooks';
+import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';

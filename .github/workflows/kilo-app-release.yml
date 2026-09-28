@@ -277,6 +277,25 @@ jobs:
           }
           download "$IOS_URL" artifacts/app.ipa "iOS"
           download "$ANDROID_URL" artifacts/app.aab "Android"
+          # The Podfile.lock this iOS build resolved, uploaded by eas.json
+          # buildArtifactPaths. Its URL is signed, so it is read from urls.txt
+          # here and never exported or echoed. EAS uploads a single build artifact
+          # as the file itself and several as one tar.gz, so both are accepted.
+          download "$(sed -n '3p' urls.txt)" artifacts/ios-build-artifacts "iOS build artifacts"
+          if gzip -t artifacts/ios-build-artifacts 2>/dev/null; then
+            MEMBER=$(tar -tzf artifacts/ios-build-artifacts | grep -E '(^|/)Podfile\.lock$' || true)
+            if [ "$(printf '%s' "$MEMBER" | grep -c '')" -ne 1 ]; then
+              echo "::error::the iOS build artifacts archive must hold exactly one Podfile.lock, found: ${MEMBER:-none}"
+              exit 1
+            fi
+            tar -xzf artifacts/ios-build-artifacts -O "$MEMBER" > artifacts/Podfile.lock
+          else
+            mv artifacts/ios-build-artifacts artifacts/Podfile.lock
+          fi
+          if ! grep -q '^PODS:' artifacts/Podfile.lock; then
+            echo "::error::the iOS build artifacts carry no Podfile.lock with a PODS: section"
+            exit 1
+          fi
 
       - name: Setup Java
         uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
@@ -292,7 +311,7 @@ jobs:
       # first submission: a build that cannot be documented is never submitted.
       - name: Generate SBOMs
         working-directory: apps/mobile
-        run: node ../../scripts/mobile-sbom.mjs --ipa artifacts/app.ipa --aab artifacts/app.aab --build-json build.json --out-dir artifacts
+        run: node ../../scripts/mobile-sbom.mjs --ipa artifacts/app.ipa --aab artifacts/app.aab --build-json build.json --podfile-lock artifacts/Podfile.lock --out-dir artifacts
 
       # The retained second copy, matching sbom.yml's cloud-sbom-<sha> pattern.
       - name: Upload SBOMs
@@ -331,8 +350,22 @@ jobs:
       # same commit pushes a second, distinct marker instead of failing on a
       # name that already exists. An annotated tag needs a tagger identity; the
       # runner has none.
+      # Both tag pushes use KILO_APP_RELEASE_TOKEN (workflow scope): GitHub
+      # refuses a GITHUB_TOKEN tag push when the tagged commit's
+      # .github/workflows differs from every branch tip, which happens whenever
+      # a workflow change merges while this job runs. The token reaches only
+      # these two steps, never .git/config, so pnpm and eas-cli cannot read it.
+      # GIT_CONFIG_* is command-line level: the empty value drops the persisted
+      # GITHUB_TOKEN header, and the second entry sends the release token.
       - name: Mark the iOS upload
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
         run: |
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           MARKER="kilo-app-upload/$(date -u +%Y-%m-%d)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
@@ -354,7 +387,14 @@ jobs:
       # Release detection only: the next run reads this to find the last release.
       # The upload cap never counts it (a partial run writes no release tag).
       - name: Tag release
+        env:
+          RELEASE_TOKEN: ${{ secrets.KILO_APP_RELEASE_TOKEN }}
         run: |
+          AUTH=$(printf 'x-access-token:%s' "$RELEASE_TOKEN" | base64 -w0)
+          echo "::add-mask::$AUTH"
+          export GIT_CONFIG_COUNT=2
+          export GIT_CONFIG_KEY_0=http.https://github.com/.extraheader GIT_CONFIG_VALUE_0=
+          export GIT_CONFIG_KEY_1=http.https://github.com/.extraheader GIT_CONFIG_VALUE_1="AUTHORIZATION: basic $AUTH"
           TAG="kilo-app-release/$(date -u +%Y-%m-%d)-$(git rev-parse --short=7 HEAD)"
           # The tag name is deterministic, so a rerun of this commit recomputes
           # the tag a failed attempt already pushed. Reuse it: the failure that

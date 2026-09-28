@@ -25,7 +25,16 @@ export function withStatus(
       ...snapshot,
       revision: snapshot.revision + 1,
       status: expired ? 'expired' : 'stale',
-      ...(expired ? { running: 0, needsInput: 0, idle: 0, needsInputSince: null } : {}),
+      ...(expired
+        ? {
+            running: 0,
+            needsInput: 0,
+            idle: 0,
+            scheduled: 0,
+            needsInputSince: null,
+            scheduledAt: null,
+          }
+        : {}),
     };
   }
   const updatedAt = new Date(now).toISOString();
@@ -55,7 +64,9 @@ export function hasSameGlanceableContent(
     a.snapshot.needsInput === b.snapshot.needsInput &&
     (a.snapshot.needsApproval ?? 0) === (b.snapshot.needsApproval ?? 0) &&
     a.snapshot.idle === b.snapshot.idle &&
+    a.snapshot.scheduled === b.snapshot.scheduled &&
     a.snapshot.needsInputSince === b.snapshot.needsInputSince &&
+    a.snapshot.scheduledAt === b.snapshot.scheduledAt &&
     a.newestSessionTitle === b.newestSessionTitle
   );
 }

@@ -28,13 +28,14 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * catalog.
  *
  * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
- * header link (`agents.sessionList.pastSessions`), the accepted-empty Agents
- * history label (`agents.sessionList.viewHistory`), the
- * `prReview.discussion.*` / `prReview.announce.*` comment-CRUD keys (the mobile
- * comment edit/delete copy), the profile-editor validation copy (the
+ * header link (`agents.sessionList.pastSessions`), the scheduled-session labels
+ * the count lines, the session list and the glanceable surfaces show
+ * (`common.scheduled`, `sessionRow.scheduled`, `glanceable.scheduledWakes`),
+ * the accepted-empty Agents history label (`agents.sessionList.viewHistory`),
+ * the `prReview.discussion.*` / `prReview.announce.*` comment-CRUD keys (the
+ * mobile comment edit/delete copy), the profile-editor validation copy (the
  * duplicate-key refusal and the MCP bound messages), and the `/` suggestion
- * list's skill-row keys
- * (`agentChat.slashCommands.skillBadge` and
+ * list's skill-row keys (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
  * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
  * missing-key assertion is strict again.

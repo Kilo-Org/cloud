@@ -932,7 +932,7 @@ describe('iosSink widget publish', () => {
       ['empty', [], 'No agents waiting', 0, false],
       // Stale draws rows, and all three draw whenever rows draw, so the
       // surface never reflows as work moves between states.
-      ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
+      ['stale', [{ status: 'busy' }], "Can't update now", 4, true],
       ['expired', [], 'Status expired', 0, false],
       ['signed_out', [], 'Sign in to see agents', 0, false],
       ['privacy', [], 'Open Kilo to see agents', 0, false],
@@ -1324,6 +1324,7 @@ describe('buildGlanceableViewProps', () => {
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
       'common.working',
+      'common.scheduled',
       'common.idle',
     ]);
   });
@@ -1353,6 +1354,7 @@ describe('buildGlanceableViewProps', () => {
       'primaryCount',
       'primaryKind',
       'primaryLabel',
+      'scheduledAt',
       'statusLine',
     ]);
     expect(json).not.toContain('user-9f3a-leak');
@@ -1549,7 +1551,7 @@ describe('buildGlanceableViewProps', () => {
       key => key
     );
 
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
     expect(props.statusLine).toBe('glanceable.stale');
     // The layout's footer prefers `statusLine`, but the props still carry the
     // fact so a later fresh publish needs no second build.
@@ -1559,7 +1561,7 @@ describe('buildGlanceableViewProps', () => {
 
   it('reports no newest result while counts show but no row has a timestamp', () => {
     const props = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(props.countLines).toHaveLength(3);
+    expect(props.countLines).toHaveLength(4);
     expect(props.newestResultKind).toBeNull();
     expect(props.newestResultLabel).toBeNull();
     expect(props.newestResultAt).toBeNull();
@@ -1593,6 +1595,7 @@ describe('toWidgetProps', () => {
     expect('primaryLabel' in props).toBe(false);
     expect('primaryKind' in props).toBe(false);
     expect('needsInputSince' in props).toBe(false);
+    expect('scheduledAt' in props).toBe(false);
     expect('newestResultKind' in props).toBe(false);
     expect('newestResultLabel' in props).toBe(false);
     expect('newestResultAt' in props).toBe(false);
@@ -1631,6 +1634,7 @@ describe('toWidgetProps', () => {
       countLines: [
         { kind: 'needsInput', count: 1 },
         { kind: 'running', count: 0 },
+        { kind: 'scheduled', count: 0 },
         { kind: 'idle', count: 0 },
       ],
     });

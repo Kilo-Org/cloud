@@ -712,6 +712,58 @@ describe('CliLiveTransport unified user web connection', () => {
     transport.destroy();
   });
 
+  it('forwards a scheduled heartbeat with its wake time and re-derives on a changed wake', () => {
+    const { userWebConnection, transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const heartbeat = (session: {
+      id: string;
+      status: string;
+      title: string;
+      scheduledAt?: string;
+    }) => {
+      userWebConnection.emitSystem({
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'owner', sessions: [session] },
+      });
+    };
+
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    // Same wake time: deduped.
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    // Changed wake time: re-derived.
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T10:00:00.000Z',
+    });
+
+    expect(serviceEvents.filter(event => event.type === 'session.status')).toEqual([
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      },
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T10:00:00.000Z' },
+      },
+    ]);
+    transport.destroy();
+  });
+
   it('buffers chat during initial snapshot replay but does not delay service events', async () => {
     let resolveSnapshot: ((snapshot: SessionSnapshot) => void) | undefined;
     const fetchSnapshot = jest.fn(

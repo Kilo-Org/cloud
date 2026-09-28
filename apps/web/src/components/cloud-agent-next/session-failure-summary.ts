@@ -1,7 +1,8 @@
 import type { inferRouterOutputs } from '@trpc/server';
 import type { RootRouter } from '@/routers/root-router';
 
-export type SessionFailureHistory = inferRouterOutputs<RootRouter>['cloudAgentNextFailures']['getSessionFailureHistory'];
+export type SessionFailureHistory =
+  inferRouterOutputs<RootRouter>['cloudAgentNextFailures']['getSessionFailureHistory'];
 
 export type SessionFailureSummary = {
   hasFailures: boolean;

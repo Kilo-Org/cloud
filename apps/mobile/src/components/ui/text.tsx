@@ -95,12 +95,6 @@ function Text({
   // take a spacing no Hebrew reader asked for — while Latin copy, in either
   // direction, keeps the tracking its class asks for (`NATURAL_LETTER_SPACING`).
   const resetsTracking = containsJoinedScript(props.children) || (isRTL && isRtlScript);
-  // The caller's own style stays last, so an explicit `letterSpacing` outranks
-  // the reset.
-  const ownStyles = [
-    isRTL ? RTL_WRITING_DIRECTION : undefined,
-    resetsTracking ? NATURAL_LETTER_SPACING : undefined,
-  ].filter(style => style !== undefined);
   const classes = cn(
     textVariants({ variant }),
     variant === 'eyebrow' && !(isRTL && isRtlScript) && EYEBROW_LATIN_DISPLAY,
@@ -113,7 +107,15 @@ function Text({
       role={variant ? ROLE[variant as keyof typeof ROLE] : undefined}
       aria-level={variant ? ARIA_LEVEL[variant as keyof typeof ARIA_LEVEL] : undefined}
       {...props}
-      style={ownStyles.length > 0 ? [...ownStyles, props.style] : props.style}
+      style={
+        isRTL || resetsTracking
+          ? [
+              isRTL ? RTL_WRITING_DIRECTION : undefined,
+              resetsTracking ? NATURAL_LETTER_SPACING : undefined,
+              props.style,
+            ]
+          : props.style
+      }
     />
   );
 }

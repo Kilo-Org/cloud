@@ -822,7 +822,11 @@ describe('container usage PostgreSQL application', () => {
       {
         ...clipContext,
         startEpochMs,
-        idempotencyKey: startIdempotencyKey(clipContext.service, clipContext.instanceId, startEpochMs),
+        idempotencyKey: startIdempotencyKey(
+          clipContext.service,
+          clipContext.instanceId,
+          startEpochMs
+        ),
       },
       clipId,
       clipFingerprint,
@@ -877,7 +881,11 @@ describe('container usage PostgreSQL application', () => {
       {
         ...fullContext,
         startEpochMs,
-        idempotencyKey: startIdempotencyKey(fullContext.service, fullContext.instanceId, startEpochMs),
+        idempotencyKey: startIdempotencyKey(
+          fullContext.service,
+          fullContext.instanceId,
+          startEpochMs
+        ),
       },
       fullId,
       fullFingerprint,

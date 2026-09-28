@@ -2347,9 +2347,7 @@ export class SandboxControl extends DurableObject<Env> {
     if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
     const allocation = await this.readCanonicalAllocation();
     const liveRef =
-      allocation.state.kind === 'stopped'
-        ? null
-        : (allocation.state.target?.providerRef ?? null);
+      allocation.state.kind === 'stopped' ? null : (allocation.state.target?.providerRef ?? null);
     if (liveRef !== null) {
       if (evidence.providerRef !== liveRef) return;
     } else {
@@ -2464,8 +2462,7 @@ export class SandboxControl extends DurableObject<Env> {
     await this.scheduleAlarm();
     if (this.vercelDeliveriesInFlight.has(generation)) return false;
     const eligible = (await this.billingSchedule.dueEntries()).some(
-      entry =>
-        entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK && entry.payload === generation
+      entry => entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK && entry.payload === generation
     );
     if (!eligible) return false;
     this.vercelDeliveriesInFlight.add(generation);
@@ -2663,8 +2660,7 @@ export class SandboxControl extends DurableObject<Env> {
       this.providerKind === 'vercel' && this.vercelResources !== undefined
         ? vercelBillingIdentity(this.vercelResources)
         : undefined;
-    const service =
-      vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
+    const service = vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
     if (service === undefined) return;
     const identity: BillingIdentity | undefined =
       vercelIdentity === undefined ? undefined : { sandboxClassName: vercelIdentity.className };

@@ -289,7 +289,8 @@ async function harness(
         throw new Error('schedule write failed');
       }
       if (typeof key === 'string') records.set(key, structuredClone(value));
-      else for (const [name, entry] of Object.entries(key)) records.set(name, structuredClone(entry));
+      else
+        for (const [name, entry] of Object.entries(key)) records.set(name, structuredClone(entry));
     },
     async delete(key: string | string[]) {
       if (typeof key === 'string') return records.delete(key);
@@ -731,7 +732,10 @@ describe('SandboxControl Vercel billing settlement', () => {
 
     const seconds = Math.floor((mocks.vercel.terminalAtMs - mocks.vercel.createdAt) / 1_000);
     expect(h.meter.stopInputs).toHaveLength(4);
-    expect(h.meter.stopInputs[3]).toMatchObject({ usageSinceLast: seconds, reason: 'runtime_signal' });
+    expect(h.meter.stopInputs[3]).toMatchObject({
+      usageSinceLast: seconds,
+      reason: 'runtime_signal',
+    });
     expect((await billingState(h.storage)).context).toBeUndefined();
     expect(await bindingFor(h.storage, generation)).toBeUndefined();
   });

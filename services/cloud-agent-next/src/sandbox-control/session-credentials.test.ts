@@ -401,7 +401,9 @@ describe('trusted worktree credential preparation', () => {
       url: 'https://github.com/acme/repo.git',
       platform: 'github',
       token: grant.scm?.alias,
+      author: { name: 'bot', email: 'bot@example.com' },
     });
+    expect(grant.scm?.author).toEqual({ name: 'bot', email: 'bot@example.com' });
     expect(capability && kiloSubjects.get(capability.credential)).toEqual({
       userId: 'user-a',
       cloudAgentSessionId: SESSION_ID,
@@ -1089,6 +1091,7 @@ describe('direct worktree credentials', () => {
         url: 'https://github.com/acme/repo.git',
         platform: 'github',
         token: GITHUB_TOKEN,
+        author: { name: 'bot', email: 'bot@example.com' },
       });
       expect(payload.env).toMatchObject({
         KILOCODE_TOKEN: KILO_TOKEN,

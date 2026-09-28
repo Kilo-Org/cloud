@@ -938,7 +938,7 @@ describe('direct worktree credential refresh', () => {
         deps
       );
       expect(result).toEqual({ ok: true, result: { attached: true } });
-      expect(runGit).toHaveBeenLastCalledWith(
+      expect(runGit).toHaveBeenCalledWith(
         ['remote', 'set-url', 'origin', `https://x-access-token:${token}@github.com/acme/repo.git`],
         identity.directory,
         expect.any(AbortSignal)
@@ -982,7 +982,7 @@ describe('direct worktree credential refresh', () => {
     expect(f.close).toHaveBeenCalledTimes(1);
     expect(runtime.env.GH_TOKEN).toBe('github-renewed');
     expect(runtime.env.KILOCODE_TOKEN).toBe('real-kilo-renewed');
-    expect(runGit).toHaveBeenCalledTimes(1);
+    expect(runGit).toHaveBeenCalledTimes(3);
     expect(directoryForSession(sibling.kiloSessionId)).toBe(identity.directory);
   });
 

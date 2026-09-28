@@ -849,8 +849,78 @@ describe('applySessionAttach', () => {
       }
     );
     expect(result.ok).toBe(true);
-    expect(gitCalls).toEqual([]);
+    expect(gitCalls).toEqual([
+      ['config', 'user.name', 'Kilo Code Cloud'],
+      ['config', 'user.email', 'agent@kilocode.ai'],
+    ]);
     expect(setupCalls).toEqual([]);
+  });
+
+  it('applies the resolved git author on a fresh clone', async () => {
+    const gitCalls: string[][] = [];
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        branch: 'topic/author',
+        git: {
+          url: 'https://github.com/acme/demo.git',
+          author: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
+        },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        ...noFs,
+        sessionExists: async () => true,
+        mkdir: async () => {},
+        hasGit: async () => false,
+        runGit: async args => {
+          gitCalls.push(args);
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['clone', 'https://github.com/acme/demo.git', session.directory],
+      ['checkout', '-B', 'topic/author', 'origin/topic/author'],
+      ['config', 'user.name', 'octocat'],
+      ['config', 'user.email', '1+octocat@users.noreply.github.com'],
+    ]);
+  });
+
+  it('refreshes the git author when the worktree was already bootstrapped', async () => {
+    const gitCalls: string[][] = [];
+    const result = await applySessionAttach(
+      session,
+      {
+        kilo,
+        git: {
+          url: 'https://github.com/acme/demo.git',
+          author: {
+            name: 'kiloconnect[bot]',
+            email: '42+kiloconnect[bot]@users.noreply.github.com',
+          },
+        },
+      },
+      {
+        kiloRuntimes: fakeKiloRuntimes(),
+        sessionExists: async () => true,
+        hasBootstrapMarker: async () => true,
+        writeBootstrapMarker: async () => undefined,
+        mkdir: async () => undefined,
+        hasGit: async () => true,
+        runGit: async args => {
+          gitCalls.push(args);
+          return { stdout: '', stderr: '', exitCode: 0 };
+        },
+      }
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+    expect(gitCalls).toEqual([
+      ['config', 'user.name', 'kiloconnect[bot]'],
+      ['config', 'user.email', '42+kiloconnect[bot]@users.noreply.github.com'],
+    ]);
   });
 
   it.each([undefined, 'main'])(

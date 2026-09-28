@@ -81,6 +81,9 @@ type OctokitMock = {
   checks: {
     listForRef: jest.Mock;
   };
+  users: {
+    getAuthenticated: jest.Mock;
+  };
   paginate: jest.Mock;
   request: jest.Mock;
 };
@@ -138,6 +141,7 @@ function buildOctokit(token: string): OctokitMock {
       listCommitStatusesForRef: jest.fn(),
     },
     checks,
+    users: { getAuthenticated: jest.fn() },
     // listChecks calls paginate(checks.listForRef, …) then
     // paginate(repos.listCommitStatusesForRef, …); dispatch on the method.
     paginate: jest.fn(async (method: unknown) =>
@@ -1464,10 +1468,35 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     body: 'edited',
   };
 
+  /**
+   * Stubs the own-comment guard's two reads: the target comment's author and
+   * the credential's own viewer identity. `authorLogin` defaults to the viewer,
+   * so a test that wants the guard to refuse passes another login.
+   */
+  function mockCommentOwnership(
+    octokit: OctokitMock,
+    kind: 'review' | 'conversation',
+    options: { authorLogin?: string | null; viewerLogin?: string } = {}
+  ) {
+    const authorLogin = options.authorLogin === undefined ? 'octocat' : options.authorLogin;
+    const comment = {
+      data: { id: 77, node_id: 'N_77', user: authorLogin === null ? null : { login: authorLogin } },
+    };
+    if (kind === 'review') {
+      octokit.pulls.getReviewComment.mockResolvedValueOnce(comment);
+    } else {
+      octokit.issues.getComment.mockResolvedValueOnce(comment);
+    }
+    octokit.users.getAuthenticated.mockResolvedValueOnce({
+      data: { login: options.viewerLogin ?? 'octocat' },
+    });
+  }
+
   it('updateComment kind review calls pulls.updateReviewComment with the REST field names', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
     t1Octokit.pulls.updateReviewComment.mockResolvedValueOnce({
       data: { id: 77, node_id: 'N_77', body: 'edited' },
     });
@@ -1488,6 +1517,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
     t1Octokit.issues.updateComment.mockResolvedValueOnce({
       data: { id: 88, node_id: 'N_88', body: 'edited' },
     });
@@ -1508,6 +1538,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
     t1Octokit.pulls.deleteReviewComment.mockResolvedValueOnce({ data: {} });
 
     const result = await caller.deleteComment({
@@ -1531,6 +1562,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
     t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
 
     const result = await caller.deleteComment({
@@ -1554,6 +1586,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review');
     t1Octokit.pulls.updateReviewComment.mockRejectedValueOnce({
       status: 403,
       message: 'Resource not accessible by integration',
@@ -1568,6 +1601,10 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    // The guard's comment read 404s as well (the comment is already gone).
+    // That is not an ownership verdict, so the idempotent-delete path decides.
+    t1Octokit.pulls.getReviewComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
     t1Octokit.pulls.deleteReviewComment.mockRejectedValueOnce({
       status: 404,
       message: 'Not Found',
@@ -1596,6 +1633,8 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    t1Octokit.issues.getComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
     t1Octokit.issues.deleteComment.mockRejectedValueOnce({
       status: 404,
       message: 'Not Found',
@@ -1619,6 +1658,7 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     const caller = createCaller({ user: { id: 'user-1' } as User });
     const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation');
     t1Octokit.issues.deleteComment.mockResolvedValueOnce({ data: {} });
 
     await caller.deleteComment({
@@ -1630,6 +1670,92 @@ describe('githubPrReviewRouter.updateComment / deleteComment', () => {
     });
 
     expect(t1Octokit.pulls.get).not.toHaveBeenCalled();
+  });
+
+  // The "own comment" rule is enforced server-side, not only by the mobile
+  // row: a caller that skips the app must not write over another author's
+  // comment through a bare comment id.
+  it('refuses to edit another author’s comment and writes nothing', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: 'someone-else' });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'You can only edit or delete your own comments.',
+    });
+
+    expect(t1Octokit.users.getAuthenticated).toHaveBeenCalledTimes(1);
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('refuses to delete another author’s comment and writes nothing', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'conversation', { authorLogin: 'someone-else' });
+
+    await expect(
+      caller.deleteComment({
+        owner: 'octocat',
+        repo: 'hello',
+        number: 1,
+        commentId: 77,
+        kind: 'conversation',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(t1Octokit.issues.deleteComment).not.toHaveBeenCalled();
+  });
+
+  it('accepts the viewer’s own comment when the login differs only in case', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: 'OctoCat' });
+    t1Octokit.pulls.updateReviewComment.mockResolvedValueOnce({
+      data: { id: 77, node_id: 'N_77', body: 'edited' },
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).resolves.toEqual({
+      commentId: 77,
+      nodeId: 'N_77',
+      body: 'edited',
+    });
+  });
+
+  it('refuses a comment whose author account is gone', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    mockCommentOwnership(t1Octokit, 'review', { authorLogin: null });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+
+    expect(t1Octokit.pulls.updateReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('lets the edit proceed when the guard read 404s and surfaces the provider NOT_FOUND', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+    // A missing comment is not an ownership verdict: the edit still runs and
+    // reports the provider 404, which the edit surface renders as terminal.
+    t1Octokit.pulls.getReviewComment.mockRejectedValueOnce({ status: 404, message: 'Not Found' });
+    t1Octokit.users.getAuthenticated.mockResolvedValueOnce({ data: { login: 'octocat' } });
+    t1Octokit.pulls.updateReviewComment.mockRejectedValueOnce({
+      status: 404,
+      message: 'Not Found',
+    });
+
+    await expect(caller.updateComment(updateCommentInput)).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+
+    expect(t1Octokit.pulls.updateReviewComment).toHaveBeenCalledTimes(1);
   });
 });
 

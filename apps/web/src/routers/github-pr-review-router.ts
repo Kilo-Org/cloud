@@ -1536,6 +1536,68 @@ async function fetchOverviewGraphQl(
   }
 }
 
+const COMMENT_NOT_OWNED_MESSAGE = 'You can only edit or delete your own comments.';
+
+/**
+ * Own-comment guard for `updateComment` / `deleteComment`.
+ *
+ * The mobile row offers Edit / Delete only on the viewer's own comment
+ * (`comment-row.tsx` compares the author login to the viewer login), but that
+ * is a UI rule: both procedures take a bare comment id, and GitHub lets a
+ * repository collaborator write over another author's comment, so a caller
+ * that skips the app could rewrite or remove someone else's. The guard reads
+ * the comment's author plus the identity the caller's own credential
+ * authenticates as — the same comparison, server-side — and refuses a
+ * mismatch with FORBIDDEN. GitHub logins are case-insensitive, so case folds.
+ *
+ * The viewer identity is read live rather than taken from the credential's
+ * recorded `githubLogin`: a GitHub rename leaves the recorded value stale and
+ * would refuse the user their own comment.
+ *
+ * A comment read that 404s is NOT an ownership verdict — it means the comment
+ * is already gone (`deleteComment` treats that as success) or unreadable — so
+ * the guard reports `missing` and each caller keeps its behavior for it.
+ */
+async function assertViewerOwnsComment(args: {
+  octokit: ReturnType<typeof createGitHubPrReviewOctokit>;
+  owner: string;
+  repo: string;
+  commentId: number;
+  kind: z.infer<typeof CommentKindSchema>;
+}): Promise<'owned' | 'missing'> {
+  const commentPromise =
+    args.kind === 'review'
+      ? args.octokit.pulls.getReviewComment({
+          owner: args.owner,
+          repo: args.repo,
+          comment_id: args.commentId,
+        })
+      : args.octokit.issues.getComment({
+          owner: args.owner,
+          repo: args.repo,
+          comment_id: args.commentId,
+        });
+  const [commentResult, viewerResult] = await Promise.allSettled([
+    commentPromise,
+    args.octokit.users.getAuthenticated(),
+  ]);
+  if (commentResult.status === 'rejected') {
+    if (classifyGitHubHttpError(commentResult.reason).code === 'NOT_FOUND') {
+      return 'missing';
+    }
+    throw commentResult.reason;
+  }
+  if (viewerResult.status === 'rejected') {
+    throw viewerResult.reason;
+  }
+  const authorLogin = commentResult.value.data.user?.login ?? null;
+  const viewerLogin = viewerResult.value.data.login;
+  if (authorLogin === null || authorLogin.toLowerCase() !== viewerLogin.toLowerCase()) {
+    throw new TRPCError({ code: 'FORBIDDEN', message: COMMENT_NOT_OWNED_MESSAGE });
+  }
+  return 'owned';
+}
+
 export const githubPrReviewRouter = createTRPCRouter({
   getPullRequest: baseProcedure.input(GetPullRequestInput).query(async ({ ctx, input }) => {
     const overview = await withGitHubUserTokenRetry({
@@ -1896,6 +1958,16 @@ export const githubPrReviewRouter = createTRPCRouter({
     return withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
+        // Ownership is enforced HERE, not only by the mobile row: a caller
+        // that skips the app must not edit another author's comment. A missing
+        // comment is not an ownership verdict — the update below reports it.
+        await assertViewerOwnsComment({
+          octokit,
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          kind: input.kind,
+        });
         const response =
           input.kind === 'review'
             ? await octokit.pulls.updateReviewComment(
@@ -1935,6 +2007,17 @@ export const githubPrReviewRouter = createTRPCRouter({
     await withGitHubUserTokenRetry({
       kiloUserId: ctx.user.id,
       call: async octokit => {
+        // Ownership is enforced HERE, not only by the mobile row: a caller that
+        // skips the app must not delete another author's comment. The guard
+        // runs before the idempotent-delete handling below so a provider 404
+        // from the guard is never mistaken for a deleted comment.
+        await assertViewerOwnsComment({
+          octokit,
+          owner: input.owner,
+          repo: input.repo,
+          commentId: input.commentId,
+          kind: input.kind,
+        });
         try {
           if (input.kind === 'review') {
             await octokit.pulls.deleteReviewComment(

@@ -2659,7 +2659,7 @@
       "invalidLink": "دا لینک نه شي پرانیستل کېدای.",
       "hostConfirmTitle": "بهرنی لینک پرانیزم؟",
       "hostConfirmMessage": "دا لینک ستاسو په براوزر کې {{host}} پرانیزي.",
-      "open": "خلاص",
+      "open": "پرانیزئ",
       "trustThisHost": "پر دې کوربه باور وکړئ"
     },
     "folderPicker": {

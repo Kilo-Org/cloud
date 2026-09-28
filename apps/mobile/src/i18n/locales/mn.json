@@ -2659,7 +2659,7 @@
       "invalidLink": "Энэ холбоосыг нээх боломжгүй.",
       "hostConfirmTitle": "Гадаад холбоос нээх үү?",
       "hostConfirmMessage": "Энэ холбоос {{host}}-ыг таны хөтөч дээр нээнэ.",
-      "open": "Нээлттэй",
+      "open": "Нээх",
       "trustThisHost": "Энэ хостыг итгэмжлэх"
     },
     "folderPicker": {

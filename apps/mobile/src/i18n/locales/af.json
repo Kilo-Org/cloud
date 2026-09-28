@@ -2659,7 +2659,7 @@
       "invalidLink": "Hierdie skakel kan nie oopgemaak word nie.",
       "hostConfirmTitle": "Eksterne skakel oopmaak?",
       "hostConfirmMessage": "Hierdie skakel maak {{host}} in jou blaaier oop.",
-      "open": "Oop",
+      "open": "Oopmaak",
       "trustThisHost": "Vertrou hierdie gasheer"
     },
     "folderPicker": {

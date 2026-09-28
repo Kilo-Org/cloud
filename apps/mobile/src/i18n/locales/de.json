@@ -2155,7 +2155,7 @@
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
       "hostConfirmTitle": "Externen Link öffnen?",
       "hostConfirmMessage": "Dieser Link öffnet {{host}} in deinem Browser.",
-      "open": "Offen",
+      "open": "Öffnen",
       "trustThisHost": "Diesem Host vertrauen"
     },
     "folderPicker": {

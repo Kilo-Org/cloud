@@ -2659,7 +2659,7 @@
       "invalidLink": "Овој линк не може да се отвори.",
       "hostConfirmTitle": "Да се отвори надворешен линк?",
       "hostConfirmMessage": "Овој линк го отвора {{host}} во твојот прелистувач.",
-      "open": "Отворено",
+      "open": "Отвори",
       "trustThisHost": "Додај го хостот во доверливи"
     },
     "folderPicker": {

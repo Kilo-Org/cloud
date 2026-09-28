@@ -2739,7 +2739,7 @@
       "invalidLink": "Te povezave ni mogoče odpreti.",
       "hostConfirmTitle": "Želiš odpreti zunanjo povezavo?",
       "hostConfirmMessage": "Ta povezava v brskalniku odpre {{host}}.",
-      "open": "Odprto",
+      "open": "Odpreti",
       "trustThisHost": "Zaupaj temu gostitelju"
     },
     "folderPicker": {

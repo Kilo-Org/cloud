@@ -2699,7 +2699,7 @@
       "invalidLink": "Aquest enllaç no es pot obrir.",
       "hostConfirmTitle": "Vols obrir l'enllaç extern?",
       "hostConfirmMessage": "Aquest enllaç obre {{host}} al navegador.",
-      "open": "Obertura",
+      "open": "Obrir",
       "trustThisHost": "Confia en aquest servidor"
     },
     "folderPicker": {

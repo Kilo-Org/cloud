@@ -2659,7 +2659,7 @@
       "invalidLink": "Bu keçidi açmaq mümkün deyil.",
       "hostConfirmTitle": "Xarici keçid açılsın?",
       "hostConfirmMessage": "Bu keçid brauzerində {{host}} saytını açır.",
-      "open": "Açıq",
+      "open": "Aç",
       "trustThisHost": "Bu sayta etibar et"
     },
     "folderPicker": {

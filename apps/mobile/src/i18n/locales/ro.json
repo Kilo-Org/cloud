@@ -2699,7 +2699,7 @@
       "invalidLink": "Acest link nu poate fi deschis.",
       "hostConfirmTitle": "Deschizi linkul extern?",
       "hostConfirmMessage": "Acest link deschide {{host}} în browser.",
-      "open": "Deschidere",
+      "open": "Deschide",
       "trustThisHost": "Marchează gazda ca fiind de încredere"
     },
     "folderPicker": {

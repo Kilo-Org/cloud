@@ -2659,7 +2659,7 @@
       "invalidLink": "Kjo lidhje nuk mund të hapet.",
       "hostConfirmTitle": "Të hapet lidhja e jashtme?",
       "hostConfirmMessage": "Kjo lidhje hap {{host}} në shfletuesin tënd.",
-      "open": "Hapje",
+      "open": "Hap",
       "trustThisHost": "Besoji këtij serveri"
     },
     "folderPicker": {

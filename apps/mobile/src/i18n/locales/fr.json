@@ -2083,7 +2083,7 @@
       "invalidLink": "Ce lien ne peut pas être ouvert.",
       "hostConfirmTitle": "Ouvrir le lien externe ?",
       "hostConfirmMessage": "Ce lien ouvre {{host}} dans votre navigateur.",
-      "open": "Ouverture",
+      "open": "Ouvrir",
       "trustThisHost": "Faire confiance à ce site"
     },
     "folderPicker": {

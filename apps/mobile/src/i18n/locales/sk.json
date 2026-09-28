@@ -2739,7 +2739,7 @@
       "invalidLink": "Tento odkaz sa nedá otvoriť.",
       "hostConfirmTitle": "Otvoriť externý odkaz?",
       "hostConfirmMessage": "Tento odkaz otvorí {{host}} v tvojom prehliadači.",
-      "open": "Otvorené",
+      "open": "Otvoriť",
       "trustThisHost": "Dôverovať tomuto serveru"
     },
     "folderPicker": {

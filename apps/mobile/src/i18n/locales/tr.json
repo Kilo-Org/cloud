@@ -2155,7 +2155,7 @@
       "invalidLink": "Bu bağlantı açılamıyor.",
       "hostConfirmTitle": "Harici bağlantı açılsın mı?",
       "hostConfirmMessage": "Bu bağlantı {{host}} adresini tarayıcında açar.",
-      "open": "Açık",
+      "open": "Aç",
       "trustThisHost": "Bu sunucuya güven"
     },
     "folderPicker": {

@@ -2659,7 +2659,7 @@
       "invalidLink": "Non se pode abrir esta ligazón.",
       "hostConfirmTitle": "Abrir a ligazón externa?",
       "hostConfirmMessage": "Esta ligazón abre {{host}} no teu navegador.",
-      "open": "Apertura",
+      "open": "Abrir",
       "trustThisHost": "Confiar neste dominio"
     },
     "folderPicker": {

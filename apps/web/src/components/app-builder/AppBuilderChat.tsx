@@ -53,7 +53,7 @@ import type { ModelOption } from '@/components/shared/ModelCombobox';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { InsufficientBalanceBanner } from '@/components/shared/InsufficientBalanceBanner';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { useOrganizationDefaults } from '@/app/api/organizations/hooks';
 import { FeedbackDialog } from './FeedbackDialog';
 

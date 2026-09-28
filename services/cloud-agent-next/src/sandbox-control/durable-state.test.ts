@@ -107,6 +107,19 @@ describe('sandbox control durable state', () => {
     }
   );
 
+  it.each([
+    ['standard-3', 'containers-standard-3'],
+    ['standard-4', 'containers-standard-4'],
+  ] as const)('projects the containers instance %s as sandbox type %s', (instance, sandboxType) => {
+    expect(initialRuntimeMetadata('ses-abcd', instance)).toEqual({
+      sandboxType,
+      kiloCliVersion: null,
+      wrapperVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    });
+  });
+
   it('round-trips metadata independently of physical lifecycle writes and erases it on deletion', async () => {
     const storage = memoryStorage();
     expect(await loadRuntimeMetadata(storage)).toBeUndefined();

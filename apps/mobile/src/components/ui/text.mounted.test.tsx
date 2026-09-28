@@ -93,9 +93,9 @@ afterEach(() => {
   renderer = undefined;
 });
 
-// The reset belongs to the RTL interface: RTL-script copy takes it there, while
-// a joined script in an LTR screen keeps the tracking its class asks for (the
-// `hasRtlScript` rule in `Text`; `text.rtl-labels` pins that LTR case).
+// The reset belongs to the script, not the interface: a joined script takes it
+// in either direction, and an RTL interface resets its RTL-script copy as well
+// (the `NATURAL_LETTER_SPACING` rule in `Text`).
 describe('Text joined-script letter spacing', () => {
   it('keeps Latin tracking in a left-to-right interface', () => {
     const node = mount('Preferences');
@@ -117,40 +117,35 @@ describe('Text joined-script letter spacing', () => {
     expect(styles.at(-1)).toEqual({ letterSpacing: 2 });
   });
 
-  it('overrides the tracking the app compiles, on a joined run in RTL only', async () => {
-    const tracking = await compiledLetterSpacing('tracking-[1.5px]');
-    expect(tracking).toBeGreaterThan(0);
+  it.each([false, true])(
+    'overrides the tracking the app compiles, on a joined run (isRTL=%s)',
+    async isRTL => {
+      const tracking = await compiledLetterSpacing('tracking-[1.5px]');
+      expect(tracking).toBeGreaterThan(0);
 
-    i18nManager.isRTL = true;
-    // Each mount replaces the tracked renderer, so read the Latin tree before
-    // the Arabic one takes its place.
-    const latin = ownStyles(mount('Settings', undefined, 'tracking-[1.5px]'));
-    const arabic = ownStyles(mount('التفصيلات', undefined, 'tracking-[1.5px]'));
+      i18nManager.isRTL = isRTL;
+      // Each mount replaces the tracked renderer, so read the Latin tree before
+      // the Arabic one takes its place.
+      const latin = ownStyles(mount('Settings', undefined, 'tracking-[1.5px]'));
+      const arabic = ownStyles(mount('التفصيلات', undefined, 'tracking-[1.5px]'));
 
-    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...latin])).toBe(tracking);
-    expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...arabic])).toBe(0);
-  });
+      expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...latin])).toBe(tracking);
+      expect(resolvedLetterSpacing([{ letterSpacing: tracking }, ...arabic])).toBe(0);
+    }
+  );
 });
 
 describe('Text mounted letter spacing', () => {
-  // The reset belongs to the RTL interface: RTL-script copy takes it there,
-  // while a joined script in an LTR screen keeps the tracking its class asks
-  // for (`text.rtl-labels` pins that LTR case).
-  it.each([false, true])(
-    'resets the tracking for Arabic children in RTL only (isRTL=%s)',
-    isRTL => {
-      i18nManager.isRTL = isRTL;
-      const text = hostText(
-        renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
-      );
+  // The reset belongs to the script: a joined script takes it in either
+  // direction, and an RTL interface resets its RTL-script copy as well.
+  it.each([false, true])('resets the tracking for Arabic children (isRTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
+    const text = hostText(
+      renderRoot(createElement(Text, { className: 'tracking-[1.5px]' }, 'الجلسات الجارية الآن'))
+    );
 
-      if (isRTL) {
-        expect(text.props.style).toContainEqual({ letterSpacing: 0 });
-      } else {
-        expect(text.props.style).toBeUndefined();
-      }
-    }
-  );
+    expect(text.props.style).toContainEqual({ letterSpacing: 0 });
+  });
 
   it('leaves Latin children untouched and keeps LTR style undefined', () => {
     const text = hostText(
@@ -211,15 +206,24 @@ describe('Text eyebrow letterspacing', () => {
     );
   });
 
-  it.each([false, true])('drops the treatment from Arabic copy in RTL (RTL=%s)', isRTL => {
+  it.each([false, true])('drops the mono family from Arabic copy (RTL=%s)', isRTL => {
     i18nManager.isRTL = isRTL;
-    const classes = hostClasses(
+    const node = hostText(
       renderRoot(createElement(Text, { variant: 'eyebrow' }, 'الجلسات الجارية الآن'))
     );
+    const classes = String(node.props.className).split(' ');
+
+    // The mono family ships no Arabic glyph and the reset is the script's, so
+    // both hold in either direction.
+    expect(classes.some(name => name.startsWith('font-mono'))).toBe(false);
+    expect(ownStyles(node)).toContainEqual({ letterSpacing: 0 });
+
     if (isRTL) {
       expect(classes).not.toContain('uppercase');
       expect(classes.some(name => name.startsWith('tracking'))).toBe(false);
     } else {
+      // The variant's own class stays on the element in an LTR interface and
+      // the reset draws its tracking inert (NativeWind merges the class first).
       expect(classes).toEqual(expect.arrayContaining(['uppercase', 'tracking-[1.5px]']));
     }
   });
@@ -250,12 +254,12 @@ describe('Text eyebrow letterspacing', () => {
   });
 });
 
-describe('Text mono variant in an RTL interface', () => {
-  // The mono variant carries a font that ships no RTL-script glyphs, so RTL
-  // copy loses the family in RTL while a Latin run such as a session id keeps
-  // it.
-  it('drops the mono family for an Arabic mono variant in RTL', () => {
-    i18nManager.isRTL = true;
+describe('Text mono variant in either interface', () => {
+  // The mono variant carries a font that ships no RTL-script glyphs, so
+  // RTL-script copy loses the family in either direction while a Latin run such
+  // as a session id keeps it.
+  it.each([false, true])('drops the mono family for an Arabic mono variant (RTL=%s)', isRTL => {
+    i18nManager.isRTL = isRTL;
     const classes = hostClasses(
       renderRoot(createElement(Text, { variant: 'mono' }, 'الجلسات الجارية الآن'))
     );

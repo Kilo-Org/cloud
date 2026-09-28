@@ -1,14 +1,7 @@
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import {
-  containsJoinedScript,
-  hasRtlScript,
-  JOINED_SCRIPT,
-  NATURAL_LETTER_SPACING,
-  textLetterSpacing,
-  withoutMonoFamily,
-} from './rtl-text';
+import { containsJoinedScript, hasRtlScript, JOINED_SCRIPT, withoutMonoFamily } from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
 // is Flow-syntax source this node project cannot load.
@@ -83,7 +76,7 @@ describe('hasRtlScript', () => {
 });
 
 describe('JOINED_SCRIPT', () => {
-  it.each(['\u0600', '\u0750', '\u08A0', '\uFB50', '\uFE70'])(
+  it.each(['\u0600', '\u0750', '\u0870', '\u08A0', '\uFB50', '\uFE70'])(
     'covers the block that starts at %j',
     value => {
       expect(JOINED_SCRIPT.test(value)).toBe(true);
@@ -108,11 +101,18 @@ describe('containsJoinedScript', () => {
   it.each([
     ['Arabic base', '\u0600'],
     ['Arabic Supplement', '\u0750'],
+    ['Arabic Extended-B', '\u0870'],
     ['Arabic Extended-A', '\u08A0'],
     ['Arabic Presentation Forms-A', '\uFB50'],
     ['Arabic Presentation Forms-B', '\uFE70'],
   ])('detects a glyph from %s', (_name, value) => {
     expect(containsJoinedScript(value)).toBe(true);
+  });
+
+  // Arabic Extended-B sits between Arabic Supplement and Arabic Extended-A;
+  // `hasRtlScript` reads it for the mono family, so the reset reads it too.
+  it('detects a label written only in Arabic Extended-B', () => {
+    expect(containsJoinedScript(FIRST_EXTENDED_B + LAST_EXTENDED_B)).toBe(true);
   });
 
   it.each(['الجلسات الجارية الآن', 'الرئيسية', 'الوكلاء', 'الملف الشخصي', 'عرض الكل'])(
@@ -183,22 +183,5 @@ describe('withoutMonoFamily', () => {
 
   it('keeps an unrelated token that merely starts with font-mono', () => {
     expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
-  });
-});
-
-describe('textLetterSpacing', () => {
-  it('returns the natural-spacing override only for a joined run', () => {
-    expect(textLetterSpacing('المظهر')).toEqual(NATURAL_LETTER_SPACING);
-    expect(textLetterSpacing('Appearance')).toBeUndefined();
-  });
-
-  it('returns the natural spacing for a joined script', () => {
-    expect(textLetterSpacing('الرئيسية')).toBe(NATURAL_LETTER_SPACING);
-    expect(textLetterSpacing(['عرض', ' الكل'])).toBe(NATURAL_LETTER_SPACING);
-  });
-
-  it('returns undefined without a joined script', () => {
-    expect(textLetterSpacing('Live now')).toBeUndefined();
-    expect(textLetterSpacing(4)).toBeUndefined();
   });
 });

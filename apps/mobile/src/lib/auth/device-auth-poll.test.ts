@@ -1,10 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dismissAuthSession, dismissBrowser } from 'expo-web-browser';
 
 import { startDeviceAuthPoll } from '@/lib/auth/device-auth-poll';
 import { type DeviceAuthState } from '@/lib/auth/device-auth-state';
 
+const platformMock = vi.hoisted(() => ({ os: 'ios' as 'ios' | 'android' }));
+
 vi.mock('react-native', () => ({
-  Platform: { OS: 'android' },
+  Platform: {
+    get OS() {
+      return platformMock.os;
+    },
+  },
 }));
 
 vi.mock('expo-application', () => ({
@@ -13,6 +20,7 @@ vi.mock('expo-application', () => ({
 
 vi.mock('expo-web-browser', () => ({
   dismissAuthSession: vi.fn(),
+  dismissBrowser: vi.fn(),
 }));
 
 vi.mock('@/lib/config', () => ({
@@ -21,11 +29,17 @@ vi.mock('@/lib/config', () => ({
 
 const fetchMock = vi.fn();
 
+function approvedResponse() {
+  return Response.json({ status: 'approved', token: 'access', expiresIn: 3600 });
+}
+
 function pendingResponse() {
   return Response.json({ status: 'pending' }, { status: 202 });
 }
 
-function makePoll(overrides: { startedAt?: number } = {}) {
+function makePoll(
+  overrides: { startedAt?: number; browserKind?: 'auth-session' | 'plain-browser' } = {}
+) {
   const setState = vi.fn<(updater: (prev: DeviceAuthState) => DeviceAuthState) => void>();
   const cleanup = vi.fn<() => void>();
   const poll = startDeviceAuthPoll({
@@ -34,6 +48,7 @@ function makePoll(overrides: { startedAt?: number } = {}) {
     signal: new AbortController().signal,
     setState,
     cleanup,
+    browserKind: 'auth-session',
     ...overrides,
   });
   return { poll, setState, cleanup };
@@ -43,6 +58,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
   fetchMock.mockReset();
+  vi.mocked(dismissAuthSession).mockClear();
+  vi.mocked(dismissBrowser).mockClear();
   globalThis.fetch = fetchMock;
 });
 
@@ -149,5 +166,44 @@ describe('startDeviceAuthPoll', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(cleanup).toHaveBeenCalled();
     expect(setState).toHaveBeenCalled();
+  });
+
+  it('dismisses the plain browser it opened when approval lands', async () => {
+    // A non-product auth host opens SFSafariViewController, which
+    // `dismissAuthSession` cannot close: without the matching dismissal the page
+    // stays over the approved app.
+    fetchMock.mockResolvedValue(approvedResponse());
+    const { setState } = makePoll({ browserKind: 'plain-browser' });
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(vi.mocked(dismissBrowser)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dismissAuthSession)).not.toHaveBeenCalled();
+    expect(setState).toHaveBeenCalled();
+  });
+
+  it('dismisses the native auth session it opened when approval lands', async () => {
+    fetchMock.mockResolvedValue(approvedResponse());
+    makePoll({ browserKind: 'auth-session' });
+
+    await vi.advanceTimersByTimeAsync(3000);
+
+    expect(vi.mocked(dismissAuthSession)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(dismissBrowser)).not.toHaveBeenCalled();
+  });
+
+  it('leaves the Android custom tab to the user when approval lands', async () => {
+    platformMock.os = 'android';
+    try {
+      fetchMock.mockResolvedValue(approvedResponse());
+      makePoll({ browserKind: 'plain-browser' });
+
+      await vi.advanceTimersByTimeAsync(3000);
+
+      expect(vi.mocked(dismissBrowser)).not.toHaveBeenCalled();
+      expect(vi.mocked(dismissAuthSession)).not.toHaveBeenCalled();
+    } finally {
+      platformMock.os = 'ios';
+    }
   });
 });

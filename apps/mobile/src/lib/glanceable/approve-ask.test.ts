@@ -69,6 +69,10 @@ const {
 // The pending-permission read is its own module; this suite owns its cases too.
 const { PendingPermissionTimeoutError, resolvePendingPermissionId } =
   await import('@/lib/glanceable/pending-permission');
+// The real ack store: the republish's counts must read it, so the suite drives
+// it rather than replacing it.
+const { ackSessionAttention, isAttentionAcked, __resetSessionAttentionForTests } =
+  await import('@/lib/session-attention');
 
 function connectedFrame(permissionIds: readonly string[]): CloudAgentEvent {
   return {
@@ -284,6 +288,8 @@ describe('resolvePendingPermissionId', () => {
 describe('runGlanceableApprove', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // The ack store is module-level: drop one case's answers before the next.
+    __resetSessionAttentionForTests();
     getSessionQuery.mockResolvedValue({ cloud_agent_session_id: 'agent_1' });
     fetchCloudAgentStreamTicket.mockImplementation(resolveTicket);
     createConnection.mockImplementation(fakeStream([connectedFrame(['perm_1'])]).open);
@@ -317,6 +323,40 @@ describe('runGlanceableApprove', () => {
       { context: { skipBatch: true } }
     );
     expect(recordWaitingAsk).toHaveBeenCalledWith(null);
+  });
+
+  it('acks the answered raise so the republish counts it as answered', async () => {
+    // The tray row keeps reading permission until the control plane's status
+    // sync lands, and the caller republishes immediately after this resolves.
+    // Without the ack the republish would draw the answered session as still
+    // waiting, with Approve back on the ongoing notification it was just
+    // answered from.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    answerPermissionMutate.mockResolvedValue(undefined);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
+    expect(isAttentionAcked('ses_1', null)).toBe(true);
+  });
+
+  it('acks a raise proven gone, and never acks a retryable failure', async () => {
+    // `gone` is terminal (answered elsewhere, or no approvable ask): the raise
+    // stops showing as waiting, exactly as the notification action path acks.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    answerPermissionMutate.mockRejectedValue(withCode('NOT_FOUND'));
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
+    expect(isAttentionAcked('ses_1', null)).toBe(true);
+
+    // Retryable keeps the ask live: the next tap has to answer that same
+    // session, so an ack here would hide the raise the user must retry.
+    __resetSessionAttentionForTests();
+    answerPermissionMutate.mockRejectedValue(new Error('network down'));
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(isAttentionAcked('ses_1', null)).toBe(false);
+  });
+
+  it('does not ack an ask it never answered', async () => {
+    readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, isCloudAgent: false });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'none' });
+    expect(isAttentionAcked('ses_1', null)).toBe(false);
   });
 
   it.each([
@@ -469,6 +509,11 @@ describe('refreshGlanceableSnapshot', () => {
     return { handleSessions: vi.fn() };
   }
 
+  beforeEach(() => {
+    // The ack store is module-level: drop one case's answers before the next.
+    __resetSessionAttentionForTests();
+  });
+
   it('publishes the first response immediately', async () => {
     const publisher = makePublisher();
     const rows = [{ id: 'ses_1', status: 'idle' }];
@@ -480,6 +525,23 @@ describe('refreshGlanceableSnapshot', () => {
     expect(fetchRows).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledWith(rows, ctx);
+  });
+
+  it('counts a raise the answer acked as answered while its tray row still trails', async () => {
+    // The tray keeps reading permission until the control plane's status sync
+    // lands, and this poll runs immediately after the answer. Counting the raw
+    // row would republish the pre-action snapshot — the answered session still
+    // waiting — on the ongoing card and the widget, which is what the ack is
+    // for. The poll still reads the raw row: that is what proves the sync.
+    ackSessionAttention('ses_1');
+    const publisher = makePublisher();
+    const rows = [{ id: 'ses_1', status: 'permission' }];
+    const fetchRows = vi.fn(async () => rows);
+    await refreshGlanceableSnapshot(
+      { userId: 'user_1', organizationId: null, answeredKiloSessionId: 'ses_1', askEnded: true },
+      { fetchRows, createPublisher: () => publisher, sleep: vi.fn(), deadlineMs: 0 }
+    );
+    expect(publisher.handleSessions).toHaveBeenCalledWith([{ id: 'ses_1', status: 'idle' }], ctx);
   });
 
   it('polls every interval while the answered session still waits', async () => {

@@ -4,12 +4,14 @@ import { type GlanceableSessionRow } from '@kilocode/app-shared/glanceable-agent
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { performRefresh } from '@/lib/auth/credentials';
 import { StreamTicketHttpError } from '@/lib/cloud-agent-stream-ticket';
+import { ackSessionAttention } from '@/lib/session-attention';
 import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { createGlanceablePublisher } from './create-publisher';
+import { resolveAnsweredRaises } from './attention-rows';
 import { resolvePendingPermissionId } from './pending-permission';
-import { readWaitingAsk, recordWaitingAsk } from './waiting-ask';
+import { readWaitingAsk, recordWaitingAsk, type WaitingAsk } from './waiting-ask';
 
 /**
  * The one answer path. The in-app permission card answers through
@@ -192,6 +194,16 @@ async function classifyUnauthorized(): Promise<GlanceableApproveResult> {
  * The flow both platforms run on an Approve tap. A question ask and a legacy
  * wrapper session have no single approval, so both are `none` and the caller
  * drops the action; an answered-elsewhere ask is `gone`.
+ *
+ * A terminal outcome acks session attention, exactly as the other answer paths
+ * do (`notification-action-interaction.ts`, `approve-front-agent.ts`): the
+ * answered raise and the raise proven gone both stop counting as waiting. The
+ * tray row still reads permission/question until the control plane's status
+ * sync lands, so without the ack the caller's republish
+ * (`refreshGlanceableSnapshot`) would resolve nothing and draw the pre-action
+ * counts — the session the user just answered, still offered with Approve — back
+ * onto the ongoing notification. A retryable outcome never acks: the ask is
+ * still waiting, and the next tap has to answer that same session.
  */
 export async function runGlanceableApprove(
   options: { now?: () => number } = {}
@@ -200,6 +212,18 @@ export async function runGlanceableApprove(
   if (ask?.status !== 'permission' || !ask.isCloudAgent) {
     return { kind: 'none' };
   }
+  const result = await answerRecordedPermission(ask, options);
+  if (result.kind === 'approved' || result.kind === 'gone') {
+    ackSessionAttention(ask.kiloSessionId);
+  }
+  return result;
+}
+
+/** The answer body, whose terminal outcome the caller acks. */
+async function answerRecordedPermission(
+  ask: WaitingAsk,
+  options: { now?: () => number }
+): Promise<GlanceableApproveResult> {
   try {
     const cloudAgentSessionId = await resolveCloudAgentSessionId(ask.kiloSessionId);
     const permissionId = await resolvePendingPermissionId(
@@ -297,6 +321,14 @@ function hasWaitingAnsweredSession(
  * immediately, then polled until the actioned session leaves
  * permission/question or the 10 s budget runs out. A failed fetch ends the poll
  * and leaves the last real snapshot in place: counts are never invented.
+ *
+ * The counts are the ack-resolved ones (`resolveAnsweredRaises`), like every
+ * other republish path (`mount.tsx`, `widget-actions.ts`, `approve-front-agent`):
+ * the action just recorded the session-attention ack, while its tray row still
+ * reads permission/question until the control plane's status sync lands, so the
+ * raw rows would republish the pre-action snapshot — the answered session still
+ * counted as waiting — immediately after the user answered it. The poll below
+ * still reads the raw row, because that is what proves the sync landed.
  */
 export async function refreshGlanceableSnapshot(
   input: {
@@ -326,7 +358,7 @@ export async function refreshGlanceableSnapshot(
         // has to skip it: recording it would put Approve back on the
         // notification the user already actioned. Dropping the selected ask
         // instead would leave a second waiting session unrecorded, so the skip
-        // happens at selection and the counts still come from the tray.
+        // happens at selection.
         skipWaitingAskSessionId: input.askEnded ? input.answeredKiloSessionId : undefined,
       }));
   const sleep = deps?.sleep ?? defaultSleep;
@@ -342,7 +374,7 @@ export async function refreshGlanceableSnapshot(
       // The last published snapshot stays; nothing is fabricated.
       return;
     }
-    publisher.handleSessions(rows, ctx);
+    publisher.handleSessions(resolveAnsweredRaises(rows), ctx);
     if (elapsedMs >= deadlineMs || !hasWaitingAnsweredSession(rows, input.answeredKiloSessionId)) {
       return;
     }

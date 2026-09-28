@@ -12,6 +12,7 @@ import type {
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   PreparationStepSnapshot,
 } from './types';
 import {
@@ -179,7 +180,11 @@ export type ServiceEvent =
       cloudStatus?: CloudStatus | undefined;
       activeMessageId?: string | null | undefined;
     }
-  | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | {
+      type: 'commands.available';
+      commands: SlashCommandInfo[];
+      catalogStatus?: SlashCommandCatalogStatus | undefined;
+    }
   | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
@@ -608,7 +613,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'commands.available', commands: r.data.commands };
+      return {
+        type: 'commands.available',
+        commands: r.data.commands,
+        ...(r.data.catalogStatus ? { catalogStatus: r.data.catalogStatus } : {}),
+      };
     }
 
     case 'cloud.message.queued': {

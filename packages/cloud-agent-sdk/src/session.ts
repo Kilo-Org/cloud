@@ -126,11 +126,11 @@ type CloudAgentSessionSendInput = {
   images?: Images | undefined;
   remoteModelOverride?: RemoteModelOverride | undefined;
   /**
-   * Ready file parts to forward to a CAPABLE remote CLI session. The
-   * session-manager gate already enforces that this is only non-empty for
-   * a `remote` session whose CLI has advertised `capabilities.attachments:
-   * true`; transports that don't support the path (cloud-agent, read-only,
-   * non-capable remote) simply ignore it.
+   * Ready file parts to forward to a remote CLI session. The session-manager
+   * gate already enforces that this is only non-empty for a `remote` session
+   * the CLI has not reported as incapable (unknown capabilities are
+   * optimistic); transports that don't support the path (cloud-agent,
+   * read-only, a CLI that reported `attachments: false`) simply ignore it.
    */
   attachmentParts?: RemoteAttachmentPart[] | undefined;
 };

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { canonicalizeEligibleVerifiedDomain } from '@/lib/organizations/verified-domain';
 import {
@@ -39,12 +40,6 @@ const PROVIDER_ERROR_MESSAGE = 'Domain verification provider request failed';
 function providerStatus(error: unknown): number | null {
   if (!error || typeof error !== 'object' || !('status' in error)) return null;
   return typeof error.status === 'number' ? error.status : null;
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== 'object') return false;
-  if ('code' in error && error.code === '23505') return true;
-  return 'cause' in error && isUniqueViolation(error.cause);
 }
 
 function conflictError(): TRPCError {

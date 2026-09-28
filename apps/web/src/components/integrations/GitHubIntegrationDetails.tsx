@@ -21,7 +21,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { buildGitHubInstallState } from './github-install-state';
 import { useConfirm } from '@/components/ui/confirm';
 import { OrganizationGitHubInstallations } from './OrganizationGitHubInstallations';

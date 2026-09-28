@@ -1,1 +1,1 @@
-export { GET } from '@/app/api/openrouter/models/[provider]/[model]/endpoints/route';
+export { handleModelEndpointsRequest as GET } from '@/lib/ai-gateway/handlers/model-endpoints';

@@ -1,4 +1,8 @@
-import { kilocode_users, platform_integrations } from '@kilocode/db/schema';
+import {
+  github_app_installations,
+  kilocode_users,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 
 import { getSeedDb } from '../lib/db';
@@ -171,6 +175,55 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   // platform_installation_id) unique index, then re-read on conflict to allow a
   // same-owner refresh and refuse cross-owner claims.
   const nowIso = new Date().toISOString();
+
+  // Multi-installation support resolves a GitHub integration through its
+  // canonical `github_app_installations` row: an active lifecycle plus a
+  // `github_connection_role = 'workflow'` association. A platform_integrations
+  // row on its own is invisible to the workflow lookup, so materialize the
+  // canonical record here rather than waiting for a webhook delivery that a
+  // local checkout never receives.
+  const [canonical] = await db
+    .insert(github_app_installations)
+    .values({
+      github_app_type: options.appType,
+      installation_id: options.installationId,
+      account_id: String(details.accountId),
+      account_login: details.accountLogin,
+      permissions: details.permissions,
+      scopes: details.events,
+      repository_access: details.repositorySelection,
+      repositories,
+      repositories_synced_at: nowIso,
+      lifecycle_state: 'active',
+      observed_at: nowIso,
+    })
+    .onConflictDoUpdate({
+      target: [github_app_installations.github_app_type, github_app_installations.installation_id],
+      set: {
+        account_id: String(details.accountId),
+        account_login: details.accountLogin,
+        permissions: details.permissions,
+        scopes: details.events,
+        repository_access: details.repositorySelection,
+        repositories,
+        repositories_synced_at: nowIso,
+        lifecycle_state: 'active',
+        suspended_at: null,
+        deleted_at: null,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        observed_at: nowIso,
+        updated_at: nowIso,
+      },
+    })
+    .returning({ id: github_app_installations.id });
+
+  if (!canonical) {
+    throw new Error(
+      `Failed to materialize the canonical GitHub installation ${options.appType}:${options.installationId}`
+    );
+  }
+
   const values = {
     owned_by_user_id: user.id,
     owned_by_organization_id: null,
@@ -186,6 +239,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     repositories,
     installed_at: details.createdAt,
     github_app_type: options.appType,
+    github_connection_role: 'workflow',
+    github_installation_id: canonical.id,
     repositories_synced_at: nowIso,
   } satisfies typeof platform_integrations.$inferInsert;
 
@@ -240,6 +295,8 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           integration_status: 'active',
           repositories: values.repositories,
           github_app_type: options.appType,
+          github_connection_role: 'workflow',
+          github_installation_id: canonical.id,
           auth_invalid_at: null,
           auth_invalid_reason: null,
           repositories_synced_at: nowIso,

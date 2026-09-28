@@ -27,7 +27,7 @@ export function toIsoTimestamp(value: string | null | undefined): string | null 
   const iso = value.includes('T')
     ? value
     : value.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
-  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(iso)) return null;
+  if (!/(?:[zZ]|[+-]\d{2}:?\d{2})$/.test(iso)) return null;
   const time = new Date(iso).getTime();
   return Number.isNaN(time) ? null : new Date(time).toISOString();
 }

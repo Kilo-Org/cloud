@@ -3241,8 +3241,37 @@
       "unauthorized": "Àwọn irinṣẹ́ Kilo kọ̀ ìpàdé yìí",
       "unauthorizedDescription": "Tún wọlé láti lo àwọn irinṣẹ́ Kilo nínú ìjíròrò yìí.",
       "unavailable": "Àwọn irinṣẹ́ Kilo kò sí",
-      "unavailableDescription": "Sáfà Kilo kò sí fún àkọsílẹ̀ yìí."
+      "unavailableDescription": "Sáfà Kilo kò sí fún àkọsílẹ̀ yìí.",
+      "sheetTitle": "Àwọn irinṣẹ́ ìjíròrò",
+      "addServerTitle": "Fi sáfà MCP kún",
+      "editServerTitle": "Ṣàtúnṣe sáfà MCP yìí",
+      "fieldName": "Orúkọ tí a fi hàn",
+      "fieldUrl": "URL sáfà",
+      "fieldUrlInvalid": "Tẹ URL sáfà tí ó tọ́ sí.",
+      "fieldToken": "Tọ́kẹ̀nì Bearer (àṣàyàn)",
+      "enableServer": "Mú sáfà yìí ṣiṣẹ́: {{name}}",
+      "editServer": "Ṣàtúnṣe sáfà",
+      "deleteServer": "Pa sáfà rẹ́",
+      "editServerA11y": "Ṣàtúnṣe sáfà: {{name}}",
+      "deleteServerA11y": "Pa sáfà rẹ́: {{name}}",
+      "retryServerA11y": "Tún sáfà yìí gbìyànjú: {{name}}",
+      "deleteTitle": "Pa sáfà yìí rẹ́?",
+      "deleteMessage": "Àwọn irinṣẹ́ rẹ̀ yóò kúrò nínú gbogbo ìjíròrò.",
+      "kiloBuiltIn": "Wọ́n kọ́ ọ sí inú. Tan tàbí pa á fún ìjíròrò yìí; a kò lè ṣàtúnṣe tàbí pa á rẹ́.",
+      "serversEmptyTitle": "Kò sí sáfà ọ̀nà jínjìn síbẹ̀",
+      "serversEmptyDescription": "Fi ọ̀kan kún láti pèsè àwọn irinṣẹ́ rẹ̀ nínú àwọn ìjíròrò rẹ.",
+      "settingsToolsTitle": "Jẹ́ kí Kilo yí àwọn ètò ápù padà",
+      "settingsToolsSubtitle": "Ó kan àwòrán, èdè, àwọn ìfitónilétí, àwọn àwòṣe àti ìyókù Àwọn Ìfẹ́.",
+      "settingsToolsOn": "Tàn — a fi àwọn irinṣẹ́ ètò ránṣẹ́ sí àwòṣe",
+      "settingsToolsOff": "Pa — a kò fi irinṣẹ́ ètò kankan ránṣẹ́ sí àwòṣe",
+      "serverChecking": "Ń ṣàyẹ̀wò sáfà yìí…",
+      "serverToolCount": "irinṣẹ́ {{count}}",
+      "serverUnreachable": "A kò lè dé sáfà yìí",
+      "serverOff": "Sáfà yìí ti pa"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Ìjẹ́rìí ìyípadà yìí?"
   },
   "appActions": {
     "start": {

@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo ٹولز نے یہ سیشن مسترد کر دیا",
       "unauthorizedDescription": "اس چیٹ میں Kilo ٹولز استعمال کرنے کے لیے دوبارہ سائن ان کریں۔",
       "unavailable": "Kilo ٹولز دستیاب نہیں",
-      "unavailableDescription": "اس اکاؤنٹ کے لیے Kilo سرور دستیاب نہیں۔"
+      "unavailableDescription": "اس اکاؤنٹ کے لیے Kilo سرور دستیاب نہیں۔",
+      "sheetTitle": "چیٹ ٹولز",
+      "addServerTitle": "MCP سرور شامل کریں",
+      "editServerTitle": "اس MCP سرور میں ترمیم کریں",
+      "fieldName": "دکھایا جانے والا نام",
+      "fieldUrl": "سرور URL",
+      "fieldUrlInvalid": "درست سرور URL درج کریں۔",
+      "fieldToken": "Bearer ٹوکن (اختیاری)",
+      "enableServer": "اس سرور کو فعال کریں: {{name}}",
+      "editServer": "سرور میں ترمیم کریں",
+      "deleteServer": "سرور حذف کریں",
+      "editServerA11y": "سرور میں ترمیم کریں: {{name}}",
+      "deleteServerA11y": "سرور حذف کریں: {{name}}",
+      "retryServerA11y": "اس سرور کو دوبارہ کوشش کریں: {{name}}",
+      "deleteTitle": "یہ سرور حذف کریں؟",
+      "deleteMessage": "اس کے ٹولز ہر چیٹ سے نکل جائیں گے۔",
+      "kiloBuiltIn": "بلٹ اِن۔ اس چیٹ کے لیے اسے آن یا آف کریں؛ اس میں ترمیم یا حذف نہیں کیا جا سکتا۔",
+      "serversEmptyTitle": "ابھی کوئی ریموٹ سرور نہیں",
+      "serversEmptyDescription": "اپنی چیٹس میں اس کے ٹولز پیش کرنے کے لیے ایک شامل کریں۔",
+      "settingsToolsTitle": "Kilo کو ایپ کی سیٹنگز تبدیل کرنے دیں",
+      "settingsToolsSubtitle": "تھیم، زبان، اطلاعات، ماڈلز اور باقی ترجیحات پر لاگو ہوتا ہے۔",
+      "settingsToolsOn": "آن — سیٹنگز ٹولز ماڈل کو بھیجے جاتے ہیں",
+      "settingsToolsOff": "آف — ماڈل کو کوئی سیٹنگز ٹول نہیں بھیجا جاتا",
+      "serverChecking": "اس سرور کی جانچ ہو رہی ہے…",
+      "serverToolCount": "{{count}} ٹولز",
+      "serverUnreachable": "اس سرور تک نہیں پہنچ سکا",
+      "serverOff": "یہ سرور بند ہے"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "اس تبدیلی کی تصدیق کریں؟"
   },
   "appActions": {
     "start": {

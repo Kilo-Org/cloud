@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo টুল এই সেশন প্রত্যাখ্যান করেছে",
       "unauthorizedDescription": "এই চ্যাটে Kilo টুল ব্যবহার করতে আবার সাইন-ইন করুন।",
       "unavailable": "Kilo টুল পাওয়া যাচ্ছে না",
-      "unavailableDescription": "এই অ্যাকাউন্টের জন্য Kilo সার্ভার নেই।"
+      "unavailableDescription": "এই অ্যাকাউন্টের জন্য Kilo সার্ভার নেই।",
+      "sheetTitle": "চ্যাট টুল",
+      "addServerTitle": "একটি MCP সার্ভার যোগ করুন",
+      "editServerTitle": "এই MCP সার্ভার সম্পাদনা করুন",
+      "fieldName": "প্রদর্শিত নাম",
+      "fieldUrl": "সার্ভার URL",
+      "fieldUrlInvalid": "একটি বৈধ সার্ভার URL লিখুন।",
+      "fieldToken": "Bearer টোকেন (ঐচ্ছিক)",
+      "enableServer": "এই সার্ভার সক্রিয় করুন: {{name}}",
+      "editServer": "সার্ভার সম্পাদনা করুন",
+      "deleteServer": "সার্ভার মুছুন",
+      "editServerA11y": "সার্ভার সম্পাদনা করুন: {{name}}",
+      "deleteServerA11y": "সার্ভার মুছুন: {{name}}",
+      "retryServerA11y": "এই সার্ভার আবার চেষ্টা করুন: {{name}}",
+      "deleteTitle": "এই সার্ভার মুছবেন?",
+      "deleteMessage": "এর টুল সব চ্যাট থেকে সরে যাবে।",
+      "kiloBuiltIn": "অন্তর্নির্মিত। এই চ্যাটের জন্য এটি চালু বা বন্ধ করুন; এটি সম্পাদনা বা মুছে ফেলা যায় না।",
+      "serversEmptyTitle": "এখনও কোনো দূরবর্তী সার্ভার নেই",
+      "serversEmptyDescription": "আপনার চ্যাটে এর টুল সরবরাহ করতে একটি যোগ করুন।",
+      "settingsToolsTitle": "Kilo-কে অ্যাপ সেটিংস পরিবর্তন করতে দিন",
+      "settingsToolsSubtitle": "থিম, ভাষা, বিজ্ঞপ্তি, মডেল এবং বাকি পছন্দগুলিতে প্রযোজ্য।",
+      "settingsToolsOn": "চালু — সেটিংস টুল মডেলে পাঠানো হয়",
+      "settingsToolsOff": "বন্ধ — মডেলে কোনো সেটিংস টুল পাঠানো হয় না",
+      "serverChecking": "এই সার্ভার যাচাই করা হচ্ছে…",
+      "serverToolCount": "{{count}} টুল",
+      "serverUnreachable": "এই সার্ভারে পৌঁছানো যায়নি",
+      "serverOff": "এই সার্ভার বন্ধ আছে"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "এই পরিবর্তন নিশ্চিত করবেন?"
   },
   "appActions": {
     "start": {

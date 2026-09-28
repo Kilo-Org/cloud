@@ -13,7 +13,7 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 import { KILO_MCP_URL } from '@/lib/config';
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { change, forgetState, moveState, NOTHING, snapshotOf } from './state';
-import { chatLayers, type ChatOrg } from './layers';
+import { chatLayers, type ChatOrg, organizationIdOf } from './layers';
 import {
   ensureKiloMcp,
   mcpEnabledFor,
@@ -22,8 +22,15 @@ import {
 } from './kilo-mcp';
 import { type ChatPlace } from './scope';
 import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
-import { chatToolNames } from './tools';
-import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from './store';
+import { chatToolNames, chatToolNamesStarting } from './tools';
+import {
+  forgetSession,
+  modelOfSession,
+  moveChat,
+  rememberChat,
+  toolsOfSession,
+  touchChat,
+} from './store';
 
 /**
  * The chats that are running, for as long as they run.
@@ -63,11 +70,12 @@ type Chat = {
   /** What was typed while `answering` was running. Drained when it ends well. */
   readonly waiting: Waiting[];
   /**
-   * A Kilo MCP choice made while an answer was arriving, applied when it
-   * settles. The tool set is frozen for the life of a session, so it is never
-   * changed under an answer that is still coming.
+   * A tool-set change made while an answer was arriving — the Kilo MCP switch,
+   * a Retry, or the settings group switch — applied when it settles. The tool
+   * set is frozen for the life of a session, so it is never changed under an
+   * answer that is still coming.
    */
-  pendingMcp: boolean | undefined;
+  pendingTools: boolean | undefined;
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -158,7 +166,8 @@ export async function prepareChats(place: ChatPlace): Promise<void> {
  * a chat that does not exist. When it is on, the tools are discovered before
  * the session opens so it can name them — bounded at four seconds, and a
  * failure still opens the chat on the base tools rather than holding the send
- * on the server.
+ * on the server. The names come from the caller's choice rather than from a
+ * stored setting, because a session opens before there is an id to read one.
  */
 export async function startChat(
   place: ChatPlace,
@@ -171,7 +180,11 @@ export async function startChat(
   }
   const { handle, scope } = await inOwnScope(
     runtime,
-    openSession({ system: SYSTEM, model, tools: chatToolNames(mcpEnabled) })
+    openSession({
+      system: SYSTEM,
+      model,
+      tools: chatToolNamesStarting(organizationIdOf(place.org), mcpEnabled),
+    })
   );
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
   if (!mcpEnabled) {
@@ -184,7 +197,7 @@ export async function startChat(
     scope,
     answering: undefined,
     waiting: [],
-    pendingMcp: undefined,
+    pendingTools: undefined,
     ...place,
   });
   change(handle.id, { ...NOTHING, model, status: 'idle' });
@@ -286,7 +299,9 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
     /* The stored names no longer resolve: the server's tool list moved on, or
        the server is down while the session was stored with its tools. The chat
        opens either way, on the names the registry holds now. */
-    const current = await onto(place, sessionId, { tools: chatToolNames(enabled) });
+    const current = await onto(place, sessionId, {
+      tools: await chatToolNames(organizationIdOf(place.org), sessionId),
+    });
     const model = modelOfSession(await open(), current) ?? '';
     const asked = await askedIn(current);
     change(current, { model, asked, status: 'idle' });
@@ -302,7 +317,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
       scope,
       answering: undefined,
       waiting: [],
-      pendingMcp: undefined,
+      pendingTools: undefined,
       ...place,
     });
     change(sessionId, {
@@ -349,7 +364,14 @@ export async function say(sessionId: string, text: string, model: string): Promi
       change(sessionId, { waiting: held.waiting.map(one => one.text) });
       return;
     }
-    current = await ontoModel(sessionId, model);
+    /* One move, not two: the question is asked on the model on screen, and a
+       switch that moved while the chat sat idle is applied in the same copy.
+       The session freezes its tools, so the list sent to the model has to be
+       the one the switches name at this moment. */
+    if (held === undefined) {
+      throw new Error('the chat is not open');
+    }
+    current = await ontoForUse(sessionId, model, held);
     const chat = chats.get(current);
     if (chat === undefined) {
       throw new Error('the chat is not open');
@@ -463,13 +485,13 @@ async function settle(
   /* The line moves only when the answer landed. A question that failed keeps
      its Retry, and asking the next one would take the place that Retry hangs
      off — so what is waiting stays waiting until the person deals with it. A
-     Kilo MCP choice made while the answer was arriving is different: it is
+     tool-set change made while the answer was arriving is different: it is
      applied either way, because the answer is no longer arriving. */
   await drain(sessionId, chat, failed !== null);
 }
 
 /**
- * Applies what was left while the answer was arriving: a Kilo MCP choice, then
+ * Applies what was left while the answer was arriving: a tool-set change, then
  * the next question the person asked.
  *
  * They typed the question while the last answer was arriving, so it was never a
@@ -479,8 +501,11 @@ async function settle(
  */
 async function drain(sessionId: string, chat: Chat, failed: boolean): Promise<void> {
   let current = sessionId;
-  if (chat.pendingMcp !== undefined) {
-    chat.pendingMcp = undefined;
+  if (chat.pendingTools !== undefined) {
+    chat.pendingTools = undefined;
+    /* The names are computed from the switches as they stand now, so a choice
+       made while the answer was arriving — the Kilo switch, a Retry, or the
+       settings group switch — all land on the same recomputation. */
     current = await ontoTools(current, chat);
   }
   if (failed) {
@@ -530,7 +555,10 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
     return sessionId;
   }
   const runtime = await runtimeFor(chat ?? place);
-  const { handle, scope } = await cloneOnto(runtime, sessionId, wanted);
+  const { handle, scope } = await cloneOnto(runtime, sessionId, {
+    move: wanted,
+    organizationId: organizationIdOf(place.org),
+  });
   const database = await open();
   moveChat(database, { from: sessionId, to: handle.id, at: Date.now() });
   await moveAsked(sessionId, handle.id);
@@ -540,7 +568,7 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   chats.set(
     handle.id,
     chat === undefined
-      ? { handle, scope, answering: undefined, waiting: [], pendingMcp: undefined, ...place }
+      ? { handle, scope, answering: undefined, waiting: [], pendingTools: undefined, ...place }
       : { ...chat, handle, scope, answering: undefined }
   );
   change(handle.id, { ...held, sessionId: handle.id, model, turns });
@@ -558,6 +586,12 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
   return handle.id;
 }
 
+/** What a copy is made of: what to move onto, and whose settings defaults to name. */
+type Clone = {
+  readonly move: Onto;
+  readonly organizationId?: string;
+};
+
 /**
  * Copies the session onto another model or tool set, on names the registry can
  * still resolve.
@@ -573,8 +607,9 @@ async function onto(place: ChatPlace, sessionId: string, move: Onto): Promise<st
 async function cloneOnto(
   runtime: ChatRuntime,
   sessionId: string,
-  wanted: Onto
+  clone: Clone
 ): Promise<{ readonly handle: SessionHandle; readonly scope: Scope.CloseableScope }> {
+  const wanted = clone.move;
   const cloned = await openOrMissing(runtime, cloneSession(sessionId, wanted));
   if (cloned.opened) {
     return cloned;
@@ -584,7 +619,7 @@ async function cloneOnto(
        rather than a stored set that moved on. */
     throw new Error('the chat was moved onto a tool the registry does not hold');
   }
-  const tools = chatToolNames(await mcpEnabledFor(sessionId));
+  const tools = await chatToolNames(clone.organizationId, sessionId);
   const again = await openOrMissing(runtime, cloneSession(sessionId, { ...wanted, tools }));
   if (!again.opened) {
     throw new Error('the chat names a tool the registry does not hold');
@@ -593,27 +628,93 @@ async function cloneOnto(
 }
 
 /**
- * Moves the chat onto the model the person picked, and answers with the session
- * to carry on with.
+ * Whether the names a session was opened with are the ones the switches name
+ * now.
+ *
+ * A session freezes its tools, so this is what the live session still offers.
+ * Reading it is how a chat already on the names is told from one that has to
+ * move: a switch that changed another server's tools must not rewrite a chat
+ * that names none of them, because a rewrite churns the session for nothing.
  */
-async function ontoModel(sessionId: string, model: string): Promise<string> {
-  const chat = chats.get(sessionId);
-  if (chat === undefined) {
-    return sessionId;
-  }
-  const carried = await onto(chat, sessionId, { model });
-  return carried;
+async function holdsTools(sessionId: string, names: readonly string[]): Promise<boolean> {
+  const held = toolsOfSession(await open(), sessionId);
+  return (
+    held !== null && held.length === names.length && held.every((name, i) => name === names[i])
+  );
 }
 
 /**
- * Moves the chat onto the tool set its Kilo MCP setting names now.
+ * The move a chat needs before its next question: onto the model on screen, and
+ * onto the names the switches name now.
  *
- * A session freezes the tools it offers, so turning the server off is a move
- * onto a session without its tools, and turning it on is a move onto one with
- * them.
+ * A session freezes its tools, so the list sent to the model is whatever this
+ * chat was opened with until it is copied. When the store still holds those
+ * names, they are compared with the switches as they stand — even if this chat
+ * was not marked when the settings group switch moved — because an unmarked
+ * chat would otherwise keep offering settings_set after the person turned it
+ * off. A session the store has not written yet is left alone unless it was
+ * marked: there are no names to compare, and copying it would churn every
+ * first question. One move rather than two, because two would copy the
+ * conversation twice and leave two rows for one chat. A chat already on the
+ * names keeps its session.
+ */
+async function ontoForUse(sessionId: string, model: string, chat: Chat): Promise<string> {
+  const marked = chat.pendingTools !== undefined;
+  chat.pendingTools = undefined;
+  const names = await chatToolNames(organizationIdOf(chat.org), sessionId);
+  const stored = toolsOfSession(await open(), sessionId);
+  const already =
+    stored !== null &&
+    stored.length === names.length &&
+    stored.every((name, i) => name === names[i]);
+  const tools = already || (stored === null && !marked) ? undefined : names;
+  return onto(chat, sessionId, {
+    model,
+    ...(tools === undefined ? {} : { tools }),
+  });
+}
+
+/**
+ * Moves the chat onto the tool set its switches name now.
+ *
+ * A session freezes the tools it offers, so a moved switch is a move onto a
+ * session that names what is on now: the Kilo server turned off, a server's
+ * enabled flag flipped, or the settings group switch moved. A chat already on
+ * those names is left where it is — the switch that moved was not its own.
  */
 async function ontoTools(sessionId: string, place: ChatPlace): Promise<string> {
-  return onto(place, sessionId, { tools: chatToolNames(await mcpEnabledFor(sessionId)) });
+  const names = await chatToolNames(organizationIdOf(place.org), sessionId);
+  if (await holdsTools(sessionId, names)) {
+    return sessionId;
+  }
+  return onto(place, sessionId, { tools: names });
+}
+
+/**
+ * Marks every open chat as naming the tool set the switches named before now.
+ *
+ * A session freezes the tools it was opened with, so flipping the settings
+ * group switch, or a server's enabled flag, changes what the next session would
+ * name and nothing about the one on screen. Marking is what makes the list sent
+ * to the model move with the switch: each marked chat is moved onto the names
+ * computed now at its next use — when a question is asked, or when the answer
+ * it was arriving with settles.
+ *
+ * Nothing is moved here, and that is the bound. A chat stays open after its
+ * screen closes, so the chats in this map are every chat visited in the run;
+ * moving them all on one tap would copy each of them, and a switch that moved
+ * one thing would pay for every chat ever opened. What is paid instead is the
+ * chats a person actually uses, and a chat already on the names is not copied
+ * even then.
+ */
+export async function refreshChatTools(): Promise<void> {
+  for (const chat of chats.values()) {
+    chat.pendingTools = true;
+  }
+  /* The marking is synchronous, and that is the point: the tap moves nothing.
+     The promise is what lets the sheet await the tap finishing before it
+     closes. */
+  await Promise.resolve();
 }
 
 /**
@@ -644,7 +745,7 @@ export async function setMcpEnabled(sessionId: string, enabled: boolean): Promis
     await ensureKiloMcp(chat, 'automatic');
   }
   if (chat.answering !== undefined) {
-    chat.pendingMcp = enabled;
+    chat.pendingTools = enabled;
     return;
   }
   await ontoTools(current, chat);
@@ -676,7 +777,7 @@ export async function retryKiloMcp(sessionId: string): Promise<void> {
     return;
   }
   if (chat.answering !== undefined) {
-    chat.pendingMcp ??= true;
+    chat.pendingTools ??= true;
     return;
   }
   await ontoTools(current, chat);

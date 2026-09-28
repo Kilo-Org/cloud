@@ -3284,8 +3284,37 @@
       "unauthorized": "Kilo rīki atteica šo sesiju",
       "unauthorizedDescription": "Piesakies vēlreiz, lai šajā tērzēšanā izmantotu Kilo rīkus.",
       "unavailable": "Kilo rīki nav pieejami",
-      "unavailableDescription": "Kilo serveris nav pieejams šim kontam."
+      "unavailableDescription": "Kilo serveris nav pieejams šim kontam.",
+      "sheetTitle": "Tērzēšanas rīki",
+      "addServerTitle": "Pievienot MCP serveri",
+      "editServerTitle": "Rediģēt šo MCP serveri",
+      "fieldName": "Parādāmais nosaukums",
+      "fieldUrl": "Servera URL",
+      "fieldUrlInvalid": "Ievadi derīgu servera URL.",
+      "fieldToken": "Bearera pilnvara (neobligāti)",
+      "enableServer": "Iespējot šo serveri: {{name}}",
+      "editServer": "Rediģēt serveri",
+      "deleteServer": "Dzēst serveri",
+      "editServerA11y": "Rediģēt serveri: {{name}}",
+      "deleteServerA11y": "Dzēst serveri: {{name}}",
+      "retryServerA11y": "Mēģināt vēlreiz šo serveri: {{name}}",
+      "deleteTitle": "Dzēst šo serveri?",
+      "deleteMessage": "Tā rīki pazūd no visām tērzēšanām.",
+      "kiloBuiltIn": "Iebūvēts. Ieslēdz vai izslēdz to šai tērzēšanai; to nevar rediģēt vai dzēst.",
+      "serversEmptyTitle": "Vēl nav attālinātu serveru",
+      "serversEmptyDescription": "Pievieno vienu, lai piedāvātu tā rīkus savās tērzēšanās.",
+      "settingsToolsTitle": "Ļaut Kilo mainīt lietotnes iestatījumus",
+      "settingsToolsSubtitle": "Attiecas uz motīvu, valodu, paziņojumiem, modeļiem un pārējiem Iestatījumiem.",
+      "settingsToolsOn": "Ieslēgts — iestatījumu rīki tiek sūtīti modelim",
+      "settingsToolsOff": "Izslēgts — modelim netiek sūtīts neviens iestatījumu rīks",
+      "serverChecking": "Pārbauda šo serveri…",
+      "serverToolCount": "{{count}} rīki",
+      "serverUnreachable": "Neizdevās sasniegt šo serveri",
+      "serverOff": "Šis serveris ir izslēgts"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Apstiprināt šo izmaiņu?"
   },
   "appActions": {
     "start": {

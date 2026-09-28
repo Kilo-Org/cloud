@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo-verktøy avviste denne økten",
       "unauthorizedDescription": "Logg inn igjen for å bruke Kilo-verktøyene i denne chatten.",
       "unavailable": "Kilo-verktøy er ikke tilgjengelige",
-      "unavailableDescription": "Kilo-serveren er ikke tilgjengelig for denne kontoen."
+      "unavailableDescription": "Kilo-serveren er ikke tilgjengelig for denne kontoen.",
+      "sheetTitle": "Chattverktøy",
+      "addServerTitle": "Legg til en MCP-server",
+      "editServerTitle": "Rediger denne MCP-serveren",
+      "fieldName": "Vist navn",
+      "fieldUrl": "Server-URL",
+      "fieldUrlInvalid": "Skriv inn en gyldig server-URL.",
+      "fieldToken": "Bearer-token (valgfritt)",
+      "enableServer": "Aktiver denne serveren: {{name}}",
+      "editServer": "Rediger server",
+      "deleteServer": "Slett server",
+      "editServerA11y": "Rediger server: {{name}}",
+      "deleteServerA11y": "Slett server: {{name}}",
+      "retryServerA11y": "Prøv denne serveren igjen: {{name}}",
+      "deleteTitle": "Slette denne serveren?",
+      "deleteMessage": "Verktøyene dens forsvinner fra alle chatter.",
+      "kiloBuiltIn": "Innebygd. Slå den på eller av for denne chatten; den kan ikke redigeres eller slettes.",
+      "serversEmptyTitle": "Ingen eksterne servere ennå",
+      "serversEmptyDescription": "Legg til en for å tilby verktøyene dens i chattene dine.",
+      "settingsToolsTitle": "La Kilo endre appinnstillinger",
+      "settingsToolsSubtitle": "Gjelder tema, språk, varsler, modeller og resten av Innstillinger.",
+      "settingsToolsOn": "På — innstillingsverktøyene sendes til modellen",
+      "settingsToolsOff": "Av — ingen innstillingsverktøy sendes til modellen",
+      "serverChecking": "Sjekker denne serveren…",
+      "serverToolCount": "{{count}} verktøy",
+      "serverUnreachable": "Kunne ikke nå denne serveren",
+      "serverOff": "Denne serveren er av"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bekrefte denne endringen?"
   },
   "appActions": {
     "start": {

@@ -3241,8 +3241,37 @@
       "unauthorized": "ابزارهای Kilo این نشست را رد کردند",
       "unauthorizedDescription": "برای استفاده از ابزارهای Kilo در این گفتگو دوباره وارد شو.",
       "unavailable": "ابزارهای Kilo در دسترس نیستند",
-      "unavailableDescription": "سرور Kilo برای این حساب در دسترس نیست."
+      "unavailableDescription": "سرور Kilo برای این حساب در دسترس نیست.",
+      "sheetTitle": "ابزارهای گفتگو",
+      "addServerTitle": "افزودن سرور MCP",
+      "editServerTitle": "ویرایش این سرور MCP",
+      "fieldName": "نام نمایشی",
+      "fieldUrl": "نشانی URL سرور",
+      "fieldUrlInvalid": "یک نشانی URL معتبر سرور وارد کنید.",
+      "fieldToken": "توکن Bearer (اختیاری)",
+      "enableServer": "فعال‌کردن این سرور: {{name}}",
+      "editServer": "ویرایش سرور",
+      "deleteServer": "حذف سرور",
+      "editServerA11y": "ویرایش سرور: {{name}}",
+      "deleteServerA11y": "حذف سرور: {{name}}",
+      "retryServerA11y": "تلاش مجدد برای این سرور: {{name}}",
+      "deleteTitle": "این سرور حذف شود؟",
+      "deleteMessage": "ابزارهای آن از همهٔ گفتگوها خارج می‌شود.",
+      "kiloBuiltIn": "داخلی. برای این گفتگو آن را روشن یا خاموش کنید؛ قابل ویرایش یا حذف نیست.",
+      "serversEmptyTitle": "هنوز سرور راه دوری وجود ندارد",
+      "serversEmptyDescription": "یکی اضافه کنید تا ابزارهایش در گفتگوهای شما ارائه شود.",
+      "settingsToolsTitle": "به Kilo اجازه دهید تنظیمات برنامه را تغییر دهد",
+      "settingsToolsSubtitle": "برای پوسته، زبان، اعلان‌ها، مدل‌ها و بقیهٔ ترجیحات اعمال می‌شود.",
+      "settingsToolsOn": "روشن — ابزارهای تنظیمات به مدل ارسال می‌شود",
+      "settingsToolsOff": "خاموش — هیچ ابزار تنظیماتی به مدل ارسال نمی‌شود",
+      "serverChecking": "در حال بررسی این سرور…",
+      "serverToolCount": "{{count}} ابزار",
+      "serverUnreachable": "دسترسی به این سرور ممکن نشد",
+      "serverOff": "این سرور خاموش است"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "این تغییر تأیید شود؟"
   },
   "appActions": {
     "start": {

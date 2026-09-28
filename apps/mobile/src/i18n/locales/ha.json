@@ -3241,8 +3241,37 @@
       "unauthorized": "Kayan aikin Kilo sun ƙi wannan zaman",
       "unauthorizedDescription": "Sake shiga don amfani da kayan aikin Kilo a wannan tattaunawa.",
       "unavailable": "Kayan aikin Kilo ba su da samuwa",
-      "unavailableDescription": "Uwar garken Kilo ba ta samuwa ga wannan asusun ba."
+      "unavailableDescription": "Uwar garken Kilo ba ta samuwa ga wannan asusun ba.",
+      "sheetTitle": "Kayan aikin hira",
+      "addServerTitle": "Ƙara sabar MCP",
+      "editServerTitle": "Gyara wannan sabar MCP",
+      "fieldName": "Sunan da ake nunawa",
+      "fieldUrl": "URL na sabar",
+      "fieldUrlInvalid": "Shigar da ingantaccen URL na sabar.",
+      "fieldToken": "Token Bearer (na zaɓi)",
+      "enableServer": "Kunna wannan sabar: {{name}}",
+      "editServer": "Gyara sabar",
+      "deleteServer": "Share sabar",
+      "editServerA11y": "Gyara sabar: {{name}}",
+      "deleteServerA11y": "Share sabar: {{name}}",
+      "retryServerA11y": "Sake gwada wannan sabar: {{name}}",
+      "deleteTitle": "A share wannan sabar?",
+      "deleteMessage": "Kayan aikinta suna barin kowace hira.",
+      "kiloBuiltIn": "Ginin ciki. Kunna ko kashe shi don wannan hira; ba a iya gyara ko share shi.",
+      "serversEmptyTitle": "Babu sabar nesa tukuna",
+      "serversEmptyDescription": "Ƙara ɗaya don bayar da kayan aikinta a cikin hirarku.",
+      "settingsToolsTitle": "Bar Kilo ya canza saitunan manhaja",
+      "settingsToolsSubtitle": "Ya shafi jigo, harshe, sanarwa, ƙirai da sauran Zaɓuɓɓuka.",
+      "settingsToolsOn": "A kunne — ana aika kayan aikin saituna ga ƙira",
+      "settingsToolsOff": "A kashe — ba a aika wani kayan aikin saituna ga ƙira",
+      "serverChecking": "Ana duba wannan sabar…",
+      "serverToolCount": "kayan aiki {{count}}",
+      "serverUnreachable": "Ba a iya isa wannan sabar ba",
+      "serverOff": "An kashe wannan sabar"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "A tabbatar da wannan canji?"
   },
   "appActions": {
     "start": {

@@ -3327,8 +3327,37 @@
       "unauthorized": "Kilo įrankiai atmetė šią sesiją",
       "unauthorizedDescription": "Prisijunk iš naujo, kad galėtum naudoti Kilo įrankius šiame pokalbyje.",
       "unavailable": "Kilo įrankiai nepasiekiami",
-      "unavailableDescription": "Kilo serveris nepasiekiamas šiai paskyrai."
+      "unavailableDescription": "Kilo serveris nepasiekiamas šiai paskyrai.",
+      "sheetTitle": "Pokalbių įrankiai",
+      "addServerTitle": "Pridėti MCP serverį",
+      "editServerTitle": "Redaguoti šį MCP serverį",
+      "fieldName": "Rodomas pavadinimas",
+      "fieldUrl": "Serverio URL",
+      "fieldUrlInvalid": "Įveskite galiojantį serverio URL.",
+      "fieldToken": "Bearer prieigos raktas (neprivaloma)",
+      "enableServer": "Įjungti šį serverį: {{name}}",
+      "editServer": "Redaguoti serverį",
+      "deleteServer": "Ištrinti serverį",
+      "editServerA11y": "Redaguoti serverį: {{name}}",
+      "deleteServerA11y": "Ištrinti serverį: {{name}}",
+      "retryServerA11y": "Bandyti dar kartą šį serverį: {{name}}",
+      "deleteTitle": "Ištrinti šį serverį?",
+      "deleteMessage": "Jo įrankiai palieka kiekvieną pokalbį.",
+      "kiloBuiltIn": "Integruota. Įjunkite arba išjunkite jį šiam pokalbiui; jo negalima redaguoti ar ištrinti.",
+      "serversEmptyTitle": "Nuotolinių serverių dar nėra",
+      "serversEmptyDescription": "Pridėkite vieną, kad pasiūlytumėte jo įrankius savo pokalbiuose.",
+      "settingsToolsTitle": "Leisti Kilo keisti programėlės nustatymus",
+      "settingsToolsSubtitle": "Taikoma temai, kalbai, pranešimams, modeliams ir likusiems Nustatymams.",
+      "settingsToolsOn": "Įjungta — nustatymų įrankiai siunčiami modeliui",
+      "settingsToolsOff": "Išjungta — modeliui nesiunčiamas joks nustatymų įrankis",
+      "serverChecking": "Tikrinamas šis serveris…",
+      "serverToolCount": "{{count}} įrankiai",
+      "serverUnreachable": "Nepavyko pasiekti šio serverio",
+      "serverOff": "Šis serveris išjungtas"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Patvirtinti šį pakeitimą?"
   },
   "appActions": {
     "start": {

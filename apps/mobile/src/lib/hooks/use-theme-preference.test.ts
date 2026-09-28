@@ -110,9 +110,15 @@ describe('useThemePreference store', () => {
     const { setThemePreference } = await import('./use-theme-preference');
 
     setThemePreference('dark');
+    // Appearance must move before the store emit: a subscriber that mounts
+    // from that emit would otherwise see useColorScheme update mid-mount
+    // (LogBox over the tab bar).
+    expect(setColorScheme).toHaveBeenCalledWith('dark');
     await flushMicrotasks();
     expect(setItemAsync).toHaveBeenCalledWith('theme-preference', 'dark');
-    expect(setColorScheme).toHaveBeenCalledWith('dark');
+    const appearanceAt = setColorScheme.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY;
+    const persistAt = setItemAsync.mock.invocationCallOrder[0] ?? Number.NEGATIVE_INFINITY;
+    expect(appearanceAt).toBeLessThan(persistAt);
 
     setThemePreference('light');
     await flushMicrotasks();

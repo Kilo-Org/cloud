@@ -3327,8 +3327,37 @@
       "unauthorized": "Инструменты Kilo отклонили этот сеанс",
       "unauthorizedDescription": "Войдите снова, чтобы использовать инструменты Kilo в этом чате.",
       "unavailable": "Инструменты Kilo недоступны",
-      "unavailableDescription": "Сервер Kilo недоступен для этой учётной записи."
+      "unavailableDescription": "Сервер Kilo недоступен для этой учётной записи.",
+      "sheetTitle": "Инструменты чата",
+      "addServerTitle": "Добавить сервер MCP",
+      "editServerTitle": "Редактировать этот сервер MCP",
+      "fieldName": "Отображаемое имя",
+      "fieldUrl": "URL сервера",
+      "fieldUrlInvalid": "Введите действительный URL сервера.",
+      "fieldToken": "Токен Bearer (необязательно)",
+      "enableServer": "Включить этот сервер: {{name}}",
+      "editServer": "Редактировать сервер",
+      "deleteServer": "Удалить сервер",
+      "editServerA11y": "Редактировать сервер: {{name}}",
+      "deleteServerA11y": "Удалить сервер: {{name}}",
+      "retryServerA11y": "Повторить попытку для этого сервера: {{name}}",
+      "deleteTitle": "Удалить этот сервер?",
+      "deleteMessage": "Его инструменты исчезнут из каждого чата.",
+      "kiloBuiltIn": "Встроенный. Включите или отключите его для этого чата; его нельзя редактировать или удалять.",
+      "serversEmptyTitle": "Удалённых серверов пока нет",
+      "serversEmptyDescription": "Добавьте один, чтобы предлагать его инструменты в ваших чатах.",
+      "settingsToolsTitle": "Разрешить Kilo изменять настройки приложения",
+      "settingsToolsSubtitle": "Применяется к теме, языку, уведомлениям, моделям и остальным Настройкам.",
+      "settingsToolsOn": "Включено — инструменты настроек отправляются модели",
+      "settingsToolsOff": "Отключено — ни один инструмент настроек не отправляется модели",
+      "serverChecking": "Проверка этого сервера…",
+      "serverToolCount": "{{count}} инструментов",
+      "serverUnreachable": "Не удалось связаться с этим сервером",
+      "serverOff": "Этот сервер выключен"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Подтвердить это изменение?"
   },
   "appActions": {
     "start": {

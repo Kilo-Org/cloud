@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo-Tools haben diese Sitzung abgelehnt",
       "unauthorizedDescription": "Melde dich erneut an, um die Kilo-Tools in diesem Chat zu verwenden.",
       "unavailable": "Kilo-Tools sind nicht verfügbar",
-      "unavailableDescription": "Der Kilo-Server ist für dieses Konto nicht verfügbar."
+      "unavailableDescription": "Der Kilo-Server ist für dieses Konto nicht verfügbar.",
+      "sheetTitle": "Chat-Tools",
+      "addServerTitle": "MCP-Server hinzufügen",
+      "editServerTitle": "Diesen MCP-Server bearbeiten",
+      "fieldName": "Anzeigename",
+      "fieldUrl": "Server-URL",
+      "fieldUrlInvalid": "Gib eine gültige Server-URL ein.",
+      "fieldToken": "Bearer-Token (optional)",
+      "enableServer": "Diesen Server aktivieren: {{name}}",
+      "editServer": "Server bearbeiten",
+      "deleteServer": "Server löschen",
+      "editServerA11y": "Server bearbeiten: {{name}}",
+      "deleteServerA11y": "Server löschen: {{name}}",
+      "retryServerA11y": "Diesen Server erneut versuchen: {{name}}",
+      "deleteTitle": "Diesen Server löschen?",
+      "deleteMessage": "Seine Tools verschwinden aus jedem Chat.",
+      "kiloBuiltIn": "Integriert. Schalte ihn für diesen Chat ein oder aus; er kann weder bearbeitet noch gelöscht werden.",
+      "serversEmptyTitle": "Noch keine Remote-Server",
+      "serversEmptyDescription": "Füge einen hinzu, um seine Tools in deinen Chats anzubieten.",
+      "settingsToolsTitle": "Kilo App-Einstellungen ändern lassen",
+      "settingsToolsSubtitle": "Gilt für Design, Sprache, Benachrichtigungen, Modelle und den Rest der Einstellungen.",
+      "settingsToolsOn": "An — die Einstellungs-Tools werden an das Modell gesendet",
+      "settingsToolsOff": "Aus — kein Einstellungs-Tool wird an das Modell gesendet",
+      "serverChecking": "Dieser Server wird geprüft…",
+      "serverToolCount": "{{count}} Tools",
+      "serverUnreachable": "Dieser Server konnte nicht erreicht werden",
+      "serverOff": "Dieser Server ist ausgeschaltet"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Diese Änderung bestätigen?"
   },
   "appActions": {
     "start": {

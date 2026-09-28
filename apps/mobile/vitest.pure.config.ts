@@ -64,6 +64,7 @@ export default defineProject({
       'src/lib/app-actions/**/!(*.mounted).test.tsx',
       'modules/kilo-app-actions/*.test.ts',
       'src/lib/query/**/*.test.ts',
+      'src/lib/settings/**/*.test.ts',
       'src/lib/voice-input/**/*.test.ts',
       'src/lib/tool-summary-translation/**/*.test.ts',
       'src/components/**/*.test.ts',

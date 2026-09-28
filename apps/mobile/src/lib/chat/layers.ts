@@ -111,24 +111,36 @@ const layerToken = Layer.succeed(TokenSource, {
 } satisfies TokenSourceService);
 
 /**
- * The tools a session may name.
+ * The tools a session may name, for the organization whose credit pays.
  *
- * The set is not frozen: the Kilo MCP server's tools are discovered while the
- * app runs, and a session opened after a discovery must be able to name them.
- * So the registry is a live view over the tools rather than a copy taken when
- * the layer was built — `resolveTools` reads it at open, and a tool found later
- * reaches the next session without the runtime being rebuilt.
+ * The set is not frozen: the settings group switch, the Kilo MCP server and the
+ * person's remote servers all move while the app runs, and a session opened
+ * after a change must be able to name what is on now. So the registry is a live
+ * view over the tools rather than a copy taken when the layer was built —
+ * `resolveTools` reads it at open, and a tool found later reaches the next
+ * session without the runtime being rebuilt.
+ *
+ * The organization is part of the set: the settings tools read and write the
+ * model defaults of the context the chat is in, so a layer built for one
+ * organization must not answer with another's.
  */
-export const layerTools = Layer.succeed(ToolRegistry, {
-  get tools() {
-    return chatToolsWithMcp();
-  },
-});
+export function layerToolsFor(organizationId?: string) {
+  return Layer.succeed(ToolRegistry, {
+    get tools() {
+      return chatToolsWithMcp(organizationId);
+    },
+  });
+}
 
 /** Whose credit pays for the chat. */
 export type ChatOrg =
   | { readonly kind: 'personal' }
   | { readonly kind: 'organization'; readonly id: string };
+
+/** The organization a chat's settings defaults belong to, when it has one. */
+export function organizationIdOf(org: ChatOrg): string | undefined {
+  return org.kind === 'organization' ? org.id : undefined;
+}
 
 export function chatLayers(database: SQLiteDatabase, org: ChatOrg) {
   const gateway = layerKiloGateway({ baseUrl: API_BASE_URL, org, fetch: chatFetch }).pipe(
@@ -138,7 +150,7 @@ export function chatLayers(database: SQLiteDatabase, org: ChatOrg) {
     layerAssembler,
     layerEntropy,
     layerCatalog,
-    layerTools,
+    layerToolsFor(organizationIdOf(org)),
     gateway,
     layerExpoStore(database)
   );

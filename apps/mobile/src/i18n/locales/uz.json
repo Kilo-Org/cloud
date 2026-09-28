@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo vositalari bu sessiyani rad etdi",
       "unauthorizedDescription": "Bu suhbatda Kilo vositalaridan foydalanish uchun qayta kiring.",
       "unavailable": "Kilo vositalari mavjud emas",
-      "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas."
+      "unavailableDescription": "Kilo serveri bu hisob uchun mavjud emas.",
+      "sheetTitle": "Chat vositalari",
+      "addServerTitle": "MCP server qoʻshish",
+      "editServerTitle": "Bu MCP serverni tahrirlash",
+      "fieldName": "Koʻrsatiladigan nom",
+      "fieldUrl": "Server URL manzili",
+      "fieldUrlInvalid": "Toʻgʻri server URL manzilini kiriting.",
+      "fieldToken": "Bearer tokeni (ixtiyoriy)",
+      "enableServer": "Bu serverni yoqish: {{name}}",
+      "editServer": "Serverni tahrirlash",
+      "deleteServer": "Serverni oʻchirish",
+      "editServerA11y": "Serverni tahrirlash: {{name}}",
+      "deleteServerA11y": "Serverni oʻchirish: {{name}}",
+      "retryServerA11y": "Bu serverni qayta urinish: {{name}}",
+      "deleteTitle": "Bu server oʻchirilsinmi?",
+      "deleteMessage": "Uning vositalari har bir chatdan chiqadi.",
+      "kiloBuiltIn": "Oʻrnatilgan. Bu chat uchun uni yoqing yoki oʻchiring; uni tahrirlash yoki oʻchirish mumkin emas.",
+      "serversEmptyTitle": "Hozircha masofaviy serverlar yoʻq",
+      "serversEmptyDescription": "Uning vositalarini chatlaringizda taklif qilish uchun bittasini qoʻshing.",
+      "settingsToolsTitle": "Kiloga ilova sozlamalarini oʻzgartirishga ruxsat berish",
+      "settingsToolsSubtitle": "Mavzu, til, bildirishnomalar, modellar va qolgan Sozlamalarga tegishli.",
+      "settingsToolsOn": "Yoniq — sozlama vositalari modelga yuboriladi",
+      "settingsToolsOff": "Oʻchiq — modelga hech qanday sozlama vositasi yuborilmaydi",
+      "serverChecking": "Bu server tekshirilmoqda…",
+      "serverToolCount": "{{count}} vosita",
+      "serverUnreachable": "Bu serverga yetib boʻlmadi",
+      "serverOff": "Bu server oʻchirilgan"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bu oʻzgarish tasdiqlansinmi?"
   },
   "appActions": {
     "start": {

@@ -176,7 +176,13 @@ function ScopedChatListScreen() {
   function renderBody() {
     if (isError) {
       return (
-        <QueryError variant="server" title={t('modelChat.list.loadFailed')} onRetry={refetch} />
+        <QueryError
+          variant="server"
+          // i18n-dup-ok: 'modelChat.list.loadFailed' was renamed from the base catalog's
+          // quickChat.historyRetry in the harness-chat rebuild; no other live key carries it.
+          title={t('modelChat.list.loadFailed')}
+          onRetry={refetch}
+        />
       );
     }
     if (modelsFailed && chats.length === 0) {
@@ -205,7 +211,11 @@ function ScopedChatListScreen() {
       return (
         <EmptyState
           icon={MessageCircle}
+          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
+          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
           title={t('modelChat.empty.title')}
+          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
+          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
           action={
             <Button onPress={start} loading={starting} accessibilityLabel={t('modelChat.list.new')}>

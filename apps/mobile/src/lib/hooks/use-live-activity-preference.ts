@@ -37,8 +37,13 @@ export function clearLiveActivityPreference() {
   store.clear();
 }
 
-function setLiveActivityEnabled(value: boolean) {
+export function setLiveActivityEnabled(value: boolean) {
   store.set(value);
+}
+
+/** The stored Live Activity value for callers with no React tree (the settings registry). */
+export function getLiveActivityEnabled(): boolean {
+  return store.get();
 }
 
 export function useLiveActivityPreference() {

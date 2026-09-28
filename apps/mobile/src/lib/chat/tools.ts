@@ -1,8 +1,9 @@
 import { type Tool } from '@kilocode/harness-sdk';
-import { timeTool } from '@kilocode/harness-sdk/plugins/tools';
 
-import { dateTimeFormat } from '@/lib/intl-cache';
-import { kiloMcpToolNames, kiloMcpTools } from './kilo-mcp';
+import { kiloMcpToolNames, kiloMcpTools, mcpEnabledFor } from './kilo-mcp';
+import { remoteServerToolNames, remoteServerTools } from './remote-mcp';
+import { isSettingsToolsEnabled } from './settings-tools-switch';
+import { chatToolsFor, toolNamesFor } from './tool-set';
 
 /**
  * What a chat can do besides talk.
@@ -14,54 +15,74 @@ import { kiloMcpToolNames, kiloMcpTools } from './kilo-mcp';
  * already for, delegating to a second session costs a second session, and a
  * to-do list is working memory for a long run that a chat does not have.
  *
- * On top of that set sit the tools of the Kilo MCP server, when the chat has it
- * on. They are not written here: they are discovered from the server while the
- * app runs, which is why the functions below read them at the moment a session
- * opens rather than holding a set of their own.
- */
-
-/**
- * The zone to report local time in, or none.
+ * On top of that set sit the app-settings tools, the tools of the Kilo MCP
+ * server, and the tools of the remote servers the person added — each behind
+ * its own gate. They are not written here: the servers' tools are discovered
+ * while the app runs, which is why the functions below read them at the moment
+ * a session opens rather than holding a set of their own.
  *
- * The tool formats through `Intl`, so a runtime that cannot name a zone gets
- * UTC alone rather than a wrong local time. What a phone answers is the zone
- * the person set, which is the one they mean when they ask what time it is.
+ * The gates themselves live in `tool-set.ts`, so the names a session is opened
+ * with and the tools the registry holds are decided in one place.
  */
-export function deviceZone(): string | undefined {
-  const zone = dateTimeFormat(undefined, {}).resolvedOptions().timeZone;
-  return zone === '' ? undefined : zone;
-}
 
-/** The tools every chat is opened with, in the order the model sees them. */
-export function chatTools(): readonly Tool[] {
-  const zone = deviceZone();
-  return [timeTool(zone === undefined ? undefined : { zone })];
+/** The tools every chat offers: the clock, plus the settings tools when the group switch is on. */
+export function chatTools(organizationId?: string): readonly Tool[] {
+  return chatToolsFor({
+    organizationId,
+    settingsEnabled: isSettingsToolsEnabled(),
+    kiloEnabled: false,
+    kiloNames: [],
+    remoteNames: [],
+    remoteTools: [],
+  });
 }
-
-/** The names of those tools, which is what a session is opened with. */
-export const CHAT_TOOL_NAMES: readonly string[] = chatTools().map(tool => tool.definition.name);
 
 /**
- * The base tools plus the Kilo MCP tools discovered so far.
+ * The base tools, the Kilo MCP tools, and every enabled remote server's tools.
  *
  * This is the registry's view of what a session may name. It is read when a
- * session opens, not when the runtime is built, because the server's tools
+ * session opens, not when the runtime is built, because the servers' tools
  * arrive while the app runs: a tool discovered after the runtime was built
  * still reaches the next session.
  */
-export function chatToolsWithMcp(): readonly Tool[] {
-  return [...chatTools(), ...kiloMcpTools()];
+export function chatToolsWithMcp(organizationId?: string): readonly Tool[] {
+  return [...chatTools(organizationId), ...kiloMcpTools(), ...remoteServerTools()];
 }
 
 /**
- * The names a chat is opened with.
+ * The names a chat is opened with, from the group switch and the chat's own
+ * server flags.
  *
- * A chat with the Kilo MCP off names the base tools alone, and one that has it
- * on but has discovered nothing yet names the same: a session is never opened
- * with a name the registry cannot resolve.
+ * The settings names are absent — not merely unresolved — when the switch is
+ * off, so the model is never offered a tool that would refuse it. A chat with
+ * the Kilo MCP off names no Kilo tool, and one that has it on but has discovered
+ * nothing yet names none either: a session is never opened with a name the
+ * registry cannot resolve.
  */
-export function chatToolNames(mcpEnabled: boolean): readonly string[] {
-  return mcpEnabled && kiloMcpTools().length > 0
-    ? [...CHAT_TOOL_NAMES, ...kiloMcpToolNames()]
-    : CHAT_TOOL_NAMES;
+export async function chatToolNames(
+  organizationId: string | undefined,
+  sessionId: string
+): Promise<readonly string[]> {
+  return chatToolNamesStarting(organizationId, await mcpEnabledFor(sessionId));
+}
+
+/**
+ * The same, for a chat that does not exist yet.
+ *
+ * Starting a chat opens a session before there is an id to read a setting from,
+ * so the caller says whether it opens with the Kilo server. Every later open
+ * and move reads the stored setting through `chatToolNames`.
+ */
+export function chatToolNamesStarting(
+  organizationId: string | undefined,
+  kiloEnabled: boolean
+): readonly string[] {
+  return toolNamesFor({
+    organizationId,
+    settingsEnabled: isSettingsToolsEnabled(),
+    kiloEnabled,
+    kiloNames: kiloMcpToolNames(),
+    remoteNames: remoteServerToolNames(),
+    remoteTools: [],
+  });
 }

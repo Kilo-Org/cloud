@@ -3241,8 +3241,37 @@
       "unauthorized": "Zana za Kilo zilikataa kipindi hiki",
       "unauthorizedDescription": "Ingia tena ili kutumia zana za Kilo katika mazungumzo haya.",
       "unavailable": "Zana za Kilo hazipatikani",
-      "unavailableDescription": "Seva ya Kilo haipatikani kwa akaunti hii."
+      "unavailableDescription": "Seva ya Kilo haipatikani kwa akaunti hii.",
+      "sheetTitle": "Zana za gumzo",
+      "addServerTitle": "Ongeza seva ya MCP",
+      "editServerTitle": "Hariri seva hii ya MCP",
+      "fieldName": "Jina linaloonyeshwa",
+      "fieldUrl": "URL ya seva",
+      "fieldUrlInvalid": "Weka URL sahihi ya seva.",
+      "fieldToken": "Tokeni ya Bearer (hiari)",
+      "enableServer": "Washa seva hii: {{name}}",
+      "editServer": "Hariri seva",
+      "deleteServer": "Futa seva",
+      "editServerA11y": "Hariri seva: {{name}}",
+      "deleteServerA11y": "Futa seva: {{name}}",
+      "retryServerA11y": "Jaribu tena seva hii: {{name}}",
+      "deleteTitle": "Futa seva hii?",
+      "deleteMessage": "Zana zake zinatoka kwenye kila gumzo.",
+      "kiloBuiltIn": "Imejengwa ndani. Iwashe au izime kwa gumzo hili; haiwezi kuhaririwa au kufutwa.",
+      "serversEmptyTitle": "Hakuna seva za mbali bado",
+      "serversEmptyDescription": "Ongeza moja ili kutoa zana zake kwenye gumzo zako.",
+      "settingsToolsTitle": "Ruhusu Kilo kubadilisha mipangilio ya programu",
+      "settingsToolsSubtitle": "Inatumika kwa mandhari, lugha, arifa, modeli na mipangilio mingine ya Mapendeleo.",
+      "settingsToolsOn": "Imewashwa — zana za mipangilio zinatumwa kwa modeli",
+      "settingsToolsOff": "Imezimwa — hakuna zana ya mipangilio inayotumwa kwa modeli",
+      "serverChecking": "Inakagua seva hii…",
+      "serverToolCount": "zana {{count}}",
+      "serverUnreachable": "Haikuweza kufikia seva hii",
+      "serverOff": "Seva hii imezimwa"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Thibitisha mabadiliko haya?"
   },
   "appActions": {
     "start": {

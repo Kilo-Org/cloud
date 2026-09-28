@@ -3284,8 +3284,37 @@
       "unauthorized": "Les eines de Kilo han rebutjat aquesta sessió",
       "unauthorizedDescription": "Torna a iniciar la sessió per utilitzar les eines de Kilo en aquest xat.",
       "unavailable": "Les eines de Kilo no estan disponibles",
-      "unavailableDescription": "El servidor de Kilo no està disponible per a aquest compte."
+      "unavailableDescription": "El servidor de Kilo no està disponible per a aquest compte.",
+      "sheetTitle": "Eines del xat",
+      "addServerTitle": "Afegeix un servidor MCP",
+      "editServerTitle": "Edita aquest servidor MCP",
+      "fieldName": "Nom que es mostra",
+      "fieldUrl": "URL del servidor",
+      "fieldUrlInvalid": "Introdueix una URL de servidor vàlida.",
+      "fieldToken": "Testimoni Bearer (opcional)",
+      "enableServer": "Activa aquest servidor: {{name}}",
+      "editServer": "Edita el servidor",
+      "deleteServer": "Elimina el servidor",
+      "editServerA11y": "Edita el servidor: {{name}}",
+      "deleteServerA11y": "Elimina el servidor: {{name}}",
+      "retryServerA11y": "Torna a provar aquest servidor: {{name}}",
+      "deleteTitle": "Vols eliminar aquest servidor?",
+      "deleteMessage": "Les seves eines surten de tots els xats.",
+      "kiloBuiltIn": "Integrat. Activa'l o desactiva'l per a aquest xat; no es pot editar ni eliminar.",
+      "serversEmptyTitle": "Encara no hi ha servidors remots",
+      "serversEmptyDescription": "Afegeix-ne un per oferir les seves eines als teus xats.",
+      "settingsToolsTitle": "Permet que Kilo canviï la configuració de l'aplicació",
+      "settingsToolsSubtitle": "S'aplica al tema, l'idioma, les notificacions, els models i la resta de Preferències.",
+      "settingsToolsOn": "Activat — les eines de configuració s'envien al model",
+      "settingsToolsOff": "Desactivat — no s'envia cap eina de configuració al model",
+      "serverChecking": "S'està comprovant aquest servidor…",
+      "serverToolCount": "{{count}} eines",
+      "serverUnreachable": "No s'ha pogut contactar amb aquest servidor",
+      "serverOff": "Aquest servidor està desactivat"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Confirmar aquest canvi?"
   },
   "appActions": {
     "start": {

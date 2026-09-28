@@ -41,6 +41,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/organization-invoice-download.ts': 'filename comparison',
   'lib/agent-attachments/validate.ts': 'file-extension normalization',
   'lib/agent-profile-forms.ts': 'environment-variable key normalization',
+  'lib/chat/remote-mcp-store.ts': 'callable-name slug normalization',
   'lib/auth/use-native-auth.ts': 'email normalization',
   'lib/telemetry/install-error-reporting.ts': 'hostname comparison',
   'lib/pr-review/diff/highlight.ts': 'file-extension normalization',

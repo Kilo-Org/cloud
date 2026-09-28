@@ -3241,8 +3241,37 @@
       "unauthorized": "Qalabka Kilo wuu diiday sheekaysigan",
       "unauthorizedDescription": "Dib u gal si aad u isticmaasho qalabka Kilo sheekaysigan.",
       "unavailable": "Qalabka Kilo lama heli karo",
-      "unavailableDescription": "Serverka Kilo lama heli karo akoonkan."
+      "unavailableDescription": "Serverka Kilo lama heli karo akoonkan.",
+      "sheetTitle": "Qalabka wada-hadalka",
+      "addServerTitle": "Ku dar server MCP",
+      "editServerTitle": "Wax ka beddel serverkan MCP",
+      "fieldName": "Magaca la muujiyo",
+      "fieldUrl": "URL-ka serverka",
+      "fieldUrlInvalid": "Geli URL server sax ah.",
+      "fieldToken": "Token Bearer (ikhtiyaari)",
+      "enableServer": "Daar serverkan: {{name}}",
+      "editServer": "Wax ka beddel serverka",
+      "deleteServer": "Tirtir serverka",
+      "editServerA11y": "Wax ka beddel serverka: {{name}}",
+      "deleteServerA11y": "Tirtir serverka: {{name}}",
+      "retryServerA11y": "Mar kale isku day serverkan: {{name}}",
+      "deleteTitle": "Ma tirtiraa serverkan?",
+      "deleteMessage": "Qalabkiisu wuu ka baxaa wada-hadal kasta.",
+      "kiloBuiltIn": "Dhex ku jira. Daar ama dami wada-hadalkan; lama beddeli karo lama tirtiri karo.",
+      "serversEmptyTitle": "Weli ma jiraan server fog",
+      "serversEmptyDescription": "Ku dar mid si aad ugu bixiso qalabkiisa wada-hadalladaada.",
+      "settingsToolsTitle": "U oggolow Kilo inuu beddelo dejinta abka",
+      "settingsToolsSubtitle": "Waxay khusaysaa muuqaalka, luqadda, ogeysiisyada, moodoollada iyo inta kale ee Doorbidyada.",
+      "settingsToolsOn": "Daaran — qalabka dejinta waxaa loo diraa moodeelka",
+      "settingsToolsOff": "Dami — ma jiro qalab dejin oo loo diraa moodeelka",
+      "serverChecking": "Waa la hubinayaa serverkan…",
+      "serverToolCount": "{{count}} qalab",
+      "serverUnreachable": "Lama gaari karin serverkan",
+      "serverOff": "Serverkan waa dammaan"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Ma xaqiijinayaa isbeddelkan?"
   },
   "appActions": {
     "start": {

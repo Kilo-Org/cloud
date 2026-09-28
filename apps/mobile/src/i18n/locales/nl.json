@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo-tools hebben deze sessie geweigerd",
       "unauthorizedDescription": "Meld je opnieuw aan om de Kilo-tools in deze chat te gebruiken.",
       "unavailable": "Kilo-tools zijn niet beschikbaar",
-      "unavailableDescription": "De Kilo-server is niet beschikbaar voor dit account."
+      "unavailableDescription": "De Kilo-server is niet beschikbaar voor dit account.",
+      "sheetTitle": "Chattools",
+      "addServerTitle": "Een MCP-server toevoegen",
+      "editServerTitle": "Deze MCP-server bewerken",
+      "fieldName": "Weergavenaam",
+      "fieldUrl": "Server-URL",
+      "fieldUrlInvalid": "Voer een geldige server-URL in.",
+      "fieldToken": "Bearer-token (optioneel)",
+      "enableServer": "Deze server inschakelen: {{name}}",
+      "editServer": "Server bewerken",
+      "deleteServer": "Server verwijderen",
+      "editServerA11y": "Server bewerken: {{name}}",
+      "deleteServerA11y": "Server verwijderen: {{name}}",
+      "retryServerA11y": "Deze server opnieuw proberen: {{name}}",
+      "deleteTitle": "Deze server verwijderen?",
+      "deleteMessage": "De tools verlaten elke chat.",
+      "kiloBuiltIn": "Ingebouwd. Zet het aan of uit voor deze chat; het kan niet worden bewerkt of verwijderd.",
+      "serversEmptyTitle": "Nog geen externe servers",
+      "serversEmptyDescription": "Voeg er een toe om de tools in je chats aan te bieden.",
+      "settingsToolsTitle": "Kilo app-instellingen laten wijzigen",
+      "settingsToolsSubtitle": "Geldt voor thema, taal, meldingen, modellen en de rest van Voorkeuren.",
+      "settingsToolsOn": "Aan — de instellingstools worden naar het model gestuurd",
+      "settingsToolsOff": "Uit — er wordt geen instellingstool naar het model gestuurd",
+      "serverChecking": "Deze server controleren…",
+      "serverToolCount": "{{count}} tools",
+      "serverUnreachable": "Kon deze server niet bereiken",
+      "serverOff": "Deze server staat uit"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Deze wijziging bevestigen?"
   },
   "appActions": {
     "start": {

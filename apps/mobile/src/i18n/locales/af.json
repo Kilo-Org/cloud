@@ -3241,8 +3241,37 @@
       "unauthorized": "Kilo-nutsmiddels het hierdie sessie geweier",
       "unauthorizedDescription": "Meld weer aan om die Kilo-nutsmiddels in hierdie klets te gebruik.",
       "unavailable": "Kilo-nutsmiddels is nie beskikbaar nie",
-      "unavailableDescription": "Die Kilo-bediener is nie vir hierdie rekening beskikbaar nie."
+      "unavailableDescription": "Die Kilo-bediener is nie vir hierdie rekening beskikbaar nie.",
+      "sheetTitle": "Tjitgereedskap",
+      "addServerTitle": "Voeg 'n MCP-bediener by",
+      "editServerTitle": "Wysig hierdie MCP-bediener",
+      "fieldName": "Vertoonnaam",
+      "fieldUrl": "Bediener-URL",
+      "fieldUrlInvalid": "Voer 'n geldige bediener-URL in.",
+      "fieldToken": "Draertoken (opsioneel)",
+      "enableServer": "Aktiveer hierdie bediener: {{name}}",
+      "editServer": "Wysig bediener",
+      "deleteServer": "Skrap bediener",
+      "editServerA11y": "Wysig bediener: {{name}}",
+      "deleteServerA11y": "Skrap bediener: {{name}}",
+      "retryServerA11y": "Probeer weer hierdie bediener: {{name}}",
+      "deleteTitle": "Skrap hierdie bediener?",
+      "deleteMessage": "Sy gereedskap verdwyn uit elke tjit.",
+      "kiloBuiltIn": "Ingebou. Skakel dit vir hierdie tjit aan of af; dit kan nie gewysig of geskrap word nie.",
+      "serversEmptyTitle": "Nog geen afgeleë bedieners nie",
+      "serversEmptyDescription": "Voeg een by om sy gereedskap in jou tjitte aan te bied.",
+      "settingsToolsTitle": "Laat Kilo programinstellings verander",
+      "settingsToolsSubtitle": "Geld vir tema, taal, kennisgewings, modelle en die res van Voorkeure.",
+      "settingsToolsOn": "Aan — die instellingsgereedskap word aan die model gestuur",
+      "settingsToolsOff": "Af — geen instellingsgereedskap word aan die model gestuur nie",
+      "serverChecking": "Kontroleer hierdie bediener…",
+      "serverToolCount": "{{count}} gereedskap",
+      "serverUnreachable": "Kon nie hierdie bediener bereik nie",
+      "serverOff": "Hierdie bediener is af"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Bevestig hierdie verandering?"
   },
   "appActions": {
     "start": {

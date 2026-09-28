@@ -3241,8 +3241,37 @@
       "unauthorized": "Alat Kilo menolak sesi ini",
       "unauthorizedDescription": "Log masuk semula untuk menggunakan alat Kilo dalam sembang ini.",
       "unavailable": "Alat Kilo tidak tersedia",
-      "unavailableDescription": "Pelayan Kilo tidak tersedia untuk akaun ini."
+      "unavailableDescription": "Pelayan Kilo tidak tersedia untuk akaun ini.",
+      "sheetTitle": "Alat sembang",
+      "addServerTitle": "Tambah pelayan MCP",
+      "editServerTitle": "Edit pelayan MCP ini",
+      "fieldName": "Nama paparan",
+      "fieldUrl": "URL pelayan",
+      "fieldUrlInvalid": "Masukkan URL pelayan yang sah.",
+      "fieldToken": "Token Bearer (pilihan)",
+      "enableServer": "Dayakan pelayan ini: {{name}}",
+      "editServer": "Edit pelayan",
+      "deleteServer": "Padam pelayan",
+      "editServerA11y": "Edit pelayan: {{name}}",
+      "deleteServerA11y": "Padam pelayan: {{name}}",
+      "retryServerA11y": "Cuba lagi pelayan ini: {{name}}",
+      "deleteTitle": "Padam pelayan ini?",
+      "deleteMessage": "Alatnya keluar dari setiap sembang.",
+      "kiloBuiltIn": "Terbina dalam. Hidupkan atau matikannya untuk sembang ini; ia tidak boleh diedit atau dipadam.",
+      "serversEmptyTitle": "Belum ada pelayan jauh",
+      "serversEmptyDescription": "Tambah satu untuk menawarkan alatnya dalam sembang anda.",
+      "settingsToolsTitle": "Benarkan Kilo menukar tetapan aplikasi",
+      "settingsToolsSubtitle": "Terpakai pada tema, bahasa, pemberitahuan, model dan selebihnya Keutamaan.",
+      "settingsToolsOn": "Hidup — alat tetapan dihantar kepada model",
+      "settingsToolsOff": "Mati — tiada alat tetapan dihantar kepada model",
+      "serverChecking": "Menyemak pelayan ini…",
+      "serverToolCount": "{{count}} alat",
+      "serverUnreachable": "Tidak dapat menghubungi pelayan ini",
+      "serverOff": "Pelayan ini dimatikan"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Sahkan perubahan ini?"
   },
   "appActions": {
     "start": {

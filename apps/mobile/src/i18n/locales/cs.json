@@ -3327,8 +3327,37 @@
       "unauthorized": "Nástroje Kilo odmítly tuto relaci",
       "unauthorizedDescription": "Přihlaste se znovu, abyste mohli v této konverzaci používat nástroje Kilo.",
       "unavailable": "Nástroje Kilo nejsou dostupné",
-      "unavailableDescription": "Server Kilo pro tento účet není k dispozici."
+      "unavailableDescription": "Server Kilo pro tento účet není k dispozici.",
+      "sheetTitle": "Nástroje chatu",
+      "addServerTitle": "Přidat server MCP",
+      "editServerTitle": "Upravit tento server MCP",
+      "fieldName": "Zobrazovaný název",
+      "fieldUrl": "URL serveru",
+      "fieldUrlInvalid": "Zadejte platnou URL serveru.",
+      "fieldToken": "Token Bearer (volitelné)",
+      "enableServer": "Povolit tento server: {{name}}",
+      "editServer": "Upravit server",
+      "deleteServer": "Smazat server",
+      "editServerA11y": "Upravit server: {{name}}",
+      "deleteServerA11y": "Smazat server: {{name}}",
+      "retryServerA11y": "Zkusit znovu tento server: {{name}}",
+      "deleteTitle": "Smazat tento server?",
+      "deleteMessage": "Jeho nástroje zmizí ze všech chatů.",
+      "kiloBuiltIn": "Vestavěné. Zapněte nebo vypněte ho pro tento chat; nelze ho upravit ani smazat.",
+      "serversEmptyTitle": "Zatím žádné vzdálené servery",
+      "serversEmptyDescription": "Přidejte jeden a nabídněte jeho nástroje ve svých chatech.",
+      "settingsToolsTitle": "Povolit Kilu měnit nastavení aplikace",
+      "settingsToolsSubtitle": "Platí pro motiv, jazyk, oznámení, modely a zbytek Předvoleb.",
+      "settingsToolsOn": "Zapnuto — nástroje nastavení se odesílají modelu",
+      "settingsToolsOff": "Vypnuto — modelu se neodesílá žádný nástroj nastavení",
+      "serverChecking": "Kontrola tohoto serveru…",
+      "serverToolCount": "{{count}} nástrojů",
+      "serverUnreachable": "Nepodařilo se připojit k tomuto serveru",
+      "serverOff": "Tento server je vypnutý"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Potvrdit tuto změnu?"
   },
   "appActions": {
     "start": {

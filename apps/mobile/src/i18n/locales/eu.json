@@ -3241,8 +3241,37 @@
       "unauthorized": "Kiloren tresnek txat saio hau baztertu dute",
       "unauthorizedDescription": "Hasi saioa berriro txat honetan Kilo tresnak erabiltzeko.",
       "unavailable": "Kiloren tresnak ez daude erabilgarri",
-      "unavailableDescription": "Kilo zerbitzaria ez dago erabilgarri kontu honetarako."
+      "unavailableDescription": "Kilo zerbitzaria ez dago erabilgarri kontu honetarako.",
+      "sheetTitle": "Txat tresnak",
+      "addServerTitle": "Gehitu MCP zerbitzari bat",
+      "editServerTitle": "Editatu MCP zerbitzari hau",
+      "fieldName": "Erakusteko izena",
+      "fieldUrl": "Zerbitzariaren URLa",
+      "fieldUrlInvalid": "Sartu baliozko zerbitzari URLa.",
+      "fieldToken": "Bearer tokena (aukerakoa)",
+      "enableServer": "Gaitu zerbitzari hau: {{name}}",
+      "editServer": "Editatu zerbitzaria",
+      "deleteServer": "Ezabatu zerbitzaria",
+      "editServerA11y": "Editatu zerbitzaria: {{name}}",
+      "deleteServerA11y": "Ezabatu zerbitzaria: {{name}}",
+      "retryServerA11y": "Saiatu zerbitzari hau berriro: {{name}}",
+      "deleteTitle": "Zerbitzari hau ezabatu?",
+      "deleteMessage": "Bere tresnak txat guztietatik aterako dira.",
+      "kiloBuiltIn": "Integratuta. Piztu edo itzali txat honetarako; ezin da editatu edo ezabatu.",
+      "serversEmptyTitle": "Oraindik ez dago urruneko zerbitzaririk",
+      "serversEmptyDescription": "Gehitu bat bere tresnak zure txatetan eskaintzeko.",
+      "settingsToolsTitle": "Utzi Kilori aplikazioaren ezarpenak aldatzen",
+      "settingsToolsSubtitle": "Gaiari, hizkuntzari, jakinarazpenei, modeloei eta Hobespenen gainerakoari aplikatzen zaio.",
+      "settingsToolsOn": "Aktibatuta — ezarpen-tresnak modelora bidaltzen dira",
+      "settingsToolsOff": "Desaktibatuta — ez da ezarpen-tresnarik modelora bidaltzen",
+      "serverChecking": "Zerbitzari hau egiaztatzen…",
+      "serverToolCount": "{{count}} tresna",
+      "serverUnreachable": "Ezin izan da zerbitzari honetara iritsi",
+      "serverOff": "Zerbitzari hau desgaituta dago"
     }
+  },
+  "settingsTools": {
+    "confirmTitle": "Aldaketa hau berretsi?"
   },
   "appActions": {
     "start": {

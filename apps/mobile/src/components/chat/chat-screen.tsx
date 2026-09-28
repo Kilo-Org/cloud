@@ -73,10 +73,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   const place = chatPlaceOf(userId, organizationId);
   const { state, send, stop, retry } = useChat(place, opened);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  // The Kilo MCP control is the connection's state plus this chat's setting, so
-  // it is read here and drawn both on the header and in the sheet.
+  // The sheet's whole model — the Kilo control, the settings-tools group switch
+  // and the remote servers — is read here. The header draws its dot from the
+  // Kilo view, so the control and the sheet cannot disagree.
   const [mcpOpen, setMcpOpen] = useState(false);
-  const mcp = useMcpSettings(state.sessionId);
+  const mcp = useMcpSettings(place, state.sessionId);
   const colors = useThemeColors();
 
   const {
@@ -179,7 +180,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
       return (
         <EmptyState
           icon={MessageCircle}
+          // i18n-dup-ok: 'modelChat.empty.title' was renamed from the base catalog's
+          // quickChat.empty.title in the harness-chat rebuild; no other live key carries it.
           title={t('modelChat.empty.title')}
+          // i18n-dup-ok: 'modelChat.empty.description' was renamed from the base catalog's
+          // quickChat.empty.description in the harness-chat rebuild; no other live key carries it.
           description={t('modelChat.empty.description')}
         />
       );
@@ -286,14 +291,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
         onClose={() => {
           setMcpOpen(false);
         }}
-        view={mcp.view}
-        onValueChange={next => {
-          mcp.setEnabled(next);
-        }}
-        onRetry={() => {
-          mcp.retry();
-        }}
-        retrying={mcp.retrying}
+        settings={mcp}
       />
     </View>
   );

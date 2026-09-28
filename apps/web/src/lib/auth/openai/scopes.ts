@@ -12,7 +12,7 @@ export const OPENAI_IDENTITY_SCOPE = 'openid profile email';
 
 /** Token-sharing scopes, used once a client is approved for delegated access. */
 export const OPENAI_TOKEN_SHARING_SCOPE =
-  'openid profile email offline_access resource.invoke chatpass.enable.request';
+  'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo';
 
 /** The API resource that token sharing targets. */
 export const OPENAI_RESOURCE = 'https://api.openai.com/v1';
@@ -20,7 +20,7 @@ export const OPENAI_RESOURCE = 'https://api.openai.com/v1';
 /**
  * The scopes that make a grant a delegated BYOK credential rather than an
  * identity-only sign-in. `resource.invoke` is what permits calling the API
- * resource on the person's behalf, `chatpass.enable.request` is the consent to
+ * resource on the person's behalf, `chatgpt.tokens.use.obo` is the consent to
  * spend the person's ChatGPT allowance, and `offline_access` is what makes the
  * token renewable without another sign-in. An identity-only sign-in grants
  * none of them, and a person can decline token sharing while still granting
@@ -28,7 +28,7 @@ export const OPENAI_RESOURCE = 'https://api.openai.com/v1';
  */
 const OPENAI_DELEGATED_GRANT_SCOPES = [
   'resource.invoke',
-  'chatpass.enable.request',
+  'chatgpt.tokens.use.obo',
   'offline_access',
 ] as const;
 

@@ -36,6 +36,16 @@ const DISCARD_TIMEOUT_MS = 10_000;
  * treated as un-capturable rather than spending the whole idle window on it.
  */
 const MAX_STAGED_BYTES = 64 * 1024 * 1024;
+/**
+ * Extra allowance for tar framing on the restore side. The capture ceiling
+ * bounds staged payload bytes, but the restored tar stream adds a 512-byte
+ * header per file plus up to 511 bytes of padding per file, headers for the
+ * meta/patch/directory entries, and the 10 KiB end-of-archive markers. Worst
+ * case is WORKTREE_STATE_MAX_UNTRACKED_FILES (4096) x 512 header (~2 MiB) plus
+ * a similar ~2 MiB of padding, so 8 MiB comfortably covers headers, padding,
+ * meta and end-of-archive without moving the staged ceiling itself.
+ */
+const RESTORE_ARCHIVE_OVERHEAD = 8 * 1024 * 1024;
 
 export type WorktreeStateEndpoint = {
   url: string;
@@ -105,15 +115,20 @@ function spawnToFile(
       written += chunk.byteLength;
       if (written > limit) fail(new Error(`${command} output exceeded the ${limit} byte ceiling`));
     });
-    child.stdout.pipe(output);
+    child.stdout.pipe(output, { end: false });
     child.on('error', fail);
     output.on('error', fail);
     child.on('close', code => {
       if (settled) return;
-      settled = true;
-      output.end(() =>
-        code === 0 ? resolve(code) : reject(new Error(`${command} exited ${code}`))
-      );
+      const exitError = code === 0 ? undefined : new Error(`${command} exited ${code}`);
+      output.once('finish', () => {
+        if (exitError) fail(exitError);
+        else if (!settled) {
+          settled = true;
+          resolve(code ?? 0);
+        }
+      });
+      output.end();
     });
   });
 }
@@ -180,6 +195,26 @@ async function writableParent(root: string, destination: string): Promise<string
     }
     const next = path.dirname(ancestor);
     if (next === ancestor) return undefined;
+    ancestor = next;
+  }
+}
+
+/**
+ * Whether `candidate` stays under `root` after resolving symlinked ancestors.
+ * A crafted bundle can smuggle `untracked/link` as a symlink, so the lexical
+ * containment check alone is not enough on the source side: the nearest
+ * existing ancestor is resolved (same walk as `writableParent`) and required
+ * to stay inside the extraction root.
+ */
+async function resolvedAncestorWithin(root: string, candidate: string): Promise<boolean> {
+  let ancestor = candidate;
+  while (true) {
+    const resolved = await fs.realpath(ancestor).catch(() => undefined);
+    if (resolved !== undefined) {
+      return resolved === root || isContainedPath(root, resolved);
+    }
+    const next = path.dirname(ancestor);
+    if (next === ancestor) return false;
     ancestor = next;
   }
 }
@@ -348,7 +383,7 @@ export async function restoreWorktreeState(
     await fs.mkdir(extracted, { recursive: true });
     const tarPath = path.join(stage, 'bundle.tar');
     try {
-      await gunzipBounded(bundlePath, tarPath, MAX_STAGED_BYTES);
+      await gunzipBounded(bundlePath, tarPath, MAX_STAGED_BYTES + RESTORE_ARCHIVE_OVERHEAD);
     } catch {
       return { status: 'skipped', reason: 'too_large' };
     }
@@ -397,6 +432,7 @@ export async function restoreWorktreeState(
         if (!isContainedPath(options.directory, destination)) continue;
         const source = path.join(extracted, WORKTREE_STATE_UNTRACKED_PREFIX, relative);
         if (!isContainedPath(extracted, source)) continue;
+        if (!(await resolvedAncestorWithin(extracted, source))) continue;
         // Never clobber a file the rebuild produced; the captured copy is only
         // meant to fill in what the fresh worktree is missing.
         if (

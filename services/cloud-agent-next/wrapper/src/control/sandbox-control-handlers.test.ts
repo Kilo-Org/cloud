@@ -2386,11 +2386,13 @@ describe('production worktree deletion routes', () => {
     const first = identity(1);
     rememberAttachedRoot(first.kiloSessionId, first.directory);
     const discarded: Array<{ url: string; grant: string }> = [];
+    const order: string[] = [];
     const handlerDeps = deps(
       {
         sessions: [{ kiloSessionId: first.kiloSessionId, lastActivityAt: 100 }],
         discardWorktreeState: async target => {
           discarded.push({ url: target.url, grant: target.grant });
+          order.push('discard');
           return true;
         },
       },
@@ -2400,17 +2402,57 @@ describe('production worktree deletion routes', () => {
     if (!runtimes) throw new Error('Expected worktree runtimes');
     runtimes.getAll = () => [];
     runtimes.get = () => undefined;
-    runtimes.deleteDirectory = async () => {};
+    runtimes.deleteDirectory = async () => {
+      order.push('delete');
+    };
     try {
       expect(
         await handleControlRequest('worktree.delete', undefined, input, handlerDeps)
       ).toMatchObject({ ok: true });
       expect(discarded).toEqual([endpoint]);
+      expect(order).toEqual(['delete', 'discard']);
       // A sibling worktree keeps its own capture.
       expect(worktreeStateEndpointFor(directory)).toBeUndefined();
       expect(worktreeStateEndpointFor(siblingDirectory)).toMatchObject({ grant: 'sibling' });
     } finally {
       filesystem.restore();
+      resetWorktreeStateEndpoints();
+    }
+  });
+
+  it('keeps the stored worktree state when the runtime deletion itself fails', async () => {
+    const filesystem = protectCheckout();
+    const endpoint = { url: 'https://worker.test/worktree-state/usr/w', grant: 'grant' };
+    rememberWorktreeStateEndpoint(directory, endpoint);
+    const first = identity(1);
+    rememberAttachedRoot(first.kiloSessionId, first.directory);
+    let discarded = 0;
+    const handlerDeps = deps(
+      {
+        sessions: [{ kiloSessionId: first.kiloSessionId, lastActivityAt: 100 }],
+        discardWorktreeState: async () => {
+          discarded += 1;
+          return true;
+        },
+      },
+      first
+    );
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected worktree runtimes');
+    runtimes.getAll = () => [];
+    runtimes.get = () => undefined;
+    runtimes.deleteDirectory = async () => {
+      throw new Error('Native worktree cleanup is unconfirmed');
+    };
+    try {
+      expect(
+        await handleControlRequest('worktree.delete', undefined, input, handlerDeps)
+      ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      expect(discarded).toBe(0);
+      expect(worktreeStateEndpointFor(directory)).toMatchObject({ grant: 'grant' });
+    } finally {
+      filesystem.restore();
+      resetWorktreeStateEndpoints();
     }
   });
 

@@ -148,6 +148,19 @@ describe('scheduled session status', () => {
     expect(parsed.status).toEqual({ type: 'scheduled', scheduledAt });
   });
 
+  it('reads an explicit null wake time as absent instead of failing the parse', () => {
+    const parsed = sessionStatusDataSchema.parse({
+      sessionID: 'ses_12345678901234567890123456',
+      status: { type: 'scheduled', scheduledAt: null },
+    });
+
+    expect(parsed.status).toEqual({ type: 'scheduled' });
+    if (parsed.status.type !== 'scheduled') {
+      throw new Error('expected the scheduled status');
+    }
+    expect(parsed.status.scheduledAt).toBeUndefined();
+  });
+
   it('carries the wake time through the v2 row and both status-updated payload shapes', () => {
     const row = {
       source: 'v2' as const,
@@ -285,6 +298,17 @@ describe('activeSessionSchema scheduledAt', () => {
       id: 'ses_remote_scheduled',
       status: 'scheduled',
       title: 'Test',
+    });
+
+    expect(parsed.scheduledAt).toBeUndefined();
+  });
+
+  it('reads an explicit null wake time as absent', () => {
+    const parsed = activeSessionSchema.parse({
+      id: 'ses_remote_scheduled',
+      status: 'scheduled',
+      title: 'Test',
+      scheduledAt: null,
     });
 
     expect(parsed.scheduledAt).toBeUndefined();

@@ -49,8 +49,10 @@ export const sessionStatusSchema = z.discriminatedUnion('type', [
   }),
   // A session that is scheduled to wake later and does nothing now. The wake
   // time is optional: a CLI may report `scheduled` without one, and the reading
-  // then stays "scheduled" with no time.
-  z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional() }),
+  // then stays "scheduled" with no time. A producer that serializes the absent
+  // time as an explicit null, or sends a value that is not a time, reads as
+  // absent instead of failing the parse.
+  z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional().catch(undefined) }),
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 
@@ -466,10 +468,12 @@ export const activeSessionSchema = z
     /**
      * ISO-8601 wake time for a `scheduled` session, as advertised by the
      * owning CLI in its `sessions.list` / `sessions.heartbeat` payload. Absent
-     * when the CLI reports `scheduled` without a wake time. Declared here so
-     * typed consumers (the mobile session list) can read it without a cast.
+     * when the CLI reports `scheduled` without a wake time, and an explicit
+     * null from a producer that serializes the absent field reads the same way.
+     * Declared here so typed consumers (the mobile session list) can read it
+     * without a cast.
      */
-    scheduledAt: z.string().optional(),
+    scheduledAt: z.string().optional().catch(undefined),
     /**
      * Per-session capabilities advertised by the owning CLI in its
      * `sessions.heartbeat` / `sessions.list` payload. Only an explicit

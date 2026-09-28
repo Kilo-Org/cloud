@@ -371,30 +371,46 @@ type HeaderElement = {
 /** The header's `inlineActions` row, whose children are its section label and controls. */
 function headerRow() {
   return header().props.inlineActions as {
-    props: { className: string; children: (HeaderElement | null)[] };
+    props: { className: string; children: HeaderElement | null | (HeaderElement | null)[] };
   };
+}
+/** The row's children as a list: a row with a single child is not an array, and
+ *  the accepted-empty state withholds the row entirely. */
+function headerRowChildren() {
+  const inlineActions = header().props.inlineActions as
+    | { props: { children: HeaderElement | null | (HeaderElement | null)[] } }
+    | undefined;
+  if (!inlineActions) {
+    return [];
+  }
+  const children = inlineActions.props.children;
+  return Array.isArray(children) ? children : [children];
 }
 /** The row's controls, in order: the section label leads the row and is not one. */
 function headerActions() {
-  return headerRow().props.children.filter(
+  return headerRowChildren().filter(
     (child): child is HeaderElement => child !== null && typeof child.props.testID === 'string'
   );
 }
 /** The section label that owns the row start (see `headerActions`). */
 function headerRowLabel() {
-  const label = headerRow().props.children[0];
+  const label = headerRowChildren()[0];
   if (!label) {
     throw new Error('Missing header row label');
   }
   return label as unknown as { props: { className: string; children: string } };
 }
 function headerAction(testID = 'agents-view-history') {
-  const button = headerActions().find(child => child.props.testID === testID);
-  const isMounted = nodes('Pressable').some(node => node.props.testID === testID);
-  if (!button || !isMounted) {
-    throw new Error(`Missing header action: ${testID}`);
+  const fromRow = headerActions().find(child => child.props.testID === testID);
+  const mounted = nodes('Pressable').find(node => node.props.testID === testID);
+  if (!mounted) {
+    throw new Error(`Missing action: ${testID}`);
   }
-  return button;
+  // The controls trail the header's `inlineActions` row while the live section
+  // shows. The accepted-empty state withholds that row and carries the history
+  // control in the body instead, so a control that is not in the row is read
+  // from the mounted node there.
+  return fromRow ?? (mounted as unknown as HeaderElement);
 }
 function filterButtonProps() {
   const button = nodes('Pressable').find(node => node.props.testID === 'agents-open-filters');
@@ -603,6 +619,14 @@ describe('AgentSessionListScreen live presentation', () => {
     const expectedInset = test.empty ? state.tabBarHeight : state.tabBarHeight + 64;
     expect(surface.props.bottomInset).toBe(expectedInset);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
+    if (test.empty) {
+      // An accepted empty live list advertises no live section — the `Live now`
+      // label names sessions that do not exist — so the whole header row is
+      // withheld and the body carries the history route instead.
+      expect(text()).not.toContain(i18n.t('home.agentSessions'));
+      expect(header().props.inlineActions).toBeUndefined();
+      expect(header().props.eyebrow).toBe('0 LIVE');
+    }
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
     headerAction().props.onPress();
@@ -616,20 +640,67 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
+  it('an accepted empty live list withholds the live label but keeps the history route', async () => {
+    await renderScreen();
+    // No live section to name, so the `Live now` label is withheld and the whole
+    // header row is gone: the empty list advertises no live-sessions row at all.
+    expect(text()).not.toContain(i18n.t('home.agentSessions'));
+    expect(header().props.inlineActions).toBeUndefined();
+    expect(header().props.eyebrow).toBe('0 LIVE');
+    // The body carries exactly one history control — the one that opens the
+    // stored history, which has no other entry point in the app (review
+    // finding) — so the header cannot quietly grow a second one.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
+    expect(headerAction().props.testID).toBe('agents-view-history');
+    headerAction().props.onPress();
+    expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
+    expect(text()).toContain('Nothing running right now');
+    expect(action('New session')).toBeDefined();
+  });
+
+  it('names the accepted-empty history route by its destination instead of a bare See-all', async () => {
+    await renderScreen();
+    // The accepted-empty state withholds the header row, so the body's history
+    // control is the app's only route to stored sessions. A bare See-all does
+    // not say where it opens — the explorer's objectless See-all, now
+    // context-free — so the control names its destination instead.
+    const history = action('Session history');
+    expect(history.props.testID).toBe('agents-view-history');
+    expect(history.findByType(Text).children).toEqual(['Session history']);
+    // The non-empty live list keeps the history route in the header, under its
+    // own destination copy instead of this body label.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(action(i18n.t('agents.sessionList.pastSessions')).props.testID).toBe(
+      'agents-view-history'
+    );
+    expect(
+      nodes('Pressable').filter(node => node.props.accessibilityLabel === 'Session history')
+    ).toHaveLength(0);
+  });
+
   it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
+    // The full controls row exists only over a non-empty live list (the
+    // accepted-empty state withholds the row and carries the history route in
+    // the body), so a populated render covers it before this case switches to
+    // the empty body it tests. The list controls share the title's row through
+    // `inlineActions`; the heading keeps `flex-1 min-w-0`, so the title keeps
+    // its tail ellipsis and nothing stacks the controls onto a second row.
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(header().props.inlineActions).toBeDefined();
+    state.live.activeSessions = [];
     await renderScreen();
     const viewport = requireNode('CenteredState');
     const emptyState = root().findByType(EmptyState);
 
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
-    // The list controls share the title's row through `inlineActions`; the
-    // heading keeps `flex-1 min-w-0`, so the title keeps its tail ellipsis and
-    // nothing stacks the controls onto a second row.
     expect(header().props.headerRight).toBeUndefined();
     expect(header().props.context).toBeUndefined();
-    expect(header().props.inlineActions).toBeDefined();
     expect(emptyState.props.placement).toBeUndefined();
     expect(nodes('ScrollView')).toHaveLength(0);
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
@@ -1197,7 +1268,7 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes(type)).toHaveLength(0);
     }
     expect(headerAction().type).toBe('Pressable');
-    // The trailing See-all label is an eyebrow-scale label, the same element the
+    // The trailing history label is an eyebrow-scale label, the same element the
     // row's section label uses.
     expect(headerAction().props.children.type).toBe(Eyebrow);
   });
@@ -1265,13 +1336,20 @@ describe('AgentSessionListScreen header and admission', () => {
   });
 
   // Finding live-now-all: the header link opened the stored-session list while
-  // reading "See all", so over a 0-live empty state it named a longer live list
-  // that is not on screen. The label names the surface it opens instead.
+  // reading "See all", so it named a longer live list that is not on screen. The
+  // label names the surface it opens instead. The accepted-empty state carries
+  // its own destination copy in the body, because that state withholds the
+  // header row (see the accepted-empty case above).
   it('names the stored-session list it opens, with the LTR-only display treatment', async () => {
-    // Accepted empty: zero live rows, the finding's state.
+    state.live.activeSessions = [row];
     await renderScreen();
     const historyLabel = i18n.t('agents.sessionList.pastSessions');
     const history = action(historyLabel);
+    // The live list's only history control is the header's: the body's copy
+    // belongs to the accepted-empty state.
+    expect(
+      nodes('Pressable').filter(node => node.props.testID === 'agents-view-history')
+    ).toHaveLength(1);
     expect(history.props.testID).toBe('agents-view-history');
     expect(history.props.accessibilityLabel).toBe(historyLabel);
     expect(history.props.accessibilityLabel).not.toBe(i18n.t('home.seeAll'));
@@ -1725,6 +1803,7 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('leads the controls row with the section label so section headers share one alignment', async () => {
+    state.live.activeSessions = [row];
     await renderScreen();
 
     const label = headerRowLabel();
@@ -1738,6 +1817,7 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('keeps the header right to See-all alone while nothing is filterable', async () => {
+    state.live.activeSessions = [row];
     await renderScreen();
 
     expect(headerActions()).toHaveLength(1);
@@ -2058,6 +2138,19 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(compact()).toBe(false);
     expect(root().findByType(EmptyState).props.compact).toBe(false);
+
+    // The live empty form is a row taller than the single-action no-match form
+    // (the stacked history link), so a band that holds the shorter form must
+    // still compact it: the decision counts the secondary action.
+    const holdsLiveForm = getEmptyStateFullHeight({ secondaryAction: true }) + state.tabBarHeight;
+    act(() => {
+      layoutBody(holdsLiveForm - 1);
+    });
+    expect(compact()).toBe(true);
+    act(() => {
+      layoutBody(holdsLiveForm);
+    });
+    expect(compact()).toBe(false);
   });
 
   it('compacts the no-match state for the reserve reduced motion adds to the band', async () => {

@@ -34,11 +34,20 @@ test('production and staging schedule independently on main every 20 minutes', (
 
 test('successful main CI selects the tested deployment SHA', () => {
   const check = gate.jobs.check.steps.find(step => step.id === 'changes');
-  assert.match(check.run, /--status success/);
-  assert.match(check.run, /--workflow ci\.yml/);
-  assert.match(check.run, /--event push/);
-  assert.match(check.run, /--workflow "\$WORKFLOW_FILE"/);
-  assert.match(check.run, /git merge-base --is-ancestor "\$sha" HEAD/);
+  assert.match(check.run, /find_latest_successful_main_push\(\)/);
+  assert.match(check.run, /actions\/workflows\/\$workflow_file\/runs\?per_page=100&page=\$page/);
+  assert.match(
+    check.run,
+    /sort_by\(\.created_at\) \| reverse \| \.\[\] \| select\(\.head_branch == "main" and \.event == "push" and \.status == "completed" and \.conclusion == "success"\)/
+  );
+  assert.match(check.run, /find_latest_successful_main_push ci\.yml HEAD/);
+  assert.match(check.run, /find_latest_successful_main_push "\$WORKFLOW_FILE"/);
+  assert.match(check.run, /\[ "\$run_count" -lt 100 \]/);
+  assert.doesNotMatch(check.run, /gh run list/);
+  assert.doesNotMatch(check.run, /--branch main/);
+  assert.doesNotMatch(check.run, /--event push/);
+  assert.doesNotMatch(check.run, /--status success/);
+  assert.match(check.run, /git merge-base --is-ancestor "\$sha" "\$ancestor_ref"/);
   assert.match(check.run, /git hash-object -t tree \/dev\/null/);
   assert.match(check.run, /git merge-base --is-ancestor "\$base_sha" "\$target_sha"/);
   assert.match(
@@ -46,6 +55,10 @@ test('successful main CI selects the tested deployment SHA', () => {
     /git diff --quiet "\$base_sha" "\$target_sha" -- \. ':\(exclude\)apps\/mobile'/
   );
   assert.match(check.run, /should_deploy=false/);
+  assert.match(
+    check.run,
+    /CI-green candidate \\`\$target_sha\\` is already included in last completed release \\`\$base_sha\\`/
+  );
   assert.equal(gate.on.workflow_call.outputs.base_sha.value, '${{ jobs.check.outputs.base_sha }}');
   assert.equal(
     gate.on.workflow_call.outputs.target_sha.value,
@@ -127,7 +140,25 @@ test('deployment gate only deploys changes since the last complete run', () => {
     git('add', '.');
     git('-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-qm', message);
   };
-  const runGate = (lastSuccessSha, ciSha = git('rev-parse', 'HEAD'), legacySha = '') => {
+  const runs = (...entries) => ({ workflow_runs: entries });
+  const pages = (...entries) =>
+    JSON.stringify(Object.fromEntries(entries.map(([page, value]) => [page, value])));
+  const successfulMainPush = headSha => ({
+    id: 1,
+    head_sha: headSha,
+    head_branch: 'main',
+    event: 'push',
+    status: 'completed',
+    conclusion: 'success',
+    created_at: '2026-09-29T20:14:27Z',
+  });
+  let lastSummary = '';
+  const runGate = (
+    lastSuccessSha,
+    ciRuns = pages(['1', runs(successfulMainPush(git('rev-parse', 'HEAD')))]),
+    legacyRuns = pages(['1', runs()]),
+    failLookup = ''
+  ) => {
     const outputPath = join(directory, '.git', 'test-output');
     const summaryPath = join(directory, '.git', 'test-summary');
     writeFileSync(outputPath, '');
@@ -139,12 +170,18 @@ test('deployment gate only deploys changes since the last complete run', () => {
         '-e',
         '-c',
         `gh() {
-        if [ "$1" = run ]; then
-          if [[ "$*" == *'--workflow ci.yml'* ]]; then
-            printf '%s\\n' "$CI_SHA"
-          else
-            printf '%s\\n' "$LEGACY_SHA"
+        if [ "$1" = api ] && [[ "$2" == *'actions/workflows/ci.yml/runs?'* ]]; then
+          page="\${2##*page=}"
+          if [ "$FAIL_LOOKUP" = "ci:$page" ]; then
+            return 1
           fi
+          jq -c --arg page "$page" '.[$page]' <<< "$CI_RUNS"
+        elif [ "$1" = api ] && [[ "$2" == *'actions/workflows/'*'/runs?'* ]]; then
+          page="\${2##*page=}"
+          if [ "$FAIL_LOOKUP" = "legacy:$page" ]; then
+            return 1
+          fi
+          jq -c --arg page "$page" '.[$page]' <<< "$LEGACY_RUNS"
         elif [[ "$2" == *'/statuses?'* ]]; then
           printf 'success\\n'
         else
@@ -161,13 +198,19 @@ test('deployment gate only deploys changes since the last complete run', () => {
           GITHUB_STEP_SUMMARY: summaryPath,
           GITHUB_REPOSITORY: 'example/repo',
           LAST_SUCCESS_SHA: lastSuccessSha,
-          CI_SHA: ciSha,
-          LEGACY_SHA: legacySha,
+          CI_RUNS: ciRuns,
+          LEGACY_RUNS: legacyRuns,
+          FAIL_LOOKUP: failLookup,
           WORKFLOW_FILE: 'deploy-production.yml',
         },
       }
     );
+    if (failLookup) {
+      assert.notEqual(result.status, 0, result.stderr);
+      return {};
+    }
     assert.equal(result.status, 0, result.stderr);
+    lastSummary = readFileSync(summaryPath, 'utf8');
     return Object.fromEntries(
       readFileSync(outputPath, 'utf8')
         .trim()
@@ -214,11 +257,105 @@ test('deployment gate only deploys changes since the last complete run', () => {
     const greenSha = git('rev-parse', 'HEAD');
     writeFileSync(join(directory, 'apps/web/file'), 'untested');
     commit('untested');
-    assert.equal(runGate(deployedSha, greenSha).target_sha, greenSha);
-    assert.equal(runGate(greenSha, greenSha).should_deploy, 'false');
-    assert.equal(runGate(greenSha, deployedSha).should_deploy, 'false');
-    assert.equal(runGate(deployedSha, '').should_deploy, 'false');
-    assert.equal(runGate('', greenSha, deployedSha).base_sha, deployedSha);
+    const unrelatedRuns = Array.from({ length: 100 }, (_, index) => ({
+      ...successfulMainPush(`unrelated-${index}`),
+      head_branch: 'feature',
+      created_at: `2026-09-29T20:${String(59 - (index % 60)).padStart(2, '0')}:00Z`,
+    }));
+    unrelatedRuns[0] = {
+      ...successfulMainPush('pending'),
+      status: 'in_progress',
+      created_at: '2026-09-29T20:59:00Z',
+    };
+    unrelatedRuns[1] = {
+      ...successfulMainPush('failed'),
+      conclusion: 'failure',
+      created_at: '2026-09-29T20:58:00Z',
+    };
+    unrelatedRuns[2] = {
+      ...successfulMainPush('pull-request'),
+      event: 'pull_request',
+      created_at: '2026-09-29T20:57:00Z',
+    };
+    const ciRuns = pages(
+      ['1', runs(...unrelatedRuns)],
+      [
+        '2',
+        runs(
+          {
+            ...successfulMainPush('pending'),
+            status: 'in_progress',
+            created_at: '2026-09-29T20:20:00Z',
+          },
+          {
+            ...successfulMainPush('failed'),
+            conclusion: 'failure',
+            created_at: '2026-09-29T20:19:00Z',
+          },
+          {
+            ...successfulMainPush('pull-request'),
+            event: 'pull_request',
+            created_at: '2026-09-29T20:18:00Z',
+          },
+          {
+            ...successfulMainPush('feature'),
+            head_branch: 'feature',
+            created_at: '2026-09-29T20:17:00Z',
+          },
+          { ...successfulMainPush(deployedSha), created_at: '2026-09-29T20:13:00Z' },
+          { ...successfulMainPush(greenSha), created_at: '2026-09-29T20:16:00Z' }
+        ),
+      ]
+    );
+    assert.equal(runGate(deployedSha, ciRuns).target_sha, greenSha);
+    assert.equal(runGate(greenSha, ciRuns).should_deploy, 'false');
+    assert.equal(
+      runGate(greenSha, pages(['1', runs(successfulMainPush(deployedSha))])).should_deploy,
+      'false'
+    );
+    assert.match(
+      lastSummary,
+      new RegExp(
+        'candidate `' +
+          deployedSha +
+          '` is already included in last completed release `' +
+          greenSha +
+          '`'
+      )
+    );
+    assert.equal(runGate(deployedSha, pages(['1', runs()])).should_deploy, 'false');
+    const nonReleaseRuns = Array.from({ length: 100 }, (_, index) => ({
+      ...successfulMainPush(git('rev-parse', 'HEAD')),
+      event: index % 2 === 0 ? 'schedule' : 'workflow_dispatch',
+    }));
+    assert.equal(
+      runGate(
+        '',
+        ciRuns,
+        pages(['1', runs(...nonReleaseRuns)], ['2', runs(successfulMainPush(deployedSha))])
+      ).base_sha,
+      deployedSha
+    );
+    assert.equal(
+      runGate('', ciRuns, pages(['1', runs(...nonReleaseRuns)], ['2', runs()])).base_sha,
+      git('hash-object', '-t', 'tree', '/dev/null')
+    );
+    runGate(deployedSha, pages(['1', runs(...unrelatedRuns)]), pages(), 'ci:2');
+    runGate('', ciRuns, pages(['1', runs(...unrelatedRuns)]), 'legacy:2');
+    assert.equal(
+      runGate(
+        '',
+        ciRuns,
+        pages([
+          '1',
+          runs(
+            { ...successfulMainPush(greenSha), created_at: '2026-09-29T20:16:00Z' },
+            { ...successfulMainPush(deployedSha), created_at: '2026-09-29T20:13:00Z' }
+          ),
+        ])
+      ).base_sha,
+      greenSha
+    );
     assert.equal(runGate('').should_deploy, 'true');
   } finally {
     rmSync(directory, { recursive: true, force: true });

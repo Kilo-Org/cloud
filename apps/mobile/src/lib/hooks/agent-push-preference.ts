@@ -167,6 +167,24 @@ export function readAgentPushPreferenceIfLoaded(
   return readFromSnapshot(snapshot)[category];
 }
 
+/**
+ * The user's `notificationPreviews` mode, or `undefined` while the
+ * server-resolved row has not loaded. `'generic'` (the schema default, and the
+ * fallback for a row that predates the field) must keep the session title off
+ * the shade and lock screen, so a caller that acts on this value must not read
+ * an unloaded cache as `'full'`.
+ */
+export function readNotificationPreviewsIfLoaded(
+  queryClient: Pick<QueryClient, 'getQueryData'>,
+  queryKey: readonly unknown[]
+): 'generic' | 'full' | undefined {
+  const snapshot = queryClient.getQueryData(queryKey) as NotificationPreferencesSnapshot;
+  if (snapshot === undefined) {
+    return undefined;
+  }
+  return readFromSnapshot(snapshot).notificationPreviews ?? 'generic';
+}
+
 type OptimisticArgs = Readonly<{
   queryClient: Pick<QueryClient, 'cancelQueries' | 'getQueryData' | 'setQueryData'>;
   queryKey: readonly unknown[];

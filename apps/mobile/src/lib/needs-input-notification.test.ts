@@ -96,6 +96,7 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan).toEqual({
       publish: [
@@ -112,6 +113,39 @@ describe('planNeedsInputNotifications', () => {
     });
   });
 
+  it('uses the generic title instead of the session title for generic previews', () => {
+    // The default preview mode must not put the session title in the shade or
+    // on the lock screen: the post carries the same content-free title the
+    // server push uses for the raise.
+    const explicit = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      notificationPreviews: 'generic',
+    });
+    expect(explicit.publish).toEqual([
+      {
+        sessionId: 'ses_1',
+        title: 'Kilo',
+        kind: 'question',
+        prUrl: null,
+        organizationId: null,
+      },
+    ]);
+
+    // An omitted mode is the default, so it must also resolve to generic.
+    const omitted = planNeedsInputNotifications({
+      previous: [],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+    });
+    expect(omitted.publish).toEqual(explicit.publish);
+  });
+
   it('falls back to the localized untitled copy for a backend default title', () => {
     const plan = planNeedsInputNotifications({
       previous: [],
@@ -125,6 +159,7 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.publish).toEqual([
       {
@@ -161,6 +196,7 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.publish).toEqual([
       {
@@ -176,7 +212,7 @@ describe('planNeedsInputNotifications', () => {
 
   it('does not re-publish a raise it already notified', () => {
     const plan = planNeedsInputNotifications({
-      previous: [notifiedRow()],
+      previous: [notifiedRow({ title: 'Kilo' })],
       next: [makeCached({ id: 'ses_1', status: 'question' })],
       pathname: AWAY,
       appState: ACTIVE,
@@ -213,6 +249,7 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.publish).toEqual([notifiedRow({ prUrl: 'https://github.com/org/repo/pull/7' })]);
     expect(plan.dismiss).toEqual([]);
@@ -225,9 +262,29 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.publish).toEqual([notifiedRow({ kind: 'permission' })]);
     expect(plan.dismiss).toEqual([]);
+  });
+
+  it('re-publishes a still-waiting raise whose title moved with the preview mode', () => {
+    // A raise posted while Message previews was 'Full' carries the session
+    // title. Switching to the 'Generic' default must re-post it content-free,
+    // or the standing notification keeps the title in the shade and on the
+    // lock screen even though the user asked for generic copy. The same
+    // identifier replaces it quietly in place.
+    const plan = planNeedsInputNotifications({
+      previous: [notifiedRow({ title: 'Fix the bug' })],
+      next: [makeCached({ id: 'ses_1', title: 'Fix the bug', status: 'question' })],
+      pathname: AWAY,
+      appState: ACTIVE,
+      attentionEnabled: true,
+      notificationPreviews: 'generic',
+    });
+    expect(plan.publish).toEqual([notifiedRow({ title: 'Kilo' })]);
+    expect(plan.dismiss).toEqual([]);
+    expect(plan.updates).toEqual(['ses_1']);
   });
 
   it('alerts again when a raise it dismisses is re-posted under a new organization', () => {
@@ -248,6 +305,7 @@ describe('planNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.dismiss).toEqual(['needs-input:ses_1']);
     expect(plan.publish).toEqual([notifiedRow({ kind: 'permission', organizationId: 'org-a' })]);
@@ -306,7 +364,7 @@ describe('planNeedsInputNotifications', () => {
 
   it('dismisses a raise that changed organization without re-posting it', () => {
     const plan = planNeedsInputNotifications({
-      previous: [notifiedRow({ organizationId: null })],
+      previous: [notifiedRow({ organizationId: null, title: 'Kilo' })],
       next: [makeCached({ id: 'ses_1', status: 'question', organizationId: 'org-a' })],
       pathname: AWAY,
       appState: ACTIVE,
@@ -543,6 +601,7 @@ describe('applyNeedsInputNotifications', () => {
       pathname: AWAY,
       appState: ACTIVE,
       attentionEnabled: true,
+      notificationPreviews: 'full',
     });
     expect(plan.updates).toEqual([]);
 

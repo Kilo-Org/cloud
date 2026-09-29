@@ -16,7 +16,10 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { resolveAnsweredRaises } from '@/lib/glanceable/attention-rows';
-import { readAgentPushPreferenceIfLoaded } from '@/lib/hooks/agent-push-preference';
+import {
+  readAgentPushPreferenceIfLoaded,
+  readNotificationPreviewsIfLoaded,
+} from '@/lib/hooks/agent-push-preference';
 import { useUserWebConnectionState } from '@/lib/hooks/use-user-web-connection-state';
 import {
   applyNeedsInputNotifications,
@@ -161,6 +164,7 @@ function useNeedsInputLocalNotifications(): void {
         preferencesQueryKey,
         'agentAttention'
       ),
+      notificationPreviews: readNotificationPreviewsIfLoaded(queryClient, preferencesQueryKey),
     });
     const dismissed = new Set(plan.dismiss);
     // A re-published row REPLACES its previous entry instead of joining it. An

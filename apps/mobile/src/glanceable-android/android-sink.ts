@@ -33,7 +33,11 @@ import {
   start as startLiveUpdate,
   update as updateLiveUpdate,
 } from './live-update';
-import { isNotificationPermissionGranted } from './permission';
+import {
+  getNotificationPermissionStatus,
+  isNotificationPermissionGranted,
+  requestNotificationPermission,
+} from './permission';
 import { showAndroidPermissionAlertOnce } from './permission-alert';
 import {
   type AndroidWidgetProps,
@@ -304,16 +308,29 @@ async function retryPendingStart(): Promise<void> {
 }
 
 /**
- * App foreground: when the ongoing cannot start (denied) and work is pending,
- * show the Open Settings alert once. When permission is granted, start at once.
- * The alert needs a foreground Activity, so this never runs on the headless path.
+ * App foreground: when the ongoing cannot start and work is pending, resolve the
+ * permission. Granted starts at once; `undetermined` (the user was never asked —
+ * push permission is requested only from the Notifications screen) takes the OS
+ * prompt the enable flow uses; only a real `denied` shows the Open Settings
+ * alert once. The alert needs a foreground Activity, so this never runs on the
+ * headless path.
  */
 export async function handleAppStateActive(): Promise<void> {
   if (pending === null) {
     return;
   }
-  if (await isNotificationPermissionGranted()) {
+  const status = await getNotificationPermissionStatus();
+  if (status === 'granted') {
     await retryPendingStart();
+    return;
+  }
+  if (status === 'undetermined') {
+    // A never-asked permission is not a denial: the Settings deep link would be
+    // wrong, so ask the OS and start once granted.
+    const requested = await requestNotificationPermission();
+    if (requested === 'granted') {
+      await retryPendingStart();
+    }
     return;
   }
   showAndroidPermissionAlertOnce();

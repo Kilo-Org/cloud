@@ -22,7 +22,11 @@ import {
   renderStoredSnapshotWithNotice,
   setGlanceableActionNotice,
 } from './android-sink';
-import { _setPermissionReaderForTests, type NotificationPermissionStatus } from './permission';
+import {
+  _setPermissionReaderForTests,
+  _setPermissionRequesterForTests,
+  type NotificationPermissionStatus,
+} from './permission';
 import { _resetAndroidPermissionAlertForTests } from './permission-alert';
 
 const mocks = vi.hoisted(() => {
@@ -283,6 +287,7 @@ beforeEach(() => {
 
 afterEach(() => {
   _setPermissionReaderForTests(null);
+  _setPermissionRequesterForTests(null);
   vi.useRealTimers();
 });
 
@@ -1362,5 +1367,43 @@ describe('handleAppStateActive permission alert', () => {
       promotion: true,
     });
     expect(mocks.alert).not.toHaveBeenCalled();
+  });
+
+  it('prompts the OS, not Settings, for a never-asked permission, then starts', async () => {
+    // A user who was never asked (push permission is requested only from the
+    // Notifications screen) must get the OS prompt the app's own enable flow
+    // uses, not the Open Settings alert that only fits a real denial.
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('undetermined'));
+    const requestPermission = vi
+      .fn<() => Promise<NotificationPermissionStatus>>()
+      .mockResolvedValue('granted');
+    _setPermissionRequesterForTests(requestPermission);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+    expect(mocks.getNotification()).toBeNull();
+
+    await handleAppStateActive();
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.getNotification()).not.toBeNull();
+  });
+
+  it('keeps the Settings alert away when the OS prompt is denied', async () => {
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    _setPermissionReaderForTests(() => Promise.resolve('undetermined'));
+    const requestPermission = vi
+      .fn<() => Promise<NotificationPermissionStatus>>()
+      .mockResolvedValue('denied');
+    _setPermissionRequesterForTests(requestPermission);
+    androidSink.startOrUpdate(MIXED, CTX);
+    await flushAsync();
+
+    await handleAppStateActive();
+
+    expect(requestPermission).toHaveBeenCalledTimes(1);
+    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.getNotification()).toBeNull();
   });
 });

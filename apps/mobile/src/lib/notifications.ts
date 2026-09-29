@@ -857,6 +857,19 @@ export async function getNotificationPermissionStatus(): Promise<
   return status;
 }
 
+/**
+ * The live permission request, returning the resulting status. The Notifications
+ * screen enable flow calls this directly; it is exported here so the Android
+ * foreground alert can take the same OS-prompt path when the permission is still
+ * `undetermined`.
+ */
+export async function requestNotificationPermissionStatus(): Promise<
+  'granted' | 'denied' | 'undetermined'
+> {
+  const { status } = await Notifications.requestPermissionsAsync();
+  return status;
+}
+
 export function getPlatform(): 'ios' | 'android' {
   if (Platform.OS === 'ios') {
     return 'ios';

@@ -35,6 +35,7 @@ import {
   androidChannelIdForPushData,
   needsInputCategoryId,
   type PushData,
+  translatePush,
 } from '@kilocode/notifications';
 
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
@@ -61,12 +62,13 @@ export type NeedsInputNotificationPlan = {
   dismiss: string[];
   /**
    * Session ids in `publish` whose post replaces a raise already on screen. They
-   * exist to move the notification's actions to the raise's current shape, so
-   * their post must update the notification quietly: Android replays the
-   * attention channel's sound on every `notify` of an existing notification, so
-   * a kind flip would otherwise alert the user again for a raise they were
-   * already told about. A session the same plan dismisses is never listed here —
-   * its dismissal runs first, so its post is a new notification that must alert.
+   * exist to move the notification's actions or its preview title to the raise's
+   * current shape, so their post must update the notification quietly: Android
+   * replays the attention channel's sound on every `notify` of an existing
+   * notification, so a kind flip or a preview-mode change would otherwise alert
+   * the user again for a raise they were already told about. A session the same
+   * plan dismisses is never listed here — its dismissal runs first, so its post
+   * is a new notification that must alert.
    */
   updates: string[];
 };
@@ -108,6 +110,13 @@ export type NeedsInputPlanInput = {
    * falling back to ON would alert a category the user turned off.
    */
   attentionEnabled: boolean | undefined;
+  /**
+   * The user's `notificationPreviews` mode, from the same row. `'generic'` (the
+   * default) must not put the session title in the shade or on the lock screen,
+   * so the post's title uses the same content-free copy the server push sends.
+   * Omitted means `'generic'`, fail-closed.
+   */
+  notificationPreviews?: 'generic' | 'full';
 };
 
 /** The identifier a session's needs-input notification is posted and replaced under. */
@@ -192,14 +201,22 @@ export function shouldPublishForSession({
 
 function toNotificationRow(
   row: CachedActiveSession,
-  kind: NeedsInputAttentionKind
+  kind: NeedsInputAttentionKind,
+  notificationPreviews: 'generic' | 'full' | undefined
 ): NeedsInputNotificationRow {
+  const sessionTitle = sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled');
   return {
     sessionId: row.id,
     // The backend's `New session - <ISO>` is machine output, so the notification
     // shows the same 'Untitled session' fallback the session list rows use
-    // instead of the raw identifier (SPOT-DEFECT e7.png).
-    title: sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled'),
+    // instead of the raw identifier (SPOT-DEFECT e7.png). A generic preview
+    // never shows the session title at all: it uses the shared content-free
+    // title the server push sends for `notificationPreviews: 'generic'`, so the
+    // shade and lock screen cannot leak it.
+    title:
+      notificationPreviews === 'full'
+        ? sessionTitle
+        : translatePush(i18n.language, 'generic.title', undefined, 'Kilo'),
     kind,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,
@@ -226,6 +243,7 @@ export function planNeedsInputNotifications({
   pathname,
   appState,
   attentionEnabled,
+  notificationPreviews,
 }: NeedsInputPlanInput): NeedsInputNotificationPlan {
   const attention = new Map<string, { row: CachedActiveSession; kind: NeedsInputAttentionKind }>();
   for (const row of next) {
@@ -266,15 +284,19 @@ export function planNeedsInputNotifications({
         ? previous.find(previousRow => previousRow.sessionId === sessionId)
         : undefined;
       // An already-notified raise is still waiting under its standing
-      // notification. Re-publish in place only when the action-relevant shape
-      // changed: the kind moved, or the associated PR appeared or changed. A
-      // raise posted before the PR link reached the cache would otherwise never
-      // offer Open PR, and a kind flip would keep offering the wrong controls.
+      // notification. Re-publish in place when the shape the notification shows
+      // changed: the kind moved, the associated PR appeared or changed, or the
+      // title changed — the last covers a `notificationPreviews` flip, so a
+      // notification posted under Full is re-posted content-free the moment the
+      // user switches to Generic. A raise posted before the PR link reached the
+      // cache would otherwise never offer Open PR, and a kind flip would keep
+      // offering the wrong controls.
+      const nextRow = toNotificationRow(row, kind, notificationPreviews);
       if (
         shouldPublishForSession({ appState, pathname, sessionId }) &&
-        needsRepublish(notifiedRow, row, kind)
+        needsRepublish(notifiedRow, nextRow)
       ) {
-        publish.push(toNotificationRow(row, kind));
+        publish.push(nextRow);
       }
     }
   }
@@ -296,19 +318,24 @@ export function planNeedsInputNotifications({
 
 /**
  * Whether a still-waiting raise's standing notification must be re-published in
- * place: never notified, or its action-relevant shape moved — the kind, or the
- * associated PR link the notification's Open PR action carries.
+ * place: never notified, or the shape the notification presents moved — the
+ * kind, the associated PR link the Open PR action carries, or the title. The
+ * title is part of the comparison so a `notificationPreviews` flip re-posts an
+ * already-posted raise: switching Full → Generic removes the session title from
+ * the shade and lock screen instead of leaving the standing notification to
+ * keep showing it.
  */
 function needsRepublish(
   notifiedRow: NeedsInputNotificationRow | undefined,
-  row: CachedActiveSession,
-  kind: NeedsInputAttentionKind
+  nextRow: NeedsInputNotificationRow
 ): boolean {
   if (notifiedRow === undefined) {
     return true;
   }
   return (
-    notifiedRow.kind !== kind || (notifiedRow.prUrl ?? null) !== (row.associatedPr?.url ?? null)
+    notifiedRow.kind !== nextRow.kind ||
+    (notifiedRow.prUrl ?? null) !== (nextRow.prUrl ?? null) ||
+    notifiedRow.title !== nextRow.title
   );
 }
 

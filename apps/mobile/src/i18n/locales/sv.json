@@ -3339,7 +3339,7 @@
     "skillNameRequired": "Ange ett färdighetsnamn",
     "skillNameInvalid": "Färdighetsnamn måste börja med en bokstav eller siffra och endast använda små bokstäver, siffror och bindestreck",
     "skillContentRequired": "Skicklighetsinnehåll krävs",
-    "skillSaveFailed": "Kunde inte rädda skickligheten",
+    "skillSaveFailed": "Kunde inte spara skickligheten",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "mcp": {
@@ -3377,7 +3377,7 @@
       "add": "Lägg till agent",
       "empty": "Inga agenter än",
       "name": "Agentens namn",
-      "slug": "Agentsnigel",
+      "slug": "Agentslug",
       "description": "Agent beskrivning",
       "model": "Modell åsidosättande",
       "modelPlaceholder": "Använd sessionsstandard",
@@ -3398,9 +3398,9 @@
       "visibilityAll": "Alla - båda",
       "saveFailed": "Det gick inte att spara agenten",
       "nameRequired": "Ange ett agentnamn",
-      "slugRequired": "Ange en agentsnigel",
+      "slugRequired": "Ange en agentslug",
       "slugInvalid": "Slug måste börja med en bokstav och endast använda små bokstäver, siffror och bindestreck",
-      "slugConflict": "Den snigeln är reserverad av en inbyggd agent",
+      "slugConflict": "Denna slug är reserverad av en inbyggd agent",
       "edit": "Redigera agent"
     },
     "slashCommands": {

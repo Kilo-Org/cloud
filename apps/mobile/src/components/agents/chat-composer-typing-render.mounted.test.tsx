@@ -306,6 +306,8 @@ describe('ChatComposer typing render cost', () => {
 
     // Baseline after mount and the input layout; count only the typed frames.
     composerCommits.count = 0;
+    const mountHeight = (input.props.style as { height: number }).height;
+    const inputHeights: number[] = [];
     let heightChanges = 0;
     let lastLineCount = 1;
     for (let index = 1; index <= DRAFT.length; index += 1) {
@@ -330,6 +332,7 @@ describe('ChatComposer typing render cost', () => {
           });
           await tick();
         });
+        inputHeights.push((input.props.style as { height: number }).height);
       }
     }
 
@@ -347,6 +350,24 @@ describe('ChatComposer typing render cost', () => {
     expect(composerCommits.count).toBeLessThanOrEqual(heightChanges + 2);
     expect(composerCommits.count).toBeLessThan(DRAFT.length / 10);
     expect(heightChanges).toBeGreaterThan(0);
+
+    // The commit bound alone is one-sided: a composer that never republished
+    // the measurement would commit less, not more. Pin the other half of the
+    // owner's growth contract — the input must still grow line by line to the
+    // snapped cap and hold there, with the row scrollable once capped.
+    expect(inputHeights.length).toBe(heightChanges);
+    const firstHeight = inputHeights.at(0) ?? Number.NaN;
+    const lastHeight = inputHeights.at(-1) ?? Number.NaN;
+    const previousHeight = inputHeights.at(-2) ?? Number.NaN;
+    expect(firstHeight).toBeGreaterThan(mountHeight);
+    expect(
+      inputHeights.every(
+        (height, index) =>
+          index === 0 || height >= (inputHeights.at(index - 1) ?? Number.POSITIVE_INFINITY)
+      )
+    ).toBe(true);
+    expect(lastHeight).toBe(previousHeight);
+    expect(input.props.scrollEnabled).toBe(true);
 
     renderer.unmount();
   });

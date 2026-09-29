@@ -179,7 +179,6 @@ export async function handleBroadcastUiAction(c: Context<GastownEnv>, params: { 
 
   const town = getTownDOStub(c.env, params.townId);
 
-  // Validate that the referenced rig belongs to this town
   const rigId = uiActionRigId(action);
   if (rigId) {
     const rig = await town.getRigAsync(rigId);

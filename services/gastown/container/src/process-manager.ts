@@ -694,9 +694,6 @@ async function ensureSDKServer(
   }
 }
 
-/**
- * Zod schema for a single pending nudge returned by the gastown worker.
- */
 const PendingNudge = z.object({
   nudge_id: z.string(),
   message: z.string(),
@@ -710,10 +707,6 @@ const PendingNudgesResponse = z.object({
   data: z.array(PendingNudge),
 });
 
-/**
- * Fetch pending nudges for an agent from the gastown worker.
- * Returns the array (may be empty), or null on error.
- */
 async function fetchPendingNudges(
   agent: ManagedAgent
 ): Promise<z.infer<typeof PendingNudge>[] | null> {
@@ -1347,9 +1340,6 @@ class StartupAbortedError extends Error {
   }
 }
 
-/**
- * Stop an agent by aborting its session.
- */
 export async function stopAgent(agentId: string): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);
@@ -1364,20 +1354,16 @@ export async function stopAgent(agentId: string): Promise<void> {
 
   agent.status = 'stopping';
 
-  // Cancel any pending idle timer
   clearIdleTimer(agentId);
 
-  // Abort event subscription
   const controller = eventAbortControllers.get(agentId);
   if (controller) controller.abort();
 
-  // Abort the session via SDK
   try {
     const instance = sdkInstances.get(agent.workdir);
     if (instance) {
       await instance.client.session.abort({ path: { id: agent.sessionId } });
       instance.sessionCount--;
-      // Stop server if no sessions left
       if (instance.sessionCount <= 0) {
         instance.server.close();
         sdkInstances.delete(agent.workdir);
@@ -1396,7 +1382,6 @@ export async function stopAgent(agentId: string): Promise<void> {
   broadcastEvent(agentId, 'agent.exited', { reason: 'stopped' });
   syncRegistry();
 
-  // Save DB snapshot before completing stop
   const apiUrl = agent.gastownApiUrl;
   const token = agent.gastownContainerToken ?? process.env.GASTOWN_CONTAINER_TOKEN ?? null;
   if (apiUrl && token) {
@@ -1404,9 +1389,6 @@ export async function stopAgent(agentId: string): Promise<void> {
   }
 }
 
-/**
- * Send a follow-up message to an agent.
- */
 export async function sendMessage(agentId: string, prompt: string): Promise<void> {
   const agent = agents.get(agentId);
   if (!agent) throw new Error(`Agent ${agentId} not found`);

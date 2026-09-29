@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloudBillingSkuIdSchema,
   cloudBillingAmountMicrodollars,
@@ -309,13 +310,6 @@ function parseUsageMetadata(metadata: unknown): Record<string, string> {
     });
   }
   return parsed.data;
-}
-
-function postgresErrorCode(error: unknown): string | undefined {
-  if (!error || typeof error !== 'object') return undefined;
-  if ('code' in error && typeof error.code === 'string') return error.code;
-  if ('cause' in error) return postgresErrorCode(error.cause);
-  return undefined;
 }
 
 export type ReconciliationStatus =
@@ -1046,7 +1040,7 @@ export const cloudBillingSkusRouter = createTRPCRouter({
           .returning();
         return serializeCloudBillingSku(created);
       } catch (error) {
-        if (postgresErrorCode(error) === '23505') {
+        if (isUniqueViolation(error)) {
           throw new TRPCError({ code: 'CONFLICT', message: 'A billing SKU with this ID exists' });
         }
         throw error;

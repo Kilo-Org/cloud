@@ -2187,6 +2187,8 @@
       "leaveChanges": "Hapụ mgbanwe",
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
+      "selectRepositoryToStart": "Họrọ ebe nchekwa koodu iji malite.",
+      "connectProviderToStart": "Jikọọ onye na-enye ọrụ iji malite.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
       "prefillRepoAndModelUnavailable": "Ebe nchekwa koodu na ihe nlereanya nke nnọkọ mbụ adịkwaghị. Họrọ ha n'okpuru.",

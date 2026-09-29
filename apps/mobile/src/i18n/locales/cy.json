@@ -2299,6 +2299,8 @@
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
+      "selectRepositoryToStart": "Dewiswch ystorfa i ddechrau.",
+      "connectProviderToStart": "Cysylltwch â darparwr i ddechrau.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",
       "prefillRepoAndModelUnavailable": "Nid yw ystorfa a model y sesiwn wreiddiol ar gael mwyach. Dewiswch rai eraill isod.",

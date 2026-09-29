@@ -113,6 +113,127 @@ export function resolveNewSessionStartDisabled(input: {
 }
 
 /**
+ * A synthetic, always-resolvable picker key used only to re-evaluate a Start
+ * gate as if a repository were selected. It is never rendered or submitted.
+ */
+const SYNTHETIC_REPOSITORY_KEY = 'synthetic:selection';
+
+/**
+ * Why the Start button is unavailable, when the missing repository is what
+ * blocks it. `select-repository` means a picker row exists to pick;
+ * `connect-provider` means the account has no repositories at all and a
+ * provider still has to be connected; `refresh-repositories` means the account
+ * has no repositories but no provider is left to connect (a provider is
+ * already connected and empty, or its list failed to load), so the way to get
+ * rows is to refresh/check access — telling the user to select or connect
+ * would name a control that does not exist.
+ */
+export type NewSessionStartBlockedReason =
+  | 'select-repository'
+  | 'connect-provider'
+  | 'refresh-repositories';
+
+/**
+ * The inputs for `resolveNewSessionStartBlockedReason`. `gate` is the entry's
+ * own Start-gate input; `selectedRepo` / `selectedRepositoryResolved` are
+ * omitted because the helper replaces them with a synthetic selection to tell
+ * whether the missing repository is the one blocking Start.
+ */
+type NewSessionStartBlockedReasonInput = {
+  /** The account has at least one repository row on some provider. */
+  hasRepositories: boolean;
+  /** A provider group the user can actually connect (`status === 'connect'`). */
+  hasConnectableProvider: boolean;
+  /** Any provider group is still loading, so its status is not settled. */
+  isLoadingRepositories: boolean;
+  /** True when a remote CLI is the run target rather than Cloud Agent. */
+  isRemoteTargetSelected: boolean;
+  /** The current picker key; `''` when no repository is selected. */
+  selectedRepo: string;
+} & (
+  | {
+      entry: 'new-session';
+      gate: Omit<
+        Parameters<typeof resolveNewSessionStartDisabled>[0],
+        'selectedRepo' | 'selectedRepositoryResolved'
+      >;
+    }
+  | {
+      entry: 'continue';
+      gate: Omit<
+        Parameters<typeof resolveContinueStartDisabled>[0],
+        'selectedRepo' | 'selectedRepositoryResolved'
+      >;
+    }
+);
+
+/**
+ * One line naming why Start is unavailable when the missing repository is the
+ * blocking gate, or `null` when it is not. Kept pure and beside the gates so
+ * both entries share the same decision and the tests can pin it without
+ * rendering.
+ *
+ * A reason is only ever emitted when re-evaluating the entry's own gate with a
+ * synthetic selected/resolved repository STILL leaves Start disabled: any
+ * other precondition (empty prompt, uploading/failed attachment, loading
+ * profile, creating/submitting, empty or unavailable model) then owns the
+ * blocker, and the repository is not it. Provider connect state and repository
+ * count stay separate, exactly like the extension's `submitBlockedReason`
+ * separates `integrationInstalled` from `repoCount`: a `connected-empty`,
+ * `error`, or `repos` group never reads as "connect a provider".
+ */
+export function resolveNewSessionStartBlockedReason(
+  input: NewSessionStartBlockedReasonInput
+): NewSessionStartBlockedReason | null {
+  // A remote-CLI target inherits its repository from the CLI and never sends
+  // one, so the missing repository is never its blocker.
+  if (input.isRemoteTargetSelected) {
+    return null;
+  }
+  // A selected repository means the picker was completed; a still-loading list
+  // means naming a blocker now would name the wrong one.
+  if (input.selectedRepo !== '') {
+    return null;
+  }
+  if (input.isLoadingRepositories) {
+    return null;
+  }
+
+  const gateDisabledWithSyntheticRepo =
+    input.entry === 'new-session'
+      ? resolveNewSessionStartDisabled({
+          ...input.gate,
+          selectedRepo: SYNTHETIC_REPOSITORY_KEY,
+          selectedRepositoryResolved: true,
+        })
+      : resolveContinueStartDisabled({
+          ...input.gate,
+          selectedRepo: SYNTHETIC_REPOSITORY_KEY,
+          selectedRepositoryResolved: true,
+        });
+
+  // Still disabled with a repository supplied: some other condition blocks
+  // Start, so the missing repository is not the reason.
+  if (gateDisabledWithSyntheticRepo) {
+    return null;
+  }
+
+  // The account cannot pick a repository yet and a provider can still be
+  // connected: name the connect step rather than an empty picker.
+  if (!input.hasRepositories && input.hasConnectableProvider) {
+    return 'connect-provider';
+  }
+  // No repositories and no provider left to connect (already connected but
+  // empty, or its list failed): the picker is empty and disabled, so neither
+  // "select" nor "connect" names a control the user can reach. Name the
+  // refresh/access step the repository section actually offers instead.
+  if (!input.hasRepositories) {
+    return 'refresh-repositories';
+  }
+  return 'select-repository';
+}
+
+/**
  * Whether the continue-form Start button is disabled. Distinct from the
  * ordinary new-session gate: a clone carries no prompt and no profile
  * requirement.

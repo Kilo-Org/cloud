@@ -2187,6 +2187,8 @@
       "leaveChanges": "அப்படியே விடவும்",
       "commitAndPush": "கமிட் செய்து புஷ் செய்யவும்",
       "startSession": "அமர்வைத் தொடங்கவும்",
+      "selectRepositoryToStart": "தொடங்க ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
+      "connectProviderToStart": "தொடங்க ஒரு வழங்குநரை இணைக்கவும்.",
       "promptPlaceholder": "எந்தப் பணியைச் செய்ய விரும்புகிறீர்கள்?",
       "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை.",
       "prefillRepoAndModelUnavailable": "அசல் அமர்வின் களஞ்சியமும் மாதிரியும் இனி கிடைக்கவில்லை. கீழே வேறொன்றைத் தேர்ந்தெடுக்கவும்.",

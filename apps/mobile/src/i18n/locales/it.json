@@ -1655,6 +1655,8 @@
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
+      "selectRepositoryToStart": "Seleziona un repository per iniziare.",
+      "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",

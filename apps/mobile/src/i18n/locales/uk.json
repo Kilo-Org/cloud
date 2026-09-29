@@ -1698,6 +1698,8 @@
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",
+      "selectRepositoryToStart": "Виберіть репозиторій, щоб почати.",
+      "connectProviderToStart": "Підключіть сервіс, щоб почати.",
       "promptPlaceholder": "Над чим хочете попрацювати?",
       "couldNotLoadModels": "Не вдалося завантажити моделі.",
       "prefillRepoAndModelUnavailable": "Репозиторій і модель початкового сеансу більше недоступні. Виберіть інші нижче.",

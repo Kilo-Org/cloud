@@ -2187,6 +2187,8 @@
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
+      "selectRepositoryToStart": "Избери хранилище, за да започнеш.",
+      "connectProviderToStart": "Свържи доставчик, за да започнеш.",
       "promptPlaceholder": "Върху какво искаш да работиш?",
       "couldNotLoadModels": "Не успяхме да заредим моделите.",
       "prefillRepoAndModelUnavailable": "Хранилището и моделът от първоначалната сесия вече не са достъпни. Избери други по-долу.",

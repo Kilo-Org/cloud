@@ -2187,6 +2187,8 @@
       "leaveChanges": "ફેરફારો રાખો",
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
+      "selectRepositoryToStart": "શરૂ કરવા માટે રિપોઝિટરી પસંદ કરો.",
+      "connectProviderToStart": "શરૂ કરવા માટે સેવા પ્રદાતા જોડો.",
       "promptPlaceholder": "તમે શેના પર કામ કરવા માંગો છો?",
       "couldNotLoadModels": "મોડલ લોડ કરી શકાયાં નહીં.",
       "prefillRepoAndModelUnavailable": "મૂળ સત્રની રિપોઝિટરી અને મોડલ હવે ઉપલબ્ધ નથી. નીચે નવી રિપોઝિટરી અને મોડલ પસંદ કરો.",

@@ -1,5 +1,6 @@
 import type { WrapperState } from './state.js';
 import type { WrapperKiloClient } from './kilo-api.js';
+import { createDrainWaiter } from './drain-wait.js';
 import { runAutoCommit } from './auto-commit.js';
 import { runCondenseOnComplete } from './condense-on-complete.js';
 import { getCurrentBranch, logToFile } from './utils.js';
@@ -42,14 +43,23 @@ export function createLifecycleManager(
 ): LifecycleManager {
   const { state, kiloClient } = deps;
   let sseTransportTimer: ReturnType<typeof setTimeout> | null = null;
-  let stableIdleTimer: ReturnType<typeof setTimeout> | null = null;
   let isAborted = false;
-  let rootIdleCandidatePresent = false;
+  let idleHint = false;
   let idleObservedDuringDelivery = false;
+  let drainEpoch = 0;
+  let drainSucceededWhileAckingEpoch: number | null = null;
+  let drainReadyWhileDisconnected = false;
+  let pendingDrainFailure: string | null = null;
   let postProcessingResolve: (() => void) | null = null;
   let drainPromise: Promise<void> | null = null;
   let lifecycleGeneration = 0;
   let postProcessingCompleted = false;
+
+  const drainWaiter = createDrainWaiter(signal => {
+    const session = state.currentSession;
+    if (!session) throw new Error('drain requested without a current session');
+    return kiloClient.drainSession({ sessionId: session.kiloSessionId, signal });
+  });
 
   function clearSseTransportTimer(): void {
     if (!sseTransportTimer) return;
@@ -57,18 +67,30 @@ export function createLifecycleManager(
     sseTransportTimer = null;
   }
 
-  function clearStableIdleCandidate(): void {
-    rootIdleCandidatePresent = false;
+  function resetDrainState(): void {
+    drainWaiter.cancel();
+    drainEpoch += 1;
+    drainSucceededWhileAckingEpoch = null;
+    drainReadyWhileDisconnected = false;
+  }
+
+  function abortDrain(): void {
+    resetDrainState();
+    idleHint = false;
     idleObservedDuringDelivery = false;
-    if (!stableIdleTimer) return;
-    clearTimeout(stableIdleTimer);
-    stableIdleTimer = null;
+    pendingDrainFailure = null;
+  }
+
+  function markAborted(): void {
+    isAborted = true;
+    state.blockAdmissions();
+    abortDrain();
   }
 
   function resetSseTransportTimer(): void {
     clearSseTransportTimer();
-    // Idle is the last expected SSE event. Reconnecting during drain races
-    // auto-commit and used to abort the complete event.
+    // Completion now waits on a drain HTTP call; reconnecting during the close
+    // drain races auto-commit.
     if (!state.hasSession || drainPromise) return;
     sseTransportTimer = setTimeout(() => {
       logToFile('SSE transport timeout — reconnecting event subscription');
@@ -195,7 +217,9 @@ export function createLifecycleManager(
     state.blockAdmissions();
     if (drainPromise) return drainPromise;
     const drainGeneration = lifecycleGeneration;
-    clearStableIdleCandidate();
+    resetDrainState();
+    idleHint = false;
+    idleObservedDuringDelivery = false;
     clearSseTransportTimer();
     const sealedMessageIds = state.pendingMessageIds;
     const session = state.currentSession;
@@ -245,29 +269,74 @@ export function createLifecycleManager(
     void drainAndClose();
   }
 
-  function trySealIdleBatch(): void {
-    stableIdleTimer = null;
-    if (!rootIdleCandidatePresent || state.deliveryAcknowledgementsInFlight > 0) {
+  function startDrainWait(): void {
+    if (isAborted || drainPromise || pendingDrainFailure !== null) return;
+    if (!state.hasPendingMessages) return;
+    if (!state.currentSession) return;
+    if (state.deliveryAcknowledgementsInFlight > 0) return;
+    if (drainSucceededWhileAckingEpoch !== null || drainReadyWhileDisconnected) return;
+    if (drainWaiter.active) return;
+    const epoch = ++drainEpoch;
+    void drainWaiter.start().then(result => {
+      if (epoch !== drainEpoch) return;
+      if (result.state === 'drained') {
+        handleDrainTrue(epoch);
+        return;
+      }
+      if (result.state === 'failed') {
+        if (result.exhaustedTransient) {
+          logToFile(`drain-transient-limit: ${result.reason}`);
+        }
+        failDrain(epoch, result.reason);
+      }
+    });
+  }
+
+  function handleDrainTrue(epoch: number): void {
+    if (state.deliveryAcknowledgementsInFlight > 0) {
+      drainSucceededWhileAckingEpoch = epoch;
       return;
     }
+    sealDrainSuccess(epoch);
+  }
+
+  function sealDrainSuccess(epoch: number = drainEpoch): void {
+    if (epoch !== drainEpoch) return;
+    if (isAborted || drainPromise) return;
+    if (state.deliveryAcknowledgementsInFlight > 0) return;
+    if (!state.hasPendingMessages) return;
     if (!deps.isConnected()) {
-      armStableIdleCandidate();
+      drainReadyWhileDisconnected = true;
       return;
     }
-    if (state.beginFinalizing()) {
-      triggerDrainAndClose();
+    if (!state.beginFinalizing()) return;
+    drainSucceededWhileAckingEpoch = null;
+    drainReadyWhileDisconnected = false;
+    triggerDrainAndClose();
+  }
+
+  function failDrain(epoch: number, reason: string): void {
+    if (epoch !== drainEpoch) return;
+    if (isAborted) return;
+    resetDrainState();
+
+    const sessionId = state.currentSession?.kiloSessionId;
+    if (sessionId) {
+      void kiloClient.abortSession({ sessionId }).catch(() => {});
     }
-  }
 
-  function armStableIdleCandidate(): void {
-    if (!rootIdleCandidatePresent || stableIdleTimer || !state.hasPendingMessages) return;
-    stableIdleTimer = setTimeout(trySealIdleBatch, STABLE_ROOT_IDLE_MS);
-  }
+    if (!deps.isConnected()) {
+      pendingDrainFailure = reason;
+      return;
+    }
 
-  function restartStableIdleCandidate(): void {
-    if (stableIdleTimer) clearTimeout(stableIdleTimer);
-    stableIdleTimer = null;
-    armStableIdleCandidate();
+    state.sendToIngest({
+      streamEventType: 'error',
+      data: { error: reason, fatal: true },
+      timestamp: new Date().toISOString(),
+    });
+    markAborted();
+    triggerDrainAndClose();
   }
 
   return {
@@ -275,44 +344,83 @@ export function createLifecycleManager(
     stop: () => {
       isAborted = true;
       clearSseTransportTimer();
-      clearStableIdleCandidate();
+      abortDrain();
     },
     onSessionIdle: () => {
-      rootIdleCandidatePresent = true;
-      if (state.deliveryAcknowledgementsInFlight > 0) idleObservedDuringDelivery = true;
-      armStableIdleCandidate();
+      if (isAborted || state.isFinalizing || drainPromise) return;
+      if (!state.hasPendingMessages || pendingDrainFailure !== null) return;
+      idleHint = true;
+      if (state.deliveryAcknowledgementsInFlight > 0) {
+        idleObservedDuringDelivery = true;
+        return;
+      }
+      if (drainWaiter.active) return;
+      if (drainSucceededWhileAckingEpoch !== null || drainReadyWhileDisconnected) return;
+      startDrainWait();
     },
-    onRootSessionActivity: clearStableIdleCandidate,
+    onRootSessionActivity: () => {
+      resetDrainState();
+      idleHint = false;
+      idleObservedDuringDelivery = false;
+    },
     onDeliveryAcknowledged: kind => {
       if (kind === 'async-prompt') {
+        resetDrainState();
         if (!idleObservedDuringDelivery) {
-          clearStableIdleCandidate();
+          idleHint = false;
           return;
         }
         if (state.deliveryAcknowledgementsInFlight > 0) return;
         idleObservedDuringDelivery = false;
-        restartStableIdleCandidate();
+        startDrainWait();
         return;
       }
-      if (state.deliveryAcknowledgementsInFlight === 0) idleObservedDuringDelivery = false;
       if (kind === 'sync-command') {
-        rootIdleCandidatePresent = true;
+        resetDrainState();
+        idleHint = true;
+        if (state.deliveryAcknowledgementsInFlight > 0) return;
+        idleObservedDuringDelivery = false;
+        startDrainWait();
+        return;
       }
-      armStableIdleCandidate();
+      if (state.deliveryAcknowledgementsInFlight > 0) return;
+      idleObservedDuringDelivery = false;
+      if (drainSucceededWhileAckingEpoch !== null || drainReadyWhileDisconnected) {
+        sealDrainSuccess();
+        return;
+      }
+      if (idleHint && !drainWaiter.active) startDrainWait();
     },
-    onConnectionRestored: armStableIdleCandidate,
+    onConnectionRestored: () => {
+      if (pendingDrainFailure !== null) {
+        const reason = pendingDrainFailure;
+        pendingDrainFailure = null;
+        state.sendToIngest({
+          streamEventType: 'error',
+          data: { error: reason, fatal: true },
+          timestamp: new Date().toISOString(),
+        });
+        markAborted();
+        triggerDrainAndClose();
+        return;
+      }
+      if (drainReadyWhileDisconnected) {
+        sealDrainSuccess();
+        return;
+      }
+      if (drainSucceededWhileAckingEpoch !== null) return;
+      if (idleHint && !drainWaiter.active && state.deliveryAcknowledgementsInFlight === 0) {
+        startDrainWait();
+      }
+    },
     triggerDrainAndClose,
     drainAndClose,
     signalCompletion,
-    setAborted: () => {
-      isAborted = true;
-      state.blockAdmissions();
-      clearStableIdleCandidate();
-    },
+    setAborted: markAborted,
     reset: () => {
       lifecycleGeneration += 1;
       isAborted = false;
-      clearStableIdleCandidate();
+      abortDrain();
       postProcessingCompleted = false;
       postProcessingResolve = null;
       clearSseTransportTimer();

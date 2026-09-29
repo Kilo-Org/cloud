@@ -178,6 +178,28 @@ function requireSdkData<T>(
   return result.data;
 }
 
+export type DrainSessionErrorKind = 'transient' | 'definitive' | 'anomalous' | 'unclassified';
+
+/**
+ * A classified drain failure. Transport-level retry policy reads `kind`; the
+ * caller never parses an HTTP status out of the message.
+ */
+export class DrainSessionError extends Error {
+  readonly kind: DrainSessionErrorKind;
+  readonly status?: number;
+
+  constructor(
+    kind: DrainSessionErrorKind,
+    message: string,
+    options?: { status?: number; cause?: unknown }
+  ) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
+    this.name = 'DrainSessionError';
+    this.kind = kind;
+    if (options?.status !== undefined) this.status = options.status;
+  }
+}
+
 export type KiloServerHandle = {
   url: string;
   close: () => void;
@@ -254,6 +276,12 @@ export type WrapperKiloClient = {
   abortSession: (opts: {
     sessionId: string;
     directory?: string;
+    signal?: AbortSignal;
+  }) => Promise<boolean>;
+  drainSession: (opts: {
+    sessionId: string;
+    directory?: string;
+    token?: string;
     signal?: AbortSignal;
   }) => Promise<boolean>;
   summarizeSession: (opts: {
@@ -475,6 +503,56 @@ export function createWrapperKiloClient(
         throw new Error(`${operation} returned no boolean result`);
       }
       return data;
+    },
+
+    drainSession: async opts => {
+      let result: Awaited<ReturnType<typeof v2Client.kilocode.drainSession>>;
+      try {
+        result = await v2Client.kilocode.drainSession(
+          {
+            sessionID: opts.sessionId,
+            directory: opts.directory ?? workspacePath,
+            token: opts.token ?? crypto.randomUUID(),
+          },
+          { signal: opts.signal, throwOnError: false }
+        );
+      } catch (error) {
+        if (opts.signal?.aborted) {
+          if (error instanceof Error) throw error;
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        throw new DrainSessionError('unclassified', 'protocol error', { cause: error });
+      }
+      const status: number | undefined = result.response?.status;
+      if (opts.signal?.aborted) {
+        if (result.error instanceof Error) throw result.error;
+        throw new DOMException('Aborted', 'AbortError');
+      }
+      if (result.error !== undefined) {
+        if (status === 408 || status === 429 || (status !== undefined && status >= 500)) {
+          throw new DrainSessionError('transient', `HTTP ${status}`, {
+            status,
+            cause: result.error,
+          });
+        }
+        if (status !== undefined && status >= 400 && status < 500) {
+          throw new DrainSessionError('definitive', `HTTP ${status}`, {
+            status,
+            cause: result.error,
+          });
+        }
+        if (result.response === undefined) {
+          throw new DrainSessionError('transient', 'request error', { cause: result.error });
+        }
+        throw new DrainSessionError('unclassified', 'protocol error', { cause: result.error });
+      }
+      if (status === 204 || typeof result.data !== 'boolean') {
+        throw new DrainSessionError('anomalous', 'returned no boolean result');
+      }
+      if (result.data === false) {
+        throw new DrainSessionError('anomalous', 'Session drain returned false');
+      }
+      return result.data;
     },
 
     summarizeSession: async opts => {

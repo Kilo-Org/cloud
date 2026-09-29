@@ -27,6 +27,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { IngestEvent } from '../../../src/shared/protocol.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
+import { createDrainWaiter, type DrainWaiter, type DrainWaitResult } from '../drain-wait.js';
 import { STABLE_ROOT_IDLE_MS } from '../lifecycle.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { runAutoCommit, type AutoCommitResult } from '../auto-commit.js';
@@ -194,6 +195,7 @@ export class SessionOperation {
   private preClientCleanup?: (deadlineAt: number) => Promise<NativeRetirement>;
   private native: NativeResult = { state: 'not_started' };
   private nativePending?: Promise<unknown>;
+  private nativePendingAtAbort = false;
   private finalization: Finalization = {};
   private readonly retainedNotifications = createRetainedOperationNotifications();
   private outcome?: SessionMessageOutcome;
@@ -205,6 +207,13 @@ export class SessionOperation {
   private admissionInFlight = 0;
   private rootIdle = false;
   private stableIdleTimer: ReturnType<typeof setTimeout> | null = null;
+  private drain?: DrainWaiter;
+  private drainHandlerPromise: Promise<DrainWaitResult> | null = null;
+  private drainGeneration = 0;
+  private drainSealRequested = false;
+  private acceptedDrainRevision: number | null = null;
+  private terminalDrain?: { reason: string; exhaustedTransient: boolean };
+  private drainFailed = false;
   private readonly sealWaiters: Array<{
     resolve: () => void;
     reject: (error: unknown) => void;
@@ -246,6 +255,14 @@ export class SessionOperation {
     if (deps.signal) signals.push(deps.signal);
     if (work.operation === 'session.prompt') signals.push(work.runtime.signal);
     this.signal = AbortSignal.any(signals);
+    this.signal.addEventListener(
+      'abort',
+      () => {
+        this.clearStableIdle();
+        this.cancelDrainWaiter();
+      },
+      { once: true }
+    );
     this.done = this.completion.promise;
     this.processes = deps.processes ?? createOwnedProcessScope();
     this.cleanupOwner = new SessionOperationCleanup(
@@ -326,7 +343,7 @@ export class SessionOperation {
       target: this.target,
       preClientCleanup: this.preClientCleanup,
       completionEvidence: this.cleanupEvidence(),
-      cancel: () => this.cancel(reason, status, deadlineAt),
+      cancel: () => this.abortOperation(reason, status, deadlineAt),
     });
   }
 
@@ -376,7 +393,7 @@ export class SessionOperation {
       deadlineAt: scoped.deadlineAt,
       target: this.target,
       completionEvidence: this.cleanupEvidence(),
-      cancel: () => this.cancel(scoped.reason, 'failed', scoped.deadlineAt),
+      cancel: () => this.abortOperation(scoped.reason, 'failed', scoped.deadlineAt),
     });
   }
 
@@ -488,6 +505,7 @@ export class SessionOperation {
     this.batchRevision += 1;
     this.rootIdle = false;
     this.clearStableIdle();
+    this.invalidateDrainAttempt();
     this.admissionInFlight += 1;
     void this.submitFollowUp(request, runtime).finally(() => {
       this.admissionInFlight -= 1;
@@ -528,6 +546,7 @@ export class SessionOperation {
     if (event.type === 'session.status' && statusType !== undefined && statusType !== 'idle') {
       this.rootIdle = false;
       this.clearStableIdle();
+      this.invalidateDrainAttempt();
     }
   }
 
@@ -573,6 +592,7 @@ export class SessionOperation {
    * in flight. A batch starts unsealed, so this is the only path that can seal.
    */
   private armStableIdle(): void {
+    if (this.signal.aborted) return;
     if (this.local || this.stableIdleTimer) return;
     if (!this.rootIdle || this.admissionInFlight > 0) return;
     if (this.sealedRevision >= this.batchRevision) return;
@@ -593,10 +613,73 @@ export class SessionOperation {
 
   private trySeal(): void {
     this.stableIdleTimer = null;
+    if (this.signal.aborted || this.local) return;
     if (this.sealedRevision >= this.batchRevision) return;
     if (!this.rootIdle || this.admissionInFlight > 0) return;
+    void this.armDrain(true);
+  }
+
+  private ensureDrainWaiter(): DrainWaiter {
+    if (!this.drain) {
+      this.drain = createDrainWaiter(async signal => {
+        const client = this.target?.client;
+        if (!client) throw new Error('drain requested without a native runtime');
+        return client.drainSession({
+          sessionId: this.session.kiloSessionId,
+          directory: this.session.directory,
+          signal,
+        });
+      });
+    }
+    return this.drain;
+  }
+
+  private armDrain(seal: boolean): Promise<DrainWaitResult | undefined> {
+    if (this.signal.aborted || this.local || this.terminalDrain) return Promise.resolve(undefined);
+    const waiter = this.ensureDrainWaiter();
+    const wasActive = waiter.active;
+    const generation = this.drainGeneration;
+    this.drainSealRequested = wasActive ? this.drainSealRequested || seal : seal;
+    const pending = waiter.start();
+    if (pending !== this.drainHandlerPromise) {
+      this.drainHandlerPromise = pending;
+      void pending.then(result => this.applyDrainResult(result, generation));
+    }
+    return pending;
+  }
+
+  private applyDrainResult(result: DrainWaitResult, generation: number): void {
+    if (generation !== this.drainGeneration) return;
+    if (result.state === 'cancelled') return;
+    if (result.state === 'failed') {
+      this.terminalDrain = { reason: result.reason, exhaustedTransient: result.exhaustedTransient };
+      this.drainFailed = true;
+      if (result.exhaustedTransient) this.diagnostic('drain-transient-limit');
+      for (const waiter of this.sealWaiters.splice(0)) waiter.reject(new Error(result.reason));
+      return;
+    }
+    this.acceptedDrainRevision = this.batchRevision;
+    if (!this.drainSealRequested) return;
+    if (!this.rootIdle || this.admissionInFlight > 0) return;
+    if (this.sealedRevision >= this.batchRevision) return;
     this.sealedRevision = this.batchRevision;
     for (const waiter of this.sealWaiters.splice(0)) waiter.resolve();
+  }
+
+  private drainFailureReason(): string | undefined {
+    return this.terminalDrain?.reason;
+  }
+
+  private cancelDrainWaiter(): void {
+    this.drainGeneration += 1;
+    this.drain?.cancel();
+    this.drainHandlerPromise = null;
+    this.drainSealRequested = false;
+  }
+
+  private invalidateDrainAttempt(): void {
+    this.cancelDrainWaiter();
+    if (!this.terminalDrain) this.drainFailed = false;
   }
 
   /**
@@ -605,6 +688,7 @@ export class SessionOperation {
    * so a cancelled batch still runs cleanup and terminal delivery.
    */
   private waitForSeal(): Promise<void> {
+    if (this.terminalDrain) return Promise.reject(new Error(this.terminalDrain.reason));
     if (this.sealedRevision >= this.batchRevision) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const onAbort = () => {
@@ -651,6 +735,16 @@ export class SessionOperation {
   }
 
   cancel(reason: string, status: 'failed' | 'cancelled', cleanupDeadlineAt?: number): void {
+    if (this.native.state === 'pending') this.nativePendingAtAbort = true;
+    this.abortOperation(reason, status, cleanupDeadlineAt);
+  }
+
+  private abortOperation(
+    reason: string,
+    status: 'failed' | 'cancelled',
+    cleanupDeadlineAt?: number
+  ): void {
+    this.cancelDrainWaiter();
     if (cleanupDeadlineAt !== undefined) {
       const captured = this.captureCleanupDeadline(cleanupDeadlineAt);
       if (this.publicationScoped)
@@ -745,6 +839,7 @@ export class SessionOperation {
   }
 
   private cleanupEvidence(): NativeCleanupEvidence {
+    if (this.drainFailed) return 'unconfirmed';
     if (
       this.admissionInFlight > 0 ||
       (this.admitted.size > 0 &&
@@ -1036,8 +1131,8 @@ export class SessionOperation {
       }
       assertCurrent();
       const error = completion?.info.error;
-      if (this.admitted.size > 0 || this.admissionInFlight > 0) {
-        if (error) {
+      if (error) {
+        if (this.admitted.size > 0 || this.admissionInFlight > 0) {
           // A terminal native error must still stop the unfinished follow-up
           // work before the operation is released. Unconfirmed cleanup must not
           // release the operation as if Kilo stopped, so apply the same
@@ -1046,10 +1141,20 @@ export class SessionOperation {
           const cleanupConfirmed = await this.cleanupOwnedWork(cleanupDeadlineAt);
           if (!cleanupConfirmed && !this.deadlineCleanup)
             this.requestRetirement('Kilo cancellation was not confirmed', cleanupDeadlineAt);
-        } else {
-          // A follow-up admitted while the first prompt ran is part of this
-          // batch: do not finalize until the batch seals on root idle plus
-          // stable idle.
+        }
+      } else if (this.terminalDrain) {
+        throw new Error(this.terminalDrain.reason);
+      } else if (this.admitted.size > 0 || this.admissionInFlight > 0) {
+        // A follow-up admitted while the first prompt ran is part of this batch:
+        // do not finalize until the drain seals on root idle plus stable idle.
+        await this.waitForSeal();
+        assertCurrent();
+      } else {
+        const drained = await this.armDrain(false);
+        const drainFailureReason = this.drainFailureReason();
+        if (drainFailureReason) throw new Error(drainFailureReason);
+        if (drained?.state === 'cancelled') {
+          if (this.signal.aborted) throw this.signal.reason;
           await this.waitForSeal();
           assertCurrent();
         }
@@ -1120,6 +1225,7 @@ export class SessionOperation {
         : { messageId, status: 'completed' };
     } catch (error) {
       diagnostic('execution_failed');
+      const abortedAtCatch = signal.aborted;
       this.recordUncertainty(error);
       const cancellation: unknown = signal.reason;
       outcome = {
@@ -1128,9 +1234,11 @@ export class SessionOperation {
         reason:
           cancellation instanceof ControlTaskCancellation
             ? cancellation.message
-            : this.authorization && this.native.state === 'unknown'
-              ? 'Kilo execution outcome is unconfirmed'
-              : failureReason,
+            : this.terminalDrain
+              ? this.terminalDrain.reason
+              : this.authorization && this.native.state === 'unknown'
+                ? 'Kilo execution outcome is unconfirmed'
+                : failureReason,
       };
       try {
         diagnostic('abort_started');
@@ -1177,6 +1285,11 @@ export class SessionOperation {
           reason: 'Kilo execution ended with MessageAbortedError',
         };
       else if (
+        !this.drainFailed &&
+        !this.terminalDrain &&
+        (abortedAtCatch
+          ? this.acceptedDrainRevision === this.batchRevision || this.nativePendingAtAbort
+          : this.acceptedDrainRevision === this.batchRevision) &&
         this.admitted.size === 0 &&
         this.admissionInFlight === 0 &&
         this.native.state === 'completed' &&

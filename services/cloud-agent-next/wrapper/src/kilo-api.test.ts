@@ -8,6 +8,7 @@ import { createKiloClient } from '@kilocode/sdk';
 import type { QuestionRequest } from '@kilocode/sdk/v2';
 import {
   createWrapperKiloClient,
+  DrainSessionError,
   isKiloServerUnreachableError,
   type WrapperKiloClient,
 } from './kilo-api';
@@ -862,5 +863,99 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     expect(stub.requests).toHaveLength(1);
     expect(stub.requests[0].method).toBe('POST');
     expect(stub.requests[0].pathname).toBe('/permission/perm_4/reply');
+  });
+
+  it('returns true and serializes the default and attached drain directory', async () => {
+    for (const directory of [undefined, '/workspace/attached repo & tests']) {
+      const stub = startStub(200, true);
+      const client = createClient(stub.url);
+
+      expect(
+        await client.drainSession({ sessionId: 'ses_1', directory, token: 'drain-token' })
+      ).toBe(true);
+      expect(stub.requests).toEqual([
+        {
+          method: 'POST',
+          pathname: '/kilocode/session/ses_1/drain',
+          directory: directory ?? '/workspace',
+          body: { token: 'drain-token' },
+        },
+      ]);
+    }
+  });
+
+  it('classifies a 404 without leaking the response body', async () => {
+    const stub = startStub(404, { message: 'secret-drain-token' });
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('definitive');
+    expect(drainError.status).toBe(404);
+    expect(drainError.message).toBe('HTTP 404');
+    expect(drainError.message).not.toContain('secret-drain-token');
+  });
+
+  it.each([408, 429, 503])('classifies HTTP %i as transient', async status => {
+    const stub = startStub(status, { message: 'transient-body' });
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('transient');
+    expect(drainError.status).toBe(status);
+    expect(drainError.message).toBe(`HTTP ${status}`);
+  });
+
+  it('classifies a refused connection as a transient request error', async () => {
+    const error = await createClient('http://127.0.0.1:1/')
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('transient');
+    expect(drainError.message).toBe('request error');
+  });
+
+  it('treats a boolean false as an anomalous failure with the exact message', async () => {
+    const stub = startStub(200, false);
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+      .catch(cause => cause);
+
+    expect(error).toBeInstanceOf(DrainSessionError);
+    const drainError = error as DrainSessionError;
+    expect(drainError.kind).toBe('anomalous');
+    expect(drainError.message).toBe('Session drain returned false');
+  });
+
+  it('treats 204 and a 200 non-boolean as anomalous with no boolean result', async () => {
+    for (const stub of [startStub(204), startStub(200, { ok: true })]) {
+      const error = await createClient(stub.url)
+        .drainSession({ sessionId: 'ses_1', token: 'drain-token' })
+        .catch(cause => cause);
+
+      expect(error).toBeInstanceOf(DrainSessionError);
+      const drainError = error as DrainSessionError;
+      expect(drainError.kind).toBe('anomalous');
+      expect(drainError.message).toBe('returned no boolean result');
+    }
+  });
+
+  it('rejects an already-aborted caller signal without a DrainSessionError', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const stub = startStub(200, true);
+
+    const error = await createClient(stub.url)
+      .drainSession({ sessionId: 'ses_1', token: 'drain-token', signal: controller.signal })
+      .catch(cause => cause);
+
+    expect(error).not.toBeInstanceOf(DrainSessionError);
   });
 });

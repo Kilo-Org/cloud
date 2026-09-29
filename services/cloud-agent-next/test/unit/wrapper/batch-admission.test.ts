@@ -55,6 +55,14 @@ function request(body: unknown): Request {
   });
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
 function createDeps(state: WrapperState) {
   return {
     state,
@@ -62,7 +70,9 @@ function createDeps(state: WrapperState) {
       sendPromptAsync: vi.fn().mockResolvedValue(undefined),
       sendCommand: vi.fn().mockResolvedValue(undefined),
       summarizeSession: vi.fn().mockResolvedValue(true),
-    } as WrapperKiloClient,
+      drainSession: vi.fn(),
+      abortSession: vi.fn().mockResolvedValue(true),
+    } as unknown as WrapperKiloClient,
     openConnection: vi.fn().mockResolvedValue(undefined),
     closeConnection: vi.fn().mockResolvedValue(undefined),
     setAborted: vi.fn(),
@@ -198,7 +208,7 @@ describe('wrapper batch admission', () => {
     });
   });
 
-  it('successful async prompt admission cancels an armed idle candidate until later root idle', async () => {
+  it('successful async prompt admission aborts the in-flight drain until a later root idle', async () => {
     vi.useFakeTimers();
     const state = new WrapperState();
     const deps = createDeps(state);
@@ -206,6 +216,10 @@ describe('wrapper batch admission', () => {
     state.setSendToIngestFn(sendToIngest);
     await bindSessionContext(binding, config, deps);
     state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false });
+    const first = deferred<boolean>();
+    vi.mocked(deps.kiloClient.drainSession)
+      .mockReturnValueOnce(first.promise)
+      .mockResolvedValueOnce(true);
     const lifecycle = createLifecycleManager(
       { workspacePath: '/workspace' },
       {
@@ -220,6 +234,7 @@ describe('wrapper batch admission', () => {
 
     lifecycle.onSessionIdle();
     await vi.advanceTimersByTimeAsync(2_000);
+    expect(deps.kiloClient.drainSession).toHaveBeenCalledTimes(1);
 
     const response = await createPromptHandler(
       config,
@@ -227,19 +242,24 @@ describe('wrapper batch admission', () => {
     )(request({ message: { id: 'message-2', prompt: 'later' }, session: binding }));
     expect(response.status).toBe(200);
 
+    expect(
+      (vi.mocked(deps.kiloClient.drainSession).mock.calls[0][0].signal as AbortSignal).aborted
+    ).toBe(true);
+
+    first.resolve(true);
     await vi.advanceTimersByTimeAsync(1_001);
     expect(sendToIngest).not.toHaveBeenCalledWith(
       expect.objectContaining({ streamEventType: 'wrapper_finalizing' })
     );
 
     lifecycle.onSessionIdle();
-    await vi.advanceTimersByTimeAsync(3_000);
     await vi.waitFor(() => {
       expect(sendToIngest).toHaveBeenCalledWith(
         expect.objectContaining({ streamEventType: 'complete' })
       );
     });
 
+    expect(deps.kiloClient.drainSession).toHaveBeenCalledTimes(2);
     expect(sendToIngest).toHaveBeenCalledWith({
       streamEventType: 'complete',
       data: expect.objectContaining({ messageIds: ['message-1', 'message-2'] }),
@@ -262,6 +282,7 @@ describe('wrapper batch admission', () => {
           resolvePrompt = resolve;
         })
     );
+    vi.mocked(deps.kiloClient.drainSession).mockResolvedValueOnce(true);
     const lifecycle = createLifecycleManager(
       { workspacePath: '/workspace' },
       {
@@ -283,6 +304,7 @@ describe('wrapper batch admission', () => {
 
     lifecycle.onSessionIdle();
     await vi.advanceTimersByTimeAsync(3_000);
+    expect(deps.kiloClient.drainSession).not.toHaveBeenCalled();
     expect(sendToIngest).not.toHaveBeenCalledWith(
       expect.objectContaining({ streamEventType: 'wrapper_finalizing' })
     );
@@ -296,6 +318,7 @@ describe('wrapper batch admission', () => {
         expect.objectContaining({ streamEventType: 'complete' })
       );
     });
+    expect(deps.kiloClient.drainSession).toHaveBeenCalledTimes(1);
     lifecycle.stop();
   });
 

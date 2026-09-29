@@ -635,6 +635,10 @@ Node server (`fake-llm-server.ts`) and the deployed Worker + Durable Object
 | `file:seed:<tag>:<path>:<bytes>:<nonce>` | Issues a real `write` of a deterministic `<bytes>`-byte seed fixture prefixed by `<nonce>` to `<path>`. The write tool argument carries the large payload; the read-back echo is where it is measured, so `large-stream` never substitutes assistant text. |
 | `file:read:<tag>:<path>` | Issues a real `read` for `<path>` and answers `file-read:<path>` plus the normalized body; rejects a result that does not match the requested path, is an error, or is empty. |
 | `question:<tag>:<text>` | Issues a real question tool call for `<text>`. The turn parks until `answerQuestion` resolves the question id; `toolResults.question` stays `0` while unanswered. |
+| `task:<parent>:<child>` | Issues a real `task` tool call whose prompt is `gate:<child>:waiting`. After the tool result, answers `done-<parent>`. A title-model request with no tools answers immediately. |
+| `background-task:<parent>:<child>` | Same as `task`, with `background: true`. HTTP 422 when the advertised `task` schema has no `background` property. |
+| `cron:<tag>:<Ns>` | Issues `cron_create` with `delay` `<Ns>` and prompt `echo:fired-<tag>`. HTTP 422 when `cron_create` is not advertised. |
+| `wakeup:<tag>:<Ns>` | Issues `schedule_wakeup` with the same delay and prompt. HTTP 422 when `schedule_wakeup` is not advertised. |
 
 Unknown `__fake__:<name>` directives produce HTTP 402 with
 `unknown fake scenario: <name>` — easy to spot in fake-LLM logs.
@@ -707,6 +711,10 @@ reusable catalog of planned and existing scenarios, see
 | `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
 | `callback-batch-followup` | Queue two turns behind a paced callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
 | `callback-interrupt` | Paced active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
+| `drain-linked-child` | Foreground `task` whose child parks on a gate. The completion callback must not arrive during an 8s hold, then must arrive after release. Omitted from `smoke.ts`'s `DEFAULT_MATRIX`; `smoke-parallel.ts` still runs it because it enumerates the registry. |
+| `drain-background-child` | Background `task` with the same hold. This is the case that stays busy only through kilo drain after the parent model has replied. Fails closed when background subagents are not advertised. |
+| `drain-scheduled-cron` | `cron_create` with a 20s delay. The scheduling callback must complete well before the resume text, and the resume must still appear. Fails closed when `cron_create` is not advertised. |
+| `drain-scheduled-wakeup` | Same contract for `schedule_wakeup`. |
 
 The three callback scenarios are shared definitions. Their `callbacks` capability
 is provided by the profile: a host HTTP sink under local Docker, and the e2e

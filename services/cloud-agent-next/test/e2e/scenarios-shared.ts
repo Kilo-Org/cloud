@@ -39,6 +39,7 @@ import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type { CapabilityName, ScenarioEnvironment } from './scenario-capabilities.js';
 import { FAILURE_SHARED_SCENARIOS } from './scenarios-shared-failures.js';
 import { CALLBACK_SHARED_SCENARIOS } from './scenarios-shared-callbacks.js';
+import { DRAIN_SHARED_SCENARIOS } from './scenarios-shared-drain.js';
 import { STREAMING_SHARED_SCENARIOS } from './scenarios-shared-streaming.js';
 import { CONTINUITY_SHARED_SCENARIOS } from './scenarios-shared-continuity.js';
 import { MICRO_SHARED_SCENARIOS } from './scenarios-shared-micro.js';
@@ -903,6 +904,7 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
   ...STREAMING_SHARED_SCENARIOS,
   ...FAILURE_SHARED_SCENARIOS,
   ...CALLBACK_SHARED_SCENARIOS,
+  ...DRAIN_SHARED_SCENARIOS,
   ...MICRO_SHARED_SCENARIOS,
   ...QUEUE_SHARED_SCENARIOS,
   ...CONTINUITY_SHARED_SCENARIOS,

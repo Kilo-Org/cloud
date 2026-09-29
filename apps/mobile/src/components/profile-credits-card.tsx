@@ -209,6 +209,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
+      {balanceFailed && selectedOrgId == null && (
+        <AddCreditsButton
+          onPress={() => {
+            router.push('/(app)/credits' as Href);
+          }}
+        />
+      )}
       {!showBalanceSkeleton && !balanceFailed && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>

@@ -448,6 +448,8 @@ describe('CreditsCard balance state', () => {
     const { renderer, texts, unmount } = await mountCard();
 
     expect(texts()).toContain('Failed to load balance. Tap to retry.');
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
+    expect(texts()).not.toContain('$0.00');
 
     const errorPressable = renderer.root.find(node => node.type === Pressable);
     await act(async () => {
@@ -497,19 +499,40 @@ describe('CreditsCard add-credits entry point', () => {
     ['ios', 10],
     ['android', 0],
     ['android', 10],
-  ] as const)('renders the personal in-app CTA in the balance card on %s at a %i balance', async (os, balance) => {
-    Platform.OS = os;
-    currentUser.userId = 'user-1';
-    const queryClient = createTestQueryClient();
-    queryClient.setQueryData([...BALANCE_KEY], { balance });
+  ] as const)(
+    'renders the personal in-app CTA in the balance card on %s at a %i balance',
+    async (os, balance) => {
+      Platform.OS = os;
+      currentUser.userId = 'user-1';
+      const queryClient = createTestQueryClient();
+      queryClient.setQueryData([...BALANCE_KEY], { balance });
 
-    const { texts, unmount } = await mountCard(queryClient);
-    await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
+      const { texts, unmount } = await mountCard(queryClient);
+      await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
+
+      expect(texts()).toContain('ADD_CREDITS_BUTTON');
+      expect(addCreditsRowProps.latest?.url).toBeUndefined();
+      expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
+
+      act(() => {
+        addCreditsRowProps.latest?.onPress?.();
+      });
+      expect(routerPush).toHaveBeenCalledWith('/(app)/credits');
+
+      unmount();
+    }
+  );
+
+  it('keeps personal Buy credits actionable when the balance request fails', async () => {
+    currentUser.userId = 'user-1';
+    getContextBalanceQueryFn.mockRejectedValue(new Error('Balance unavailable'));
+
+    const { texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('Failed to load balance. Tap to retry.'));
 
     expect(texts()).toContain('ADD_CREDITS_BUTTON');
-    expect(addCreditsRowProps.latest?.url).toBeUndefined();
+    expect(texts()).not.toContain('$0.00');
     expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
-
     act(() => {
       addCreditsRowProps.latest?.onPress?.();
     });

@@ -20,7 +20,7 @@ import { useTRPC } from '@/lib/trpc';
  * retried on the next pass, and the balance queries are the signal that it did.
  * Logged, so a failure that never clears is diagnosable instead of invisible.
  */
-export function logRecoveryError(message: string | null): void {
+function logRecoveryError(message: string | null): void {
   if (message) {
     // eslint-disable-next-line no-console -- a purchase that never credits must be diagnosable
     console.warn(`[iap-recovery] ${message}`);
@@ -153,6 +153,8 @@ export function StorePurchaseRecoveryMount(): null {
   const invalidateAfterKiloPassCompletion = useCallback(async () => {
     await Promise.all([
       queryClient.invalidateQueries(trpc.kiloPass.getState.pathFilter()),
+      queryClient.invalidateQueries(trpc.user.getContextBalance.pathFilter()),
+      queryClient.invalidateQueries(trpc.user.getCreditBlocks.pathFilter()),
       queryClient.invalidateQueries(trpc.kiloPass.getCreditHistory.pathFilter()),
       queryClient.invalidateQueries(trpc.kiloPass.getPurchasePresentation.pathFilter()),
     ]);
@@ -190,9 +192,9 @@ export function StorePurchaseRecoveryMount(): null {
         requestPurchase: requestStorePurchase,
         getAvailablePurchases: async () => {
           const pendingPurchases = await withStoreDeadline(
-        fetchPendingStorePurchases(storefront),
-        'the pending purchase lookup'
-      );
+            fetchPendingStorePurchases(storefront),
+            'the pending purchase lookup'
+          );
           return pendingPurchases;
         },
         restorePurchases: restoreStorePurchases,
@@ -215,6 +217,7 @@ export function StorePurchaseRecoveryMount(): null {
   );
 
   const passInFlightRef = useRef(false);
+  const rerunRequestedRef = useRef(false);
   const knownProductIdCount =
     creditPackAppleProductIds.length +
     creditPackGoogleProductIds.length +
@@ -224,13 +227,20 @@ export function StorePurchaseRecoveryMount(): null {
   const recoverUnfinishedPurchases = useCallback(async () => {
     // No catalog yet means no product id to match a purchase against, and no
     // reason to open a store connection.
-    if (knownProductIdCount === 0 || passInFlightRef.current) {
+    if (!signedIn || knownProductIdCount === 0) {
+      return;
+    }
+    if (passInFlightRef.current) {
+      rerunRequestedRef.current = true;
       return;
     }
     passInFlightRef.current = true;
     try {
       await connectStoreOnce();
-      const pendingPurchases = await fetchPendingStorePurchases(storefront);
+      const pendingPurchases = await withStoreDeadline(
+        fetchPendingStorePurchases(storefront),
+        'the pending purchase lookup'
+      );
       if (pendingPurchases.length === 0) {
         return;
       }
@@ -249,8 +259,12 @@ export function StorePurchaseRecoveryMount(): null {
       console.warn('[iap-recovery] unfinished purchase pass failed', String(error));
     } finally {
       passInFlightRef.current = false;
+      if (rerunRequestedRef.current) {
+        rerunRequestedRef.current = false;
+        void recoverRef.current();
+      }
     }
-  }, [creditActions, kiloPassActions, knownProductIdCount, storefront]);
+  }, [creditActions, kiloPassActions, knownProductIdCount, signedIn, storefront]);
 
   // The pass is held in a ref so the triggers below depend on state, never on a
   // callback identity: a rebuilt callback would re-run the pass on a render that
@@ -260,17 +274,17 @@ export function StorePurchaseRecoveryMount(): null {
     recoverRef.current = recoverUnfinishedPurchases;
   }, [recoverUnfinishedPurchases]);
 
-  const hasKnownProducts = knownProductIdCount > 0;
+  const hasCreditProducts =
+    creditPackAppleProductIds.length + creditPackGoogleProductIds.length > 0;
+  const hasKiloPassProducts = kiloPassAppleProductIds.length + kiloPassGoogleProductIds.length > 0;
 
-  // Mount attempt, and the first pass after the catalog answers: the store seeds
-  // `isActive` as true, so a mount while the app is already active is not a
-  // foreground edge and this effect is what covers it. It also waits for a
-  // product id, because a purchase cannot be matched without one.
+  // Each catalog arrives independently. If the second arrives during a pass,
+  // the in-flight guard queues a pass with the newly available product IDs.
   useEffect(() => {
-    if (signedIn && hasKnownProducts) {
+    if (signedIn && (hasCreditProducts || hasKiloPassProducts)) {
       void recoverRef.current();
     }
-  }, [hasKnownProducts, signedIn]);
+  }, [hasCreditProducts, hasKiloPassProducts, signedIn]);
 
   // Foreground regain: the background -> active edge only, so an active -> active
   // echo never re-runs the pass. The app keeps one `AppState` listener, in

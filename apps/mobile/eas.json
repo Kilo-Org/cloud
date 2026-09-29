@@ -14,12 +14,6 @@
       "distribution": "internal",
       "environment": "development"
     },
-    "pr6615-device": {
-      "extends": "base",
-      "developmentClient": true,
-      "distribution": "internal",
-      "environment": "pr6615-local"
-    },
     "production": {
       "extends": "base",
       "autoIncrement": true,

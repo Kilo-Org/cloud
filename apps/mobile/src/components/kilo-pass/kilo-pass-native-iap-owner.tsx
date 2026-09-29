@@ -572,45 +572,40 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       }
 
       const unrecoveredPurchases = pendingPurchases.filter(availablePurchase => {
-      const id = getPurchaseCompletionId(availablePurchase);
-      if (
-        recoveredPurchaseIdsRef.current.has(id) ||
-        recoveryInFlightPurchaseIdsRef.current.has(id)
-      ) {
-        return false;
-      }
-      recoveryInFlightPurchaseIdsRef.current.add(id);
-      return true;
-    });
+        const id = getPurchaseCompletionId(availablePurchase);
+        if (
+          recoveredPurchaseIdsRef.current.has(id) ||
+          recoveryInFlightPurchaseIdsRef.current.has(id)
+        ) {
+          return false;
+        }
+        recoveryInFlightPurchaseIdsRef.current.add(id);
+        return true;
+      });
 
-    if (unrecoveredPurchases.length === 0) {
-      return;
-    }
+      if (unrecoveredPurchases.length === 0) {
+        return;
+      }
 
-    try {
-      const recoveredPurchases =
-        await recoverActionsRef.current.recoverPurchases(unrecoveredPurchases);
-      for (const recoveredPurchase of recoveredPurchases) {
-        recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
+      try {
+        const recoveredPurchases =
+          await recoverActionsRef.current.recoverPurchases(unrecoveredPurchases);
+        for (const recoveredPurchase of recoveredPurchases) {
+          recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
+        }
+      } finally {
+        for (const unrecoveredPurchase of unrecoveredPurchases) {
+          recoveryInFlightPurchaseIdsRef.current.delete(
+            getPurchaseCompletionId(unrecoveredPurchase)
+          );
+        }
       }
-    } finally {
-      for (const unrecoveredPurchase of unrecoveredPurchases) {
-        recoveryInFlightPurchaseIdsRef.current.delete(
-          getPurchaseCompletionId(unrecoveredPurchase)
-        );
-      }
-    }
     })();
 
     return () => {
       recoveryRun.cancelled = true;
     };
-  }, [
-    connected,
-    enabledAppleProductIds.length,
-    enabledGoogleProductIds.length,
-    storefront,
-  ]);
+  }, [connected, enabledAppleProductIds.length, enabledGoogleProductIds.length, storefront]);
 
   const value = useMemo<KiloPassNativeIapContextValue>(
     () => ({

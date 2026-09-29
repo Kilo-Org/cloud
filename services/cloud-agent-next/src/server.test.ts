@@ -151,6 +151,7 @@ const {
   default: worker,
   REPORT_RETENTION_CRON,
   OUTCOME_AGGREGATE_CRON,
+  OUTCOME_AGGREGATE_CRONS,
 } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -424,6 +425,26 @@ describe('server background reporting', () => {
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
   });
 
+  it('runs the collections on the tolerated legacy 3-minute cron', async () => {
+    const env = createEnv();
+    const scheduledTime = Date.parse('2026-02-01T00:10:42.000Z');
+
+    await worker.scheduled(
+      { cron: '*/3 * * * *', scheduledTime } as ScheduledController,
+      env as unknown as Env
+    );
+
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(
+      env,
+      expect.any(Date),
+      scheduledTime
+    );
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
+  });
+
   it('still runs the open-stock collection and preserves the outcome error when outcome collection rejects', async () => {
     const env = createEnv();
     const outcomeError = new Error('outcome collection failed');
@@ -464,6 +485,7 @@ describe('server background reporting', () => {
     expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
     expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
     expect(OUTCOME_AGGREGATE_CRON).toBe('*/5 * * * *');
+    expect([...OUTCOME_AGGREGATE_CRONS]).toEqual([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
   });
 });
 

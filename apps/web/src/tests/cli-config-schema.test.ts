@@ -1,3 +1,4 @@
+import { Validator, type Schema as JsonSchema } from '@cfworker/json-schema';
 import { merge, type Schema } from '@/app/config.json/route';
 
 const upstream: Schema = {
@@ -77,6 +78,9 @@ const referencedUpstream: Schema = {
   },
 };
 
+const validates = (schema: Schema, instance: unknown) =>
+  new Validator(schema as JsonSchema, '2020-12', false).validate(instance).valid;
+
 describe('kilo config.json schema merge', () => {
   const out = merge(upstream);
   const props = out.properties as Record<string, unknown>;
@@ -111,6 +115,47 @@ describe('kilo config.json schema merge', () => {
 
   test('privacy_mode is a boolean', () => {
     expect(props.privacy_mode).toEqual(expect.objectContaining({ type: 'boolean' }));
+  });
+
+  test('adds require_approval_for_config_edits as a top-level boolean with a scoped description', () => {
+    const field = props.require_approval_for_config_edits as {
+      type?: string;
+      description?: string;
+    };
+    expect(field.type).toBe('boolean');
+    const description = field.description ?? '';
+    expect(description.length).toBeGreaterThan(0);
+    expect(description).toContain('defaults to true');
+    expect(description).toContain('project');
+    expect(description).toContain('global');
+    expect(description).toContain('re-enabling protection');
+    expect(description).toContain('permission rules');
+  });
+
+  test('validates require_approval_for_config_edits true and false against the composed schema', () => {
+    expect(validates(out, { require_approval_for_config_edits: true })).toBe(true);
+    expect(validates(out, { require_approval_for_config_edits: false })).toBe(true);
+  });
+
+  test('validates omitting require_approval_for_config_edits', () => {
+    expect(validates(out, {})).toBe(true);
+    expect(validates(out, { web_search: true })).toBe(true);
+  });
+
+  test('rejects non-boolean require_approval_for_config_edits values', () => {
+    for (const value of ['true', 'false', 1, 0, null, {}, []]) {
+      expect(validates(out, { require_approval_for_config_edits: value })).toBe(false);
+    }
+  });
+
+  test('rejects unknown top-level properties under the strict referenced composition', () => {
+    const referenced = merge(referencedUpstream);
+    expect(validates(referenced, { require_approval_for_config_edits: true })).toBe(true);
+    expect(validates(referenced, { require_approval_for_config_edits: false })).toBe(true);
+    expect(validates(referenced, {})).toBe(true);
+    expect(validates(referenced, { existing: true })).toBe(true);
+    expect(validates(referenced, { require_approval_for_config_edits: 'yes' })).toBe(false);
+    expect(validates(referenced, { unknown_property: true })).toBe(false);
   });
 
   test('auto_collapse_reasoning is a boolean', () => {
@@ -209,6 +254,7 @@ describe('kilo config.json schema merge', () => {
     expect(props.remote_control).toBeDefined();
     expect(props.web_search).toBeDefined();
     expect(props.privacy_mode).toBeDefined();
+    expect(props.require_approval_for_config_edits).toBeDefined();
     expect(props.existing).toEqual({ type: 'boolean' });
 
     const agent = props.agent as { properties: Record<string, unknown> };

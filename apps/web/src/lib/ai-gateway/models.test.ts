@@ -168,18 +168,18 @@ describe('isFreeModel', () => {
       });
     });
 
-    test('routes 80% of Auto Free traffic to Space Bunny', () => {
+    test('routes 70% of Auto Free traffic to Space Bunny', () => {
       const weights = Object.fromEntries(
         autoFreeModels.map(({ model, weight }) => [model, weight])
       );
       expect(weights).toEqual({
-        'stealth/space-bunny-alpha': 12,
+        'stealth/space-bunny-alpha': 7,
         'poolside/laguna-s-2.1:free': 1,
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
       });
       const totalWeight = autoFreeModels.reduce((total, { weight }) => total + weight, 0);
-      expect(weights['stealth/space-bunny-alpha'] / totalWeight).toBe(0.8);
+      expect(weights['stealth/space-bunny-alpha'] / totalWeight).toBe(0.7);
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

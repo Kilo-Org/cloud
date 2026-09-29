@@ -306,6 +306,11 @@ export function ChildSessionDrawer({
                 <span>
                   {selectedEntry?.agent ? `Agent: ${selectedEntry.agent}` : 'Sub-agent session'}
                 </span>
+                {selectedEntry?.model && (
+                  <span className="truncate" title={selectedEntry.model}>
+                    Model: {selectedEntry.model}
+                  </span>
+                )}
                 {selectedSessionId && (
                   <span className="truncate font-mono text-xs">{selectedSessionId}</span>
                 )}

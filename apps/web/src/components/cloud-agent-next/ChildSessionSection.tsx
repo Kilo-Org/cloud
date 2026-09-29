@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { formatModelRefName } from '@/lib/format-model-name';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -17,6 +18,7 @@ export type ChildSessionDrawerEntry = {
   sessionId: KiloSessionId;
   description?: string;
   agent?: string;
+  model?: string;
 };
 
 export type OpenChildSession = (entry: ChildSessionDrawerEntry) => void;
@@ -53,6 +55,9 @@ export function ChildSessionSection({
   const [isExpanded, setIsExpanded] = useState(false);
   const description = subtaskPart?.description || getTaskDescription(taskToolPart);
   const agent = subtaskPart?.agent || getTaskAgent(taskToolPart);
+  const model = subtaskPart?.model
+    ? formatModelRefName(subtaskPart.model)
+    : getTaskModel(taskToolPart);
   const taskStatus = taskToolPart?.state?.status;
   const isCompleted = taskStatus === 'completed';
   const isRunning = taskStatus === 'running' || taskStatus === 'pending';
@@ -73,7 +78,7 @@ export function ChildSessionSection({
   const handleOpen = () => {
     if (!sessionId) return;
     if (onOpenChildSession) {
-      onOpenChildSession({ sessionId, description, agent });
+      onOpenChildSession({ sessionId, description, agent, model });
       return;
     }
     if (inlineRenderPart) {
@@ -284,6 +289,20 @@ function getTaskAgent(toolPart?: ToolPart): string | undefined {
   if (!toolPart || toolPart.tool !== 'task') return undefined;
   const input = toolPart.state?.input;
   return getStringProperty(input, 'subagent_type');
+}
+
+function getTaskModel(toolPart?: ToolPart): string | undefined {
+  if (!toolPart || toolPart.tool !== 'task') return undefined;
+  const state = toolPart.state;
+  if (state.status !== 'running' && state.status !== 'completed') return undefined;
+  const metadata = state.metadata;
+  if (!isRecord(metadata)) return undefined;
+  const model = metadata['model'];
+  if (!isRecord(model)) return undefined;
+  const { providerID, modelID } = model;
+  if (typeof providerID !== 'string' || providerID.length === 0) return undefined;
+  if (typeof modelID !== 'string' || modelID.length === 0) return undefined;
+  return formatModelRefName({ providerID, modelID });
 }
 
 function isKiloSessionId(sessionId: string | undefined): sessionId is KiloSessionId {

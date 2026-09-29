@@ -11,6 +11,8 @@ import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
 import { DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS } from '@/lib/autoTopUpConstants';
+import type * as bouncerClientModule from '@/lib/bouncer/client';
+import { reportCreditEvent } from '@/lib/bouncer/client';
 
 // Mock Stripe client to avoid API calls in tests
 jest.mock('@/lib/stripe-client', () => ({
@@ -28,6 +30,16 @@ jest.mock('@/lib/stripe-client', () => ({
     },
   },
 }));
+
+// Bouncer is report-only. Capture its calls without any network access.
+jest.mock('@/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+  return {
+    __esModule: true,
+    ...actual,
+    reportCreditEvent: jest.fn(),
+  };
+});
 
 describe('organization auto-top-up router', () => {
   let ownerUser: User;
@@ -195,6 +207,7 @@ describe('organization auto-top-up router', () => {
     });
 
     it('returns redirectUrl when no payment method exists', async () => {
+      (reportCreditEvent as jest.Mock).mockClear();
       const caller = await createCallerForUser(ownerUser.id);
       const result = await caller.organizations.autoTopUp.toggle({
         organizationId: testOrg.id,
@@ -205,6 +218,16 @@ describe('organization auto-top-up router', () => {
       expect(result.enabled).toBe(false);
       expect(result.redirectUrl).toBeDefined();
       expect(typeof result.redirectUrl).toBe('string');
+      expect(reportCreditEvent).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'charge.attempted',
+          flow: 'auto_topup',
+          userId: ownerUser.id,
+          orgId: testOrg.id,
+          amountCents: 50000,
+          accountCreatedAt: testOrg.created_at,
+        })
+      );
     });
 
     it('throws UNAUTHORIZED for non-owner members', async () => {

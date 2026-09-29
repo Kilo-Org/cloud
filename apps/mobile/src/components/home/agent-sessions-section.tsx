@@ -1,14 +1,13 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
+import { ActiveAgentsCard } from '@/components/home/active-agents-card';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -29,7 +28,6 @@ import { cn } from '@/lib/utils';
 
 // The trailing slash pins the index route.
 const AGENTS_INDEX_HREF = '/(app)/(tabs)/(2_agents)/' as const;
-const MAX_ROWS = 3;
 
 type LiveSessionProps = Readonly<{ context: LiveSessionContext; sessions: LiveSessions }>;
 
@@ -283,16 +281,6 @@ export function LiveSessionFeedback({
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const navigateToSession = useAgentSessionNavigator();
-  // One handler shared by every card row: with the row memoised, an unchanged
-  // payload leaves each row's props referentially stable and skips its render.
-  // The handler reads only the id, so it takes the shape it needs.
-  const handleRowPress = useCallback(
-    (session: { id: string }) => {
-      navigateToSession(session.id);
-    },
-    [navigateToSession]
-  );
   const content = liveSessionContent(context, sessions);
 
   return (
@@ -336,20 +324,12 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
             </Text>
           </View>
         )}
-        {content === 'rows' &&
-          sessions.activeSessions.slice(0, MAX_ROWS).map(session => (
-            <View
-              key={`active:${session.id}`}
-              className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card"
-            >
-              <RemoteSessionRow
-                session={session}
-                variant="card"
-                interactive={false}
-                onPress={handleRowPress}
-              />
-            </View>
-          ))}
+        {content === 'rows' && (
+          <ActiveAgentsCard
+            sessions={sessions.activeSessions}
+            organizationId={context.organizationId}
+          />
+        )}
       </View>
     </View>
   );

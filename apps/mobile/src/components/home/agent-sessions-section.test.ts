@@ -172,18 +172,14 @@ afterEach(() => {
 });
 
 describe('Home live section', () => {
-  it('preserves incoming live order and caps rendered rows at three without stored queries', async () => {
+  it('renders one glanceable card row for the relevant session without stored queries', async () => {
     await render({ ...settled, activeSessions: ['a3', 'a1', 'a4', 'a2'].map(id => session(id)) });
     expect(nodes('RemoteSessionRow').map(row => (row.props.session as ActiveSession).id)).toEqual([
       'a3',
-      'a1',
-      'a4',
     ]);
-    const secondRow = node('RemoteSessionRow', 1);
-    (secondRow.props.onPress as (session: ActiveSession) => void)(
-      secondRow.props.session as ActiveSession
-    );
-    expect(sessionDestination.id).toBe('a1');
+    const row = node('RemoteSessionRow');
+    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
+    expect(sessionDestination.id).toBe('a3');
   });
 
   it('keeps row identity and navigation while refreshing cached content', async () => {

@@ -188,9 +188,14 @@ type UseActiveSessionsFloorPollOptions = {
  * Owns the `activeSessions.list` floor poll for the app. The interval is armed
  * only while `enabled && visible` and re-arms when `connected` flips (30s
  * connected, 10s offline, the intervals the query shipped). A tick is skipped
- * while the app is not foregrounded, while a tick is already in flight, or
- * before the first payload is in the cache (nothing to compare against, and an
- * empty cache belongs to the initial fetch, not this poll).
+ * while the app is not foregrounded, while a tick is already in flight, while
+ * any `activeSessions.list` refresh is already in flight through React Query's
+ * own fetch path, or before the first payload is in the cache (nothing to
+ * compare against, and an empty cache belongs to the initial fetch, not this
+ * poll). Re-arming because the surface became visible again fires one immediate
+ * tick so a returning user sees state that changed off-screen without waiting
+ * out the 30s floor; the in-flight guard above yields that tick to a refresh
+ * already covering the same moment.
  */
 export function useActiveSessionsFloorPoll({
   enabled,
@@ -202,14 +207,36 @@ export function useActiveSessionsFloorPoll({
 }: UseActiveSessionsFloorPollOptions): void {
   const { authEpoch } = useAuth();
   const inFlight = useRef(false);
+  // `visible` at the last arm, initialized from the first render so the first
+  // arm — including a cold start on a live surface — does not fire the catch-up
+  // tick. Only a genuine hide-then-show counts as "became visible again". A ref,
+  // not state, so flipping it never re-renders or re-arms the interval.
+  const wasVisible = useRef(visible);
 
   useEffect(() => {
     if (!enabled || !visible) {
+      // Hiding the surface unarms the poll and clears the marker, so the next
+      // show fires the one catch-up tick. `enabled` flips (auth/context) do not:
+      // the surface never left, and the query's own mount fetch covers it.
+      if (!visible) {
+        wasVisible.current = false;
+      }
       return undefined;
     }
+    const becameVisible = !wasVisible.current;
+    wasVisible.current = true;
     const controller = new AbortController();
     const tick = async (): Promise<void> => {
-      if (AppState.currentState !== 'active' || inFlight.current) {
+      // Yield to a refresh already in flight through React Query's fetch path:
+      // the live-sync's foreground/reconnect refresh, the initial mount fetch,
+      // or a pull-to-refresh. This poll calls the query function directly, so it
+      // cannot cancel that request; starting a concurrent one would double the
+      // traffic and let the older response race the newer writer.
+      if (
+        AppState.currentState !== 'active' ||
+        inFlight.current ||
+        queryClient.getQueryState(queryKey)?.fetchStatus === 'fetching'
+      ) {
         return;
       }
       // The payload this tick compares against, captured before the fetch.
@@ -271,6 +298,14 @@ export function useActiveSessionsFloorPoll({
       },
       connected ? CONNECTED_FLOOR_POLL_MS : DISCONNECTED_FLOOR_POLL_MS
     );
+    // One catch-up tick when returning to a live surface, so state the user
+    // changed while inside a session reappears promptly instead of after the
+    // full floor interval. Exactly one: the interval above stays the only
+    // repeating fetch, and the tick's in-flight guard drops this call when a
+    // refresh already covers the moment.
+    if (becameVisible) {
+      void tick();
+    }
     return () => {
       clearInterval(interval);
       // Stop the in-flight request as well as future ticks: an aborted fetch

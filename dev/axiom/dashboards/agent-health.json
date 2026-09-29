@@ -1,0 +1,316 @@
+{
+  "uid": "agent-health",
+  "name": "Agent Health Overview",
+  "owner": "X-AXIOM-EVERYONE",
+  "description": "Cloud Agent turns and Code Reviewer reviews. Production only.",
+  "charts": [
+    {
+      "id": "ah-ca-completed-pct",
+      "name": "Completed turns, % of completed + failed (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where ws >= ago(65m)\n| summarize goodSum = sum(completed), settledSum = sum(settled)\n| project ['of completed + failed turns'] = iff(settledSum > 0, round(100.0 * goodSum / settledSum, 1), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29"
+    },
+    {
+      "id": "ah-ca-pf-pct",
+      "name": "Platform-failed turns, % of completed + failed (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where ws >= ago(65m)\n| summarize failedSum = sum(platformFailed), settledSum = sum(settled)\n| project ['of completed + failed turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29"
+    },
+    {
+      "id": "ah-ca-provider-pct",
+      "name": "Provider-failed turns, % of completed + failed (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where ws >= ago(65m)\n| summarize failedSum = sum(providerFailed), settledSum = sum(settled)\n| project ['of completed + failed turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29"
+    },
+    {
+      "id": "ah-ca-user-pct",
+      "name": "User-failed turns, % of completed + failed (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where ws >= ago(65m)\n| summarize failedSum = sum(userFailed), settledSum = sum(settled)\n| project ['of completed + failed turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29"
+    },
+    {
+      "id": "ah-ca-completed-or-failed",
+      "name": "Completed + failed turns (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where ws >= ago(65m)\n| summarize ['turns'] = sum(settled)"
+      },
+      "sectionId": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29"
+    },
+    {
+      "id": "ah-cr-completed",
+      "name": "Completed reviews, % of ended reviews (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['vercel']\n| where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n| where ['message'] has '\"metric\":\"review_outcome\"'\n| extend j = parse_json(['message'])\n| where tostring(j['metric']) == 'review_outcome'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), completed = tolong(j['completed']), failed = tolong(j['failed']), cancelled = tolong(j['cancelled']), interrupted = tolong(j['interrupted']), durationCount = tolong(j['durationCount']), durationMs = todouble(j['durationMs'])\n| summarize arg_max(obs, _time, completed, failed, cancelled, interrupted, durationCount, durationMs) by ws\n| extend terminal = completed + failed + cancelled + interrupted\n| where ws >= ago(65m)\n| summarize completedSum = sum(completed), terminalSum = sum(terminal)\n| project ['of ended reviews'] = iff(terminalSum > 0, round(100.0 * completedSum / terminalSum, 1), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-agent-share",
+      "name": "Platform-failed Code Reviewer agent turns, % of completed + failed agent turns (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where origin == 'code-review'\n| where ws >= ago(65m)\n| summarize failedSum = sum(platformFailed), settledSum = sum(settled)\n| project ['of completed + failed agent turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-provider-pct",
+      "name": "Provider-failed Code Reviewer agent turns, % of completed + failed agent turns (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where origin == 'code-review'\n| where ws >= ago(65m)\n| summarize failedSum = sum(providerFailed), settledSum = sum(settled)\n| project ['of completed + failed agent turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-user-pct",
+      "name": "User-failed Code Reviewer agent turns, % of completed + failed agent turns (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n| summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n| extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n| where origin == 'code-review'\n| where ws >= ago(65m)\n| summarize failedSum = sum(userFailed), settledSum = sum(settled)\n| project ['of completed + failed agent turns'] = iff(settledSum > 0, round(100.0 * failedSum / settledSum, 2), todouble(dynamic(null)))"
+      },
+      "unit": "Percent100",
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-ended",
+      "name": "Ended reviews, any outcome (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['vercel']\n| where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n| where ['message'] has '\"metric\":\"review_outcome\"'\n| extend j = parse_json(['message'])\n| where tostring(j['metric']) == 'review_outcome'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), completed = tolong(j['completed']), failed = tolong(j['failed']), cancelled = tolong(j['cancelled']), interrupted = tolong(j['interrupted']), durationCount = tolong(j['durationCount']), durationMs = todouble(j['durationMs'])\n| summarize arg_max(obs, _time, completed, failed, cancelled, interrupted, durationCount, durationMs) by ws\n| extend terminal = completed + failed + cancelled + interrupted\n| where ws >= ago(65m)\n| summarize ['reviews'] = sum(terminal)"
+      },
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-runtime",
+      "name": "Avg completed review run time, excludes queue wait (last hour)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['vercel']\n| where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n| where ['message'] has '\"metric\":\"review_outcome\"'\n| extend j = parse_json(['message'])\n| where tostring(j['metric']) == 'review_outcome'\n| project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), completed = tolong(j['completed']), failed = tolong(j['failed']), cancelled = tolong(j['cancelled']), interrupted = tolong(j['interrupted']), durationCount = tolong(j['durationCount']), durationMs = todouble(j['durationMs'])\n| summarize arg_max(obs, _time, completed, failed, cancelled, interrupted, durationCount, durationMs) by ws\n| extend terminal = completed + failed + cancelled + interrupted\n| where ws >= ago(65m)\n| summarize totalMs = sum(durationMs), sampleCount = sum(durationCount)\n| project ['minutes'] = iff(sampleCount > 0, round(totalMs / sampleCount / 60000.0, 1), todouble(dynamic(null)))"
+      },
+      "customUnits": "min",
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-cr-queue",
+      "name": "Reviews in queue now (pending)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['vercel']\n| where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n| where ['message'] has '\"metric\":\"review_open\"'\n| extend j = parse_json(['message'])\n| where tostring(j['metric']) == 'review_open'\n| project _time, obs = todatetime(j['observedAt']), pending = tolong(j['pending']), over5 = tolong(j['pendingOverFiveMinutes']), oldestMs = todouble(j['oldestPendingAgeMs']), stale = tolong(j['staleQueued']), running90 = tolong(j['runningOverNinetyMinutes']), missing = tolong(j['missingCompletedAt'])\n| top 1 by obs desc\n| where obs > ago(30m)\n| project ['reviews'] = pending"
+      },
+      "sectionId": "9bd914e6-d282-5fd8-86af-449d27a76d8c"
+    },
+    {
+      "id": "ah-trend-completed",
+      "name": "Completed, % (Cloud Agent turns, Code Reviewer reviews)",
+      "type": "TimeSeries",
+      "query": {
+        "apl": "union\n  (\n    ['cloudflare-logpush']\n    | where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n    | mv-expand ['Logs']\n    | extend j = parse_json(tostring(['Logs']['Message'][0]))\n    | where tostring(j['metric']) == 'agent_execution'\n    | project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n    | summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n    | extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n    | where settled > 0\n    | project _time, feed = 'Cloud Agent turns', good = completed, total = settled\n  ),\n  (\n    ['vercel']\n    | where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n    | where ['message'] has '\"metric\":\"review_outcome\"'\n    | extend j = parse_json(['message'])\n    | where tostring(j['metric']) == 'review_outcome'\n    | project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), completed = tolong(j['completed']), failed = tolong(j['failed']), cancelled = tolong(j['cancelled']), interrupted = tolong(j['interrupted']), durationCount = tolong(j['durationCount']), durationMs = todouble(j['durationMs'])\n    | summarize arg_max(obs, _time, completed, failed, cancelled, interrupted, durationCount, durationMs) by ws\n    | extend terminal = completed + failed + cancelled + interrupted\n    | where terminal > 0\n    | project _time, feed = 'Code Reviewer reviews', good = completed, total = terminal\n  )\n| summarize ['Completed %'] = 100.0 * sum(good) / sum(total) by bin_auto(_time), feed",
+        "queryOptions": {
+          "overlayCharts": "true",
+          "timeSeriesView": "charts"
+        }
+      },
+      "sectionId": "9c71cd56-08ac-5177-86cb-7d1e0e3d353a"
+    },
+    {
+      "id": "ah-trend-platform-failed",
+      "name": "Platform-failed turns, % (Cloud Agent, Code Reviewer agent turns)",
+      "type": "TimeSeries",
+      "query": {
+        "apl": "union\n  (\n    ['cloudflare-logpush']\n    | where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n    | mv-expand ['Logs']\n    | extend j = parse_json(tostring(['Logs']['Message'][0]))\n    | where tostring(j['metric']) == 'agent_execution'\n    | project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n    | summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n    | extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n    | where settled > 0\n    | project _time, feed = 'Cloud Agent (all turns)', bad = platformFailed, total = settled\n  ),\n  (\n    ['cloudflare-logpush']\n    | where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n    | mv-expand ['Logs']\n    | extend j = parse_json(tostring(['Logs']['Message'][0]))\n    | where tostring(j['metric']) == 'agent_execution'\n    | project _time, obs = todatetime(j['observedAt']), ws = todatetime(j['windowStart']), generation = tostring(j['generation']), role = tostring(j['role']), origin = tostring(j['productOrigin']), completed = tolong(j['completed']), platformFailed = tolong(j['platformFailed']), providerFailed = tolong(j['providerFailed']), userFailed = tolong(j['userFailed']), unknownFailed = tolong(j['unknownFailed']), interrupted = tolong(j['interrupted'])\n    | summarize arg_max(obs, _time, completed, platformFailed, providerFailed, userFailed, unknownFailed, interrupted) by ws, generation, role, origin\n    | extend settled = completed + platformFailed + providerFailed + userFailed + unknownFailed\n    | where origin == 'code-review' and settled > 0\n    | project _time, feed = 'Code Reviewer (its agent turns)', bad = platformFailed, total = settled\n  )\n| summarize ['Platform-failed %'] = 100.0 * sum(bad) / sum(total) by bin_auto(_time), feed",
+        "queryOptions": {
+          "overlayCharts": "true",
+          "timeSeriesView": "charts"
+        }
+      },
+      "sectionId": "9c71cd56-08ac-5177-86cb-7d1e0e3d353a"
+    },
+    {
+      "id": "ah-fresh-ca-out",
+      "name": "Cloud Agent data last updated (minutes ago)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['cloudflare-logpush']\n| where ['ScriptName'] == 'cloud-agent-next' and ['EventType'] == 'scheduled'\n| mv-expand ['Logs']\n| extend j = parse_json(tostring(['Logs']['Message'][0]))\n| where tostring(j['metric']) == 'agent_execution'\n| summarize lastObs = max(todatetime(j['observedAt']))\n| project ['minutes'] = round(todouble(datetime_diff('second', now(), todatetime(lastObs))) / 60.0, 1)"
+      },
+      "colorScheme": "Green",
+      "warningThreshold": "AboveOrEqual",
+      "warningThresholdValue": "10",
+      "errorThreshold": "AboveOrEqual",
+      "errorThresholdValue": "15",
+      "sectionId": "a4c63917-0637-536e-a774-53fca54dabeb"
+    },
+    {
+      "id": "ah-fresh-cr-out",
+      "name": "Code Reviewer data last updated (minutes ago)",
+      "type": "Statistic",
+      "query": {
+        "apl": "['vercel']\n| where ['request.path'] == '/api/cron/code-review-outcome-aggregate' and ['vercel.environment'] == 'production'\n| where ['message'] has '\"metric\":\"review_outcome\"'\n| extend j = parse_json(['message'])\n| where tostring(j['metric']) == 'review_outcome'\n| summarize lastObs = max(todatetime(j['observedAt']))\n| project ['minutes'] = round(todouble(datetime_diff('second', now(), todatetime(lastObs))) / 60.0, 1)"
+      },
+      "colorScheme": "Green",
+      "warningThreshold": "AboveOrEqual",
+      "warningThresholdValue": "10",
+      "errorThreshold": "AboveOrEqual",
+      "errorThresholdValue": "15",
+      "sectionId": "a4c63917-0637-536e-a774-53fca54dabeb"
+    }
+  ],
+  "layout": [
+    {
+      "i": "ah-ca-completed-pct",
+      "x": 0,
+      "y": 0,
+      "w": 3,
+      "h": 2
+    },
+    {
+      "i": "ah-ca-pf-pct",
+      "x": 3,
+      "y": 0,
+      "w": 3,
+      "h": 2
+    },
+    {
+      "i": "ah-ca-provider-pct",
+      "x": 6,
+      "y": 0,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-ca-user-pct",
+      "x": 8,
+      "y": 0,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-ca-completed-or-failed",
+      "x": 10,
+      "y": 0,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-completed",
+      "x": 0,
+      "y": 2,
+      "w": 3,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-agent-share",
+      "x": 3,
+      "y": 2,
+      "w": 3,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-provider-pct",
+      "x": 6,
+      "y": 2,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-user-pct",
+      "x": 8,
+      "y": 2,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-ended",
+      "x": 10,
+      "y": 2,
+      "w": 2,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-runtime",
+      "x": 0,
+      "y": 4,
+      "w": 6,
+      "h": 2
+    },
+    {
+      "i": "ah-cr-queue",
+      "x": 6,
+      "y": 4,
+      "w": 6,
+      "h": 2
+    },
+    {
+      "i": "ah-trend-completed",
+      "x": 0,
+      "y": 6,
+      "w": 6,
+      "h": 6
+    },
+    {
+      "i": "ah-trend-platform-failed",
+      "x": 6,
+      "y": 6,
+      "w": 6,
+      "h": 6
+    },
+    {
+      "i": "ah-fresh-ca-out",
+      "x": 0,
+      "y": 12,
+      "w": 3,
+      "h": 2
+    },
+    {
+      "i": "ah-fresh-cr-out",
+      "x": 3,
+      "y": 12,
+      "w": 3,
+      "h": 2
+    }
+  ],
+  "sections": [
+    {
+      "id": "5ff5c85e-5462-5c2c-bddd-7a7ca3e4cb29",
+      "title": "Cloud Agent: turns (one per user message)"
+    },
+    {
+      "id": "9bd914e6-d282-5fd8-86af-449d27a76d8c",
+      "title": "Code Reviewer: reviews and the agent turns they run"
+    },
+    {
+      "id": "9c71cd56-08ac-5177-86cb-7d1e0e3d353a",
+      "title": "Trends"
+    },
+    {
+      "id": "a4c63917-0637-536e-a774-53fca54dabeb",
+      "title": "Data freshness"
+    }
+  ],
+  "datasets": ["cloudflare-logpush", "vercel"],
+  "refreshTime": 300,
+  "schemaVersion": 2,
+  "timeWindowStart": "qr-now-24h",
+  "timeWindowEnd": "qr-now"
+}

@@ -122,13 +122,18 @@ async function syncChatGptUsageLimit(
   if (!owner) return;
 
   if (response.status < 400) {
-    after(async () => {
-      try {
-        await clearOpenAiChatGptUsageLimit(owner);
-      } catch {
-        // Best-effort, exactly like the record path below.
-      }
-    });
+    try {
+      after(async () => {
+        try {
+          await clearOpenAiChatGptUsageLimit(owner);
+        } catch {
+          // Best-effort, exactly like the record path below.
+        }
+      });
+    } catch {
+      // `after` needs a request scope. Without one the request keeps its
+      // outcome, and the next request through the connection clears the record.
+    }
     return;
   }
 

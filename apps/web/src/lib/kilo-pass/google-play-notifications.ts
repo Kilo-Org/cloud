@@ -679,10 +679,17 @@ export async function processGooglePlayKiloPassNotification(params: {
     ) {
       throw new Error('Google Play multi-quantity credit pack refund is not supported');
     }
+    // Play reports a whole-order refund as REFUNDED and a quantity-based refund as
+    // PARTIALLY_REFUNDED. A credit pack is sold one unit at a time, so a
+    // quantity-based refund of that single unit refunds the whole pack.
+    const refundedOrderStates =
+      voided.refundType === GOOGLE_PLAY_VOIDED_REFUND_TYPE.QUANTITY_BASED_PARTIAL_REFUND
+        ? ['REFUNDED', 'PARTIALLY_REFUNDED']
+        : ['REFUNDED'];
     if (
       order.orderId !== orderId ||
       order.purchaseToken !== purchaseToken ||
-      order.state !== 'REFUNDED'
+      !refundedOrderStates.includes(order.state ?? '')
     ) {
       throw new Error('Google Play refund does not match a refunded order');
     }

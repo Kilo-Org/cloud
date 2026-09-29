@@ -1250,6 +1250,26 @@ describe('processGooglePlayKiloPassNotification', () => {
       expect(await reversalAmounts(orderId)).toEqual([-toMicrodollars(10)]);
     });
 
+    // Play keeps PARTIALLY_REFUNDED for a quantity-based refund, which is the whole
+    // pack when the line item holds one unit.
+    it('reverses the whole pack when Play reports PARTIALLY_REFUNDED for one unit', async () => {
+      const { orderId, purchaseToken } = await grantGooglePlayCreditPack();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken,
+        state: 'PARTIALLY_REFUNDED',
+        lineItems: [{ productId: 'credits_usd10', oneTimePurchaseDetails: { quantity: 1 } }],
+      });
+
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: voidedMessage({ orderId, purchaseToken, refundType: 2 }),
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await reversalAmounts(orderId)).toEqual([-toMicrodollars(10)]);
+    });
+
     it('rejects a quantity-based refund of a multi-quantity pack without reversing', async () => {
       const { user, orderId, purchaseToken } = await grantGooglePlayCreditPack();
       mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({

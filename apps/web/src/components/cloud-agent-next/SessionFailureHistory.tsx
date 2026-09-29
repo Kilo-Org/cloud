@@ -38,25 +38,43 @@ export function SessionFailureHistory({ cloudAgentSessionId }: SessionFailureHis
 
   const history = historyQuery.data;
 
-  if (!enabled || !history) {
+  if (!enabled) {
     return null;
   }
 
-  if (historyQuery.isError) {
+  if (historyQuery.isError && !history) {
     return (
       <section
         className="border-border bg-muted/30 space-y-3 rounded-lg border p-4 text-sm"
         aria-label="Failure history"
+        role="alert"
       >
         <div className="flex items-center gap-2">
           <AlertTriangle className="text-destructive h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="text-foreground font-medium">Could not load failure history</span>
         </div>
-        <p className="text-muted-foreground text-xs">
-          A transient error hid this section. Reopen the dialog to try again.
-        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void historyQuery.refetch()}
+          disabled={historyQuery.isFetching}
+        >
+          {historyQuery.isFetching ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              Loading failure history...
+            </>
+          ) : (
+            'Try again'
+          )}
+        </Button>
       </section>
     );
+  }
+
+  if (!history) {
+    return null;
   }
 
   const summary = summarizeSessionFailureHistory(history);

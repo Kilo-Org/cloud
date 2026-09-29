@@ -135,6 +135,7 @@ describe('cloudAgentNextFailuresRouter', () => {
     await db.insert(organization_memberships).values({
       kilo_user_id: owner.id,
       organization_id: organization.id,
+      role: 'member',
     });
   });
 

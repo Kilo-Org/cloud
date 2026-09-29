@@ -1578,7 +1578,7 @@
     "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר.",
     "liveCount_one": "בזמן אמת: {{count}}",
     "liveCount_other": "בזמן אמת: {{count}}",
-    "liveCount_two": "{{count}} פעילים"
+    "liveCount_two": "בזמן אמת: {{count}}"
   },
   "agentChat": {
     "session": {
@@ -2152,11 +2152,11 @@
       "ofWindowTokens": "מתוך {{window}} טוקנים",
       "tokens": "טוקנים",
       "tokensWithPercentage": "טוקנים ({{percentage}})",
-      "stepsCount_one": "מספר שלבים: {{steps}}",
+      "stepsCount_one": "מספר צעדים: {{steps}}",
       "stepsCount": "{{steps}} צעדים",
       "stepsCount_other": "{{steps}} צעדים",
       "modelAccessibilityLabel": "{{name}}, {{provider}}, {{steps}}, {{cost}}",
-      "stepsCount_two": "{{steps}} שלבים",
+      "stepsCount_two": "{{steps}} צעדים",
       "modelsCount_one": "מודל ({{displayCount}})",
       "modelsCount_other": "מודלים ({{displayCount}})",
       "modelsCount_two": "מודלים ({{displayCount}})"

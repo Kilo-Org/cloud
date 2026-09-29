@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
-import { sql, eq, isNull } from 'drizzle-orm';
+import { sql, eq, inArray, isNull, or } from 'drizzle-orm';
 import type {
   GuiCreditCategoryStatistics,
   CreditCategoriesApiResponse,
@@ -26,7 +26,13 @@ export async function GET(
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
   const whereCondition = !key
-    ? undefined
+    ? or(
+        isNull(credit_transactions.credit_category),
+        inArray(
+          credit_transactions.credit_category,
+          promoCreditCategories.map(category => category.credit_category)
+        )
+      )
     : key === '<null:paid>'
       ? isNull(credit_transactions.credit_category)
       : eq(credit_transactions.credit_category, key);

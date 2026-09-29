@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner-native';
 import { ulid } from 'ulid';
 
+import { type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
@@ -311,7 +312,7 @@ export function useQuickChat(model: string) {
     })();
   }
 
-  function onSend(text: string): void {
+  function onSend(text: string, options?: ChatComposerSendOptions): void {
     if (!orgLoaded) {
       // The org scope has not hydrated. Accepting would persist to the personal
       // thread before the stored org swaps in. Throw so the composer preserves
@@ -333,6 +334,12 @@ export function useQuickChat(model: string) {
     };
     const history = gatewayHistory();
     setLocalTurns(prev => [...prev, { clientId, user: userRow, assistant: null }]);
+    // The optimistic row is now in the transcript. Signal the composer so it
+    // clears its input and persisted draft: its prompt branch only clears
+    // through this callback, so without it the sent prompt stays in the
+    // composer and can be sent again. Fired only after acceptance, so the
+    // draft survives the rejected-send branches above.
+    options?.onOptimisticSend?.();
     startStream(clientId, userRow, history);
   }
 

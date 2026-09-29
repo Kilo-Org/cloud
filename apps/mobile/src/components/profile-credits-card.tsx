@@ -8,7 +8,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
-import { AddCreditsRow } from '@/components/add-credits-row';
+import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
@@ -257,19 +257,19 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                 )
               ))}
           </Animated.View>
-          {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+          <View className="flex-row items-center gap-2">
+            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+            {selectedOrgId == null && (
+              <AddCreditsButton
+                onPress={() => {
+                  router.push('/(app)/credits' as Href);
+                }}
+              />
+            )}
+          </View>
         </View>
       )}
-      {selectedOrgId == null ? (
-        // Personal: in-app purchase entry point on both platforms, shown at any
-        // balance so a funded user can still top up.
-        <AddCreditsRow
-          onPress={() => {
-            router.push('/(app)/credits' as Href);
-          }}
-          className="rounded-lg bg-secondary px-3 py-3"
-        />
-      ) : (
+      {selectedOrgId != null &&
         canManageOrgBilling &&
         !balanceLoading &&
         !balancePending &&
@@ -279,8 +279,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             url={`${WEB_BASE_URL}/organizations/${selectedOrgId}/payment-details`}
             className="rounded-lg bg-secondary px-3 py-3"
           />
-        )
-      )}
+        )}
       {/* One loading indicator per section: while the balance slot shows its
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from

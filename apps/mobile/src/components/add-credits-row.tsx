@@ -7,6 +7,30 @@ import { openExternalUrl } from '@/lib/external-link';
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { cn } from '@/lib/utils';
 
+type AddCreditsButtonProps = Readonly<{
+  /** In-app destination (the credit purchase screen); platform-agnostic. */
+  onPress: () => void;
+  className?: string;
+}>;
+
+/**
+ * The "Add credits" call to action on its own, so a call site can place it
+ * inside another surface — the balance card puts it on the right — instead of
+ * rendering the whole row.
+ *
+ * It is always an in-app CTA and therefore always safe to show on iOS. The
+ * external billing-page variant lives in `AddCreditsRow`, which owns the App
+ * Store gate.
+ */
+export function AddCreditsButton({ onPress, className }: AddCreditsButtonProps) {
+  const { t } = useTranslation();
+  return (
+    <Button size="sm" variant="outline" className={className} onPress={onPress}>
+      <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
+    </Button>
+  );
+}
+
 type AddCreditsRowProps = Readonly<{
   /** External billing page to open. App Store review forbids this on iOS. */
   url?: string;
@@ -37,28 +61,22 @@ export function AddCreditsRow({ url, onPress, className }: AddCreditsRowProps) {
   if (!onPress && Platform.OS === 'ios') {
     return null;
   }
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-      return;
-    }
-    if (url) {
-      void openExternalUrl(url, { label: t('addCredits.billingPage') });
-    }
-  };
   return (
     <View className={cn(narrow ? 'gap-2' : 'flex-row items-center justify-between', className)}>
       <Text className={cn(narrow ? undefined : 'flex-1 pr-3', 'text-xs text-muted-foreground')}>
         {t('addCredits.description')}
       </Text>
-      <Button
-        size="sm"
-        variant="outline"
+      <AddCreditsButton
+        onPress={
+          onPress ??
+          (() => {
+            if (url) {
+              void openExternalUrl(url, { label: t('addCredits.billingPage') });
+            }
+          })
+        }
         className={narrow ? 'w-full' : undefined}
-        onPress={handlePress}
-      >
-        <Text className="text-xs font-semibold">{t('addCredits.cta')}</Text>
-      </Button>
+      />
     </View>
   );
 }

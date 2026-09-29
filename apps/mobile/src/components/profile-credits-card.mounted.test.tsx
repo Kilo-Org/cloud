@@ -155,6 +155,10 @@ const addCreditsRowProps = vi.hoisted(() => ({
   latest: undefined as { url?: string; onPress?: () => void } | undefined,
 }));
 vi.mock('@/components/add-credits-row', () => ({
+  AddCreditsButton: (props: { url?: string; onPress?: () => void }) => {
+    addCreditsRowProps.latest = props;
+    return 'ADD_CREDITS_BUTTON';
+  },
   AddCreditsRow: (props: { url?: string; onPress?: () => void }) => {
     addCreditsRowProps.latest = props;
     return 'ADD_CREDITS_ROW';
@@ -369,9 +373,9 @@ describe('CreditsCard balance state', () => {
 
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('$0.00');
-    // The personal purchase entry point no longer depends on the balance, so it
-    // is already present while the balance slot still shimmers.
-    expect(texts()).toContain('ADD_CREDITS_ROW');
+    // The personal CTA lives inside the balance card, so it arrives with the
+    // card instead of beside the balance skeleton.
+    expect(texts()).not.toContain('ADD_CREDITS_BUTTON');
 
     unmount();
   });
@@ -493,7 +497,7 @@ describe('CreditsCard add-credits entry point', () => {
     ['ios', 10],
     ['android', 0],
     ['android', 10],
-  ] as const)('renders the personal in-app row on %s at a %i balance', async (os, balance) => {
+  ] as const)('renders the personal in-app CTA in the balance card on %s at a %i balance', async (os, balance) => {
     Platform.OS = os;
     currentUser.userId = 'user-1';
     const queryClient = createTestQueryClient();
@@ -502,7 +506,7 @@ describe('CreditsCard add-credits entry point', () => {
     const { texts, unmount } = await mountCard(queryClient);
     await waitFor(() => texts().includes(`$${balance.toFixed(2)}`));
 
-    expect(texts()).toContain('ADD_CREDITS_ROW');
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
     expect(addCreditsRowProps.latest?.url).toBeUndefined();
     expect(addCreditsRowProps.latest?.onPress).toBeTypeOf('function');
 
@@ -526,7 +530,7 @@ describe('CreditsCard add-credits entry point', () => {
     expect(texts()).not.toContain(
       'Your credit balance is empty. Credits are managed outside the iOS app for this account.'
     );
-    expect(texts()).toContain('ADD_CREDITS_ROW');
+    expect(texts()).toContain('ADD_CREDITS_BUTTON');
 
     unmount();
   });

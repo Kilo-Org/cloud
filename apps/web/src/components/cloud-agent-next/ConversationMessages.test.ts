@@ -1160,6 +1160,18 @@ describe('PartRenderer tool lifecycle', () => {
     expect(html).not.toContain('animate-spin');
   });
 
+  it('renders a completed native scheduler tool with no input', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, {
+        part: toolPart('schedule_wakeup', 'Schedule wakeup', completedState),
+      })
+    );
+
+    expect(html).toContain('Schedule wakeup');
+    expect(html).toContain('data-tool-card');
+    expect(html).not.toContain('Failed to render');
+  });
+
   it.each([
     { tool: 'question', title: 'Questions dismissed' },
     { tool: 'suggest', title: 'Suggestion dismissed' },

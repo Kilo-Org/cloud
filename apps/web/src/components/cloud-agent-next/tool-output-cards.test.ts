@@ -439,12 +439,50 @@ describe('ScheduledTaskToolCard', () => {
     expect(html).not.toContain('aria-label="Output"');
   });
 
-  it('keeps unrecognized list output raw as a drift fallback', () => {
+  it('keeps unrecognized list output bounded and copyable without claiming no tasks', () => {
     const part = completedTool('cron_list', {}, 'Totally unexpected response');
     const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
 
-    expect(html).toContain('Totally unexpected response');
-    expect(html).not.toContain('aria-label="Output"');
+    expect(html).toContain('aria-label="Output"');
+    expect(html).toContain('<code>Totally unexpected response</code>');
+    expect(html).toContain('aria-label="Copy output"');
+    expect(html).not.toContain('None scheduled');
+    expect(html).not.toContain('No scheduled tasks');
+  });
+
+  it('only treats the exact native empty-list phrase as an empty list', () => {
+    const empty = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session.'
+    );
+    const emptyHtml = expanded(ScheduledTaskToolCard({ toolPart: empty }));
+
+    expect(emptyHtml).toContain('None scheduled');
+    expect(emptyHtml).toContain('No pending wakeups for this session.');
+
+    const nearMiss = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session? '
+    );
+    const nearMissHtml = expanded(ScheduledTaskToolCard({ toolPart: nearMiss }));
+
+    expect(nearMissHtml).not.toContain('None scheduled');
+    expect(nearMissHtml).toContain('aria-label="Output"');
+  });
+
+  it('renders a completed part with missing or malformed input', () => {
+    for (const malformed of [undefined, null, 'bad', 42]) {
+      const part = completedTool('schedule_wakeup', { prompt: 'x' }, '');
+      Object.defineProperty(part.state, 'input', { value: malformed, enumerable: true });
+      const html = renderToStaticMarkup(
+        React.createElement(ScheduledTaskToolCard, { toolPart: part })
+      );
+
+      expect(html).toContain('Schedule wakeup');
+      expect(html).toContain('aria-expanded="false"');
+    }
   });
 
   it('surfaces a failed state with no unbacked cancel or delete controls', () => {

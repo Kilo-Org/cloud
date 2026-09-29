@@ -83,6 +83,11 @@ function deleteConfirmation(output: string): ParsedOutput | undefined {
   return { id: match[1], schedule: `next ${match[2]}` };
 }
 
+const emptyListMessages = new Map([
+  ['wakeup', 'No pending wakeups for this session.'],
+  ['cron', 'No scheduled cron tasks for this session.'],
+]);
+
 function listRows(output: string, kind: 'wakeup' | 'cron'): ParsedOutput {
   const rows: ScheduledRow[] = [];
   const leftover: string[] = [];
@@ -111,8 +116,10 @@ function listRows(output: string, kind: 'wakeup' | 'cron'): ParsedOutput {
           }
     );
   }
-  if (rows.length === 0) return { rows, leftover: leftover.join('\n') || output.trim() };
-  return { rows, leftover: leftover.join('\n') || undefined };
+  if (rows.length > 0) return { rows, leftover: leftover.join('\n') || undefined };
+  const trimmed = output.trim();
+  if (trimmed === emptyListMessages.get(kind)) return { rows, leftover: trimmed };
+  return { leftover: trimmed };
 }
 
 function parseOutput(tool: string, input: Record<string, unknown>, output: string): ParsedOutput {
@@ -136,7 +143,8 @@ function parseOutput(tool: string, input: Record<string, unknown>, output: strin
 
 export function ScheduledTaskToolCard({ toolPart }: { toolPart: ToolPart }) {
   const state = toolPart.state;
-  const input = state.input;
+  const input: Record<string, unknown> =
+    state.input && typeof state.input === 'object' ? state.input : {};
   const output = state.status === 'completed' ? normalizeTerminalOutput(state.output) : '';
   const parsed = state.status === 'completed' ? parseOutput(toolPart.tool, input, output) : {};
   const prompt = text(input.prompt) ?? parsed.prompt;

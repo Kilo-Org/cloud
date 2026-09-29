@@ -44,7 +44,9 @@ import {
 import { ConversationMessages } from './ConversationMessages';
 import { CurrentTaskList } from './CurrentTaskList';
 import { getCurrentTodos } from './current-todos';
-import { isUserMessage, getUserTextContent } from './MessageBubble';
+import { getUserTextContent } from './MessageBubble';
+import { retryFailedMessage } from './retry-failed-message';
+import { isUserMessage } from './types';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
@@ -278,7 +280,6 @@ export default function CloudChatPage({
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
   const failedPrompt = useAtomValue(manager.atoms.failedPrompt);
-  const setFailedPrompt = useSetAtom(manager.atoms.failedPrompt);
   const staticMessages = useAtomValue(manager.atoms.staticMessages);
   const dynamicMessages = useAtomValue(manager.atoms.dynamicMessages);
   const pendingMessages = useAtomValue(manager.atoms.pendingMessages);
@@ -754,7 +755,7 @@ export default function CloudChatPage({
   }, [canCreateWorktreeChat, createWorktreeChat, sessionIdFromParams]);
 
   const handleSendMessage = useCallback(
-    async (prompt: string, attachments?: CloudAgentAttachments) => {
+    async (prompt: string, attachments?: CloudAgentAttachments, onOptimisticSend?: () => void) => {
       // Sending takes the position over only once the send is accepted: end a
       // resume that is still looking for its anchor, or its effect re-pauses
       // follow and cancels this scroll when the message lands. A rejected send
@@ -783,6 +784,7 @@ export default function CloudChatPage({
             : (sessionConfig?.variant ?? undefined),
         },
         attachments: supportsAttachments ? attachments : undefined,
+        onOptimisticSend,
       });
       // Pins the tail when the list already follows. While a resume has the
       // follow off this is a no-op, so a refused send never moves the reader
@@ -845,6 +847,39 @@ export default function CloudChatPage({
     },
     [manager, scheduleScrollToBottom, setChatUI, supportsAttachments]
   );
+
+  const handleRetryFailedMessage = useCallback(
+    async (message: StoredMessage) => {
+      if (!isUserMessage(message.info)) return;
+      const prompt = getUserTextContent(message.parts);
+      if (prompt === '') return;
+      // The row belongs to the session this page opened. The re-send is
+      // awaited and the user can switch chats while it is in flight, so the
+      // owner is captured here: a resolution recorded after the switch would
+      // otherwise land on the session that was switched to.
+      const ownerSessionId =
+        sessionIdFromParams && isCurrentSession ? (sessionIdFromParams as KiloSessionId) : null;
+      if (!ownerSessionId) return;
+      const messageId = message.info.id;
+      await retryFailedMessage({
+        messageId,
+        ownerSessionId,
+        recovery: manager,
+        send: onOptimisticSend => handleSendMessage(prompt, undefined, onOptimisticSend),
+      });
+    },
+    [handleSendMessage, isCurrentSession, manager, sessionIdFromParams]
+  );
+
+  const composerCopyTokenRef = useRef(0);
+  const [requestedComposerText, setRequestedComposerText] = useState<{
+    text: string;
+    token: number;
+  } | null>(null);
+  const handleCopyFailedToComposer = useCallback((text: string) => {
+    composerCopyTokenRef.current += 1;
+    setRequestedComposerText({ text, token: composerCopyTokenRef.current });
+  }, []);
 
   const handleStopExecution = useCallback(() => {
     void manager.interrupt();
@@ -1682,6 +1717,10 @@ export default function CloudChatPage({
                                     commitsAfterMessage={commitsAfterMessage}
                                     getChildMessages={getChildMessages}
                                     onOpenChildSession={handleOpenTopLevelChildSession}
+                                    onRetryMessage={
+                                      isCurrentSession ? handleRetryFailedMessage : undefined
+                                    }
+                                    onCopyToComposer={handleCopyFailedToComposer}
                                     onOpenPreparationDetails={handleOpenPreparationDetails}
                                   />
 
@@ -1798,6 +1837,7 @@ export default function CloudChatPage({
                                 availableVariants={displayAvailableVariants}
                                 showToolbar={Boolean(sessionIdFromParams)}
                                 initialValue={failedPrompt ?? undefined}
+                                requestedValue={requestedComposerText}
                                 customModeOptions={customModeOptions}
                                 modelPickerDisabled={
                                   modelPickerLocked || sessionModels.modelPickerDisabled

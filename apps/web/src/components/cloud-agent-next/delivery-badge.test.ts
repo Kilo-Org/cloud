@@ -33,4 +33,12 @@ describe('getDeliveryBadge', () => {
       title: 'Pending queued message interrupted by user',
     });
   });
+
+  it('reports an execution failure as a response failure, not a delivery one', () => {
+    expect(getDeliveryBadge({ status: 'failed', error: 'Aborted', reason: 'execution' })).toEqual({
+      label: 'Response failed',
+      tone: 'error',
+      title: 'Aborted',
+    });
+  });
 });

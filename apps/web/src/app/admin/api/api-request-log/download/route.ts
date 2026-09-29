@@ -5,6 +5,7 @@ import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
+import { getApiRequestLogBlob } from '@/lib/r2/api-request-log';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -47,6 +48,19 @@ function isJson(value: unknown): boolean {
     }
   }
   return false;
+}
+
+type LoadedBody = { value: unknown } | { loadError: string };
+
+async function loadBody(key: string | null, legacyInlineValue: unknown): Promise<LoadedBody> {
+  if (key === null) {
+    return { value: legacyInlineValue };
+  }
+  try {
+    return { value: await getApiRequestLogBlob(key) };
+  } catch (error) {
+    return { loadError: `Failed to load ${key} from R2: ${String(error)}` };
+  }
 }
 
 function parseDate(value: string): Date | null {
@@ -182,22 +196,32 @@ export async function GET(request: NextRequest) {
 
       if (rows.length === 0) break;
 
-      for (const row of rows) {
+      const bodies = await Promise.all(
+        rows.map(async row => {
+          const [request, response] = await Promise.all([
+            loadBody(row.request_r2_key, row.request),
+            loadBody(row.response_r2_key, row.response),
+          ]);
+          return { request, response };
+        })
+      );
+
+      for (const [index, row] of rows.entries()) {
         const ts = formatTimestamp(row.created_at);
         const id = String(row.id);
 
-        const requestExt = isJson(row.request) ? 'json' : 'txt';
-        const requestContent = tryFormatJson(row.request);
-        if (requestContent) {
-          totalAppendedEntries += 1;
-          archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
-        }
-
-        const responseExt = isJson(row.response) ? 'json' : 'txt';
-        const responseContent = tryFormatJson(row.response);
-        if (responseContent) {
-          totalAppendedEntries += 1;
-          archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
+        for (const [kind, body] of Object.entries(bodies[index])) {
+          if ('loadError' in body) {
+            totalAppendedEntries += 1;
+            archive.append(body.loadError, { name: `${ts}_${id}_${kind}_load-error.txt` });
+            continue;
+          }
+          const ext = isJson(body.value) ? 'json' : 'txt';
+          const content = tryFormatJson(body.value);
+          if (content) {
+            totalAppendedEntries += 1;
+            archive.append(content, { name: `${ts}_${id}_${kind}.${ext}` });
+          }
         }
 
         if (row.error !== null && row.error !== undefined) {

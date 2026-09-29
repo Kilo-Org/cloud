@@ -5955,6 +5955,24 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
+    // Outcome-time windows and the start-latency sample each range-scan their own
+    // timestamp; the missing-outcome-time aggregate matches only null completed_at
+    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
+    // non-null completed_at index can serve.
+    index('idx_cloud_agent_code_reviews_completed_at')
+      .on(table.completed_at)
+      .concurrently()
+      .where(isNotNull(table.completed_at)),
+    index('idx_cloud_agent_code_reviews_started_at')
+      .on(table.started_at)
+      .concurrently()
+      .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
+      .on(table.status)
+      .concurrently()
+      .where(
+        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
+      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
@@ -6554,6 +6572,8 @@ export type CloudAgentFailureReason =
   | 'structured_output'
   | 'unclassified';
 
+export type CloudAgentProductOrigin = 'code-review' | 'other';
+
 export const cloud_agent_sessions = pgTable(
   'cloud_agent_sessions',
   {
@@ -6561,6 +6581,7 @@ export const cloud_agent_sessions = pgTable(
     kilo_session_id: text().notNull(),
     initial_message_id: text().notNull(),
     sandbox_id: text(),
+    product_origin: text().$type<CloudAgentProductOrigin>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     failure_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionFailureStage>(),
@@ -6607,6 +6628,10 @@ export const cloud_agent_sessions = pgTable(
       'cloud_agent_sessions_error_expiry_check',
       sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
         (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
+    ),
+    check(
+      'cloud_agent_sessions_product_origin_check',
+      sql`${table.product_origin} IS NULL OR ${table.product_origin} IN ('code-review', 'other')`
     ),
   ]
 );

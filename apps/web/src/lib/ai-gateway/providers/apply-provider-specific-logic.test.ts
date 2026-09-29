@@ -182,7 +182,9 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
 });
 
 describe('applyProviderSpecificLogic space-bunny reasoning', () => {
-  async function transform(model: string, settings: Partial<OpenRouterChatCompletionRequest>) {
+  type ReasoningSettings = Partial<OpenRouterChatCompletionRequest>;
+
+  async function transform(model: string, settings: ReasoningSettings) {
     const request = makeRequest(model);
     Object.assign(request.body, settings);
 
@@ -202,7 +204,7 @@ describe('applyProviderSpecificLogic space-bunny reasoning', () => {
     return request.body;
   }
 
-  it.each([
+  const cases: [ReasoningSettings, ReasoningSettings][] = [
     [{ reasoning: { enabled: false, effort: 'none' }, reasoning_effort: 'none' }, {}],
     [
       { reasoning: { enabled: false, effort: 'high', exclude: true }, reasoning_effort: 'low' },
@@ -214,10 +216,9 @@ describe('applyProviderSpecificLogic space-bunny reasoning', () => {
     ],
     [{ reasoning_effort: 'none' }, {}],
     [{ reasoning_effort: 'medium' }, { reasoning_effort: 'medium' }],
-  ] satisfies [
-    Partial<OpenRouterChatCompletionRequest>,
-    Partial<OpenRouterChatCompletionRequest>,
-  ][])(
+  ];
+
+  it.each(cases)(
     'normalizes unsupported reasoning settings for space-bunny (%#)',
     async (settings, expected) => {
       const body = await transform('stealth/space-bunny-alpha', settings);

@@ -287,6 +287,15 @@ export async function applyProviderSpecificLogic(
 
     repairChatCompletionsTools(requestToMutate.body);
 
+    if (requestedModel === 'stealth/space-bunny-alpha') {
+      const { body } = requestToMutate;
+      if (body.reasoning?.enabled === false) delete body.reasoning.enabled;
+      if (body.reasoning?.effort !== undefined) delete body.reasoning_effort;
+      if (body.reasoning?.effort === 'none') delete body.reasoning.effort;
+      if (body.reasoning_effort === 'none') delete body.reasoning_effort;
+      if (body.reasoning && Object.keys(body.reasoning).length === 0) delete body.reasoning;
+    }
+
     if (isClaudeModel(requestedModel)) {
       // Workaround for older clients corrupting Claude reasoning, resulting in:
       // `thinking` or `redacted_thinking` blocks in the latest assistant message cannot be modified

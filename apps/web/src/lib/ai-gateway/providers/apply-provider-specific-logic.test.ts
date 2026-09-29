@@ -8,7 +8,10 @@ import {
   applyReasoningDetailsTransform,
   removeUnsupportedRequestServiceTier,
 } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type {
+  GatewayRequest,
+  OpenRouterChatCompletionRequest,
+} from '@/lib/ai-gateway/providers/openrouter/types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
@@ -175,6 +178,68 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
     const content = await applyToToolResult('vendor/model:free', '{"$ref":"#/$defs/result"}');
 
     expect(content).toBe('{"$ref":"#/$defs/result"}');
+  });
+});
+
+describe('applyProviderSpecificLogic space-bunny reasoning', () => {
+  async function transform(model: string, settings: Partial<OpenRouterChatCompletionRequest>) {
+    const request = makeRequest(model);
+    Object.assign(request.body, settings);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null
+    );
+
+    return request.body;
+  }
+
+  it.each([
+    [{ reasoning: { enabled: false, effort: 'none' }, reasoning_effort: 'none' }, {}],
+    [
+      { reasoning: { enabled: false, effort: 'high', exclude: true }, reasoning_effort: 'low' },
+      { reasoning: { effort: 'high', exclude: true } },
+    ],
+    [
+      { reasoning: { enabled: true, effort: 'none', max_tokens: 1024 }, reasoning_effort: 'high' },
+      { reasoning: { enabled: true, max_tokens: 1024 } },
+    ],
+    [{ reasoning_effort: 'none' }, {}],
+    [{ reasoning_effort: 'medium' }, { reasoning_effort: 'medium' }],
+  ] satisfies [
+    Partial<OpenRouterChatCompletionRequest>,
+    Partial<OpenRouterChatCompletionRequest>,
+  ][])(
+    'normalizes unsupported reasoning settings for space-bunny (%#)',
+    async (settings, expected) => {
+      const body = await transform('stealth/space-bunny-alpha', settings);
+
+      expect(body.reasoning).toEqual(expected.reasoning);
+      expect(body.reasoning_effort).toEqual(expected.reasoning_effort);
+      expect(Object.hasOwn(body, 'reasoning')).toBe(Object.hasOwn(expected, 'reasoning'));
+      expect(Object.hasOwn(body, 'reasoning_effort')).toBe(
+        Object.hasOwn(expected, 'reasoning_effort')
+      );
+    }
+  );
+
+  it('preserves the same settings for other models', async () => {
+    const settings = {
+      reasoning: { enabled: false, effort: 'none' as const },
+      reasoning_effort: 'high' as const,
+    };
+    const body = await transform('vendor/model', settings);
+
+    expect(body.reasoning).toEqual(settings.reasoning);
+    expect(body.reasoning_effort).toBe(settings.reasoning_effort);
   });
 });
 

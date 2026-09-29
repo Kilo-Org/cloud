@@ -140,23 +140,70 @@ export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined 
   return undefined;
 }
 
+/**
+ * Whether this part is a running task for `childSessionId`, or a running task
+ * whose child transcript (where a nested subagent's task lives) reaches it.
+ */
+function runningTaskDescendsToSession(
+  part: Part,
+  childSessionId: KiloSessionId,
+  getChildMessages: ((sessionId: string) => StoredMessage[]) | undefined,
+  visitedSessions: Set<string>
+): boolean {
+  if (!isToolPart(part) || part.tool !== 'task' || part.state.status !== 'running') {
+    return false;
+  }
+  const taskSessionId = getTaskToolSessionId(part);
+  if (taskSessionId === childSessionId) {
+    return true;
+  }
+  if (
+    taskSessionId === undefined ||
+    getChildMessages === undefined ||
+    visitedSessions.has(taskSessionId)
+  ) {
+    return false;
+  }
+  visitedSessions.add(taskSessionId);
+  return transcriptHasRunningChildTask(
+    getChildMessages(taskSessionId),
+    childSessionId,
+    getChildMessages,
+    visitedSessions
+  );
+}
+
+/**
+ * Whether `messages`, or any running task's child transcript reachable from it,
+ * contains a running task for `childSessionId`. A subagent opened from inside
+ * another subagent's sheet is spawned by a running task in that sheet's
+ * transcript, not by the top-level one, so the target's task part is only
+ * reachable by descending through the running tasks' child transcripts.
+ */
+function transcriptHasRunningChildTask(
+  messages: StoredMessage[],
+  childSessionId: KiloSessionId,
+  getChildMessages: ((sessionId: string) => StoredMessage[]) | undefined,
+  visitedSessions: Set<string>
+): boolean {
+  return messages.some(
+    message =>
+      message.info.role === 'assistant' &&
+      message.parts.some(part =>
+        runningTaskDescendsToSession(part, childSessionId, getChildMessages, visitedSessions)
+      )
+  );
+}
+
 export function getChildSessionStreaming(
   messages: StoredMessage[],
-  childSessionId: KiloSessionId
+  childSessionId: KiloSessionId,
+  getChildMessages?: (sessionId: string) => StoredMessage[]
 ): boolean {
+  // The sessions already covered by the passed transcript need no descent.
+  const visitedSessions = new Set<string>();
   for (const message of messages) {
-    if (message.info.role === 'assistant') {
-      for (const part of message.parts) {
-        if (
-          isToolPart(part) &&
-          part.tool === 'task' &&
-          part.state.status === 'running' &&
-          getTaskToolSessionId(part) === childSessionId
-        ) {
-          return true;
-        }
-      }
-    }
+    visitedSessions.add(message.info.sessionID);
   }
-  return false;
+  return transcriptHasRunningChildTask(messages, childSessionId, getChildMessages, visitedSessions);
 }

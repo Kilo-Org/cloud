@@ -2293,7 +2293,14 @@ export function SessionDetailContent({
               getIndicatorMessages={getChildMessages}
               hydrationState={getChildSessionHydrationState(childSessionSheet.sheet.sessionId)}
               sessionError={getChildSessionError(childSessionSheet.sheet.sessionId)}
-              isStreaming={getChildSessionStreaming(messages, childSessionSheet.sheet.sessionId)}
+              isStreaming={getChildSessionStreaming(
+                messages,
+                childSessionSheet.sheet.sessionId,
+                // Descend through running tasks' child transcripts so a session
+                // opened from inside another subagent's sheet (a nested task)
+                // reads as streaming too.
+                getChildMessages
+              )}
               hasOlderMessages={childHasOlderMessages}
               isLoadingOlderMessages={childIsLoadingOlderMessages}
               olderMessagesError={childOlderMessagesError}

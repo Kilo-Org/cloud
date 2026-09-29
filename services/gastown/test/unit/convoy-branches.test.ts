@@ -106,8 +106,6 @@ describe('convoy feature branch naming', () => {
   });
 });
 
-// ── Cycle detection ─────────────────────────────────────────────────
-
 /**
  * Pure reimplementation of the cycle detection from Town.do.ts slingConvoy.
  * Throws if the depends_on graph contains a cycle.

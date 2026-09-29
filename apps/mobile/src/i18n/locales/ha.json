@@ -3178,6 +3178,7 @@
     "emptyTitle": "Babu rukunin yanar gizo da aka amince da shi",
     "emptyDescription": "Idan ka amince da rukunin yanar gizon mahaɗi, za a buɗe shi ba tare da sake tambaya ba.",
     "revoke": "Soke amincewa da {{host}}",
+    "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
   "quickChat": {
@@ -3305,7 +3306,7 @@
     "deleteFailed": "An kasa share bayanan martaba",
     "deleteBlocked": "Ana amfani da wannan bayanin martaba ta hanyar faɗakarwa ta yanar gizo. Cire shi daga waɗancan abubuwan tunzura.",
     "deletedToast": "An goge bayanin martaba \"{{name}}\".",
-    "variablesTitle": "Matsalolin muhalli",
+    "variablesTitle": "Masu canjin yanayi",
     "addVariable": "Ƙara m",
     "keyLabel": "Maɓalli",
     "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
@@ -3388,7 +3389,7 @@
       "topPPlaceholder": "misali 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Wakilina",
-      "promptPlaceholder": "ka a...",
+      "promptPlaceholder": "Kai mataimaki ne...",
       "tools": "Kayan aiki",
       "visibility": "Ganuwa",
       "visibilityPrimary": "Na farko - wanda aka nuna a cikin mai ɗaukar hoto",

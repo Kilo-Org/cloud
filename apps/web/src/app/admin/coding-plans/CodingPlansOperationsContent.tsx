@@ -58,6 +58,8 @@ import {
   getSubscriptionSummaryItems,
   getSwapCredentialCompleteToast,
   getSwapCredentialDialogCopy,
+  getTerminateSubscriptionCompleteToast,
+  getTerminateSubscriptionDialogCopy,
   type InsightsRangeDays,
 } from '@/app/admin/coding-plans/coding-plan-operations';
 import {
@@ -84,6 +86,7 @@ type OperationsState = {
   inventoryReplacementApiKey: string;
   inventoryReplacementConfirmOpen: boolean;
   cancelSelection: AdminCodingPlanSubscriptionItem | null;
+  terminateSelection: AdminCodingPlanSubscriptionItem | null;
   extendSelection: AdminCodingPlanSubscriptionItem | null;
   extendDays: string;
   swapSelection: AdminCodingPlanSubscriptionItem | null;
@@ -126,6 +129,7 @@ const INITIAL_OPERATIONS_STATE: OperationsState = {
   inventoryReplacementApiKey: '',
   inventoryReplacementConfirmOpen: false,
   cancelSelection: null,
+  terminateSelection: null,
   extendSelection: null,
   extendDays: '7',
   swapSelection: null,
@@ -152,6 +156,7 @@ export function CodingPlansOperationsContent() {
     inventoryReplacementApiKey,
     inventoryReplacementConfirmOpen,
     cancelSelection,
+    terminateSelection,
     extendSelection,
     extendDays,
     swapSelection,
@@ -180,6 +185,8 @@ export function CodingPlansOperationsContent() {
     updateState({ inventoryReplacementConfirmOpen });
   const setCancelSelection = (cancelSelection: AdminCodingPlanSubscriptionItem | null) =>
     updateState({ cancelSelection });
+  const setTerminateSelection = (terminateSelection: AdminCodingPlanSubscriptionItem | null) =>
+    updateState({ terminateSelection });
   const setExtendSelection = (extendSelection: AdminCodingPlanSubscriptionItem | null) =>
     updateState({ extendSelection });
   const setExtendDays = (extendDays: string) => updateState({ extendDays });
@@ -272,6 +279,16 @@ export function CodingPlansOperationsContent() {
         await refreshOperations();
       },
       onError: error => toast.error(error.message || 'Unable to cancel subscription.'),
+    })
+  );
+  const terminateMutation = useMutation(
+    trpc.codingPlans.adminTerminateSubscription.mutationOptions({
+      onSuccess: async () => {
+        setTerminateSelection(null);
+        toast.success(getTerminateSubscriptionCompleteToast());
+        await refreshOperations();
+      },
+      onError: error => toast.error(error.message || 'Unable to terminate subscription.'),
     })
   );
   const extendMutation = useMutation(
@@ -483,6 +500,7 @@ export function CodingPlansOperationsContent() {
             }}
             onPageChange={setSubscriptionPage}
             onCancel={setCancelSelection}
+            onTerminate={setTerminateSelection}
             onExtend={item => {
               setExtendSelection(item);
               setExtendDays('7');
@@ -591,6 +609,10 @@ export function CodingPlansOperationsContent() {
         cancelPending={cancelMutation.isPending}
         onCloseCancel={() => setCancelSelection(null)}
         onCancel={subscriptionId => cancelMutation.mutate({ subscriptionId })}
+        terminateSelection={terminateSelection}
+        terminatePending={terminateMutation.isPending}
+        onCloseTerminate={() => setTerminateSelection(null)}
+        onTerminate={subscriptionId => terminateMutation.mutate({ subscriptionId })}
         extendSelection={extendSelection}
         extendDays={extendDays}
         extendPending={extendMutation.isPending}
@@ -1110,6 +1132,7 @@ function SubscriptionsTable({
   onStatusChange,
   onPageChange,
   onCancel,
+  onTerminate,
   onExtend,
   onSwap,
   availableCountsByPlan,
@@ -1127,6 +1150,7 @@ function SubscriptionsTable({
   onStatusChange: (value: SubscriptionDisplayStatus | 'all') => void;
   onPageChange: (page: number) => void;
   onCancel: (item: AdminCodingPlanSubscriptionItem) => void;
+  onTerminate: (item: AdminCodingPlanSubscriptionItem) => void;
   onExtend: (item: AdminCodingPlanSubscriptionItem) => void;
   onSwap: (item: AdminCodingPlanSubscriptionItem) => void;
   availableCountsByPlan: Record<string, number>;
@@ -1241,6 +1265,7 @@ function SubscriptionsTable({
                       ? formatLocalDateTimeLabel(billingDate.date)
                       : formatDateLabel(billingDate.date);
                   const canCancel = item.status === 'active' && !item.cancelAtPeriodEnd;
+                  const canTerminate = item.status === 'active' || item.status === 'past_due';
                   const canExtend = item.status === 'active';
                   const inventoryKeyId = item.inventoryKeyId;
                   const upstreamPlanId = item.upstreamPlanId;
@@ -1357,6 +1382,15 @@ function SubscriptionsTable({
                           {canCancel ? (
                             <Button variant="destructive" size="sm" onClick={() => onCancel(item)}>
                               Cancel
+                            </Button>
+                          ) : null}
+                          {canTerminate ? (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => onTerminate(item)}
+                            >
+                              Terminate now
                             </Button>
                           ) : null}
                         </div>
@@ -1769,6 +1803,10 @@ function OperationsDialogs({
   cancelPending,
   onCloseCancel,
   onCancel,
+  terminateSelection,
+  terminatePending,
+  onCloseTerminate,
+  onTerminate,
   extendSelection,
   extendDays,
   extendPending,
@@ -1807,6 +1845,10 @@ function OperationsDialogs({
   cancelPending: boolean;
   onCloseCancel: () => void;
   onCancel: (subscriptionId: string) => void;
+  terminateSelection: AdminCodingPlanSubscriptionItem | null;
+  terminatePending: boolean;
+  onCloseTerminate: () => void;
+  onTerminate: (subscriptionId: string) => void;
   extendSelection: AdminCodingPlanSubscriptionItem | null;
   extendDays: string;
   extendPending: boolean;
@@ -1841,6 +1883,9 @@ function OperationsDialogs({
     replacementSelection?.providerDisplayName ?? 'the provider'
   );
   const cancelCopy = getCancelSubscriptionDialogCopy(cancelSelection?.userName ?? 'this user');
+  const terminateCopy = getTerminateSubscriptionDialogCopy(
+    terminateSelection?.userName ?? 'this user'
+  );
   const extendCopy = getExtendSubscriptionDialogCopy(extendSelection?.userName ?? 'this user');
   const swapCopy = getSwapCredentialDialogCopy(swapSelection?.userName ?? 'this user');
   const parsedExtendDays = Number(extendDays);
@@ -1938,6 +1983,32 @@ function OperationsDialogs({
               disabled={cancelPending}
             >
               {cancelPending ? 'Scheduling cancellation...' : 'Cancel at period end'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={terminateSelection !== null}
+        onOpenChange={open => {
+          if (!open && !terminatePending) onCloseTerminate();
+        }}
+      >
+        <DialogContent showCloseButton={!terminatePending}>
+          <DialogHeader>
+            <DialogTitle>{terminateCopy.title}</DialogTitle>
+            <DialogDescription>{terminateCopy.description}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={onCloseTerminate} disabled={terminatePending}>
+              Keep subscription
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => terminateSelection && onTerminate(terminateSelection.id)}
+              disabled={terminatePending}
+            >
+              {terminatePending ? 'Terminating...' : 'Terminate now'}
             </Button>
           </DialogFooter>
         </DialogContent>

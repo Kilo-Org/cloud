@@ -30,7 +30,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       tasks: [{ title: 'Task 1' }],
     });
 
-    // Run alarm to trigger reconciler assignment (lazy assignment)
     await runDurableObjectAlarm(town);
 
     const beadId = result.beads[0].bead.bead_id;
@@ -47,19 +46,15 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
     // agentDone is event-only — run alarm to drain events and create MR bead
     await runDurableObjectAlarm(town);
 
-    // Source bead should now be in_review (waiting for refinery)
     const sourceBead = await town.getBeadAsync(beadId);
     expect(sourceBead?.status).toBe('in_review');
 
-    // Find the MR bead
     const allBeads = await town.listBeads({ type: 'merge_request' });
     const mrBead = allBeads.find(b => b.metadata?.source_bead_id === beadId);
     expect(mrBead).toBeTruthy();
 
     return { result, beadId, agentId, mrBeadId: mrBead!.bead_id, convoyId: result.convoy.id };
   }
-
-  // ── completeReviewWithResult properly updates convoy progress ───────
 
   describe('completeReviewWithResult on MR failure', () => {
     it('should return source bead to in_progress when MR bead fails', async () => {
@@ -72,7 +67,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         message: 'Refinery container failed to start',
       });
 
-      // MR bead should be failed
       const mrBead = await town.getBeadAsync(mrBeadId);
       expect(mrBead?.status).toBe('failed');
 
@@ -92,21 +86,16 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         message: 'Merged by refinery',
       });
 
-      // Source bead should be closed
       const sourceBead = await town.getBeadAsync(beadId);
       expect(sourceBead?.status).toBe('closed');
 
-      // MR bead should be closed
       const mrBead = await town.getBeadAsync(mrBeadId);
       expect(mrBead?.status).toBe('closed');
 
-      // Convoy progress should reflect the closed bead
       const convoyStatus = await town.getConvoyStatus(convoyId);
       expect(convoyStatus?.closed_beads).toBe(1);
     });
   });
-
-  // ── Multi-bead convoy: failed MR doesn't stall the convoy ──────────
 
   describe('convoy progress with mixed outcomes', () => {
     it('should not stall convoy when one MR fails and another merges', async () => {
@@ -123,7 +112,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         tasks: [{ title: 'Task 1' }, { title: 'Task 2' }],
       });
 
-      // Run alarm to trigger reconciler assignment (lazy assignment)
       await runDurableObjectAlarm(town);
 
       const bead0Id = result.beads[0].bead.bead_id;
@@ -133,7 +121,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       const bead1 = await town.getBeadAsync(bead1Id);
       const agent1Id = bead1!.assignee_agent_bead_id!;
 
-      // Both agents complete work (event-only)
       await town.agentDone(agent0Id, {
         branch: 'gt/polecat/task-1',
         summary: 'Task 1 done',
@@ -143,10 +130,8 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         summary: 'Task 2 done',
       });
 
-      // Drain events to create MR beads
       await runDurableObjectAlarm(town);
 
-      // Find MR beads
       const mrBeads = await town.listBeads({ type: 'merge_request' });
       const mr0 = mrBeads.find(b => b.metadata?.source_bead_id === bead0Id);
       const mr1 = mrBeads.find(b => b.metadata?.source_bead_id === bead1Id);
@@ -160,18 +145,15 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         message: 'Review failed',
       });
 
-      // Source bead 0 should be back to open (ready for rework by reconciler)
       const source0 = await town.getBeadAsync(bead0Id);
       expect(source0?.status).toBe('open');
 
-      // Merge MR for task 2
       await town.completeReviewWithResult({
         entry_id: mr1!.bead_id,
         status: 'merged',
         message: 'Merged',
       });
 
-      // Source bead 1 should be closed
       const source1 = await town.getBeadAsync(bead1Id);
       expect(source1?.status).toBe('closed');
 
@@ -181,8 +163,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       expect(convoyStatus?.closed_beads).toBe(1);
     });
   });
-
-  // ── Source bead in_review after agentDone ──────────────────────────
 
   describe('agentDone transitions source bead to in_review', () => {
     it('should set source bead to in_review after polecat calls agentDone', async () => {
@@ -199,7 +179,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
         tasks: [{ title: 'Single Task' }],
       });
 
-      // Run alarm to trigger reconciler assignment (lazy assignment)
       await runDurableObjectAlarm(town);
 
       const beadId = result.beads[0].bead.bead_id;
@@ -217,7 +196,6 @@ describe('Review failure paths — convoy progress and source bead recovery', ()
       const updatedBead = await town.getBeadAsync(beadId);
       expect(updatedBead?.status).toBe('in_review');
 
-      // An MR bead should have been created
       const mrBeads = await town.listBeads({ type: 'merge_request' });
       expect(mrBeads.length).toBeGreaterThan(0);
       expect(mrBeads.some(b => b.metadata?.source_bead_id === beadId)).toBe(true);

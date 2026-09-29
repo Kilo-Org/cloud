@@ -1361,6 +1361,9 @@ export class SessionService {
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
+      // Background subagents let a root session idle before publishing its work,
+      // which the platform treats as completion; keep subagents foreground-only.
+      KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };

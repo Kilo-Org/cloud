@@ -254,6 +254,8 @@ export function getCountryDisplayName(code: string): string {
 export function formatPrice(price: string): string {
   const num = parseFloat(price);
   if (num === 0) return 'Free';
+  // Routers such as `openrouter/auto` report `-1` because the price depends on the model they pick.
+  if (num < 0) return 'Varies';
   const perMillion = num * 1_000_000;
   if (perMillion >= 0.01) return `$${perMillion.toFixed(2)}/1M tokens`;
   return `$${perMillion.toFixed(6)}/1M tokens`;

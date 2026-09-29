@@ -179,6 +179,33 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
     expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
   });
+
+  it('forces background subagents off and wins over a profile that re-enables them', () => {
+    const service = new SessionService();
+
+    const defaultEnv = service.buildRuntimeEnv({
+      context: service.buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_test',
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+    expect(defaultEnv.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+
+    const overridden = service.buildRuntimeEnv({
+      context: service.buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_test',
+        envVars: { KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true' },
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+    expect(overridden.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+  });
 });
 
 describe('code-review command guard policy', () => {

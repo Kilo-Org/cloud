@@ -663,6 +663,34 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
   });
 
+  it('routes virtual routers through the allowed real providers only', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: { provider_allow_list: ['virtual', 'amazon-bedrock'] },
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: true,
+      eligibleProviderRoutes: new Set(['virtual', 'amazon-bedrock']),
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('openrouter/auto')) as never);
+
+    expect(response.status).toBe(200);
+    const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
+    expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
+  });
+
   it('allows a group grant to override the organization model baseline', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {

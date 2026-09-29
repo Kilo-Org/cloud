@@ -6,6 +6,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ChatComposer } from './chat-composer';
+import { COMPOSER_INPUT_MAX_HEIGHT } from './chat-composer-input-height';
 
 // Pins the composer's typing-render contract: typing a keystroke must not
 // re-render the 1400-line `ChatComposer`. The hidden mirror and its measurement
@@ -350,12 +351,25 @@ describe('ChatComposer typing render cost', () => {
     expect(composerCommits.count).toBeLessThanOrEqual(heightChanges + 2);
     expect(composerCommits.count).toBeLessThan(DRAFT.length / 10);
     expect(heightChanges).toBeGreaterThan(0);
+    // Positive control for the two upper bounds above: both stay satisfied by a
+    // count of 0, so without this they could pass vacuously if the probe's mock
+    // stopped firing (a mock or renderer change). A composer that published the
+    // hasText flip and the grown height must have counted at least one commit.
+    expect(composerCommits.count).toBeGreaterThan(0);
 
     // The commit bound alone is one-sided: a composer that never republished
     // the measurement would commit less, not more. Pin the other half of the
-    // owner's growth contract — the input must still grow line by line to the
-    // snapped cap and hold there, with the row scrollable once capped.
-    expect(inputHeights.length).toBe(heightChanges);
+    // owner's growth contract — the input must still grow line by line and hold
+    // at the cap, with the row scrollable once capped. This suite never reports
+    // the real input's `onContentSizeChange`, so `nativeContentHeight` stays
+    // null, `useTextHeight` derives no native pitch, and the cap exercised here
+    // is the raw remaining-space cap (`COMPOSER_INPUT_MAX_HEIGHT`); the line
+    // snapping that only runs once a native pitch is known is not covered.
+    // Each entry is one added line's published height: the 24pt vertical
+    // padding plus 20pt per line from the second line on, clamped to the cap.
+    expect(inputHeights).toEqual(
+      [2, 3, 4, 5, 6, 7, 8].map(lines => Math.min(lines * 20 + 24, COMPOSER_INPUT_MAX_HEIGHT))
+    );
     const firstHeight = inputHeights.at(0) ?? Number.NaN;
     const lastHeight = inputHeights.at(-1) ?? Number.NaN;
     const previousHeight = inputHeights.at(-2) ?? Number.NaN;

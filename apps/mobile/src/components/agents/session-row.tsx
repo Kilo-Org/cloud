@@ -17,6 +17,7 @@ import {
   shouldShowNeedsInput,
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
+import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
 import {
   namedSessionTitle,
   SESSION_TITLE_MAX_LENGTH,
@@ -51,6 +52,23 @@ import {
  * `subtitle`, `meta`, `metaWhileLive`) are passed identically in both. */
 export type RowVariant = 'list' | 'card';
 
+/**
+ * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * The native router and browser imports are lazy: they cannot load under the
+ * mounted row tests' node environment, and only the long-press entry reaches
+ * them.
+ */
+async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
+  const target = await resolveSessionPrPressTarget({ url });
+  if (target.kind === 'in-app') {
+    const { router } = await import('expo-router');
+    router.push(target.href);
+    return;
+  }
+  const { openExternalUrl } = await import('@/lib/external-link');
+  await openExternalUrl(target.url, { label });
+}
+
 type StoredSessionRowProps = {
   session: {
     session_id: string;
@@ -64,7 +82,7 @@ type StoredSessionRowProps = {
     status: string | null;
     status_updated_at: string | null;
     total_cost_microdollars: number | null;
-    associatedPr?: { number: number } | null;
+    associatedPr?: { number: number; url?: string | null } | null;
   };
   /**
    * Which timestamp drives the row's relative meta label. The list
@@ -154,6 +172,11 @@ export function StoredSessionRow({
       onCopySessionId: () => {
         void copySessionId(session.session_id);
       },
+      onViewPr: session.associatedPr
+        ? () => {
+            void openSessionPr(session.associatedPr?.url, t('common.pullRequest'));
+          }
+        : undefined,
       onRename: onRename
         ? () => {
             if (Platform.OS === 'ios') {

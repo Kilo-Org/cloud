@@ -1,20 +1,21 @@
 // Footer action bar rendered in-flow below the PR diff FlashList. The list
 // ends at its top edge, so a diff row is never clipped by it at any scroll
 // position (spot check e3: the bar floated over the list and cut the last
-// src/beta.ts line). Hosts:
+// src/beta.ts line). Hosts compact icon controls:
 //   - The "Comment" affordance that pushes the comment-composer route
-//     when a diff-line selection exists, plus a "Clear" button that
-//     drops the selection.
-//   - The "Finish review" button that pushes the review-submit route,
-//     shown regardless of pending-comment count so a clean PR can still
-//     be approved. The numeric count badge only renders when the queue
-//     is non-empty.
+//     when a diff-line selection exists, plus a compact clear (X) icon
+//     control that drops the selection.
+//   - The compact "Finish review" icon control that pushes the review-submit
+//     route, shown regardless of pending-comment count so a clean PR can
+//     still be approved. The numeric count badge only renders when the
+//     queue is non-empty, as an in-flow pill after the icon so it never
+//     covers it.
 //
 // Extracted from `pr-diff-file-list.tsx` to keep that file under the
 // 300-line repo cap.
 
 import { type Href, useRouter } from 'expo-router';
-import { MessageCirclePlus } from '@/components/ui/icons';
+import { Check, MessageCirclePlus, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +29,6 @@ import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
-import { cn } from '@/lib/utils';
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -126,51 +126,58 @@ export function PrDiffFloatingActions({
         ...(insets.right > 0 ? { paddingRight: insets.right } : undefined),
       }}
     >
-      <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
-        {showSelectionAction ? (
-          <View className="flex-row items-center gap-2">
-            <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
-              {selectionDescription(selection)}
-            </Text>
-            <Button
-              variant="ghost"
-              size="sm"
-              onPress={() => {
-                onClearSelection();
-                clearDiffSelection({ owner, repo, number });
-              }}
-              accessibilityLabel={t('prReview.floatingActions.clearSelection')}
-            >
-              <Text>{t('prReview.floatingActions.clear')}</Text>
-            </Button>
-            <Button
-              onPress={openCommentComposer}
-              size="sm"
-              accessibilityLabel={t('prReview.floatingActions.commentOnSelectedLines')}
-            >
-              <MessageCirclePlus size={14} color={colors.primaryForeground} />
-              <Text>{t('prReview.floatingActions.comment')}</Text>
-            </Button>
-          </View>
-        ) : null}
-        {/* The Button row is `flex-row items-center justify-center gap-2`, so
-            the count badge is an in-flow pill AFTER the label. It used to ride
-            the label's top-right corner (`absolute -right-2.5 -top-2.5`),
-            which drew the opaque badge over the last glyphs of the label
-            (spot check e1-select-line / e1-line1-comment). In-flow the badge
-            can never cover the label, at any pending count or font scale. */}
-        <Button
-          onPress={openReviewSubmit}
-          accessibilityLabel={t('prReview.floatingActions.finishReview')}
-          className={cn(showSelectionAction && 'mt-1')}
-        >
-          <Text>{t('prReview.floatingActions.finishReview')}</Text>
-          {pending.items.length > 0 ? (
-            <View className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
-              <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>
-            </View>
+      <View className="w-full rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">
+        <View className="flex-row items-center justify-end gap-1">
+          {showSelectionAction ? (
+            <>
+              <Text className="flex-1 text-xs text-muted-foreground" numberOfLines={1}>
+                {selectionDescription(selection)}
+              </Text>
+              <Button
+                variant="ghost"
+                size="icon"
+                onPress={() => {
+                  onClearSelection();
+                  clearDiffSelection({ owner, repo, number });
+                }}
+                accessibilityLabel={t('prReview.floatingActions.clearSelection')}
+                accessibilityHint={t('prReview.floatingActions.clear')}
+              >
+                <X size={18} color={colors.foreground} />
+              </Button>
+              <Button
+                onPress={openCommentComposer}
+                size="sm"
+                accessibilityLabel={t('prReview.floatingActions.commentOnSelectedLines')}
+              >
+                <MessageCirclePlus size={14} color={colors.primaryForeground} />
+                <Text>{t('prReview.floatingActions.comment')}</Text>
+              </Button>
+            </>
           ) : null}
-        </Button>
+          {/* The submit affordance is a compact icon control. An icon-only
+              control has no label to cover, so the pending count is an
+              in-flow pill AFTER the Check icon: the button's base row
+              (`flex-row items-center justify-center gap-2`) spaces them
+              side by side, so the badge can never cover the icon at any
+              pending count or font scale (spot check e1 in-flow guard; an
+              `absolute` corner badge grew with large text and drew over the
+              icon). `w-auto min-w-[44px]` keeps the icon-only box at the
+              44pt touch target while letting it widen for the badge. */}
+          <Button
+            onPress={openReviewSubmit}
+            size="icon"
+            className="w-auto min-w-[44px] px-2"
+            accessibilityLabel={t('prReview.floatingActions.finishReview')}
+          >
+            <Check size={18} color={colors.primaryForeground} />
+            {pending.items.length > 0 ? (
+              <View className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
+                <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>
+              </View>
+            ) : null}
+          </Button>
+        </View>
       </View>
     </View>
   );

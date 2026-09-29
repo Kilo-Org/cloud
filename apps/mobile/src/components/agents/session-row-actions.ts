@@ -91,6 +91,11 @@ type SessionActionMenuOptions = {
     onSelect: (index?: number) => void
   ) => void;
   onCopySessionId: () => void;
+  /**
+   * Omitted → no View PR entry. Only a session with an associated PR passes
+   * this, so the entry never appears on a session without one.
+   */
+  onViewPr?: () => void;
   /** Omitted → no Rename entry. */
   onRename?: () => void;
   /**
@@ -107,19 +112,31 @@ type SessionActionMenuOptions = {
 
 /**
  * Shared session long-press menu. Builds one options list — Copy session ID,
- * optional Rename, optional Exit session, optional Delete session, Cancel —
- * and dispatches by index. Exit session is additive when `onExit` is passed;
- * callers that omit it keep the old Copy / Rename / Delete / Cancel form.
+ * optional View PR, optional Rename, optional Exit session, optional Delete
+ * session, Cancel — and dispatches by index. View PR is additive when
+ * `onViewPr` is passed; Exit session is additive when `onExit` is passed;
+ * callers that omit them keep the old Copy / Rename / Delete / Cancel form.
  * iOS delegates to native ActionSheetIOS via @expo/react-native-action-sheet;
  * Android gets backdrop-tap and hardware-back dismiss from the library.
  */
 export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const { showActionSheetWithOptions, onCopySessionId, onRename, onExit, onDelete, themedSheet } =
-    opts;
+  const {
+    showActionSheetWithOptions,
+    onCopySessionId,
+    onViewPr,
+    onRename,
+    onExit,
+    onDelete,
+    themedSheet,
+  } = opts;
 
   const options = [i18n.t('agents.sessionRow.copyId')];
   const handlers: (() => void)[] = [onCopySessionId];
 
+  if (onViewPr) {
+    options.push(i18n.t('securityAgent.findingRow.viewPr'));
+    handlers.push(onViewPr);
+  }
   if (onRename) {
     options.push(i18n.t('common.rename'));
     handlers.push(onRename);

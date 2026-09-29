@@ -3101,7 +3101,9 @@ describe('session detail composer after a failed turn', () => {
 });
 
 describe('SessionDetailContent goal visibility', () => {
+  const activeGoal: SessionGoal = { text: 'Ship p7 objective', status: 'active' };
   const pausedGoal: SessionGoal = { text: 'Ship p7 objective', status: 'paused' };
+  const mergedPr: AssociatedPrData = { ...ASSOCIATED_PR, state: 'merged' };
 
   // The store is module-level and outlives every mount here, so each case
   // starts from expanded (there is no test-only reset export).
@@ -3161,8 +3163,8 @@ describe('SessionDetailContent goal visibility', () => {
     expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
   });
 
-  it('hands the PR badge to the goal row and keeps it out of the header', async () => {
-    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
+  it('hands the PR badge to the active goal row and keeps it out of the header', async () => {
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
     associatedPrMountOption = ASSOCIATED_PR;
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
 
@@ -3171,20 +3173,41 @@ describe('SessionDetailContent goal visibility', () => {
     expect(header.findAllByType('SessionPrBadge')).toHaveLength(0);
 
     const section = goalSectionOf(view);
-    expect(section.props.goal).toEqual(pausedGoal);
+    expect(section.props.goal).toEqual(activeGoal);
     expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
   });
 
-  it('shows the goal row for a PR-only session', async () => {
+  it('keeps the inactive goal row and its content intact and shows no PR badge', async () => {
+    goalMountOptions = { goal: pausedGoal, resolvedType: 'remote' };
     associatedPrMountOption = ASSOCIATED_PR;
     const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
 
+    // The row still mounts for the goal; only the trailing pill is withheld.
+    // The context sheet owns its own PR pill, so the assertion is scoped to
+    // the goal row.
     const section = goalSectionOf(view);
-    expect(section.props.goal).toBeNull();
-    expect(section.findAllByType('SessionPrBadge')).toHaveLength(1);
-    // The row exists because the PR landed, so the badge never renders the
-    // session-loading skeleton; the wrapper's FadeIn reveals it.
-    expect(section.findAllByType('SessionPrBadge')[0]?.props.loading).toBe(false);
+    expect(section.props.goal).toEqual(pausedGoal);
+    expect(section.props.trailing).toBeUndefined();
+    expect(section.props.onPress).toBeTypeOf('function');
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(0);
+  });
+
+  it('shows no PR badge for an active goal with a merged PR', async () => {
+    goalMountOptions = { goal: activeGoal, resolvedType: 'remote' };
+    associatedPrMountOption = mergedPr;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    const section = goalSectionOf(view);
+    expect(section.props.goal).toEqual(activeGoal);
+    expect(section.findAllByType('SessionPrBadge')).toHaveLength(0);
+  });
+
+  it('omits the goal row for a PR-only session with no goal', async () => {
+    associatedPrMountOption = ASSOCIATED_PR;
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+
+    expect(view.renderer.root.findAllByType(SessionGoalSection)).toHaveLength(0);
+    expect(view.renderer.root.findAllByType('SessionPrBadge')).toHaveLength(0);
   });
 
   it('omits the goal row when it holds neither a goal nor a PR', async () => {

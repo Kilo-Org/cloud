@@ -9,6 +9,7 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
+import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
 import { Platform, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -62,6 +63,23 @@ type RemoteSessionRowProps = {
   /** See `StoredSessionRowProps.interactive`. Defaults to `true`. */
   interactive?: boolean;
 };
+
+/**
+ * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * The native router and browser imports are lazy: they cannot load under the
+ * mounted row tests' node environment, and only the long-press entry reaches
+ * them.
+ */
+async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
+  const target = await resolveSessionPrPressTarget({ url });
+  if (target.kind === 'in-app') {
+    const { router } = await import('expo-router');
+    router.push(target.href);
+    return;
+  }
+  const { openExternalUrl } = await import('@/lib/external-link');
+  await openExternalUrl(target.url, { label });
+}
 
 export const RemoteSessionRow = memo(function RemoteSessionRow({
   session,
@@ -253,6 +271,11 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       onCopySessionId: () => {
         void copySessionId(session.id);
       },
+      onViewPr: session.associatedPr
+        ? () => {
+            void openSessionPr(session.associatedPr?.url, t('common.pullRequest'));
+          }
+        : undefined,
       onRename: () => {
         if (Platform.OS === 'ios') {
           showRenamePrompt(renameInitialValue, newTitle => {

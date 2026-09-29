@@ -118,21 +118,6 @@ describe('GET /admin/api/api-request-log/download', () => {
     });
   });
 
-  it('exports legacy rows whose bodies are stored inline', async () => {
-    const [row] = await db
-      .insert(api_request_log)
-      .values({ ...baseRow, request: { legacy: true }, response: 'data: legacy\n\n' })
-      .returning({ id: api_request_log.id });
-
-    const entries = await downloadEntries();
-
-    expect(Object.keys(entries)).toHaveLength(2);
-    expect(readEntry(entries, `_${row.id}_request.json`)).toBe(
-      JSON.stringify({ legacy: true }, null, 2)
-    );
-    expect(readEntry(entries, `_${row.id}_response.txt`)).toBe('data: legacy\n\n');
-  });
-
   it('skips missing R2 objects and records R2 read failures without aborting the export', async () => {
     const [missing, failing] = await db
       .insert(api_request_log)

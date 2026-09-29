@@ -30,6 +30,11 @@ export function createSecureStorePreference<T>(options: {
   const { key, defaultValue, parse, serialize, mergeOnLoad } = options;
   let value = defaultValue;
   let hasLoaded = false;
+  // The initial disk read itself settled. Distinct from `hasLoaded`, which a
+  // set()/clear() also flips before the read resolves: a caller that must
+  // reconcile an in-memory write against the persisted value has to wait for
+  // the read, not for the first write.
+  let loadSettled = false;
   // A set() or clear() before the initial load resolves must win over the
   // disk value.
   let dirty = false;
@@ -76,6 +81,7 @@ export function createSecureStorePreference<T>(options: {
       });
     } finally {
       hasLoaded = true;
+      loadSettled = true;
       markLoaded();
       emit();
     }
@@ -127,6 +133,12 @@ export function createSecureStorePreference<T>(options: {
     },
     get: () => value,
     getHasLoaded: () => hasLoaded,
+    /**
+     * True only once the initial disk read settled, unlike `getHasLoaded`,
+     * which a write before that read also flips. Use this to decide when the
+     * persisted value — not a pending write — is safe to reconcile against.
+     */
+    getLoadSettled: () => loadSettled,
     set: (next: T) => {
       value = next;
       dirty = true;

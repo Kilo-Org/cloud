@@ -27,28 +27,40 @@ export function mountSection(
 ) {
   const renderer: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
   act(() => {
-    renderer.current = TestRenderer.create(
-      createElement(NewSessionRepositorySection, {
-        disabled: false,
-        isRetrying: false,
-        onChange: vi.fn(() => undefined),
-        onConnect: vi.fn(() => undefined),
-        onRefreshRepos: vi.fn(() => undefined),
-        repositories: [githubRow, gitlabRow],
-        recents: [],
-        groups: [group('github', 'repos'), group('gitlab', 'repos')],
-        value: '',
-        organizationId: undefined,
-        isCloneEntry: false,
-        ...overrides,
-      })
-    );
+    renderer.current = TestRenderer.create(sectionElement(overrides));
   });
   const created = renderer.current;
   if (created === null) {
     throw new Error('the section did not render');
   }
   return created;
+}
+
+/** Re-render the section with the same defaulted props, to land a mock change. */
+export function rerenderSection(
+  renderer: TestRenderer.ReactTestRenderer,
+  overrides: Partial<ComponentProps<typeof NewSessionRepositorySection>>
+): void {
+  act(() => {
+    renderer.update(sectionElement(overrides));
+  });
+}
+
+function sectionElement(overrides: Partial<ComponentProps<typeof NewSessionRepositorySection>>) {
+  return createElement(NewSessionRepositorySection, {
+    disabled: false,
+    isRetrying: false,
+    onChange: vi.fn(() => undefined),
+    onConnect: vi.fn(() => undefined),
+    onRefreshRepos: vi.fn(() => undefined),
+    repositories: [githubRow, gitlabRow],
+    recents: [],
+    groups: [group('github', 'repos'), group('gitlab', 'repos')],
+    value: '',
+    organizationId: undefined,
+    isCloneEntry: false,
+    ...overrides,
+  });
 }
 
 export function branchSelectorProps(renderer: TestRenderer.ReactTestRenderer) {

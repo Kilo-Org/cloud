@@ -1,5 +1,5 @@
 import { readStoredValue, type SecureStoreReadOptions } from '@/lib/auth/secure-store-value';
-import { E2E_SECURE_STORE_FAULT_MS } from '@/lib/config';
+import * as config from '@/lib/config';
 import { E2eInjectedFaultError } from '@/lib/telemetry/e2e-fault';
 import { reportSecureStoreFailure } from '@/lib/telemetry/secure-store-events';
 
@@ -31,7 +31,29 @@ const RETRY_DELAYS_MS = [250, 500, 1000] as const;
 const moduleLoadTime = Date.now();
 
 function isFaultWindowOpen(): boolean {
-  return E2E_SECURE_STORE_FAULT_MS > 0 && Date.now() - moduleLoadTime < E2E_SECURE_STORE_FAULT_MS;
+  return (
+    config.E2E_SECURE_STORE_FAULT_MS > 0 &&
+    Date.now() - moduleLoadTime < config.E2E_SECURE_STORE_FAULT_MS
+  );
+}
+
+// E2E-only hold, the sibling of the fault window above: the bundle names one
+// SecureStore key, and a read of that scoped key never settles instead of
+// spending the retry budget, so a preference's `load` never reaches `finally`
+// and stays in its pre-load state for the harness to assert. Env-gated, so the
+// constant is `undefined` and this is inert in production. Every other key,
+// and the E2E_SECURE_STORE_FAULT_MS rejection path, is unchanged.
+const NEVER_SETTLES: Promise<never> = new Promise<never>(() => {
+  // Intentionally never resolves or rejects: the held read must stay pending.
+});
+
+// Looked up through the config namespace and guarded: a config surface that
+// does not carry the key keeps the hold off rather than failing the read.
+const E2E_HELD_KEY: string | undefined =
+  'E2E_SECURE_STORE_HOLD_KEY' in config ? config.E2E_SECURE_STORE_HOLD_KEY : undefined;
+
+function isE2eHeldKey(key: string): boolean {
+  return E2E_HELD_KEY !== undefined && E2E_HELD_KEY !== '' && key === E2E_HELD_KEY;
 }
 
 async function delay(ms: number): Promise<void> {
@@ -46,6 +68,11 @@ async function readOnce(
   options: SecureStoreReadOptions | undefined,
   firstAttempt: Promise<string | null> | undefined
 ): Promise<string | null> {
+  if (isE2eHeldKey(key)) {
+    // The hold outranks the fault window: the held read must stay pending
+    // rather than reject, so the caller's `finally` never runs.
+    await NEVER_SETTLES;
+  }
   if (isFaultWindowOpen()) {
     // No key in the message: the exhausted-read report attaches this error, and
     // the report must carry no key material, like the real store's error. The

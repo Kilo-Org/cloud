@@ -43,15 +43,22 @@ const store = createSecureStorePreference<RepoPlatform[]>({
   mergeOnLoad: (disk, pending) => [...new Set([...disk, ...pending])],
 });
 
-// Warm the store as soon as this module is imported: the connect card gates
-// its first paint on `hasLoaded`, so the disk read must start before the
-// new-session screen mounts (same reason as use-trusted-hosts).
+// Warm the store as soon as this module is imported: the new-session screen
+// reads it during its first render, so starting it here lets the persisted
+// collapse apply on the render after the connect card's header first paints
+// instead of after the screen is already interactive (same reason as
+// use-trusted-hosts).
 store.preload();
 
 export function useCollapsedConnectCtas() {
   const collapsedCtas = useSyncExternalStore(store.subscribe, store.get);
-  const hasLoaded = useSyncExternalStore(store.subscribe, store.getHasLoaded);
-  return { collapsedCtas, hasLoaded };
+  // `getLoadSettled`, not `getHasLoaded`: collapsing one provider calls
+  // `store.set`, which flips `hasLoaded` before the disk read resolves. The
+  // new-session section must wait for the stored list itself, or an in-flight
+  // open it has not committed yet is cleared against the un-merged value and
+  // the load's merge then re-collapses the card the person just opened.
+  const loadSettled = useSyncExternalStore(store.subscribe, store.getLoadSettled);
+  return { collapsedCtas, loadSettled };
 }
 
 export function setConnectCtaCollapsed(platform: RepoPlatform, collapsed: boolean): void {

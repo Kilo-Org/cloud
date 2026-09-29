@@ -220,6 +220,7 @@ export function ModelPickerContent() {
             <Search size={18} color={colors.mutedForeground} />
             <Input
               ref={searchInputRef}
+              accessibilityLabel={t('common.searchModels')}
               placeholder={t('common.searchModels')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"

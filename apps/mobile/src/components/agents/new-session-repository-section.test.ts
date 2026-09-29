@@ -12,6 +12,7 @@ import {
   group,
   mountSection,
   renderedText,
+  rerenderSection,
 } from './new-session-repository-section.test-helpers';
 import {
   getSelectedBranchOverride,
@@ -59,13 +60,13 @@ vi.mock('react-native-reanimated', () => ({
 
 const collapseState = vi.hoisted(() => ({
   collapsedCtas: [] as string[],
-  hasLoaded: true,
+  loadSettled: true,
   setConnectCtaCollapsed: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
   useCollapsedConnectCtas: () => ({
     collapsedCtas: collapseState.collapsedCtas,
-    hasLoaded: collapseState.hasLoaded,
+    loadSettled: collapseState.loadSettled,
   }),
   setConnectCtaCollapsed: collapseState.setConnectCtaCollapsed,
 }));
@@ -105,8 +106,8 @@ function pressHeader(renderer: TestRenderer.ReactTestRenderer, title: string): v
 beforeEach(() => {
   resetSelectedBranchOverrides();
   collapseState.collapsedCtas = [];
-  collapseState.hasLoaded = true;
-  collapseState.setConnectCtaCollapsed.mockClear();
+  collapseState.loadSettled = true;
+  collapseState.setConnectCtaCollapsed.mockReset();
 });
 
 describe('NewSessionRepositorySection repository picker', () => {
@@ -294,14 +295,105 @@ describe('NewSessionRepositorySection connect card collapse', () => {
     expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', !collapsed);
   });
 
-  it('renders no connect card until the persisted state has loaded', () => {
-    collapseState.hasLoaded = false;
+  it('renders the connect card collapsed while the persisted state is still loading', () => {
+    // The connect card must not wait on the persisted-collapse read: a cold
+    // start (or process death) can leave that read in flight for seconds, and
+    // gating the whole card on it left the repository section with only the
+    // disabled picker — no way to connect a provider. But its body must not
+    // paint expanded and then snap shut when a stored collapse lands (every
+    // row below it would move for the length of the read), so the header is
+    // shown collapsed until the preference has loaded.
+    collapseState.loadSettled = false;
     const renderer = mountSection({ groups: [group('github', 'connect')] });
 
     const text = renderedText(renderer);
-    expect(text).not.toContain(i18n.t('common.connectGithub'));
+    expect(text).toContain(i18n.t('common.connectGithub'));
     expect(text).not.toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
-    expect(pressables(renderer)).toHaveLength(0);
+    expect(pressables(renderer)).toHaveLength(1);
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: false });
+  });
+
+  it('keeps a persisted-collapsed card collapsed through the loading read', () => {
+    // A card the person had collapsed must never paint expanded while the read
+    // is in flight, or it flashes open and snaps shut in front of them.
+    collapseState.collapsedCtas = ['github'];
+    collapseState.loadSettled = false;
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+
+    const text = renderedText(renderer);
+    expect(text).toContain(i18n.t('common.connectGithub'));
+    expect(text).not.toContain(i18n.t('agentChat.newSession.connectGithubDescription'));
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: false });
+  });
+
+  it('opens a collapsed card on a header press while the persisted read is in flight', () => {
+    // The collapsed header is the only visible connect control on a cold start,
+    // so pressing it must reveal the description and Open button even though
+    // the persisted-collapse read has not landed: otherwise the store's setter
+    // drops the write against its not-yet-loaded default and the press is a
+    // silent no-op for up to ~1.75s.
+    collapseState.loadSettled = false;
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+
+    pressHeader(renderer, i18n.t('common.connectGithub'));
+
+    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', false);
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.connectGithubDescription')
+    );
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it('does not commit an in-flight open before the persisted read settles', () => {
+    // Collapsing another provider writes the store and flips its hasLoaded
+    // before the disk read resolves. The section must key on the read's own
+    // settled flag: committing the open against the un-merged value let the
+    // load's merge restore the disk collapse and snap the card shut.
+    collapseState.loadSettled = false;
+    const renderer = mountSection({ groups: bothConnect });
+    pressHeader(renderer, i18n.t('common.connectGithub'));
+    collapseState.setConnectCtaCollapsed.mockClear();
+
+    rerenderSection(renderer, { groups: bothConnect });
+
+    expect(collapseState.setConnectCtaCollapsed).not.toHaveBeenCalled();
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
+  });
+
+  it('commits an in-flight open to the persisted list when the read lands', () => {
+    // The person opened the card before the stored collapse arrived. When that
+    // collapse lands it must be overwritten, not applied, or the card they just
+    // opened snaps shut in front of them.
+    collapseState.loadSettled = false;
+    collapseState.setConnectCtaCollapsed.mockImplementation(
+      (platform: string, collapsed: boolean) => {
+        collapseState.collapsedCtas = collapsed
+          ? [...collapseState.collapsedCtas, platform]
+          : collapseState.collapsedCtas.filter(item => item !== platform);
+      }
+    );
+    const renderer = mountSection({ groups: [group('github', 'connect')] });
+    pressHeader(renderer, i18n.t('common.connectGithub'));
+
+    collapseState.collapsedCtas = ['github'];
+    collapseState.loadSettled = true;
+    rerenderSection(renderer, { groups: [group('github', 'connect')] });
+
+    expect(collapseState.setConnectCtaCollapsed).toHaveBeenCalledWith('github', false);
+    expect(renderedText(renderer)).toContain(
+      i18n.t('agentChat.newSession.connectGithubDescription')
+    );
+    expect(
+      connectHeader(renderer, i18n.t('common.connectGithub'))?.props.accessibilityState
+    ).toEqual({ expanded: true });
   });
 
   it.each([
@@ -378,7 +470,7 @@ describe('NewSessionRepositorySection connect cards after selection', () => {
     const onConnect = vi.fn(() => undefined);
     const onRefreshRepos = vi.fn(() => undefined);
     collapseState.collapsedCtas = [platform];
-    collapseState.hasLoaded = false;
+    collapseState.loadSettled = false;
     setSelectedBranchOverride(row, 'release/2.0');
     const renderer = mountSection({
       value: `${row.platform}:${row.fullName}`,

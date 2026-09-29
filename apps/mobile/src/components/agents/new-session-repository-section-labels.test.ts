@@ -42,7 +42,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: (ms: number) => ({ __linearTransition: ms }) },
 }));
 vi.mock('@/lib/hooks/use-collapsed-connect-ctas-preference', () => ({
-  useCollapsedConnectCtas: () => ({ collapsedCtas: [], hasLoaded: true }),
+  useCollapsedConnectCtas: () => ({ collapsedCtas: [], loadSettled: true }),
   setConnectCtaCollapsed: vi.fn(),
 }));
 

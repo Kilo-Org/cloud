@@ -271,6 +271,22 @@ describe('ModelPickerContent deferred search', () => {
     await i18n.changeLanguage('en');
   });
 
+  it('names the model search field for screen readers', async () => {
+    // The field is the sheet's only control that filters models, so it must
+    // carry an accessible name; without one a screen-reader user hears an
+    // unlabelled text field and cannot find the model search. The Agents list
+    // search field is exposed the same way.
+    const renderer = await mount();
+
+    const label = searchInput(renderer).props.accessibilityLabel;
+    expect(label).toBe(i18n.t('common.searchModels'));
+    expect(String(label).trim()).not.toBe('');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('finds an auto model by the translated name its row renders', async () => {
     // The row shows the catalog's name for a Kilo auto model, so the query a
     // user types is the translated one. The picker must match it, not answer

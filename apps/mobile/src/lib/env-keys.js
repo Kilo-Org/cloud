@@ -30,6 +30,12 @@ export const OPTIONAL_ENV_KEYS = {
   // through lib/auth/secure-store-read rejects, so the session-restore
   // failure states are provable on a live build.
   e2eSecureStoreFaultMs: 'E2E_SECURE_STORE_FAULT_MS',
+  // E2E-only: names one SecureStore key whose reads are held pending (never
+  // settle) so the harness can keep a screen's preference load out of
+  // `finally` and prove its pre-load state on a live build. Unset → every key
+  // reads normally and the fault window from E2E_SECURE_STORE_FAULT_MS above
+  // is unchanged.
+  e2eSecureStoreHoldKey: 'E2E_SECURE_STORE_HOLD_KEY',
   sentryEnvironment: 'EXPO_PUBLIC_SENTRY_ENVIRONMENT',
   // Client-observed request-latency ingest endpoint. Optional: config.ts falls
   // back to the committed LATENCY_INGEST_URL_DEFAULT (url-contract.js), so a

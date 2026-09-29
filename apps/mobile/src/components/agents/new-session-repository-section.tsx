@@ -1,4 +1,4 @@
-import { Fragment, type ReactElement } from 'react';
+import { Fragment, type ReactElement, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
@@ -116,7 +116,36 @@ export function NewSessionRepositorySection({
 }: Readonly<NewSessionRepositorySectionProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { collapsedCtas, hasLoaded: collapseStateLoaded } = useCollapsedConnectCtas();
+  // `loadSettled`, not the store's `hasLoaded`: collapsing one provider writes
+  // the store before the disk read resolves and flips `hasLoaded`, so only the
+  // read's own settled flag tells us the persisted list has been reconciled.
+  const { collapsedCtas, loadSettled: collapseStateLoaded } = useCollapsedConnectCtas();
+  // The providers a person explicitly opened before the persisted-collapse read
+  // settled. While that read is in flight the card still paints collapsed (see
+  // `renderConnectCard`), so the press must carry local intent: the store's
+  // setter treats "not in the list" as already expanded and drops a write
+  // against its not-yet-loaded empty default, and `expanded` is pinned false
+  // until the read lands, so without this an in-flight tap on the only visible
+  // connect control is swallowed.
+  const [pendingExpandedCtas, setPendingExpandedCtas] = useState<RepositoryPlatform[]>([]);
+
+  // Once the persisted list lands, commit any in-flight open to it so the card
+  // the person opened does not snap shut, then drop the local intent. This
+  // waits for the disk read itself: a collapse of another provider while that
+  // read is in flight calls `store.set`, which flips the store's `hasLoaded`
+  // before `mergeOnLoad` has unioned the disk list. Committing on that early
+  // flip cleared the intent against the un-merged value, and the merge then
+  // restored the disk's collapse for the opened provider — the card snapped
+  // shut.
+  useEffect(() => {
+    if (!collapseStateLoaded || pendingExpandedCtas.length === 0) {
+      return;
+    }
+    for (const platform of pendingExpandedCtas) {
+      setConnectCtaCollapsed(platform, false);
+    }
+    setPendingExpandedCtas([]);
+  }, [collapseStateLoaded, pendingExpandedCtas]);
 
   const hasRepos = repositories.length > 0;
   const anyLoading = groups.some(group => group.status === 'loading');
@@ -218,16 +247,26 @@ export function NewSessionRepositorySection({
     }
   }
 
-  function renderConnectCard(platform: RepositoryPlatform): ReactElement | null {
+  function renderConnectCard(platform: RepositoryPlatform): ReactElement {
     const copy = PROVIDER_COPY[platform];
     const noteKey = connectNoteKey(platform);
-    // The persisted flag decides the card's height, so the card must not paint
-    // expanded and then snap shut when the disk read lands (every row below it
-    // would move). The read is already in flight from module import, so this
-    // gate lasts a frame, not a spinner.
-    if (!collapseStateLoaded) {
-      return null;
-    }
+    // The card header paints before the persisted-collapse read settles, so a
+    // cold start (or a process death) never leaves the repository section with
+    // only the disabled picker and no way to connect a provider. Its body waits
+    // for that read: the preference's default is "nothing collapsed", so
+    // painting expanded first and then collapsing on the stored value made a
+    // card the person had collapsed flash open (description + Open button) and
+    // snap shut, moving every row below it, for the length of a read that
+    // retries for up to ~1.75s on a locked keystore. The card is rendered
+    // collapsed until the read lands, so the stored collapse is the first state
+    // a person sees; the rest of the section still renders immediately. A press
+    // while the read is in flight records `pendingExpandedCtas` above, so the
+    // header is never a no-op even though `collapseStateLoaded` keeps the body
+    // hidden until that read lands.
+    const persistedCollapsed = collapsedCtas.includes(platform);
+    const expanded = pendingExpandedCtas.includes(platform)
+      ? true
+      : collapseStateLoaded && !persistedCollapsed;
     return (
       <CollapsibleSection
         className="mt-3 gap-3 rounded-lg border border-border bg-card p-4"
@@ -241,9 +280,17 @@ export function NewSessionRepositorySection({
         // frame against a sibling that has already snapped, so it paints over
         // the row above it — the picker's bottom edge or the branch row.
         animateLayout={false}
-        expanded={!collapsedCtas.includes(platform)}
+        expanded={expanded}
         onToggle={() => {
-          setConnectCtaCollapsed(platform, !collapsedCtas.includes(platform));
+          const nextExpanded = !expanded;
+          if (!collapseStateLoaded) {
+            setPendingExpandedCtas(current =>
+              nextExpanded
+                ? [...new Set([...current, platform])]
+                : current.filter(item => item !== platform)
+            );
+          }
+          setConnectCtaCollapsed(platform, !nextExpanded);
         }}
       >
         <View className="gap-1">

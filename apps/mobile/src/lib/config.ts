@@ -81,3 +81,9 @@ export const E2E_LATENCY_WS_MS: number = optionalLatencyMs('e2eLatencyWsMs');
 /** E2E-only secure-store fault window (see lib/auth/secure-store-read.ts):
  *  while it is open, every read through the retry helper rejects. 0 = disabled. */
 export const E2E_SECURE_STORE_FAULT_MS: number = optionalLatencyMs('e2eSecureStoreFaultMs');
+
+/** E2E-only hold (see lib/auth/secure-store-read.ts): the SecureStore key whose
+ *  reads never settle while set, so `secure-store-preference`'s load stays
+ *  pending and its pre-load state is provable. Unset = no key held; the
+ *  E2E_SECURE_STORE_FAULT_MS rejection path above is unaffected. */
+export const E2E_SECURE_STORE_HOLD_KEY: string | undefined = optional('e2eSecureStoreHoldKey');

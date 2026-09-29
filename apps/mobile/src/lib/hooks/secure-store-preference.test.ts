@@ -159,6 +159,35 @@ describe('createSecureStorePreference', () => {
     unsubscribe();
   });
 
+  it('keeps loadSettled false when a set() races the initial read, until the read settles', async () => {
+    const pendingReads: ((raw: string | null) => void)[] = [];
+    getItemAsync.mockReturnValue(
+      new Promise<string | null>(resolve => {
+        pendingReads.push(resolve);
+      })
+    );
+    const store = createSecureStorePreference<boolean>({
+      key: 'k',
+      defaultValue: false,
+      parse: raw => raw === 'true',
+      serialize: value => (value ? 'true' : 'false'),
+    });
+
+    const unsubscribe = store.subscribe(noopListener);
+    store.set(true);
+    // The write flips hasLoaded, but the read itself has not settled. A caller
+    // that reconciles against the persisted value must key off loadSettled, or
+    // it acts on a value the read's merge has not yet been applied to.
+    expect(store.getHasLoaded()).toBe(true);
+    expect(store.getLoadSettled()).toBe(false);
+
+    pendingReads[0]?.(null);
+    await flushMicrotasks();
+
+    expect(store.getLoadSettled()).toBe(true);
+    unsubscribe();
+  });
+
   it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {
     const pendingReads: ((raw: string | null) => void)[] = [];
     getItemAsync.mockReturnValue(

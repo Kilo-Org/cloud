@@ -163,6 +163,29 @@ describe('collapsed-connect-ctas store', () => {
     expect(setItemAsync).toHaveBeenLastCalledWith('collapsed-connect-ctas', '[]');
   });
 
+  it('does not report the read settled when a set() races it', async () => {
+    const readGate = deferred();
+    getItemAsync.mockImplementation(async () => {
+      await readGate.promise;
+      return '["github"]';
+    });
+    const store = await makeStore();
+
+    const unsubscribe = store.subscribe(noopListener);
+    store.set(['gitlab']);
+    // A collapse write before the read resolves flips hasLoaded, so the
+    // new-session section must not use it as "the persisted list has landed":
+    // the merge below has not run yet.
+    expect(store.getHasLoaded()).toBe(true);
+    expect(store.getLoadSettled()).toBe(false);
+
+    readGate.resolve();
+    await flushMicrotasks();
+
+    expect(store.getLoadSettled()).toBe(true);
+    unsubscribe();
+  });
+
   it('clearCollapsedConnectCtasPreference deletes the key', async () => {
     getItemAsync.mockResolvedValue(null);
     const { clearCollapsedConnectCtasPreference } =

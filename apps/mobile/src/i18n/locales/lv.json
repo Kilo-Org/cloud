@@ -2125,6 +2125,7 @@
       "renamePlaceholder": "Sesijas nosaukums",
       "transcriptAccessibility": "Sesijas sarakste",
       "readOnly": "Šī sesija ir pieejama tikai lasīšanai.",
+      "continueInNewSession": "Turpināt jaunā sesijā",
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",

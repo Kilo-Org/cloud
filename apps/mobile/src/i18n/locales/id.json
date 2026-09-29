@@ -1584,6 +1584,7 @@
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini hanya dapat dibaca.",
+      "continueInNewSession": "Lanjutkan di sesi baru",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",

@@ -23,7 +23,7 @@ import { getLowerDomainFromEmail } from '@/lib/utils';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { after } from 'next/server';
 import { sendOrgCancelledEmail, sendOrgRenewedEmail, sendOrgSubscriptionEmail } from '@/lib/email';
 import { IS_IN_AUTOMATED_TEST } from '@/lib/config.server';

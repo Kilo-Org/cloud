@@ -12,7 +12,7 @@ import { toMicrodollars } from '@/lib/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { SYSTEM_AUTO_TOP_UP_USER_ID } from '@/lib/autoTopUpConstants';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { sendCreditsTopUpEmail } from '@/lib/email';

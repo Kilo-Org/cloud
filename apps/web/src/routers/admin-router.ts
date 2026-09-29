@@ -95,9 +95,9 @@ import {
   min,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   findUsersByIds,
-  findUserById,
   getCrossAccountEmailConflicts,
   inferRowlessAuthProviders,
 } from '@/lib/user';

@@ -35,7 +35,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from '../user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
 import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';

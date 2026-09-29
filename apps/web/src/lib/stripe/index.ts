@@ -29,7 +29,7 @@ import {
 } from '@/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
-import { reportCreditEvent } from '@/lib/bouncer/client';
+import { reportCreditEvent, type CreditEvent } from '@/lib/bouncer/client';
 import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
@@ -96,7 +96,7 @@ import {
 } from '@/lib/config.server';
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { seatPrice } from '@/lib/organizations/constants';
+import { annualTotal, seatPrice } from '@/lib/organizations/constants';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
@@ -239,6 +239,41 @@ async function resolveBouncerCreditOwner(params: {
   return organization?.created_by_kilo_user_id
     ? { userId: organization.created_by_kilo_user_id, orgId: organization.id }
     : null;
+}
+
+/** A credit event without its payer: `reportWebhookCreditEvent` resolves the payer. */
+type WebhookCreditEvent = CreditEvent extends infer Event
+  ? Event extends CreditEvent
+    ? Omit<Event, 'userId' | 'orgId'>
+    : never
+  : never;
+
+/**
+ * Resolves the payer and reports one webhook outcome to bouncer. It never throws: the owner
+ * lookup reads the database, and a bouncer failure must not fail the Stripe webhook, which would
+ * make Stripe retry and skip the entitlement work later in the same delivery. When the event has
+ * no card fingerprint, `fingerprintChargeId` names a charge to read it from, inside the guard.
+ */
+async function reportWebhookCreditEvent(
+  owner: Parameters<typeof resolveBouncerCreditOwner>[0],
+  event: WebhookCreditEvent,
+  fingerprintChargeId?: string | null
+): Promise<void> {
+  try {
+    const payer = await resolveBouncerCreditOwner(owner);
+    if (!payer) return;
+    const cardFingerprint =
+      event.cardFingerprint ??
+      (fingerprintChargeId ? await bouncerCardFingerprintForChargeId(fingerprintChargeId) : null);
+    await reportCreditEvent({
+      ...event,
+      cardFingerprint,
+      userId: payer.userId,
+      orgId: payer.orgId,
+    });
+  } catch (error) {
+    captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
+  }
 }
 
 /** The card fingerprint of a charge, or null when the charge cannot be read. */
@@ -1080,22 +1115,20 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       const chargeInvoiceId =
         'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
       if (!chargeInvoiceId) {
-        const owner = await resolveBouncerCreditOwner({
-          kiloUserId: paymentIntent.metadata.kiloUserId,
-          organizationId: paymentIntent.metadata.organizationId,
-          customer: charge.customer,
-        });
-        if (owner) {
-          await reportCreditEvent({
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: paymentIntent.metadata.kiloUserId,
+            organizationId: paymentIntent.metadata.organizationId,
+            customer: charge.customer,
+          },
+          {
             type: 'charge.succeeded',
             eventId: event.id,
             occurredAt: new Date(event.created * 1000),
-            userId: owner.userId,
-            orgId: owner.orgId,
             cardFingerprint: charge.payment_method_details?.card?.fingerprint,
             amountCents: charge.amount,
-          });
-        }
+          }
+        );
       }
       break;
     }
@@ -1158,26 +1191,23 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         invoice.metadata?.type === 'auto-topup' || invoice.metadata?.type === 'org-auto-topup';
       if (invoice.amount_paid > 0 && (isSubscriptionInvoice || isAutoTopUpInvoice)) {
         const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
-        const owner = await resolveBouncerCreditOwner({
-          kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
-          organizationId: invoice.metadata?.organizationId ?? subscriptionMetadata?.organizationId,
-          customer: invoice.customer,
-        });
-        if (owner) {
-          const invoiceChargeId =
-            'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
-          await reportCreditEvent({
+        const invoiceChargeId =
+          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
+            organizationId:
+              invoice.metadata?.organizationId ?? subscriptionMetadata?.organizationId,
+            customer: invoice.customer,
+          },
+          {
             type: 'charge.succeeded',
             eventId: event.id,
             occurredAt: new Date(event.created * 1000),
-            userId: owner.userId,
-            orgId: owner.orgId,
-            cardFingerprint: invoiceChargeId
-              ? await bouncerCardFingerprintForChargeId(invoiceChargeId)
-              : null,
             amountCents: invoice.amount_paid,
-          });
-        }
+          },
+          invoiceChargeId
+        );
       }
 
       // Kilo Pass invoice.paid events should be routed to the Kilo Pass handler first.
@@ -1369,18 +1399,16 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       });
 
       // Bouncer: report the dispute against the payer the disputed charge resolved to.
-      const disputeOwner = await resolveBouncerCreditOwner({ customer: disputeCharge?.customer });
-      if (disputeOwner) {
-        await reportCreditEvent({
+      await reportWebhookCreditEvent(
+        { customer: disputeCharge?.customer },
+        {
           type: 'charge.disputed',
           eventId: event.id,
           occurredAt: new Date(event.created * 1000),
-          userId: disputeOwner.userId,
-          orgId: disputeOwner.orgId,
           cardFingerprint: disputeCharge?.payment_method_details?.card?.fingerprint ?? null,
           disputeId: dispute.id,
-        });
-      }
+        }
+      );
 
       if (!chargeId) {
         break;
@@ -1446,18 +1474,16 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       // change), so reporting only on `closed` keeps one win to one event. Reuse the disputed
       // charge so the win repeats the same payer and card as `charge.disputed`.
       if (event.type === 'charge.dispute.closed' && dispute.status === 'won') {
-        const wonOwner = await resolveBouncerCreditOwner({ customer: disputeCharge?.customer });
-        if (wonOwner) {
-          await reportCreditEvent({
+        await reportWebhookCreditEvent(
+          { customer: disputeCharge?.customer },
+          {
             type: 'charge.dispute_won',
             eventId: event.id,
             occurredAt: new Date(event.created * 1000),
-            userId: wonOwner.userId,
-            orgId: wonOwner.orgId,
             cardFingerprint: disputeCharge?.payment_method_details?.card?.fingerprint ?? null,
             disputeId: dispute.id,
-          });
-        }
+          }
+        );
       }
       break;
     }
@@ -1756,42 +1782,38 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
       });
       // Bouncer: skip when the warning's charge could not be read, so no owner resolves.
       if (warnedCharge) {
-        const owner = await resolveBouncerCreditOwner({
-          kiloUserId: warnedCharge.metadata?.kiloUserId,
-          organizationId: warnedCharge.metadata?.organizationId,
-          customer: warnedCharge.customer,
-        });
-        if (owner) {
-          await reportCreditEvent({
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: warnedCharge.metadata?.kiloUserId,
+            organizationId: warnedCharge.metadata?.organizationId,
+            customer: warnedCharge.customer,
+          },
+          {
             type: 'charge.early_fraud_warning',
             eventId: event.id,
             occurredAt: new Date(event.created * 1000),
-            userId: owner.userId,
-            orgId: owner.orgId,
             cardFingerprint: warnedCharge.payment_method_details?.card?.fingerprint ?? null,
-          });
-        }
+          }
+        );
       }
       break;
     }
 
     case 'charge.failed': {
       const charge = event.data.object;
-      const owner = await resolveBouncerCreditOwner({
-        kiloUserId: charge.metadata?.kiloUserId,
-        organizationId: charge.metadata?.organizationId,
-        customer: charge.customer,
-      });
-      if (owner) {
-        await reportCreditEvent({
+      await reportWebhookCreditEvent(
+        {
+          kiloUserId: charge.metadata?.kiloUserId,
+          organizationId: charge.metadata?.organizationId,
+          customer: charge.customer,
+        },
+        {
           type: 'charge.failed',
           eventId: event.id,
           occurredAt: new Date(event.created * 1000),
-          userId: owner.userId,
-          orgId: owner.orgId,
           cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
-        });
-      }
+        }
+      );
       break;
     }
 
@@ -2107,7 +2129,11 @@ export async function getStripeSeatsCheckoutUrl(
         flow: 'seats',
         userId: kiloUserId,
         orgId: organizationId,
-        amountCents: Math.round(seatPrice(plan, billingCycle) * 100) * quantity,
+        // `seatPrice` is a per-month rate for both cycles; an annual checkout charges the year.
+        amountCents:
+          Math.round(
+            (billingCycle === 'annual' ? annualTotal(plan) : seatPrice(plan, billingCycle)) * 100
+          ) * quantity,
         accountCreatedAt: props.attempt.accountCreatedAt,
         ip: props.attempt.ip,
         ipCountry: props.attempt.ipCountry,

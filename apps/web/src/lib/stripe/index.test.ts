@@ -72,6 +72,7 @@ import {
   handleUpdateSeatCount,
   isCardFingerprintEligibleForFreeCredits,
   KNOWN_SEAT_PRICE_IDS,
+  getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@/lib/stripe-client';
 import { reportCreditEvent } from '@/lib/bouncer/client';
@@ -4922,6 +4923,24 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     expect(reportCreditEvent).not.toHaveBeenCalled();
   });
 
+  test('a bouncer failure does not fail the webhook', async () => {
+    // Stripe retries a failed webhook, and later work in the delivery would be skipped.
+    jest.mocked(reportCreditEvent).mockRejectedValueOnce(new Error('bouncer down'));
+    const charge = sampleStripeCharge({
+      id: 'ch_bouncer_down',
+      customer: testUser.stripe_customer_id,
+    });
+    const event = {
+      ...baseStripeEvent(),
+      id: 'evt_bouncer_down',
+      type: 'charge.failed',
+      data: { object: charge },
+    } as unknown as Stripe.Event;
+
+    await expect(processStripePaymentEventHook(event)).resolves.not.toThrow();
+    expect(reportCreditEvent).toHaveBeenCalled();
+  });
+
   test('charge.dispute.created reports the disputed payer', async () => {
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
@@ -5081,5 +5100,34 @@ describe('processStripePaymentEventHook bouncer credit events', () => {
     );
 
     retrieveSpy.mockRestore();
+  });
+});
+
+describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
+  test.each([
+    // Teams seats cost $18/month billed monthly and $15/month billed annually ($180/year).
+    ['monthly', 18_00 * 3],
+    ['annual', 180_00 * 3],
+  ] as const)('reports the amount the %s checkout charges', async (billingCycle, amountCents) => {
+    const createSpy = jest.spyOn(client.checkout.sessions, 'create').mockResolvedValue({
+      url: 'https://checkout.stripe.test/s',
+    } as Stripe.Response<Stripe.Checkout.Session>);
+    jest.mocked(reportCreditEvent).mockClear();
+
+    await getStripeSeatsCheckoutUrl({
+      kiloUserId: 'user-seats',
+      stripeCustomerId: 'cus_seats',
+      quantity: 3,
+      organizationId: 'org-seats',
+      cancelUrl: 'https://app.test/cancel',
+      plan: 'teams',
+      billingCycle,
+      attempt: { accountCreatedAt: '2026-01-01T00:00:00.000Z' },
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'charge.attempted', flow: 'seats', amountCents })
+    );
+    createSpy.mockRestore();
   });
 });

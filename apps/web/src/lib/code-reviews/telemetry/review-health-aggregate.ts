@@ -41,7 +41,7 @@ type StartedLatencyRow = {
 type OpenCountsRow = {
   pendingCount: number;
   pendingOverFiveMinutes: number;
-  oldestPendingEpochMs: number | null;
+  oldestPendingAgeMs: number | null;
   staleQueuedClaimCount: number;
   runningOverNinetyMinutes: number;
 };
@@ -98,7 +98,6 @@ export function reviewStartedLatencyQuery(database: Database, window: ReviewWind
       p95WaitMs: sql<
         number | null
       >`(percentile_cont(0.95) within group (order by ${waitMsExpression}) filter (where ${cloud_agent_code_reviews.started_at} >= ${cloud_agent_code_reviews.created_at}))::double precision`,
-      invalidWaitCount: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.started_at} < ${cloud_agent_code_reviews.created_at}))::int`,
     })
     .from(cloud_agent_code_reviews)
     .where(
@@ -126,9 +125,9 @@ export function reviewOpenCountsQuery(database: Database) {
     .select({
       pendingCount: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.status} = 'pending'))::int`,
       pendingOverFiveMinutes: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.status} = 'pending' and ${cloud_agent_code_reviews.created_at} < ${staleQueuedCodeReviewCutoffSql()}))::int`,
-      oldestPendingEpochMs: sql<
+      oldestPendingAgeMs: sql<
         number | null
-      >`(extract(epoch from (min(${cloud_agent_code_reviews.created_at}) filter (where ${cloud_agent_code_reviews.status} = 'pending'))) * 1000)::double precision`,
+      >`(extract(epoch from (now() - (min(${cloud_agent_code_reviews.created_at}) filter (where ${cloud_agent_code_reviews.status} = 'pending')))) * 1000)::double precision`,
       staleQueuedClaimCount: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.status} = 'queued' and ${cloud_agent_code_reviews.updated_at} < ${staleQueuedCodeReviewCutoffSql()}))::int`,
       runningOverNinetyMinutes: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.status} = 'running' and coalesce(${cloud_agent_code_reviews.started_at}, ${cloud_agent_code_reviews.updated_at}, ${cloud_agent_code_reviews.created_at}) < ${staleRunningCodeReviewCutoffSql()}))::int`,
     })
@@ -141,7 +140,7 @@ async function selectOpenCounts(database: Database): Promise<OpenCountsRow> {
   return {
     pendingCount: row?.pendingCount ?? 0,
     pendingOverFiveMinutes: row?.pendingOverFiveMinutes ?? 0,
-    oldestPendingEpochMs: row?.oldestPendingEpochMs ?? null,
+    oldestPendingAgeMs: row?.oldestPendingAgeMs ?? null,
     staleQueuedClaimCount: row?.staleQueuedClaimCount ?? 0,
     runningOverNinetyMinutes: row?.runningOverNinetyMinutes ?? 0,
   };
@@ -330,10 +329,7 @@ export async function collectCodeReviewOpenStock(
         observedAt,
         pending: counts.pendingCount,
         pendingOverFiveMinutes: counts.pendingOverFiveMinutes,
-        oldestPendingAgeMs:
-          counts.oldestPendingEpochMs === null
-            ? null
-            : Date.parse(observedAt) - counts.oldestPendingEpochMs,
+        oldestPendingAgeMs: counts.oldestPendingAgeMs,
         staleQueued: counts.staleQueuedClaimCount,
         runningOverNinetyMinutes: counts.runningOverNinetyMinutes,
         missingCompletedAt,

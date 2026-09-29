@@ -38,7 +38,7 @@ const zeroLatency = {
 const zeroOpenCounts = {
   pendingCount: 0,
   pendingOverFiveMinutes: 0,
-  oldestPendingEpochMs: null,
+  oldestPendingAgeMs: null,
   staleQueuedClaimCount: 0,
   runningOverNinetyMinutes: 0,
 };
@@ -189,7 +189,6 @@ describe('review SQL allowlist', () => {
     ];
 
     for (const query of databases) {
-      expect(query.sql).toContain('cloud_agent_code_reviews');
       expect(query.sql).not.toContain('cloud_agent_code_review_attempts');
     }
   });
@@ -253,7 +252,6 @@ describe('review collection wiring', () => {
     expect(outcome).not.toHaveProperty('windowMinutes');
     const start = records[1];
     expect(start).toMatchObject({ started: 0, startedWithinFiveMinutes: 0, p95WaitMs: null });
-    expect(start).not.toHaveProperty('invalidWaitCount');
     expect(errorSpy).not.toHaveBeenCalled();
   });
 

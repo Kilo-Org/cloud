@@ -2070,6 +2070,8 @@
       "selectModelBeforeSending": "Selecciona un modelo antes de enviar el mensaje.",
       "preparingPlaceholder": "Configurando el entorno…",
       "finalizingPlaceholder": "Finalizando…",
+      "sessionLoadFailed": "No se pudo cargar la sesión. Vuelve a intentarlo primero.",
+      "sendUnavailable": "El envío no está disponible hasta que la sesión esté lista.",
       "cannotReceiveFiles": "Esta sesión no puede recibir archivos. Quita los archivos adjuntos para enviar tu mensaje.",
       "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Vuelve a enviar el mensaje para intentarlo de nuevo.",
       "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",

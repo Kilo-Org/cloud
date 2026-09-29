@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Zgjidh një model para se të dërgosh mesazhin.",
       "preparingPlaceholder": "Duke konfiguruar mjedisin...",
       "finalizingPlaceholder": "Duke përfunduar...",
+      "sessionLoadFailed": "Sesioni nuk mund të ngarkohej. Provo përsëri fillimisht.",
+      "sendUnavailable": "Dërgimi nuk është i disponueshëm derisa sesioni të jetë gati.",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiq bashkëngjitjet për të dërguar mesazhin tënd.",
       "couldNotAttachFiles": "Nuk u bashkëngjitën skedarët. Prek butonin e dërgimit për të provuar përsëri.",
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",

@@ -2049,6 +2049,8 @@
       "selectModelBeforeSending": "Hãy chọn mô hình trước khi gửi.",
       "preparingPlaceholder": "Đang thiết lập môi trường...",
       "finalizingPlaceholder": "Đang hoàn tất...",
+      "sessionLoadFailed": "Không thể tải phiên. Hãy thử lại trước.",
+      "sendUnavailable": "Không thể gửi cho đến khi phiên sẵn sàng.",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
       "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",

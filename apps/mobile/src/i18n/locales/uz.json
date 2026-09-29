@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Yuborishdan oldin modelni tanlang.",
       "preparingPlaceholder": "Muhit sozlanmoqda...",
       "finalizingPlaceholder": "Yakunlanmoqda...",
+      "sessionLoadFailed": "Sessiyani yuklab bo'lmadi. Avval qayta urinib ko'ring.",
+      "sendUnavailable": "Sessiya tayyor bo'lmaguncha yuborish mavjud emas.",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirilgan fayllarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborish tugmasini bosing.",
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",

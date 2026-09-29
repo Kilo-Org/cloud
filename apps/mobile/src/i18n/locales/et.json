@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Enne saatmist vali mudel.",
       "preparingPlaceholder": "Keskkonna seadistamine...",
       "finalizingPlaceholder": "Lõpetamine...",
+      "sessionLoadFailed": "Seanssi ei saanud laadida. Proovi esmalt uuesti.",
+      "sendUnavailable": "Saatmine pole saadaval, kuni seanss on valmis.",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemalda manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puuduta saatmisnuppu.",
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",

@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Chagua modeli kabla ya kutuma.",
       "preparingPlaceholder": "Inatayarisha mazingira...",
       "finalizingPlaceholder": "Inahitimisha...",
+      "sessionLoadFailed": "Kipindi hakikuweza kupakiwa. Jaribu tena kwanza.",
+      "sendUnavailable": "Kutuma hakupatikani hadi kipindi kiwe tayari.",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
       "couldNotAttachFiles": "Imeshindikana kuambatisha faili. Gusa Tuma ili ujaribu tena.",
       "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",

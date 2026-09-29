@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "ເລືອກໂມເດວກ່ອນສົ່ງ.",
       "preparingPlaceholder": "ກຳລັງຕັ້ງຄ່າສະພາບແວດລ້ອມ…",
       "finalizingPlaceholder": "ກຳລັງເຮັດຂັ້ນຕອນສຸດທ້າຍ…",
+      "sessionLoadFailed": "ບໍ່ສາມາດໂຫຼດເຊສຊັນໄດ້. ລອງອີກຄັ້ງກ່ອນ.",
+      "sendUnavailable": "ການສົ່ງບໍ່ມີຈົນກວ່າເຊສຊັນຈະພ້ອມ.",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ຮັບໄຟລ໌ບໍ່ໄດ້. ເອົາໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
       "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌ໄດ້. ແຕະປຸ່ມສົ່ງເພື່ອລອງໃໝ່.",
       "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",

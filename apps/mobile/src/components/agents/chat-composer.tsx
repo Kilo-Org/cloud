@@ -178,6 +178,20 @@ type ChatComposerProps = {
    * Retry instead of only Retry.
    */
   sendDisabled?: boolean;
+  /**
+   * Why send is unavailable, rendered as a one-line reason beside the send
+   * control and announced when it changes. Null/omitted while send can proceed
+   * or when the host knows no reason. Each cannot-send state supplies its own
+   * reason (the load-error state: "The session could not be loaded. Retry
+   * first."), so the control never renders inert without explaining itself.
+   */
+  sendDisabledReason?: string | null;
+  /**
+   * The tone for `sendDisabledReason`: `error` for a genuine failure, `neutral`
+   * for a progress phase or the generic not-ready line. Omitted defaults to the
+   * error tone, matching the previous behavior.
+   */
+  sendDisabledReasonTone?: 'error' | 'neutral' | null;
   isStreaming?: boolean;
   placeholder?: string;
   mode: AgentMode;
@@ -245,6 +259,8 @@ export function ChatComposer({
   onStop,
   disabled = false,
   sendDisabled = false,
+  sendDisabledReason = null,
+  sendDisabledReasonTone = null,
   isStreaming = false,
   placeholder = i18n.t('common.sendMessage'),
   mode,
@@ -1391,6 +1407,8 @@ export function ChatComposer({
               paperclipDisabled={control.paperclipDisabled}
               placeholder={placeholder}
               returnSendsMessage={returnSendsMessage}
+              sendDisabledReason={sendDisabledReason}
+              sendDisabledReasonTone={sendDisabledReasonTone}
               textInputStyle={textInputStyle}
               voiceDisabled={control.voiceDisabled}
               voiceInputAvailable={voiceInput.available}

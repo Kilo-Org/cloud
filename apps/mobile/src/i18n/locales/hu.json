@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Küldés előtt válassz modellt.",
       "preparingPlaceholder": "Környezet előkészítése…",
       "finalizingPlaceholder": "Befejezés…",
+      "sessionLoadFailed": "A munkamenetet nem sikerült betölteni. Először próbálja újra.",
+      "sendUnavailable": "A küldés nem érhető el, amíg a munkamenet nem áll készen.",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
       "couldNotAttachFiles": "Nem sikerült csatolni a fájlokat. Az újrapróbáláshoz koppints a küldés gombjára.",
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",

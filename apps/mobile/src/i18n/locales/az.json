@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Göndərməzdən əvvəl model seç.",
       "preparingPlaceholder": "Mühit qurulur...",
       "finalizingPlaceholder": "Tamamlanır...",
+      "sessionLoadFailed": "Sessiya yüklənə bilmədi. Əvvəlcə yenidən cəhd edin.",
+      "sendUnavailable": "Sessiya hazır olana qədər göndərmə mövcud deyil.",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajını göndərmək üçün əlavələri sil.",
       "couldNotAttachFiles": "Faylları əlavə etmək mümkün olmadı. Yenidən cəhd etmək üçün «Göndər» düyməsinə toxun.",
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",

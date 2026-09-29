@@ -2049,6 +2049,8 @@
       "selectModelBeforeSending": "送信前にモデルを選択してください。",
       "preparingPlaceholder": "環境を準備中…",
       "finalizingPlaceholder": "終了処理中…",
+      "sessionLoadFailed": "セッションを読み込めませんでした。先に再試行してください。",
+      "sendUnavailable": "セッションの準備ができるまで送信できません。",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。「送信」をタップして、もう一度お試しください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",

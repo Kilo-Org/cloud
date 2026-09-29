@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
+      "sessionLoadFailed": "Seshan lama soo gelin karin. Marka hore mar kale isku day.",
+      "sendUnavailable": "Dirista lama heli karo ilaa seshanku diyaar noqdo.",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",

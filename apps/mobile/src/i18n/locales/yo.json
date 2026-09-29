@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Yan àwòṣe kí o tó fi ránṣẹ́.",
       "preparingPlaceholder": "Ń ṣètò àyíká iṣẹ́...",
       "finalizingPlaceholder": "Ń parí...",
+      "sessionLoadFailed": "A ko le gbe igba naa. Gbiyanju lẹẹkansi ni akọkọ.",
+      "sendUnavailable": "Fifiranṣẹ ko si titi igba naa yoo fi ṣetan.",
       "cannotReceiveFiles": "Ìgbà iṣẹ́ yìí kò lè gba fáìlì. Yọ àwọn àsomọ́ kúrò láti fi ìfiránṣẹ́ rẹ ránṣẹ́.",
       "couldNotAttachFiles": "A kò lè so àwọn fáìlì mọ́ ìfiránṣẹ́. Tẹ Fíránṣẹ́ láti gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardAttachmentsMessage": "A ó pa àwọn fáìlì tí a ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",

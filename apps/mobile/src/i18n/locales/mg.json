@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Misafidiana modely alohan'ny handefasana.",
       "preparingPlaceholder": "Manomana ny tontolo fiasana...",
       "finalizingPlaceholder": "Mamita...",
+      "sessionLoadFailed": "Tsy afaka nampiditra ny seho. Andramo indray aloha.",
+      "sendUnavailable": "Tsy misy fandefasana raha tsy efa vonona ny seho.",
       "cannotReceiveFiles": "Tsy afaka mandray rakitra ity fotoam-piasana ity. Esory ny rakitra ampiarahina mba handefasana ny hafatrao.",
       "couldNotAttachFiles": "Tsy nahomby ny fampiarahana ny rakitra. Tsindrio ny bokotra fandefasana hanandramana indray.",
       "discardAttachmentsMessage": "Hofafana ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",

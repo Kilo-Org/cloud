@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "เลือกโมเดลก่อนส่ง",
       "preparingPlaceholder": "กำลังตั้งค่าสภาพแวดล้อม...",
       "finalizingPlaceholder": "กำลังทำงานขั้นสุดท้าย...",
+      "sessionLoadFailed": "ไม่สามารถโหลดเซสชันได้ ลองอีกครั้งก่อน",
+      "sendUnavailable": "ยังส่งไม่ได้จนกว่าเซสชันจะพร้อม",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
       "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",

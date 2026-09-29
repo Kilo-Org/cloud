@@ -700,6 +700,14 @@ function messageLists(renderer: ReactTestRenderer): ReactTestInstance[] {
   return renderer.root.findAll(node => Object.is(node.type, 'MessageList'));
 }
 
+/** The send-gate props the screen hands the mounted composer. */
+function composerProps(view: { renderer: ReactTestRenderer }) {
+  return view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer')).props as {
+    sendDisabled?: boolean;
+    sendDisabledReason?: string | null;
+  };
+}
+
 /**
  * The FlashList keys the first message list would mount rows under. The list is
  * stubbed, so read the props the stub was handed: the same `keyExtractor` the
@@ -3097,6 +3105,74 @@ describe('session detail composer after a failed turn', () => {
     const node = view.renderer.root.find(candidate => Object.is(candidate.type, 'ChatComposer'));
     expect(node.props.disabled).toBe(false);
     expect(node.props.sendDisabled).toBe(false);
+  });
+});
+
+describe('session detail composer cannot-send reason', () => {
+  it('states the load-failure reason beside send in the load-error state', async () => {
+    // The audit's state (owner evidence A4/A12): the open fails, the transcript
+    // is empty and the manager cannot send, but the input stays editable. The
+    // reason beside send must name the load failure, not a runtime class.
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Something went wrong. Please retry in a moment.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    const props = composerProps(view);
+    expect(props.sendDisabled).toBe(true);
+    expect(props.sendDisabledReason).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+    expect(props.sendDisabledReason).not.toBe(i18n.t('agentChat.session.connectionTrouble'));
+  });
+
+  it('states the class reason for a running session that cannot send', async () => {
+    // A non-empty transcript means a terminal failure is a runtime class, not
+    // the load failure behind the full-screen Retry, so its own copy is shown.
+    const view = await mountDetails([childMessage(ROOT_ID, 'hello')]);
+    act(() => {
+      view.store.set<
+        'cloud-agent' | 'read-only' | 'remote' | null,
+        ['cloud-agent' | 'read-only' | 'remote' | null],
+        unknown
+      >(view.manager.atoms.activeSessionType, 'cloud-agent');
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.isReadOnly, false);
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, false);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        {
+          type: 'error',
+          message: 'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+          timestamp: 0,
+        }
+      );
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBe(
+      i18n.t('agentChat.session.notEnoughCredits')
+    );
+  });
+
+  it('passes no reason while the session can send', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set<boolean, [boolean], unknown>(view.manager.atoms.canSend, true);
+      view.store.set<string | null, [string | null], unknown>(view.manager.atoms.error, null);
+      view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+        view.manager.atoms.statusIndicator,
+        null
+      );
+    });
+
+    expect(composerProps(view).sendDisabledReason).toBeNull();
   });
 });
 

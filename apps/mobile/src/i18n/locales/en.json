@@ -2592,6 +2592,8 @@
       "selectModelBeforeSending": "Select a model before sending",
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
+      "sessionLoadFailed": "The session could not be loaded. Retry first.",
+      "sendUnavailable": "Sending isn't available until the session is ready.",
       "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
       "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
     },

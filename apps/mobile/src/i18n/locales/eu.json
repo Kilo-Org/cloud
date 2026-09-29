@@ -2562,6 +2562,8 @@
       "selectModelBeforeSending": "Hautatu modelo bat bidali aurretik.",
       "preparingPlaceholder": "Ingurunea prestatzen…",
       "finalizingPlaceholder": "Amaitzen…",
+      "sessionLoadFailed": "Ezin izan da saioa kargatu. Saiatu berriro lehenik.",
+      "sendUnavailable": "Bidaltzea ez dago erabilgarri saioa prest egon arte.",
       "cannotReceiveFiles": "Saio honek ezin du fitxategirik jaso. Kendu eranskinak zure mezua bidaltzeko.",
       "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu Bidali berriro saiatzeko.",
       "discardAttachmentsMessage": "Igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",

@@ -99,16 +99,18 @@ async function openDrainSession(
   deadline: ScenarioDeadline,
   args: LifecycleArgs,
   sink: CallbackSink,
-  directive: string
+  directive: string,
+  onSessionStarted: (sessionId: string) => void
 ): Promise<{
   sessionId: string;
   messageId: string;
   stream: StreamConnection;
 }> {
   const { config, api = 'unified' } = args;
+  if (!args.env) throw new Error('scenario environment is required');
   const session = await deadline.within('start', signal =>
     startSession(
-      trackStartedSession(config, () => {}),
+      trackStartedSession(config, onSessionStarted),
       {
         prompt: fakeDirective(directive),
         signal,
@@ -125,22 +127,30 @@ async function openDrainSession(
     )
   );
   const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
-  if (!args.env) throw new Error('scenario environment is required');
-  const sandbox = sessionSandboxObservation(args.env);
-  const container = await deadline.within('container', signal =>
-    sandbox.waitForContainer({
-      cloudAgentSessionId: session.cloudAgentSessionId,
-      kiloSessionId: session.kiloSessionId,
-      timeoutMs: Math.max(1, Math.min(60_000, deadline.remaining('container'))),
-      signal,
-    })
-  );
-  if (container === null) throw new Error('sandbox did not appear');
-  return {
-    sessionId: session.cloudAgentSessionId,
-    messageId: session.messageId,
-    stream,
-  };
+  try {
+    const sandbox = sessionSandboxObservation(args.env);
+    const container = await deadline.within('container', signal =>
+      sandbox.waitForContainer({
+        cloudAgentSessionId: session.cloudAgentSessionId,
+        kiloSessionId: session.kiloSessionId,
+        timeoutMs: Math.max(1, Math.min(60_000, deadline.remaining('container'))),
+        signal,
+      })
+    );
+    if (container === null) throw new Error('sandbox did not appear');
+    return {
+      sessionId: session.cloudAgentSessionId,
+      messageId: session.messageId,
+      stream,
+    };
+  } catch (error) {
+    try {
+      stream.close();
+    } catch {
+      /* best-effort close */
+    }
+    throw error;
+  }
 }
 
 async function runHeldChild(
@@ -159,7 +169,9 @@ async function runHeldChild(
   let completed = false;
   try {
     sink = await deadline.within('callback open', signal => callbacks.open(signal));
-    const opened = await openDrainSession(deadline, args, sink, directive);
+    const opened = await openDrainSession(deadline, args, sink, directive, id => {
+      sessionId = id;
+    });
     stream = opened.stream;
     sessionId = opened.sessionId;
     const engaged = await deadline.within('child gate', signal =>
@@ -249,7 +261,9 @@ async function runScheduledResume(
   const fired = `fired-${tag}`;
   try {
     sink = await deadline.within('callback open', signal => callbacks.open(signal));
-    const opened = await openDrainSession(deadline, args, sink, directive);
+    const opened = await openDrainSession(deadline, args, sink, directive, id => {
+      sessionId = id;
+    });
     stream = opened.stream;
     sessionId = opened.sessionId;
     const payload = await sink.waitFor(

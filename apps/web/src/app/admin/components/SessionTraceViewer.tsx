@@ -31,6 +31,7 @@ import {
   Download,
   Server,
   Tag,
+  DollarSign,
 } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
@@ -400,6 +401,17 @@ export function SessionTraceViewer() {
                   <span className="text-sm font-medium">Model:</span>
                   <span className="font-mono text-sm">
                     {isV2 ? v2SummaryModel : sessionQuery.data.last_model}
+                  </span>
+                </div>
+              )}
+              {sessionQuery.data.total_cost_microdollars != null && (
+                <div className="flex items-center gap-2">
+                  <DollarSign className="text-muted-foreground h-4 w-4" />
+                  <span className="text-sm">
+                    Cost:{' '}
+                    <span className="font-mono tabular-nums">
+                      ${(sessionQuery.data.total_cost_microdollars / 1_000_000).toFixed(4)}
+                    </span>
                   </span>
                 </div>
               )}

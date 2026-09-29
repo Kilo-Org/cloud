@@ -128,6 +128,9 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
+  // Billing-derived session cost is authoritative when available; fall back to the
+  // orchestrator-accumulated review cost for reviews without a linked session.
+  const sessionCostMusd = data.sessionCostMusd ?? review.total_cost_musd;
   const isSupersededCancellation =
     status === 'cancelled' &&
     (review.terminal_reason === 'superseded' ||
@@ -264,10 +267,10 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 </dd>
               </div>
             )}
-            {review.total_cost_musd != null && review.total_cost_musd > 0 && (
+            {sessionCostMusd != null && sessionCostMusd > 0 && (
               <div>
                 <dt className="text-muted-foreground">Cost</dt>
-                <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
+                <dd>${(sessionCostMusd / 1_000_000).toFixed(4)}</dd>
               </div>
             )}
             <div>

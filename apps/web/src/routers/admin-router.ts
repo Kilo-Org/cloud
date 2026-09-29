@@ -2444,8 +2444,9 @@ export const adminRouter = createTRPCRouter({
 
         return {
           ...session,
-          // V1 doesn't have git_branch — null it out for a consistent shape
+          // V1 doesn't have git_branch or per-session cost — null them out for a consistent shape
           git_branch: null,
+          total_cost_microdollars: null,
           user: user
             ? {
                 id: user.id,

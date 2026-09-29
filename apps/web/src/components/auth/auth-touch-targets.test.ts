@@ -61,10 +61,6 @@ jest.mock('@/components/AnimatedLogoMark', () => ({ AnimatedLogoMark: () => null
 // buttons are real, only their stylesheet name is stubbed.
 jest.mock('./sign-in/AuthProviderButtons.module.css', () => ({ anacondaButton: 'anacondaButton' }));
 
-jest.mock('@/hooks/useChatGptSignInAccess', () => ({
-  useChatGptSignInAccess: () => false,
-}));
-
 jest.mock('@/hooks/usePasskeySignIn', () => ({ usePasskeySignIn: () => mockPasskey }));
 
 jest.mock('next-auth/react', () => ({ signOut: jest.fn(async () => undefined) }));

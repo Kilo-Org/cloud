@@ -666,6 +666,87 @@ export function extractFimPromptInfo(body: { prompt: string; suffix?: string | n
   };
 }
 
+/** An input item with a role, as both the chat and the responses APIs use. */
+function isRoleMessage(value: unknown): value is { role?: unknown; content?: unknown } {
+  return typeof value === 'object' && value !== null && 'role' in value;
+}
+
+/** Joins the text of a message content, which is a string or a list of content parts. */
+function textFromPromptContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: unknown[] = content;
+  const texts: string[] = [];
+  for (const part of parts) {
+    // The text payload field is always `text`; its part type differs per API
+    // (`text` for chat and messages, `input_text` for responses). Non-text
+    // parts (images, tool output) carry no `text` field.
+    if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+      texts.push(part.text);
+    }
+  }
+  return texts.join('\n');
+}
+
+/** The text of the last `user` turn, scanning from the end of the input list. */
+function lastUserTurnText(input: unknown): string | null {
+  if (typeof input === 'string') return input; // responses accepts a plain prompt string
+  if (!Array.isArray(input)) return null;
+  const messages: unknown[] = input;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (isRoleMessage(message) && message.role === 'user') {
+      return textFromPromptContent(message.content);
+    }
+  }
+  return null;
+}
+
+/**
+ * The request shapes that carry a user prompt. The body is typed structurally
+ * because only the three gateway kinds pass through here, and FIM's `prompt`
+ * body is not part of `GatewayRequest`.
+ */
+type PromptBearingRequest = {
+  kind: GatewayChatApiKind | 'fim_completions';
+  body: { messages?: unknown; input?: unknown; prompt?: unknown };
+};
+
+/**
+ * The last user turn's text, which bouncer hashes into a prompt SimHash.
+ * Chat Completions and Messages carry it in `messages`, Responses in `input`
+ * (a prompt string or an input-item list), FIM in `prompt`. Null when the
+ * request carries no user text.
+ */
+export function lastUserPromptText(request: PromptBearingRequest): string | null {
+  if (request.kind === 'responses') return lastUserTurnText(request.body.input);
+  if (request.kind === 'fim_completions') {
+    return typeof request.body.prompt === 'string' ? request.body.prompt : null;
+  }
+  return lastUserTurnText(request.body.messages);
+}
+
+/**
+ * True when the request asked for token-level probabilities, which bouncer
+ * reads as a distillation signal. No gateway request type declares all three
+ * fields (Messages declares none), so read them structurally.
+ */
+export function requestedLogprobs(body: unknown): boolean {
+  if (typeof body !== 'object' || body === null) return false;
+  const logitBias = 'logit_bias' in body ? body.logit_bias : undefined;
+  return (
+    ('logprobs' in body && Boolean(body.logprobs)) ||
+    ('top_logprobs' in body && Boolean(body.top_logprobs)) ||
+    (typeof logitBias === 'object' && logitBias !== null && Object.keys(logitBias).length > 0)
+  );
+}
+
+/** The `n` sampling parameter, or null when the request did not set one. */
+export function requestedSamples(body: unknown): number | null {
+  if (typeof body !== 'object' || body === null || !('n' in body)) return null;
+  return typeof body.n === 'number' ? body.n : null;
+}
+
 // ============================================================================
 // FIM-Specific Code
 // ============================================================================

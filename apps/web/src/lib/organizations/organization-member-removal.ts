@@ -6,7 +6,6 @@ import { and, eq } from 'drizzle-orm';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 import { lockOrganizationMembershipMutation } from '@/lib/organizations/organizations';
 
@@ -59,19 +58,6 @@ export async function removeUserFromOrganization(
             previous_role: membership.role,
           },
         });
-
-      void reportEvents({
-        events: [
-          {
-            type: 'org.member_removed',
-            data: {
-              kilo_user_id: userId,
-              organization_id: organizationId,
-              role: membership.role,
-            },
-          },
-        ],
-      });
     }
 
     return result;

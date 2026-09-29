@@ -304,6 +304,11 @@ export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THRE
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
+// Bouncer: report-only fraud, distillation, and rate verdicts (Kilo-Org/bouncer).
+export const BOUNCER_URL =
+  getEnvVariable('BOUNCER_URL') ||
+  (process.env.NODE_ENV === 'production' ? 'https://bouncer.kiloapps.io' : null);
+
 // Abuse Detection Service
 export const ABUSE_SERVICE_CF_ACCESS_CLIENT_ID = getEnvVariable(
   'ABUSE_SERVICE_CF_ACCESS_CLIENT_ID'

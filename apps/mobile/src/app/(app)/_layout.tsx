@@ -9,6 +9,7 @@ import { LauncherSurfacesMount } from '@/components/launcher-surfaces-mount';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { TourAutoOpen } from '@/components/tour/tour-auto-open';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
+import { StorePurchaseRecoveryMount } from '@/lib/iap/store-purchase-recovery-mount';
 import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
 import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
@@ -115,6 +116,7 @@ export default function AppLayout() {
       <LauncherSurfacesMount />
       <CachePersistenceMount />
       <ToolSummaryTranslationRetryMount />
+      <StorePurchaseRecoveryMount />
       <ForegroundReconciliationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />

@@ -9,7 +9,7 @@ import { POLICY } from '../sandbox-state/schedule.js';
 import type { SessionRoute } from './session-routes.js';
 import type { SandboxControlConnectionObservation } from './socket.js';
 import { projectStatusSnapshot } from './status-snapshot.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 
 const NOW = 1_000_000;
 const INC = 'inc-1';

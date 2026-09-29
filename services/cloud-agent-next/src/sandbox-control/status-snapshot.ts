@@ -15,7 +15,7 @@ import {
 import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
 import { projectStatus } from '../sandbox-state/project/status.js';
 import { POLICY } from '../sandbox-state/schedule.js';
-import { sha256Hex } from '../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import type { SessionRoute } from './session-routes.js';
 import type { SandboxControlConnectionObservation } from './socket.js';
 

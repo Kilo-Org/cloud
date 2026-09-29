@@ -43,7 +43,7 @@ describe('voice input feedback side effects', () => {
     showFeedback({
       action: 'open-settings',
       availability: 'available',
-      message: 'Microphone access is off. Enable it in Settings.',
+      message: 'Speech recognition or microphone access is off. Enable it in Settings.',
       retryable: false,
     });
 
@@ -51,8 +51,8 @@ describe('voice input feedback side effects', () => {
       | { text: string; onPress?: () => void }[]
       | undefined;
     expect(alertMock.alert).toHaveBeenCalledWith(
-      'Microphone access is off',
-      'Microphone access is off. Enable it in Settings.',
+      'Voice input needs permissions',
+      'Speech recognition or microphone access is off. Enable it in Settings.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Open Settings', onPress: expect.any(Function) },

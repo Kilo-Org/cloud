@@ -5,7 +5,6 @@ import {
   getEffectiveModelDecision,
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { VIRTUAL_PROVIDER } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -454,84 +453,5 @@ describe('effective organization model access', () => {
     expect(restricted.allowed).toBe(true);
     expect([...restricted.eligibleProviderRoutes!]).toEqual(['stepfun']);
     expect(unrestricted).toEqual({ allowed: false, denialSource: 'organization_model' });
-  });
-
-  describe('virtual routers', () => {
-    const ROUTER = 'openrouter/auto';
-    const routerLookup = async (modelId: string) =>
-      new Set(modelId === ROUTER ? [VIRTUAL_PROVIDER.slug] : ['anthropic']);
-
-    function baselinePolicy(providerAllowList: string[]) {
-      return evaluateEffectiveModelAccessPolicy(
-        context({
-          organization: {
-            ...context().organization,
-            settings: { provider_allow_list: providerAllowList, model_deny_list: [] },
-          },
-          defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
-        })
-      );
-    }
-
-    it('routes through the real providers the organization allows', async () => {
-      const decision = await getEffectiveModelDecision(
-        baselinePolicy(['anthropic', VIRTUAL_PROVIDER.slug, 'openai']),
-        ROUTER,
-        routerLookup
-      );
-
-      expect(decision).toEqual({
-        allowed: true,
-        eligibleProviderRoutes: new Set([VIRTUAL_PROVIDER.slug, 'anthropic', 'openai']),
-      });
-    });
-
-    it('denies routers when the virtual provider is not allowed', async () => {
-      await expect(
-        getEffectiveModelDecision(baselinePolicy(['anthropic', 'openai']), ROUTER, routerLookup)
-      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
-    });
-
-    it('denies routers when no real provider is allowed', async () => {
-      await expect(
-        getEffectiveModelDecision(baselinePolicy([VIRTUAL_PROVIDER.slug]), ROUTER, routerLookup)
-      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
-    });
-
-    it('routes member provider grants through the granted real providers', async () => {
-      const policy = evaluateEffectiveModelAccessPolicy(
-        context({
-          groupPolicies: [
-            [
-              {
-                type: 'model_access',
-                data: {
-                  mode: 'selected',
-                  model_allow_list: [],
-                  provider_allow_list: [VIRTUAL_PROVIDER.slug, 'google'],
-                },
-              },
-            ],
-          ],
-        })
-      );
-
-      const decision = await getEffectiveModelDecision(policy, ROUTER, routerLookup);
-
-      expect(decision).toEqual({
-        allowed: true,
-        eligibleProviderRoutes: new Set([VIRTUAL_PROVIDER.slug, 'google']),
-      });
-    });
-
-    it('does not widen routes for models served by real providers', async () => {
-      const decision = await getEffectiveModelDecision(
-        baselinePolicy(['anthropic', VIRTUAL_PROVIDER.slug, 'openai']),
-        'anthropic/claude',
-        routerLookup
-      );
-
-      expect(decision).toEqual({ allowed: true, eligibleProviderRoutes: new Set(['anthropic']) });
-    });
   });
 });

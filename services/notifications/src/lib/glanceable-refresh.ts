@@ -1,7 +1,4 @@
-import {
-  GLANCEABLE_SNAPSHOT_EXPIRY_MS,
-  isEligibleGlanceableWork,
-} from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { GLANCEABLE_SNAPSHOT_EXPIRY_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { z } from 'zod';
 
 import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glanceable-delivery';
@@ -323,7 +320,7 @@ export async function refreshGlanceableSnapshot(
     needsApproval: committed.needsApproval ?? 0,
   });
 
-  const eligible = isEligibleGlanceableWork(committed);
+  const eligible = committed.running + committed.needsInput + committed.idle > 0;
   try {
     await deliverGlanceableSnapshot(scope, {
       ...deps,
@@ -339,6 +336,7 @@ export async function refreshGlanceableSnapshot(
         if (current.revision !== request.revision) return [];
         const withoutFencedStarts = await dropFencedStarts(tokens, storage, {
           prefix: iosStartPrefix,
+          key: iosStartKey,
         });
         // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
         if (!eligible) return withoutFencedStarts;
@@ -567,20 +565,13 @@ export async function foldPendingGlanceableRefreshDeadline(
  * fence has not lapsed is removed from the list, which leaves
  * `apnsSendsForTokens` with no start to send while that ambiguity stands.
  *
- * The fence belongs to the scope, not to the token that wrote it. A card raised
- * by push-to-start is still on screen while the device registers a fresh
- * push-to-start token, and a start on that token would raise a second card
- * beside it. APNs requires an `alert` on every push-to-start, and that alert is
- * what lights the screen and expands the card, so while any fence in the scope
- * is live every push-to-start token in it stays out of the list.
- *
  * Every read also drops the lapsed fences, including those of tokens the device
  * has since rotated away and will never present again.
  */
 async function dropFencedStarts<T extends { token: string; kind: string; superseded?: boolean }>(
   tokens: readonly T[],
   storage: DurableObjectStorage,
-  fence: { prefix: string }
+  fence: { prefix: string; key: (token: string) => string }
 ): Promise<T[]> {
   const held = await storage.list<number>({ prefix: fence.prefix });
   // Only exactly one live (non-superseded) `ios_activity` row means the scope is
@@ -602,6 +593,8 @@ async function dropFencedStarts<T extends { token: string; kind: string; superse
   if (lapsed.length > 0) {
     await storage.delete(lapsed);
   }
-  const scopeHeld = [...held].some(([, until]) => until > now);
-  return scopeHeld ? tokens.filter(({ kind }) => kind !== 'ios_push_to_start') : [...tokens];
+  return tokens.filter(({ token, kind }) => {
+    const until = held.get(fence.key(token));
+    return kind !== 'ios_push_to_start' || until === undefined || until <= now;
+  });
 }

@@ -103,6 +103,17 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('allows generation usage processing to run for every route alias', async () => {
+    const routes = await Promise.all([
+      import('./route'),
+      import('@/app/api/openrouter/v1/audio/transcriptions/route'),
+      import('@/app/api/gateway/audio/transcriptions/route'),
+      import('@/app/api/gateway/v1/audio/transcriptions/route'),
+    ]);
+
+    expect(routes.map(route => route.maxDuration)).toEqual([800, 800, 800, 800]);
+  });
+
   it('proxies transcription requests to OpenRouter', async () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(
@@ -113,8 +124,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       })
     );
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -157,8 +168,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -175,10 +186,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   it('rejects malformed transcription bodies before proxying without reporting to Sentry', async () => {
     setUserAuth();
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
-      makeRequest({ model: 'openai/gpt-4o-mini-transcribe' }) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ model: 'openai/gpt-4o-mini-transcribe' }) as never);
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -188,13 +197,13 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   it('rejects non-JSON transcription bodies without reporting to Sentry', async () => {
     setUserAuth();
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const { POST } = await import('./route');
     const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-forwarded-for': '127.0.0.1' },
       body: 'not json',
     });
-    const response = await handleAudioTranscriptionsRequest(request as never);
+    const response = await POST(request as never);
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -208,8 +217,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       organizationId: undefined,
     });
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -230,8 +239,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     mockedIsFreeModel.mockReturnValue(true);
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'fake-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -252,8 +261,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
     mockedIsFreeModel.mockReturnValue(false);
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -274,8 +283,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     mockedIsFreeModel.mockReturnValue(false);
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         model: 'openai/gpt-4o-mini-transcribe',
         input_audio: { data: 'UklGRiQA', format: 'wav' },
@@ -298,8 +307,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest(
         { model: 'openai/gpt-4o-mini-transcribe', language: 'en' },
         { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
@@ -339,8 +348,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     });
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest(
         { model: 'openai/gpt-4o-mini-transcribe' },
         { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
@@ -358,8 +367,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ text: 'hello world' }));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest(
         { model: 'openai/gpt-4o-mini-transcribe' },
         { blob: new Blob(['UklGRiQA'], { type: 'audio/wav' }), filename: 'speech.wav' }
@@ -378,8 +387,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   it('rejects multipart requests without a model field', async () => {
     setUserAuth();
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest({}, { blob: new Blob(['UklGRiQA']), filename: 'speech.wav' }) as never
     );
 
@@ -390,8 +399,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   it('rejects multipart requests without a file part', async () => {
     setUserAuth();
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest({ model: 'openai/gpt-4o-mini-transcribe' }, null) as never
     );
 
@@ -402,7 +411,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
   it('rejects a malformed multipart body with a controlled 400', async () => {
     setUserAuth();
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
+    const { POST } = await import('./route');
     // The content type claims multipart/form-data, but the boundary cannot be
     // parsed. `request.formData()` rejects; the route must still answer 400.
     const request = new Request('http://localhost:3000/api/gateway/v1/audio/transcriptions', {
@@ -413,7 +422,7 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
       },
       body: 'not a multipart body',
     });
-    const response = await handleAudioTranscriptionsRequest(request as never);
+    const response = await POST(request as never);
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -424,8 +433,8 @@ describe('POST /api/gateway/v1/audio/transcriptions', () => {
     setUserAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse({ error: 'model not found' }, 404));
 
-    const { handleAudioTranscriptionsRequest } = await import('./audio-transcriptions');
-    const response = await handleAudioTranscriptionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeMultipartRequest(
         { model: 'openai/gpt-4o-mini-transcribe' },
         { blob: new Blob(['UklGRiQA']), filename: 'speech.wav' }

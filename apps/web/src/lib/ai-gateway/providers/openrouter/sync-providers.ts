@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getRawOpenRouterModels, normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import {
   convertFromKiloExclusiveModel,
   getInferenceProvider,
@@ -33,8 +33,6 @@ import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
-import { injectVirtualModels } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organization-types';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -129,13 +127,10 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   return providers;
 }
 
-async function syncProviders(params: {
-  providers: OpenRouterProvider[];
-  openRouterModels: Record<string, StoredModel>;
-  openRouterCatalogModels: CatalogModel[];
-  vercelModels: Record<string, StoredModel>;
-}) {
-  const { providers, openRouterModels, openRouterCatalogModels, vercelModels } = params;
+async function syncProviders(
+  providers: OpenRouterProvider[],
+  vercelModels: Record<string, StoredModel>
+) {
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -223,12 +218,6 @@ async function syncProviders(params: {
     providerModelData,
     openRouterFreeEndpoints,
     kiloExclusiveModels,
-  });
-
-  injectVirtualModels({
-    providerModelData,
-    catalogModels: openRouterCatalogModels,
-    storedModels: openRouterModels,
   });
 
   // Filter out providers with no models
@@ -385,14 +374,7 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const openRouterCatalog = await getRawOpenRouterModels();
-
-  const providers = await syncProviders({
-    providers: openrouterProviders,
-    openRouterModels: openrouter_data,
-    openRouterCatalogModels: openRouterCatalog.data,
-    vercelModels: vercel_data,
-  });
+  const providers = await syncProviders(openrouterProviders, vercel_data);
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

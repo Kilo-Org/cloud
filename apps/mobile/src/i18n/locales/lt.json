@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Grįžti",
     "idle": "Laukia",
-    "scheduled": "Suplanuota",
     "keepEditing": "Tęsti redagavimą",
     "keepRunning": "Tęsti vykdymą",
     "kiloclaw": "KiloClaw",
@@ -589,14 +588,7 @@
       "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "deleteComment": "Ištrinti komentarą",
-      "deleteCommentTitle": "Ištrinti komentarą?",
-      "deleteCommentMessage": "Šis komentaras bus ištrintas iš pakeitimų užklausos.",
-      "commentEditFailed": "Nepavyko išsaugoti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
-      "commentEditUnavailable": "Šio komentaro negalima redaguoti. Jis gali būti ištrintas.",
-      "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
-      "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -787,8 +779,6 @@
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
-      "commentUpdated": "Komentaras atnaujintas",
-      "commentDeleted": "Komentaras ištrintas",
       "reviewSubmitted": "Peržiūra pateikta",
       "autoMergeEnabled": "Automatinis sujungimas įjungtas"
     },
@@ -2077,14 +2067,12 @@
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
       "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
-      "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
       "tryAdjustFilters": "Pabandyk pakeisti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko atlikti sesijų paieškos.",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
-      "pastSessions": "Ankstesnės sesijos",
       "live": "TIESIOGIAI",
       "updating": "Atnaujinama"
     },
@@ -2854,8 +2842,7 @@
     "optionsExpiredDescription": "Grįžkite ir iš ankstesnio ekrano iš naujo atidarykite šį parinkiklį."
   },
   "sessionRow": {
-    "needsInput": "LAUKIA ATSAKYMO",
-    "scheduled": "SUPLANUOTA"
+    "needsInput": "LAUKIA ATSAKYMO"
   },
   "voiceInput": {
     "listening": "Klausomasi...",
@@ -3294,8 +3281,7 @@
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "newestResult": "Naujausias rezultatas",
-    "scheduledWakes": "prabunda {{time}}"
+    "newestResult": "Naujausias rezultatas"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

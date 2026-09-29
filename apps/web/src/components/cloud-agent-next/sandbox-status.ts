@@ -68,13 +68,11 @@ const statusLabels = {
 type SandboxType = NonNullable<NonNullable<SandboxStatusSnapshot['runtime']>['sandboxType']>;
 
 const sandboxTypes = {
-  shared: 'Large · Shared',
+  shared: 'Shared',
   'isolated-small': 'Small',
-  'isolated-standard': 'Large',
+  'isolated-standard': 'Standard',
   'code-review': 'Code review',
   devcontainer: 'Custom environment',
-  'containers-standard-3': 'Medium',
-  'containers-standard-4': 'Large',
   unknown: 'Unknown',
 } satisfies Record<SandboxType, string>;
 
@@ -93,8 +91,6 @@ const sandboxTypeServices: Record<SandboxType, string | null> = {
   'isolated-standard': 'cloud-agent-next-sandbox',
   'code-review': 'cloud-agent-next-sandbox-code-review',
   devcontainer: 'cloud-agent-next-sandbox-dind',
-  'containers-standard-3': 'cloud-agent-next-sandbox-containers-standard3',
-  'containers-standard-4': 'cloud-agent-next-sandbox-containers-standard4',
   unknown: null,
 };
 

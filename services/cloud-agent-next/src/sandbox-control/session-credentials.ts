@@ -27,7 +27,6 @@ import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
-import { gitAuthorSchema } from '../shared/sandbox-control-protocol.js';
 import {
   agentSandboxProviderSchema,
   parseCanonicalBitbucketCloneUrl,
@@ -143,7 +142,6 @@ const scmSchema = z
     purpose: z.enum(['github', 'gitlab', 'bitbucket']),
     alias: tokenSchema.optional(),
     gitUrl: z.string().url(),
-    author: gitAuthorSchema.optional(),
     capability: capabilitySchema.optional(),
     nativeToken: realTokenSchema.optional(),
     gitlab: z
@@ -265,7 +263,6 @@ export const sessionCredentialGrantSchema = z
       reject();
     }
     if (!grant.scm) return;
-    if (grant.scm.author && grant.scm.purpose !== 'github') reject();
     if (grant.containmentEnabled === false) {
       if (
         grant.scm.alias !== undefined ||
@@ -343,18 +340,7 @@ export function isContainedSessionCredentialGrant(
 }
 
 type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
-  Partial<
-    Pick<
-      Env,
-      | 'GIT_TOKEN_SERVICE'
-      | 'NEXTAUTH_SECRET'
-      | 'WORKER_URL'
-      | 'GITHUB_APP_SLUG'
-      | 'GITHUB_LITE_APP_SLUG'
-      | 'GITHUB_APP_BOT_USER_ID'
-      | 'GITHUB_LITE_APP_BOT_USER_ID'
-    >
-  > &
+  Partial<Pick<Env, 'GIT_TOKEN_SERVICE' | 'NEXTAUTH_SECRET' | 'WORKER_URL'>> &
   KiloTargetEnv;
 
 type PreparedSessionAttachPayload = SessionAttachPayload & {
@@ -640,7 +626,6 @@ async function refreshScmCapability(
       purpose: 'github',
       alias,
       gitUrl: `https://github.com/${repository.repo}.git`,
-      author: issued.value.gitAuthor,
       capability: cachedCapability(issued.value.capability, 'kgh2.', outboundContainerId, now),
     };
   } else if (repository.type === 'gitlab') {
@@ -809,14 +794,7 @@ function preparedPayload(
     directory: grant.directory,
     env,
     ...(grant.scm
-      ? {
-          git: {
-            url: grant.scm.gitUrl,
-            platform: grant.scm.purpose,
-            token: scmToken,
-            ...(grant.scm.author ? { author: grant.scm.author } : {}),
-          },
-        }
+      ? { git: { url: grant.scm.gitUrl, platform: grant.scm.purpose, token: scmToken } }
       : grant.repository?.type === 'git'
         ? {
             git: {
@@ -846,7 +824,6 @@ async function resolveDirectScmCredentials(
   const common = { userId: grant.userId, ...(grant.orgId ? { orgId: grant.orgId } : {}) };
   if (repository.type === 'github') {
     let nativeToken = payload.git?.token;
-    let author: { name: string; email: string } | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         ...common,
@@ -859,17 +836,11 @@ async function resolveDirectScmCredentials(
       });
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
       nativeToken = resolved.value.githubToken;
-      author = resolved.value.gitAuthor;
     }
     if (!nativeToken) invalidCredentials();
     return {
       ...grant,
-      scm: {
-        purpose: 'github',
-        gitUrl: `https://github.com/${repository.repo}.git`,
-        nativeToken,
-        ...(author ? { author } : {}),
-      },
+      scm: { purpose: 'github', gitUrl: `https://github.com/${repository.repo}.git`, nativeToken },
     };
   }
   if (repository.type === 'gitlab') {
@@ -1054,7 +1025,6 @@ export async function prepareSessionCredentials(input: {
     grant = await refreshScmCapability(env, grant, outboundContainerId, now);
   } else if (repository?.type === 'github') {
     let nativeToken = payload.git?.token;
-    let author: { name: string; email: string } | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
         githubRepo: repository.repo,
@@ -1068,7 +1038,6 @@ export async function prepareSessionCredentials(input: {
       });
       if (!resolved.success) throw new Error('GitHub credential is unavailable');
       nativeToken = resolved.value.githubToken;
-      author = resolved.value.gitAuthor;
     }
     if (!nativeToken) invalidCredentials();
     grant = {
@@ -1078,7 +1047,6 @@ export async function prepareSessionCredentials(input: {
         alias: existing?.scm?.alias ?? createControlPlaneCredential(sandboxId, 'github'),
         gitUrl: `https://github.com/${repository.repo}.git`,
         nativeToken,
-        ...(author ? { author } : {}),
       },
     };
   }

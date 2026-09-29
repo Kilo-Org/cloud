@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Dib u noqo",
     "idle": "Hawl la'aan",
-    "scheduled": "La qorsheeyay",
     "keepEditing": "Sii wad wax ka beddelka",
     "keepRunning": "Sii wad socodsiinta",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "isticmaale la tirtiray",
       "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
-      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya.",
-      "deleteComment": "Tirtir faallada",
-      "deleteCommentTitle": "Tirtir faallada?",
-      "deleteCommentMessage": "Faalladan waxaa laga tirtiri doonaa codsiga isku-darka.",
-      "commentEditFailed": "Faaladaada lama kaydin karin. Hubi xiriirkaaga oo mar kale isku day.",
-      "commentEditUnavailable": "Faalladan lama tafatiri karo. Waxaa laga yaabaa in la tirtiray.",
-      "commentDeleteFailed": "Faaladaada lama tirtiri karin. Hubi xiriirkaaga oo mar kale isku day.",
-      "commentDeleteUnavailable": "Faalladan lama tirtiri karo."
+      "moreLinesAbove_other": "… {{displayCount}} sadar oo dheeraad ah ayaa ka sarreeya."
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
-      "commentUpdated": "Faallada waa la cusboonaysiiyay",
-      "commentDeleted": "Faallada waa la tirtiray",
       "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
       "autoMergeEnabled": "Isku-darka tooska ah waa la daaray"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "Kalfadhiyada firfircoon lama soo rari karin.",
       "couldNotRefresh": "Lama cusboonaysiin karin",
       "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah. Kalfadhiyadaada ayaa halkan ka soo muuqan doona.",
-      "viewHistory": "Taariikhda kalfadhiyada",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey kale oo raadinta ah.",
       "tryAdjustFilters": "Isku day inaad wax ka beddesho shaandhooyinkaaga ama ka saarto.",
       "couldNotSearch": "Kalfadhiyada lama raadin karin.",
       "completedWillAppear": "Kalfadhiyada la dhammaystiray halkan ayay soo muuqan doonaan.",
       "noPastSessions": "Ma jiraan kalfadhiyo hore",
-      "pastSessions": "Kalfadhiyo hore",
       "live": "TOOS AH",
       "updating": "Waa la cusboonaysiinayaa"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Dib u noqo oo xulahan mar kale ka fur shaashaddii hore."
   },
   "sessionRow": {
-    "needsInput": "JAWAAB SUGAYA",
-    "scheduled": "LA QORSHEEYAY"
+    "needsInput": "JAWAAB SUGAYA"
   },
   "voiceInput": {
     "listening": "Waa la dhegaysanayaa...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka.",
     "openSession": "Fur",
     "approveFailed": "Lama oggolaan karin. Taabo $t(common.approve) si aad mar kale isku daydo.",
-    "newestResult": "Natiijada ugu cusub",
-    "scheduledWakes": "wuxuu soo toosaa {{time}}"
+    "newestResult": "Natiijada ugu cusub"
   },
   "transcriptionModel": {
     "title": "Moodeelka qoraal u beddelidda",

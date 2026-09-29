@@ -1641,7 +1641,6 @@ export function SessionDetailContent({
     userWebConnected,
     reconnectExhausted,
     everConnected: wasConnected,
-    agentStatusType: agentStatus.type,
     sessionRefresh: cachedMetadataRefresh ? { isLoading: statusIndicator === null } : undefined,
   });
   const retrySessionConnection = useCallback(() => {

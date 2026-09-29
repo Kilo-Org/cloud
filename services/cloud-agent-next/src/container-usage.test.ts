@@ -418,50 +418,6 @@ describe('MeteredSandbox', () => {
     ]);
   });
 
-  it('does not skip an unmeasured context that carries a pending stop', async () => {
-    const rpc = createRpc();
-    const { sandbox, storage, flushShadowTasks } = createSandbox(rpc);
-    await sandbox.configureBilling(billingInput);
-    sandbox.mockState = { status: 'healthy' };
-    await sandbox.onStart();
-    await flushShadowTasks();
-    const first = await getBillingContext(storage);
-    if (!first) throw new Error('Expected active billing context');
-
-    sandbox.setPhysicalRunning(false);
-    await updateBillingContext(storage, {
-      ...first,
-      measurementStarted: false,
-      pendingStop: { seq: 1, usageSinceLast: 0, measuredAtMs: 1_000, reason: 'runtime_signal' },
-    });
-
-    await expect(
-      sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toEqual({ success: true });
-
-    expect(rpc.recordStop).toHaveBeenCalledWith(
-      expect.objectContaining({ seq: 1, reason: 'runtime_signal' })
-    );
-    const next = await getBillingContext(storage);
-    expect(next?.generation).not.toBe(first.generation);
-    expect(next?.measurementStarted).toBe(false);
-  });
-
-  it('keeps a freshly created generation when recordStart fails uncertainly', async () => {
-    const rpc = createRpc();
-    const { sandbox, storage } = createSandbox(rpc);
-    vi.mocked(rpc.recordStart).mockRejectedValue(new Error('meter unavailable'));
-
-    await expect(
-      sandbox.ensureBillingAdmission({ ...billingInput, enforcementRequested: true })
-    ).resolves.toMatchObject({ success: false, code: 'meter_unavailable' });
-
-    const context = await getBillingContext(storage);
-    expect(context).toBeDefined();
-    expect(context?.measurementStarted).toBe(false);
-    expect(await storage.get('container-usage:start-ack-generation:v1')).toBeUndefined();
-  });
-
   it('fails selected admission closed for low balance and accepts shadow starts', async () => {
     const lowBalanceRpc = createRpc();
     vi.mocked(lowBalanceRpc.recordStart).mockRejectedValue(

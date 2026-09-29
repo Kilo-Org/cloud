@@ -67,13 +67,6 @@ const EMPTY_STATE_DESCRIPTION_GAP = 3.5;
 const EMPTY_STATE_DESCRIPTION_LINE_HEIGHT = 17.5;
 const EMPTY_STATE_ACTION_MIN_HEIGHT = 44;
 const EMPTY_STATE_ACTION_PADDING = 14;
-// The live empty state stacks a second action (its See-all history link) under
-// the primary button: a `gap-3` block gap (0.75rem, 10.5dp, fixed) plus one
-// eyebrow line. The eyebrow renders at `text-[11px]`; a `text-sm` line (17.5dp)
-// is a safe upper bound, so the estimate stays above the rendered height and
-// errs toward the compact form.
-const EMPTY_STATE_SECONDARY_ACTION_GAP = 10.5;
-const EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT = 17.5;
 
 /**
  * Height the full empty-state presentation needs at `fontScale`. The text parts
@@ -101,20 +94,16 @@ const EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT = 17.5;
  * `titleLines` and `descriptionLines` are the line counts at `fontScale === 1`.
  * The title fits one line; the live description
  * (`agents.sessionList.noSessionsYetDescription`) is longer than one line at
- * phone width, so it defaults to two. `secondaryAction` adds the live empty
- * state's stacked history link; the no-match state renders a single action and
- * leaves it false.
+ * phone width, so it defaults to two.
  */
 export function getEmptyStateFullHeight({
   fontScale = 1,
   titleLines = 1,
   descriptionLines = 2,
-  secondaryAction = false,
 }: {
   fontScale?: number;
   titleLines?: number;
   descriptionLines?: number;
-  secondaryAction?: boolean;
 } = {}): number {
   // The box keeps its width while the glyphs scale, so the line count scales
   // with the font scale; round up to stay above the rendered height.
@@ -128,11 +117,6 @@ export function getEmptyStateFullHeight({
     EMPTY_STATE_ACTION_MIN_HEIGHT,
     EMPTY_STATE_DESCRIPTION_LINE_HEIGHT * fontScale + EMPTY_STATE_ACTION_PADDING
   );
-  // The stacked secondary action's gap is a fixed rem value; its label scales
-  // with Dynamic Type like the rest of the copy.
-  const secondary = secondaryAction
-    ? EMPTY_STATE_SECONDARY_ACTION_GAP + EMPTY_STATE_SECONDARY_ACTION_LINE_HEIGHT * fontScale
-    : 0;
   return Math.round(
     EMPTY_STATE_BUBBLE_HEIGHT +
       EMPTY_STATE_BLOCK_GAP +
@@ -140,8 +124,7 @@ export function getEmptyStateFullHeight({
       EMPTY_STATE_DESCRIPTION_GAP +
       description +
       EMPTY_STATE_BLOCK_GAP +
-      action +
-      secondary
+      action
   );
 }
 
@@ -175,7 +158,6 @@ export function getEmptyStatePresentation({
   fontScale = 1,
   titleLines = 1,
   descriptionLines = 2,
-  secondaryAction = false,
 }: {
   available: number | null;
   bottomInset: number;
@@ -183,11 +165,10 @@ export function getEmptyStatePresentation({
   fontScale?: number;
   titleLines?: number;
   descriptionLines?: number;
-  secondaryAction?: boolean;
 }): 'compact' | 'full' {
   return available !== null &&
     available - bottomInset - reservedHeight <
-      getEmptyStateFullHeight({ fontScale, titleLines, descriptionLines, secondaryAction })
+      getEmptyStateFullHeight({ fontScale, titleLines, descriptionLines })
     ? 'compact'
     : 'full';
 }

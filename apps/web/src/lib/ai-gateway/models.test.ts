@@ -90,7 +90,7 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free', 'nex-agi/nex-n2.5-pro:free'])(
+    test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free'])(
       'removes %s from exclusive, Auto Free, and preferred models without restricting availability',
       modelId => {
         expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
@@ -165,6 +165,7 @@ describe('isFreeModel', () => {
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
+        'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'high' },
       });
     });
 
@@ -177,6 +178,7 @@ describe('isFreeModel', () => {
         'poolside/laguna-s-2.1:free': 1,
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
+        'nex-agi/nex-n2.5-pro:free': 1,
       });
     });
 

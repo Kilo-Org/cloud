@@ -17,10 +17,7 @@
     "production": {
       "extends": "base",
       "autoIncrement": true,
-      "environment": "production",
-      "ios": {
-        "buildArtifactPaths": ["ios/Podfile.lock"]
-      }
+      "environment": "production"
     },
     "preview": {
       "extends": "base",

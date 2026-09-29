@@ -50,7 +50,7 @@ describe('OpenAI OAuth config', () => {
       'email',
       'offline_access',
       'resource.invoke',
-      'chatgpt.tokens.use.obo',
+      'chatpass.enable.request',
     ]);
     expect(OPENAI_RESOURCE).toBe('https://api.openai.com/v1');
   });
@@ -66,7 +66,7 @@ describe('OpenAI OAuth config', () => {
     );
     // A grant that can call the resource and refresh, but that declined the
     // ChatGPT allowance consent, must stay an identity sign-in: token sharing
-    // cannot spend the allowance without `chatgpt.tokens.use.obo`.
+    // cannot spend the allowance without `chatpass.enable.request`.
     expect(
       isOpenAiTokenSharingGrant({
         scope: 'openid profile email resource.invoke offline_access',

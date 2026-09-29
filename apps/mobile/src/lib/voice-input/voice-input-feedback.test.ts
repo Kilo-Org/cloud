@@ -18,19 +18,21 @@ function feedback(overrides: Partial<VoiceInputFeedback> = {}): VoiceInputFeedba
 }
 
 describe('resolveVoiceInputFeedbackPresentation', () => {
-  it('returns an alert with a fixed microphone-off title when the action is open-settings', () => {
+  it('returns an alert with the permissions title when the action is open-settings', () => {
     const presentation: VoiceInputFeedbackPresentation = resolveVoiceInputFeedbackPresentation(
       feedback({
         action: 'open-settings',
-        message: 'Microphone access is off. Enable it in Settings to use voice input.',
+        message:
+          'Speech recognition or microphone access is off. Enable it in Settings to use voice input.',
         retryable: false,
       })
     );
 
     expect(presentation).toEqual({
       kind: 'alert',
-      title: 'Microphone access is off',
-      message: 'Microphone access is off. Enable it in Settings to use voice input.',
+      title: 'Voice input needs permissions',
+      message:
+        'Speech recognition or microphone access is off. Enable it in Settings to use voice input.',
       destination: 'system-settings',
     });
   });

@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Чакае",
-    "scheduled": "Запланавана",
     "keepEditing": "Працягнуць рэдагаванне",
     "keepRunning": "Працягнуць працу",
     "kiloclaw": "KiloClaw",
@@ -589,14 +588,7 @@
       "moreLinesAbove_one": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_other": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_few": "… дадатковыя радкі вышэй: {{displayCount}}",
-      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}",
-      "deleteComment": "Выдаліць каментар",
-      "deleteCommentTitle": "Выдаліць каментар?",
-      "deleteCommentMessage": "Гэты каментар будзе выдалены з запыту на зліццё.",
-      "commentEditFailed": "Не атрымалася захаваць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
-      "commentEditUnavailable": "Гэты каментар нельга рэдагаваць. Магчыма, ён быў выдалены.",
-      "commentDeleteFailed": "Не атрымалася выдаліць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
-      "commentDeleteUnavailable": "Гэты каментар нельга выдаліць."
+      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -787,8 +779,6 @@
     "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",
-      "commentUpdated": "Каментар абноўлены",
-      "commentDeleted": "Каментар выдалены",
       "reviewSubmitted": "Праверка кода адпраўлена",
       "autoMergeEnabled": "Аўтазліццё ўключана"
     },
@@ -2077,14 +2067,12 @@
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы.",
       "couldNotRefresh": "Не атрымалася абнавіць",
       "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона. Твае сеансы з'явяцца тут.",
-      "viewHistory": "Гісторыя сеансаў",
       "noMatches": "Няма сеансаў паводле ўмоў пошуку",
       "tryDifferentSearch": "Паспрабуй іншы пошукавы запыт.",
       "tryAdjustFilters": "Паспрабуй змяніць або скінуць фільтры.",
       "couldNotSearch": "Не атрымалася выканаць пошук сеансаў.",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма завершаных сеансаў",
-      "pastSessions": "Завершаныя сеансы",
       "live": "НАЖЫВА",
       "updating": "Абнаўленне"
     },
@@ -2854,8 +2842,7 @@
     "optionsExpiredDescription": "Вярніцеся на папярэдні экран і зноў адкрыйце акно выбару."
   },
   "sessionRow": {
-    "needsInput": "ЧАКАЕ АДКАЗУ",
-    "scheduled": "ЗАПЛАНАВАНА"
+    "needsInput": "ЧАКАЕ АДКАЗУ"
   },
   "voiceInput": {
     "listening": "Слухаем…",
@@ -3294,8 +3281,7 @@
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
-    "newestResult": "Найноўшы вынік",
-    "scheduledWakes": "прачынаецца {{time}}"
+    "newestResult": "Найноўшы вынік"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",

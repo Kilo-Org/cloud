@@ -401,9 +401,7 @@ describe('trusted worktree credential preparation', () => {
       url: 'https://github.com/acme/repo.git',
       platform: 'github',
       token: grant.scm?.alias,
-      author: { name: 'bot', email: 'bot@example.com' },
     });
-    expect(grant.scm?.author).toEqual({ name: 'bot', email: 'bot@example.com' });
     expect(capability && kiloSubjects.get(capability.credential)).toEqual({
       userId: 'user-a',
       cloudAgentSessionId: SESSION_ID,
@@ -1091,7 +1089,6 @@ describe('direct worktree credentials', () => {
         url: 'https://github.com/acme/repo.git',
         platform: 'github',
         token: GITHUB_TOKEN,
-        author: { name: 'bot', email: 'bot@example.com' },
       });
       expect(payload.env).toMatchObject({
         KILOCODE_TOKEN: KILO_TOKEN,
@@ -1114,30 +1111,6 @@ describe('direct worktree credentials', () => {
       );
     }
   );
-
-  it('applies the installation bot author on the legacy GitHub auth path', async () => {
-    const { broker } = createBroker();
-    const legacyBroker: GitTokenService = { ...broker };
-    delete legacyBroker.getCloudAgentAuthForRepo;
-    const env = {
-      ...environment(legacyBroker),
-      GITHUB_APP_SLUG: 'kiloconnect',
-      GITHUB_APP_BOT_USER_ID: '42',
-    };
-    const { grant, payload } = await prepareDirect(env);
-    expect(broker.getCloudAgentAuthForRepo).not.toHaveBeenCalled();
-    expect(broker.getTokenForRepo).toHaveBeenCalled();
-    const author = {
-      name: 'kiloconnect[bot]',
-      email: '42+kiloconnect[bot]@users.noreply.github.com',
-    };
-    expect(grant.scm?.author).toEqual(author);
-    expect(payload.git).toMatchObject({
-      url: 'https://github.com/acme/repo.git',
-      platform: 'github',
-      author,
-    });
-  });
 
   it('prepares repository-free worktrees without a broker', async () => {
     const { grant, payload } = await prepareDirect(

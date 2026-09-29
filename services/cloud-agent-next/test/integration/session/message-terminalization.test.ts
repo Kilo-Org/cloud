@@ -569,7 +569,7 @@ describe('message terminalization and stream events', () => {
         completionSource: 'assistant_message_event',
         terminalEffects: { event: 'pending', callback: { disposition: 'not-required' } },
       });
-      instance['ensureUniqueMessageEvent'] = () => {
+      instance['ensureTerminalMessageEvent'] = () => {
         throw new Error('terminal effect remains unavailable');
       };
       const startedAt = Date.now();

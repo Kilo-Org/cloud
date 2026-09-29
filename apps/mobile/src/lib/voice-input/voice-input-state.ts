@@ -103,6 +103,11 @@ export function classifyVoiceInputPermission(
       retryable: true,
     };
   }
+  // A permanent denial reaches here for the combined iOS permission, which
+  // covers both the microphone and speech recognition (the request asks for
+  // speech recognition first, then the microphone). A single denied status
+  // cannot say which scope is off, so the copy names both permissions instead
+  // of blaming the microphone; the Settings page holds both toggles.
   return {
     action: 'open-settings',
     availability: 'available',

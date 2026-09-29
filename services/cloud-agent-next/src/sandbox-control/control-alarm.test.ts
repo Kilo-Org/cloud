@@ -81,7 +81,6 @@ describe('control alarm composition', () => {
         allocation: allocated(NOW + 500),
         credentialExpiryAt: NOW + 5_000,
         socketHandshakeAt: NOW + 3_000,
-        billingDueAt: null,
       })
     ).toBe(NOW + 500);
     expect(
@@ -89,7 +88,6 @@ describe('control alarm composition', () => {
         allocation: allocated(),
         credentialExpiryAt: NOW + 1_000,
         socketHandshakeAt: NOW + 3_000,
-        billingDueAt: null,
       })
     ).toBe(NOW + 1_000);
     expect(
@@ -97,41 +95,8 @@ describe('control alarm composition', () => {
         allocation: allocated(),
         credentialExpiryAt: NOW + 5_000,
         socketHandshakeAt: NOW + 200,
-        billingDueAt: null,
       })
     ).toBe(NOW + 200);
-  });
-
-  it('takes the billing due time when it is the earliest of every candidate', () => {
-    expect(
-      composeControlAlarmAt({
-        allocation: allocated(NOW + 5_000),
-        credentialExpiryAt: NOW + 4_000,
-        socketHandshakeAt: NOW + 3_000,
-        billingDueAt: NOW + 100,
-      })
-    ).toBe(NOW + 100);
-  });
-
-  it('composes exactly the pre-change value when the billing due time is null', () => {
-    const allocation = allocated(NOW + 500);
-    const at = composeControlAlarmAt({
-      allocation,
-      credentialExpiryAt: NOW + 5_000,
-      socketHandshakeAt: NOW + 3_000,
-      billingDueAt: null,
-    });
-    // `null` contributes no candidate: a later billing time yields the same
-    // earliest anchor, and the value is never NaN or 0.
-    expect(at).toBe(NOW + 500);
-    expect(
-      composeControlAlarmAt({
-        allocation,
-        credentialExpiryAt: NOW + 5_000,
-        socketHandshakeAt: NOW + 3_000,
-        billingDueAt: NOW + 50_000,
-      })
-    ).toBe(NOW + 500);
   });
 
   it('ignores a stopped allocation and uses only the infrastructure anchors', () => {
@@ -140,7 +105,6 @@ describe('control alarm composition', () => {
         allocation: stopped(),
         credentialExpiryAt: NOW + 5_000,
         socketHandshakeAt: null,
-        billingDueAt: null,
       })
     ).toBe(NOW + 5_000);
   });
@@ -151,20 +115,8 @@ describe('control alarm composition', () => {
         allocation: stopped(),
         credentialExpiryAt: null,
         socketHandshakeAt: null,
-        billingDueAt: null,
       })
     ).toBeNull();
-  });
-
-  it('keeps a stopped allocation armed while a billing continuation is due', () => {
-    expect(
-      composeControlAlarmAt({
-        allocation: stopped(),
-        credentialExpiryAt: null,
-        socketHandshakeAt: null,
-        billingDueAt: NOW + 12_000,
-      })
-    ).toBe(NOW + 12_000);
   });
 });
 
@@ -175,7 +127,6 @@ describe('control alarm scheduling', () => {
       allocation: allocated(NOW + 500),
       credentialExpiryAt: NOW + 5_000,
       socketHandshakeAt: null,
-      billingDueAt: null,
     });
     expect(at).toBe(NOW + 500);
     expect(scheduler.calls).toEqual([`set:${NOW + 500}`]);
@@ -188,23 +139,9 @@ describe('control alarm scheduling', () => {
         allocation: null,
         credentialExpiryAt: null,
         socketHandshakeAt: null,
-        billingDueAt: null,
       })
     ).toBeNull();
     expect(scheduler.calls).toEqual(['delete']);
-  });
-
-  it('arms the billing continuation when it is the only candidate', async () => {
-    const scheduler = recordingScheduler();
-    expect(
-      await scheduleControlAlarm(scheduler, {
-        allocation: stopped(),
-        credentialExpiryAt: null,
-        socketHandshakeAt: null,
-        billingDueAt: NOW + 7_000,
-      })
-    ).toBe(NOW + 7_000);
-    expect(scheduler.calls).toEqual([`set:${NOW + 7_000}`]);
   });
 });
 
@@ -221,9 +158,7 @@ describe('legacy control alarm anchor import', () => {
       socketHandshakeAt: NOW + 3_000,
       credentialExpiryAt: NOW + 5_000,
     });
-    expect(composeControlAlarmAt({ allocation: null, billingDueAt: null, ...anchors })).toBe(
-      NOW + 3_000
-    );
+    expect(composeControlAlarmAt({ allocation: null, ...anchors })).toBe(NOW + 3_000);
   });
 
   it.each([undefined, {}])(

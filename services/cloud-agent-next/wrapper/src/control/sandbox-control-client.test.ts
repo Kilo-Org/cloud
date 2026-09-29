@@ -406,7 +406,6 @@ describe('createSandboxControlClient', () => {
           eventBatches?: boolean;
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
-          gitAuthor?: boolean;
           nativeRuntimeIdCapture?: boolean;
         };
       };
@@ -427,7 +426,6 @@ describe('createSandboxControlClient', () => {
         eventBatches: true,
         scopedCleanupResult: true,
         workingBranches: true,
-        gitAuthor: true,
         nativeRuntimeIdCapture: true,
       },
     });

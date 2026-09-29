@@ -75,7 +75,6 @@ function helloFrame(
     runtimeRecovery?: true;
     scopedCleanupResult?: boolean;
     workingBranches?: boolean;
-    gitAuthor?: boolean;
     nativeRuntimeIdCapture?: boolean;
   }
 ): string {
@@ -477,20 +476,6 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(handler.supportsWorkingBranches?.()).toBe(true);
-  });
-
-  it('reads the git author capability from the wrapper handshake', async () => {
-    const incoming = createFakeWebSocket();
-    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
-
-    await handler.handleMessage(
-      asWs(incoming),
-      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_git_author', {
-        gitAuthor: true,
-      })
-    );
-
-    expect(handler.supportsGitAuthor?.()).toBe(true);
   });
 
   it('reads the native runtime id capture capability from the wrapper handshake', async () => {

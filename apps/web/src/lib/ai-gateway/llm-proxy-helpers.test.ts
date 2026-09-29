@@ -39,16 +39,6 @@ import {
 } from './llm-proxy-helpers';
 
 describe('checkOrganizationModelRestrictions', () => {
-  it('does not forward the snapshot-only virtual provider upstream', () => {
-    const result = checkOrganizationModelRestrictions({
-      modelId: 'openai/text-embedding-3-small',
-      settings: { provider_allow_list: ['openai', 'virtual', 'azure'] },
-      organizationPlan: 'enterprise',
-    });
-
-    expect(result.providerConfig?.only).toEqual(['openai', 'azure']);
-  });
-
   describe('enterprise plan - model deny list restrictions', () => {
     it('should allow model when it is not in the deny list on enterprise plan', () => {
       const result = checkOrganizationModelRestrictions({

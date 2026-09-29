@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Ожидание",
-    "scheduled": "Запланировано",
     "keepEditing": "Продолжить редактирование",
     "keepRunning": "Продолжить выполнение",
     "kiloclaw": "KiloClaw",
@@ -1532,14 +1531,12 @@
       "couldNotLoadActive": "Не удалось загрузить активные сеансы.",
       "couldNotRefresh": "Не удалось обновить",
       "noSessionsYetDescription": "Запустите задачу по разработке с телефона. Ваши сеансы появятся здесь.",
-      "viewHistory": "История сеансов",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или сбросить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов.",
       "completedWillAppear": "Завершённые сеансы появятся здесь.",
       "noPastSessions": "Нет завершённых сеансов",
-      "pastSessions": "Завершённые сеансы",
       "live": "В РЕАЛЬНОМ ВРЕМЕНИ",
       "updating": "Обновление"
     },
@@ -2309,8 +2306,7 @@
     "optionsExpiredDescription": "Вернитесь на предыдущий экран и снова откройте список выбора."
   },
   "sessionRow": {
-    "needsInput": "ОЖИДАНИЕ ВВОДА",
-    "scheduled": "ЗАПЛАНИРОВАНО"
+    "needsInput": "ОЖИДАНИЕ ВВОДА"
   },
   "voiceInput": {
     "listening": "Говорите…",
@@ -2684,14 +2680,7 @@
       "moreLinesAbove_one": "… строк выше: {{displayCount}}",
       "moreLinesAbove_other": "… строк выше: {{displayCount}}",
       "moreLinesAbove_few": "… строк выше: {{displayCount}}",
-      "moreLinesAbove_many": "… строк выше: {{displayCount}}",
-      "deleteComment": "Удалить комментарий",
-      "deleteCommentTitle": "Удалить комментарий?",
-      "deleteCommentMessage": "Этот комментарий будет удалён из запроса на слияние.",
-      "commentEditFailed": "Не удалось сохранить ваш комментарий. Проверьте подключение и попробуйте снова.",
-      "commentEditUnavailable": "Этот комментарий нельзя редактировать. Возможно, он был удалён.",
-      "commentDeleteFailed": "Не удалось удалить ваш комментарий. Проверьте подключение и попробуйте снова.",
-      "commentDeleteUnavailable": "Этот комментарий нельзя удалить."
+      "moreLinesAbove_many": "… строк выше: {{displayCount}}"
     },
     "entry": {
       "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
@@ -3028,8 +3017,6 @@
     "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",
     "announce": {
       "commentPosted": "Комментарий опубликован",
-      "commentUpdated": "Комментарий обновлён",
-      "commentDeleted": "Комментарий удалён",
       "reviewSubmitted": "Ревью отправлено",
       "autoMergeEnabled": "Автослияние включено"
     },
@@ -3294,8 +3281,7 @@
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
-    "newestResult": "Последний результат",
-    "scheduledWakes": "просыпается {{time}}"
+    "newestResult": "Последний результат"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",

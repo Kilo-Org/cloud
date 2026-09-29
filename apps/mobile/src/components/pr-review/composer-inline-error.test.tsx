@@ -1,15 +1,12 @@
 // Terms-gate coverage for `useComposerInlineError`. The composer mirrors the
 // reply-input / submit sheets: a terms-required classification prompts the
 // gate, and an `outdated` outcome is terminal (bad-request copy, no retry).
-// One further case pins the surface-specific bad-request copy: the
-// `'edit-comment'` surface selects the own-comment edit copy. Only the hook is
-// under test, so no full composer mount is required.
+// Only the hook is under test, so no full composer mount is required.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type MutationErrorDisplaySurface } from '@/lib/pr-review/mutation-error-display';
 import { useComposerInlineError } from './composer-inline-error';
 
 const { ensureTermsAcceptedOutcomeMock, TERMS_CHECK_RETRY, TERMS_OUTDATED } = vi.hoisted(() => ({
@@ -38,16 +35,8 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 let latestState: ReturnType<typeof useComposerInlineError> | null = null;
 
-function Harness({
-  error,
-  isEdit,
-  surface,
-}: {
-  error: unknown;
-  isEdit: boolean;
-  surface?: MutationErrorDisplaySurface;
-}) {
-  latestState = useComposerInlineError(error, isEdit, surface);
+function Harness({ error, isEdit }: { error: unknown; isEdit: boolean }) {
+  latestState = useComposerInlineError(error, isEdit);
   return null;
 }
 
@@ -65,14 +54,10 @@ async function flush(): Promise<void> {
   await Promise.resolve();
 }
 
-async function mount(
-  error: unknown,
-  isEdit = false,
-  surface?: MutationErrorDisplaySurface
-): Promise<TestRenderer.ReactTestRenderer> {
+async function mount(error: unknown, isEdit = false): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   await act(async () => {
-    renderer = TestRenderer.create(createElement(Harness, { error, isEdit, surface }));
+    renderer = TestRenderer.create(createElement(Harness, { error, isEdit }));
     await flush();
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition
@@ -135,21 +120,6 @@ describe('useComposerInlineError terms gate', () => {
 
     expect(latestState?.inlineError).toBe(null);
     expect(latestState?.inlineErrorKind).toBe(null);
-
-    renderer.unmount();
-  });
-
-  it("selects the edit-comment bad-request copy for the 'edit-comment' surface", async () => {
-    const badRequest = new Error('Comment is too long');
-    Object.assign(badRequest, { data: { code: 'BAD_REQUEST' } });
-
-    const renderer = await mount(badRequest, false, 'edit-comment');
-
-    expect(latestState?.inlineError).toBe(
-      "This comment can't be edited. It may have been deleted."
-    );
-    expect(latestState?.inlineErrorKind).toBe('bad-request');
-    expect(latestState?.inlineErrorIsLocal).toBe(false);
 
     renderer.unmount();
   });

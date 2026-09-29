@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "ወደ ኋላ ተመለስ",
     "idle": "በእረፍት",
-    "scheduled": "የተያዘ",
     "keepEditing": "ማርትዕህን ቀጥል",
     "keepRunning": "እንዲሠራ ተወው",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "የተሰረዘ ተጠቃሚ",
       "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
       "moreLinesAbove_one": "… ከላይ ተጨማሪ {{displayCount}} መስመር አለ።",
-      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።",
-      "deleteComment": "አስተያየት ሰርዝ",
-      "deleteCommentTitle": "አስተያየት ሰርዝ?",
-      "deleteCommentMessage": "ይህ አስተያየት ከዚህ የማዋሃድ ጥያቄ ይሰረዛል።",
-      "commentEditFailed": "አስተያየትህን ማስቀመጥ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
-      "commentEditUnavailable": "ይህ አስተያየት ሊስተካከል አይችልም። ተሰርዞ ሊሆን ይችላል።",
-      "commentDeleteFailed": "አስተያየትህን መሰረዝ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
-      "commentDeleteUnavailable": "ይህ አስተያየት ሊሰረዝ አይችልም።"
+      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።"
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም።",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
     "announce": {
       "commentPosted": "አስተያየት ተለጥፏል",
-      "commentUpdated": "አስተያየት ተዘምኗል",
-      "commentDeleted": "አስተያየት ተሰርዟል",
       "reviewSubmitted": "ግምገማ ቀርቧል",
       "autoMergeEnabled": "ራስ-ሰር ማዋሃድ ነቅቷል"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
       "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
-      "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",
       "tryAdjustFilters": "ማጣሪያዎችህን ለማስተካከል ወይም ለማጽዳት ሞክር።",
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
-      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
       "live": "ቀጥታ",
       "updating": "በማዘመን ላይ"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "ወደ ኋላ ይመለሱና ይህን መምረጫ ከቀደመው ገጽ እንደገና ይክፈቱ።"
   },
   "sessionRow": {
-    "needsInput": "ምላሽ ይፈልጋል",
-    "scheduled": "የተያዘ"
+    "needsInput": "ምላሽ ይፈልጋል"
   },
   "voiceInput": {
     "listening": "በማዳመጥ ላይ...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
-    "newestResult": "አዲሱ ውጤት",
-    "scheduledWakes": "{{time}} ይነቃል"
+    "newestResult": "አዲሱ ውጤት"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",

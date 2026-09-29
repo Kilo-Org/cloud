@@ -42,7 +42,6 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-m
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import { NextRequest } from 'next/server';
 
 jest.mock('next/server', () => {
   return {
@@ -161,7 +160,7 @@ const provider = {
 } satisfies Provider;
 
 function makeRequest(body: unknown, headers?: HeadersInit, path = '/chat/completions') {
-  return new NextRequest(`http://localhost:3000/api/openrouter/v1${path}`, {
+  return new Request(`http://localhost:3000/api/openrouter/v1${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -283,8 +282,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       organizationId: 'org-123',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
         // A Kilo client sets `apiKey: "anonymous"` when nobody is signed in.
         // This is the free tier's normal path, so it must stay anonymous.
@@ -317,8 +316,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       tokenSource: 'api-token',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
         authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
       }) as never
@@ -360,8 +359,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       bypassAccessCheck: false,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(), {
         authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
       }) as never
@@ -402,8 +401,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       organizationId: 'org-123',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(), {
         authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
       }) as never
@@ -429,8 +428,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       organizationId: 'org-123',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
         // Even a free model must not be served anonymously to a caller that
         // sent a credential: the caller believes it is authenticated.
@@ -458,8 +457,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       organizationId: 'org-123',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
         authorization: `Bearer ${token}`,
       }) as never
@@ -481,8 +480,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     });
     mockedIsAutoTopUpInFlight.mockResolvedValue(false);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(402);
     expect(mockedIsAutoTopUpInFlight).toHaveBeenCalledWith({
@@ -507,8 +506,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
       skipBalanceCheck: true,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalled();
@@ -523,8 +522,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     });
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(503);
     expect(response.headers.get('retry-after')).toBe('5');
@@ -544,8 +543,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
     });
     mockedIsAutoTopUpInFlight.mockResolvedValue(true);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(402);
     expect(mockedIsAutoTopUpInFlight).not.toHaveBeenCalled();
@@ -573,8 +572,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it('rejects providerOptions and directs clients to provider', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({ ...makeBody(), providerOptions: { gateway: { only: ['anthropic'] } } }) as never
     );
 
@@ -589,9 +588,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it('passes the Vercel request ID to request logging', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const { POST } = await import('./route');
 
-    const response = await handleLlmProxyRequest(
+    const response = await POST(
       makeRequest(makeBody(), { 'x-vercel-id': 'iad1::iad1::request-id' }) as never
     );
 
@@ -612,9 +611,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       userByok: null,
       bypassAccessCheck: false,
     });
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const { POST } = await import('./route');
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
@@ -623,9 +622,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   });
 
   it('uses the read replica for balance and organization settings', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const { POST } = await import('./route');
 
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
@@ -652,42 +651,12 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       eligibleProviderRoutes: new Set(['amazon-bedrock']),
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('anthropic/claude-sonnet-4.5')) as never);
 
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect(getRoutingProviderConfig).toBeDefined();
-    expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
-  });
-
-  it('routes virtual routers through the allowed real providers only', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: { provider_allow_list: ['virtual', 'amazon-bedrock'] },
-      plan: 'enterprise',
-    });
-    mockedGetEffectiveModelDecision.mockResolvedValue({
-      allowed: true,
-      eligibleProviderRoutes: new Set(['virtual', 'amazon-bedrock']),
-    });
-
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('openrouter/auto')) as never);
-
-    expect(response.status).toBe(200);
-    const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['amazon-bedrock']);
   });
 
@@ -707,8 +676,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       plan: 'enterprise',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
@@ -737,10 +706,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       eligibleProviderRoutes: new Set(['google']),
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('google/gemini-2.5-pro')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('google/gemini-2.5-pro')) as never);
 
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
@@ -750,10 +717,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   it('returns 404 when the OpenRouter model id is unknown', async () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(false);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('not-a-real-model')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('not-a-real-model')) as never);
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
@@ -770,8 +735,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   ])('rejects the unavailable or disabled model %s before upstream', async modelId => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody(modelId)) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody(modelId)) as never);
 
     expect(response.status).toBe(404);
     expect(await response.json()).toMatchObject({
@@ -783,8 +748,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
   it('applies free-model rate limiting to flagged Kilo-exclusive models', async () => {
     mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: false, requestCount: 200 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(gemma_4_26b_a4b_it_free_model.public_id)) as never
     );
 
@@ -806,8 +771,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
     );
 
@@ -825,8 +790,8 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       message: 'Your ChatGPT connection has expired. Reconnect to continue.',
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody()) as never);
     const body = (await response.json()) as { error: string; error_type: string };
 
     expect(response.status).toBe(400);
@@ -871,8 +836,8 @@ describe.each([
       data_collection: 'deny',
       zdr: true,
     };
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({ model: 'openai/gpt-4o', ...input, provider: requestProvider }, undefined, path)
     );
 
@@ -886,10 +851,8 @@ describe.each([
       expect(request.body).not.toHaveProperty('provider');
       return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
     });
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest({ model: 'openai/gpt-4o', ...input }, undefined, path)
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ model: 'openai/gpt-4o', ...input }, undefined, path));
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider).toEqual({ order: ['openai'] });
@@ -898,8 +861,8 @@ describe.each([
   it.each([{ data_collection: 'invalid' }, { zdr: 'true' }])(
     'rejects invalid provider privacy %j',
     async privacy => {
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
+      const { POST } = await import('./route');
+      const response = await POST(
         makeRequest({ model: 'openai/gpt-4o', ...input, provider: privacy }, undefined, path)
       );
 
@@ -941,8 +904,8 @@ describe.each([
         expect(await getRoutingProviderConfig?.()).toEqual(expectedPrivacy);
         return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
       });
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
+      const { POST } = await import('./route');
+      const response = await POST(
         makeRequest(
           { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], ...requestPrivacy } },
           undefined,
@@ -976,8 +939,8 @@ describe.each([
       expect(await getRoutingProviderConfig?.()).toEqual({ only: ['openai'], ...privacy });
       return { kind: 'provider', provider, userByok: null, bypassAccessCheck: false };
     });
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest(
         { model: 'openai/gpt-4o', ...input, provider: { only: ['azure'], ...privacy } },
         undefined,
@@ -1057,8 +1020,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       return { decision: null, costUsd: 0 };
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({
         ...makeBody('kilo-auto/efficient'),
         provider: { only: ['openai'], data_collection: 'allow', zdr: true },
@@ -1108,8 +1071,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       model: {} as never,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/org')) as never);
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
@@ -1145,8 +1108,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       return { kind: 'no_free_models_available' };
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/free')) as never);
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/free')) as never);
 
     expect(response.status).toBe(503);
     expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
@@ -1169,10 +1132,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.002,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(200);
     // Wait for after() callback to settle
@@ -1206,10 +1167,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.002,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/balanced')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
 
     expect(response.status).toBe(200);
     await Promise.resolve();
@@ -1236,8 +1195,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     await Promise.resolve();
     await Promise.resolve();
@@ -1266,8 +1225,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.002,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     await Promise.resolve();
     await Promise.resolve();
@@ -1290,8 +1249,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       organizationId: undefined,
     } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/efficient')) as never);
+    const { POST } = await import('./route');
+    await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     await Promise.resolve();
     await Promise.resolve();
@@ -1321,10 +1280,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.003,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(400);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
@@ -1367,10 +1324,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.003,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
@@ -1408,10 +1363,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.003,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedCollectDeniedAutoRoutingModelIds).toHaveBeenCalled();
@@ -1444,8 +1397,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       ]);
       mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-      const { handleLlmProxyRequest } = await import('./llm-proxy');
-      const response = await handleLlmProxyRequest(
+      const { POST } = await import('./route');
+      const response = await POST(
         makeRequest({
           ...makeBody('kilo-auto/balanced'),
           ...(requestProvider && { provider: requestProvider }),
@@ -1466,10 +1419,8 @@ describe('kilo-auto/efficient classifier billing', () => {
   it('does not deny data-collecting models when data collection is allowed', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedCollectDataCollectionRequiredAutoRoutingModelIds).not.toHaveBeenCalled();
@@ -1484,10 +1435,8 @@ describe('kilo-auto/efficient classifier billing', () => {
       costUsd: 0.001,
     });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(200);
     await Promise.resolve();
@@ -1519,10 +1468,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
@@ -1554,10 +1501,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/efficient')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
@@ -1596,10 +1541,8 @@ describe('auto-routing shadow classifier', () => {
     const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
     mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody('kilo-auto/balanced')) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);

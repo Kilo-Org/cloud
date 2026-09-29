@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
-    "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
     "kiloclaw": "KiloClaw",
@@ -1514,14 +1513,12 @@
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
       "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
-      "viewHistory": "Sessiegeschiedenis",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Pas je filters aan of wis ze.",
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
-      "pastSessions": "Eerdere sessies",
       "live": "ACTIEF",
       "updating": "Bijwerken"
     },
@@ -2259,8 +2256,7 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "INVOER NODIG",
-    "scheduled": "GEPLAND"
+    "needsInput": "INVOER NODIG"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2624,14 +2620,7 @@
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
       "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
-      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}.",
-      "deleteComment": "Opmerking verwijderen",
-      "deleteCommentTitle": "Opmerking verwijderen?",
-      "deleteCommentMessage": "Deze opmerking wordt uit de PR verwijderd.",
-      "commentEditFailed": "Je opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.",
-      "commentEditUnavailable": "Deze opmerking kan niet worden bewerkt. Mogelijk is deze verwijderd.",
-      "commentDeleteFailed": "Je opmerking kon niet worden verwijderd. Controleer je verbinding en probeer het opnieuw.",
-      "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2944,8 +2933,6 @@
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
-      "commentUpdated": "Opmerking bijgewerkt",
-      "commentDeleted": "Opmerking verwijderd",
       "reviewSubmitted": "Beoordeling verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
     },
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat",
-    "scheduledWakes": "wordt wakker {{time}}"
+    "newestResult": "Nieuwste resultaat"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

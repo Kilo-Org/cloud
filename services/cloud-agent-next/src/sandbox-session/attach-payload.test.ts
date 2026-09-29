@@ -92,23 +92,6 @@ describe('buildSessionAttachPayload', () => {
     });
   });
 
-  it('drops the git author for a wrapper that does not support it', () => {
-    const payload = {
-      directory: '/workspace/a',
-      git: {
-        url: 'https://github.com/acme/demo.git',
-        platform: 'github' as const,
-        author: { name: 'octocat', email: '1+octocat@users.noreply.github.com' },
-      },
-    };
-
-    expect(adaptSessionAttachPayloadForWrapper(payload, true, true)).toEqual(payload);
-    expect(adaptSessionAttachPayloadForWrapper(payload, true, false)).toEqual({
-      directory: '/workspace/a',
-      git: { url: 'https://github.com/acme/demo.git', platform: 'github' },
-    });
-  });
-
   for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
     it(`rejects ${key} in public session environment variables`, () => {
       const result = envVarsSchema.safeParse({ [key]: 'user-controlled-secret' });

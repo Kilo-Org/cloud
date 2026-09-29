@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Torna indietro",
     "idle": "Inattivo",
-    "scheduled": "Pianificata",
     "keepEditing": "Continua a modificare",
     "keepRunning": "Continua l'esecuzione",
     "kiloclaw": "KiloClaw",
@@ -1492,14 +1491,12 @@
       "couldNotLoadActive": "Impossibile caricare le sessioni attive.",
       "couldNotRefresh": "Impossibile aggiornare",
       "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono. Le tue sessioni appariranno qui.",
-      "viewHistory": "Cronologia delle sessioni",
       "noMatches": "Nessuna sessione trovata",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
       "tryAdjustFilters": "Prova a modificare o rimuovere i filtri.",
       "couldNotSearch": "Impossibile cercare le sessioni.",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione precedente",
-      "pastSessions": "Sessioni precedenti",
       "live": "IN TEMPO REALE",
       "updating": "Aggiornamento in corso"
     },
@@ -2284,8 +2281,7 @@
     "optionsExpiredDescription": "Torna alla schermata precedente e riapri la selezione."
   },
   "sessionRow": {
-    "needsInput": "IN ATTESA DI RISPOSTA",
-    "scheduled": "PIANIFICATA"
+    "needsInput": "IN ATTESA DI RISPOSTA"
   },
   "voiceInput": {
     "listening": "In ascolto…",
@@ -2654,14 +2650,7 @@
       "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}.",
       "moreLinesAbove_one": "… altre righe sopra: {{displayCount}}.",
       "moreLinesAbove_other": "… altre righe sopra: {{displayCount}}.",
-      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}.",
-      "deleteComment": "Elimina commento",
-      "deleteCommentTitle": "Eliminare il commento?",
-      "deleteCommentMessage": "Questo commento verrà eliminato dalla pull request.",
-      "commentEditFailed": "Impossibile salvare il tuo commento. Controlla la connessione e riprova.",
-      "commentEditUnavailable": "Questo commento non può essere modificato. Potrebbe essere stato eliminato.",
-      "commentDeleteFailed": "Impossibile eliminare il tuo commento. Controlla la connessione e riprova.",
-      "commentDeleteUnavailable": "Questo commento non può essere eliminato."
+      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Apri una pull request o una merge request tramite URL",
@@ -2986,8 +2975,6 @@
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
-      "commentUpdated": "Commento aggiornato",
-      "commentDeleted": "Commento eliminato",
       "reviewSubmitted": "Revisione inviata",
       "autoMergeEnabled": "Unione automatica attivata"
     },
@@ -3251,8 +3238,7 @@
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
-    "newestResult": "Risultato più recente",
-    "scheduledWakes": "si risveglia {{time}}"
+    "newestResult": "Risultato più recente"
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",

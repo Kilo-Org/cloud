@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Gå tillbaka",
     "idle": "Väntar",
-    "scheduled": "Schemalagd",
     "keepEditing": "Fortsätt redigera",
     "keepRunning": "Fortsätt köra",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "borttagen användare",
       "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
       "moreLinesAbove_one": "… fler rader ovanför: {{displayCount}}",
-      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}",
-      "deleteComment": "Ta bort kommentar",
-      "deleteCommentTitle": "Ta bort kommentaren?",
-      "deleteCommentMessage": "Den här kommentaren tas bort från PR:en.",
-      "commentEditFailed": "Det gick inte att spara din kommentar. Kontrollera anslutningen och försök igen.",
-      "commentEditUnavailable": "Den här kommentaren kan inte redigeras. Den kan ha tagits bort.",
-      "commentDeleteFailed": "Det gick inte att ta bort din kommentar. Kontrollera anslutningen och försök igen.",
-      "commentDeleteUnavailable": "Den här kommentaren kan inte tas bort."
+      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}"
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
-      "commentUpdated": "Kommentar uppdaterad",
-      "commentDeleted": "Kommentar borttagen",
       "reviewSubmitted": "Granskning skickad",
       "autoMergeEnabled": "Automatisk sammanslagning aktiverad"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
       "couldNotRefresh": "Kunde inte uppdatera",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
-      "viewHistory": "Sessionshistorik",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Prova att ändra eller rensa filtren.",
       "couldNotSearch": "Kunde inte söka bland sessionerna.",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
-      "pastSessions": "Tidigare sessioner",
       "live": "I REALTID",
       "updating": "Uppdaterar"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna väljaren igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "VÄNTAR PÅ SVAR",
-    "scheduled": "SCHEMALAGD"
+    "needsInput": "VÄNTAR PÅ SVAR"
   },
   "voiceInput": {
     "listening": "Lyssnar…",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
-    "newestResult": "Nyaste resultatet",
-    "scheduledWakes": "vaknar {{time}}"
+    "newestResult": "Nyaste resultatet"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

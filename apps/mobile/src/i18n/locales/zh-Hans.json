@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "返回",
     "idle": "空闲",
-    "scheduled": "已计划",
     "keepEditing": "继续编辑",
     "keepRunning": "继续运行",
     "kiloclaw": "KiloClaw",
@@ -1514,14 +1513,12 @@
       "couldNotLoadActive": "无法加载进行中的会话。",
       "couldNotRefresh": "无法刷新",
       "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
-      "viewHistory": "会话历史",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
       "tryAdjustFilters": "请尝试调整或清除筛选条件。",
       "couldNotSearch": "无法搜索会话。",
       "completedWillAppear": "已完成的会话将显示在这里。",
       "noPastSessions": "暂无历史会话",
-      "pastSessions": "历史会话",
       "live": "实时",
       "updating": "正在更新"
     },
@@ -2259,8 +2256,7 @@
     "optionsExpiredDescription": "请返回上一页面，重新打开此选择器。"
   },
   "sessionRow": {
-    "needsInput": "等待输入",
-    "scheduled": "已计划"
+    "needsInput": "等待输入"
   },
   "voiceInput": {
     "listening": "正在收听…",
@@ -2624,14 +2620,7 @@
       "deletedUser": "已删除的用户",
       "replyForbiddenTerm": "你无权回复此{{term}}。",
       "moreLinesAbove_one": "上方还有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。",
-      "deleteComment": "删除评论",
-      "deleteCommentTitle": "删除评论？",
-      "deleteCommentMessage": "此评论将从拉取请求中删除。",
-      "commentEditFailed": "无法保存你的评论。请检查网络连接后重试。",
-      "commentEditUnavailable": "无法编辑此评论。它可能已被删除。",
-      "commentDeleteFailed": "无法删除你的评论。请检查网络连接后重试。",
-      "commentDeleteUnavailable": "无法删除此评论。"
+      "moreLinesAbove_other": "上方还有 {{displayCount}} 行。"
     },
     "entry": {
       "eyebrow": "通过 URL 打开拉取请求或合并请求",
@@ -2944,8 +2933,6 @@
     "linkPasteNotAPullRequest": "不是拉取请求或合并请求链接",
     "announce": {
       "commentPosted": "评论已发布",
-      "commentUpdated": "评论已更新",
-      "commentDeleted": "评论已删除",
       "reviewSubmitted": "审查已提交",
       "autoMergeEnabled": "已开启自动合并"
     },
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。",
     "openSession": "打开",
     "approveFailed": "无法批准。点按$t(common.approve)重试。",
-    "newestResult": "最新结果",
-    "scheduledWakes": "{{time}}唤醒"
+    "newestResult": "最新结果"
   },
   "transcriptionModel": {
     "title": "转写模型",

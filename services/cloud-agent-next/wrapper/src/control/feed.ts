@@ -1,10 +1,22 @@
 import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
-import { isRecord, kiloEventSessionId } from '../../../src/shared/kilo-event.js';
 import type { HandlerSessionSnapshot } from './sandbox-control-handlers';
 import { directoryForSession, rememberChildSession, rootForSession } from './session-directories';
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 export function eventKiloSessionId(properties: Record<string, unknown>): string | undefined {
-  return kiloEventSessionId(properties);
+  if (typeof properties.sessionID === 'string') return properties.sessionID;
+  if (typeof properties.sessionId === 'string') return properties.sessionId;
+  if (isRecord(properties.info)) {
+    if (typeof properties.info.sessionID === 'string') return properties.info.sessionID;
+    if (typeof properties.info.id === 'string') return properties.info.id;
+  }
+  if (isRecord(properties.part) && typeof properties.part.sessionID === 'string') {
+    return properties.part.sessionID;
+  }
+  return undefined;
 }
 
 export function childFromSessionCreated(

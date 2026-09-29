@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Очікування",
-    "scheduled": "Заплановано",
     "keepEditing": "Продовжити редагування",
     "keepRunning": "Продовжити виконання",
     "kiloclaw": "KiloClaw",
@@ -1532,14 +1531,12 @@
       "couldNotLoadActive": "Не вдалося завантажити активні сеанси.",
       "couldNotRefresh": "Не вдалося оновити",
       "noSessionsYetDescription": "Запустіть завдання з програмування з телефона. Ваші сеанси з'являться тут.",
-      "viewHistory": "Історія сеансів",
       "noMatches": "Немає відповідних сеансів",
       "tryDifferentSearch": "Спробуй інший пошуковий запит.",
       "tryAdjustFilters": "Спробуйте змінити або скинути фільтри.",
       "couldNotSearch": "Не вдалося виконати пошук сеансів.",
       "completedWillAppear": "Завершені сеанси з'являться тут.",
       "noPastSessions": "Немає попередніх сеансів",
-      "pastSessions": "Попередні сеанси",
       "live": "НАЖИВО",
       "updating": "Оновлення"
     },
@@ -2309,8 +2306,7 @@
     "optionsExpiredDescription": "Поверніться на попередній екран і знову відкрийте це вікно вибору."
   },
   "sessionRow": {
-    "needsInput": "ОЧІКУЄ ВІДПОВІДІ",
-    "scheduled": "ЗАПЛАНОВАНО"
+    "needsInput": "ОЧІКУЄ ВІДПОВІДІ"
   },
   "voiceInput": {
     "listening": "Слухаємо…",
@@ -2684,14 +2680,7 @@
       "moreLinesAbove_one": "… Вище є додаткові рядки: {{displayCount}}.",
       "moreLinesAbove_other": "… Вище є додаткові рядки: {{displayCount}}.",
       "moreLinesAbove_few": "… Вище є додаткові рядки: {{displayCount}}.",
-      "moreLinesAbove_many": "… Вище є додаткові рядки: {{displayCount}}.",
-      "deleteComment": "Видалити коментар",
-      "deleteCommentTitle": "Видалити коментар?",
-      "deleteCommentMessage": "Цей коментар буде видалено із запиту на злиття.",
-      "commentEditFailed": "Не вдалося зберегти ваш коментар. Перевірте з'єднання та спробуйте ще раз.",
-      "commentEditUnavailable": "Цей коментар не можна редагувати. Можливо, його було видалено.",
-      "commentDeleteFailed": "Не вдалося видалити ваш коментар. Перевірте з'єднання та спробуйте ще раз.",
-      "commentDeleteUnavailable": "Цей коментар не можна видалити."
+      "moreLinesAbove_many": "… Вище є додаткові рядки: {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Відкрийте запит на злиття або merge-запит за URL",
@@ -3028,8 +3017,6 @@
     "linkPasteNotAPullRequest": "Це не посилання на запит на злиття або merge-запит",
     "announce": {
       "commentPosted": "Коментар опубліковано",
-      "commentUpdated": "Коментар оновлено",
-      "commentDeleted": "Коментар видалено",
       "reviewSubmitted": "Результат перевірки коду надіслано",
       "autoMergeEnabled": "Автоматичне злиття ввімкнено"
     },
@@ -3294,8 +3281,7 @@
     "activityKitDisabledBody": "Увімкніть «Дії наживо» в «Параметрах», щоб бачити активних агентів на замкненому екрані.",
     "openSession": "Відкрити",
     "approveFailed": "Не вдалося схвалити. Торкніться $t(common.approve), щоб спробувати ще раз.",
-    "newestResult": "Найновіший результат",
-    "scheduledWakes": "прокидається {{time}}"
+    "newestResult": "Найновіший результат"
   },
   "transcriptionModel": {
     "title": "Модель розпізнавання мовлення",

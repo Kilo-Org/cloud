@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Retour",
     "idle": "En veille",
-    "scheduled": "Planifiée",
     "keepEditing": "Continuer à modifier",
     "keepRunning": "Laisser continuer",
     "kiloclaw": "KiloClaw",
@@ -2213,8 +2212,7 @@
     "optionsExpiredDescription": "Revenez en arrière et rouvrez ce sélecteur depuis l'écran précédent."
   },
   "sessionRow": {
-    "needsInput": "INTERVENTION REQUISE",
-    "scheduled": "PLANIFIÉE"
+    "needsInput": "INTERVENTION REQUISE"
   },
   "voiceInput": {
     "listening": "À l'écoute…",
@@ -2439,14 +2437,12 @@
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
       "couldNotRefresh": "Impossible d'actualiser",
       "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
-      "viewHistory": "Historique des sessions",
       "noMatches": "Aucune session ne correspond aux critères",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "tryAdjustFilters": "Modifiez vos filtres ou supprimez-les.",
       "couldNotSearch": "Impossible de rechercher des sessions.",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session terminée",
-      "pastSessions": "Sessions terminées",
       "live": "EN DIRECT",
       "updating": "Mise à jour en cours"
     },
@@ -2654,14 +2650,7 @@
       "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre à {{term}}.",
       "moreLinesAbove_one": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
       "moreLinesAbove_other": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
-      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
-      "deleteComment": "Supprimer le commentaire",
-      "deleteCommentTitle": "Supprimer le commentaire ?",
-      "deleteCommentMessage": "Ce commentaire sera supprimé de la demande de fusion.",
-      "commentEditFailed": "Impossible d'enregistrer votre commentaire. Vérifiez votre connexion et réessayez.",
-      "commentEditUnavailable": "Ce commentaire ne peut pas être modifié. Il a peut-être été supprimé.",
-      "commentDeleteFailed": "Impossible de supprimer votre commentaire. Vérifiez votre connexion et réessayez.",
-      "commentDeleteUnavailable": "Ce commentaire ne peut pas être supprimé."
+      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}."
     },
     "entry": {
       "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
@@ -2986,8 +2975,6 @@
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de PR ou de merge request",
     "announce": {
       "commentPosted": "Commentaire publié",
-      "commentUpdated": "Commentaire mis à jour",
-      "commentDeleted": "Commentaire supprimé",
       "reviewSubmitted": "Revue envoyée",
       "autoMergeEnabled": "Fusion automatique activée"
     },
@@ -3251,8 +3238,7 @@
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
-    "newestResult": "Dernier résultat",
-    "scheduledWakes": "se réveille {{time}}"
+    "newestResult": "Dernier résultat"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",

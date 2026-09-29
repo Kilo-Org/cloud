@@ -15,8 +15,8 @@ export type VoiceInputFeedbackPresentation =
 /**
  * Pure projection of a `VoiceInputFeedback` into the surface that should
  * display it. Feedback with a follow-up destination gets a native alert with
- * a Cancel affordance plus a button that opens that destination: permanent
- * microphone denial opens the system settings, a gateway transcription
+ * a Cancel affordance plus a button that opens that destination: a permanent
+ * permission denial opens the system settings, a gateway transcription
  * problem that needs a different model opens the transcription model picker.
  * Every other case is a transient toast — retryable failures invite the user
  * to try again, non-retryable ones are informational only. Keeping this

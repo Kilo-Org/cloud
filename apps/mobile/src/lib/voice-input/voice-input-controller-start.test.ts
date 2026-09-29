@@ -112,7 +112,8 @@ describe('createVoiceInputController - start and permission', () => {
         {
           action: 'open-settings',
           availability: 'available',
-          message: 'Microphone access is off. Enable it in Settings to use voice input.',
+          message:
+            'Speech recognition or microphone access is off. Enable it in Settings to use voice input.',
           retryable: false,
         },
       ]);

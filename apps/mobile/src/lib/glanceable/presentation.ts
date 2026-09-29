@@ -18,14 +18,10 @@ export const GLANCEABLE_STATUS_COPY_KEY = {
   privacy: 'glanceable.privacy',
 } as const satisfies Record<Exclude<GlanceableStatus, 'happy'>, string>;
 
-type GlanceableCountKey =
-  | 'common.working'
-  | 'glanceable.needsInput'
-  | 'common.idle'
-  | 'common.scheduled';
+type GlanceableCountKey = 'common.working' | 'glanceable.needsInput' | 'common.idle';
 
 /** The state a count line stands for. Surfaces map it to a glyph and a color. */
-export type GlanceableCountKind = 'needsInput' | 'running' | 'idle' | 'scheduled';
+export type GlanceableCountKind = 'needsInput' | 'running' | 'idle';
 
 export type GlanceableCountLine = {
   key: GlanceableCountKey;
@@ -35,18 +31,17 @@ export type GlanceableCountLine = {
 
 /**
  * Rank order: what the user must act on, then what is making progress, then
- * what will wake later, then what is only connected. Compact surfaces show the
- * first line only, so this ranking decides what a glance says.
+ * what is only connected. Compact surfaces show the first line only, so this
+ * ranking decides what a glance says.
  */
 const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind }[] = [
   { key: 'glanceable.needsInput', kind: 'needsInput' },
   { key: 'common.working', kind: 'running' },
-  { key: 'common.scheduled', kind: 'scheduled' },
   { key: 'common.idle', kind: 'idle' },
 ];
 
 /**
- * All four counts in rank order, zeros included.
+ * All three counts in rank order, zeros included.
  *
  * A zero row still draws: dropping it would move every remaining row as work
  * changes state, and a surface the user only glances at must not reflow. The
@@ -66,15 +61,6 @@ export function primaryGlanceableCount(
   snapshot: GlanceableAgentsSnapshot
 ): GlanceableCountLine | null {
   return glanceableCountLines(snapshot).find(line => line.count > 0) ?? null;
-}
-
-/**
- * The soonest wake a surface renders, or null when nothing is scheduled.
- * A scheduled count with no usable wake time is representable, so a surface
- * that draws a time reads this rather than `snapshot.scheduledAt` directly.
- */
-export function glanceableScheduledAt(snapshot: GlanceableAgentsSnapshot): string | null {
-  return snapshot.scheduled > 0 ? snapshot.scheduledAt : null;
 }
 
 export type GlanceableSurfaceFlags = {

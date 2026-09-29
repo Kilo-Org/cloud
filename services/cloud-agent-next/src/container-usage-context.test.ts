@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
 import type { SandboxId, SandboxInstance } from './types.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
 import {
@@ -7,16 +6,12 @@ import {
   billingCapacityForSandboxClass,
   buildSandboxBillingInput,
   configureSandboxBillingInput,
-  CONTAINERS_BILLING_CAPACITIES,
   containersBillingIdentity,
   forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
   isContainersBillingClassName,
-  isVercelBillingClassName,
   SANDBOX_CAPACITIES,
   SANDBOX_USAGE_SKUS,
-  VERCEL_BILLING_CAPACITIES,
-  vercelBillingIdentity,
   type SandboxClassName,
 } from './container-usage-context.js';
 
@@ -120,8 +115,6 @@ describe('container usage context', () => {
       SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
       SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
       SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
-      SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
-      SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
     });
   });
 
@@ -159,110 +152,6 @@ describe('container usage context', () => {
   it('does not classify inherited object keys as containers billing classes', () => {
     for (const className of ['toString', 'constructor', 'valueOf', '__proto__'] as const) {
       expect(isContainersBillingClassName(className as SandboxClassName)).toBe(false);
-    }
-  });
-
-  it('classifies exactly the own Vercel billing classes', () => {
-    for (const className of ['SandboxVercelSmall', 'SandboxVercelLarge'] as const) {
-      expect(isVercelBillingClassName(className)).toBe(true);
-    }
-    for (const className of [
-      'Sandbox',
-      'SandboxContainment',
-      'SandboxSmall',
-      'SandboxSmallContainment',
-      'SandboxDIND',
-      'SandboxCodeReview',
-      'SandboxCodeReviewContainment',
-      'SandboxContainersStandard3',
-      'SandboxContainersStandard4',
-    ] as const) {
-      expect(isVercelBillingClassName(className)).toBe(false);
-    }
-    for (const className of ['toString', 'constructor', 'valueOf', '__proto__'] as const) {
-      expect(isVercelBillingClassName(className as SandboxClassName)).toBe(false);
-    }
-  });
-
-  it('snapshots the Vercel capacities without a disk field', () => {
-    expect(VERCEL_BILLING_CAPACITIES).toEqual({
-      SandboxVercelSmall: { vcpu: 2, memoryMiB: 4_096 },
-      SandboxVercelLarge: { vcpu: 4, memoryMiB: 8_192 },
-    });
-    for (const capacity of Object.values(VERCEL_BILLING_CAPACITIES)) {
-      expect(capacity).not.toHaveProperty('diskMB');
-      expect(capacity).not.toHaveProperty('disk_mb');
-    }
-  });
-
-  it('resolves a Vercel identity for both accepted presets', () => {
-    const small: VercelSandboxResources = { vcpus: 2, memory: 4096 };
-    const large: VercelSandboxResources = { vcpus: 4, memory: 8192 };
-
-    expect(vercelBillingIdentity(small)).toEqual({
-      className: 'SandboxVercelSmall',
-      service: 'cloud-agent-next-sandbox-vercel-small',
-      sku: 'cloud-agent-vercel-small-2026-09',
-      capacity: { vcpu: 2, memoryMiB: 4_096 },
-    });
-    expect(vercelBillingIdentity(large)).toEqual({
-      className: 'SandboxVercelLarge',
-      service: 'cloud-agent-next-sandbox-vercel-large',
-      sku: 'cloud-agent-vercel-large-2026-09',
-      capacity: { vcpu: 4, memoryMiB: 8_192 },
-    });
-  });
-
-  it('throws instead of guessing a SKU for unsupported Vercel resources', () => {
-    for (const resources of [
-      { vcpus: 1, memory: 2048 },
-      { vcpus: 2, memory: 8192 },
-      { vcpus: 4, memory: 4096 },
-      { vcpus: 8, memory: 16384 },
-    ]) {
-      expect(() => vercelBillingIdentity(resources as VercelSandboxResources)).toThrow(
-        `Vercel billing is unsupported for resources: ${resources.vcpus}:${resources.memory}`
-      );
-    }
-  });
-
-  it('routes the capacity lookup to Vercel, containers, and legacy records', () => {
-    expect(billingCapacityForSandboxClass('SandboxVercelSmall')).toEqual({
-      vcpu: 2,
-      memoryMiB: 4_096,
-    });
-    expect(billingCapacityForSandboxClass('SandboxVercelLarge')).toEqual({
-      vcpu: 4,
-      memoryMiB: 8_192,
-    });
-    expect(billingCapacityForSandboxClass('SandboxContainersStandard3')).toEqual(
-      CONTAINERS_BILLING_CAPACITIES.SandboxContainersStandard3
-    );
-    expect(billingCapacityForSandboxClass('SandboxSmall')).toEqual(SANDBOX_CAPACITIES.SandboxSmall);
-  });
-
-  it('accepts both Vercel classes against an isolated `ses` billing ID and rejects others', () => {
-    const vercelClasses = ['SandboxVercelSmall', 'SandboxVercelLarge'] as const;
-    const attribution = {
-      subject: { type: 'user', id: 'user_vercel' },
-      actor: { type: 'user', id: 'user_vercel' },
-      sessionId: 'agent_1',
-      metadata: { origin: 'cloud-agent' },
-    } as const;
-
-    for (const sandboxClassName of vercelClasses) {
-      expect(() =>
-        assertSandboxBillingAllocation(sandboxClassName, {
-          sandboxId: 'ses-abcdef',
-          ...attribution,
-        })
-      ).not.toThrow();
-
-      for (const sandboxId of ['abcdef' as SandboxId, 'istd-abcdef' as SandboxId]) {
-        expect(() =>
-          assertSandboxBillingAllocation(sandboxClassName, { sandboxId, ...attribution })
-        ).toThrow(`${sandboxClassName} billing received an incompatible sandbox ID`);
-      }
     }
   });
 
@@ -333,13 +222,6 @@ describe('container usage context', () => {
       SandboxDIND: { vcpu: 2, memoryMiB: 6_144, diskMB: 10_000 },
       SandboxCodeReview: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
       SandboxCodeReviewContainment: { vcpu: 1, memoryMiB: 4_096, diskMB: 8_000 },
-    });
-  });
-
-  it('keeps the containers billing capacities unchanged', () => {
-    expect(CONTAINERS_BILLING_CAPACITIES).toEqual({
-      SandboxContainersStandard3: { vcpu: 2, memoryMiB: 8_192, diskMB: 16_000 },
-      SandboxContainersStandard4: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
     });
   });
 

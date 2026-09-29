@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Înapoi",
     "idle": "Inactiv",
-    "scheduled": "Programată",
     "keepEditing": "Continuă editarea",
     "keepRunning": "Continuă rularea",
     "kiloclaw": "KiloClaw",
@@ -578,14 +577,7 @@
       "replyForbiddenTerm": "Nu ai permisiunea să răspunzi la acest {{term}}.",
       "moreLinesAbove_one": "… încă {{displayCount}} linie mai sus",
       "moreLinesAbove_other": "… încă {{displayCount}} linii mai sus",
-      "moreLinesAbove_few": "… încă {{displayCount}} linii mai sus",
-      "deleteComment": "Șterge comentariul",
-      "deleteCommentTitle": "Ștergi comentariul?",
-      "deleteCommentMessage": "Acest comentariu va fi șters din PR.",
-      "commentEditFailed": "Nu s-a putut salva comentariul tău. Verifică conexiunea și încearcă din nou.",
-      "commentEditUnavailable": "Acest comentariu nu poate fi editat. Este posibil să fi fost șters.",
-      "commentDeleteFailed": "Nu s-a putut șterge comentariul tău. Verifică conexiunea și încearcă din nou.",
-      "commentDeleteUnavailable": "Acest comentariu nu poate fi șters."
+      "moreLinesAbove_few": "… încă {{displayCount}} linii mai sus"
     },
     "couldNotOpenGitHubAppSettings": "Nu s-au putut deschide setările aplicației GitHub.",
     "installKiloGitHubApp": "Instalează aplicația Kilo pentru GitHub",
@@ -771,8 +763,6 @@
     "linkPasteNotAPullRequest": "Aceasta nu este o legătură către un PR sau un merge request",
     "announce": {
       "commentPosted": "Comentariu publicat",
-      "commentUpdated": "Comentariu actualizat",
-      "commentDeleted": "Comentariu șters",
       "reviewSubmitted": "Revizuire trimisă",
       "autoMergeEnabled": "Îmbinare automată activată"
     },
@@ -2052,14 +2042,12 @@
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active.",
       "couldNotRefresh": "Nu s-a putut reîmprospăta",
       "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon. Sesiunile tale vor apărea aici.",
-      "viewHistory": "Istoricul sesiunilor",
       "noMatches": "Nicio sesiune nu corespunde filtrelor",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "tryAdjustFilters": "Încearcă să modifici sau să elimini filtrele.",
       "couldNotSearch": "Nu s-a putut căuta în sesiuni.",
       "completedWillAppear": "Sesiunile finalizate vor apărea aici.",
       "noPastSessions": "Nicio sesiune anterioară",
-      "pastSessions": "Sesiuni anterioare",
       "live": "ÎN TIMP REAL",
       "updating": "Se actualizează"
     },
@@ -2813,8 +2801,7 @@
     "optionsExpiredDescription": "Revino la ecranul anterior și redeschide selectorul."
   },
   "sessionRow": {
-    "needsInput": "AȘTEAPTĂ UN RĂSPUNS",
-    "scheduled": "PROGRAMATĂ"
+    "needsInput": "AȘTEAPTĂ UN RĂSPUNS"
   },
   "voiceInput": {
     "listening": "Se ascultă…",
@@ -3251,8 +3238,7 @@
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare.",
     "openSession": "Deschide",
     "approveFailed": "Aprobarea nu a reușit. Atinge $t(common.approve) pentru a încerca din nou.",
-    "newestResult": "Cel mai recent rezultat",
-    "scheduledWakes": "se trezește {{time}}"
+    "newestResult": "Cel mai recent rezultat"
   },
   "transcriptionModel": {
     "title": "Model de transcriere",

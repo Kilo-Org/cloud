@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "უკან დაბრუნება",
     "idle": "უმოქმედოა",
-    "scheduled": "დაგეგმილი",
     "keepEditing": "რედაქტირების გაგრძელება",
     "keepRunning": "მუშაობის გაგრძელება",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "წაშლილი მომხმარებელი",
       "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
       "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
-      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
-      "deleteComment": "კომენტარის წაშლა",
-      "deleteCommentTitle": "წავშალო კომენტარი?",
-      "deleteCommentMessage": "ეს კომენტარი წაიშლება შერწყმის მოთხოვნიდან.",
-      "commentEditFailed": "კომენტარის შენახვა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
-      "commentEditUnavailable": "ამ კომენტარის რედაქტირება შეუძლებელია. შესაძლოა ის წაშლილია.",
-      "commentDeleteFailed": "კომენტარის წაშლა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
-      "commentDeleteUnavailable": "ამ კომენტარის წაშლა შეუძლებელია."
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
-      "commentUpdated": "კომენტარი განახლდა",
-      "commentDeleted": "კომენტარი წაიშალა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
       "autoMergeEnabled": "ავტომატური შერწყმა ჩართულია"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotRefresh": "განახლება ვერ მოხერხდა",
       "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
-      "viewHistory": "სესიების ისტორია",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",
       "tryAdjustFilters": "სცადე ფილტრების შეცვლა ან გასუფთავება.",
       "couldNotSearch": "სესიების ძიება ვერ მოხერხდა.",
       "completedWillAppear": "დასრულებული სესიები აქ გამოჩნდება.",
       "noPastSessions": "დასრულებული სესიები არ არის",
-      "pastSessions": "დასრულებული სესიები",
       "live": "აქტიური",
       "updating": "ახლდება"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "დაბრუნდით წინა ეკრანზე და ხელახლა გახსენით არჩევის ეს ფანჯარა."
   },
   "sessionRow": {
-    "needsInput": "პასუხს ელის",
-    "scheduled": "დაგეგმილი"
+    "needsInput": "პასუხს ელის"
   },
   "voiceInput": {
     "listening": "გისმენ...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "newestResult": "უახლესი შედეგი",
-    "scheduledWakes": "{{time}} იღვიძებს"
+    "newestResult": "უახლესი შედეგი"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",

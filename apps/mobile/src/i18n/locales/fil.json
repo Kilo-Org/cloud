@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Bumalik",
     "idle": "Walang ginagawa",
-    "scheduled": "Naka-iskedyul",
     "keepEditing": "Ituloy ang pag-edit",
     "keepRunning": "Hayaang tumakbo",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "binurang user",
       "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
       "moreLinesAbove_one": "… may {{displayCount}} pang linya sa itaas.",
-      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas.",
-      "deleteComment": "Alisin ang komento",
-      "deleteCommentTitle": "Alisin ang komento?",
-      "deleteCommentMessage": "Aalisin ang komentong ito sa pull request.",
-      "commentEditFailed": "Hindi mai-save ang komento mo. Suriin ang koneksyon mo at subukan muli.",
-      "commentEditUnavailable": "Hindi ma-edit ang komentong ito. Maaaring naalis na ito.",
-      "commentDeleteFailed": "Hindi maalis ang komento mo. Suriin ang koneksyon mo at subukan muli.",
-      "commentDeleteUnavailable": "Hindi maalis ang komentong ito."
+      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",
-      "commentUpdated": "Na-update ang komento",
-      "commentDeleted": "Naalis ang komento",
       "reviewSubmitted": "Naisumite ang pagsusuri",
       "autoMergeEnabled": "Aktibo na ang awtomatikong pag-merge"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session.",
       "couldNotRefresh": "Hindi ma-refresh",
       "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo. Lalabas dito ang mga session mo.",
-      "viewHistory": "Kasaysayan ng mga session",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukang maghanap gamit ang ibang salita.",
       "tryAdjustFilters": "Subukang baguhin o alisin ang mga filter mo.",
       "couldNotSearch": "Hindi mahanap ang mga session.",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
-      "pastSessions": "Mga nakaraang session",
       "live": "AKTIBO",
       "updating": "Ina-update"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Bumalik sa naunang screen at muling buksan ang pagpipiliang ito."
   },
   "sessionRow": {
-    "needsInput": "NAGHIHINTAY NG SAGOT",
-    "scheduled": "NAKA-ISKEDYUL"
+    "needsInput": "NAGHIHINTAY NG SAGOT"
   },
   "voiceInput": {
     "listening": "Nakikinig...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
-    "newestResult": "Pinakabagong resulta",
-    "scheduledWakes": "gigising {{time}}"
+    "newestResult": "Pinakabagong resulta"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",

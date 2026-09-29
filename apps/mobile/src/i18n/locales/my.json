@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "နောက်သို့ ပြန်သွားပါ",
     "idle": "အလုပ်မလုပ်နေ",
-    "scheduled": "စီစဉ်ထားသည်",
     "keepEditing": "ဆက်လက်တည်းဖြတ်ပါ",
     "keepRunning": "ဆက်လက်လုပ်ဆောင်ပါ",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "အကောင့်ဖျက်ထားသော အသုံးပြုသူ",
       "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
       "moreLinesAbove_one": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
-      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။",
-      "deleteComment": "မှတ်ချက်ကို ဖျက်ပါ",
-      "deleteCommentTitle": "မှတ်ချက်ကို ဖျက်မလား?",
-      "deleteCommentMessage": "ဤမှတ်ချက်ကို PR မှ ဖျက်ပစ်မည်။",
-      "commentEditFailed": "သင့်မှတ်ချက်ကို သိမ်း၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
-      "commentEditUnavailable": "ဤမှတ်ချက်ကို တည်းဖြတ်၍မရပါ။ ၎င်းကို ဖျက်ပြီးဖြစ်နိုင်ပါသည်။",
-      "commentDeleteFailed": "သင့်မှတ်ချက်ကို ဖျက်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။",
-      "commentDeleteUnavailable": "ဤမှတ်ချက်ကို ဖျက်၍မရပါ။"
+      "moreLinesAbove_other": "… အပေါ်တွင် နောက်ထပ်စာကြောင်း {{displayCount}} ကြောင်း ရှိပါသည်။"
     },
     "couldNotOpenGitHubAppSettings": "GitHub အက်ပ်၏ ဆက်တင်များကို မဖွင့်နိုင်ပါ။",
     "installKiloGitHubApp": "Kilo GitHub အက်ပ်ကို ထည့်သွင်းပါ",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
-      "commentUpdated": "မှတ်ချက် အပ်ဒိတ်လုပ်ပြီးပါပြီ",
-      "commentDeleted": "မှတ်ချက် ဖျက်ပြီးပါပြီ",
       "reviewSubmitted": "သုံးသပ်မှု တင်သွင်းပြီးပါပြီ",
       "autoMergeEnabled": "အလိုအလျောက် ပေါင်းစည်းမှု ဖွင့်ပြီးပါပြီ"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "လုပ်ဆောင်နေသော စက်ရှင်များကို ရယူ၍မရပါ။",
       "couldNotRefresh": "ပြန်ရယူ၍မရပါ",
       "noSessionsYetDescription": "သင့်ဖုန်းမှ ကုဒ်ရေးသည့် အလုပ်တစ်ခုကို စတင်ပါ။ သင့်စက်ရှင်များ ဒီနေရာတွင် ပေါ်လာပါမည်။",
-      "viewHistory": "စက်ရှင်မှတ်တမ်း",
       "noMatches": "ကိုက်ညီသော စက်ရှင် မရှိပါ",
       "tryDifferentSearch": "အခြားစကားလုံးဖြင့် ရှာကြည့်ပါ။",
       "tryAdjustFilters": "စစ်ထုတ်မှုများကို ပြောင်းပါ သို့မဟုတ် ရှင်းပါ။",
       "couldNotSearch": "စက်ရှင်များကို ရှာဖွေ၍မရပါ။",
       "completedWillAppear": "ပြီးဆုံးသော စက်ရှင်များ ဤနေရာတွင် ပေါ်လာမည်။",
       "noPastSessions": "ယခင်စက်ရှင်များ မရှိပါ",
-      "pastSessions": "ယခင်စက်ရှင်များ",
       "live": "တိုက်ရိုက်",
       "updating": "မွမ်းမံနေသည်"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "ယခင်မျက်နှာပြင်သို့ ပြန်သွားပြီး ရွေးချယ်သည့်အကွက်ကို ထပ်ဖွင့်ပါ။"
   },
   "sessionRow": {
-    "needsInput": "တုံ့ပြန်ချက် လိုအပ်",
-    "scheduled": "စီစဉ်ထားသည်"
+    "needsInput": "တုံ့ပြန်ချက် လိုအပ်"
   },
   "voiceInput": {
     "listening": "နားထောင်နေသည်...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "သော့ခတ်မျက်နှာပြင်တွင် လုပ်ဆောင်နေသော အေးဂျင့်များကို ကြည့်ရန် ဆက်တင်များ၌ တိုက်ရိုက်လုပ်ဆောင်မှုများကို ဖွင့်ပါ။",
     "openSession": "ဖွင့်ပါ",
     "approveFailed": "အတည်ပြု၍မရပါ။ ထပ်ကြိုးစားရန် $t(common.approve) ကို နှိပ်ပါ။",
-    "newestResult": "အသစ်ဆုံး ရလဒ်",
-    "scheduledWakes": "{{time}} နိုးမည်"
+    "newestResult": "အသစ်ဆုံး ရလဒ်"
   },
   "transcriptionModel": {
     "title": "အသံမှစာသားပြောင်းမော်ဒယ်",

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
 import { classifySandboxId } from '../sandbox-id.js';
 import {
   MAX_REFERENCE_BYTES,
@@ -58,41 +57,15 @@ export const sessionReferenceStateSchema = z.object({
     .refine(entries => serializedReferenceBytes(entries) <= MAX_REFERENCE_BYTES),
 });
 
-export function initialRuntimeMetadata(
-  sandboxId: string,
-  instance?: CloudflareContainersInstance
-): SandboxRuntimeMetadata {
+export function initialRuntimeMetadata(sandboxId: string): SandboxRuntimeMetadata {
   const classification = classifySandboxId(sandboxId);
   return {
-    sandboxType:
-      instance !== undefined
-        ? sandboxTypeForContainersInstance(instance)
-        : classification === 'legacy-shared'
-          ? 'shared'
-          : classification,
+    sandboxType: classification === 'legacy-shared' ? 'shared' : classification,
     kiloCliVersion: null,
     wrapperVersion: null,
     startedAt: null,
     stoppedAt: null,
   };
-}
-
-/**
- * The public `sandboxType` for a DO-managed containers instance. This is the only
- * instance-to-type map; the stored runtime metadata and the status read project it.
- */
-const CONTAINERS_SANDBOX_TYPE: Record<
-  CloudflareContainersInstance,
-  NonNullable<SandboxRuntimeMetadata['sandboxType']>
-> = {
-  'standard-3': 'containers-standard-3',
-  'standard-4': 'containers-standard-4',
-};
-
-export function sandboxTypeForContainersInstance(
-  instance: CloudflareContainersInstance
-): NonNullable<SandboxRuntimeMetadata['sandboxType']> {
-  return CONTAINERS_SANDBOX_TYPE[instance];
 }
 
 export async function loadRuntimeMetadata(storage: {

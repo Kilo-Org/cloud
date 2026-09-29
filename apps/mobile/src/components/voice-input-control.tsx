@@ -4,7 +4,6 @@ import { Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { VOICE_INPUT_LG_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -19,12 +18,9 @@ type VoiceInputButtonProps = {
   size?: VoiceInputButtonSize;
 };
 
-// Visual class and hitSlop travel as a coupled pair: the tap area is the
-// visual frame plus 2 * hitSlop per side. Frames are rem-scaled (NativeWind's
-// rem is 14pt), so `lg` measures 35dp. The composer input row spaces its
-// controls one `COMPOSER_CONTROL_GAP_DP` apart, which has to exceed this slop
-// plus the row's own or the two tap areas overlap
-// (`VOICE_INPUT_LG_HIT_SLOP_DP`, `chat-composer-input-row.tsx`).
+// Visual class and hitSlop travel as a coupled pair so the effective touch
+// target stays >=44pt (visual size + 2 * hitSlop per side) at every size.
+// `lg` reaches the 48dp Android minimum for the composer input row.
 const SIZE_STYLES = {
   sm: {
     className: 'h-8 w-8 rounded-full',
@@ -36,12 +32,7 @@ const SIZE_STYLES = {
   },
   lg: {
     className: 'h-10 w-10 rounded-full',
-    hitSlop: {
-      top: VOICE_INPUT_LG_HIT_SLOP_DP,
-      bottom: VOICE_INPUT_LG_HIT_SLOP_DP,
-      left: VOICE_INPUT_LG_HIT_SLOP_DP,
-      right: VOICE_INPUT_LG_HIT_SLOP_DP,
-    },
+    hitSlop: { top: 4, bottom: 4, left: 4, right: 4 },
   },
 } satisfies Record<
   VoiceInputButtonSize,

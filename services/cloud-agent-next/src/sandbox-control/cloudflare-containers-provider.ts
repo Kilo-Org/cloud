@@ -1,7 +1,6 @@
 import { CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE } from '@kilocode/worker-utils/sandbox-allocation';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import {
-  containersBillingIdentity,
   parseSandboxBillingInput,
   type SandboxBillingAdmissionResult,
 } from '../container-usage-context.js';
@@ -124,16 +123,12 @@ export function createCloudflareContainersProviderAdapter(deps: {
         throw new Error('Invalid Cloudflare containers allocation');
       }
       const container = deps.getContainer(deps.logicalSandboxId);
-      const workloadLimitMb =
-        env['CONTROL_WORKLOAD_LIMIT_MB'] ??
-        String(containersBillingIdentity(instance).capacity.memoryMiB);
       await container.launchWrapper({
         allocationRef: ref,
         instance,
         containment: owned.containment,
         env: {
           ...env,
-          CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,
           PROVIDER_INSTANCE_ID: ref,
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },

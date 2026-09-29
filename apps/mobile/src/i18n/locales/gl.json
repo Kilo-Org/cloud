@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Volver",
     "idle": "En espera",
-    "scheduled": "Programada",
     "keepEditing": "Seguir editando",
     "keepRunning": "Continuar a execución",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "usuario eliminado",
       "replyForbiddenTerm": "Non tes permiso para responder a esta {{term}}.",
       "moreLinesAbove_one": "… hai {{displayCount}} liña máis arriba.",
-      "moreLinesAbove_other": "… hai {{displayCount}} liñas máis arriba.",
-      "deleteComment": "Eliminar o comentario",
-      "deleteCommentTitle": "Eliminar o comentario?",
-      "deleteCommentMessage": "Este comentario eliminarase da solicitude de integración.",
-      "commentEditFailed": "Non se puido gardar o teu comentario. Comproba a conexión e téntao de novo.",
-      "commentEditUnavailable": "Este comentario non se pode editar. Pode que se eliminase.",
-      "commentDeleteFailed": "Non se puido eliminar o teu comentario. Comproba a conexión e téntao de novo.",
-      "commentDeleteUnavailable": "Este comentario non se pode eliminar."
+      "moreLinesAbove_other": "… hai {{displayCount}} liñas máis arriba."
     },
     "couldNotOpenGitHubAppSettings": "Non se puideron abrir os axustes da aplicación de GitHub.",
     "installKiloGitHubApp": "Instalar a aplicación de Kilo para GitHub",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Non é unha ligazón a unha solicitude de integración ou de fusión",
     "announce": {
       "commentPosted": "Comentario publicado",
-      "commentUpdated": "Comentario actualizado",
-      "commentDeleted": "Comentario eliminado",
       "reviewSubmitted": "Revisión enviada",
       "autoMergeEnabled": "Fusión automática activada"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "Non se puideron cargar as sesións activas.",
       "couldNotRefresh": "Non se puido actualizar",
       "noSessionsYetDescription": "Inicia unha tarefa de programación desde o móbil. As túas sesións aparecerán aquí.",
-      "viewHistory": "Historial de sesións",
       "noMatches": "Non hai sesións que coincidan",
       "tryDifferentSearch": "Proba con outro termo de busca.",
       "tryAdjustFilters": "Tenta axustar ou limpar os filtros.",
       "couldNotSearch": "Non se puideron buscar sesións.",
       "completedWillAppear": "As sesións completadas aparecerán aquí.",
       "noPastSessions": "Non hai sesións anteriores",
-      "pastSessions": "Sesións anteriores",
       "live": "EN TEMPO REAL",
       "updating": "Actualizando"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Volve e reabre este selector desde a pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "AGARDANDO RESPOSTA",
-    "scheduled": "PROGRAMADA"
+    "needsInput": "AGARDANDO RESPOSTA"
   },
   "voiceInput": {
     "listening": "Escoitando...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Activa as actividades en directo nos axustes para ver os axentes activos na pantalla de bloqueo.",
     "openSession": "Abrir",
     "approveFailed": "Non se puido aprobar. Toca $t(common.approve) para tentalo de novo.",
-    "newestResult": "Resultado máis recente",
-    "scheduledWakes": "esperta {{time}}"
+    "newestResult": "Resultado máis recente"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrición",

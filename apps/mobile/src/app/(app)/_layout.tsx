@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 
 import { UserWebConnectionProvider } from '@/components/agents/user-web-connection-provider';
 import { KiloChatPresenceMount } from '@/components/kilo-chat/kilo-chat-presence-mount';
@@ -20,7 +21,6 @@ import {
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
-import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useSecurityLifecycleInvalidation } from '@/lib/hooks/use-security-lifecycle-invalidation';
 import { CachePersistenceMount } from '@/lib/persist/cache-persistence-mount';
@@ -29,55 +29,66 @@ import { ToolSummaryTranslationRetryMount } from '@/lib/tool-summary-translation
 import { useTRPC } from '@/lib/trpc';
 
 /**
- * The single owner of the app's authenticated foreground reconciliation work,
- * replacing the two independent `AppState` listeners the logout and push
- * mounts used to register. Every pass runs the same ordered queue: failed
- * logout cleanup first, then push-token ownership.
- *
- * It fires on the same triggers as before — once `user.getMe` has resolved on
- * the authenticated mount (plus the push-token rotation subscription), and on
- * each return to the foreground — but the foreground path is the app's shared
- * `useAppLifecycle()` store, so the whole tree keeps one `AppState` listener
- * and the pair runs only on the background -> active edge. The store seeds
- * `isActive` as `true`, so a mount while already active is not an edge and
- * only the mount attempt runs.
- *
- * No minimum interval is added at this layer: both attempts are already
- * single-flight with 60 s spacing, and
- * `attemptPushRegistrationReconciliation` additionally skips when the stored
- * token, locale and app version already match the device
- * (`src/lib/auth/push-registration-reconciliation.ts`). Re-gating them here
- * would duplicate that contract without adding a skip.
+ * Attempts failed logout cleanup on every "next authenticated opportunity":
+ * once `user.getMe` has resolved on the authenticated mount, and on each
+ * AppState return to `active` while authenticated. The attempt itself is
+ * single-flight with 60 s spacing, so foreground flaps do not hammer the
+ * server and a transient failure retries on the next foreground.
  */
-function ForegroundReconciliationMount() {
+function LogoutReconciliationMount() {
   const { userId, isLoading, isError } = useCurrentUserId();
-  const { isActive } = useAppLifecycle();
-  const wasActiveRef = useRef(isActive);
 
-  // Mount attempt and push-token rotation subscription.
   useEffect(() => {
     if (!userId || isLoading || isError) {
       return undefined;
     }
 
     void attemptLogoutReconciliation(userId);
-    void attemptPushRegistrationReconciliation(userId);
-    const unsubscribeRotation = subscribeToPushTokenRotation(userId);
+
+    const subscription = AppState.addEventListener('change', nextState => {
+      if (nextState === 'active') {
+        void attemptLogoutReconciliation(userId);
+      }
+    });
 
     return () => {
-      unsubscribeRotation();
+      subscription.remove();
     };
   }, [userId, isLoading, isError]);
 
-  // Foreground regain: the false -> true edge only, so an active -> active
-  // echo (or a duplicate `active` from the OS) never re-runs the pair.
+  return null;
+}
+
+/**
+ * Ensures the signed-in user owns the device's Expo push token on every
+ * authenticated opportunity: once `user.getMe` has resolved on the
+ * authenticated mount, on each AppState return to `active`, and on each push
+ * token rotation. The attempt itself is single-flight with 60 s spacing, so
+ * foreground flaps do not hammer the server and a transient failure retries
+ * on the next foreground.
+ */
+function PushRegistrationMount() {
+  const { userId, isLoading, isError } = useCurrentUserId();
+
   useEffect(() => {
-    if (!wasActiveRef.current && isActive && userId && !isLoading && !isError) {
-      void attemptLogoutReconciliation(userId);
-      void attemptPushRegistrationReconciliation(userId);
+    if (!userId || isLoading || isError) {
+      return undefined;
     }
-    wasActiveRef.current = isActive;
-  }, [isActive, userId, isLoading, isError]);
+
+    void attemptPushRegistrationReconciliation(userId);
+
+    const appState = AppState.addEventListener('change', next => {
+      if (next === 'active') {
+        void attemptPushRegistrationReconciliation(userId);
+      }
+    });
+    const unsubscribeRotation = subscribeToPushTokenRotation(userId);
+
+    return () => {
+      appState.remove();
+      unsubscribeRotation();
+    };
+  }, [userId, isLoading, isError]);
 
   return null;
 }
@@ -115,7 +126,8 @@ export default function AppLayout() {
       <LauncherSurfacesMount />
       <CachePersistenceMount />
       <ToolSummaryTranslationRetryMount />
-      <ForegroundReconciliationMount />
+      <LogoutReconciliationMount />
+      <PushRegistrationMount />
       <AppWideFreshnessMount />
       <SharePayloadNavigator />
       <TourAutoOpen />

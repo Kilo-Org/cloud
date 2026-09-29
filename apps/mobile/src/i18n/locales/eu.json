@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Itzuli",
     "idle": "Geldirik",
-    "scheduled": "Programatuta",
     "keepEditing": "Jarraitu editatzen",
     "keepRunning": "Jarraitu exekutatzen",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "erabiltzaile ezabatua",
       "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
       "moreLinesAbove_one": "… Beste {{displayCount}} lerro dago goian.",
-      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian.",
-      "deleteComment": "Ezabatu iruzkina",
-      "deleteCommentTitle": "Iruzkina ezabatu?",
-      "deleteCommentMessage": "Iruzkin hau bateratze-eskaeratik ezabatuko da.",
-      "commentEditFailed": "Ezin izan da zure iruzkina gorde. Egiaztatu konexioa eta saiatu berriro.",
-      "commentEditUnavailable": "Iruzkin hau ezin da editatu. Baliteke ezabatuta egotea.",
-      "commentDeleteFailed": "Ezin izan da zure iruzkina ezabatu. Egiaztatu konexioa eta saiatu berriro.",
-      "commentDeleteUnavailable": "Iruzkin hau ezin da ezabatu."
+      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian."
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan dira GitHub aplikazioaren ezarpenak ireki.",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
     "announce": {
       "commentPosted": "Iruzkina argitaratuta",
-      "commentUpdated": "Iruzkina eguneratu da",
-      "commentDeleted": "Iruzkina ezabatu da",
       "reviewSubmitted": "Berrikuspena bidalita",
       "autoMergeEnabled": "Bateratze automatikoa gaituta"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "Ezin izan dira saio aktiboak kargatu.",
       "couldNotRefresh": "Ezin izan da freskatu",
       "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik. Zure saioak hemen agertuko dira.",
-      "viewHistory": "Saioen historiala",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu beste bilaketa-termino batekin.",
       "tryAdjustFilters": "Saiatu iragazkiak doitzen edo ezabatzen.",
       "couldNotSearch": "Ezin izan dira saioak bilatu.",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
-      "pastSessions": "Aurreko saioak",
       "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Itzuli aurreko pantailara eta ireki hautatzaile hau berriro."
   },
   "sessionRow": {
-    "needsInput": "ZURE ERANTZUNAREN ZAIN",
-    "scheduled": "PROGRAMATUTA"
+    "needsInput": "ZURE ERANTZUNAREN ZAIN"
   },
   "voiceInput": {
     "listening": "Entzuten...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
-    "newestResult": "Emaitza berriena",
-    "scheduledWakes": "{{time}} esnatuko da"
+    "newestResult": "Emaitza berriena"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",

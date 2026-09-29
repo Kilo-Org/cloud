@@ -91,15 +91,13 @@ describe('Text eyebrow in an RTL interface', () => {
     expect(label.props.style).toEqual([{ writingDirection: 'rtl' }, undefined, undefined]);
   });
 
-  it('drops the mono family and adds the reset for Arabic in an LTR interface', () => {
+  it('keeps the mono family and adds no letter spacing for Arabic in an LTR interface', () => {
     i18nManager.isRTL = false;
     const label = hostText(mount(createElement(Text, { variant: 'eyebrow' }, ARABIC)));
     const classes = (label.props.className as string).split(' ');
 
-    // Neither rule is the interface's: the script cannot take the tracking and
-    // the mono family ships no glyph of it, in either direction.
-    expect(classes.some(token => token.startsWith('font-mono'))).toBe(false);
-    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(classes).toContain('font-mono-medium');
+    expect(label.props.style).toBeUndefined();
   });
 
   it('applies the same rule to the Eyebrow wrapper', () => {

@@ -13,30 +13,7 @@ import type {
 
 type GitTokenServiceEnv = {
   GIT_TOKEN_SERVICE?: GitTokenService;
-  GITHUB_APP_SLUG?: string;
-  GITHUB_LITE_APP_SLUG?: string;
-  GITHUB_APP_BOT_USER_ID?: string;
-  GITHUB_LITE_APP_BOT_USER_ID?: string;
 };
-
-export function installationGitAuthorFromEnv(
-  env: GitTokenServiceEnv,
-  githubAppType: 'standard' | 'lite'
-): GitAuthorConfig | undefined {
-  const slug =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
-      : env.GITHUB_APP_SLUG;
-  const userId =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
-      : env.GITHUB_APP_BOT_USER_ID;
-  if (!slug || !userId) return undefined;
-  return {
-    name: `${slug}[bot]`,
-    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
-  };
-}
 
 export type ResolvedGitHubToken = {
   token: string;
@@ -175,7 +152,6 @@ async function resolveLegacyInstallationAuthForRepo(
       appType: result.value.appType,
       accountLogin: result.value.accountLogin,
       source: 'installation',
-      gitAuthor: installationGitAuthorFromEnv(env, result.value.appType),
     },
   };
 }

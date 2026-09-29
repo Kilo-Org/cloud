@@ -49,13 +49,6 @@ export const CLIOutboundMessageSchema = z.discriminatedUnion('type', [
       z.object({
         id: z.string(),
         status: z.string(),
-        // Wake time for a `scheduled` session (ISO-8601). Sent beside `status`;
-        // absent for every other status and on legacy CLIs that predate
-        // scheduling. A producer that serializes the absent field as an explicit
-        // null, or a value that is not a time at all, reads as absent: rejecting
-        // the value would fail `CLIOutboundMessageSchema` and drop the whole
-        // heartbeat, so the session would never reach `sessions.list`.
-        scheduledAt: z.string().optional().catch(undefined),
         title: z.string(),
         gitUrl: z.string().optional(),
         gitBranch: z.string().optional(),
@@ -158,11 +151,7 @@ export const WebOutboundMessageSchema = z.discriminatedUnion('type', [
 
 // -- V2 session system events -------------------------------------------------
 
-// Permissive on purpose: producers and stored rows may carry a status this
-// worker does not know yet (`scheduled` today, others later). A strict enum
-// would make `parse()` throw and drop the event, so an unrecognized status is
-// relayed as-is rather than crashing ingest or being coerced to `idle`.
-export const SessionStatusSchema = z.string();
+export const SessionStatusSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
 
 export const SessionEventV2RowSchema = z.object({
   source: z.literal('v2'),
@@ -177,9 +166,6 @@ export const SessionEventV2RowSchema = z.object({
   parentSessionId: z.string().nullable(),
   worktreeId: z.string().nullable().optional(),
   status: SessionStatusSchema.nullable(),
-  // Wake time for a `scheduled` session (ISO-8601). Absent for every other
-  // status and on rows written before scheduling existed.
-  scheduledAt: z.string().nullable().optional(),
   statusUpdatedAt: z.string().nullable(),
 });
 
@@ -196,7 +182,6 @@ export const SessionStatusUpdatedPayloadSchema = z.union([
     session: SessionEventV2RowSchema,
     previousStatus: SessionStatusSchema.nullable(),
     status: SessionStatusSchema.nullable(),
-    scheduledAt: z.string().nullable().optional(),
     statusUpdatedAt: z.string().nullable(),
     changedAt: z.string(),
   }),
@@ -205,7 +190,6 @@ export const SessionStatusUpdatedPayloadSchema = z.union([
     sessionId: z.string(),
     previousStatus: SessionStatusSchema.nullable(),
     status: SessionStatusSchema.nullable(),
-    scheduledAt: z.string().nullable().optional(),
     statusUpdatedAt: z.string().nullable(),
     updatedAt: z.string().optional(),
     changedAt: z.string(),

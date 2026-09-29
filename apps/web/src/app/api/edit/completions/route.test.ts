@@ -170,8 +170,8 @@ describe('POST /api/edit/completions', () => {
   it('rejects unsupported edit models with the dedicated error type', async () => {
     setOrganizationAuth();
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({ ...makeValidRequestBody(), model: 'mistralai/codestral' }) as never
     );
 
@@ -187,10 +187,8 @@ describe('POST /api/edit/completions', () => {
     async model => {
       setOrganizationAuth();
 
-      const { handleEditCompletionsRequest } = await import('./edit-completions');
-      const response = await handleEditCompletionsRequest(
-        makeRequest({ ...makeValidRequestBody(), model }) as never
-      );
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest({ ...makeValidRequestBody(), model }) as never);
 
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({
@@ -203,8 +201,8 @@ describe('POST /api/edit/completions', () => {
   it('rejects requests with non-positive max_tokens', async () => {
     setOrganizationAuth();
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
+    const { POST } = await import('./route');
+    const response = await POST(
       makeRequest({ ...makeValidRequestBody(), max_tokens: -1 }) as never
     );
 
@@ -216,10 +214,8 @@ describe('POST /api/edit/completions', () => {
   it('rejects direct Inception requests when organization data collection is denied', async () => {
     setOrganizationAuth({ data_collection: 'deny' } satisfies OrganizationSettings);
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({
@@ -240,10 +236,8 @@ describe('POST /api/edit/completions', () => {
   ])('rejects unsupported edit messages before proxying', async ({ messages }) => {
     setOrganizationAuth();
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest({ ...makeValidRequestBody(), messages }) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest({ ...makeValidRequestBody(), messages }) as never);
 
     expect(response.status).toBe(400);
     expect(mockedFetch).not.toHaveBeenCalled();
@@ -257,10 +251,8 @@ describe('POST /api/edit/completions', () => {
       plan: 'teams',
     });
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
 
     expect(response.status).toBe(402);
     expect(await response.json()).toMatchObject({
@@ -273,9 +265,9 @@ describe('POST /api/edit/completions', () => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
+    const { POST } = await import('./route');
     const requestBody = makeValidRequestBody();
-    const response = await handleEditCompletionsRequest(makeRequest(requestBody) as never);
+    const response = await POST(makeRequest(requestBody) as never);
 
     expect(response.status).toBe(200);
     const [url, init] = mockedFetch.mock.calls[0];
@@ -290,10 +282,8 @@ describe('POST /api/edit/completions', () => {
     setOrganizationAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
     expect(response.status).toBe(200);
 
     await flushAfter();
@@ -311,10 +301,8 @@ describe('POST /api/edit/completions', () => {
     setBYOKAuth();
     mockedFetch.mockResolvedValue(makeUpstreamResponse());
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
     expect(response.status).toBe(200);
 
     await flushAfter();
@@ -343,10 +331,8 @@ describe('POST /api/edit/completions', () => {
       })
     );
 
-    const { handleEditCompletionsRequest } = await import('./edit-completions');
-    const response = await handleEditCompletionsRequest(
-      makeRequest(makeValidRequestBody()) as never
-    );
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeValidRequestBody()) as never);
     expect(response.status).toBe(200);
 
     await flushAfter();

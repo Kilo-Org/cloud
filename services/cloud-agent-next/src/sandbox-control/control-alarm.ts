@@ -45,8 +45,6 @@ export type ControlAlarmAnchors = {
   allocation: AllocationRecord | null;
   credentialExpiryAt: number | null;
   socketHandshakeAt: number | null;
-  /** Earliest due billing-schedule callback; `null` means loaded and empty. */
-  billingDueAt: number | null;
 };
 
 type AnchorStorage = {
@@ -173,7 +171,6 @@ export function composeControlAlarmAt(anchors: ControlAlarmAnchors): number | nu
   }
   if (anchors.credentialExpiryAt !== null) candidates.push(anchors.credentialExpiryAt);
   if (anchors.socketHandshakeAt !== null) candidates.push(anchors.socketHandshakeAt);
-  if (anchors.billingDueAt !== null) candidates.push(anchors.billingDueAt);
   return candidates.length === 0 ? null : Math.min(...candidates);
 }
 

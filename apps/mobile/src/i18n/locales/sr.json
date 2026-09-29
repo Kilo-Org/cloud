@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Nazad",
     "idle": "U mirovanju",
-    "scheduled": "Zakazano",
     "keepEditing": "Nastavi uređivanje",
     "keepRunning": "Nastavi izvršavanje",
     "kiloclaw": "KiloClaw",
@@ -578,14 +577,7 @@
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
       "moreLinesAbove_one": "… Iznad ima još redova: {{displayCount}}.",
       "moreLinesAbove_other": "… Iznad ima još redova: {{displayCount}}.",
-      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}.",
-      "deleteComment": "Obriši komentar",
-      "deleteCommentTitle": "Obrisati komentar?",
-      "deleteCommentMessage": "Ovaj komentar će biti obrisan iz zahteva za spajanje.",
-      "commentEditFailed": "Nije moguće sačuvati tvoj komentar. Proveri vezu i pokušaj ponovo.",
-      "commentEditUnavailable": "Ovaj komentar se ne može urediti. Možda je obrisan.",
-      "commentDeleteFailed": "Nije moguće obrisati tvoj komentar. Proveri vezu i pokušaj ponovo.",
-      "commentDeleteUnavailable": "Ovaj komentar se ne može obrisati."
+      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti podešavanja GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -771,8 +763,6 @@
     "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",
-      "commentUpdated": "Komentar ažuriran",
-      "commentDeleted": "Komentar obrisan",
       "reviewSubmitted": "Pregled poslat",
       "autoMergeEnabled": "Automatsko spajanje je uključeno"
     },
@@ -2052,14 +2042,12 @@
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije.",
       "couldNotRefresh": "Nije moguće osvežiti",
       "noSessionsYetDescription": "Započni zadatak programiranja sa telefona. Tvoje sesije će se pojaviti ovde.",
-      "viewHistory": "Istorija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj sa drugim pojmom za pretragu.",
       "tryAdjustFilters": "Pokušaj da promeniš ili ukloniš filtere.",
       "couldNotSearch": "Nije moguće pretražiti sesije.",
       "completedWillAppear": "Završene sesije će se pojaviti ovde.",
       "noPastSessions": "Nema prethodnih sesija",
-      "pastSessions": "Prethodne sesije",
       "live": "UŽIVO",
       "updating": "Ažuriranje"
     },
@@ -2813,8 +2801,7 @@
     "optionsExpiredDescription": "Vrati se na prethodni ekran i ponovo otvori ovaj izbor."
   },
   "sessionRow": {
-    "needsInput": "ČEKA UNOS",
-    "scheduled": "ZAKAZANO"
+    "needsInput": "ČEKA UNOS"
   },
   "voiceInput": {
     "listening": "Slušam…",
@@ -3251,8 +3238,7 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
-    "newestResult": "Najnoviji rezultat",
-    "scheduledWakes": "budi se {{time}}"
+    "newestResult": "Najnoviji rezultat"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

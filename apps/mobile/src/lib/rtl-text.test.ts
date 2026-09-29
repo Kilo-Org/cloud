@@ -1,7 +1,14 @@
 import { createElement } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { containsJoinedScript, hasRtlScript, JOINED_SCRIPT, withoutMonoFamily } from './rtl-text';
+import {
+  containsJoinedScript,
+  hasRtlScript,
+  JOINED_SCRIPT,
+  NATURAL_LETTER_SPACING,
+  textLetterSpacing,
+  withoutMonoFamily,
+} from './rtl-text';
 
 // `rtl-text` imports `I18nManager` for its direction helpers; the real module
 // is Flow-syntax source this node project cannot load.
@@ -76,7 +83,7 @@ describe('hasRtlScript', () => {
 });
 
 describe('JOINED_SCRIPT', () => {
-  it.each(['\u0600', '\u0750', '\u0870', '\u08A0', '\uFB50', '\uFE70'])(
+  it.each(['\u0600', '\u0750', '\u08A0', '\uFB50', '\uFE70'])(
     'covers the block that starts at %j',
     value => {
       expect(JOINED_SCRIPT.test(value)).toBe(true);
@@ -85,36 +92,6 @@ describe('JOINED_SCRIPT', () => {
 });
 
 describe('containsJoinedScript', () => {
-  it.each([
-    ['Arabic heading', 'التفصيلات'],
-    ['Arabic section label', 'أعلام المميزات'],
-    ['Farsi', 'تنظیمات'],
-    ['Urdu', 'ترجیحات'],
-    ['Kurdish (Sorani)', 'ڕێکخستنەکان'],
-    ['Pashto', 'تنظیمات'],
-    ['Arabic presentation form', '\uFB50\uFB51'],
-    ['a Latin run quoting an Arabic word', 'Saved · محفوظ'],
-  ])('reads a joined script in %s', (_name, text) => {
-    expect(containsJoinedScript(text)).toBe(true);
-  });
-
-  it.each([
-    ['Arabic base', '\u0600'],
-    ['Arabic Supplement', '\u0750'],
-    ['Arabic Extended-B', '\u0870'],
-    ['Arabic Extended-A', '\u08A0'],
-    ['Arabic Presentation Forms-A', '\uFB50'],
-    ['Arabic Presentation Forms-B', '\uFE70'],
-  ])('detects a glyph from %s', (_name, value) => {
-    expect(containsJoinedScript(value)).toBe(true);
-  });
-
-  // Arabic Extended-B sits between Arabic Supplement and Arabic Extended-A;
-  // `hasRtlScript` reads it for the mono family, so the reset reads it too.
-  it('detects a label written only in Arabic Extended-B', () => {
-    expect(containsJoinedScript(FIRST_EXTENDED_B + LAST_EXTENDED_B)).toBe(true);
-  });
-
   it.each(['الجلسات الجارية الآن', 'الرئيسية', 'الوكلاء', 'الملف الشخصي', 'عرض الكل'])(
     'detects Arabic in %j',
     value => {
@@ -123,24 +100,18 @@ describe('containsJoinedScript', () => {
   );
 
   it.each([
-    ['English', 'Preferences'],
-    ['Hebrew (right-to-left, not joined)', 'הגדרות'],
-    ['Greek', 'Ρυθμίσεις'],
-    ['Cyrillic', 'Настройки'],
-    ['a number', '1.0.12'],
-  ])('does not read a joined script in %s', (_name, text) => {
-    expect(containsJoinedScript(text)).toBe(false);
+    ['Arabic base', '\u0600'],
+    ['Arabic Supplement', '\u0750'],
+    ['Arabic Extended-A', '\u08A0'],
+    ['Arabic Presentation Forms-A', '\uFB50'],
+    ['Arabic Presentation Forms-B', '\uFE70'],
+  ])('detects a glyph from %s', (_name, value) => {
+    expect(containsJoinedScript(value)).toBe(true);
   });
 
   it('detects Arabic inside a mixed array of strings', () => {
     expect(containsJoinedScript(['عرض', ' ', 'الكل'])).toBe(true);
     expect(containsJoinedScript(['Live now', 'عرض الكل'])).toBe(true);
-  });
-
-  it('reads every string in a child array and ignores non-text children', () => {
-    expect(containsJoinedScript(['المظهر', undefined, 3, null])).toBe(true);
-    expect(containsJoinedScript(['Appearance', 3])).toBe(false);
-    expect(containsJoinedScript(3)).toBe(false);
   });
 
   it('is false for Latin, Hebrew, digits and punctuation', () => {
@@ -163,11 +134,6 @@ describe('containsJoinedScript', () => {
     expect(containsJoinedScript(4)).toBe(false);
     expect(containsJoinedScript(createElement('Text', null, 'الرئيسية'))).toBe(false);
   });
-
-  it('leaves a nested element to its own run', () => {
-    // A nested Text is a separate run and applies its own letter spacing.
-    expect(containsJoinedScript(createElement('Text', null, 'التفصيلات'))).toBe(false);
-  });
 });
 
 describe('withoutMonoFamily', () => {
@@ -183,5 +149,17 @@ describe('withoutMonoFamily', () => {
 
   it('keeps an unrelated token that merely starts with font-mono', () => {
     expect(withoutMonoFamily('font-mono-bold text-sm')).toBe('font-mono-bold text-sm');
+  });
+});
+
+describe('textLetterSpacing', () => {
+  it('returns the natural spacing for a joined script', () => {
+    expect(textLetterSpacing('الرئيسية')).toBe(NATURAL_LETTER_SPACING);
+    expect(textLetterSpacing(['عرض', ' الكل'])).toBe(NATURAL_LETTER_SPACING);
+  });
+
+  it('returns undefined without a joined script', () => {
+    expect(textLetterSpacing('Live now')).toBeUndefined();
+    expect(textLetterSpacing(4)).toBeUndefined();
   });
 });

@@ -11,12 +11,22 @@
  * session ownership state is created.
  */
 import { protectedProcedure } from '../auth.js';
+import type { WorkerDb } from '@kilocode/db/client';
 import { logger, withLogTags } from '../../logger.js';
+import { getPgDb } from '../../db/pg.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
 import { startNewSession } from '../../session/session-registration.js';
+import {
+  assertModeAvailableForProfile,
+  profileResolutionPolicyForSessionCreateOrigin,
+  resolveEffectiveSessionConfiguration,
+} from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
-import { preflightSessionCreation } from './session-creation-preflight.js';
+import { assertKiloModelAvailable } from '../../model-validation.js';
+import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import { assertOrganizationMembership } from './organization-membership.js';
+import jwt from 'jsonwebtoken';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -92,14 +102,51 @@ const startSessionHandler = protectedProcedure
   .output(StartSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'start' }, async () => {
-      const request = await preflightSessionCreation(
-        startInputToSessionCreateRequest(input),
-        ctx,
-        'start'
+      const request = startInputToSessionCreateRequest(input);
+      const organizationId = request.options?.kilocodeOrganizationId;
+      let db: WorkerDb | undefined;
+      if (organizationId) {
+        db = getPgDb(ctx.env);
+        await assertOrganizationMembership(db, ctx.userId, organizationId);
+      }
+      await assertRepositoryAccessBeforeSessionCreation({
+        env: ctx.env,
+        userId: ctx.userId,
+        orgId: organizationId,
+        repository: request.repository,
+      });
+
+      const policy = profileResolutionPolicyForSessionCreateOrigin(
+        input.options?.createdOnPlatform
       );
+      const requestWithProfile = await resolveEffectiveSessionConfiguration(
+        ctx,
+        request,
+        policy,
+        db
+      );
+      assertModeAvailableForProfile(
+        requestWithProfile.agent.mode,
+        requestWithProfile.profile?.resolved ?? {}
+      );
+      const claims = jwt.decode(ctx.authToken);
+      const isPolicyBearing =
+        claims !== null &&
+        typeof claims === 'object' &&
+        ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+      if (!isPolicyBearing) {
+        await assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: requestWithProfile.agent.model,
+          originalToken: ctx.authToken,
+          originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
+          createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
+          procedure: 'start',
+        });
+      }
 
       const registration = await startNewSession(
-        request,
+        requestWithProfile,
         {
           env: ctx.env,
           userId: ctx.userId,

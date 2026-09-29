@@ -86,8 +86,7 @@ function notificationText(snapshot: GlanceableAgentsSnapshot): string {
     {},
     translate,
     formatGlanceableCount,
-    getActionNotice(),
-    formatGlanceableAgo
+    getActionNotice()
   );
 }
 

@@ -1,3 +1,3 @@
-export { handleAudioTranscriptionsRequest as POST } from '@/lib/ai-gateway/handlers/audio-transcriptions';
+export { POST } from '@/app/api/openrouter/audio/transcriptions/route';
 
 export const maxDuration = 800;

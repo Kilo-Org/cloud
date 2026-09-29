@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "Gå tilbage",
     "idle": "Inaktiv",
-    "scheduled": "Planlagt",
     "keepEditing": "Fortsæt med at redigere",
     "keepRunning": "Lad køre",
     "kiloclaw": "KiloClaw",
@@ -567,14 +566,7 @@
       "deletedUser": "slettet bruger",
       "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}.",
       "moreLinesAbove_one": "… der er flere linjer ovenfor: {{displayCount}}.",
-      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}.",
-      "deleteComment": "Slet kommentar",
-      "deleteCommentTitle": "Slet kommentaren?",
-      "deleteCommentMessage": "Denne kommentar bliver slettet fra pull requesten.",
-      "commentEditFailed": "Kunne ikke gemme din kommentar. Tjek din forbindelse, og prøv igen.",
-      "commentEditUnavailable": "Denne kommentar kan ikke redigeres. Den er muligvis slettet.",
-      "commentDeleteFailed": "Kunne ikke slette din kommentar. Tjek din forbindelse, og prøv igen.",
-      "commentDeleteUnavailable": "Denne kommentar kan ikke slettes."
+      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -755,8 +747,6 @@
     "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
-      "commentUpdated": "Kommentar opdateret",
-      "commentDeleted": "Kommentar slettet",
       "reviewSubmitted": "Gennemgang sendt",
       "autoMergeEnabled": "Automatisk fletning aktiveret"
     },
@@ -2027,14 +2017,12 @@
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
       "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
-      "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "tryAdjustFilters": "Prøv at justere eller fjerne dine filtre.",
       "couldNotSearch": "Der kunne ikke søges i sessionerne.",
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
-      "pastSessions": "Tidligere sessioner",
       "live": "I REALTID",
       "updating": "Opdaterer"
     },
@@ -2772,8 +2760,7 @@
     "optionsExpiredDescription": "Gå tilbage til den forrige skærm og åbn valgmulighederne igen."
   },
   "sessionRow": {
-    "needsInput": "AFVENTER SVAR",
-    "scheduled": "PLANLAGT"
+    "needsInput": "AFVENTER SVAR"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -3208,8 +3195,7 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "newestResult": "Nyeste resultat",
-    "scheduledWakes": "vågner {{time}}"
+    "newestResult": "Nyeste resultat"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",

@@ -20,24 +20,13 @@ export function resolveSessionConnectionState(input: {
   return 'none';
 }
 
-export type SessionConnectionDisplay =
-  | 'connected'
-  | 'connecting'
-  | 'reconnecting'
-  | 'lost'
-  | 'scheduled';
+export type SessionConnectionDisplay = 'connected' | 'connecting' | 'reconnecting' | 'lost';
 
 export function resolveSessionConnectionDisplay(input: {
   transport: SessionConnectionState;
   userWebConnected: boolean;
   reconnectExhausted: boolean;
   everConnected: boolean;
-  /**
-   * The agent's own lifecycle status. A `scheduled` agent has no live work to
-   * report, so an otherwise-connected transport reads as scheduled rather than
-   * connected; a down, lost or exhausted transport still wins.
-   */
-  agentStatusType?: AgentStatus['type'];
   /** Cached transcript is readable, but session metadata still needs a refresh. */
   sessionRefresh?: { isLoading: boolean };
 }): SessionConnectionDisplay {
@@ -57,7 +46,7 @@ export function resolveSessionConnectionDisplay(input: {
     }
   }
   if (state === 'up') {
-    return input.agentStatusType === 'scheduled' ? 'scheduled' : 'connected';
+    return 'connected';
   }
   if (state === 'exhausted') {
     return 'lost';

@@ -98,7 +98,6 @@
     "gitlab": "GitLab",
     "goBack": "رجوع",
     "idle": "خامل",
-    "scheduled": "مجدول",
     "keepEditing": "متابعة التعديل",
     "keepRunning": "متابعة التشغيل",
     "kiloclaw": "KiloClaw",
@@ -1550,14 +1549,12 @@
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة.",
       "couldNotRefresh": "تعذّر التحديث",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
-      "viewHistory": "سجل الجلسات",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب كلمة بحث أخرى.",
       "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
       "couldNotSearch": "تعذّر البحث في الجلسات.",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
-      "pastSessions": "الجلسات السابقة",
       "live": "مباشر",
       "updating": "جارٍ التحديث"
     },
@@ -2359,8 +2356,7 @@
     "optionsExpiredDescription": "ارجع إلى الشاشة السابقة وأعد فتح قائمة الاختيار."
   },
   "sessionRow": {
-    "needsInput": "بانتظار تدخلك",
-    "scheduled": "مجدول"
+    "needsInput": "بانتظار تدخلك"
   },
   "voiceInput": {
     "listening": "جارٍ الاستماع...",
@@ -2744,14 +2740,7 @@
       "moreLinesAbove_zero": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_two": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_few": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "deleteComment": "حذف التعليق",
-      "deleteCommentTitle": "حذف التعليق؟",
-      "deleteCommentMessage": "سيُحذف هذا التعليق من طلب السحب.",
-      "commentEditFailed": "تعذّر حفظ تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
-      "commentEditUnavailable": "لا يمكن تعديل هذا التعليق. ربما حُذف.",
-      "commentDeleteFailed": "تعذّر حذف تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
-      "commentDeleteUnavailable": "لا يمكن حذف هذا التعليق."
+      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}."
     },
     "entry": {
       "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
@@ -3112,8 +3101,6 @@
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
     "announce": {
       "commentPosted": "تم نشر التعليق",
-      "commentUpdated": "تم تحديث التعليق",
-      "commentDeleted": "تم حذف التعليق",
       "reviewSubmitted": "تم إرسال المراجعة",
       "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
     },
@@ -3380,8 +3367,7 @@
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
-    "newestResult": "أحدث نتيجة",
-    "scheduledWakes": "يستيقظ {{time}}"
+    "newestResult": "أحدث نتيجة"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

@@ -214,8 +214,7 @@ repository.
    `runtime` MUST contain only nullable `sandboxType`, `kiloCliVersion`,
    `wrapperVersion`, `startedAt`, and `stoppedAt` fields. Sandbox types MUST be
    bounded to shared, isolated-small, isolated-standard, code-review,
-   devcontainer, containers-standard-3, containers-standard-4, or unknown.
-   Versions MUST be bounded, validated values reported
+   devcontainer, or unknown. Versions MUST be bounded, validated values reported
    by the relevant runtime, not inferred from the current deployment. Runtime
    identifiers, owner identifiers, infrastructure addresses or regions,
    credentials, and raw backend errors MUST NOT appear in status responses or

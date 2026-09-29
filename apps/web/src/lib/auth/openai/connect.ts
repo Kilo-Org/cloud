@@ -31,6 +31,6 @@ export async function startOpenAiChatGptConnect(
   await signIn(
     'openai',
     { callbackUrl: openAiChatGptByokPath(organizationId) },
-    { scope: OPENAI_TOKEN_SHARING_SCOPE, force_reconsent: 'true' }
+    { scope: OPENAI_TOKEN_SHARING_SCOPE }
   );
 }

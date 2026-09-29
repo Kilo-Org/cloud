@@ -34,7 +34,6 @@ import {
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
-import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
@@ -101,6 +100,22 @@ const wrapperEventTruncatedSchema = z.object({
 });
 
 const wrapperGenerationParamSchema = z.coerce.number().int().nonnegative();
+
+function getAssistantErrorMessage(error: unknown): string | undefined {
+  if (error === undefined || error === null) return undefined;
+  if (typeof error === 'string') return error;
+  if (typeof error === 'object') {
+    if ('data' in error && error.data && typeof error.data === 'object') {
+      if ('message' in error.data && typeof error.data.message === 'string') {
+        return error.data.message;
+      }
+    }
+    if ('message' in error && typeof error.message === 'string') {
+      return error.message;
+    }
+  }
+  return 'Assistant message failed';
+}
 
 function sanitizeKilocodeEventData(data: unknown): unknown {
   if (typeof data !== 'object' || data === null) return data;
@@ -763,7 +778,7 @@ export function createIngestHandler(
             const properties = data.properties as Record<string, unknown> | undefined;
             const info = properties?.info as Record<string, unknown> | undefined;
             const assistantError = info?.error;
-            const assistantErrorMessage = assistantErrorDetail(assistantError);
+            const assistantErrorMessage = getAssistantErrorMessage(assistantError);
             const parentMessageId =
               info?.role === 'assistant' && typeof info.parentID === 'string'
                 ? info.parentID

@@ -3,7 +3,6 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import {
   AppState,
-  I18nManager,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -39,13 +38,12 @@ import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
 import { Eyebrow } from '@/components/ui/eyebrow';
-import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { Text } from '@/components/ui/text';
 import { ScreenHeader } from '@/components/screen-header';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
-import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
@@ -205,14 +203,7 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useAgentSessionNavigator();
 
-  // The header link opens the stored-session list, so it names that surface: a
-  // bare `home.seeAll` here claimed a longer live list that is not on screen
-  // (finding live-now-all).
-  const historyLabel = t('agents.sessionList.pastSessions');
-  // The accepted-empty body names where its history route goes for the same
-  // reason: a bare See-all on an empty live list does not say what it opens, and
-  // this is the only route to stored sessions there (UX repair, agents-empty).
-  const viewHistoryLabel = t('agents.sessionList.viewHistory');
+  const seeAllLabel = t('home.seeAll');
   // The list controls share the title's row through the header's `inlineActions`
   // slot, trailing the eyebrow + title heading. The heading keeps
   // `min-w-0 flex-1`, so the 30px title keeps its tail ellipsis while the
@@ -229,44 +220,24 @@ export function AgentSessionListScreen() {
   // row start and grows, so the controls keep the row end — the same shape the
   // Home live-sessions header uses. A row holding only the trailing 'See all'
   // read as a section header whose label was missing (e2, agents).
-  // The history route is the app's only route to the stored-session history,
-  // which exists independently of the live list, so it outlives the live
-  // section: the accepted-empty state carries the same control in the body,
-  // labeled by its destination (`viewHistoryAction`), while the header links to
-  // the same route with its own destination copy (`historyLabel`) over a
-  // non-empty live list.
-  const historyControl = (label: string) => (
-    <Pressable
-      onPress={() => {
-        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-      }}
-      // left slop capped against the gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      testID="agents-view-history"
-      className="min-w-0 shrink justify-center active:opacity-70"
-    >
-      {/* An eyebrow-scale label, with the same LTR-only treatment: the
-          letterspaced capitals break a cursive script's joins, so an RTL
-          label drops them (home-ar-loading) while the variant and
-          `SectionHeader` keep the identical class string. */}
-      <Eyebrow
-        numberOfLines={1}
-        className={cn(
-          'shrink text-center text-[11px] text-primary',
-          !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
-        )}
-      >
-        {label}
-      </Eyebrow>
-    </Pressable>
-  );
-  const viewHistoryAction = historyControl(viewHistoryLabel);
   const headerActions = (
     <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
       <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
-      {historyControl(historyLabel)}
+      <Pressable
+        onPress={() => {
+          router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+        }}
+        // left slop capped against the gap, right slop reaches 44pt wide
+        hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
+        accessibilityRole="button"
+        accessibilityLabel={seeAllLabel}
+        testID="agents-view-history"
+        className="min-w-0 shrink justify-center active:opacity-70"
+      >
+        <Eyebrow numberOfLines={1} className="shrink text-center text-[11px] text-primary">
+          {seeAllLabel}
+        </Eyebrow>
+      </Pressable>
       {query.canFilter ? (
         <SessionFilterButton
           activeCount={query.activeFilterCount}
@@ -303,14 +274,8 @@ export function AgentSessionListScreen() {
   // `useAgentsListChrome`). The rows list's bottom split stays here: the FAB
   // clearance rides on the list's content, so the frame keeps only the tab bar
   // (see `listInsets` below).
-  const {
-    onBodyLayout,
-    fabStyle,
-    sidePadding,
-    centeredBottomInset,
-    compactEmptyState,
-    compactLiveEmptyState,
-  } = useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
+  const { onBodyLayout, fabStyle, sidePadding, centeredBottomInset, compactEmptyState } =
+    useAgentsListChrome({ showFab, tabBarHeight, fontScale, left, right });
 
   // The tab bar and the FAB are absolutely-positioned overlays, so scrollable
   // content must clear them. The tab bar keeps its viewport inset as the list
@@ -402,8 +367,7 @@ export function AgentSessionListScreen() {
       <LiveSessionListEmptyState
         organizationId={organizationId}
         refreshControl={refreshControl}
-        compact={compactLiveEmptyState}
-        historyAction={viewHistoryAction}
+        compact={compactEmptyState}
       />
     );
   } else if (hasLiveRows) {
@@ -495,15 +459,7 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          // An accepted empty live list must not advertise a live section: the
-          // `Live now` label names sessions that do not exist. The whole row is
-          // withheld, so the accepted-empty state renders no live-sessions row
-          // at all, and the body below carries the history route instead
-          // (`LiveSessionListEmptyState`'s `historyAction`). Rows, pending, and
-          // error keep the full row byte-identical, and the search/filter
-          // no-match body is a `rows` state
-          // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.
-          inlineActions={content === 'empty' ? undefined : headerActions}
+          inlineActions={headerActions}
         />
         {hasLiveRows || isSearching ? (
           <SessionListSearchHeader

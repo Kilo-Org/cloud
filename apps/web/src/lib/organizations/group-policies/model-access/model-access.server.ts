@@ -9,10 +9,6 @@ import { getKiloExclusiveInferenceProviderRestriction } from '@/lib/ai-gateway/k
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import {
-  VIRTUAL_PROVIDER,
-  withoutVirtualProvider,
-} from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 import { isModelRestrictionExempt } from '@/lib/model-allow.server';
 import { db } from '@/lib/drizzle';
 import {
@@ -127,22 +123,6 @@ export function evaluateEffectiveModelAccessPolicy(
   };
 }
 
-/**
- * Routers listed under the snapshot-only virtual provider pick a real provider
- * per request. Allowing `virtual` lets them route to every real provider that
- * the same allow list permits; without one, they have nowhere to route.
- */
-function getEligibleProviderRoutes(
-  modelProviders: ReadonlySet<string>,
-  allowedProviders: ReadonlySet<string>
-): Set<string> {
-  if (modelProviders.has(VIRTUAL_PROVIDER.slug) && allowedProviders.has(VIRTUAL_PROVIDER.slug)) {
-    const realProviders = withoutVirtualProvider([...allowedProviders]);
-    return new Set(realProviders.length > 0 ? [VIRTUAL_PROVIDER.slug, ...realProviders] : []);
-  }
-  return new Set([...modelProviders].filter(provider => allowedProviders.has(provider)));
-}
-
 export async function getEffectiveModelDecision(
   policy: EffectiveOrganizationModelPolicy,
   modelId: string,
@@ -178,7 +158,9 @@ export async function getEffectiveModelDecision(
     if (modelProviders.size === 0) {
       return { allowed: false, denialSource: 'organization_model' };
     }
-    const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, organizationRoutes);
+    const eligibleProviderRoutes = new Set(
+      [...modelProviders].filter(provider => organizationRoutes.has(provider))
+    );
     return eligibleProviderRoutes.size > 0
       ? { allowed: true, eligibleProviderRoutes }
       : { allowed: false, denialSource: 'organization_provider' };
@@ -196,7 +178,9 @@ export async function getEffectiveModelDecision(
   if (policy.memberGrant.providerAllowList.length > 0) {
     const modelProviders = currentModelProviders ?? (await providerLookup(modelId));
     const memberProviders = new Set(policy.memberGrant.providerAllowList);
-    const eligibleProviderRoutes = getEligibleProviderRoutes(modelProviders, memberProviders);
+    const eligibleProviderRoutes = new Set(
+      [...modelProviders].filter(provider => memberProviders.has(provider))
+    );
     if (eligibleProviderRoutes.size > 0) {
       if (policy.memberGrant.includeOrganizationBaseline) {
         const baselineDecision = await decisionWithinOrganizationBaseline();

@@ -164,7 +164,8 @@ describe('classifyVoiceInputPermission', () => {
     expect(feedback).toEqual({
       action: 'open-settings',
       availability: 'available',
-      message: 'Microphone access is off. Enable it in Settings to use voice input.',
+      message:
+        'Speech recognition or microphone access is off. Enable it in Settings to use voice input.',
       retryable: false,
     });
   });
@@ -224,7 +225,8 @@ describe('classifyVoiceInputError', () => {
     expect(classifyVoiceInputError('not-allowed')).toEqual({
       action: 'open-settings',
       availability: 'available',
-      message: 'Microphone access is off. Enable it in Settings to use voice input.',
+      message:
+        'Speech recognition or microphone access is off. Enable it in Settings to use voice input.',
       retryable: false,
     });
   });

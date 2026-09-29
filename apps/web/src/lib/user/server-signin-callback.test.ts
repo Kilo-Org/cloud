@@ -304,7 +304,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
       },
       profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
     } as never);
@@ -339,7 +339,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
       },
       profile,
     } as never);
@@ -392,7 +392,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
+        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
       },
       profile: { sub: 'openai-shared-services-sub', email: 'shared-services@example.com' },
     } as never);

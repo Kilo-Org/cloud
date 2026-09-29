@@ -33,7 +33,6 @@ import type {
 } from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
-  AgentStatus,
   CloudStatus,
   FilePart,
   MessageDeliveryState,
@@ -118,7 +117,7 @@ const mockSession = {
       return () => {};
     }),
     getActivity: jest.fn((): SessionActivity => ({ type: 'idle' })),
-    getStatus: jest.fn<AgentStatus, []>(() => ({ type: 'idle' })),
+    getStatus: jest.fn<{ type: 'idle' | 'disconnected' }, []>(() => ({ type: 'idle' })),
     getCloudStatus: jest.fn<CloudStatus | null, []>(() => null),
     getSetupLog: jest.fn<readonly string[], []>(() => []),
     getCommits: jest.fn(() => []),
@@ -1435,26 +1434,6 @@ describe('createSessionManager', () => {
       expect(
         atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
       ).toBeNull();
-    });
-
-    it('exposes a scheduled agent status without painting a status indicator', async () => {
-      mockSession.state.getStatus.mockReturnValue({
-        type: 'scheduled',
-        scheduledAt: '2026-09-24T09:00:00.000Z',
-      });
-
-      const config = createMockConfig();
-      const mgr = createSessionManager(config);
-
-      await mgr.switchSession(kiloId('ses-1'));
-
-      expect(atomValue<AgentStatus>(config.store, mgr.atoms.agentStatus)).toEqual({
-        type: 'scheduled',
-        scheduledAt: '2026-09-24T09:00:00.000Z',
-      });
-      // The session-detail connection row owns the scheduled reading; the
-      // bottom-bar indicator stays empty.
-      expect(atomValue(config.store, mgr.atoms.statusIndicator)).toBeNull();
     });
 
     it('restores sending after a settled preparation failure without clearing its error', async () => {

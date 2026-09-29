@@ -63,16 +63,6 @@ export function encodeVercelProviderRef(ref: VercelProviderRef): string {
   return JSON.stringify(ref);
 }
 
-/**
- * Lifetime evidence the adapter writes to the current billing generation's
- * binding. The adapter does not know the generation; the sink resolves it.
- */
-export type VercelBillingLifetimeSink = (evidence: {
-  providerRef: string;
-  createdAtMs?: number;
-  terminalAtMs?: number;
-}) => Promise<void>;
-
 export function decodeVercelProviderRef(raw: string | null): VercelProviderRef | null {
   if (raw === null) return null;
   try {
@@ -83,7 +73,7 @@ export function decodeVercelProviderRef(raw: string | null): VercelProviderRef |
   }
 }
 
-export function classifyVercelSessionStatus(status: VercelSandboxSession['status']): ObserveResult {
+function observeStatus(status: VercelSandboxSession['status']): ObserveResult {
   if (ACTIVE_STATUSES.has(status)) return 'active';
   if (TERMINAL_STATUSES.has(status)) return 'terminal';
   return 'unknown';
@@ -98,7 +88,6 @@ export function createVercelProviderAdapter(deps: {
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
-  billingLifetimeSink?: VercelBillingLifetimeSink;
 }): ProviderAdapter {
   const config = deps.config;
   if (!config) {
@@ -143,18 +132,6 @@ export function createVercelProviderAdapter(deps: {
       );
     }
   };
-  const recordBillingLifetime = async (
-    providerRef: string,
-    session: VercelSandboxSession
-  ): Promise<void> => {
-    if (!deps.billingLifetimeSink) return;
-    const terminalAtMs = session.stoppedAt ?? session.abortedAt;
-    await deps.billingLifetimeSink({
-      providerRef,
-      createdAtMs: session.createdAt,
-      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
-    });
-  };
 
   return {
     resumable: false,
@@ -162,6 +139,7 @@ export function createVercelProviderAdapter(deps: {
     destroysOnStop: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
+      await ensureBillingAdmission(intent.allocationName ?? deps.sandboxName, intent.billing);
       const created = await restClient.createSandbox({
         name: intent.allocationName ?? deps.sandboxName,
         operationId: intent.intentId,
@@ -172,9 +150,7 @@ export function createVercelProviderAdapter(deps: {
         ...(config.resources === undefined ? {} : { resources: config.resources }),
         ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
       });
-      const providerRef = encodeVercelProviderRef(created.runtime);
-      await recordBillingLifetime(providerRef, created.session);
-      return { providerRef };
+      return { providerRef: encodeVercelProviderRef(created.runtime) };
     },
     async launch(ref, env) {
       const parsed = decodeOwnedProviderRef(ref);
@@ -197,8 +173,7 @@ export function createVercelProviderAdapter(deps: {
       try {
         if (parsed) {
           const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
-          await recordBillingLifetime(ref ?? encodeVercelProviderRef(parsed), session);
-          return { status: classifyVercelSessionStatus(session.status) };
+          return { status: observeStatus(session.status) };
         }
         if (ref !== null || !intent) return { status: 'unknown' };
         const inspected = await restClient.inspectByName({
@@ -214,11 +189,9 @@ export function createVercelProviderAdapter(deps: {
             status: now() < intent.createdAt + DEADLINE_MS.createSettle ? 'unknown' : 'terminal',
           };
         }
-        const providerRef = encodeVercelProviderRef(inspected.runtime);
-        await recordBillingLifetime(providerRef, inspected.session);
         return {
-          status: classifyVercelSessionStatus(inspected.session.status),
-          providerRef,
+          status: observeStatus(inspected.session.status),
+          providerRef: encodeVercelProviderRef(inspected.runtime),
         };
       } catch (error) {
         return { status: parsed && isNotFound(error) ? 'terminal' : 'unknown' };
@@ -239,7 +212,6 @@ export function createVercelProviderAdapter(deps: {
       logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
-        await recordBillingLifetime(ref ?? encodeVercelProviderRef(parsed), session);
         const result = TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';
         logControlDiagnostic('native_stop', {
           ...diagnostic,

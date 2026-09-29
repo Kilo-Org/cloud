@@ -12,19 +12,13 @@ import { Text } from '@/components/ui/text';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { i18n } from '@/i18n';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import {
-  mutationErrorDisplay,
-  type MutationErrorDisplaySurface,
-} from '@/lib/pr-review/mutation-error-display';
+import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 
 export type ComposerInlineErrorKind =
   | 'retryable'
   | 'bad-request'
   | 'forbidden'
   | 'reconnect'
-  // The edit surface's terminal 404: the posted comment no longer exists.
-  // Terminal like `forbidden` — the sheet keeps Save down.
-  | 'not-found'
   | null;
 
 type ComposerInlineErrorProps = {
@@ -59,15 +53,8 @@ export function ComposerInlineError({
  * error into the inline box, and clears the recoverable bad-request state
  * when the body changes. The Terms gate is prompted here on a terms-required
  * classification.
- *
- * `surface` selects the surface-specific bad-request copy; the two-argument
- * call sites keep the `'composer'` behavior byte-for-byte.
  */
-export function useComposerInlineError(
-  error: unknown,
-  isEdit: boolean,
-  surface: MutationErrorDisplaySurface = 'composer'
-) {
+export function useComposerInlineError(error: unknown, isEdit: boolean) {
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [inlineErrorKind, setInlineErrorKind] = useState<ComposerInlineErrorKind>(null);
   // True when `inlineError` is a local empty-body validation error (no
@@ -103,11 +90,11 @@ export function useComposerInlineError(
       })();
       return;
     }
-    const display = mutationErrorDisplay(surface, classification, { rawError: error });
+    const display = mutationErrorDisplay('composer', classification, { rawError: error });
     setInlineError(display.message);
     setInlineErrorKind(display.kind);
     setInlineErrorIsLocal(false);
-  }, [error, isEdit, surface]);
+  }, [error, isEdit]);
 
   function clearBadRequestOnBodyEdit() {
     // bad-request clears on body change; forbidden stays for the session.

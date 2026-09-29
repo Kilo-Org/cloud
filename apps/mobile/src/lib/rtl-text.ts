@@ -44,16 +44,31 @@ export function withRtlInputAlignment(
   return [RTL_INPUT_ALIGNMENT, style];
 }
 
+/**
+ * Letter-spacing — Tailwind's `tracking-*` — is a Latin typographic device:
+ * it opens every glyph from its neighbour, and the RTL scripts the app ships
+ * do not take it. An Arabic-script word is one connected shape, so a tracked
+ * label renders its letters as isolated forms ('استكشف'), and a Hebrew word
+ * takes a spacing no Hebrew reader asked for; a letter-spacing of 0 keeps the
+ * paragraph's natural spacing. An explicit style outranks a `className` rule,
+ * so applying this leaves the tracked class the LTR design owns inert in RTL.
+ *
+ * `@/components/ui/text` applies this to the RTL-script copy that needs it,
+ * in the same RTL style array as `RTL_WRITING_DIRECTION` (see
+ * `hasRtlScript`): Latin copy in an RTL interface keeps its tracking.
+ */
+export const RTL_NO_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
+
 /** The right-to-left script blocks the app ships: the Hebrew block and its
  * presentation forms, then Arabic, Arabic Supplement, Arabic Extended-B,
- * Arabic Extended-A, and the Arabic Presentation Forms-A and -B. The mono
- * family ships no glyph of either script, so any character in them means the
- * copy needs a font with its glyphs (see `withoutMonoFamily`). */
+ * Arabic Extended-A, and the Arabic Presentation Forms-A and -B. Any
+ * character in them means the copy is not Latin script: it needs the no-track
+ * reset, and a joining script needs a font with its glyphs (see
+ * `withoutMonoFamily`). */
 const RTL_SCRIPT =
   /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
-/** Whether a React child tree contains copy in a right-to-left script: the copy
- * the mono family cannot draw, whatever the interface direction is. */
+/** Whether a React child tree contains copy in a right-to-left script. */
 export function hasRtlScript(node: ReactNode): boolean {
   if (Array.isArray(node)) {
     return node.some((child: ReactNode) => hasRtlScript(child));
@@ -70,10 +85,9 @@ export function hasRtlScript(node: ReactNode): boolean {
 
 /**
  * JetBrains Mono ships no Arabic or Hebrew glyphs, so a fallback renders the
- * word one character at a time (`ا س ت ك ش ف`); the system font the app draws
- * its other copy with keeps the joins. The font ships the glyphs of neither
- * script, so the rule is the script and not the interface direction. Drop the
- * `font-mono*` utility, keeping the size, color and weight classes around it.
+ * word one character at a time (`ا س ت ك ش ف`); the system font the rest of an
+ * RTL screen uses keeps the joins. Drop the `font-mono*` utility, keeping the
+ * size, color and weight classes around it.
  */
 export function withoutMonoFamily(className: string): string {
   return className
@@ -110,29 +124,13 @@ export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirectio
  * Latin display device — opens every glyph from its neighbour and splits a word
  * mid-shape («الوكلاء» draws as «الوكلا ء»). This is the script, not the
  * interface direction: a Latin run inside an Arabic interface (`KiloClaw`,
- * `PR`) joins nothing and keeps its tracking. Arabic, Arabic Supplement,
- * Arabic Extended-B, Arabic Extended-A and the two Arabic Presentation Forms
- * blocks are the ranges a joined Arabic run arrives in. Hebrew is right to
- * left and joins nothing, so it stays out of this range.
+ * `PR`) joins nothing and keeps its tracking. Arabic, Arabic Supplement, Arabic
+ * Extended-A and the two Arabic Presentation Forms blocks are the ranges a
+ * joined Arabic run arrives in.
  */
-export const JOINED_SCRIPT =
-  /[\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
+export const JOINED_SCRIPT = /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 
-/**
- * Letter-spacing reset: no added advance between glyphs, what a joined script's
- * shaping expects. `letter-spacing` — Tailwind's `tracking-*` — is a Latin
- * typographic device, so the copy that cannot take it gets this instead. Two
- * rules reach for it in `@/components/ui/text`: a joined script in either
- * direction (see `containsJoinedScript`), and any RTL script the app ships
- * inside an RTL interface, where a Hebrew word would take a spacing no Hebrew
- * reader asked for (see `hasRtlScript`). Latin copy in an RTL interface keeps
- * its tracking.
- *
- * The reset lands in the style array behind the caller's own style, so an
- * explicit `letterSpacing` still wins, and ahead of the class a `className`
- * rule compiles to, so a tracked class stays on the element but draws inert
- * (`text.rtl-tracking.mounted.test.tsx`).
- */
+/** No added advance between glyphs, what a joined script's shaping expects. */
 export const NATURAL_LETTER_SPACING: TextStyle = { letterSpacing: 0 };
 
 /** A `ReactNode` string member, the only child a `Text` lays out as one run. */
@@ -150,10 +148,6 @@ function isChildArray(children: ReactNode): children is ReactNode[] {
  * Whether a direct string child holds a glyph of a joined script. Array
  * children recurse; a nested `Text` is its own run and applies the rule itself,
  * and numbers, functions and elements are not strings.
- *
- * `@/components/ui/text` reads this to decide the letter-spacing reset, in
- * either interface direction: the joined shape is what the tracking pulls
- * apart.
  */
 export function containsJoinedScript(children: ReactNode): boolean {
   if (isStringChild(children)) {
@@ -163,4 +157,9 @@ export function containsJoinedScript(children: ReactNode): boolean {
     return children.some(child => containsJoinedScript(child));
   }
   return false;
+}
+
+/** The natural spacing for a joined script, or nothing to override. */
+export function textLetterSpacing(children: ReactNode): TextStyle | undefined {
+  return containsJoinedScript(children) ? NATURAL_LETTER_SPACING : undefined;
 }

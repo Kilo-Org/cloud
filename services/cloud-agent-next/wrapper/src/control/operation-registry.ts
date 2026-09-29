@@ -10,11 +10,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
 import { rootForSession } from './session-directories.js';
-import type {
-  NativeRuntimeControl,
-  WorktreeKiloRuntime,
-  WorktreeKiloRuntimes,
-} from './worktree-runtime.js';
+import type { WorktreeKiloRuntime, WorktreeKiloRuntimes } from './worktree-runtime.js';
 import type {
   NativeOperationTarget,
   NativeRetirement,
@@ -29,7 +25,7 @@ import {
 } from './session-operation.js';
 
 type OperationRegistryDependencies = {
-  native: NativeRuntimeControl & {
+  native: {
     get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
     getEntryRuntimeId?(directory: string, root: string): string | undefined;
     getRetained(
@@ -42,6 +38,25 @@ type OperationRegistryDependencies = {
       deadlineAt: number,
       target?: NativeOperationTarget
     ): Promise<NativeRetirement>;
+    retireRuntimeIfUnshared?(
+      directory: string,
+      target: NativeOperationTarget,
+      retiringRoot: string,
+      deadlineAt: number,
+      reason?: string
+    ): Promise<NativeRetirement | 'shared'>;
+    deferRuntimeRetirementIfShared?(
+      directory: string,
+      target: NativeOperationTarget,
+      retiringRoot: string,
+      deadlineAt: number,
+      reason?: string
+    ): Promise<NativeRetirement | 'shared'>;
+    rootRetirementScope?(
+      directory: string,
+      target: NativeOperationTarget,
+      retiringRoot: string
+    ): 'shared' | 'sole' | 'stale';
     verifyQuiescence(
       directory: string,
       target: NativeOperationTarget,

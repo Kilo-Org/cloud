@@ -218,6 +218,14 @@ describe('organization auto-top-up router', () => {
       expect(result.enabled).toBe(false);
       expect(result.redirectUrl).toBeDefined();
       expect(typeof result.redirectUrl).toBe('string');
+      // The router does not await the report: its org lookup runs detached, so wait for it.
+      for (
+        let tick = 0;
+        tick < 100 && (reportCreditEvent as jest.Mock).mock.calls.length === 0;
+        tick++
+      ) {
+        await new Promise(resolve => setTimeout(resolve, 10));
+      }
       expect(reportCreditEvent).toHaveBeenCalledWith(
         expect.objectContaining({
           type: 'charge.attempted',

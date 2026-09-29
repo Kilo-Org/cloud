@@ -38,7 +38,6 @@ import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 
 export async function getOrganizationById(
@@ -285,23 +284,6 @@ export async function createOrganization(
     return org;
   });
 
-  if (userId) {
-    void reportEvents({
-      events: [
-        {
-          type: 'org.created',
-          data: {
-            kilo_user_id: userId,
-            organization_id: organization.id,
-            role: 'owner',
-            plan: organization.plan ?? null,
-            in_free_trial: organization.free_trial_end_at != null,
-          },
-        },
-      ],
-    });
-  }
-
   return organization;
 }
 
@@ -349,14 +331,6 @@ export async function addUserToOrganization(
   // inserted.
   if (added) {
     await bumpOrganizationGroupPolicyRevision(txn, organizationId, userId);
-    void reportEvents({
-      events: [
-        {
-          type: 'org.member_added',
-          data: { kilo_user_id: userId, organization_id: organizationId, role },
-        },
-      ],
-    });
   }
   return added;
 }
@@ -830,18 +804,6 @@ export async function acceptOrganizationInvite(
     });
 
     if (result.success && result.membershipInserted) {
-      void reportEvents({
-        events: [
-          {
-            type: 'org.member_added',
-            data: {
-              kilo_user_id: userId,
-              organization_id: result.organizationId,
-              role: result.role,
-            },
-          },
-        ],
-      });
       if (joinedDistinctId) {
         captureOrganizationMemberJoined(joinedDistinctId, result.role);
       }

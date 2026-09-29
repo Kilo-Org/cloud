@@ -1,5 +1,6 @@
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
+import { materializeMcpServers } from '../mcp-config.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
 import { readProfileBundle } from '../session-profile.js';
 import { getSessionWorkspacePath } from '../workspace.js';
@@ -48,7 +49,8 @@ function gitFromMetadata(
 
 export function buildSessionAttachPayload(
   metadata: SessionMetadata,
-  preparation?: SessionAttachPayload['preparation']
+  preparation?: SessionAttachPayload['preparation'],
+  mcpPrivateKey?: string
 ): SessionAttachPayload {
   const directory =
     metadata.workspace?.workspacePath ??
@@ -77,6 +79,9 @@ export function buildSessionAttachPayload(
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),
+    ...(profile.mcpServers && Object.keys(profile.mcpServers).length > 0
+      ? { mcp: materializeMcpServers(profile.mcpServers, mcpPrivateKey) }
+      : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(preparation ? { preparation } : {}),
   };
@@ -96,5 +101,6 @@ export function adaptSessionAttachPayloadForWrapper(
     const { author: _author, ...git } = adapted.git;
     adapted = { ...adapted, git };
   }
+  if (adapted.mcp) adapted = { ...adapted, runtimeIsolation: 'per-session' };
   return adapted;
 }

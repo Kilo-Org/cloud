@@ -353,6 +353,7 @@ type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
       | 'GITHUB_LITE_APP_SLUG'
       | 'GITHUB_APP_BOT_USER_ID'
       | 'GITHUB_LITE_APP_BOT_USER_ID'
+      | 'AGENT_ENV_VARS_PRIVATE_KEY'
     >
   > &
   KiloTargetEnv;
@@ -954,7 +955,7 @@ export async function prepareSessionCredentials(input: {
   });
   if (!targets.success) invalidCredentials();
   const existing = input.existing === undefined ? undefined : validateGrant(input.existing);
-  const payload = buildSessionAttachPayload(metadata);
+  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
   const scopeId = scopeIdSchema.safeParse(
     metadata.workspace?.worktreeId ?? metadata.identity.sessionId
   );

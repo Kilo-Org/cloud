@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import { encryptWithPublicKey } from '@kilocode/encryption';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { sessionAttachPayloadSchema } from '../shared/sandbox-control-protocol.js';
 import { envVarsSchema } from '../types.js';
 import {
   adaptSessionAttachPayloadForWrapper,
   buildSessionAttachPayload,
 } from './attach-payload.js';
+
+const mcpKeyPair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const mcpPublicKey = mcpKeyPair.publicKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+const mcpPrivateKey = mcpKeyPair.privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
 
 describe('buildSessionAttachPayload', () => {
   it('packs directory, git clone, branch, snapshot identity, and session env', () => {
@@ -59,6 +66,77 @@ describe('buildSessionAttachPayload', () => {
     });
   });
 
+  it('materializes profile MCP servers at the worker boundary before attach', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+      },
+      auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
+      agent: { mode: 'code', model: 'kilo/test' },
+      profile: {
+        mcpServers: {
+          local: {
+            type: 'local',
+            command: ['npx', 'local-mcp'],
+            environment: {
+              API_TOKEN: encryptWithPublicKey('local-secret', mcpPublicKey),
+            },
+          },
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: {
+              Authorization: encryptWithPublicKey('Bearer remote-secret', mcpPublicKey),
+            },
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(buildSessionAttachPayload(metadata, undefined, mcpPrivateKey).mcp).toEqual({
+      local: {
+        type: 'local',
+        command: ['npx', 'local-mcp'],
+        environment: { API_TOKEN: 'local-secret' },
+      },
+      remote: {
+        type: 'remote',
+        url: 'https://mcp.example.test/connect',
+        headers: { Authorization: 'Bearer remote-secret' },
+      },
+    });
+  });
+
+  it('fails closed when an encrypted MCP value has no worker private key', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+      },
+      auth: { kiloSessionId: 'kilo_1' },
+      profile: {
+        mcpServers: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: {
+              Authorization: encryptWithPublicKey('Bearer remote-secret', mcpPublicKey),
+            },
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(() => buildSessionAttachPayload(metadata)).toThrow(
+      'MCP server "remote" headers cannot be decrypted because the worker decryption key is unavailable'
+    );
+  });
+
   it('marks a generated workspace branch as a working branch', () => {
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
@@ -107,6 +185,88 @@ describe('buildSessionAttachPayload', () => {
       directory: '/workspace/a',
       git: { url: 'https://github.com/acme/demo.git', platform: 'github' },
     });
+  });
+
+  it('keeps MCP servers for a supported wrapper and isolates its runtime', () => {
+    const payload = {
+      directory: '/workspace/a',
+      mcp: { remote: { type: 'remote' as const, url: 'https://mcp.example.test/connect' } },
+    };
+
+    expect(adaptSessionAttachPayloadForWrapper(payload, true, true)).toEqual({
+      ...payload,
+      runtimeIsolation: 'per-session',
+    });
+  });
+
+  it('accepts only materialized MCP values in the attach protocol', () => {
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: { Authorization: 'Bearer secret' },
+          },
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: { Authorization: encryptWithPublicKey('Bearer secret', mcpPublicKey) },
+          },
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          local: { type: 'local', command: ['node', '-e', ''] },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it.each(['\u96ea', '\n'])(
+    'bounds the UTF-8 serialized MCP configuration for %j values',
+    value => {
+      const result = sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          local: {
+            type: 'local',
+            command: ['node', '-e', ''],
+            environment: Object.fromEntries(
+              Array.from({ length: 12 }, (_, index) => [`VALUE_${index}`, value.repeat(4096)])
+            ),
+          },
+        },
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(issue => issue.message)).toContain(
+          'Serialized MCP configuration exceeds the 80 KiB limit'
+        );
+      }
+    }
+  );
+
+  it.each(['local', 'remote'])('rejects fractional %s MCP request timeouts', type => {
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          server: {
+            type,
+            ...(type === 'local' ? { command: ['node'] } : { url: 'https://mcp.example.test' }),
+            timeout: 500.5,
+          },
+        },
+      }).success
+    ).toBe(false);
   });
 
   for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {

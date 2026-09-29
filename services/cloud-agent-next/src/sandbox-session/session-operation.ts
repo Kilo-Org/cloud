@@ -22,6 +22,8 @@ import {
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
+  type SessionAttachPayload,
+  type SessionPromptPayload,
 } from '../shared/sandbox-control-protocol.js';
 import {
   applySessionOperationResult,
@@ -258,11 +260,24 @@ export async function dispatchSessionOperation(
       if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
-    const payload = structuredClone(
-      kind === 'attach'
-        ? sessionAttachPayloadSchema.parse(input.payload)
-        : sessionPromptPayloadSchema.parse(input.payload)
-    );
+    let validatedPayload: SessionAttachPayload | SessionPromptPayload;
+    try {
+      validatedPayload =
+        kind === 'attach'
+          ? sessionAttachPayloadSchema.parse(input.payload)
+          : sessionPromptPayloadSchema.parse(input.payload);
+    } catch {
+      throw new ControlRequestError({
+        code: 'protocol_error',
+        message:
+          kind === 'attach'
+            ? 'Session attachment configuration is invalid'
+            : 'Session prompt configuration is invalid',
+        retryable: false,
+        admission: 'not-admitted',
+      });
+    }
+    const payload = structuredClone(validatedPayload);
     if (!record(true)) throw new Error('Session operation proof could not be persisted');
     assertDispatchedCurrent();
     try {

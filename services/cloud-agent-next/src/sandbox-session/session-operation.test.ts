@@ -272,6 +272,63 @@ describe('dispatchSessionOperation', () => {
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
   });
 
+  it.each([
+    { description: 'empty command', local: { type: 'local', command: [] } },
+    {
+      description: 'fractional timeout',
+      local: { type: 'local', command: ['node'], timeout: 500.5 },
+    },
+    {
+      description: 'oversized configuration',
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: 12 }, (_, index) => [`VALUE_${index}`, 'x'.repeat(8192)])
+        ),
+      },
+    },
+  ])('rejects $description before dispatching it as transport uncertainty', async ({ local }) => {
+    const attachAuthorization = {
+      ...authorization,
+      operation: 'session.attach' as const,
+      operationId: 'attempt_invalid_attach_1',
+      dispatchDeadlineAt: Date.now() + 60_000,
+    };
+    let stored = messages();
+    const request = vi.fn();
+
+    await expect(
+      dispatchSessionOperation(
+        {
+          authorization: attachAuthorization,
+          payload: {
+            mcp: {
+              local,
+            },
+          },
+        },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({
+      state: 'rejected',
+      error: {
+        code: 'protocol_error',
+        message: 'Session attachment configuration is invalid',
+        retryable: false,
+      },
+    });
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('retires a dispatched attach the runtime has no record of and dispatches a fresh attach', async () => {
     const attach: SessionOperationAuthorization = {
       operation: 'session.attach',

@@ -117,26 +117,52 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     }
   }, [options.connected]);
 
+  const loadProducts = useCallback(async () => {
+    return await loadAppStoreKiloPassProducts({
+      fetchStoreProducts: options.fetchStoreProducts,
+      loadBackendProducts: async () => {
+        const backendResponse = await queryClient.fetchQuery(
+          backendStoreKiloPassProductsQueryOptions(trpc)
+        );
+        return backendResponse;
+      },
+      storefront,
+    });
+  }, [options.fetchStoreProducts, queryClient, trpc]);
+
   const productsQuery = useQuery({
     queryKey: ['kilo-pass', 'app-store-products', userId],
-    queryFn: async () => {
-      const loadedProducts = await loadAppStoreKiloPassProducts({
-        fetchStoreProducts: options.fetchStoreProducts,
-        loadBackendProducts: async () => {
-          const backendResponse = await queryClient.fetchQuery(
-            backendStoreKiloPassProductsQueryOptions(trpc)
-          );
-          return backendResponse;
-        },
-        storefront,
-      });
-      return loadedProducts;
-    },
+    queryFn: loadProducts,
     enabled: isIapPlatform && options.connected && userId != null,
     staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
   });
 
   const { refetch: refetchProducts } = productsQuery;
+
+  // Force path for the store-connection retry. `reconnect` can report success
+  // without the owner rendering `connected`, and the query above is enabled only
+  // while `connected` is true, so a reload through the observer would run against
+  // the disabled query. Fetch the same entry by key directly — `fetchQuery`
+  // ignores `enabled` — so the catalog loads from a store that answered the
+  // handshake even when `connected` never renders, and drop the store-connection
+  // message the moment it answers. Returns a settled result so the caller's
+  // bounded reload loop can retry a store whose billing service is still coming
+  // up. Disables React Query's own retry so one failed attempt fails fast and the
+  // caller's bound, not a multi-second backoff, owns the retry.
+  const refetchForced = useCallback(async (): Promise<{ isError: boolean }> => {
+    try {
+      await queryClient.fetchQuery({
+        queryKey: ['kilo-pass', 'app-store-products', userId],
+        queryFn: loadProducts,
+        staleTime: 0,
+        retry: false,
+      });
+    } catch {
+      return { isError: true };
+    }
+    setStoreErrorMessage(null);
+    return { isError: false };
+  }, [loadProducts, queryClient, userId]);
 
   // The retry ends when the catalog fetch settles AND the minimum busy time has
   // passed. While the store is not connected the bounded wait above owns the end
@@ -159,7 +185,7 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
       endRetryWhenSettled();
     }, MINIMUM_RETRY_BUSY_MS);
     try {
-      await refetchProducts();
+      return await refetchProducts();
     } finally {
       retrySettledRef.current = true;
       endRetryWhenSettled();
@@ -216,5 +242,6 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     isError: productsState.isError,
     errorMessage: productsState.errorMessage,
     refetch,
+    refetchForced,
   };
 }

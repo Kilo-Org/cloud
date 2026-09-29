@@ -13,6 +13,7 @@ import {
 import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  endConnection,
   fetchProducts as fetchIapProducts,
   getAvailablePurchases as getAvailableIapPurchases,
   type ProductOrSubscription,
@@ -53,6 +54,98 @@ const isAndroid = Platform.OS === 'android';
 const STORE_CONNECTION_ERROR_MESSAGE_KEY = isAndroid
   ? 'kiloPass.couldNotConnectToPlay'
   : 'kiloPass.couldNotConnectToAppStore';
+// A store that just reconnected can report the handshake before its billing
+// service serves product queries, so the reload that follows the retry can fail
+// against a store that is already up. Reload it across the store-product hook's
+// own connection wait, sized to the store reconnect bound below, before the
+// products-unavailable card is left standing.
+const PRODUCTS_RETRY_ATTEMPTS = 8;
+const PRODUCTS_RETRY_DELAY_MS = 1500;
+// Bounds the whole catalog reload of one retry. A forced fetch can stay pending
+// forever — React Query pauses it while the app is offline, and the native store
+// call has no timeout — so without this the retry's busy state would never clear
+// and the button would sit disabled on "Trying again" with no way back. A reload
+// that lands after the bound still writes the query cache, so a store that
+// answers late still clears the card.
+const PRODUCTS_RELOAD_BOUND_MS = 15000;
+// A store whose billing service never answers leaves `reconnect` pending. Bound
+// the handshake at the store-product hook's own connection wait so the catalog
+// reload still runs: a store that answers product queries clears the
+// products-unavailable card even though the handshake never reported back, and a
+// handshake that lands after the bound re-enables the hook's own query.
+const STORE_RECONNECT_BOUND_MS = 8000;
+
+async function waitForProductsRetry(ms: number): Promise<void> {
+  await new Promise(resolve => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/**
+ * Awaits `work` for at most `ms`. Bounds the store handshake: a `reconnect`
+ * whose billing service never answers must not hold the catalog reload. The
+ * losing wait is cancelled so no timer outlives the retry.
+ */
+async function waitForAtMost(ms: number, work: Promise<unknown>): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work,
+      new Promise<void>(resolve => {
+        timer = setTimeout(resolve, ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/**
+ * Awaits `work` for at most `ms`, returning its value, or `undefined` when the
+ * bound wins. Unlike `waitForAtMost`, the caller needs the value to tell an
+ * answered reload from one that ran out of time. The losing work keeps running
+ * and still lands in the query cache.
+ */
+async function settleForAtMost<T>(ms: number, work: Promise<T>): Promise<T | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<undefined>(resolve => {
+        timer = setTimeout(() => resolve(undefined), ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+/**
+ * Reloads the catalog until it answers, a bounded number of times. The first
+ * query after a fresh store handshake can fail while the billing service is
+ * still coming up, so a single refetch is not enough to clear the
+ * products-unavailable card. Bounded so a store that is truly down still falls
+ * through to the store-product hook's connection wait. Reports whether the
+ * catalog answered.
+ */
+async function reloadProductsUntilAnswered(
+  reload: () => Promise<{ isError: boolean }>,
+  attemptsLeft: number
+): Promise<boolean> {
+  const result = await reload();
+  if (!result.isError) {
+    return true;
+  }
+  if (attemptsLeft <= 1) {
+    return false;
+  }
+  await waitForProductsRetry(PRODUCTS_RETRY_DELAY_MS);
+  return reloadProductsUntilAnswered(reload, attemptsLeft - 1);
+}
 
 /**
  * The screen shows one store-failure surface. The store-connection message is
@@ -123,6 +216,7 @@ export type KiloPassNativeIapContextValue = {
   productsIsLoading: boolean;
   productsIsRefetching: boolean;
   productsError: string | null;
+  /** Re-runs the store handshake, then retries the catalog fetch. */
   productsRefetch: () => Promise<void>;
   purchase: (
     product: AppStoreKiloPassProduct,
@@ -185,6 +279,11 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const [ownershipChecked, setOwnershipChecked] = useState(false);
   const [ownershipCheckFailed, setOwnershipCheckFailed] = useState(false);
   const [ownershipAttempt, setOwnershipAttempt] = useState(0);
+  // True for the whole products retry: the native handshake and the bounded wait
+  // for `connected` run before the store-product hook's `refetch` can raise its
+  // own busy flag, so without this the retry button stays enabled and labelled
+  // "Try again" for that window and the user can fire it repeatedly.
+  const [isRetryingProducts, setIsRetryingProducts] = useState(false);
   const retryOwnershipCheck = useCallback(() => {
     setOwnershipCheckFailed(false);
     setOwnershipAttempt(attempt => attempt + 1);
@@ -256,12 +355,39 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     connected,
     finishTransaction,
     requestPurchase,
+    // Re-runs the store handshake after the initial auto-connect failed. `useIAP`
+    // only connects once on mount, so without this the failed connection never
+    // recovers while the route stays open.
+    reconnect,
     restorePurchases: restoreStorePurchases,
     // The hook's own fetch is the only one that publishes into `availablePurchases`.
     // The module-level `getAvailablePurchases` returns the list without touching
     // hook state, which left every ownership check blind until a manual restore.
     getAvailablePurchases: refreshAvailablePurchases,
   } = actionsRef;
+
+  // The store answered, so the ownership lookup is no longer in doubt. Runs on
+  // mount and again after a store reconnect, because the lookup that ran against
+  // the dead connection raised the store-connection message.
+  const checkOwnership = useCallback(async () => {
+    try {
+      await refreshAvailablePurchases();
+      // Purchases are only known after the store answers. Until then the screen
+      // must not start a purchase: a device subscription owned by another Kilo
+      // account would otherwise charge the user before any check can see it.
+      setOwnershipChecked(true);
+      setOwnershipCheckFailed(false);
+      // The lookup that failed before has now answered, so the store-connection
+      // message it raised no longer describes this screen. Any other failure
+      // (a purchase or a restore message) is still true and stays.
+      setIapError(current => (current?.storeConnection ? null : current));
+    } catch {
+      // A failed lookup answers nothing, so purchasing stays blocked and the
+      // screen offers a retry instead of charging the user blind.
+      setOwnershipCheckFailed(true);
+      setIapError({ message: i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY), storeConnection: true });
+    }
+  }, [refreshAvailablePurchases]);
 
   // The backend's product identifiers, unioned by the enabled-id sets below with
   // the store-resolved ones, so a tier the store cannot query still has its
@@ -273,6 +399,57 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
   });
+  // The products-unavailable "Try again" is also the store-connection retry. The
+  // store-product hook's `refetch` only restarts its bounded wait for the
+  // connection; it never re-runs the native handshake, so it keeps failing
+  // against a store whose billing service is gone. End the cached connection
+  // first: `initConnection` short-circuits while expo-iap's native ready flag is
+  // still set (even when the owner renders `connected` false), so without
+  // `endConnection` the reconnect reports success without rebinding a dead
+  // billing client and the catalog keeps failing. Then reload the catalog through
+  // the hook's force path rather than its gated `refetch`: `reconnect` can report
+  // failure (or success without the owner rendering `connected`), and the hook's
+  // query is enabled only while `connected` is true, so the force path is what
+  // fetches from a store that answers product queries. A store whose billing
+  // service comes up before, during, or after the handshake is then caught,
+  // because the reload runs alongside the handshake instead of waiting for it to
+  // settle. The handshake, the connection teardown, and the reload are each
+  // bounded, so a `reconnect` or fetch that never answers cannot hold the retry's
+  // busy state: the reload keeps running past the bound and still lands in the
+  // query cache.
+  const { refetchForced: refetchProductsForced } = productsQuery;
+  const retryProducts = useCallback(async () => {
+    setIsRetryingProducts(true);
+    try {
+      // Bound the teardown too. `endConnection` queues on expo-iap's native
+      // connection lock, so a store that never answers it must not hold the
+      // reconnect and reload that recover the catalog.
+      try {
+        await waitForAtMost(STORE_RECONNECT_BOUND_MS, endConnection());
+      } catch {
+        // Nothing to end when no connection ever established; the reconnect
+        // below is the part that matters.
+      }
+      // Start the handshake and the catalog reload together, so a store that
+      // answers product queries mid-handshake clears the card instead of waiting
+      // out the handshake first and then missing the reload budget.
+      const handshake = waitForAtMost(STORE_RECONNECT_BOUND_MS, reconnect());
+      const answered =
+        (await settleForAtMost(
+          PRODUCTS_RELOAD_BOUND_MS,
+          reloadProductsUntilAnswered(refetchProductsForced, PRODUCTS_RETRY_ATTEMPTS)
+        )) ?? false;
+      await handshake;
+      // The screen's own ownership retry runs before the reconnect lands and
+      // fails again against the dead store, so it is re-run here, against the
+      // store that answered, to clear its failure together with the catalog.
+      if (answered) {
+        await checkOwnership();
+      }
+    } finally {
+      setIsRetryingProducts(false);
+    }
+  }, [checkOwnership, reconnect, refetchProductsForced]);
   const enabledAppleProductIds = useMemo(
     () =>
       getEnabledProductIds(
@@ -486,26 +663,8 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       return;
     }
 
-    void (async () => {
-      try {
-        await refreshAvailablePurchases();
-        // Purchases are only known after the store answers. Until then the screen
-        // must not start a purchase: a device subscription owned by another Kilo
-        // account would otherwise charge the user before any check can see it.
-        setOwnershipChecked(true);
-        setOwnershipCheckFailed(false);
-        // The lookup that failed before has now answered, so the store-connection
-        // message it raised no longer describes this screen. Any other failure
-        // (a purchase or a restore message) is still true and stays.
-        setIapError(current => (current?.storeConnection ? null : current));
-      } catch {
-        // A failed lookup answers nothing, so purchasing stays blocked and the
-        // screen offers a retry instead of charging the user blind.
-        setOwnershipCheckFailed(true);
-        setIapError({ message: i18n.t(STORE_CONNECTION_ERROR_MESSAGE_KEY), storeConnection: true });
-      }
-    })();
-  }, [connected, ownershipAttempt, refreshAvailablePurchases]);
+    void checkOwnership();
+  }, [checkOwnership, connected, ownershipAttempt]);
 
   useEffect(() => {
     if (
@@ -549,9 +708,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     () => ({
       products: productsQuery.products,
       productsIsLoading: productsQuery.isLoading,
-      productsIsRefetching: productsQuery.isRefetching,
+      productsIsRefetching: productsQuery.isRefetching || isRetryingProducts,
       productsError: productsQuery.errorMessage,
-      productsRefetch: productsQuery.refetch,
+      productsRefetch: retryProducts,
       purchase: startPurchase,
       restorePurchases,
       isPending:
@@ -579,6 +738,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       iapError,
       isRequestingPurchase,
       isRestoringPurchases,
+      isRetryingProducts,
       ownedAppleProductId,
       ownedByAnotherAccount,
       ownedGoogleProductId,
@@ -591,8 +751,8 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       productsQuery.isLoading,
       productsQuery.isRefetching,
       productsQuery.products,
-      productsQuery.refetch,
       restorePurchases,
+      retryProducts,
       startPurchase,
     ]
   );

@@ -21,6 +21,7 @@ import { type AppStoreKiloPassProduct } from './store-products';
 const mockedIap = vi.hoisted(() => ({
   availablePurchases: [] as Purchase[],
   connected: false,
+  endConnection: vi.fn(),
   fetchProducts: vi.fn(),
   finishTransaction: vi.fn(),
   getAvailablePurchases: vi.fn(),
@@ -28,6 +29,7 @@ const mockedIap = vi.hoisted(() => ({
     onPurchaseError: (error: Error) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
   } | null,
+  reconnect: vi.fn(),
   requestPurchase: vi.fn(),
   restorePurchases: vi.fn(),
   useIAP: vi.fn(),
@@ -64,6 +66,7 @@ vi.mock('expo-iap', () => ({
     BillingUnavailable: 'billing-unavailable',
     UserCancelled: 'user-cancelled',
   },
+  endConnection: mockedIap.endConnection,
   fetchProducts: mockedIap.fetchProducts,
   getAvailablePurchases: mockedIap.getAvailablePurchases,
   useIAP: (handlers: {
@@ -77,6 +80,7 @@ vi.mock('expo-iap', () => ({
       connected: mockedIap.connected,
       finishTransaction: mockedIap.finishTransaction,
       getAvailablePurchases: mockedIap.getAvailablePurchases,
+      reconnect: mockedIap.reconnect,
       requestPurchase: mockedIap.requestPurchase,
       restorePurchases: mockedIap.restorePurchases,
     };
@@ -381,10 +385,12 @@ beforeEach(() => {
   mockedCurrentUserId.userId = 'user-1';
   mockedIap.availablePurchases = [];
   mockedIap.connected = false;
+  mockedIap.endConnection.mockResolvedValue(true);
   mockedIap.fetchProducts.mockResolvedValue([]);
   mockedIap.finishTransaction.mockResolvedValue(undefined);
   mockedIap.getAvailablePurchases.mockResolvedValue(undefined);
   mockedIap.handlers = null;
+  mockedIap.reconnect.mockResolvedValue(false);
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
   mockedReactQuery.backendProductsStaleTime = undefined;
@@ -1371,6 +1377,15 @@ describe('KiloPassNativeIapOwner', () => {
     expect(typeof value.restorePurchases).toBe('function');
     expect(typeof value.clearError).toBe('function');
     expect(typeof value.productsRefetch).toBe('function');
+  });
+
+  it('reconnects the store when the products-unavailable retry runs', async () => {
+    const owner = renderKiloPassNativeIapOwner();
+
+    const value = owner.render();
+    await value.productsRefetch();
+
+    expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
   });
 
   it('locks purchase while a request is in flight', async () => {

@@ -450,13 +450,18 @@ async function handleBackgroundNotificationTask(
  * `notification-background-task.ts`, whose task executor lazy-loads this module
  * when a task fires (a headless start evaluates only the app entry, so this
  * graph must not load at entry). Loads the glanceable sinks — a fresh headless
- * process has none registered — then dispatches.
+ * process has none registered — creates the Android channels, then dispatches.
  */
-// eslint-disable-next-line promise-function-async -- passthrough dispatch: the executor is the async boundary
-export function runBackgroundNotificationTask(
+export async function runBackgroundNotificationTask(
   body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
 ): Promise<Notifications.BackgroundNotificationTaskResult> {
   ensureGlanceableSinksLoaded();
+  // A headless start never evaluates the root layout, so the Android channels
+  // the server routes pushes to (`agent-progress` among them) do not exist yet.
+  // Create them before the first post: Android drops a notification addressed
+  // to a channel the app never created, and FirebaseMessaging logs the miss on
+  // every message. Idempotent and never rejecting.
+  await ensureAndroidNotificationChannels();
   return handleBackgroundNotificationTask(body);
 }
 

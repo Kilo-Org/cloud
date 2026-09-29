@@ -1868,6 +1868,35 @@ describe('setupNotificationBackgroundHandler', () => {
   });
 });
 
+describe('runBackgroundNotificationTask', () => {
+  it('creates the Android channels before it dispatches a headless payload', async () => {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+
+    const result = await loaded.runBackgroundNotificationTask({
+      data: {
+        notification: null,
+        data: { dataString: JSON.stringify({ type: 'chat.message' }) },
+      },
+      error: null,
+      executionInfo: {
+        eventId: 'e-channels',
+        taskName: 'active-agents-glanceable-background-task',
+      },
+    });
+
+    // A headless start never evaluates the root layout, so the entry executor
+    // must create the channels the server routes pushes to before it runs
+    // anything else: Android drops a notification addressed to a channel the
+    // app never created, and FirebaseMessaging logs the miss on every message.
+    expect(mocks.setNotificationChannelAsync.mock.calls.map(call => call[0])).toContain(
+      'agent-progress'
+    );
+    // A non-glanceable payload still reports NoData.
+    expect(result).toBe(1);
+  });
+});
+
 describe('foreground attention-push suppression', () => {
   async function loadHandler() {
     const loaded = await loadNotifications();

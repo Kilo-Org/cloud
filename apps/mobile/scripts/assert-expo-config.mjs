@@ -45,6 +45,18 @@ const BLOCKED_PERMISSIONS = [
 const REQUESTED_PERMISSIONS = ['android.permission.ACCESS_NOTIFICATION_POLICY'];
 const SENTRY_PLUGIN = '@sentry/react-native/expo';
 const ROTATION_SURFACE_PLUGIN = './plugins/withAndroidRotationSurface';
+const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
+const NOTIFICATIONS_PLUGIN = 'expo-notifications';
+// The Android channel Firebase falls back to when an FCM message omits
+// `channel_id`, mirrored from app.config.ts. It must be a channel the app
+// creates (src/lib/notifications.ts), or Android drops the fallback push.
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'agent-progress';
+// expo-task-manager instantiates its headless app loader by name from
+// AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
+// constructor, not the class), so without this rule a minified release removes
+// the class and a background FCM data message crashes TaskService.executeTask.
+const HEADLESS_APP_LOADER_KEEP_RULE =
+  '-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }';
 // The manifest fix carries the native alert title override beside the backup
 // rules and optional-feature declarations. React Native's bundled
 // `alert_title_layout.xml` pins the title to `viewStart`; without this plugin
@@ -336,6 +348,29 @@ for (const [option, expected] of Object.entries(DEV_CLIENT_PLUGIN_OPTIONS)) {
     `plugins "${DEV_CLIENT_PLUGIN}" must set ${option}: ${JSON.stringify(expected)}`
   );
 }
+
+// Android release minification: the prebuild reads `extraProguardRules` from
+// this option, so a dropped entry silently reintroduces the headless crash.
+const buildPropertiesPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === BUILD_PROPERTIES_PLUGIN
+);
+const extraProguardRules = buildPropertiesPlugin?.[1]?.android?.extraProguardRules;
+check(
+  typeof extraProguardRules === 'string' &&
+    extraProguardRules.includes(HEADLESS_APP_LOADER_KEEP_RULE),
+  `plugins "${BUILD_PROPERTIES_PLUGIN}" must keep expo-task-manager's headless app loader (${HEADLESS_APP_LOADER_KEEP_RULE})`
+);
+
+// FCM falls back to this channel for a message without `channel_id`; naming a
+// channel the app creates stops FirebaseMessaging from logging "Missing Default
+// Notification Channel metadata" on every message.
+const notificationsPlugin = (config.plugins ?? []).find(
+  plugin => Array.isArray(plugin) && plugin[0] === NOTIFICATIONS_PLUGIN
+);
+check(
+  notificationsPlugin?.[1]?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
+  `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
+);
 
 const extra = config.extra ?? {};
 for (const key of Object.keys(ENV_KEYS)) {

@@ -4,27 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import ReposRoute from '@/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { ReviewListScreen } from './review-list-screen';
+import { firstList, review, type ReviewStub } from './review-list-screen.test-helpers';
 import { renderWithProviders } from '@/test/render-with-providers';
-
-type ReviewStub = {
-  id: string;
-  pr_title: string;
-  repo_full_name: string;
-  pr_number: number;
-  status: string;
-  created_at: string;
-};
-
-function review(id: string, prTitle = `Review ${id}`): ReviewStub {
-  return {
-    id,
-    pr_title: prTitle,
-    repo_full_name: 'org/repo',
-    pr_number: 1,
-    status: 'completed',
-    created_at: '2026-09-01T00:00:00Z',
-  };
-}
 
 const state = vi.hoisted(() => ({
   platform: 'gitlab',
@@ -45,7 +26,7 @@ const state = vi.hoisted(() => ({
   },
   reviews: {
     data: { pages: [{ success: true, reviews: [] }], pageParams: [0] } as unknown,
-    isLoading: false,
+    isPending: false,
     isError: false,
     isFetching: false,
     isFetchingNextPage: false,
@@ -115,6 +96,7 @@ beforeEach(() => {
   state.bitbucket.data = { repositoryCache: { status: 'available', repositories: [] } };
   state.bitbucket.isError = false;
   state.reviews.data = { pages: [{ success: true, reviews: [] }], pageParams: [0] };
+  state.reviews.isPending = false;
   state.reviews.isError = false;
   state.reviews.isFetchingNextPage = false;
   state.reviews.isFetchNextPageError = false;
@@ -122,10 +104,6 @@ beforeEach(() => {
   state.reviews.error.data.code = 'INTERNAL_SERVER_ERROR';
   vi.clearAllMocks();
 });
-
-function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
-  return renderer.root.find(node => String(node.type) === 'FlatList');
-}
 
 describe('Reviewer repository bodies', () => {
   it.each(['gitlab', 'bitbucket'])(
@@ -189,6 +167,25 @@ describe('Recent review bodies', () => {
       unmount();
     }
   );
+
+  it('paints the loading skeleton when a paused offline first fetch has no data', async () => {
+    // Offline cold start: the query is paused (no network) with no cached page,
+    // so `isLoading` is false but `isPending` is true. The body must not fall
+    // through to the rows branch and render nothing.
+    state.reviews.data = undefined;
+    state.reviews.isPending = true;
+    state.reviews.isError = false;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(ReviewListScreen, { scope: 'personal' })
+    );
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Skeleton').length
+    ).toBeGreaterThan(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
 
   it.each(['INTERNAL_SERVER_ERROR', 'FORBIDDEN', 'NOT_FOUND', 'UNAUTHORIZED'])(
     'keeps the %s retry policy outside the scroller',

@@ -88,7 +88,13 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const paddingBottom = useTabBarBottomPadding();
   const {
     data,
-    isLoading,
+    // React Query v5's `isLoading` is `isPending && isFetching`, so it is false
+    // on the first render and while a query is paused (offline). Key "no data
+    // yet" off `isPending` instead: it stays true until the query settles, so a
+    // cold open that is paused offline still paints the skeleton rather than
+    // falling through to the rows branch with nothing to render. It is false as
+    // soon as any page is cached, so a background refetch never blanks rows.
+    isPending,
     isError,
     isFetching,
     hasNextPage,
@@ -125,7 +131,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   let body: ReactNode = null;
-  if (!isLoading && firstPage?.success && reviews.length === 0) {
+  if (!isPending && firstPage?.success && reviews.length === 0) {
     body = (
       <EmptyState
         icon={GitPullRequest}
@@ -150,7 +156,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         }
       />
     );
-  } else if (!isLoading && ((isError && !data) || (firstPage && !firstPage.success))) {
+  } else if (!isPending && ((isError && !data) || (firstPage && !firstPage.success))) {
     body = (
       <QueryError
         variant={!data ? errorVariant : 'server'}
@@ -159,7 +165,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         isRetrying={isFetching}
       />
     );
-  } else if (isLoading) {
+  } else if (isPending) {
     body = (
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View exiting={FadeOut.duration(150)} className="gap-3">

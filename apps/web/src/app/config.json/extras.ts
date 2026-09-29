@@ -146,6 +146,11 @@ export const kiloExtras = {
       description: 'Enable native tools for reading, editing, and executing VS Code notebooks',
       type: 'boolean',
     },
+    code_mode: {
+      description:
+        'Route MCP tool calls through a confined JavaScript runtime with on-demand tool discovery instead of exposing every MCP tool directly',
+      type: 'boolean',
+    },
     openTelemetry: {
       description: 'Enable telemetry. Set to false to opt-out.',
       default: true,

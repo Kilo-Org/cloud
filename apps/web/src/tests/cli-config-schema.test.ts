@@ -186,6 +186,7 @@ describe('kilo config.json schema merge', () => {
     expect(exp.properties.native_notebook_tools).toEqual(
       expect.objectContaining({ type: 'boolean' })
     );
+    expect(exp.properties.code_mode).toEqual(expect.objectContaining({ type: 'boolean' }));
     expect(exp.properties.openTelemetry).toBeDefined();
     expect(exp.properties.batch_tool).toBeDefined(); // upstream key preserved
   });
@@ -221,6 +222,7 @@ describe('kilo config.json schema merge', () => {
       properties: Record<string, unknown>;
     };
     expect(experimental.properties.codebase_search).toBeUndefined();
+    expect(experimental.properties.code_mode).toBeDefined();
     expect(experimental.properties.batch_tool).toBeDefined();
     expect(config.additionalProperties).toBe(false);
     expect(out.properties).toBeUndefined();

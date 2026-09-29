@@ -1,6 +1,7 @@
 import { and, eq, gt, gte, lt, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
   type CloudAgentSessionRunStatus,
@@ -91,7 +92,7 @@ export type AgentSetupFailureRecord = {
 
 type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
 
-export const originBucketExpression: SQL<ProductOrigin> = sql<ProductOrigin>`case when ${cloud_agent_sessions.product_origin} = 'code-review' then 'code-review' when ${cloud_agent_sessions.product_origin} = 'other' then 'other' else 'unknown' end`;
+export const originBucketExpression: SQL<ProductOrigin> = sql<ProductOrigin>`case when ${cli_sessions_v2.created_on_platform} = 'code-review' then 'code-review' when ${cli_sessions_v2.created_on_platform} is null or ${cli_sessions_v2.created_on_platform} = 'unknown' then 'unknown' else 'other' end`;
 
 const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'provider', 'user'))`;
 
@@ -148,6 +149,10 @@ function readRunCounts(
         cloud_agent_session_runs.cloud_agent_session_id
       )
     )
+    .leftJoin(
+      cli_sessions_v2,
+      eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
+    )
     .where(retainedWindow(cloud_agent_session_runs.terminal_at, window, retentionCutoffIso))
     .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`, sql`8`);
 }
@@ -166,6 +171,10 @@ function readSessionSetupFailures(
       failureCount: sql<number>`count(*)::int`,
     })
     .from(cloud_agent_sessions)
+    .leftJoin(
+      cli_sessions_v2,
+      eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
+    )
     .where(retainedWindow(cloud_agent_sessions.failure_at, window, retentionCutoffIso))
     .groupBy(sql`1`, sql`2`, sql`3`, sql`4`);
 }

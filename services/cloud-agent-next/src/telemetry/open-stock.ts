@@ -1,6 +1,7 @@
 import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
   type CloudAgentSessionRunStatus,
@@ -63,6 +64,10 @@ export function readOpenStock(
         cloud_agent_sessions.cloud_agent_session_id,
         cloud_agent_session_runs.cloud_agent_session_id
       )
+    )
+    .leftJoin(
+      cli_sessions_v2,
+      eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
     )
     .where(
       and(

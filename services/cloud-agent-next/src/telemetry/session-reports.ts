@@ -2,7 +2,6 @@ import type { Env } from '../types.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getPgDb } from '../db/pg.js';
 import { CLOUD_AGENT_REPORT_RETENTION_DAYS, createCloudAgentReportStore } from './report-store.js';
-import { reportingProductOrigin } from './product-origin.js';
 import type { CloudAgentAdmissionFailureCode } from '@kilocode/worker-utils/cloud-agent-failure';
 
 export type CloudAgentSessionFailure =
@@ -23,7 +22,6 @@ export async function createCloudAgentSessionReport(
     kiloSessionId: string;
     initialMessageId: string;
     occurredAt?: string;
-    productOrigin?: 'code-review' | 'other' | null;
   },
   env: ReportingEnv
 ): Promise<void> {
@@ -32,7 +30,6 @@ export async function createCloudAgentSessionReport(
     kiloSessionId: params.kiloSessionId,
     initialMessageId: params.initialMessageId,
     occurredAt: params.occurredAt ?? new Date().toISOString(),
-    ...(params.productOrigin !== undefined ? { productOrigin: params.productOrigin } : {}),
   });
 }
 
@@ -60,7 +57,6 @@ export async function ensureCloneSessionReport(
       kiloSessionId,
       initialMessageId,
       occurredAt,
-      productOrigin: reportingProductOrigin(metadata.identity.billingOrigin),
     },
     env
   );

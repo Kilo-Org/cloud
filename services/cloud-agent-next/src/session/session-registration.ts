@@ -70,7 +70,6 @@ import {
   recordCloudAgentSandboxIdentity,
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
-import { reportingProductOrigin } from '../telemetry/product-origin.js';
 import {
   generateSandboxRoutingTarget,
   selectSandboxProvider,
@@ -667,7 +666,6 @@ async function allocateNewSession(
           cloudAgentSessionId,
           kiloSessionId,
           initialMessageId: initialTurn.messageId,
-          productOrigin: reportingProductOrigin(options?.billingOrigin),
         },
         ctx.env
       );

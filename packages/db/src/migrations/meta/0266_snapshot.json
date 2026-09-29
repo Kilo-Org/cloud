@@ -1,5 +1,5 @@
 {
-  "id": "0b33ae06-e616-456b-b9d7-8d777d98956c",
+  "id": "978a7d66-2b3d-4d3a-a67b-dbec01553a78",
   "prevId": "9fb1cda5-eb55-4dd5-b5c3-a0783c1d9615",
   "version": "7",
   "dialect": "postgresql",
@@ -6095,12 +6095,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "product_origin": {
-          "name": "product_origin",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -6316,10 +6310,6 @@
         "cloud_agent_sessions_error_expiry_check": {
           "name": "cloud_agent_sessions_error_expiry_check",
           "value": "(\"cloud_agent_sessions\".\"error_message_redacted\" IS NULL AND \"cloud_agent_sessions\".\"error_expires_at\" IS NULL) OR\n        (\"cloud_agent_sessions\".\"error_message_redacted\" IS NOT NULL AND \"cloud_agent_sessions\".\"error_expires_at\" IS NOT NULL)"
-        },
-        "cloud_agent_sessions_product_origin_check": {
-          "name": "cloud_agent_sessions_product_origin_check",
-          "value": "\"cloud_agent_sessions\".\"product_origin\" IS NULL OR \"cloud_agent_sessions\".\"product_origin\" IN ('code-review', 'other')"
         }
       },
       "isRLSEnabled": false

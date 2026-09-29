@@ -6572,8 +6572,6 @@ export type CloudAgentFailureReason =
   | 'structured_output'
   | 'unclassified';
 
-export type CloudAgentProductOrigin = 'code-review' | 'other';
-
 export const cloud_agent_sessions = pgTable(
   'cloud_agent_sessions',
   {
@@ -6581,7 +6579,6 @@ export const cloud_agent_sessions = pgTable(
     kilo_session_id: text().notNull(),
     initial_message_id: text().notNull(),
     sandbox_id: text(),
-    product_origin: text().$type<CloudAgentProductOrigin>(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     failure_at: timestamp({ withTimezone: true, mode: 'string' }),
     failure_stage: text().$type<CloudAgentSessionFailureStage>(),
@@ -6628,10 +6625,6 @@ export const cloud_agent_sessions = pgTable(
       'cloud_agent_sessions_error_expiry_check',
       sql`(${table.error_message_redacted} IS NULL AND ${table.error_expires_at} IS NULL) OR
         (${table.error_message_redacted} IS NOT NULL AND ${table.error_expires_at} IS NOT NULL)`
-    ),
-    check(
-      'cloud_agent_sessions_product_origin_check',
-      sql`${table.product_origin} IS NULL OR ${table.product_origin} IN ('code-review', 'other')`
     ),
   ]
 );

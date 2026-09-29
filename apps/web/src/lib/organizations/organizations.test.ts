@@ -17,12 +17,12 @@ import {
   createOrganization,
   addUserToOrganization,
   addSsoUserToOrganization,
-  removeUserFromOrganization,
   updateUserRoleInOrganization,
   inviteUserToOrganization,
   getOrganizationMembers,
   acceptOrganizationInvite,
 } from './organizations';
+import { removeUserFromOrganization } from './organization-member-removal';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';

@@ -1095,7 +1095,7 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
-export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -1127,7 +1127,7 @@ export default {
     }
     if (controller.cron === OUTCOME_AGGREGATE_CRON) {
       try {
-        await runCloudAgentOutcomeCollection(env);
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
       } finally {
         await runCloudAgentOpenStockCollection(env);
       }

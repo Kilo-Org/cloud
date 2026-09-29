@@ -26,7 +26,9 @@ export async function createCloudAgentSessionReport(
   env: ReportingEnv
 ): Promise<void> {
   await createCloudAgentReportStore(getPgDb(env)).createSessionReport({
-    ...params,
+    cloudAgentSessionId: params.cloudAgentSessionId,
+    kiloSessionId: params.kiloSessionId,
+    initialMessageId: params.initialMessageId,
     occurredAt: params.occurredAt ?? new Date().toISOString(),
   });
 }
@@ -50,7 +52,12 @@ export async function ensureCloneSessionReport(
 
   const cloudAgentSessionId = metadata.identity.sessionId;
   await createCloudAgentSessionReport(
-    { cloudAgentSessionId, kiloSessionId, initialMessageId, occurredAt },
+    {
+      cloudAgentSessionId,
+      kiloSessionId,
+      initialMessageId,
+      occurredAt,
+    },
     env
   );
   const sandboxId = metadata.workspace?.sandboxId;

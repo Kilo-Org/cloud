@@ -153,7 +153,7 @@ import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import * as z from 'zod';
 import {

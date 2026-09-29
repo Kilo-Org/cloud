@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",
       "readOnly": "Jy kan hierdie sessie net lees.",
+      "continueInNewSession": "Gaan voort in 'n nuwe sessie",
       "emptyDescription": "Stuur 'n boodskap hieronder om te begin.",
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",

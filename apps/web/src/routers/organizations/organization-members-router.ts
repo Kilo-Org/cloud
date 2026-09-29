@@ -1,6 +1,6 @@
+import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   updateUserRoleInOrganization,
-  removeUserFromOrganization,
   addUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,

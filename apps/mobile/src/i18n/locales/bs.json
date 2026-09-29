@@ -2125,6 +2125,7 @@
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ova sesija je dostupna samo za čitanje.",
+      "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u nastavku za početak.",
       "scrollToBottom": "Pomjeri se na dno",
       "emptyTitle": "Još nema poruka",

@@ -44,7 +44,7 @@ export function ProfilePickerSheet({
 
   let body = null;
   if (isLoading) {
-    body = <Skeleton className="mx-4 h-14 w-full rounded-md bg-muted-soft" />;
+    body = <Skeleton className="h-14 w-full rounded-md bg-muted-soft" />;
   } else if (isError) {
     body = (
       <QueryError

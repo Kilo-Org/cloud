@@ -94,7 +94,7 @@ function attempt(id: string, triggerMessageId: string) {
 }
 
 describe('transcript derive identity', () => {
-  it('reuses the stripped message object across derive passes', () => {
+  it('reuses the derived object for an unchanged reasoning-bearing message', () => {
     const source = message('m1', BASE, [reasoningPart('m1', 'thinking'), textPart('m1', 'answer')]);
 
     const first = withoutReasoningParts([source]);
@@ -111,7 +111,7 @@ describe('transcript derive identity', () => {
     expect(second[0]).toBe(first[0]);
   });
 
-  it('keeps every unchanged row identity through the reasoning-hidden derive', () => {
+  it('reuses every unchanged item when only the last message changes', () => {
     const firstMessage = message('m1', BASE, [
       reasoningPart('m1', 'thinking'),
       textPart('m1', 'a'),
@@ -132,6 +132,13 @@ describe('transcript derive identity', () => {
     const after = mergeSessionTranscript(withoutReasoningParts([firstMessage, changed]), attempts);
 
     // Order: m1 message, its preparation attempt, then m2 message.
+    const firstItemReused = after[0] === before[0];
+    const changedItemRebuilt = after[2] !== before[2];
+    // eslint-disable-next-line no-console -- the PR proof greps these merge markers
+    console.log(`KWF_DERIVE merge firstItem reused: ${firstItemReused}`);
+    // eslint-disable-next-line no-console -- the PR proof greps these merge markers
+    console.log(`KWF_DERIVE merge changedItem rebuilt: ${changedItemRebuilt}`);
+
     expect(after[0]).toBe(before[0]);
     expect(after[1]).toBe(before[1]);
     expect(after[2]).not.toBe(before[2]);

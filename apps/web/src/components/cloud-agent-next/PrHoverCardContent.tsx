@@ -58,6 +58,12 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const state = normalizePrBadgeState(pr.state);
+  // A verified link whose per-PR cache row has not synced yet renders with
+  // state `unknown` and no title. The Refresh action must stay reachable for
+  // it, or a missed webhook leaves the session's own PR stuck without live
+  // state. (An unverified link never reaches this component: the server shows
+  // no PR for it.)
+  const awaitingVerification = pr.state === 'unknown';
   const headShaShort = pr.headSha?.slice(0, 7) ?? null;
   const truncatedTitle = truncatePrTitle(pr.title, 80);
 
@@ -84,6 +90,13 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
         <PrStateBadge state={state} />
         <span className="text-muted-foreground text-xs leading-5">PR #{pr.number}</span>
       </div>
+
+      {awaitingVerification && (
+        <p className="text-muted-foreground text-xs leading-snug">
+          Not verified against GitHub yet. Refresh to confirm this is the session&apos;s own pull
+          request.
+        </p>
+      )}
 
       {truncatedTitle && (
         <p className="text-foreground line-clamp-2 text-sm leading-snug">{truncatedTitle}</p>
@@ -115,7 +128,7 @@ export function PrHoverCardContent({ pr, sessionId, gitBranch }: PrHoverCardCont
       </div>
 
       <div className="border-border/60 flex items-center gap-2 border-t pt-3">
-        {!isWithinRefreshThrottle(pr.lastSyncedAt) && (
+        {(awaitingVerification || !isWithinRefreshThrottle(pr.lastSyncedAt)) && (
           <Button
             variant="ghost"
             size="sm"

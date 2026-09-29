@@ -74,7 +74,9 @@ type ExtractableMetaKey =
   | 'status'
   | 'prPlatform'
   | 'prUrl'
-  | 'prNumber';
+  | 'prNumber'
+  | 'prHeadRef'
+  | 'prHeadSha';
 
 function writeIngestMetaIfChanged(
   db: DrizzleSqliteDODatabase,
@@ -425,6 +427,8 @@ export class SessionIngestDO extends DurableObject<Env> {
       prPlatform: undefined,
       prUrl: undefined,
       prNumber: undefined,
+      prHeadRef: undefined,
+      prHeadSha: undefined,
     };
 
     const lifecycleEvents: IngestLifecycleEvent[] = [];
@@ -537,13 +541,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
       }
 
-      // session_pr_link emits the whole triple atomically (or nothing), so the change
-      // map always receives all three keys together.
+      // session_pr_link emits the whole tuple atomically (or nothing), so the change
+      // map always receives all five keys together.
       const prLink = extractSessionPrLink(item);
       if (prLink !== undefined) {
         incomingByKey.prPlatform = prLink.prPlatform;
         incomingByKey.prUrl = prLink.prUrl;
         incomingByKey.prNumber = prLink.prNumber;
+        incomingByKey.prHeadRef = prLink.prHeadRef;
+        incomingByKey.prHeadSha = prLink.prHeadSha;
       }
 
       if (ingestVersion >= 1) {

@@ -432,6 +432,35 @@ describe('CLIOutboundMessageSchema prLink', () => {
     }
   });
 
+  it('parses a prLink with headRef and headSha evidence', () => {
+    const msg = {
+      type: 'heartbeat',
+      sessions: [
+        {
+          ...baseSession,
+          prLink: {
+            platform: 'github',
+            prUrl: 'https://github.com/o/r/pull/42',
+            prNumber: 42,
+            headRef: 'fix/typo',
+            headSha: 'abc123',
+          },
+        },
+      ],
+    };
+    const result = CLIOutboundMessageSchema.safeParse(msg);
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === 'heartbeat') {
+      expect(result.data.sessions[0].prLink).toEqual({
+        platform: 'github',
+        prUrl: 'https://github.com/o/r/pull/42',
+        prNumber: 42,
+        headRef: 'fix/typo',
+        headSha: 'abc123',
+      });
+    }
+  });
+
   it('rejects a prLink with an oversize prUrl', () => {
     const msg = {
       type: 'heartbeat',

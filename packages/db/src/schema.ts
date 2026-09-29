@@ -6413,6 +6413,15 @@ export const cli_sessions_v2 = pgTable(
     platform: text(), // PR host (e.g. github), NOT the OS.
     pr_url: text(),
     pr_number: integer(),
+    // The head ref and head commit the session reported for its own PR. Used to
+    // verify the link against GitHub before it is stored or shown. Nullable so
+    // rows written by older CLIs and pre-existing (unverified) links stay
+    // unshown until the session reports verifiable evidence.
+    pr_head_ref: text(),
+    pr_head_sha: text(),
+    // Set only after the link has been verified against GitHub. Null means the
+    // link is not trustworthy yet and must not be shown.
+    pr_link_verified_at: timestamp({ withTimezone: true, mode: 'string' }),
     status: text(),
     status_updated_at: timestamp({ withTimezone: true, mode: 'string' }),
     last_activity_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -6460,6 +6469,15 @@ export const cli_sessions_v2 = pgTable(
       .where(isNotNull(table.cloud_agent_worktree_id)),
     // Supports joins from github_branch_pull_requests on (git_url, git_branch).
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
+    // Supports the webhook verified-link gate, which updates sessions by
+    // `(git_url, pr_number)`. Without this index that UPDATE can only use the
+    // `git_url` prefix of the branch index above and then heap-fetches every
+    // session in the repository to test `pr_number` and the head evidence, so
+    // webhook latency and DB load grow with sessions-per-repository. Built
+    // concurrently — `cli_sessions_v2` is large.
+    index('IDX_cli_sessions_v2_git_url_pr_number')
+      .on(table.git_url, table.pr_number)
+      .concurrently(),
   ]
 );
 
@@ -6780,22 +6798,20 @@ export const github_branch_pull_requests = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Partial unique indexes serve as ON CONFLICT targets for the webhook
-    // upsert. Identity columns (git_url, git_branch) lead; tenant column
-    // trails since all hot-path reads supply every column anyway.
+    // Identity is the PR, not the branch: the cache is only a state/review
+    // cache for a PR a session already verifiably links. Branch names are
+    // reused and shared across sessions, so (git_url, git_branch) can never
+    // identify which PR belongs to which session. These partial unique indexes
+    // serve as ON CONFLICT targets for the webhook upsert, keyed by PR number.
     uniqueIndex('UQ_github_branch_prs_org')
-      .on(table.git_url, table.git_branch, table.owned_by_organization_id)
-      .where(isNotNull(table.owned_by_organization_id)),
+      .on(table.git_url, table.pr_number, table.owned_by_organization_id)
+      .where(isNotNull(table.pr_number)),
     uniqueIndex('UQ_github_branch_prs_user')
-      .on(table.git_url, table.git_branch, table.owned_by_user_id)
-      .where(isNotNull(table.owned_by_user_id)),
-    // The session-to-PR LEFT JOIN matches (git_url, git_branch) and picks the
-    // tenant column with an OR. Neither partial unique index above can serve
-    // that join: the planner cannot prove `owned_by_*_id IS NOT NULL` per row,
-    // so it falls back to a hash join and sequentially scans this whole table
-    // on every session list and search. This plain index restores the nested
-    // loop (292 ms to 2.8 ms on a 1M-row cache).
-    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.git_branch).concurrently(),
+      .on(table.git_url, table.pr_number, table.owned_by_user_id)
+      .where(isNotNull(table.pr_number)),
+    // Reads resolve a PR by identity (git_url, pr_number); branch columns are
+    // no longer part of the join key.
+    index('IDX_github_branch_prs_url_branch').on(table.git_url, table.pr_number).concurrently(),
     check(
       'github_branch_pull_requests_owner_check',
       sql`(

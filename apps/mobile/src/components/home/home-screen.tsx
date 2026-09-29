@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
@@ -32,6 +33,25 @@ export function HomeScreen() {
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const [refreshing, setRefreshing] = useState(false);
   const context = useLiveSessionContext();
+  const { refetch: refetchContext } = context;
+  // The Home tab is frozen while another tab is focused (`freezeOnBlur`), so
+  // returning from the Profile tab resumes this screen without re-running its
+  // mount queries. The live-session context's membership boundary can be left
+  // stale or failed by that detour, keeping `context.isReady` false and the
+  // EXPLORE rows unrendered after the user comes back. Refresh the context on
+  // every focus regain after the first — the mount focus is already covered by
+  // the query's own mount fetch — mirroring the Agents list's foreground
+  // refresh and `useRouteForegroundRefresh`'s first-focus rule.
+  const firstFocusRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocusRef.current) {
+        firstFocusRef.current = false;
+        return;
+      }
+      void refetchContext();
+    }, [refetchContext])
+  );
   const sessions = useLiveAgentSessions({
     organizationId: context.organizationId,
     enabled: context.isReady,

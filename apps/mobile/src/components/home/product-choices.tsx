@@ -1,5 +1,5 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -20,6 +20,25 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
   const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
+
+  // Code Reviewer and Security Agent live in the Profile tab, so a plain push
+  // from Home stacks the chosen agent on top of whatever agent screens the
+  // Profile tab was last left on. Back then reveals that stale screen (for
+  // example the Code Reviewer GitHub connect screen behind a Home-opened
+  // Security Agent) instead of returning to Home. Open the agent on the Profile
+  // tab, pop the tab's stack to its first screen, then replace that screen with
+  // the agent, so the agent is the tab's only screen and Back leaves the tab
+  // for Home where the user started. The opening navigate also gives the stack
+  // a second route to pop before `dismissAll`, so `dismissAll` is always
+  // handled (a POP_TO_TOP on a one-route stack is an unhandled action and
+  // surfaces as a development LogBox error over the screen). The three calls
+  // are queued in order, so each sees the previous one's state.
+  const openProfileAgent = (href: Href) => {
+    router.navigate(href);
+    router.dismissAll();
+    router.replace(href);
+  };
+
   if (!contextReady && !prReviewEnabled) {
     return null;
   }
@@ -36,7 +55,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
               subtitle={t('profile.codeReviewerSubtitle')}
               className="rounded-lg bg-secondary px-3"
               onPress={() => {
-                router.push(getCodeReviewerProfilePath(scope));
+                openProfileAgent(getCodeReviewerProfilePath(scope));
               }}
             />
             <ConfigureRow
@@ -46,7 +65,7 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
               className="rounded-lg bg-secondary px-3"
               last={!prReviewEnabled}
               onPress={() => {
-                router.push(getSecurityAgentPath(scope));
+                openProfileAgent(getSecurityAgentPath(scope));
               }}
             />
           </>

@@ -8,10 +8,13 @@ import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const push = vi.hoisted(() => vi.fn());
+const navigate = vi.hoisted(() => vi.fn());
+const dismissAll = vi.hoisted(() => vi.fn());
+const replace = vi.hoisted(() => vi.fn());
 const prReviewEnabled = vi.hoisted(() => ({ value: true }));
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push, navigate, dismissAll, replace }),
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -88,19 +91,31 @@ describe('ProductChoices', () => {
     await unmount(renderer);
   });
 
-  it('navigates each row to its product path', async () => {
+  it('opens each profile agent as the Profile tab root so Back lands on Home', async () => {
     prReviewEnabled.value = true;
     push.mockClear();
+    navigate.mockClear();
+    dismissAll.mockClear();
+    replace.mockClear();
     const renderer = await mountProductChoices('org-1');
 
     pressRow(renderer.root, 'Code Reviewer');
-    expect(push).toHaveBeenCalledWith(getCodeReviewerProfilePath('org-1'));
+    expect(navigate).toHaveBeenLastCalledWith(getCodeReviewerProfilePath('org-1'));
+    expect(dismissAll).toHaveBeenCalledTimes(1);
+    expect(replace).toHaveBeenLastCalledWith(getCodeReviewerProfilePath('org-1'));
 
     pressRow(renderer.root, 'Security Agent');
-    expect(push).toHaveBeenCalledWith(getSecurityAgentPath('org-1'));
+    expect(navigate).toHaveBeenLastCalledWith(getSecurityAgentPath('org-1'));
+    expect(dismissAll).toHaveBeenCalledTimes(2);
+    expect(replace).toHaveBeenLastCalledWith(getSecurityAgentPath('org-1'));
 
     pressRow(renderer.root, 'PR Review');
-    expect(push).toHaveBeenCalledWith(getPrReviewEntryPath());
+    expect(push).toHaveBeenLastCalledWith(getPrReviewEntryPath());
+    // PR Review is a root-stack screen, not a Profile tab agent, so it must not
+    // reset the Profile tab stack.
+    expect(navigate).toHaveBeenCalledTimes(2);
+    expect(dismissAll).toHaveBeenCalledTimes(2);
+    expect(replace).toHaveBeenCalledTimes(2);
 
     await unmount(renderer);
   });
@@ -108,13 +123,18 @@ describe('ProductChoices', () => {
   it('falls back to the personal scope when no organization is selected', async () => {
     prReviewEnabled.value = true;
     push.mockClear();
+    navigate.mockClear();
+    dismissAll.mockClear();
+    replace.mockClear();
     const renderer = await mountProductChoices(null);
 
     pressRow(renderer.root, 'Code Reviewer');
-    expect(push).toHaveBeenCalledWith(getCodeReviewerProfilePath('personal'));
+    expect(navigate).toHaveBeenLastCalledWith(getCodeReviewerProfilePath('personal'));
+    expect(replace).toHaveBeenLastCalledWith(getCodeReviewerProfilePath('personal'));
 
     pressRow(renderer.root, 'Security Agent');
-    expect(push).toHaveBeenCalledWith(getSecurityAgentPath('personal'));
+    expect(navigate).toHaveBeenLastCalledWith(getSecurityAgentPath('personal'));
+    expect(replace).toHaveBeenLastCalledWith(getSecurityAgentPath('personal'));
 
     await unmount(renderer);
   });

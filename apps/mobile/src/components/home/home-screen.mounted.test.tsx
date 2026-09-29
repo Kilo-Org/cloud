@@ -44,6 +44,10 @@ const state = vi.hoisted(() => ({
   owners: 0,
   liveQuery: vi.fn<(options: Parameters<typeof useLiveAgentSessions>[0]) => void>(),
 }));
+// Captures the useFocusEffect callback so a test can simulate a focus regain.
+const focusEffect = vi.hoisted(() => ({
+  effect: undefined as (() => void) | undefined,
+}));
 const queryClient = new ReactQuery.QueryClient();
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
@@ -82,6 +86,9 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: {},
 }));
 vi.mock('expo-router', () => ({
+  useFocusEffect: (effect: () => void) => {
+    focusEffect.effect = effect;
+  },
   useRouter: () => ({
     canGoBack: () => false,
     push: (path: string) => {
@@ -250,6 +257,7 @@ beforeEach(() => {
   state.boundaryRefetch.mockReset();
   state.socketRetry.mockReset();
   state.liveQuery.mockReset();
+  focusEffect.effect = undefined;
 });
 afterEach(async () => {
   act(() => renderer?.unmount());
@@ -691,6 +699,25 @@ describe('Home live presentation', () => {
       await control.promise;
     });
     expect(refresh().props.refreshing).toBe(false);
+  });
+});
+
+describe('Home focus refresh', () => {
+  it('refreshes the live-session context only when Home regains focus', async () => {
+    await renderHome();
+    expect(focusEffect.effect).toBeDefined();
+    act(() => {
+      focusEffect.effect?.();
+    });
+    // The mount focus is already covered by the query's own mount fetch, so the
+    // first focus must not fire a second one.
+    expect(state.boundaryRefetch).not.toHaveBeenCalled();
+    act(() => {
+      focusEffect.effect?.();
+    });
+    // Returning from the Profile tab must re-admit the context so `isReady`
+    // settles and the EXPLORE rows render again.
+    expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
   });
 });
 

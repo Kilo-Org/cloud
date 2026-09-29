@@ -3,6 +3,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { HomeScreen } from '@/components/home/home-screen';
 
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
+vi.mock('expo-router', () => ({
+  useFocusEffect: vi.fn(),
+}));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_PR_REVIEW: 'pr-review',

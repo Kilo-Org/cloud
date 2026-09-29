@@ -87,6 +87,10 @@ vi.mock('react-native', () => ({
   Platform: mockedPlatform,
 }));
 
+vi.mock('@/lib/iap/pending-store-purchases', () => ({
+  fetchPendingStorePurchases: mockedIap.getAvailablePurchases,
+}));
+
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => {
     mockedReactQuery.useMutation();
@@ -1478,9 +1482,8 @@ describe('KiloPassNativeIapOwner', () => {
   // must stay silent rather than pop a bare toast behind a screen with no
   // purchase UI.
   it('keeps a recovery failure silent while no inline error surface is mounted', async () => {
-    // Recovery reads the owner's own store lookup (`getAvailableIapPurchases`),
-    // not the hook's reactive list, so the store must be connected and answer
-    // with the charged purchase.
+    // Recovery reads the transactions the store still holds, so the store must be
+    // connected and answer with the charged purchase.
     mockedIap.connected = true;
     mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedReactQuery.mobileStoreProductsData = {
@@ -1491,10 +1494,6 @@ describe('KiloPassNativeIapOwner', () => {
     });
     const owner = renderKiloPassNativeIapOwner();
 
-    owner.render();
-    await flushPromises();
-    // The store answer lands in the owner's own state; the recovery effect runs
-    // on the render that follows it.
     owner.render();
     await flushPromises();
 

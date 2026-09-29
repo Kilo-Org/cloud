@@ -13,7 +13,6 @@ import {
 } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  getAvailablePurchases as fetchAvailablePurchases,
   fetchProducts as fetchIapProducts,
   type ProductOrSubscription,
   type Purchase,
@@ -26,6 +25,7 @@ import {
   type StoreCreditProductListing,
 } from '@/lib/credits/store-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
+import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import {
   createStoreCreditPurchaseActions,
   getPurchaseCompletionId,
@@ -301,12 +301,16 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // Recover the purchases the store already charged but the backend has not
   // granted yet.
   //
-  // The lookup uses the store SDK's value-returning `getAvailablePurchases`,
-  // not `useIAP().getAvailablePurchases`: the hook routes every failed query to
-  // `console.error`, and in a dev build the LogBox it raises sits on top of the
-  // screen's own store-unavailable banner — two error affordances, the extra one
-  // a raw library message. A store that cannot answer is exactly the state the
-  // screen reports inline, so its lookup must fail silently here.
+  // The lookup is `fetchPendingStorePurchases`, which reads the transactions the
+  // store still holds: the StoreKit payment queue on iOS — the only place an
+  // unfinished consumable waits, and a place `getAvailablePurchases` does not
+  // read — and Play's own query on Android. It is the store SDK's
+  // value-returning call, not `useIAP().getAvailablePurchases`: the hook routes
+  // every failed query to `console.error`, and in a dev build the LogBox it
+  // raises sits on top of the screen's own store-unavailable banner — two error
+  // affordances, the extra one a raw library message. A store that cannot answer
+  // is exactly the state the screen reports inline, so its lookup fails silently
+  // here.
   useEffect(() => {
     if (!connected) {
       return undefined;
@@ -319,7 +323,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     void (async () => {
       let storePurchases: Purchase[] = [];
       try {
-        storePurchases = await fetchAvailablePurchases();
+        storePurchases = await fetchPendingStorePurchases(storefront);
       } catch {
         // The store is unreachable; the screen's inline banner says so. The
         // next connect retries.
@@ -361,7 +365,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
     return () => {
       recoveryRun.cancelled = true;
     };
-  }, [actions, connected, creditPackAppleProductIds.length, creditPackGoogleProductIds.length]);
+  }, [
+    actions,
+    connected,
+    creditPackAppleProductIds.length,
+    creditPackGoogleProductIds.length,
+    storefront,
+  ]);
 
   const value = useMemo<CreditNativeIapContextValue>(
     () => ({

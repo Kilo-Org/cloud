@@ -65,6 +65,10 @@ vi.mock('react-native', () => ({
   Platform: mockedPlatform,
 }));
 
+vi.mock('@/lib/iap/pending-store-purchases', () => ({
+  fetchPendingStorePurchases: mockedIap.getAvailablePurchases,
+}));
+
 vi.mock('@tanstack/react-query', () => ({
   useMutation: () => ({ isPending: false, mutateAsync: mockedQuery.completePurchase }),
   useQuery: () => ({ data: mockedQuery.serverProductsData }),

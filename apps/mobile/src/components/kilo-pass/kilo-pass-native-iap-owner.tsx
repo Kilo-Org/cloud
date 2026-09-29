@@ -14,6 +14,9 @@ import { Platform } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchProducts as fetchIapProducts,
+  // The ownership snapshot reads what the account owns. That is the entitlement
+  // query, not the pending queue: the two answer different questions and only
+  // recovery wants the queue.
   getAvailablePurchases as getAvailableIapPurchases,
   type ProductOrSubscription,
   type ProductSubscription,
@@ -28,6 +31,7 @@ import {
 } from '@/lib/analytics/posthog';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
+import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import {
   type AppStoreKiloPassProduct,
   type StoreKiloPassProduct,
@@ -337,10 +341,14 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     ]);
   }, [queryClient, trpc]);
 
+  // The store this device has, named once so the purchase sheet and the
+  // recovery lookup can never read two different stores.
+  const storefront = isAndroid ? 'play' : 'app_store';
+
   const actions = useMemo(
     () =>
       createAppStoreKiloPassPurchaseActions({
-        storefront: isAndroid ? 'play' : 'app_store',
+        storefront,
         requestPurchase,
         getAvailablePurchases: getAvailableIapPurchases,
         restorePurchases: restoreStorePurchases,
@@ -390,6 +398,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       enabledAppleProductIds,
       enabledGoogleProductIds,
       finishTransaction,
+      storefront,
       invalidateAfterCompletion,
       queryClient,
       requestPurchase,
@@ -523,15 +532,46 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     })();
   }, [connected, ownershipAttempt]);
 
+  // Held in a ref so the effect below depends on the store's state, never on a
+  // rebuilt actions identity: a rebuilt identity would re-run recovery on a
+  // render that changed nothing, and a retry after a failed completion belongs
+  // to the next connect, not to this session.
+  const recoverActionsRef = useRef(actions);
   useEffect(() => {
-    if (
-      availableStorePurchases.length === 0 ||
-      (enabledAppleProductIds.length === 0 && enabledGoogleProductIds.length === 0)
-    ) {
-      return;
+    recoverActionsRef.current = actions;
+  }, [actions]);
+
+  // Recover the purchases the store charged but the backend has not granted yet.
+  //
+  // The candidates are the transactions the store still holds, read by
+  // `fetchPendingStorePurchases`: the App Store queue on iOS, which is the only
+  // place an unfinished transaction waits. The ownership snapshot above is a
+  // different answer — what the account owns — and an unfinished transaction can
+  // be absent from it, so recovering from that snapshot recovers nothing for the
+  // purchase that most needs it.
+  useEffect(() => {
+    if (!connected) {
+      return undefined;
+    }
+    if (enabledAppleProductIds.length === 0 && enabledGoogleProductIds.length === 0) {
+      return undefined;
     }
 
-    const unrecoveredPurchases = availableStorePurchases.filter(availablePurchase => {
+    const recoveryRun = { cancelled: false };
+    void (async () => {
+      let pendingPurchases: Purchase[] = [];
+      try {
+        pendingPurchases = await fetchPendingStorePurchases(storefront);
+      } catch {
+        // The store cannot answer; the screen's own store-connection message
+        // reports it, and the next connect retries this pass.
+        return;
+      }
+      if (recoveryRun.cancelled) {
+        return;
+      }
+
+      const unrecoveredPurchases = pendingPurchases.filter(availablePurchase => {
       const id = getPurchaseCompletionId(availablePurchase);
       if (
         recoveredPurchaseIdsRef.current.has(id) ||
@@ -543,27 +583,33 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       return true;
     });
 
-    if (unrecoveredPurchases.length > 0) {
-      void (async () => {
-        try {
-          const recoveredPurchases = await actions.recoverPurchases(unrecoveredPurchases);
-          for (const recoveredPurchase of recoveredPurchases) {
-            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
-          }
-        } finally {
-          for (const unrecoveredPurchase of unrecoveredPurchases) {
-            recoveryInFlightPurchaseIdsRef.current.delete(
-              getPurchaseCompletionId(unrecoveredPurchase)
-            );
-          }
-        }
-      })();
+    if (unrecoveredPurchases.length === 0) {
+      return;
     }
+
+    try {
+      const recoveredPurchases =
+        await recoverActionsRef.current.recoverPurchases(unrecoveredPurchases);
+      for (const recoveredPurchase of recoveredPurchases) {
+        recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(recoveredPurchase));
+      }
+    } finally {
+      for (const unrecoveredPurchase of unrecoveredPurchases) {
+        recoveryInFlightPurchaseIdsRef.current.delete(
+          getPurchaseCompletionId(unrecoveredPurchase)
+        );
+      }
+    }
+    })();
+
+    return () => {
+      recoveryRun.cancelled = true;
+    };
   }, [
-    actions,
-    availableStorePurchases,
+    connected,
     enabledAppleProductIds.length,
     enabledGoogleProductIds.length,
+    storefront,
   ]);
 
   const value = useMemo<KiloPassNativeIapContextValue>(

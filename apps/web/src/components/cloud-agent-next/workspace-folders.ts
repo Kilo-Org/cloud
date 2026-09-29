@@ -86,8 +86,8 @@ export function getWorkspaceFolderDropAction(
   if (target.type === 'folder' && !folders.some(folder => folder.id === target.id)) return null;
 
   if (drag.type === 'session') {
-    const folderId = target.type === 'folder' ? target.id : null;
-    return { type: 'move-session', sessionId: drag.id, folderId };
+    if (target.type === 'ungrouped') return null;
+    return { type: 'move-session', sessionId: drag.id, folderId: target.id };
   }
 
   if (drag.type === 'worktree') {

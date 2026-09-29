@@ -33,12 +33,12 @@ import {
   getUserUUID,
   uuidSchema,
   parseSignInRedirectContext,
-  getProfileRedirectPath,
   getUserFromAuth,
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
   getUserFromSessionForCredentialIssuanceOrRedirect,
 } from './server';
+import { getProfileRedirectPath } from './profile-redirect-path';
 import { db } from '@/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';

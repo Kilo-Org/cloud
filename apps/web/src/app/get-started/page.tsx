@@ -1,7 +1,8 @@
 import { buildLandingRedirectUrl } from '@/lib/landing-redirect';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
-import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
+import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
+import { getUserFromAuth } from '@/lib/user/server';
 import { redirect } from 'next/navigation';
 
 export default async function GetStartedPage({ searchParams }: AppPageProps) {

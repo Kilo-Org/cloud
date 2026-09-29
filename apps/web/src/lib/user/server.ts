@@ -48,8 +48,6 @@ import {
   parseImpactAffiliateTouchFromUrl,
   parseImpactReferralTouchFromUrl,
 } from '@/lib/impact/referral-utils';
-import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { secondsInDay } from 'date-fns/constants';
 import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
@@ -59,18 +57,12 @@ import PostHogClient from '@/lib/posthog';
 import { captureException } from '@sentry/nextjs';
 import {
   getOrganizationById,
-  getProfileOrganizations,
-  getSingleUserOrganization,
   getUserOrgMemberships,
-  getUserOrganizationsWithSeats,
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
-import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
-import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
-import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
@@ -1687,20 +1679,6 @@ export async function getUserFromAuthOrRedirect(
   return user;
 }
 
-// Resolve where a user whose personal account is disabled should land by default.
-// Prefers a sales demo org, then their oldest organization (stable across
-// requests); falls back to an allowed personal route when they somehow belong
-// to no organizations.
-// Note: this only affects where we send them by default (e.g. after login); we
-// do not block direct navigation to personal routes.
-async function resolvePersonalAccountDisabledLandingPath(userId: User['id']): Promise<string> {
-  const orgs = await getUserOrganizationsWithSeats(userId);
-  // Old form sorted by created_at then organizationId; the shared comparator
-  // additionally lets a sales-demo org win.
-  const firstOrg = [...orgs].sort(compareOrganizationsForDefault)[0];
-  return firstOrg ? `/organizations/${firstOrg.organizationId}` : '/connected-accounts';
-}
-
 export async function signInUrlWithCallbackPath(): Promise<string> {
   return appendCallbackPath('/users/sign_in');
 }
@@ -1820,49 +1798,4 @@ export function getUserUUID(user: User): string {
   } else {
     return uuidv5(user.id, USER_UUID_NAMESPACE);
   }
-}
-
-// Prefer the user's verified-domain organization, then preserve the existing
-// personal-account and single-organization fallbacks.
-export async function getProfileRedirectPath(user: User) {
-  const profileOrganizations = await getProfileOrganizations(user.id, {
-    excludeAccessBlocked: true,
-  });
-  const preferredOrganizationId = await resolvePreferredVerifiedDomainOrganizationId(
-    user,
-    profileOrganizations
-  );
-  if (preferredOrganizationId) {
-    return `/organizations/${preferredOrganizationId}`;
-  }
-
-  // Users whose personal account is disabled have no personal surface;
-  // always send them into an organization regardless of org count.
-  if (user.personal_account_disabled) {
-    return resolvePersonalAccountDisabledLandingPath(user.id);
-  }
-
-  // Old form sent multi-org users to /profile; a live sales-demo membership
-  // wins so login lands on the demo org.
-  const salesDemoOrg = await findLiveSalesDemoForUser(user.id);
-  if (salesDemoOrg) {
-    return `/organizations/${salesDemoOrg.id}`;
-  }
-
-  // Check if user is a member of exactly one organization (skip redirect if multiple)
-  const singleOrg = await getSingleUserOrganization(user.id);
-  if (singleOrg) {
-    const latestPurchase = await getMostRecentSeatPurchase(singleOrg.id);
-    const classification = classifyOrganizationEntitlement({
-      organization: singleOrg,
-      latestSeatPurchaseStatus: latestPurchase?.subscription_status ?? null,
-      now: new Date(),
-    });
-    if (classification.isTrialExpiredForEnforcement) {
-      return '/profile';
-    }
-    return `/organizations/${singleOrg.id}`;
-  }
-
-  return '/profile';
 }

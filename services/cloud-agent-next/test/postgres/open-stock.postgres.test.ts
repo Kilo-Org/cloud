@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDrizzleClient, getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { eq } from 'drizzle-orm';
-import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_session_runs,
+  cloud_agent_sessions,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import { logger } from '../../src/logger.js';
 import { AGENT_OPEN_METRIC, COLLECTION_METRIC } from '../../src/telemetry/outcome-aggregate.js';
 import {
@@ -32,6 +37,7 @@ const OBSERVED_AT = '2096-02-01T00:10:00.000Z';
 let connectionString: string;
 let reader: WorkerDb;
 let writer: ReturnType<typeof createDrizzleClient>;
+let originUserId: string;
 const trackedSessionIds: string[] = [];
 
 function requirePostgresUrl(): string {
@@ -43,20 +49,36 @@ function requirePostgresUrl(): string {
 const uniqueSessionId = (plane: 'agent' | 'workspace') => `${plane}_${randomUUID()}`;
 const uniqueMessageId = () => `msg_${randomUUID().replace(/-/g, '')}`;
 
+async function insertOrigin(
+  cloudAgentSessionId: string,
+  kiloSessionId: string,
+  createdOnPlatform: string
+): Promise<void> {
+  await writer.db.insert(cli_sessions_v2).values({
+    session_id: kiloSessionId,
+    kilo_user_id: originUserId,
+    cloud_agent_session_id: cloudAgentSessionId,
+    created_on_platform: createdOnPlatform,
+  });
+}
+
 async function insertSession(
   sessionId: string,
   createdAt: string,
-  productOrigin?: 'code-review' | 'other'
+  createdOnPlatform?: string
 ): Promise<string> {
   trackedSessionIds.push(sessionId);
   const initialMessageId = uniqueMessageId();
+  const kiloSessionId = `ses_${randomUUID().replace(/-/g, '').slice(0, 26)}`;
   await writer.db.insert(cloud_agent_sessions).values({
     cloud_agent_session_id: sessionId,
-    kilo_session_id: `ses_${randomUUID().replace(/-/g, '').slice(0, 26)}`,
+    kilo_session_id: kiloSessionId,
     initial_message_id: initialMessageId,
     created_at: createdAt,
-    product_origin: productOrigin ?? null,
   });
+  if (createdOnPlatform !== undefined) {
+    await insertOrigin(sessionId, kiloSessionId, createdOnPlatform);
+  }
   return initialMessageId;
 }
 
@@ -120,10 +142,19 @@ function failAtSelect(
   return { db: instrumented, state };
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   connectionString = requirePostgresUrl();
   reader = getWorkerDb(connectionString);
   writer = createDrizzleClient({ connectionString, ssl: false });
+  originUserId = `oauth/test-origin-${randomUUID()}`;
+  await writer.db.insert(kilocode_users).values({
+    id: originUserId,
+    google_user_email: `origin-${randomUUID()}@example.test`,
+    google_user_name: 'Origin fixture',
+    google_user_image_url: '',
+    stripe_customer_id: '',
+    api_token_pepper: null,
+  });
 });
 
 afterEach(async () => {
@@ -137,6 +168,8 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await writer.db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, originUserId));
+  await writer.db.delete(kilocode_users).where(eq(kilocode_users.id, originUserId));
   await writer.pool.end();
   const readerPool = (reader as unknown as { $client?: { end: () => Promise<void> } }).$client;
   await readerPool?.end();
@@ -338,12 +371,12 @@ describe('cloud agent open stock against PostgreSQL', () => {
     expect(controlAccepted?.oldestAcceptedEpochMs).toBeNull();
   });
 
-  it('keeps three stored origins as three cells inside the six rows', async () => {
+  it('keeps three created_on_platform origins as three cells inside the six rows', async () => {
     const reviewSession = uniqueSessionId('agent');
     const otherSession = uniqueSessionId('agent');
     const unknownSession = uniqueSessionId('agent');
     await insertSession(reviewSession, FIXTURE_CREATED_AT, 'code-review');
-    await insertSession(otherSession, FIXTURE_CREATED_AT, 'other');
+    await insertSession(otherSession, FIXTURE_CREATED_AT, 'cloud-agent-web');
     await insertSession(unknownSession, FIXTURE_CREATED_AT);
     await insertRun({
       cloudAgentSessionId: reviewSession,

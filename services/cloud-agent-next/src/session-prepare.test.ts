@@ -2059,7 +2059,6 @@ describe('start endpoint', () => {
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
         kiloSessionId: 'cli-session-abc123',
         initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
-        productOrigin: 'other',
       },
       expect.any(Object)
     );
@@ -2071,41 +2070,6 @@ describe('start endpoint', () => {
       expect.any(Object)
     );
     expect(recordSessionFailureMock).not.toHaveBeenCalled();
-  });
-
-  it('stores the other origin for a public start that claims code-review', async () => {
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
-
-    await caller.start({
-      message: { prompt: 'Public start' },
-      agent: { mode: 'code', model: 'anthropic/claude-sonnet-4-20250514' },
-      repository: { type: 'github', repo: 'acme/repo' },
-      options: { createdOnPlatform: 'code-review' },
-    });
-
-    expect(createSessionReportMock).toHaveBeenCalledWith(
-      expect.objectContaining({ productOrigin: 'other' }),
-      expect.any(Object)
-    );
-  });
-
-  it('stores the code-review origin for an internal prepare that selects code-review', async () => {
-    const doStub = createMockDOStub();
-    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
-
-    await caller.prepareSession({
-      prompt: 'Internal prepare',
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      createdOnPlatform: 'code-review',
-    });
-
-    expect(createSessionReportMock).toHaveBeenCalledWith(
-      expect.objectContaining({ productOrigin: 'code-review' }),
-      expect.any(Object)
-    );
   });
 
   it('admits canonical document attachments through one grouped creation operation', async () => {

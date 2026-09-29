@@ -2,7 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createDrizzleClient, getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import { eq } from 'drizzle-orm';
-import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  cloud_agent_session_runs,
+  cloud_agent_sessions,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { logger } from '../../src/logger.js';
 import { createCloudAgentReportStore } from '../../src/telemetry/report-store.js';
@@ -36,6 +41,7 @@ let reader: WorkerDb;
 let writer: ReturnType<typeof createDrizzleClient>;
 let store: ReturnType<typeof createCloudAgentReportStore>;
 let writerStore: ReturnType<typeof createCloudAgentReportStore>;
+let originUserId: string;
 const trackedSessionIds: string[] = [];
 
 function requirePostgresUrl(): string {
@@ -99,20 +105,36 @@ function unclassifiedFailedRun(
   };
 }
 
+async function insertOrigin(
+  cloudAgentSessionId: string,
+  kiloSessionId: string,
+  createdOnPlatform: string
+): Promise<void> {
+  await writer.db.insert(cli_sessions_v2).values({
+    session_id: kiloSessionId,
+    kilo_user_id: originUserId,
+    cloud_agent_session_id: cloudAgentSessionId,
+    created_on_platform: createdOnPlatform,
+  });
+}
+
 async function createSession(
   sessionId: string,
   occurredAt: string,
   initialMessageId = uniqueMessageId(),
-  productOrigin?: 'code-review' | 'other'
+  createdOnPlatform?: string
 ): Promise<string> {
   trackedSessionIds.push(sessionId);
+  const kiloSessionId = uniqueKiloSessionId();
   await store.createSessionReport({
     cloudAgentSessionId: sessionId,
-    kiloSessionId: uniqueKiloSessionId(),
+    kiloSessionId,
     initialMessageId,
     occurredAt,
-    productOrigin,
   });
+  if (createdOnPlatform !== undefined) {
+    await insertOrigin(sessionId, kiloSessionId, createdOnPlatform);
+  }
   return initialMessageId;
 }
 
@@ -129,17 +151,20 @@ async function saveReport(
 async function insertSession(
   sessionId: string,
   createdAt: string,
-  productOrigin?: 'code-review' | 'other'
+  createdOnPlatform?: string
 ): Promise<string> {
   trackedSessionIds.push(sessionId);
   const initialMessageId = uniqueMessageId();
+  const kiloSessionId = uniqueKiloSessionId();
   await writer.db.insert(cloud_agent_sessions).values({
     cloud_agent_session_id: sessionId,
-    kilo_session_id: uniqueKiloSessionId(),
+    kilo_session_id: kiloSessionId,
     initial_message_id: initialMessageId,
     created_at: createdAt,
-    product_origin: productOrigin ?? null,
   });
+  if (createdOnPlatform !== undefined) {
+    await insertOrigin(sessionId, kiloSessionId, createdOnPlatform);
+  }
   return initialMessageId;
 }
 
@@ -300,12 +325,21 @@ function failAtQuery(
   return { db: instrumented, state };
 }
 
-beforeAll(() => {
+beforeAll(async () => {
   connectionString = requirePostgresUrl();
   reader = getWorkerDb(connectionString);
   writer = createDrizzleClient({ connectionString, ssl: false });
   store = createCloudAgentReportStore(reader);
   writerStore = createCloudAgentReportStore(writer.db);
+  originUserId = `oauth/test-origin-${randomUUID()}`;
+  await writer.db.insert(kilocode_users).values({
+    id: originUserId,
+    google_user_email: `origin-${randomUUID()}@example.test`,
+    google_user_name: 'Origin fixture',
+    google_user_image_url: '',
+    stripe_customer_id: '',
+    api_token_pepper: null,
+  });
 });
 
 afterEach(async () => {
@@ -319,6 +353,8 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await writer.db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.kilo_user_id, originUserId));
+  await writer.db.delete(kilocode_users).where(eq(kilocode_users.id, originUserId));
   await writer.pool.end();
   const readerPool = (reader as unknown as { $client?: { end: () => Promise<void> } }).$client;
   await readerPool?.end();
@@ -631,7 +667,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
     expect(headline(result, 'legacy', 'initial', 'unknown').platformFailed).toBe(0);
   });
 
-  it('labels stored origins as their stored value and null as unknown', async () => {
+  it('labels created_on_platform code-review as code-review, other platforms as other, and missing as unknown', async () => {
     const window = nextWindow();
     const reviewSession = uniqueSessionId('agent');
     const otherSession = uniqueSessionId('agent');
@@ -646,7 +682,7 @@ describe('cloud agent outcome aggregate against PostgreSQL', () => {
       otherSession,
       window.start,
       uniqueMessageId(),
-      'other'
+      'cloud-agent-web'
     );
     const unknownInitial = await createSession(unknownSession, window.start);
     await saveReport(reviewSession, completedRun(reviewInitial, window.start), window.end);

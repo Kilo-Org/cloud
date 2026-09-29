@@ -51,6 +51,7 @@ function makeDb(results: QueryResult[]) {
       const chain = {
         from: () => chain,
         innerJoin: () => chain,
+        leftJoin: () => chain,
         where: () => chain,
         groupBy: () => chain,
         then(resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown): unknown {
@@ -432,9 +433,10 @@ describe('cloud agent outcome aggregate wiring', () => {
     );
 
     const origin = render(runSelect.origin as SQL);
-    expect(origin.sql).toContain(`"cloud_agent_sessions"."product_origin" = 'code-review'`);
+    expect(origin.sql).toContain(`"cli_sessions_v2"."created_on_platform" = 'code-review'`);
     expect(origin.sql).toContain(`then 'code-review'`);
-    expect(origin.sql).toContain(`"cloud_agent_sessions"."product_origin" = 'other'`);
+    expect(origin.sql).toContain(`then 'unknown'`);
+    expect(origin.sql).toContain(`else 'other' end`);
     expect(origin.sql).not.toContain('codeReview');
 
     const code = render(runSelect.failureCode as SQL);

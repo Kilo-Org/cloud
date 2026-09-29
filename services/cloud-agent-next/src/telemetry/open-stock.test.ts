@@ -54,6 +54,7 @@ function makeDb(result: QueryResult) {
   const chain = {
     from: () => chain,
     innerJoin: () => chain,
+    leftJoin: () => chain,
     where: (arg: unknown) => {
       state.where = arg;
       return chain;

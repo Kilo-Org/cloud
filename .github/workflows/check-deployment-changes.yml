@@ -47,22 +47,41 @@ jobs:
           WORKFLOW_FILE: ${{ inputs.workflow_file }}
         run: |
           set -euo pipefail
-          ci_shas=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow ci.yml \
-            --branch main \
-            --event push \
-            --status success \
-            --json headSha \
-            --limit 100 \
-            --jq '.[].headSha')
-          target_sha=""
-          while read -r sha; do
-            if [ -n "$sha" ] && git merge-base --is-ancestor "$sha" HEAD; then
-              target_sha="$sha"
-              break
-            fi
-          done <<< "$ci_shas"
+          find_latest_successful_main_push() {
+            local workflow_file="$1"
+            local ancestor_ref="${2:-}"
+            local page=1
+            local response run_shas run_count sha
+
+            while :; do
+              if ! response=$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow_file/runs?per_page=100&page=$page"); then
+                echo "::error::Failed to look up workflow runs for $workflow_file" >&2
+                return 1
+              fi
+              if ! run_shas=$(jq -r '.workflow_runs | sort_by(.created_at) | reverse | .[] | select(.head_branch == "main" and .event == "push" and .status == "completed" and .conclusion == "success") | .head_sha' <<< "$response"); then
+                echo "::error::Failed to parse workflow runs for $workflow_file" >&2
+                return 1
+              fi
+              while IFS= read -r sha; do
+                if [ -n "$sha" ] && { [ -z "$ancestor_ref" ] || git merge-base --is-ancestor "$sha" "$ancestor_ref"; }; then
+                  printf '%s\n' "$sha"
+                  return 0
+                fi
+              done <<< "$run_shas"
+              if ! run_count=$(jq -r '.workflow_runs | length' <<< "$response"); then
+                echo "::error::Failed to count workflow runs for $workflow_file" >&2
+                return 1
+              fi
+              if [ "$run_count" -lt 100 ]; then
+                return 0
+              fi
+              page=$((page + 1))
+            done
+          }
+
+          if ! target_sha=$(find_latest_successful_main_push ci.yml HEAD); then
+            exit 1
+          fi
 
           if [ -z "$target_sha" ]; then
             echo "::notice::No successful main CI candidate is available"
@@ -89,15 +108,9 @@ jobs:
           done <<< "$deployments"
 
           if [ -z "$base_sha" ]; then
-            base_sha=$(gh run list \
-              --repo "$GITHUB_REPOSITORY" \
-              --workflow "$WORKFLOW_FILE" \
-              --branch main \
-              --event push \
-              --status success \
-              --json headSha \
-              --limit 1 \
-              --jq '.[0].headSha // empty')
+            if ! base_sha=$(find_latest_successful_main_push "$WORKFLOW_FILE"); then
+              exit 1
+            fi
           fi
 
           if [ -z "$base_sha" ]; then
@@ -105,7 +118,7 @@ jobs:
           elif ! git merge-base --is-ancestor "$base_sha" "$target_sha"; then
             if git merge-base --is-ancestor "$target_sha" "$base_sha"; then
               echo "::notice::The most recent successful CI candidate is already deployed"
-              echo "The most recent successful main CI candidate is already deployed: \`$base_sha\`." >> "$GITHUB_STEP_SUMMARY"
+              echo "CI-green candidate \`$target_sha\` is already included in last completed release \`$base_sha\`." >> "$GITHUB_STEP_SUMMARY"
               echo "should_deploy=false" >> "$GITHUB_OUTPUT"
               exit 0
             fi

@@ -92,8 +92,11 @@ function fakeDatabase(results: FakeResults) {
   };
 }
 
-const outcomeRow = (input: { status: string; terminalReason: string | null; rowCount: number }) =>
-  input;
+const outcomeRow = (input: {
+  status: string;
+  terminalReason: string | null;
+  rowCount: number;
+}) => ({ ...input, durationCount: 0, durationMs: 0 });
 
 describe('review outcome assembly', () => {
   it('classifies benign, system and unknown and collapses unrecognized into one bounded row', () => {
@@ -142,9 +145,24 @@ describe('review outcome assembly', () => {
   });
 
   it('returns explicit zeros and no reasons for a zero window', () => {
-    const { headline, reasons } = assembleReviewOutcome([]);
+    const { headline, reasons, durationCount, durationMs } = assembleReviewOutcome([]);
     expect(headline).toEqual({ completed: 0, failed: 0, cancelled: 0, interrupted: 0 });
     expect(reasons).toEqual([]);
+    expect({ durationCount, durationMs }).toEqual({ durationCount: 0, durationMs: 0 });
+  });
+
+  it('sums valid completed review runtimes across reason groups', () => {
+    const result = assembleReviewOutcome([
+      {
+        status: 'completed',
+        terminalReason: null,
+        rowCount: 3,
+        durationCount: 2,
+        durationMs: 80000,
+      },
+      { status: 'failed', terminalReason: 'timeout', rowCount: 1, durationCount: 0, durationMs: 0 },
+    ]);
+    expect(result).toMatchObject({ durationCount: 2, durationMs: 80000 });
   });
 
   it('keeps literal unknown out of system and out of a merged unrecognized row', () => {
@@ -200,6 +218,13 @@ describe('review SQL allowlist', () => {
     expect(query.sql).toMatch(/"completed_at" is null/);
   });
 
+  it('aggregates only nonnegative completed review runtimes excluding queue wait', () => {
+    const query = reviewOutcomeStatusQuery(usageDb() as never, window).toSQL();
+    expect(query.sql).toContain('"completed_at" - "started_at"');
+    expect(query.sql).toContain('"status" = \'completed\'');
+    expect(query.sql).toContain('"completed_at" >= "started_at"');
+  });
+
   it('restricts the open-stock scan to non-terminal statuses in the WHERE clause', () => {
     const query = reviewOpenCountsQuery(usageDb() as never).toSQL();
 
@@ -246,7 +271,14 @@ describe('review collection wiring', () => {
       expect(record.windowEnd).toBe('2026-02-01T00:10:00.000Z');
     }
     const outcome = records[0];
-    expect(outcome).toMatchObject({ completed: 0, failed: 0, cancelled: 0, interrupted: 0 });
+    expect(outcome).toMatchObject({
+      completed: 0,
+      failed: 0,
+      cancelled: 0,
+      interrupted: 0,
+      durationCount: 0,
+      durationMs: 0,
+    });
     expect(outcome).not.toHaveProperty('reason');
     expect(outcome).not.toHaveProperty('reasonClass');
     expect(outcome).not.toHaveProperty('windowMinutes');
@@ -291,6 +323,24 @@ describe('review collection wiring', () => {
       reasonClass: 'system',
       count: 2,
     });
+  });
+
+  it('emits sum and sample count, not an average of bucket averages', async () => {
+    const database = fakeDatabase({
+      statusRows: [
+        {
+          status: 'completed',
+          terminalReason: null,
+          rowCount: 3,
+          durationCount: 2,
+          durationMs: 80000,
+        },
+      ],
+      latencyRow: zeroLatency,
+    });
+
+    await collectCodeReviewOutcome(new Date('2026-02-01T00:12:00.000Z'), database as never);
+    expect(loggedRecords()[0]).toMatchObject({ durationCount: 2, durationMs: 80000 });
   });
 
   it('still logs the start row and one outcome collection error when the status query throws', async () => {

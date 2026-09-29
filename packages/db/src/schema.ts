@@ -7125,10 +7125,11 @@ export const openai_chatgpt_connections = pgTable(
     is_shared_services: boolean().default(false).notNull(),
     /**
      * The last time OpenAI answered a delegated request with a plan usage
-     * limit. The gateway writes it and a reconnect clears it. It is request
-     * state, not credential state, so it stays out of the encrypted payload. A
-     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
-     * hides it once the reset time OpenAI reported has passed.
+     * limit. The gateway writes it, a request through the same connection that
+     * succeeds clears it, and a reconnect clears it. It is request state, not
+     * credential state, so it stays out of the encrypted payload. It gates
+     * nothing: `readOpenAiChatGptUsageLimit` hides a record once the reset time
+     * OpenAI reported has passed, and routing never reads it.
      */
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */

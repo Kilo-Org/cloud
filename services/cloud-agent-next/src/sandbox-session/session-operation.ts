@@ -5,25 +5,22 @@ import type {
 } from '../sandbox-control/socket.js';
 import type { EventQueries } from '../session/queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
+import { parseOperationPayload } from '../sandbox-control/frames.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sameSessionOperation,
-  sessionAttachPayloadSchema,
   sessionAttachResultSchema,
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
   sessionOperationLookupResultSchema,
-  sessionPromptPayloadSchema,
   sessionPromptResultSchema,
   type ControlError,
   type ResponseFrame,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
-  type SessionAttachPayload,
-  type SessionPromptPayload,
 } from '../shared/sandbox-control-protocol.js';
 import {
   applySessionOperationResult,
@@ -260,24 +257,15 @@ export async function dispatchSessionOperation(
       if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
-    let validatedPayload: SessionAttachPayload | SessionPromptPayload;
-    try {
-      validatedPayload =
-        kind === 'attach'
-          ? sessionAttachPayloadSchema.parse(input.payload)
-          : sessionPromptPayloadSchema.parse(input.payload);
-    } catch {
-      throw new ControlRequestError({
-        code: 'protocol_error',
-        message:
-          kind === 'attach'
-            ? 'Session attachment configuration is invalid'
-            : 'Session prompt configuration is invalid',
-        retryable: false,
-        admission: 'not-admitted',
-      });
+    const validatedPayload = parseOperationPayload(authorization.operation, input.payload);
+    if (!validatedPayload.ok) {
+      return {
+        state: 'rejected',
+        error: { ...validatedPayload.error, retryable: false },
+        rejectionReceived: true,
+      };
     }
-    const payload = structuredClone(validatedPayload);
+    const payload = structuredClone(validatedPayload.payload);
     if (!record(true)) throw new Error('Session operation proof could not be persisted');
     assertDispatchedCurrent();
     try {

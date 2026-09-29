@@ -1227,7 +1227,9 @@ export class SandboxControl extends DurableObject<Env> {
     }
     let outbound = input;
     if (input.operation === 'session.attach') {
-      const attach = sessionAttachPayloadSchema.parse(input.payload);
+      const parsed = parseOperationPayload(input.operation, input.payload);
+      if (!parsed.ok) throw new Error(parsed.error.message);
+      const attach = sessionAttachPayloadSchema.parse(parsed.payload);
       if (attach.mcp && this.socketHandler.supportsMcpServers?.() !== true) {
         throw new ControlRequestError({
           code: 'protocol_error',

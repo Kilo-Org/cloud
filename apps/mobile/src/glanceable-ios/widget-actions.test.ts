@@ -943,6 +943,37 @@ describe('activeAgentsWidgetLayout', () => {
     expect(slotHeight(reservedSlot(starting))).toBe(slotHeight(reservedSlot(approving)));
   });
 
+  // The owner's reported defect: a stored marker with a recognized action that
+  // the app never ran (the App Intent does not foreground the app) held
+  // "Starting…" on a settled idle-only tray. A settled surface must never draw
+  // the press line, whatever action the marker names.
+  it('never draws the press line on a settled, populated widget', () => {
+    const idleOnly: GlanceableWidgetProps = {
+      ...HAPPY_WAITING_PROPS,
+      countLines: [
+        { label: 'Needs input', kind: 'needsInput', count: 0 },
+        { label: 'Working', kind: 'running', count: 0 },
+        { label: 'Idle', kind: 'idle', count: 1 },
+      ],
+      primaryLabel: 'Idle',
+      primaryKind: 'idle',
+      primaryCount: 1,
+      pendingAction: 'new-agent',
+      pendingActionVisible: true,
+    };
+
+    for (const family of ['systemSmall', 'systemMedium', 'systemLarge'] as WidgetFamily[]) {
+      const text = collectText(renderWidget(idleOnly, family));
+      expect(text).not.toContain('Starting…');
+      expect(text).not.toContain('Approving…');
+    }
+    // The app's own newest line still reaches the reserved slot on the Home
+    // Screen families: only the transient press line is suppressed.
+    expect(collectText(renderWidget(idleOnly, 'systemMedium'))).toContain(
+      'Newest: Fix the flaky test'
+    );
+  });
+
   it('draws the New agent button for the empty state and no Approve button', () => {
     const tree = renderWidget(EMPTY_WIDGET_PROPS, 'systemSmall');
 

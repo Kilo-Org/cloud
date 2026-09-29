@@ -1,19 +1,25 @@
 /**
- * Drain scenarios for work that outlives the model's first reply.
+ * Control-plane drain scenarios for work that outlives the model's first reply.
  *
  * Callback completion is the observation point: the Worker emits it only after
- * the wrapper finishes the turn, and the wrapper now waits for kilo's drain.
- * A linked child or background task must keep that callback from arriving while
- * the child is still held. A cron or wakeup must not hold the scheduling turn,
- * and the scheduled resume must still run after that turn completes.
+ * the control-plane operation finishes the turn, and that operation now waits
+ * for kilo's drain. A linked child or background task must keep that callback
+ * from arriving while the child is still held. A cron or wakeup must not hold
+ * the scheduling turn, and the scheduled resume must still run after that turn
+ * completes.
  *
- * These are not in the default smoke matrix. The sandbox image's pinned CLI
+ * These drive the unified `start` surface (the control plane) via
+ * `defaultApi: 'unified'`. `start` does not accept `callbackTarget`, so the sink
+ * is registered on the session through `updateSession` right after start.
+ *
+ * They are not in the default smoke matrix. The sandbox image's pinned CLI
  * may not advertise background subagents, cron_create, or schedule_wakeup.
  */
 import {
   fakeDirective,
   interruptSession,
   openStream,
+  registerSessionCallback,
   releaseGate,
   startSession,
   waitForGateEngaged,
@@ -99,16 +105,23 @@ async function openDrainSession(
   messageId: string;
   stream: StreamConnection;
 }> {
-  const { config, api = 'legacy' } = args;
+  const { config, api = 'unified' } = args;
   const session = await deadline.within('start', signal =>
     startSession(
       trackStartedSession(config, () => {}),
       {
         prompt: fakeDirective(directive),
-        callbackTarget: { url: sink.callbackUrl },
         signal,
       },
       api
+    )
+  );
+  await deadline.within('callback target', signal =>
+    registerSessionCallback(
+      config,
+      session.cloudAgentSessionId,
+      { url: sink.callbackUrl },
+      signal
     )
   );
   const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
@@ -353,7 +366,7 @@ export const DRAIN_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     name: 'drain-linked-child',
     requires: ['callbacks', 'sessionSandbox', 'gates'],
     defaultConversation: 'task:drainparent:drainchild',
-    defaultApi: 'legacy',
+    defaultApi: 'unified',
     defaultTimeoutMs: DRAIN_SCENARIO_TIMEOUT_MS,
     run: (args, env) => {
       const directive = chosenDirective(args.conversation, 'task:drainparent:drainchild');
@@ -364,7 +377,7 @@ export const DRAIN_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     name: 'drain-background-child',
     requires: ['callbacks', 'sessionSandbox', 'gates'],
     defaultConversation: 'background-task:drainbg:drainheld',
-    defaultApi: 'legacy',
+    defaultApi: 'unified',
     defaultTimeoutMs: DRAIN_SCENARIO_TIMEOUT_MS,
     run: (args, env) => {
       const directive = chosenDirective(args.conversation, 'background-task:drainbg:drainheld');
@@ -380,7 +393,7 @@ export const DRAIN_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     name: 'drain-scheduled-cron',
     requires: ['callbacks', 'sessionSandbox'],
     defaultConversation: `cron:draincron:${SCHEDULE_DELAY}`,
-    defaultApi: 'legacy',
+    defaultApi: 'unified',
     defaultTimeoutMs: DRAIN_SCENARIO_TIMEOUT_MS,
     run: (args, env) => {
       const directive = chosenDirective(args.conversation, `cron:draincron:${SCHEDULE_DELAY}`);
@@ -396,7 +409,7 @@ export const DRAIN_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     name: 'drain-scheduled-wakeup',
     requires: ['callbacks', 'sessionSandbox'],
     defaultConversation: `wakeup:drainwake:${SCHEDULE_DELAY}`,
-    defaultApi: 'legacy',
+    defaultApi: 'unified',
     defaultTimeoutMs: DRAIN_SCENARIO_TIMEOUT_MS,
     run: (args, env) => {
       const directive = chosenDirective(args.conversation, `wakeup:drainwake:${SCHEDULE_DELAY}`);

@@ -18,17 +18,10 @@ function wait(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function drainClient(drainSession: WrapperKiloClient['drainSession']): WrapperKiloClient {
-  return {
-    drainSession,
-    abortSession: async () => true,
-  } as unknown as WrapperKiloClient;
-}
-
 /**
- * `finalizeDrain` probes the workspace branch with a git subprocess, so a fixed
- * short wait races that spawn. Poll for the event instead of assuming it lands
- * inside the wait.
+ * The stable-idle drain emits `complete` only after `finalizeDrain` probes the
+ * workspace branch with a git subprocess, so a fixed short wait races that
+ * spawn. Poll for the event instead of assuming it lands inside the wait.
  */
 async function waitForStreamEvent(
   events: IngestEvent[],
@@ -43,7 +36,7 @@ async function waitForStreamEvent(
 }
 
 describe('wrapper lifecycle drain races', () => {
-  it('clears aborted state when reset interrupts a drain and completes on a new drain', async () => {
+  it('clears aborted state when activity cancels an aborted drain', async () => {
     const state = new WrapperState();
     const events: IngestEvent[] = [];
     state.bindSession(sessionContext);
@@ -54,7 +47,7 @@ describe('wrapper lifecycle drain races', () => {
       { workspacePath: '/tmp' },
       {
         state,
-        kiloClient: drainClient(async () => true),
+        kiloClient: {} as WrapperKiloClient,
         closeConnections: async () => {
           closeCalls += 1;
         },
@@ -80,6 +73,7 @@ describe('wrapper lifecycle drain races', () => {
     expect(closeCalls).toBe(0);
 
     lifecycle.onSessionIdle();
+    await wait(3_050);
     await waitForStreamEvent(events, 'complete');
     expect(events.map(event => event.streamEventType)).toContain('complete');
   }, 15_000);
@@ -94,7 +88,7 @@ describe('wrapper lifecycle drain races', () => {
       { workspacePath: '/tmp' },
       {
         state,
-        kiloClient: drainClient(async () => true),
+        kiloClient: {} as WrapperKiloClient,
         closeConnections: async () => {
           closeCalls += 1;
         },
@@ -116,7 +110,7 @@ describe('wrapper lifecycle drain races', () => {
     expect(state.currentSession).toEqual(sessionContext);
   });
 
-  it('does not complete until the drain resolves true', async () => {
+  it('waits for three seconds of stable root idle before completing', async () => {
     const state = new WrapperState();
     const events: IngestEvent[] = [];
     state.bindSession(sessionContext);
@@ -125,15 +119,11 @@ describe('wrapper lifecycle drain races', () => {
       autoCommit: false,
       condenseOnComplete: false,
     });
-    let resolveDrain: ((value: boolean) => void) | undefined;
-    const pendingDrain = new Promise<boolean>(resolve => {
-      resolveDrain = resolve;
-    });
     const lifecycle = createLifecycleManager(
       { workspacePath: '/tmp' },
       {
         state,
-        kiloClient: drainClient(() => pendingDrain),
+        kiloClient: {} as WrapperKiloClient,
         closeConnections: async () => {},
         isConnected: () => true,
         reconnectEventSubscription: () => {},
@@ -141,16 +131,15 @@ describe('wrapper lifecycle drain races', () => {
     );
 
     lifecycle.onSessionIdle();
-    await wait(300);
+    await wait(2_950);
     expect(events.map(event => event.streamEventType)).not.toContain('complete');
 
-    if (!resolveDrain) throw new Error('Expected the drain to be pending');
-    resolveDrain(true);
+    await wait(150);
     await waitForStreamEvent(events, 'complete');
     expect(events.map(event => event.streamEventType)).toContain('complete');
   }, 15_000);
 
-  it('requires a fresh drain after root activity', async () => {
+  it('requires a fresh stable idle interval after root activity', async () => {
     const state = new WrapperState();
     const events: IngestEvent[] = [];
     state.bindSession(sessionContext);
@@ -159,23 +148,11 @@ describe('wrapper lifecycle drain races', () => {
       autoCommit: false,
       condenseOnComplete: false,
     });
-
-    let drainCalls = 0;
-    let resolveFirst: ((value: boolean) => void) | undefined;
-    const client = drainClient(() => {
-      drainCalls += 1;
-      if (drainCalls === 1) {
-        return new Promise<boolean>(resolve => {
-          resolveFirst = resolve;
-        });
-      }
-      return Promise.resolve(true);
-    });
     const lifecycle = createLifecycleManager(
       { workspacePath: '/tmp' },
       {
         state,
-        kiloClient: client,
+        kiloClient: {} as WrapperKiloClient,
         closeConnections: async () => {},
         isConnected: () => true,
         reconnectEventSubscription: () => {},
@@ -183,18 +160,18 @@ describe('wrapper lifecycle drain races', () => {
     );
 
     lifecycle.onSessionIdle();
-    await wait(100);
+    await wait(2_900);
     lifecycle.onRootSessionActivity();
 
-    await wait(300);
+    await wait(200);
     expect(events.map(event => event.streamEventType)).not.toContain('complete');
 
     lifecycle.onSessionIdle();
-    await waitForStreamEvent(events, 'complete');
-    expect(drainCalls).toBe(2);
+    await wait(2_900);
+    expect(events.map(event => event.streamEventType)).not.toContain('complete');
 
-    resolveFirst?.(true);
-    await wait(100);
+    await wait(500);
+    await waitForStreamEvent(events, 'complete');
     expect(events.filter(event => event.streamEventType === 'complete')).toHaveLength(1);
   }, 20_000);
 });

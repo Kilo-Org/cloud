@@ -711,9 +711,9 @@ reusable catalog of planned and existing scenarios, see
 | `callback-completion` | Open the profile's callback sink, register `callbackTarget.url`, run `echo:done`, assert the sink received `status: 'completed'`. |
 | `callback-batch-followup` | Queue two turns behind a paced callback session, assert one callback for the final queued turn, then assert a later hot turn emits a fresh callback and no extra one after the batch settles. |
 | `callback-interrupt` | Paced active turn + `interruptSession`, assert callback fires with `status: 'interrupted'`. |
-| `drain-linked-child` | Foreground `task` whose child parks on a gate. The completion callback must not arrive during an 8s hold, then must arrive after release. Omitted from `smoke.ts`'s `DEFAULT_MATRIX`; `smoke-parallel.ts` still runs it because it enumerates the registry. |
-| `drain-background-child` | Background `task` with the same hold. This is the case that stays busy only through kilo drain after the parent model has replied. Fails closed when background subagents are not advertised. |
-| `drain-scheduled-cron` | `cron_create` with a 20s delay. The scheduling callback must complete well before the resume text, and the resume must still appear. Fails closed when `cron_create` is not advertised. |
+| `drain-linked-child` | Control-plane `unified` start: a foreground `task` whose child parks on a gate. The completion callback must not arrive during an 8s hold, then must arrive after release. The callback sink is registered through `updateSession` because `start` does not accept `callbackTarget`. Omitted from `smoke.ts`'s `DEFAULT_MATRIX`; `smoke-parallel.ts` still runs it because it enumerates the registry. |
+| `drain-background-child` | Control-plane background `task` with the same hold. This is the case that stays busy only through kilo drain after the parent model has replied. Fails closed when background subagents are not advertised. |
+| `drain-scheduled-cron` | Control-plane `cron_create` with a 20s delay. The scheduling callback must complete well before the resume text, and the resume must still appear. Fails closed when `cron_create` is not advertised. |
 | `drain-scheduled-wakeup` | Same contract for `schedule_wakeup`. |
 
 The three callback scenarios are shared definitions. Their `callbacks` capability

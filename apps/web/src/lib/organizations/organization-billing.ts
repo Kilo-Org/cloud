@@ -8,7 +8,7 @@ import { createStripeCustomer } from '@/lib/stripe-client';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { resolveStripeReceiptUrl, type StripeConfig } from '@/lib/credits';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { logExceptInTest } from '@/lib/utils.server';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';

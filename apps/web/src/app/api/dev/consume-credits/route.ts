@@ -5,7 +5,7 @@ import { findUserById } from '@/lib/user/find-user-by-id';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { countAndStoreUsage } from '@/lib/ai-gateway/processUsage';
 import { captureException } from '@sentry/nextjs';
-import { getFraudDetectionHeaders } from '@/lib/utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

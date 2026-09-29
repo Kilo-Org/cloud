@@ -19,7 +19,7 @@ import {
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@/lib/email-address';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';

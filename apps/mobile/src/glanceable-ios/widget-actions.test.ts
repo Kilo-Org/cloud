@@ -702,7 +702,7 @@ describe('runPendingWidgetActions', () => {
     // `none` is the shared contract's "caller opens the app instead": the
     // create had no draft, model, or repository, so the press lands on the
     // new-session screen — the same destination the Android twin opens.
-    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp://agent-chat/new');
+    expect(mocks.linkingOpenURL).toHaveBeenCalledWith('kiloapp:///cloud/sessions/new');
   });
 
   it('hands an approve with nothing to act on to the agents list', async () => {

@@ -9,6 +9,7 @@ import {
   runWidgetAction,
   type WidgetAction,
 } from '@/lib/glanceable/widget-actions';
+import { LAUNCHER_NEW_AGENT_URL } from '@/lib/launcher-surfaces';
 
 import { ActiveAgentsWidget, WIDGET_NAME, type WidgetProps } from './active-agents-widget';
 import {
@@ -138,8 +139,17 @@ function republishWidgetProps(): void {
 
 /** Where an unfinished action lands: the same agents list the body tap opens. */
 const OPEN_AGENTS_URI = 'kiloapp:///cloud/sessions';
-/** Where a create with nothing to start from lands: the new-session screen. */
-const OPEN_NEW_AGENT_URI = 'kiloapp://agent-chat/new';
+/**
+ * Where a create with nothing to start from lands: the new-session screen.
+ *
+ * `LAUNCHER_NEW_AGENT_URL` is the canonical `kiloapp:///cloud/sessions/new` the
+ * launcher shortcuts already use; `resolveIncomingUrl` maps it to
+ * `/(app)/agent-chat/new`. The old widget-local `kiloapp://agent-chat/new`
+ * matched no universal-link row, so the deep link resolved to null and the tap
+ * dead-ended. Sharing the constant with the Android twin keeps both platforms
+ * on the canonical row.
+ */
+const OPEN_NEW_AGENT_URI = LAUNCHER_NEW_AGENT_URL;
 
 /**
  * Run one press. `runWidgetAction` republishes the tray through every sink on

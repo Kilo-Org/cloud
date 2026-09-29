@@ -219,8 +219,8 @@ describe('cloud agent open stock query shape', () => {
     expect(selectSql.sql).toContain('extract(epoch from');
     expect(selectSql.sql).toContain('::double precision');
     expect(selectSql.sql).not.toContain('count(distinct');
-    expect(selectSql.sql).not.toContain('queuedMissingAgeTurns');
-    expect(selectSql.sql).not.toContain('acceptedMissingAgeTurns');
+    expect(selectSql.sql).not.toContain('"queued_at" is null');
+    expect(selectSql.sql).not.toContain('"dispatch_accepted_at" is null');
 
     expect(whereSql.sql).toContain('"status" in ($1, $2)');
     expect(whereSql.sql).toContain('"terminal_at" is null');

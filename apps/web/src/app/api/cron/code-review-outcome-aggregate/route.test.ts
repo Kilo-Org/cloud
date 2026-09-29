@@ -69,12 +69,15 @@ describe('GET /api/cron/code-review-outcome-aggregate', () => {
 });
 
 describe('route module without CRON_SECRET', () => {
+  const isolatedOutcomeMock = jest.fn();
+  const isolatedOpenStockMock = jest.fn();
+
   it('imports and returns 401 without collecting', async () => {
     jest.resetModules();
     jest.doMock('@/lib/config.server', () => ({ CRON_SECRET: '' }));
     jest.doMock('@/lib/code-reviews/telemetry/review-health-aggregate', () => ({
-      collectCodeReviewOutcome: jest.fn(),
-      collectCodeReviewOpenStock: jest.fn(),
+      collectCodeReviewOutcome: isolatedOutcomeMock,
+      collectCodeReviewOpenStock: isolatedOpenStockMock,
     }));
 
     const { GET: isolatedGet } = (await import('./route')) as { GET: typeof GET };
@@ -82,5 +85,7 @@ describe('route module without CRON_SECRET', () => {
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({ error: 'Unauthorized' });
+    expect(isolatedOutcomeMock).not.toHaveBeenCalled();
+    expect(isolatedOpenStockMock).not.toHaveBeenCalled();
   });
 });

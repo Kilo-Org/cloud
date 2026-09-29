@@ -231,6 +231,7 @@ describe('cloud agent reporting store', () => {
       productOrigin: 'other',
     });
     const insert = fake.inserts.find(call => call.table === cloud_agent_sessions);
+    expect(insert).toBeDefined();
     expect(insert?.conflictValues).toBeUndefined();
     expect(fake.updates).toHaveLength(0);
   });

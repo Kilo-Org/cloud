@@ -29,7 +29,6 @@ import {
   executionOutcomeWindow,
   readOutcomeAggregate,
   runCloudAgentOutcomeCollection,
-  type OutcomeAggregate,
   type OutcomeGeneration,
   type OutcomeRole,
   type ProductOrigin,
@@ -379,7 +378,6 @@ describe('setup failure assembly', () => {
       },
     ]);
     expect(rows[0]).not.toHaveProperty('role');
-    expect(assembleExecutionHeadlines([]).every(row => row.completed === 0)).toBe(true);
   });
 });
 
@@ -560,7 +558,15 @@ describe('runCloudAgentOutcomeCollection emission', () => {
   it('emits a setup failure without a role and does not add it to the headline', async () => {
     getPgDbMock.mockReturnValue(
       makeDb([
-        [],
+        [
+          runRow({
+            generation: 'legacy',
+            role: 'initial',
+            origin: 'code-review',
+            status: 'completed',
+            runCount: 3,
+          }),
+        ],
         [
           setupRow({
             generation: 'legacy',
@@ -593,9 +599,14 @@ describe('runCloudAgentOutcomeCollection emission', () => {
     });
     const headlines = records.filter(record => record.metric === AGENT_EXECUTION_METRIC);
     expect(headlines).toHaveLength(12);
-    expect(headlines.every(record => record.completed === 0 && record.platformFailed === 0)).toBe(
-      true
+    const headline = headlines.find(
+      record =>
+        record.generation === 'legacy' &&
+        record.role === 'initial' &&
+        record.productOrigin === 'code-review'
     );
+    expect(headline?.completed).toBe(3);
+    expect(headline?.platformFailed).toBe(0);
   });
 
   it('logs one collection row and no counts when the second query throws', async () => {
@@ -620,12 +631,5 @@ describe('runCloudAgentOutcomeCollection emission', () => {
 describe('product origin vocabulary', () => {
   it('uses stored labels in the documented order', () => {
     expect([...PRODUCT_ORIGINS]).toEqual(['code-review', 'other', 'unknown']);
-  });
-});
-
-describe('outcome aggregate type surface', () => {
-  it('keeps the aggregate shape', () => {
-    const aggregate: OutcomeAggregate = { runCounts: [], sessionSetupFailures: [] };
-    expect(aggregate.runCounts).toEqual([]);
   });
 });

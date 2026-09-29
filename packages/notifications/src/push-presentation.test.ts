@@ -483,6 +483,22 @@ describe('genericPushContentForPushData', () => {
     });
   });
 
+  it('translates the spend-alert preview for the is and it locales', () => {
+    const parsed = pushDataSchema.parse({
+      type: 'spend_alert',
+      scope: 'organization',
+      organizationId: 'org1',
+    });
+    expect(genericPushContentForPushData(parsed, 'is')).toEqual({
+      title: 'Kilo',
+      body: 'Útgjöldin þín þarfnast athygli',
+    });
+    expect(genericPushContentForPushData(parsed, 'it')).toEqual({
+      title: 'Kilo',
+      body: 'La tua spesa richiede attenzione',
+    });
+  });
+
   it('falls back to English for an unknown locale', () => {
     const parsed = pushDataSchema.parse({
       type: 'low_balance',

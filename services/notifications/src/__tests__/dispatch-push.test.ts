@@ -1557,6 +1557,41 @@ describe('NotificationChannelDO per-token locale translation', () => {
     expect(esMessage?.title).not.toBe(enMessage?.title);
   });
 
+  it('translates the internal spend-alert copy per token locale', async () => {
+    installDbMock({
+      tokens: [
+        { user_id: 'user-spend', token: 'tok-is', locale: 'is' },
+        { user_id: 'user-spend', token: 'tok-it', locale: 'it' },
+      ],
+      previews: 'full',
+    });
+    const stub = getDO('user-spend');
+    const result = await stub.dispatchPush(
+      baseInput({
+        userId: 'user-spend',
+        idempotencyKey: 'k-spend',
+        presenceContext: null,
+        push: {
+          title: 'Spend alert',
+          body: 'Acme Corp spend crossed $12',
+          i18nKey: 'internal.spendAlert',
+          i18nParams: { scopeName: 'Acme Corp', amountUsd: '12' },
+          data: { type: 'spend_alert', scope: 'personal' },
+          sound: 'default',
+          priority: 'high',
+        },
+      })
+    );
+    expect(result.kind).toBe('delivered');
+    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
+    const isMessage = messages.find(m => m.to === 'tok-is');
+    const itMessage = messages.find(m => m.to === 'tok-it');
+    expect(isMessage?.title).toBe('Útgjaldaviðvörun');
+    expect(isMessage?.body).toBe('Útgjöld Acme Corp fóru yfir $12');
+    expect(itMessage?.title).toBe('Avviso di spesa');
+    expect(itMessage?.body).toBe('La spesa di Acme Corp ha superato $12');
+  });
+
   it('treats a null locale as English', async () => {
     installDbMock({
       tokens: [{ user_id: 'user-null-locale', token: 'tok-null', locale: null }],

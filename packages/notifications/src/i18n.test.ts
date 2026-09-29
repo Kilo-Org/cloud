@@ -36,6 +36,24 @@ describe('translatePush', () => {
   });
 });
 
+describe('spend-alert catalog translations', () => {
+  it('translates the Icelandic spend-alert push and internal copy', () => {
+    expect(translatePush('is', 'generic.body.spendAlert')).toBe('Útgjöldin þín þarfnast athygli');
+    expect(translatePush('is', 'internal.spendAlert.title')).toBe('Útgjaldaviðvörun');
+    expect(
+      translatePush('is', 'internal.spendAlert.body', { scopeName: 'Acme Corp', amountUsd: '12' })
+    ).toBe('Útgjöld Acme Corp fóru yfir $12');
+  });
+
+  it('translates the Italian spend-alert push and internal copy', () => {
+    expect(translatePush('it', 'generic.body.spendAlert')).toBe('La tua spesa richiede attenzione');
+    expect(translatePush('it', 'internal.spendAlert.title')).toBe('Avviso di spesa');
+    expect(
+      translatePush('it', 'internal.spendAlert.body', { scopeName: 'Acme Corp', amountUsd: '12' })
+    ).toBe('La spesa di Acme Corp ha superato $12');
+  });
+});
+
 describe('resolvePushLocale', () => {
   it('keeps a supported tag', () => {
     expect(resolvePushLocale('es')).toBe('es');

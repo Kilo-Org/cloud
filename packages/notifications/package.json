@@ -11,7 +11,8 @@
   "scripts": {
     "typecheck": "tsgo --noEmit",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/notifications/src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "assert:spend-alert-i18n": "node --import tsx scripts/assert-spend-alert-i18n.mjs"
   },
   "dependencies": {
     "i18next": "^26.3.6",

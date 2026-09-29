@@ -1054,7 +1054,12 @@ export function SessionDetailContent({
     [getChildMessages, hideReasoningRows]
   );
 
-  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
+  // The details lookup runs on every render (including each composer
+  // keystroke), so memoize it against the two inputs that can change it.
+  const detailsMessage = useMemo(
+    () => displayedMessages.find(message => message.info.id === detailsMessageId),
+    [displayedMessages, detailsMessageId]
+  );
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);

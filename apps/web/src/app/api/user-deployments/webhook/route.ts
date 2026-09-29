@@ -7,7 +7,7 @@ import { and, eq, ne } from 'drizzle-orm';
 import * as z from 'zod';
 import { webhookPayloadSchema, type WebhookPayload } from '@/lib/user-deployments/types';
 import { sendDeploymentFailedEmail } from '@/lib/email';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
 
 export async function POST(req: NextRequest): Promise<NextResponse> {

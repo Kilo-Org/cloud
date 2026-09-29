@@ -13,8 +13,9 @@ import {
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
+import { findUserById } from '@/lib/user/find-user-by-id';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
-import { findUserById, createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
+import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { db, readDb } from '@/lib/drizzle';
 import type {
   NextAuthOptions,

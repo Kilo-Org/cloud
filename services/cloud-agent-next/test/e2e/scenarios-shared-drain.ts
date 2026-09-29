@@ -119,12 +119,7 @@ async function openDrainSession(
     )
   );
   await deadline.within('callback target', signal =>
-    registerSessionCallback(
-      config,
-      session.cloudAgentSessionId,
-      { url: sink.callbackUrl },
-      signal
-    )
+    registerSessionCallback(config, session.cloudAgentSessionId, { url: sink.callbackUrl }, signal)
   );
   const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
   try {

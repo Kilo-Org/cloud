@@ -31,7 +31,9 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@/lib/email-address';
+import { toMicrodollars } from '@/lib/microdollars';
+import { isValidUUID } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,

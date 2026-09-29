@@ -161,7 +161,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/email-address';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,

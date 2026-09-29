@@ -16,7 +16,7 @@ import {
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {
   public_id: 'test/non-flex-exclusive',

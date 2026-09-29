@@ -19,7 +19,7 @@ import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);

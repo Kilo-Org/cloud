@@ -127,7 +127,7 @@ import {
   routeFromHeaders,
 } from '@/lib/admin/admin-access-log';
 import { processSSOUserLogin } from '@/lib/user/sso';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@/lib/email-address';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@/lib/web-session-revocation';

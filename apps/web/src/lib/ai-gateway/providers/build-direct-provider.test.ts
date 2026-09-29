@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import { CustomLlmApiConfigSchema, type CustomLlmApiConfig } from '@kilocode/db';
-import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import { applyReasoningDetailsTransform } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';

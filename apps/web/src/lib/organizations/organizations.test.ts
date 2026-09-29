@@ -23,7 +23,7 @@ import {
   getOrganizationMembers,
   acceptOrganizationInvite,
 } from './organizations';
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';

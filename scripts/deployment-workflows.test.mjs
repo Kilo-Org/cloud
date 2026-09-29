@@ -324,13 +324,21 @@ test('deployment gate only deploys changes since the last complete run', () => {
       )
     );
     assert.equal(runGate(deployedSha, pages(['1', runs()])).should_deploy, 'false');
+    const nonReleaseRuns = Array.from({ length: 100 }, (_, index) => ({
+      ...successfulMainPush(git('rev-parse', 'HEAD')),
+      event: index % 2 === 0 ? 'schedule' : 'workflow_dispatch',
+    }));
     assert.equal(
       runGate(
         '',
         ciRuns,
-        pages(['1', runs(...unrelatedRuns)], ['2', runs(successfulMainPush(deployedSha))])
+        pages(['1', runs(...nonReleaseRuns)], ['2', runs(successfulMainPush(deployedSha))])
       ).base_sha,
       deployedSha
+    );
+    assert.equal(
+      runGate('', ciRuns, pages(['1', runs(...nonReleaseRuns)], ['2', runs()])).base_sha,
+      git('hash-object', '-t', 'tree', '/dev/null')
     );
     runGate(deployedSha, pages(['1', runs(...unrelatedRuns)]), pages(), 'ci:2');
     runGate('', ciRuns, pages(['1', runs(...unrelatedRuns)]), 'legacy:2');

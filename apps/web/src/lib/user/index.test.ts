@@ -143,12 +143,12 @@ import {
 } from '@kilocode/db/schema';
 
 import { eq, count, inArray, and, isNull, sql } from 'drizzle-orm';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   softDeleteUser,
   anonymizeCloudUserData,
   assertUserCanBeSoftDeleted,
   SoftDeletePreconditionError,
-  findUserById,
   findUsersByIds,
   createOrUpdateUser,
   getAllUserProviders,

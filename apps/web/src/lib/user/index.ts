@@ -4,6 +4,7 @@ import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
@@ -153,7 +154,7 @@ import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import * as z from 'zod';
 import {
@@ -161,7 +162,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/email-address';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -190,18 +191,6 @@ import {
 } from '@/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
-
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function findUserById(
-  userId: string,
-  fromDb: typeof db = db
-): Promise<User | undefined> {
-  return await fromDb.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
 
 export async function findUsersByIds(userIds: string[]): Promise<Map<string, User>> {
   if (userIds.length === 0) return new Map();

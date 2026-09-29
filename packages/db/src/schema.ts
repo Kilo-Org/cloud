@@ -2831,9 +2831,9 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
-    /** Legacy inline request body; new rows store it in R2 under `request_r2_key`. */
+    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
     request: jsonb(),
-    /** Legacy inline response body; new rows store it in R2 under `response_r2_key`. */
+    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
     request_r2_key: text(),
@@ -5955,6 +5955,24 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
+    // Outcome-time windows and the start-latency sample each range-scan their own
+    // timestamp; the missing-outcome-time aggregate matches only null completed_at
+    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
+    // non-null completed_at index can serve.
+    index('idx_cloud_agent_code_reviews_completed_at')
+      .on(table.completed_at)
+      .concurrently()
+      .where(isNotNull(table.completed_at)),
+    index('idx_cloud_agent_code_reviews_started_at')
+      .on(table.started_at)
+      .concurrently()
+      .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
+      .on(table.status)
+      .concurrently()
+      .where(
+        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
+      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',

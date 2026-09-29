@@ -16,10 +16,8 @@ import { resolve } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { DeviceAuthClient as DeviceAuthClientType } from '@/app/device-auth/DeviceAuthClient';
-import type {
-  AuthProviderId,
-  ProdNonSSOAuthProviders as ProdNonSSOAuthProvidersType,
-} from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { ProdNonSSOAuthProviders as ProdNonSSOAuthProvidersType } from '@/lib/auth/provider-metadata';
 import type { AuthErrorNotification as AuthErrorNotificationType } from './AuthErrorNotification';
 import type { MagicLinkSentConfirmation as MagicLinkSentConfirmationType } from './MagicLinkSentConfirmation';
 import type { SignInForm as SignInFormType } from './SignInForm';

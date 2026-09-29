@@ -146,7 +146,7 @@ jest.mock('@/lib/bot/platforms/linear-webhook', () => ({
   createLinearWebhookHandler: jest.fn(() => async () => new Response('ok')),
 }));
 
-jest.mock('@/lib/user', () => ({
+jest.mock('@/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
 
@@ -176,7 +176,7 @@ import {
   canKiloUserAccessPlatformIntegration,
   getPlatformIntegration,
 } from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { processLinkedMessage } from '@/lib/bot/run';
 import { bot } from './bot';
 

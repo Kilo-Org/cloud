@@ -16,7 +16,6 @@ import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import { AnimatedLogoMark } from '@/components/AnimatedLogoMark';
 import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
-// The jest transform compiles JSX with the classic runtime, so React must stay in scope.
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
 import { OAuthProviderIds } from '@/lib/auth/provider-metadata';

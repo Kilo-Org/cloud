@@ -50,11 +50,11 @@ function isJson(value: unknown): boolean {
   return false;
 }
 
-type LoadedBody = { value: unknown } | { loadError: string };
+type LoadedBody = { value: string | null } | { loadError: string };
 
-async function loadBody(key: string | null, legacyInlineValue: unknown): Promise<LoadedBody> {
+async function loadBody(key: string | null): Promise<LoadedBody> {
   if (key === null) {
-    return { value: legacyInlineValue };
+    return { value: null };
   }
   try {
     return { value: await getApiRequestLogBlob(key) };
@@ -188,7 +188,13 @@ export async function GET(request: NextRequest) {
     let cursor: bigint | null = null;
     for (;;) {
       const rows = await db
-        .select()
+        .select({
+          id: api_request_log.id,
+          created_at: api_request_log.created_at,
+          error: api_request_log.error,
+          request_r2_key: api_request_log.request_r2_key,
+          response_r2_key: api_request_log.response_r2_key,
+        })
         .from(api_request_log)
         .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
         .orderBy(asc(api_request_log.id))
@@ -199,8 +205,8 @@ export async function GET(request: NextRequest) {
       const bodies = await Promise.all(
         rows.map(async row => {
           const [request, response] = await Promise.all([
-            loadBody(row.request_r2_key, row.request),
-            loadBody(row.response_r2_key, row.response),
+            loadBody(row.request_r2_key),
+            loadBody(row.response_r2_key),
           ]);
           return { request, response };
         })

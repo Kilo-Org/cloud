@@ -42,7 +42,7 @@ import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, View } from 'react-native';
+import { AppState, useColorScheme, View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -217,6 +217,9 @@ function RootLayoutNav({
   // notification's organization through this provider before it navigates.
   const { setOrganizationId } = useOrganization();
   const { preference: themePreference, hasLoaded: themeHasLoaded } = useThemePreference();
+  // The device scheme drives 'system'. Re-applying when it changes keeps the
+  // paint in sync with the device, and re-resolves after the preference load.
+  const systemColorScheme = useColorScheme();
   const { hasLoaded: languageHasLoaded } = useLanguagePreference();
   const { t } = useTranslation();
   // True when the cold-start RTL reload failed after syncRtl forced the native
@@ -337,7 +340,7 @@ function RootLayoutNav({
     if (themeHasLoaded) {
       applyThemePreference(themePreference);
     }
-  }, [themeHasLoaded, themePreference]);
+  }, [themeHasLoaded, themePreference, systemColorScheme]);
 
   // Resolve the active language once the stored preference has loaded, then
   // prepare the direction and catalog before first paint. A direction change

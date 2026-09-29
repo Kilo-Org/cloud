@@ -10,7 +10,7 @@ import {
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import { TRPCError } from '@trpc/server';
-import { and, asc, eq, inArray, isNull, max, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   workspaceFolderColorSchema,
@@ -107,38 +107,21 @@ function ownedRootSessions(tx: DrizzleTransaction, scope: FolderScope, worktreeI
         isNull(cli_sessions_v2.parent_session_id)
       )
     )
-    .orderBy(asc(cli_sessions_v2.created_at), asc(cli_sessions_v2.session_id));
+    .orderBy(asc(cli_sessions_v2.session_id), asc(cli_sessions_v2.created_at));
 }
 
-async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
-  const selectWorktree = () =>
-    tx
-      .select()
-      .from(cloud_agent_worktrees)
-      .where(eq(cloud_agent_worktrees.worktree_id, worktreeId))
-      .for('update');
+function worktreeForUpdate(tx: DrizzleTransaction, worktreeId: string) {
+  return tx
+    .select()
+    .from(cloud_agent_worktrees)
+    .where(eq(cloud_agent_worktrees.worktree_id, worktreeId))
+    .for('update');
+}
 
-  let [worktree] = await selectWorktree();
-  if (!worktree) {
-    const roots = await ownedRootSessions(tx, scope, worktreeId);
-    const firstRoot = roots.find(
-      root => workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success
-    );
-    if (!firstRoot) {
-      throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
-    }
-    await tx
-      .insert(cloud_agent_worktrees)
-      .values({
-        worktree_id: worktreeId,
-        kilo_user_id: scope.userId,
-        organization_id: scope.organizationId,
-        created_at: firstRoot.createdAt,
-      })
-      .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-    [worktree] = await selectWorktree();
-  }
-
+function assertOwnedLiveWorktree(
+  worktree: typeof cloud_agent_worktrees.$inferSelect | undefined,
+  scope: FolderScope
+) {
   if (
     !worktree ||
     worktree.kilo_user_id !== scope.userId ||
@@ -149,11 +132,34 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
   if (worktree.deletion_started_at !== null || worktree.deletion_completed_at !== null) {
     throw new TRPCError({ code: 'CONFLICT', message: 'Worktree is being deleted' });
   }
+}
 
-  const roots = await ownedRootSessions(tx, scope, worktreeId).for('share');
-  if (!roots.some(root => workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success)) {
+async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
+  const roots = await ownedRootSessions(tx, scope, worktreeId).for('update');
+  let firstRoot: (typeof roots)[number] | undefined;
+  for (const root of roots) {
+    if (!workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success) continue;
+    if (!firstRoot || root.createdAt < firstRoot.createdAt) firstRoot = root;
+  }
+  if (!firstRoot) {
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
   }
+
+  let [worktree] = await worktreeForUpdate(tx, worktreeId);
+  if (!worktree) {
+    await tx
+      .insert(cloud_agent_worktrees)
+      .values({
+        worktree_id: worktreeId,
+        kilo_user_id: scope.userId,
+        organization_id: scope.organizationId,
+        created_at: firstRoot.createdAt,
+      })
+      .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
+    [worktree] = await worktreeForUpdate(tx, worktreeId);
+  }
+
+  assertOwnedLiveWorktree(worktree, scope);
 }
 
 export const workspaceFoldersRouter = createTRPCRouter({
@@ -340,15 +346,16 @@ export const workspaceFoldersRouter = createTRPCRouter({
             eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
             isNull(cli_sessions_v2.parent_session_id)
           )
-        )
-        .for('update');
+        );
       if (!session) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+      if (!session.cloudAgentWorktreeId && input.folderId === null) {
+        return { success: true };
+      }
 
-      const groupedWorktreeId = session.cloudAgentWorktreeId;
       const worktreeId =
-        groupedWorktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
-      if (groupedWorktreeId) {
-        await lockMovableWorktree(ctx.folderDb, ctx.folderScope, groupedWorktreeId);
+        session.cloudAgentWorktreeId ?? `worktree_${input.sessionId.slice('workspace_'.length)}`;
+      if (session.cloudAgentWorktreeId) {
+        await lockMovableWorktree(ctx.folderDb, ctx.folderScope, worktreeId);
       } else {
         await ctx.folderDb
           .insert(cloud_agent_worktrees)
@@ -359,18 +366,27 @@ export const workspaceFoldersRouter = createTRPCRouter({
             created_at: session.createdAt,
           })
           .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-        await ctx.folderDb
+        const [worktree] = await worktreeForUpdate(ctx.folderDb, worktreeId);
+        assertOwnedLiveWorktree(worktree, ctx.folderScope);
+        const [linked] = await ctx.folderDb
           .update(cli_sessions_v2)
           .set({ cloud_agent_worktree_id: worktreeId })
           .where(
             and(
               ownerScopeCondition(cli_sessions_v2, ctx.folderScope),
-              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId)
+              eq(cli_sessions_v2.cloud_agent_session_id, input.sessionId),
+              isNull(cli_sessions_v2.parent_session_id),
+              or(
+                isNull(cli_sessions_v2.cloud_agent_worktree_id),
+                eq(cli_sessions_v2.cloud_agent_worktree_id, worktreeId)
+              )
             )
-          );
+          )
+          .returning({ sessionId: cli_sessions_v2.session_id });
+        if (!linked) throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
       }
 
-      await ctx.folderDb
+      const [moved] = await ctx.folderDb
         .update(cloud_agent_worktrees)
         .set({ folder_id: input.folderId })
         .where(
@@ -378,7 +394,9 @@ export const workspaceFoldersRouter = createTRPCRouter({
             ownerScopeCondition(cloud_agent_worktrees, ctx.folderScope),
             eq(cloud_agent_worktrees.worktree_id, worktreeId)
           )
-        );
+        )
+        .returning({ worktreeId: cloud_agent_worktrees.worktree_id });
+      if (!moved) throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
       return { success: true };
     }),
 

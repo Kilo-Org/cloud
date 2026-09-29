@@ -1200,7 +1200,7 @@ export function ChatSidebar({
                   isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
                   dropPlacement={
                     dropTarget?.type === 'folder' && dropTarget.id === folder.id
-                      ? dragItem?.type === 'worktree'
+                      ? dragItem?.type === 'worktree' || dragItem?.type === 'session'
                         ? 'inside'
                         : dropTarget.placement
                       : null

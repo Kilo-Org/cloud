@@ -186,7 +186,7 @@ describe('workspace folder drops', () => {
     ).toBeNull();
   });
 
-  it('unfiles a dragged session via Ungrouped', () => {
+  it('ignores ungrouped session drops because standalone rows are already unfiled', () => {
     expect(
       getWorkspaceFolderDropAction(
         { type: 'session', id: standaloneSession },
@@ -194,7 +194,7 @@ describe('workspace folder drops', () => {
         makeFolders(),
         visibleWorktrees
       )
-    ).toEqual({ type: 'move-session', sessionId: standaloneSession, folderId: null });
+    ).toBeNull();
   });
 
   it('reorders a folder before an earlier folder while preserving all members', () => {

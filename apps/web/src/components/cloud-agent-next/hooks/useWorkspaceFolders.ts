@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useLocalStorage } from '@/hooks/useLocalStorage';
 import type { WorkspaceFolderColor } from '@/lib/cloud-agent/workspace-folders';
+import { invalidateSessionQueries } from '../session-deletion';
 import {
   controlPlaneSessionIdSchema,
   getCollapsedWorkspaceFoldersStorageKey,
@@ -129,10 +130,13 @@ export function useWorkspaceFolders(currentUserId: string, organizationId?: stri
           }),
         folderId ? 'Session moved to folder' : 'Session moved to Ungrouped'
       );
-      if (moved && folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      if (moved) {
+        await invalidateSessionQueries({ queryClient, trpc });
+        if (folderId) setCollapsedFolderIds(ids => ids.filter(id => id !== folderId));
+      }
       return moved;
     },
-    [assignSession, organizationId, run, setCollapsedFolderIds]
+    [assignSession, organizationId, queryClient, run, setCollapsedFolderIds, trpc]
   );
 
   const reorderFolders = useCallback(

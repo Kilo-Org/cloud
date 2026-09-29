@@ -257,6 +257,12 @@ describe('workspaceFolders persistence and validation', () => {
       folderId: folder.id,
     };
     Reflect.deleteProperty(moveWithoutScope, 'organizationId');
+    const moveSessionWithoutScope: Parameters<FolderCaller['moveSession']>[0] = {
+      organizationId: null,
+      sessionId: WORKSPACE_ID,
+      folderId: folder.id,
+    };
+    Reflect.deleteProperty(moveSessionWithoutScope, 'organizationId');
     const requests = [
       () => caller.list({} as Parameters<FolderCaller['list']>[0]),
       () =>
@@ -269,6 +275,7 @@ describe('workspaceFolders persistence and validation', () => {
         >[0]),
       () => caller.delete({ folderId: folder.id } as Parameters<FolderCaller['delete']>[0]),
       () => caller.moveWorktree(moveWithoutScope),
+      () => caller.moveSession(moveSessionWithoutScope),
       () => caller.reorder({ folderIds: [folder.id] } as Parameters<FolderCaller['reorder']>[0]),
       () => caller.update({ organizationId: null, folderId: folder.id }),
       () => caller.list({ organizationId: 'not-an-organization' }),
@@ -278,6 +285,18 @@ describe('workspaceFolders persistence and validation', () => {
         caller.moveWorktree({
           organizationId: null,
           worktreeId: WORKTREE_ID,
+          folderId: 'not-a-folder',
+        }),
+      () =>
+        caller.moveSession({
+          organizationId: null,
+          sessionId: 'not-a-session',
+          folderId: folder.id,
+        }),
+      () =>
+        caller.moveSession({
+          organizationId: null,
+          sessionId: WORKSPACE_ID,
           folderId: 'not-a-folder',
         }),
       () => caller.reorder({ organizationId: null, folderIds: ['not-a-folder'] }),
@@ -706,6 +725,9 @@ describe('workspaceFolders worktree membership', () => {
       await expect(
         callerFor().moveWorktree({ organizationId: null, worktreeId: WORKTREE_ID, folderId })
       ).rejects.toMatchObject({ code: 'CONFLICT' });
+      await expect(
+        callerFor().moveSession({ organizationId: null, sessionId: WORKSPACE_ID, folderId })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     }
     expect((await readWorktree())?.folder_id).toBeNull();
     expect(await readSessions()).toHaveLength(1);
@@ -729,6 +751,32 @@ describe('workspaceFolders worktree membership', () => {
       callerFor().moveWorktree({
         organizationId: null,
         worktreeId: WORKTREE_ID,
+        folderId: folder.id,
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    release.resolve();
+    await Promise.all([deletion, move]);
+    expect((await readWorktree())?.folder_id).toBeNull();
+  });
+
+  it('honors a deletion fence committed by an overlapping writer during session moves', async () => {
+    const folder = await createFolder();
+    await insertWorktree();
+    const locked = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const deletion = db.transaction(async tx => {
+      await tx
+        .update(cloud_agent_worktrees)
+        .set({ deletion_started_at: INITIAL_TIME })
+        .where(eq(cloud_agent_worktrees.worktree_id, WORKTREE_ID));
+      locked.resolve();
+      await release.promise;
+    });
+    await locked.promise;
+    const move = expect(
+      callerFor().moveSession({
+        organizationId: null,
+        sessionId: WORKSPACE_ID,
         folderId: folder.id,
       })
     ).rejects.toMatchObject({ code: 'CONFLICT' });
@@ -805,6 +853,56 @@ describe('workspaceFolders session moves', () => {
           .where(eq(cli_sessions_v2.session_id, session.session_id))
       )[0]?.cloudAgentWorktreeId
     ).toBe(worktreeId);
+  });
+
+  it('does not materialize metadata when unfiling a standalone session', async () => {
+    const workspaceId = `workspace_${crypto.randomUUID()}`;
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await expect(
+      callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: null })
+    ).resolves.toEqual({ success: true });
+    expect(await readWorktree(worktreeId)).toBeUndefined();
+    expect(
+      (
+        await db
+          .select({ cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.cloud_agent_session_id, workspaceId))
+      )[0]?.cloudAgentWorktreeId
+    ).toBeNull();
+  });
+
+  it('rejects filing a standalone session onto a deleting materialized worktree', async () => {
+    const folder = await createFolder();
+    const workspaceId = `workspace_${crypto.randomUUID()}`;
+    const worktreeId = `worktree_${workspaceId.slice('workspace_'.length)}`;
+    await insertSession({
+      cloud_agent_session_id: workspaceId,
+      cloud_agent_worktree_id: null,
+    });
+    await insertWorktree({
+      worktree_id: worktreeId,
+      deletion_started_at: INITIAL_TIME,
+    });
+    await expect(
+      callerFor().moveSession({ organizationId: null, sessionId: workspaceId, folderId: folder.id })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(await readWorktree(worktreeId)).toMatchObject({
+      folder_id: null,
+      deletion_started_at: INITIAL_TIME,
+    });
+    expect(
+      (
+        await db
+          .select({ cloudAgentWorktreeId: cli_sessions_v2.cloud_agent_worktree_id })
+          .from(cli_sessions_v2)
+          .where(eq(cli_sessions_v2.cloud_agent_session_id, workspaceId))
+      )[0]?.cloudAgentWorktreeId
+    ).toBeNull();
   });
 
   it('moves the whole workspace group when filing a grouped session by any root chat', async () => {
@@ -924,12 +1022,13 @@ describe('workspaceFolders session moves', () => {
   it('rejects cross-scope or foreign-member destinations before touching session metadata', async () => {
     const crossScopeDestination = await createFolder(ORGANIZATION_ID);
     const otherMemberDestination = await createFolder(ORGANIZATION_ID, 'Private', otherUser);
+    const worktree = await insertWorktree({ name: 'Keep me' });
     for (const folderId of [crossScopeDestination.id, otherMemberDestination.id]) {
       await expect(
         callerFor().moveSession({ organizationId: null, sessionId: WORKSPACE_ID, folderId })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     }
-    expect(await readWorktree()).toBeUndefined();
+    expect(await readWorktree()).toEqual(worktree);
   });
 });
 

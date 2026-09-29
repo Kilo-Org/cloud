@@ -263,6 +263,66 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
     });
   });
 
+  it('sends a deselect made while its add is still in flight instead of dropping it', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    // Select 3 and let its debounced add dispatch. The save stays in flight:
+    // onSuccess is deliberately not called yet.
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const addVars = mutateMock.mock.calls[0]?.[0];
+
+    // Deselect 3 before the add settles. Diffing against the confirmed
+    // baseline would collapse this to an empty delta and drop the deselect.
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    expect(mutateMock.mock.calls[1]?.[0]).toEqual({
+      add: [],
+      remove: [3],
+      optimisticSelection: [1, 2],
+    });
+
+    // The in-flight add settling after the deselect must not flip 3 back on.
+    deltaOptions.onSuccess?.({ success: true, webhookSync: null }, addVars);
+    const removeVars = mutateMock.mock.calls[1]?.[0];
+    deltaOptions.onSuccess?.({ success: true, webhookSync: null }, removeVars);
+
+    expect(reviewConfigCache?.selectedRepositoryIds).toEqual([1, 2]);
+  });
+
+  it('rolls back when a newer save fails after an earlier save settled', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    // Select 3 and dispatch its add; the save stays in flight.
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const addVars = mutateMock.mock.calls[0]?.[0];
+
+    // Select 4 while the add is in flight, so a second save is enqueued.
+    toggleRepo(4);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    const addFourVars = mutateMock.mock.calls[1]?.[0];
+
+    // The earlier add settles while the newer save is still in flight. The
+    // newer intent must survive that settlement so a later failure can roll
+    // it back; matching the projected selection is not confirmation.
+    deltaOptions.onSuccess?.({ success: true, webhookSync: null }, addVars);
+
+    deltaOptions.onError?.(new Error('Network unreachable'), addFourVars);
+
+    expect(reviewConfigCache?.selectedRepositoryIds).toEqual([1, 2, 3]);
+    expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
+  });
+
   it('re-sends a toggle made during the settle-to-refetch window so it stays visible', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);

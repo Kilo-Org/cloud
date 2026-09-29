@@ -34,20 +34,36 @@ type RepoSelectionSender = {
   // The last server-confirmed selection. Null means the server state is not
   // yet known (no toggle and no refetch have synced it).
   serverSelection: (number | string)[] | null;
+  // The optimistic selection of the most recently enqueued save: what the
+  // server will hold once every in-flight save applies. Null when no save is
+  // in flight. Deltas diff against this, not the not-yet-advanced confirmed
+  // baseline, so a toggle made while a save is in flight is not lost.
+  projectedSelection: (number | string)[] | null;
+  // Enqueued saves that have not settled yet. `projectedSelection` is cleared
+  // when this returns to zero.
+  inflightSaves: number;
   // The mutation trigger of the hook instance that currently owns this key.
   mutate: ((vars: RepoSelectionSaveVars) => void) | null;
 };
 
 // One pending debounced send per scope+platform. The timer closes over the
 // sender state, so a remount never retargets an older timer. `serverSelection`
-// is the last server-confirmed selection; `pendingSelection` is the latest
-// user-intended selection and is null while nothing is pending.
+// is the last server-confirmed selection; `projectedSelection` is what the
+// server will hold once every in-flight save applies; `pendingSelection` is the
+// latest user-intended selection and is null while nothing is pending.
 const repoSelectionSenders = new Map<string, RepoSelectionSender>();
 
 function getRepoSelectionSender(key: string): RepoSelectionSender {
   let sender = repoSelectionSenders.get(key);
   if (!sender) {
-    sender = { timer: null, pendingSelection: null, serverSelection: null, mutate: null };
+    sender = {
+      timer: null,
+      pendingSelection: null,
+      serverSelection: null,
+      projectedSelection: null,
+      inflightSaves: 0,
+      mutate: null,
+    };
     repoSelectionSenders.set(key, sender);
   }
   return sender;
@@ -64,9 +80,9 @@ function sameSelection(a: (number | string)[] | null, b: (number | string)[] | n
 }
 
 // Schedules the trailing-edge 500ms send. The delta is computed at fire time
-// from the module-level pending/server selections, so no intermediate rapid
-// toggle is lost and a refetch that clobbers the optimistic cache cannot
-// collapse the send to an empty delta.
+// from the module-level pending and projected/server selections, so no
+// intermediate rapid toggle is lost and a refetch that clobbers the optimistic
+// cache cannot collapse the send to an empty delta.
 function scheduleSend(sender: RepoSelectionSender): void {
   if (sender.timer) {
     clearTimeout(sender.timer);
@@ -74,19 +90,34 @@ function scheduleSend(sender: RepoSelectionSender): void {
   sender.timer = setTimeout(() => {
     sender.timer = null;
     const pending = sender.pendingSelection;
-    const server = sender.serverSelection ?? [];
     if (pending === null) {
       return;
     }
-    const add = pending.filter(id => !server.includes(id));
-    const remove = server.filter(id => !pending.includes(id));
+    // Diff against what the server will hold once every in-flight save
+    // applies. Diffing against `serverSelection` alone collapses a deselect
+    // made while its add is still in flight to an empty delta (the server
+    // baseline has not advanced yet), which drops the deselect.
+    const baseline = sender.projectedSelection ?? sender.serverSelection ?? [];
+    const add = pending.filter(id => !baseline.includes(id));
+    const remove = baseline.filter(id => !pending.includes(id));
     if (add.length === 0 && remove.length === 0) {
-      // The intent now equals the server state, so nothing is left to send.
-      // Clear it so a later refetch does not mistake it for live user intent.
-      sender.pendingSelection = null;
+      // The intent now equals what the server is (or will be) holding. While
+      // a save is still in flight the projection may yet advance, so keep the
+      // intent and let that save's settlement reconcile it. Otherwise clear it
+      // so a later refetch does not mistake it for live user intent.
+      if (sender.inflightSaves === 0) {
+        sender.pendingSelection = null;
+      }
       return;
     }
-    sender.mutate?.({ add, remove, optimisticSelection: pending });
+    if (!sender.mutate) {
+      return;
+    }
+    // Record the projection before dispatching so the next delta diffs against
+    // what this save will apply.
+    sender.projectedSelection = pending;
+    sender.inflightSaves += 1;
+    sender.mutate({ add, remove, optimisticSelection: pending });
   }, REPO_SELECTION_DEBOUNCE_MS);
 }
 
@@ -138,6 +169,11 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
       }),
     onError: (error, vars) => {
       const sender = getRepoSelectionSender(saveChainKey);
+      sender.inflightSaves = Math.max(0, sender.inflightSaves - 1);
+      if (sender.inflightSaves === 0) {
+        // No save is in flight; the confirmed baseline is authoritative again.
+        sender.projectedSelection = null;
+      }
       // Roll back only when no newer toggle superseded this failed save. A
       // newer toggle's own debounced send reconciles against the unchanged
       // server state, so clobbering it here would lose that selection.
@@ -158,13 +194,34 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
     onSuccess: (_result, vars) => {
       const sender = getRepoSelectionSender(saveChainKey);
       sender.serverSelection = vars.optimisticSelection;
-      // Clear the pending intent only when it matches what this save just
-      // confirmed; a newer toggle keeps its own pending send alive.
-      if (
-        sender.pendingSelection !== null &&
-        sameSelection(sender.pendingSelection, vars.optimisticSelection)
-      ) {
-        sender.pendingSelection = null;
+      sender.inflightSaves = Math.max(0, sender.inflightSaves - 1);
+      if (sender.inflightSaves === 0) {
+        // No save is in flight; the confirmed baseline is authoritative again.
+        sender.projectedSelection = null;
+      }
+      if (sender.pendingSelection === null) {
+        return;
+      }
+      // Keep the pending intent until every in-flight save has settled. It is
+      // not confirmed merely because it matches the projected selection: that
+      // projection belongs to an in-flight save, and if that save fails there
+      // is nothing left for onError to roll back, so the failed optimistic
+      // selection would stay in the cache. The intent is only safe to clear
+      // once no save remains in flight and the server holds it.
+      if (sender.inflightSaves === 0) {
+        if (sameSelection(sender.pendingSelection, sender.serverSelection)) {
+          sender.pendingSelection = null;
+        } else {
+          // No save carries the intent and the server does not hold it; send it.
+          scheduleSend(sender);
+        }
+        return;
+      }
+      // A newer save is still in flight. If it already carries the pending
+      // intent the projection will confirm it; otherwise reschedule against the
+      // advanced baseline so the intent reaches the server.
+      if (!sameSelection(sender.pendingSelection, sender.projectedSelection)) {
+        scheduleSend(sender);
       }
     },
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
@@ -175,8 +232,10 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
 /**
  * Returns a `toggleRepo` that applies the optimistic cache update immediately
  * and schedules a trailing-edge 500ms debounced delta send keyed on
- * scope+platform. The delta is computed at send time against the last
- * server-confirmed selection, so no intermediate rapid toggle is lost.
+ * scope+platform. The delta is computed at send time against what the server
+ * will hold once every in-flight save applies (falling back to the last
+ * server-confirmed selection), so no intermediate rapid toggle is lost and a
+ * toggle made while a save is in flight is not dropped.
  */
 export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform) {
   const queryClient = useQueryClient();

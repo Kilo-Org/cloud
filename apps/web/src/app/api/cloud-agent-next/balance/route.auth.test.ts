@@ -17,6 +17,7 @@ jest.mock('next-auth', () => ({
   default: jest.fn(),
   getServerSession: jest.fn(),
 }));
+jest.mock('@/lib/user', () => ({}));
 jest.mock('@/lib/user/find-user-by-id', () => ({
   findUserById: (...args: unknown[]) => mockFindUser(...args),
 }));

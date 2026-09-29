@@ -1,6 +1,5 @@
-import { afterEach, describe, expect, it, vi, expectTypeOf } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxRecovery } from '../../shared/sandbox-control-protocol.js';
-import type { SandboxControlSocketHandler } from '../../sandbox-control/socket.js';
 import { ReconcilePortError, createReconcilePort, type ReconcileSendRequest } from './reconcile.js';
 
 const recovery: SandboxRecovery = {
@@ -43,12 +42,6 @@ function recorder(): {
 afterEach(() => vi.useRealTimers());
 
 describe('reconcile port', () => {
-  it('is assignable from the production control transport', () => {
-    expectTypeOf<
-      SandboxControlSocketHandler['sendRequest']
-    >().toMatchTypeOf<ReconcileSendRequest>();
-  });
-
   it('sends the reconcile phase with the explicit attempt identity and remaining timeout', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1_500);

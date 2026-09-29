@@ -131,18 +131,32 @@ describe('Input single-line box', () => {
 });
 
 describe('Input multiline', () => {
-  it('keeps the caller box and vertical alignment', () => {
+  it('applies the shared inset while keeping the caller line height and vertical alignment', () => {
     const input = mountInput({ multiline: true, className: 'leading-6', textAlignVertical: 'top' });
 
-    expect(input.props.className).toBe('leading-6');
+    expect(input.props.className).toBe('px-3 py-2.5 leading-6');
+    // No single-line box leaks into a multiline field: no min-height floor and
+    // no re-asserted line height from `INPUT_BOX_CLASS`.
     expect(input.props.className).not.toContain('min-h-[44px]');
+    expect(input.props.className).not.toContain('leading-[normal]');
     expect(input.props.textAlignVertical).toBe('top');
+  });
+
+  it('lets a caller own horizontal and vertical padding override the shared inset', () => {
+    const input = mountInput({ multiline: true, className: 'px-4 py-3 leading-5' });
+
+    expect(input.props.className).toContain('px-4');
+    expect(input.props.className).toContain('py-3');
+    expect(input.props.className).not.toContain('px-3');
+    expect(input.props.className).not.toContain('py-2.5');
   });
 
   it('does not force an alignment when the caller sets none', () => {
     const input = mountInput({ multiline: true });
 
+    expect(input.props.className).toBe('px-3 py-2.5');
     expect(input.props.className).not.toContain('min-h-[44px]');
+    expect(input.props.className).not.toContain('leading-[normal]');
     expect(input.props.textAlignVertical).toBeUndefined();
   });
 });

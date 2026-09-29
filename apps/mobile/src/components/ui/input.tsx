@@ -13,6 +13,14 @@ import { cn } from '@/lib/utils';
 const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] px-3';
 const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 
+// The multiline inset: the same horizontal padding plus a real vertical inset,
+// so wrapped copy and its placeholder clear the border instead of hugging it.
+// It carries no `min-h-*`/`leading-*`, so a call site keeps its own field
+// height and line height. Like the single-line shape it sits before the
+// caller's `className`, so a caller's own `px-*`/`py-*` still wins through
+// tailwind-merge.
+const INPUT_MULTILINE_INSET_CLASS = 'px-3 py-2.5';
+
 /** The one single-line box. Every single-line field renders this. */
 export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT_CLASS}`;
 
@@ -54,9 +62,13 @@ export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT
  * caller's choice stays last and wins on both platforms and in both
  * directions.
  *
- * A `multiline` caller is a different control: it keeps its own box (an
- * explicit `leading-*`) and its own `textAlignVertical`, so neither the shared
- * box nor the forced vertical alignment applies.
+ * A `multiline` caller is a different control: it keeps only its own line
+ * height/min-height (an explicit `leading-*` and `min-h-*`), while the shared
+ * multiline inset (`px-3 py-2.5`) supplies its padding, and it keeps its own
+ * `textAlignVertical`, so neither the shared single-line box nor the forced
+ * vertical alignment applies. As with the single-line shape, the inset comes
+ * before the caller's `className`, so a call site's own `px-*`/`py-*` still
+ * wins through tailwind-merge.
  */
 function Input({
   className,
@@ -78,7 +90,7 @@ function Input({
       {...props}
       multiline={multiline}
       className={cn(
-        multiline ? undefined : INPUT_BOX_SHAPE_CLASS,
+        multiline ? INPUT_MULTILINE_INSET_CLASS : INPUT_BOX_SHAPE_CLASS,
         className,
         multiline ? undefined : INPUT_BOX_LINE_HEIGHT_CLASS
       )}

@@ -1,7 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { Alert, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import {
@@ -15,6 +15,7 @@ import {
 import { ProfileRepoPinsSection } from '@/components/profiles/profile-repo-pins-section';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { FormField } from '@/components/ui/form-field';
@@ -239,10 +240,9 @@ export function ProfileOverviewScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={profile?.name ?? t('profiles.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="gap-6 px-6 pt-4 pb-8"
-        keyboardShouldPersistTaps="handled"
+        contentContainerClassName="gap-6 px-6 pt-4"
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
@@ -321,7 +321,7 @@ export function ProfileOverviewScreen({
             </Button>
           </>
         ) : null}
-      </ScrollView>
+      </TabScreenScrollView>
     </View>
   );
 }

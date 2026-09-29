@@ -218,16 +218,36 @@ export function ModelPickerContent() {
         <View>
           <View className="flex-row items-center gap-2 rounded-full bg-secondary px-3 py-2 mx-4 mb-3 mt-3">
             <Search size={18} color={colors.mutedForeground} />
-            <Input
-              ref={searchInputRef}
-              placeholder={t('common.searchModels')}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="search"
-              className="flex-1 px-0 text-base text-foreground"
-              onChangeText={setSearch}
-            />
+            {/* The placeholder is a single-line Text overlay, not the input's own
+                placeholder: Android lays the native hint out at the field's width
+                with no line cap, so copy wider than a narrow field wraps onto a
+                second line. A tail-ellipsized Text truncates the copy at any width
+                instead. The shared box draws the value on one line box and centres
+                it, and both texts share `px-0` so the overlay sits exactly where
+                the typed text will. */}
+            <View className="relative flex-1">
+              <Input
+                ref={searchInputRef}
+                accessibilityLabel={t('common.searchModels')}
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="search"
+                className="flex-1 px-0 text-base text-foreground"
+                onChangeText={setSearch}
+              />
+              {search.length === 0 ? (
+                <View className="absolute inset-0 justify-center" pointerEvents="none">
+                  <Text
+                    accessible={false}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    className="text-base leading-[normal] font-normal px-0 text-muted-foreground"
+                  >
+                    {t('common.searchModels')}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             {/* In-field clear, on every platform: `clearButtonMode` is iOS
                 only, so Android rendered the query with no way to reset it. */}
             {search.length > 0 ? (

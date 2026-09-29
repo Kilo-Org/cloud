@@ -161,9 +161,10 @@ export function SpendAlertsScreen({ organizationId }: SpendAlertsScreenProps) {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('notifications.channel.spend')} />
       <TabScreenScrollView
+        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
+        automaticallyAdjustKeyboardInsets
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"
-        automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

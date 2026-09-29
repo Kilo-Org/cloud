@@ -2,6 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import * as Application from 'expo-application';
 import { type Href, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   BookOpenCheck,
@@ -16,7 +17,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, View } from 'react-native';
+import { Alert, type LayoutChangeEvent, type ScrollView, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { ActionTile } from '@/components/profile-action-tile';
@@ -76,6 +77,9 @@ export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
+  const deleteScrollRef = useRef<ScrollView>(null);
+  const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
+  const [deleteScrollFrameHeight, setDeleteScrollFrameHeight] = useState(0);
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
   // The account queries wait for the tab transition to settle, but the hook
@@ -126,6 +130,36 @@ export function ProfileScreen() {
     setCode,
   } = useDeleteAccount();
 
+  // The confirmation code renders one row above the destructive submit. The
+  // block is appended below the offset the user was parked at, and Android's
+  // edge-to-edge window does not resize for the IME, so the submit stays below
+  // the viewport (and, with the keyboard up, behind the IME). The shared scroll
+  // view ends its viewport at the IME's top edge; reveal the block when it
+  // appears and again once the IME's occlusion lands, so the submit clears the
+  // tab bar and the keyboard. Android may commit the IME lift after
+  // `keyboardDidShow` reports, so the reveal also watches the scroll view's
+  // committed frame height and reruns once that frame reaches its final size.
+  // The occlusion arrives from the shared scroll view that already tracks it,
+  // so this screen does not read the keyboard itself.
+  useEffect(() => {
+    if (deletePhase !== 'awaiting-code' && deletePhase !== 'executing') {
+      return undefined;
+    }
+    const frame = requestAnimationFrame(() => {
+      deleteScrollRef.current?.scrollToEnd({ animated: false });
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+    };
+  }, [deletePhase, deleteKeyboardOcclusion, deleteScrollFrameHeight]);
+
+  const onDeleteScrollLayout = useCallback((event: LayoutChangeEvent) => {
+    const { height } = event.nativeEvent.layout;
+    // A guarded update: an equal height leaves the state identity untouched so
+    // the reveal effect does not rerun on every unrelated layout pass.
+    setDeleteScrollFrameHeight(current => (current === height ? current : height));
+  }, []);
+
   const confirmDeleteAccount = () => {
     Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
@@ -161,10 +195,13 @@ export function ProfileScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
+        ref={deleteScrollRef}
         className="flex-1"
         style={scrollStyle}
         contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
+        onKeyboardOcclusionChange={setDeleteKeyboardOcclusion}
+        onLayout={onDeleteScrollLayout}
       >
         {/* Credits */}
         <CreditsCard orgs={orgs} enabled={isAuthenticated} />
@@ -401,6 +438,14 @@ export function ProfileScreen() {
                 label={t('profile.confirmationCode')}
                 placeholder={t('profile.confirmationCodePlaceholder')}
                 keyboardType="number-pad"
+                // Android only: keep the IME docked to the number-pad instead
+                // of swapping to its full-screen extract editor, whose window
+                // parks over the whole screen and buries the destructive submit
+                // below it. The shared scroll view already reserves the docked
+                // IME height and the reveal scrolls the block to its end, so
+                // `TabScreenScrollView`'s occlusion reservation leaves the
+                // submit above the keyboard without a dimensions change here.
+                disableFullscreenUI
                 defaultValue={devCode ?? undefined}
                 onChangeText={setCode}
                 editable={deletePhase !== 'executing'}

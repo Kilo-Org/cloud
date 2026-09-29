@@ -55,8 +55,11 @@ export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT
  * directions.
  *
  * A `multiline` caller is a different control: it keeps its own box (an
- * explicit `leading-*`) and its own `textAlignVertical`, so neither the shared
- * box nor the forced vertical alignment applies.
+ * explicit `leading-*`) and its own `textAlignVertical`, and keeps its own
+ * `numberOfLines` (no default is applied), so neither the shared box nor the
+ * forced vertical alignment applies. A single-line caller is pinned to
+ * `numberOfLines={1}`, so the placeholder and the value cannot wrap to a second
+ * line and shift the text off the box's vertical centre.
  */
 function Input({
   className,
@@ -65,6 +68,7 @@ function Input({
   placeholderTextColor,
   multiline,
   textAlignVertical,
+  numberOfLines,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
@@ -77,6 +81,7 @@ function Input({
     <TextInput
       {...props}
       multiline={multiline}
+      numberOfLines={multiline ? numberOfLines : 1}
       className={cn(
         multiline ? undefined : INPUT_BOX_SHAPE_CLASS,
         className,

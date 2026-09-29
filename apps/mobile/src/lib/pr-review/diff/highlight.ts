@@ -128,8 +128,13 @@ const HLJS_CLASS_PALETTE: ReadonlyMap<string, string> = new Map([
   ['function-variable', 'function'],
   ['class-name', 'type'],
   ['type', 'type'],
-  ['title.function', 'function'],
-  ['title.class', 'type'],
+  // lowlight/highlight.js emits a dotted scope as a base class plus a
+  // suffixed child: `title.function` becomes `hljs-title` + `function_`
+  // and `title.class` becomes `hljs-title` + `class_` (the trailing
+  // underscores come from `scopeToCSSClass`). `hljs-title` is shared by
+  // both, so only the suffixed child distinguishes them.
+  ['function_', 'function'],
+  ['class_', 'type'],
   ['function', 'function'],
   ['attr', 'attribute'],
   ['attribute', 'attribute'],

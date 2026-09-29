@@ -301,6 +301,32 @@ describe('buildItems trailing gap totalLines', () => {
       context: { startLine: 9, endLine: 9 },
     });
   });
+
+  it('keeps a between-hunk separator bounded by its own gap end, not the file totalLines', () => {
+    // The leading and between-hunk gaps are finite; once a window loads and
+    // the server reports the whole-file totalLines, the separator must stay
+    // bounded by `endLine` (44), or a fully expanded gap never completes and
+    // offers to expand the following hunk's lines a second time.
+    const items = buildItems(
+      baseArgs({
+        files: [makeFile(largeGapPatch)],
+        expanded: { 'a.ts': true },
+        expandedContext: {
+          'a.ts': {
+            0: {
+              status: 'partial',
+              lines: Array.from({ length: 20 }, (_, i) => `gap-line-${i}`),
+              totalLines: 100,
+            },
+          },
+        },
+      })
+    );
+    expect(separatorFor(items, 0)).toMatchObject({
+      state: 'partial',
+      context: { gapIndex: 0, startLine: 28, endLine: 44 },
+    });
+  });
 });
 
 describe('buildItems composition', () => {

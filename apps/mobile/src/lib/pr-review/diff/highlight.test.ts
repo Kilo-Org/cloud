@@ -121,4 +121,20 @@ describe('highlightLine', () => {
     expect(classes(tokens)).toContain('string');
     expect(texts(tokens).join('')).toBe('"name": "kilo"');
   });
+
+  it('maps lowlight title.function / title.class sub-scopes to the palette', () => {
+    // lowlight splits a dotted scope into `hljs-title` plus the suffixed
+    // `function_` / `class_` child. The palette must key on the suffixed
+    // child; the dotted `title.function` / `title.class` names never match
+    // and would leave function and class names in the default foreground.
+    const fn = highlightLine('export function alphaExtra() {', 'typescript').find(
+      t => t.text === 'alphaExtra'
+    );
+    expect(fn?.className).toBe('function');
+
+    const cls = highlightLine('export class AlphaClass {', 'typescript').find(
+      t => t.text === 'AlphaClass'
+    );
+    expect(cls?.className).toBe('type');
+  });
 });

@@ -3,7 +3,7 @@
 // component stays under the max-lines limit.
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import {
   addContextLoadState,
@@ -79,22 +79,17 @@ export function usePrDiffContextLoader(args: {
   const [expandedContext, setExpandedContext] = useState<
     Record<string, Record<number, ExpandSeparatorState>>
   >({});
-  const expandedContextRef = useRef(expandedContext);
-  expandedContextRef.current = expandedContext;
-
   const handleLoadContext = useCallback(
     (item: Extract<ListItem, { kind: 'expand-separator' }>, windowSize: number) => {
-      const existingState = expandedContextRef.current[item.filePath]?.[item.context.gapIndex];
-      const alreadyLoaded =
-        existingState?.status === 'loading' ||
-        existingState?.status === 'partial' ||
-        existingState?.status === 'error'
-          ? existingState.lines.length
-          : 0;
+      // The separator's `startLine` is already advanced past every line a
+      // previous window loaded (`pushGapItems` recomputes it from the
+      // accumulated lines), so it is the next line to fetch. Passing the
+      // accumulated count as `alreadyLoaded` would advance it a second
+      // time, skipping a window or overshooting the gap end.
       const { startLine, endLine } = buildContextWindow({
         startLine: item.context.startLine,
         endLine: item.context.endLine,
-        alreadyLoaded,
+        alreadyLoaded: 0,
         windowSize,
       });
 

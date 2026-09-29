@@ -3,6 +3,14 @@
 // previous slice already fetched, so the next slice starts right after
 // them. The end is clamped by the gap's own `endLine` so the last slice
 // never overshoots the gap.
+//
+// `startLine` is the first line the caller still needs. The diff loader
+// keeps that invariant by moving `context.startLine` forward in
+// `pushGapItems` (it is `gapStart + linesLoaded`) and then passing
+// `alreadyLoaded: 0` here. A caller that instead passes the gap's
+// original start with a non-zero `alreadyLoaded` must not also advance
+// `startLine`, or the two offsets compose and skip a window (the defect
+// this contract exists to prevent).
 
 export type ContextWindow = {
   startLine: number;

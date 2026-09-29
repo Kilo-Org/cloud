@@ -45,7 +45,13 @@ export function pushGapItems(args: {
   const state = args.fileContext[args.gapIndex] ?? { status: 'idle' as const };
   const cumulativeLines = getCumulativeLines(state);
   const loadedCount = cumulativeLines.length;
-  const effectiveEndLine = getTotalLines(state) ?? args.endLine;
+  // A finite gap has a real endLine from the hunk list; use it so the
+  // gap stops at the next hunk. Only the trailing gap (endLine
+  // `Infinity`) needs the server's whole-file `totalLines` to find its
+  // end.
+  const effectiveEndLine = Number.isFinite(args.endLine)
+    ? args.endLine
+    : (getTotalLines(state) ?? args.endLine);
   const gapSize = effectiveEndLine - args.startLine + 1;
   const isComplete = loadedCount >= gapSize;
   const viewMode: DiffViewMode = args.viewMode ?? 'unified';

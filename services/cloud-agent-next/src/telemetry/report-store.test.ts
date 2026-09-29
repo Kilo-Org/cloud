@@ -196,7 +196,43 @@ describe('cloud agent reporting store', () => {
       kilo_session_id: 'ses_12345678901234567890123456',
       initial_message_id: 'msg_initial',
       created_at: occurredAt,
+      product_origin: null,
     });
+  });
+
+  it('stores the supplied product origin on the session report', async () => {
+    const fake = makeDb();
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.createSessionReport({
+      cloudAgentSessionId,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      initialMessageId: 'msg_initial',
+      occurredAt,
+      productOrigin: 'code-review',
+    });
+    expect(fake.inserts.find(call => call.table === cloud_agent_sessions)?.values).toEqual({
+      cloud_agent_session_id: cloudAgentSessionId,
+      kilo_session_id: 'ses_12345678901234567890123456',
+      initial_message_id: 'msg_initial',
+      created_at: occurredAt,
+      product_origin: 'code-review',
+    });
+    expect(fake.updates).toHaveLength(0);
+  });
+
+  it('does not update a stored origin on a conflicting session insert', async () => {
+    const fake = makeDb();
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.createSessionReport({
+      cloudAgentSessionId,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      initialMessageId: 'msg_initial',
+      occurredAt,
+      productOrigin: 'other',
+    });
+    const insert = fake.inserts.find(call => call.table === cloud_agent_sessions);
+    expect(insert?.conflictValues).toBeUndefined();
+    expect(fake.updates).toHaveLength(0);
   });
 
   it('accepts control-plane workspace_ session ids on the session report', async () => {
@@ -214,6 +250,7 @@ describe('cloud agent reporting store', () => {
       kilo_session_id: 'ses_12345678901234567890123456',
       initial_message_id: 'msg_initial',
       created_at: occurredAt,
+      product_origin: null,
     });
   });
 

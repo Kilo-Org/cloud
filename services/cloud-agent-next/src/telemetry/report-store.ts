@@ -42,6 +42,7 @@ const createSessionReportSchema = z.object({
   kiloSessionId: kiloSessionIdSchema,
   initialMessageId: z.string().min(1),
   occurredAt: isoTimestampSchema,
+  productOrigin: z.enum(['code-review', 'other']).nullish(),
 });
 const recordSandboxIdentitySchema = z.object({
   cloudAgentSessionId: cloudAgentSessionIdSchema,
@@ -454,6 +455,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
             kilo_session_id: input.kiloSessionId,
             initial_message_id: input.initialMessageId,
             created_at: input.occurredAt,
+            product_origin: input.productOrigin ?? null,
           })
           .onConflictDoNothing({ target: cloud_agent_sessions.cloud_agent_session_id });
       });

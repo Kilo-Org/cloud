@@ -114,6 +114,7 @@ describe('Cloud Agent session report writes', () => {
       kiloSessionId,
       initialMessageId,
       occurredAt: reportingCreatedAt,
+      productOrigin: null,
     });
     expect(reportStore.recordSandboxIdentity).not.toHaveBeenCalled();
     creation.resolve();
@@ -136,8 +137,20 @@ describe('Cloud Agent session report writes', () => {
     await ensureCloneSessionReport(metadata, env);
 
     expect(reportStore.createSessionReport.mock.calls.map(([input]) => input)).toEqual([
-      { cloudAgentSessionId, kiloSessionId, initialMessageId, occurredAt: reportingCreatedAt },
-      { cloudAgentSessionId, kiloSessionId, initialMessageId, occurredAt: reportingCreatedAt },
+      {
+        cloudAgentSessionId,
+        kiloSessionId,
+        initialMessageId,
+        occurredAt: reportingCreatedAt,
+        productOrigin: null,
+      },
+      {
+        cloudAgentSessionId,
+        kiloSessionId,
+        initialMessageId,
+        occurredAt: reportingCreatedAt,
+        productOrigin: null,
+      },
     ]);
   });
 
@@ -184,7 +197,43 @@ describe('Cloud Agent session report writes', () => {
       kiloSessionId,
       initialMessageId,
       occurredAt,
+      productOrigin: null,
     });
+  });
+
+  it('classifies a clone from billingOrigin, never from createdOnPlatform', async () => {
+    await ensureCloneSessionReport(
+      cloneMetadata({
+        identity: {
+          sessionId: cloudAgentSessionId,
+          userId: 'user_clone',
+          billingOrigin: 'cloud-agent',
+          createdOnPlatform: 'code-review',
+        },
+      }),
+      env
+    );
+
+    expect(reportStore.createSessionReport).toHaveBeenCalledWith(
+      expect.objectContaining({ productOrigin: 'other' })
+    );
+  });
+
+  it('stores the code-review origin for a clone whose billingOrigin is code-review', async () => {
+    await ensureCloneSessionReport(
+      cloneMetadata({
+        identity: {
+          sessionId: cloudAgentSessionId,
+          userId: 'user_clone',
+          billingOrigin: 'code-review',
+        },
+      }),
+      env
+    );
+
+    expect(reportStore.createSessionReport).toHaveBeenCalledWith(
+      expect.objectContaining({ productOrigin: 'code-review' })
+    );
   });
 
   it.each(['createSessionReport', 'recordSandboxIdentity'] as const)(
@@ -202,6 +251,7 @@ describe('Cloud Agent session report writes', () => {
         kiloSessionId,
         initialMessageId,
         occurredAt: reportingCreatedAt,
+        productOrigin: null,
       });
       expect(reportStore.recordSandboxIdentity).toHaveBeenLastCalledWith({
         cloudAgentSessionId,

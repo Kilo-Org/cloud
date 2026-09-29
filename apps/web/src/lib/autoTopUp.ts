@@ -17,7 +17,6 @@ import type { UserForBalance } from '@/lib/user/balance-types';
 import { findUserById } from '@/lib/user/find-user-by-id';
 import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
-import { reportCreditEvent } from '@/lib/bouncer/client';
 import { reportChargeAttempted } from '@/lib/bouncer/credit-events';
 import { sendAutoTopUpFailedEmail } from '@/lib/email';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';

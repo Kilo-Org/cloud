@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback } from 'react';
-import { Scissors, Image, FileText, AlertCircle, Clock } from 'lucide-react';
+import { Scissors, Image, FileText, AlertCircle, Clock, RotateCcw } from 'lucide-react';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import type { AssistantMessage } from '@/types/opencode.gen';
 import type { MessageDeliveryState } from '@kilocode/cloud-agent-sdk';
@@ -213,124 +213,80 @@ function DeliveryStatusIcon({ badge }: { badge: DeliveryBadge }) {
 }
 
 /**
- * Fixed, safe copy for a failed row, keyed by kind. Mirrors mobile's
- * `selectMessageFailure` so web and mobile state the same failure the same way;
- * the catalog is in `en.json` under `agentChat.messageFailure.*` and is the
- * single source of truth for both surfaces.
+ * Fixed, safe copy for a failed delivery, matching the delivery badge's
+ * wording. The untranslated transport text stays in the badge's tooltip and
+ * the copy action, never in the statement itself.
  */
-type MessageFailure = {
-  kind: 'delivery' | 'assistant';
+type DeliveryFailure = {
   title: string;
   detail: string | null;
-  canRetry: boolean;
-  canCopy: boolean;
 };
-
-const NON_RETRYABLE_ASSISTANT_ERRORS = [
-  'ProviderAuthError',
-  'MessageAbortedError',
-  'ContextOverflowError',
-] as const;
 
 const DELIVERY_DETAIL_BY_REASON = {
   interrupted: 'Pending queued message interrupted by user',
   exhausted: 'Failed to deliver after retries',
-  execution: 'Response failed',
 } as const;
 
-function selectMessageFailure(input: {
-  deliveryState?: MessageDeliveryState;
-  info: StoredMessage['info'];
-}): MessageFailure | null {
-  const { deliveryState, info } = input;
-  if (info.role === 'user' && deliveryState?.status === 'failed') {
-    if (deliveryState.reason === 'execution') {
-      return {
-        kind: 'delivery',
-        title: 'Response failed',
-        detail: null,
-        canRetry: true,
-        canCopy: true,
-      };
-    }
-    return {
-      kind: 'delivery',
-      title: 'Failed to deliver',
-      detail: DELIVERY_DETAIL_BY_REASON[deliveryState.reason],
-      canRetry: true,
-      canCopy: true,
-    };
+/**
+ * `execution` is the response failing, not the transport: the message reached
+ * the agent and the run could not complete it. It states the turn failed and
+ * leaves out a delivery-flavoured second line, because the delivery badge and
+ * the session status line already report the same failure.
+ */
+function selectDeliveryFailure(
+  deliveryState: MessageDeliveryState | undefined
+): DeliveryFailure | null {
+  if (deliveryState?.status !== 'failed') return null;
+  if (deliveryState.reason === 'execution') {
+    return { title: 'Response failed', detail: null };
   }
-  if (info.role === 'assistant' && info.error) {
-    const errorName = info.error.name;
-    const interrupted = errorName === 'MessageAbortedError';
-    return {
-      kind: 'assistant',
-      title: interrupted ? 'Interrupted' : 'Failed',
-      detail: null,
-      canRetry: !interrupted,
-      canCopy: false,
-    };
-  }
-  return null;
+  return {
+    title: 'Failed to deliver',
+    detail: DELIVERY_DETAIL_BY_REASON[deliveryState.reason],
+  };
 }
 
-function RetryFailureFooter({
+function DeliveryFailureFooter({
   failure,
   message,
   onRetryMessage,
   onCopyToComposer,
 }: {
-  failure: MessageFailure;
+  failure: DeliveryFailure;
   message: StoredMessage;
   onRetryMessage?: (message: StoredMessage) => void;
   onCopyToComposer?: (text: string) => void;
 }) {
-  const [retried, setRetried] = useState(false);
-  const copyText = failure.canCopy ? getUserTextContent(message.parts) : '';
-  const relevantHandlerWired =
-    failure.kind === 'delivery'
-      ? onRetryMessage !== undefined || onCopyToComposer !== undefined
-      : onRetryMessage !== undefined;
-  if (!relevantHandlerWired) return null;
+  if (onRetryMessage === undefined && onCopyToComposer === undefined) return null;
+  const copyText = getUserTextContent(message.parts);
   return (
-    <div className="mt-1 flex flex-col gap-1">
-      <div className="flex items-center gap-1 text-xs">
+    <div className="mt-1 flex flex-col items-end gap-1">
+      <div className="text-muted-foreground flex items-center gap-1 text-xs">
         <AlertCircle className="h-3 w-3" />
-        <span
-          className={
-            failure.canRetry ? 'text-muted-foreground' : 'text-destructive'
-          }
-        >
-          {failure.title}
-        </span>
-        {failure.detail !== null ? (
-          <span className="text-muted-foreground">{failure.detail}</span>
-        ) : null}
+        <span>{failure.title}</span>
+        {failure.detail !== null ? <span>{failure.detail}</span> : null}
       </div>
-      <div className="flex items-center gap-2">
-        {failure.canRetry && onRetryMessage ? (
+      <div className="flex items-center gap-1">
+        {onRetryMessage ? (
           <button
             type="button"
-            disabled={retried}
-            onClick={() => {
-              setRetried(true);
-              onRetryMessage(message);
-            }}
+            onClick={() => onRetryMessage(message)}
             aria-label="Retry"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            title="Retry"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </button>
         ) : null}
-        {failure.canCopy && onCopyToComposer && copyText !== '' ? (
+        {onCopyToComposer && copyText !== '' ? (
           <button
             type="button"
             onClick={() => onCopyToComposer(copyText)}
             aria-label="Copy to composer"
-            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+            title="Copy to composer"
+            className="text-muted-foreground hover:text-foreground focus-visible:ring-ring cursor-pointer rounded p-1 text-xs transition-colors focus-visible:ring-2 focus-visible:outline-none"
           >
-            <span className="text-xs">Copy</span>
+            Copy
           </button>
         ) : null}
       </div>
@@ -347,15 +303,13 @@ type MessageBubbleProps = {
   getChildMessages?: (sessionId: string) => StoredMessage[];
   onOpenChildSession?: OpenChildSession;
   /**
-   * Retry a failed row. Mirrors mobile's `onRetryMessage`: a user delivery
-   * failure re-sends the row's own text; an assistant failure re-sends the
-   * newest preceding user row. `null` when no retryable prompt exists, which
-   * suppresses the control (same as mobile).
+   * Re-send a failed user row's own prompt. The page resolves the owning
+   * session before awaiting, so the row never resolves to a different chat.
    */
   onRetryMessage?: (message: StoredMessage) => void;
   /**
-   * Copy a failed user row's text into the composer. Wired only for delivery
-   * failures (an assistant failure has no preceding user row to copy from).
+   * Put a failed user row's text back into the composer, for a user who would
+   * rather edit and resend than repeat the send.
    */
   onCopyToComposer?: (text: string) => void;
 };
@@ -372,10 +326,13 @@ export function MessageBubble({
   deliveryState,
   getChildMessages,
   onOpenChildSession,
+  onRetryMessage,
+  onCopyToComposer,
 }: MessageBubbleProps) {
   const isStreaming = isStreamingProp ?? isMessageStreaming(message);
   const timestamp = message.info.time.created;
   const deliveryBadge = getDeliveryBadge(deliveryState);
+  const deliveryFailure = selectDeliveryFailure(deliveryState);
 
   const getTextForCopy = useCallback(
     () =>
@@ -437,9 +394,9 @@ export function MessageBubble({
           {userContent && <CopyMessageButton getText={getTextForCopy} />}
           <TimeAgo timestamp={timestamp} className="text-muted-foreground/70 text-xs" />
         </div>
-        {failure && !isStreaming && (
-          <RetryFailureFooter
-            failure={failure}
+        {deliveryFailure && !isStreaming && (
+          <DeliveryFailureFooter
+            failure={deliveryFailure}
             message={message}
             onRetryMessage={onRetryMessage}
             onCopyToComposer={onCopyToComposer}
@@ -488,14 +445,6 @@ export function MessageBubble({
             <AlertCircle className="h-3 w-3" />
             {interrupted ? 'Interrupted' : 'Failed'}
           </span>
-        )}
-        {failure && !isStreaming && (
-          <RetryFailureFooter
-            failure={failure}
-            message={message}
-            onRetryMessage={onRetryMessage}
-            onCopyToComposer={onCopyToComposer}
-          />
         )}
         {!isStreaming && hasText && (
           <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-focus-within/msg:opacity-100 group-hover/msg:opacity-100">

@@ -426,4 +426,51 @@ describe('ChatInput finalize failure', () => {
       dom.cleanup();
     }
   });
+
+  it('replaces a draft when a copy action requests composer text', () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    let root!: Root;
+    const render = (requestedValue: { text: string; token: number } | null) =>
+      createElement(ChatInput, {
+        onSend: jest.fn(async () => true),
+        attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
+        requestedValue,
+      });
+    try {
+      act(() => {
+        root = createRoot(dom.container);
+        root.render(render(null));
+      });
+
+      act(() => {
+        setTextareaValue(dom.container, 'a half-written draft');
+      });
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'a half-written draft'
+      );
+
+      act(() => {
+        root.render(render({ text: 'the failed prompt', token: 1 }));
+      });
+
+      // The copy control must not be a no-op just because a draft exists.
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'the failed prompt'
+      );
+
+      act(() => {
+        root.render(render({ text: 'the failed prompt', token: 2 }));
+      });
+
+      expect((dom.container.querySelector('textarea') as HTMLTextAreaElement).value).toBe(
+        'the failed prompt'
+      );
+    } finally {
+      act(() => {
+        root.unmount();
+      });
+      dom.cleanup();
+    }
+  });
 });

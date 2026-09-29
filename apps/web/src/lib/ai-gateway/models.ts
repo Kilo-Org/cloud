@@ -27,7 +27,7 @@ export type AutoFreeModel = {
 export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'stealth/space-bunny-alpha',
-    weight: 1,
+    weight: 12,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
   {

@@ -7,7 +7,7 @@
       "instanceLifecycle": "तुमच्या इंस्टन्समध्ये अपडेट आहे",
       "scheduledAction": "नियोजित क्रियेत अपडेट आहे",
       "lowBalance": "तुमच्या शिल्लकीकडे लक्ष आवश्यक आहे",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "तुमच्या खर्चाकडे लक्ष आवश्यक आहे",
       "securityFinding": "सुरक्षा निष्कर्षाकडे लक्ष आवश्यक आहे",
       "activeAgentsGlanceable": "सक्रिय एजंट्सकडे अपडेट आहे"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} शिल्लक ${{minimumBalanceUsd}} च्या खाली गेली"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "खर्च सूचना",
+      "body": "{{scopeName}} चा खर्च ${{amountUsd}} पेक्षा जास्त झाला"
     },
     "securityFindingNew": {
       "title": "नवीन सुरक्षा निष्कर्ष ({{severity}})",

@@ -17,8 +17,6 @@ describe('Convoy DAG and Feature Branches', () => {
     await town.setTownId(townName);
   });
 
-  // ── Feature Branch ─────────────────────────────────────────────────
-
   describe('feature branch creation', () => {
     it('should create a convoy with a feature branch', async () => {
       // Need a rig for slingConvoy
@@ -56,7 +54,6 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Task 1' }],
       });
 
-      // Should be lowercased, special chars replaced with hyphens, ends with /head
       expect(result.convoy.feature_branch).toMatch(
         /^convoy\/fix-bug-123-with-special-characters\/[0-9a-f]+\/head$/
       );
@@ -83,8 +80,6 @@ describe('Convoy DAG and Feature Branches', () => {
     });
   });
 
-  // ── DAG Dependencies ───────────────────────────────────────────────
-
   describe('DAG dependency edges', () => {
     it('should create blocks dependencies from depends_on indices', async () => {
       await town.addRig({
@@ -94,9 +89,6 @@ describe('Convoy DAG and Feature Branches', () => {
         defaultBranch: 'main',
       });
 
-      // Task 0: no deps
-      // Task 1: depends on Task 0
-      // Task 2: depends on Task 0 and Task 1
       const result = await town.slingConvoy({
         rigId: 'rig-1',
         convoyTitle: 'Serial Convoy',
@@ -110,23 +102,19 @@ describe('Convoy DAG and Feature Branches', () => {
       const status = await town.getConvoyStatus(result.convoy.id);
       expect(status).toBeTruthy();
       expect(status!.dependency_edges).toBeDefined();
-      expect(status!.dependency_edges.length).toBe(3); // 1→0, 2→0, 2→1
-
+      expect(status!.dependency_edges.length).toBe(3);
       const beadIds = result.beads.map(b => b.bead.bead_id);
 
-      // Step 2 (index 1) depends on Step 1 (index 0)
       expect(status!.dependency_edges).toContainEqual({
         bead_id: beadIds[1],
         depends_on_bead_id: beadIds[0],
       });
 
-      // Step 3 (index 2) depends on Step 1 (index 0)
       expect(status!.dependency_edges).toContainEqual({
         bead_id: beadIds[2],
         depends_on_bead_id: beadIds[0],
       });
 
-      // Step 3 (index 2) depends on Step 2 (index 1)
       expect(status!.dependency_edges).toContainEqual({
         bead_id: beadIds[2],
         depends_on_bead_id: beadIds[1],
@@ -173,8 +161,6 @@ describe('Convoy DAG and Feature Branches', () => {
     });
   });
 
-  // ── DAG-Aware Scheduling ───────────────────────────────────────────
-
   describe('DAG-aware scheduling', () => {
     it('should not dispatch blocked beads', async () => {
       await town.addRig({
@@ -194,19 +180,14 @@ describe('Convoy DAG and Feature Branches', () => {
         ],
       });
 
-      // Run alarm to trigger reconciler assignment (lazy assignment).
-      // Only unblocked beads get agents assigned.
       await runDurableObjectAlarm(town);
 
       const bead0 = await town.getBeadAsync(result.beads[0].bead.bead_id);
       const bead1 = await town.getBeadAsync(result.beads[1].bead.bead_id);
       const bead2 = await town.getBeadAsync(result.beads[2].bead.bead_id);
 
-      // First bead is unblocked — reconciler assigned an agent
       expect(bead0?.assignee_agent_bead_id).toBeTruthy();
 
-      // Second and third are blocked — reconciler does NOT assign agents
-      // (lazy assignment only assigns unblocked beads)
       expect(bead1?.assignee_agent_bead_id).toBeNull();
       expect(bead2?.assignee_agent_bead_id).toBeNull();
     });
@@ -225,7 +206,6 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Step 1' }, { title: 'Step 2', depends_on: [0] }],
       });
 
-      // Run alarm to trigger reconciler assignment of unblocked beads
       await runDurableObjectAlarm(town);
 
       const beadIds = result.beads.map(b => b.bead.bead_id);
@@ -233,17 +213,13 @@ describe('Convoy DAG and Feature Branches', () => {
       const agent0Id = bead0!.assignee_agent_bead_id!;
       expect(agent0Id).toBeTruthy();
 
-      // Close the first bead — this should unblock the second
       await town.updateBeadStatus(beadIds[0], 'closed', agent0Id);
 
-      // Run alarm again so reconciler assigns agent to the now-unblocked bead
       await runDurableObjectAlarm(town);
 
-      // After closing, check convoy progress
       const status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(1);
 
-      // The second bead should be assigned and in_progress (unblocked by bead 0)
       const bead1 = await town.getBeadAsync(beadIds[1]);
       expect(bead1?.status).not.toBe('closed');
       expect(bead1?.assignee_agent_bead_id).toBeTruthy();
@@ -264,28 +240,23 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Task A' }, { title: 'Task B' }, { title: 'Task C', depends_on: [0, 1] }],
       });
 
-      // Run alarm to trigger reconciler assignment of unblocked beads (A and B)
       await runDurableObjectAlarm(town);
 
       const beadIds = result.beads.map(b => b.bead.bead_id);
       const beadA = await town.getBeadAsync(beadIds[0]);
       const beadB = await town.getBeadAsync(beadIds[1]);
 
-      // Close task A — task C should still be blocked (B is open)
       await town.updateBeadStatus(beadIds[0], 'closed', beadA!.assignee_agent_bead_id!);
 
       const status1 = await town.getConvoyStatus(result.convoy.id);
       expect(status1?.closed_beads).toBe(1);
 
-      // Close task B — task C should now be unblocked
       await town.updateBeadStatus(beadIds[1], 'closed', beadB!.assignee_agent_bead_id!);
 
       const status2 = await town.getConvoyStatus(result.convoy.id);
       expect(status2?.closed_beads).toBe(2);
     });
   });
-
-  // ── Convoy Progress and Auto-Landing ────────────────────────────────
 
   describe('convoy progress', () => {
     it('should track closed_beads progress', async () => {
@@ -302,22 +273,18 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Task 1' }, { title: 'Task 2' }, { title: 'Task 3' }],
       });
 
-      // Initially 0 closed
       let status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(0);
       expect(status?.total_beads).toBe(3);
 
-      // Run alarm to trigger reconciler assignment
       await runDurableObjectAlarm(town);
 
-      // Close one bead
       const beadIds = result.beads.map(b => b.bead.bead_id);
       await town.updateBeadStatus(beadIds[0], 'closed', 'system');
 
       status = await town.getConvoyStatus(result.convoy.id);
       expect(status?.closed_beads).toBe(1);
 
-      // Close second
       await town.updateBeadStatus(beadIds[1], 'closed', 'system');
 
       status = await town.getConvoyStatus(result.convoy.id);
@@ -338,12 +305,10 @@ describe('Convoy DAG and Feature Branches', () => {
         tasks: [{ title: 'Only task' }],
       });
 
-      // Convoy should have a feature branch
       expect(result.convoy.feature_branch).toBeTruthy();
 
       const beadId = result.beads[0].bead.bead_id;
 
-      // Close the only bead
       await town.updateBeadStatus(beadId, 'closed', 'system');
 
       // Convoy should NOT auto-close (it has a feature branch that needs landing)
@@ -368,7 +333,6 @@ describe('Convoy DAG and Feature Branches', () => {
 
       const beadIds = result.beads.map(b => b.bead.bead_id);
 
-      // Fail one bead, close the other
       await town.updateBeadStatus(beadIds[0], 'failed', 'system');
       await town.updateBeadStatus(beadIds[1], 'closed', 'system');
 
@@ -377,8 +341,6 @@ describe('Convoy DAG and Feature Branches', () => {
       expect(status?.closed_beads).toBe(2);
     });
   });
-
-  // ── Force Close ────────────────────────────────────────────────────
 
   describe('force close convoy', () => {
     it('should close all tracked beads and the convoy', async () => {
@@ -398,15 +360,12 @@ describe('Convoy DAG and Feature Branches', () => {
       const closed = await town.closeConvoy(result.convoy.id);
       expect(closed?.status).toBe('landed');
 
-      // All beads should be closed
       for (const b of result.beads) {
         const bead = await town.getBeadAsync(b.bead.bead_id);
         expect(bead?.status).toBe('closed');
       }
     });
   });
-
-  // ── Self-referential and edge cases ────────────────────────────────
 
   describe('edge cases', () => {
     it('should ignore self-referential depends_on', async () => {
@@ -426,7 +385,6 @@ describe('Convoy DAG and Feature Branches', () => {
       });
 
       const status = await town.getConvoyStatus(result.convoy.id);
-      // Self-references should be ignored
       expect(status!.dependency_edges).toEqual([]);
     });
 
@@ -451,8 +409,6 @@ describe('Convoy DAG and Feature Branches', () => {
     // Cycle detection is tested in unit tests (convoy-branches.test.ts)
     // since DO throws corrupt vitest-pool-workers isolated storage.
   });
-
-  // ── Merge Mode ─────────────────────────────────────────────────────
 
   describe('merge mode', () => {
     it('should default to review-then-land when merge_mode is not specified', async () => {
@@ -548,7 +504,6 @@ describe('Convoy DAG and Feature Branches', () => {
         merge_mode: 'review-then-land',
       });
 
-      // Run alarm to trigger reconciler assignment
       await runDurableObjectAlarm(town);
 
       const beadId = result.beads[0].bead.bead_id;
@@ -556,7 +511,6 @@ describe('Convoy DAG and Feature Branches', () => {
       const agentId = bead0!.assignee_agent_bead_id!;
       expect(agentId).toBeTruthy();
 
-      // Simulate agent completing work
       await town.agentDone(agentId, {
         branch: 'gt/toast/test1234',
         summary: 'Done with task',
@@ -565,11 +519,9 @@ describe('Convoy DAG and Feature Branches', () => {
       // agentDone is event-only — run alarm to drain events and apply
       await runDurableObjectAlarm(town);
 
-      // Verify the source bead was transitioned to in_review
       const bead = await town.getBeadAsync(beadId);
       expect(bead?.status).toBe('in_review');
 
-      // Check that the MR bead exists with convoy metadata
       const allBeads = await town.listBeads({ type: 'merge_request' });
       const mrBead = allBeads.find(b => b.metadata?.source_bead_id === beadId);
       expect(mrBead).toBeTruthy();

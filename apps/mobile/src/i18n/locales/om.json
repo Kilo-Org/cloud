@@ -3179,6 +3179,7 @@
     "emptyTitle": "Keessummeessitoonni amanaman hin jiran",
     "emptyDescription": "Keessummeessaa geessituu tokko yoo amante, deebi'ee osoo hin gaafatin bana.",
     "revoke": "Amanamummaa {{host}} haqi",
+    "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
   "quickChat": {

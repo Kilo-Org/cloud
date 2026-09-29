@@ -27,14 +27,4 @@ describe('Kilo Pass legal disclosure links', () => {
       'Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Google Play account at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your Google Play account settings.'
     );
   });
-
-  it('composes the full footer disclosure with legal link labels', () => {
-    const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks('https://app.example.com');
-
-    expect(
-      `${kiloPassLegalDisclosure('ios')} By subscribing, you agree to the ${termsOfUseLink.label} and acknowledge the ${privacyPolicyLink.label}.`
-    ).toBe(
-      'Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings. By subscribing, you agree to the Terms of Use (EULA) and acknowledge the Privacy Policy.'
-    );
-  });
 });

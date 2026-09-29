@@ -311,6 +311,7 @@ export const sandboxHelloPayloadSchema = z.object({
       gitAuthor: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
+      worktreeState: z.boolean().optional(),
     })
     .optional(),
 });
@@ -506,6 +507,17 @@ export const sessionAttachPayloadSchema = z
     snapshot: z
       .object({
         url: z.string().min(1).max(4096),
+      })
+      .strict()
+      .optional(),
+    /**
+     * Endpoint and grant for the durable capture of this worktree's uncommitted
+     * changes, so a rebuilt sandbox can restore them instead of discarding them.
+     */
+    worktreeState: z
+      .object({
+        url: z.string().min(1).max(4096),
+        grant: z.string().min(1).max(4096),
       })
       .strict()
       .optional(),
@@ -1142,6 +1154,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       gitAuthor: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
+      worktreeState: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

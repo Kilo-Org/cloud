@@ -26,6 +26,25 @@ vi.mock('react-native', () => ({
 const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
 vi.mock('@sentry/react-native', () => ({ captureException }));
 
+// The persisted "explainer answered" flag. The hook reads it after the disk
+// load and writes it on either alert button, so the test controls it directly
+// and asserts a soft decline is stored.
+const { promptState, markPromptSeen } = vi.hoisted(() => {
+  const state = { seen: false };
+  return {
+    promptState: state,
+    markPromptSeen: () => {
+      state.seen = true;
+    },
+  };
+});
+vi.mock('@/lib/hooks/install-attribution-prompt-preference', () => ({
+  readInstallAttributionPromptSeen: () => promptState.seen,
+  markInstallAttributionPromptSeen: markPromptSeen,
+  // eslint-disable-next-line no-empty-function -- the mocked load has no work; the awaited promise is the contract
+  whenInstallAttributionPromptSeenLoaded: async () => {},
+}));
+
 import { useTrackingPermissionPrompt } from './use-tracking-permission-prompt';
 
 type AlertButton = { text: string; style?: string; onPress?: () => void };
@@ -77,6 +96,7 @@ describe('useTrackingPermissionPrompt', () => {
     requestTrackingPermissionsAsync.mockReset();
     alertMock.mockReset();
     captureException.mockReset();
+    promptState.seen = false;
   });
 
   afterEach(() => {
@@ -165,6 +185,50 @@ describe('useTrackingPermissionPrompt', () => {
     });
 
     expect(requestTrackingPermissionsAsync).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
+  // Soft decline persists: the native status stays undetermined after Not now,
+  // so the stored answer must keep the explainer from reappearing on relaunch.
+  it('persists Not now and does not show the explainer on the next launch', async () => {
+    getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+
+    const first = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const [notNowButton] = getAlertButtons();
+    await act(async () => {
+      notNowButton.onPress?.();
+      await Promise.resolve();
+    });
+
+    expect(promptState.seen).toBe(true);
+    first.unmount();
+
+    // Simulate the next cold launch: the native status is still undetermined,
+    // but the explainer must stay away.
+    alertMock.mockClear();
+    const second = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
+    second.unmount();
+  });
+
+  it('does not show the explainer when it was already answered', async () => {
+    promptState.seen = true;
+    getTrackingPermissionsAsync.mockResolvedValue({ status: 'undetermined' });
+
+    const renderer = mountHarness(true);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertMock).not.toHaveBeenCalled();
     renderer.unmount();
   });
 

@@ -24,6 +24,13 @@ export const SESSION_FILTERS_KEY = 'agent-session-filters';
 /** Filter record for the live sessions page. Separate: the pages filter separate lists. */
 export const LIVE_SESSION_FILTERS_KEY = 'live-session-filters';
 export const NOTIFICATION_PROMPT_SEEN_KEY = 'notification-prompt-seen';
+/**
+ * Device-level record that the iOS install-attribution explainer has been
+ * shown and answered (Continue or Not now). iOS keeps reporting the tracking
+ * authorization as `undetermined` while the system prompt has never been
+ * requested, so without this a soft decline is re-asked on every cold launch.
+ */
+export const INSTALL_ATTRIBUTION_PROMPT_SEEN_KEY = 'install-attribution-prompt-seen';
 export const LAST_ACTIVE_INSTANCE_KEY = 'last-active-chat-instance';
 /** Last "Run on" destination on the new-agent screen. Empty means Cloud Agent. */
 export const LAST_RUN_ON_DESTINATION_KEY = 'last-run-on-destination';

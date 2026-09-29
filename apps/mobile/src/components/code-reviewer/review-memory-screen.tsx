@@ -182,7 +182,14 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         )}
         ListFooterComponent={footer}
         onEndReached={() => {
-          if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage) {
+          // Once the list is in an error state, auto-loading re-fires on
+          // every content-size change (the footer grows/shrinks as the fetch
+          // flips between loading and error), so the retry footer never
+          // settles and its Retry control is unreachable. Guard on the same
+          // error state the footer renders, which also covers a failed
+          // foreground/invalidated refetch. Leave recovery to the user's
+          // Retry tap until a fetch succeeds.
+          if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage && !laterPageError) {
             void proposalsQuery.fetchNextPage();
           }
         }}

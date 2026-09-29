@@ -6,7 +6,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { getDeadlineCopy } from '@/lib/security-agent-copy';
+import { openExternalUrl } from '@/lib/external-link';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
@@ -264,7 +265,9 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            void Linking.openURL(advisoryUrl);
+            void openExternalUrl(advisoryUrl, {
+              label: t('securityAgent.findingDetails.viewAdvisory'),
+            });
           }}
           accessibilityRole="link"
         >

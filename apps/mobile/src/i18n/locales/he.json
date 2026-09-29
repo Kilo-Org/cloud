@@ -1079,7 +1079,7 @@
       "sortSeverityAsc": "חומרה: מהנמוכה לגבוהה",
       "sortSeverityDesc": "חומרה: מהגבוהה לנמוכה",
       "sortSlaDue": "מועד אחרון לפי SLA",
-      "statusIgnored": "ממצאים שהוחרגו",
+      "statusIgnored": "ממצאים שהתעלמו מהם",
       "statusOpen": "פתוח"
     },
     "analysis": {

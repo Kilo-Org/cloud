@@ -250,7 +250,21 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
           }
           refreshControl={refreshControl}
           onEndReached={() => {
-            if (findings.hasNextPage && !findings.isFetchingNextPage) {
+            // Once the next page has failed, auto-loading re-fires on every
+            // content-size change (the footer grows/shrinks as the fetch flips
+            // between loading and error), so the retry footer never settles and
+            // its Retry control is unreachable. `isFetchNextPageError` is the
+            // state a failed load-more leaves behind (a next-page failure keeps
+            // `isError` false because data already exists), matching the
+            // sibling review list. `isError` also covers a failed
+            // foreground/invalidated refetch. Leave recovery to the user's
+            // Retry tap until a fetch succeeds.
+            if (
+              findings.hasNextPage &&
+              !findings.isFetchingNextPage &&
+              !findings.isFetchNextPageError &&
+              !findings.isError
+            ) {
               void findings.fetchNextPage();
             }
           }}
@@ -261,7 +275,11 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             <View className="pt-3">
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
-                error={findings.isFetchNextPageError}
+                // Must match the onEndReached guard. A failed load-more leaves
+                // `isFetchNextPageError` true while `isError` stays false, so
+                // the footer has to key on both or the inline Retry would be
+                // hidden and paging would stop with no recovery control.
+                error={findings.isFetchNextPageError || findings.isError}
                 onRetry={() => void findings.fetchNextPage()}
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />

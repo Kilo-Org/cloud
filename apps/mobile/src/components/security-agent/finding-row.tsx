@@ -5,7 +5,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { openExternalUrl } from '@/lib/external-link';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
@@ -114,7 +115,7 @@ function FindingRowQuickAction({
         size="sm"
         className="mt-1 self-start px-3"
         onPress={() => {
-          void Linking.openURL(prUrl);
+          void openExternalUrl(prUrl, { label: t('common.pullRequest') });
         }}
       >
         <ExternalLink size={13} color={colors.foreground} />

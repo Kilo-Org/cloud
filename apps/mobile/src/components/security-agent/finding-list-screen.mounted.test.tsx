@@ -174,16 +174,38 @@ describe('Security Agent list surfaces', () => {
       expect(root.findAllByType(EmptyState)).toHaveLength(0);
       expect(root.findAllByType(QueryError)).toHaveLength(0);
       act(list.props.onEndReached as () => void);
-      expect(findings.fetchNextPage).toHaveBeenCalledOnce();
+      // A failed next page must not auto-refire: the footer flickers between
+      // skeleton and error, so Retry would be unreachable.
+      expect(findings.fetchNextPage).not.toHaveBeenCalled();
       const footer = list.props.ListFooterComponent as ReactNode;
       mounted?.unmount();
       mounted = await renderWithProviders(createElement('Footer', null, footer));
       const error = mounted.renderer.root.findByType(QueryError);
       expect(error.props.placement).toBe('top');
       act(error.props.onRetry as () => void);
-      expect(findings.fetchNextPage).toHaveBeenCalledTimes(2);
+      expect(findings.fetchNextPage).toHaveBeenCalledOnce();
     }
   );
+
+  it('shows the inline Retry when a refetch fails with cached rows and no next-page error', async () => {
+    findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };
+    findings.isError = true;
+    findings.isFetchNextPageError = false;
+    findings.hasNextPage = true;
+    const root = await mount();
+    const list = root.findByType(FlashList);
+    act(list.props.onEndReached as () => void);
+    // The guard is keyed on `isError`, so a failed foreground/invalidated
+    // refetch must still pause auto-paging.
+    expect(findings.fetchNextPage).not.toHaveBeenCalled();
+    const footer = list.props.ListFooterComponent as ReactNode;
+    mounted?.unmount();
+    mounted = await renderWithProviders(createElement('Footer', null, footer));
+    const error = mounted.renderer.root.findByType(QueryError);
+    expect(error.props.placement).toBe('top');
+    act(error.props.onRetry as () => void);
+    expect(findings.fetchNextPage).toHaveBeenCalledOnce();
+  });
 
   it('spaces rows with a measured separator instead of the ignored contentContainerStyle gap', async () => {
     findings.data = { pages: [{ findings: [{ id: 'finding-1' }] }] };

@@ -42,7 +42,6 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
-  isReasoningExplicitlyEnabled,
   mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -212,24 +211,6 @@ export async function applyGatewayModelsFallback(
   delete requestToMutate.body.models;
 }
 
-export function applyAnthropicThinkingDefault(
-  requestedModel: string,
-  requestToMutate: GatewayRequest
-) {
-  const defaultsToThinking =
-    (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === 'z-ai/glm-5.2';
-  if (
-    defaultsToThinking &&
-    requestToMutate.kind === 'messages' &&
-    !isReasoningExplicitlyEnabled(requestToMutate)
-  ) {
-    // The Anthropic provider omits thinking:disabled when reasoning is not enabled, but these
-    // models can default to thinking when the field is absent.
-    requestToMutate.body.thinking = { type: 'disabled' };
-  }
-}
-
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
@@ -349,8 +330,6 @@ export async function applyProviderSpecificLogic(
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
   }
-
-  applyAnthropicThinkingDefault(requestedModel, requestToMutate);
 
   await provider.transformRequest({
     provider,

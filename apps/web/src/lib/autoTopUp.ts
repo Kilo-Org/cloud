@@ -403,12 +403,6 @@ async function performAutoTopUpForEntity(
         code,
         reason: error.message,
       });
-      void reportCreditEvent({
-        type: 'charge.failed',
-        eventId: randomUUID(),
-        userId: bouncerUserId,
-        orgId: bouncerOrgId,
-      });
     } else {
       captureException(error, {
         tags: { source: 'auto_top_up' },

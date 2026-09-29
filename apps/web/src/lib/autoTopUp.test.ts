@@ -748,7 +748,7 @@ describe('invoice metadata includes traceId', () => {
     );
   });
 
-  test('a declined off-session charge reports charge.attempted then charge.failed', async () => {
+  test('a declined off-session charge reports only charge.attempted', async () => {
     const user = await insertTestUser({
       auto_top_up_enabled: true,
       stripe_customer_id: `cus_decline_${Date.now()}`,
@@ -791,11 +791,10 @@ describe('invoice metadata includes traceId', () => {
         amountCents: 2000,
       })
     );
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.failed',
-        userId: user.id,
-      })
+    // Stripe's `charge.failed` webhook reports the decline, with Stripe's event id; a local
+    // report would count the same decline twice.
+    expect(reportCreditEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'charge.failed' })
     );
   });
 });

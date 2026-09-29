@@ -23,6 +23,7 @@ import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayo
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
 import { isSandboxStatusEligible } from './sandbox-status';
+import { resolveSessionBranchDisplay } from './session-context-display';
 import { ChatInput } from './ChatInput';
 import {
   dedupeCustomModeOptions,
@@ -304,6 +305,22 @@ export default function CloudChatPage({
   );
 
   useCliSessionPresence(fetchedSessionData?.kiloSessionId ?? null);
+
+  const sessionBranchDisplay = resolveSessionBranchDisplay({
+    scope: {
+      displayedKiloSessionId: sessionIdFromParams,
+      displayedWorktreeId: selectedWorktreeId,
+    },
+    metadata: fetchedSessionData
+      ? {
+          kiloSessionId: fetchedSessionData.kiloSessionId,
+          worktreeId: fetchedSessionData.worktreeId ?? null,
+          branch: fetchedSessionData.gitBranch,
+        }
+      : null,
+    isPreparing:
+      isLoading || cloudStatus?.type === 'preparing' || cloudStatus?.type === 'finalizing',
+  });
 
   const setSessionConfig = useSetAtom(manager.atoms.sessionConfig);
 
@@ -1380,7 +1397,7 @@ export default function CloudChatPage({
       kiloSessionId={sessionIdFromParams ?? undefined}
       organizationId={organizationId}
       repository={sessionConfig?.repository ?? ''}
-      branch={fetchedSessionData?.gitBranch ?? undefined}
+      branch={sessionBranchDisplay.kind === 'branch' ? sessionBranchDisplay.branch : undefined}
       gitUrl={fetchedSessionData?.gitUrl}
       model={sessionConfig?.model}
       modelDisplayName={modelDisplayName}
@@ -1701,19 +1718,28 @@ export default function CloudChatPage({
                                 </div>
                               )}
                               {(sessionConfig?.repository ||
+                                sessionBranchDisplay.kind !== 'unavailable' ||
                                 (contextUsage !== undefined && contextWindow !== undefined)) && (
                                 <div className="text-muted-foreground flex items-center gap-3 px-[max(1rem,calc(50%_-_27rem))] pb-3 text-xs md:pb-4">
-                                  {sessionConfig?.repository && (
+                                  {(sessionConfig?.repository ||
+                                    sessionBranchDisplay.kind !== 'unavailable') && (
                                     <div className="flex min-w-0 items-center gap-1.5">
                                       <GitBranch className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{sessionConfig.repository}</span>
-                                      {fetchedSessionData?.gitBranch && (
+                                      {sessionConfig?.repository && (
+                                        <span className="truncate">{sessionConfig.repository}</span>
+                                      )}
+                                      {sessionBranchDisplay.kind === 'branch' && (
                                         <>
-                                          <span>·</span>
+                                          {sessionConfig?.repository && <span>·</span>}
                                           <span className="truncate">
-                                            {fetchedSessionData.gitBranch}
+                                            {sessionBranchDisplay.branch}
                                           </span>
                                         </>
+                                      )}
+                                      {sessionBranchDisplay.kind === 'assigning' && (
+                                        <span className="truncate" role="status">
+                                          Assigning branch…
+                                        </span>
                                       )}
                                     </div>
                                   )}

@@ -25,20 +25,23 @@ import { afterEach, beforeAll, beforeEach, describe, test, expect } from '@jest/
 import {
   isEmailBlacklistedByDomain,
   isBlockedTLD,
+  getUserUUID,
+  uuidSchema,
+  getUserFromAuth,
+  sessionAuthOptions,
+  getUserFromBearerForCredentialExchange,
+  getUserFromSessionForCredentialIssuance,
+  getUserFromSessionForCredentialIssuanceOrRedirect,
+} from './server';
+import {
   parseLinkedInProfileName,
   parseAnacondaProfile,
   parseOpenAiProfile,
   profileProvesEmailOwnership,
   authOptions,
-  getUserUUID,
-  uuidSchema,
   parseSignInRedirectContext,
-  getProfileRedirectPath,
-  getUserFromAuth,
-  getUserFromBearerForCredentialExchange,
-  getUserFromSessionForCredentialIssuance,
-  getUserFromSessionForCredentialIssuanceOrRedirect,
-} from './server';
+} from './next-auth-options';
+import { getProfileRedirectPath } from './profile-redirect-path';
 import { db } from '@/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
@@ -404,6 +407,21 @@ describe('OpenAI (ChatGPT) OAuth provider', () => {
     // in the token exchange.
     expect(provider?.client.redirect_uris).toEqual([OPENAI_REDIRECT_URI]);
     expect(provider?.token.request).toBeInstanceOf(Function);
+  });
+});
+
+describe('sessionAuthOptions', () => {
+  test('reads a session with the same configuration as authOptions', async () => {
+    expect(authOptions.secret).toBe(sessionAuthOptions.secret);
+    expect(authOptions.logger).toBe(sessionAuthOptions.logger);
+    expect(authOptions.pages).toBe(sessionAuthOptions.pages);
+    expect(authOptions.debug).toBe(sessionAuthOptions.debug);
+    expect(authOptions.callbacks?.session).toBe(sessionAuthOptions.callbacks.session);
+
+    // A session read runs the jwt callback without a trigger.
+    const token = { kiloUserId: 'user-id', version: 3 } as JWT;
+    await expect(authOptions.callbacks?.jwt?.({ token } as never)).resolves.toBe(token);
+    await expect(sessionAuthOptions.callbacks.jwt({ token } as never)).resolves.toBe(token);
   });
 });
 
@@ -1193,7 +1211,7 @@ describe('credential issuance authentication guards', () => {
     const result = await getUserFromSessionForCredentialIssuance();
 
     expect(result.user?.id).toBe(user.id);
-    expect(mockGetServerSession).toHaveBeenCalledWith(authOptions);
+    expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
   });
 
   test('rejects a revoked web session', async () => {

@@ -241,6 +241,7 @@
     "addPasskey": "添加通行密钥",
     "passkeyDefaultName": "通行密钥",
     "passkeyAddedOn": "添加于 {{date}}",
+    "passkeyLastUsedOn": "最后使用于 {{date}}",
     "passkeyAdded": "已添加通行密钥。",
     "passkeyAddFailed": "无法添加通行密钥。请重试。",
     "passkeyAddUnsupported": "此设备无法创建通行密钥。",

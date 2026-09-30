@@ -241,6 +241,7 @@
     "addPasskey": "ഒരു പാസ്കീ ചേർക്കുക",
     "passkeyDefaultName": "പാസ്കീ",
     "passkeyAddedOn": "{{date}}-ന് ചേർത്തു",
+    "passkeyLastUsedOn": "അവസാനം ഉപയോഗിച്ചത് {{date}}",
     "passkeyAdded": "പാസ്കീ ചേർത്തു.",
     "passkeyAddFailed": "പാസ്കീ ചേർക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "passkeyAddUnsupported": "ഈ ഉപകരണത്തിന് പാസ്കീകൾ സൃഷ്ടിക്കാനാവില്ല.",

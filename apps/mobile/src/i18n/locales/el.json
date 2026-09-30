@@ -241,6 +241,7 @@
     "addPasskey": "Προσθήκη κλειδιού πρόσβασης",
     "passkeyDefaultName": "Κλειδί πρόσβασης",
     "passkeyAddedOn": "Προστέθηκε {{date}}",
+    "passkeyLastUsedOn": "Τελευταία χρήση {{date}}",
     "passkeyAdded": "Το κλειδί πρόσβασης προστέθηκε.",
     "passkeyAddFailed": "Δεν ήταν δυνατή η προσθήκη κλειδιού πρόσβασης. Δοκιμάστε ξανά.",
     "passkeyAddUnsupported": "Αυτή η συσκευή δεν μπορεί να δημιουργήσει κλειδιά πρόσβασης.",

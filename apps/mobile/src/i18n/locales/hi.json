@@ -241,6 +241,7 @@
     "addPasskey": "पासकी जोड़ें",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} को जोड़ा गया",
+    "passkeyLastUsedOn": "अंतिम बार उपयोग {{date}}",
     "passkeyAdded": "पासकी जोड़ दी गई।",
     "passkeyAddFailed": "पासकी जोड़ी नहीं जा सकी। फिर से प्रयास करें।",
     "passkeyAddUnsupported": "यह डिवाइस पासकी नहीं बना सकता।",

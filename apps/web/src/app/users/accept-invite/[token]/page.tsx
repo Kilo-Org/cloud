@@ -1,4 +1,5 @@
-import { authOptions, getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { authOptions } from '@/lib/user/next-auth-options';
+import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { getServerSession } from 'next-auth';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';

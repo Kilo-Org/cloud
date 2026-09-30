@@ -625,7 +625,9 @@ describe('AgentSessionListScreen live presentation', () => {
       // withheld and the body carries the history route instead.
       expect(text()).not.toContain(i18n.t('home.agentSessions'));
       expect(header().props.inlineActions).toBeUndefined();
-      expect(header().props.eyebrow).toBe('0 LIVE');
+      // The accepted-empty snapshot names no live sessions, so the count is
+      // withheld exactly as the tab badge hides at zero.
+      expect(header().props.eyebrow).toBeUndefined();
     }
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -646,7 +648,9 @@ describe('AgentSessionListScreen live presentation', () => {
     // header row is gone: the empty list advertises no live-sessions row at all.
     expect(text()).not.toContain(i18n.t('home.agentSessions'));
     expect(header().props.inlineActions).toBeUndefined();
-    expect(header().props.eyebrow).toBe('0 LIVE');
+    // The accepted-empty snapshot withholds the count as well: the count
+    // names live sessions, and there are none.
+    expect(header().props.eyebrow).toBeUndefined();
     // The body carries exactly one history control — the one that opens the
     // stored history, which has no other entry point in the app (review
     // finding) — so the header cannot quietly grow a second one.
@@ -1452,7 +1456,6 @@ describe('AgentSessionListScreen header and admission', () => {
 
 describe('AgentSessionListScreen live counts', () => {
   it.each([
-    { count: 0, label: '0 LIVE' },
     { count: 1, label: '1 LIVE' },
     { count: 3, label: '3 LIVE' },
     { count: 4, label: '4 LIVE' },
@@ -1466,6 +1469,20 @@ describe('AgentSessionListScreen live counts', () => {
 
     expect(header().props.eyebrow).toBe(label);
     expect(header().props.title).toBe('Agents');
+  });
+
+  it('withholds the live count for an accepted-empty snapshot while live rows keep it', async () => {
+    // The accepted-empty snapshot names no live sessions, so the eyebrow
+    // withholds the count exactly as the tab badge hides at zero, and the empty
+    // card below remains the sole live-session content. A live row keeps it.
+    await renderScreen();
+    expect(header().props.eyebrow).toBeUndefined();
+    expect(nodes('FlashList')).toHaveLength(0);
+    expect(nodes('CenteredState')).toHaveLength(1);
+
+    state.live.activeSessions = [row];
+    await renderScreen();
+    expect(header().props.eyebrow).toBe('1 LIVE');
   });
 
   it.each([

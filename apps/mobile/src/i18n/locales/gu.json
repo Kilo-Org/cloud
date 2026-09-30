@@ -241,6 +241,7 @@
     "addPasskey": "પાસકી ઉમેરો",
     "passkeyDefaultName": "પાસકી",
     "passkeyAddedOn": "{{date}} ઉમેરાયું",
+    "passkeyLastUsedOn": "છેલ્લે વપરાયું {{date}}",
     "passkeyAdded": "પાસકી ઉમેરાઈ.",
     "passkeyAddFailed": "પાસકી ઉમેરી શકાઈ નથી. ફરી પ્રયાસ કરો.",
     "passkeyAddUnsupported": "આ ઉપકરણ પાસકી બનાવી શકતું નથી.",

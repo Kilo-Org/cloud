@@ -1,4 +1,5 @@
-import { adminProcedure, createTRPCRouter, creditManagerProcedure } from '@/lib/trpc/init';
+import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import {
   organizations,
@@ -46,7 +47,7 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { findUserById } from '@/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getAdminCreditTransactionsForOrganization } from '@/lib/creditTransactions';

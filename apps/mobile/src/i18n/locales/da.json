@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Kodelagre",
     "securityAgent": "Sikkerhedsagent",
     "unknown": "Ukendt",
@@ -721,7 +721,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet, ventende kommentar ved {{location}}",
       "editA11y": "Rediger ventende kommentar ved {{location}}",
-      "staleHint": "pR'en er blevet opdateret, siden du skrev dette.",
+      "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
       "noCommentsQueued": "Der er ingen kommentarer i køen. Gennemgangen sendes kun med det valgte resultat ovenfor.",
@@ -2059,7 +2059,7 @@
       "dollar_other": "dollar",
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenTitle": "Kunne ikke åbne GitHub",
@@ -2660,7 +2660,7 @@
       "open": "åben PR",
       "closed": "lukket PR",
       "merged": "flettet PR",
-      "draft": "pR-kladde",
+      "draft": "PR-kladde",
       "updating": "Opdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

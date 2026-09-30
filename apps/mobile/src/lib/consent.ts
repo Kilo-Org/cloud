@@ -193,8 +193,11 @@ export async function setOptionalConsent(userId: string, optional: boolean): Pro
 
 export async function revokeConsent(userId: string): Promise<void> {
   await chainSave(keyFor(userId), async () => {
-    await SecureStore.deleteItemAsync(keyFor(userId));
-    await SecureStore.deleteItemAsync(legacyKeyFor(userId));
+    // Two independent records, removed in one native Keychain round-trip.
+    await Promise.all([
+      SecureStore.deleteItemAsync(keyFor(userId)),
+      SecureStore.deleteItemAsync(legacyKeyFor(userId)),
+    ]);
   });
   // A queued enable outcome must never fire after revoke.
   pendingConsentOutcome = null;

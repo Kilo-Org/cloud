@@ -1,10 +1,12 @@
 export function getFilename(filePath: string): string {
-  return filePath.split('/').pop() ?? filePath;
+  const parts = filePath.split('/');
+  return parts.at(-1) || filePath;
 }
 
 export function getDirectoryName(path: string): string {
-  const parts = path.split('/');
-  return parts.at(-1) ?? path;
+  const cleaned = path.replace(/\/+$/, '');
+  const parts = cleaned.split('/');
+  return parts.at(-1) || path || '.';
 }
 
 export function truncateText(text: string, maxLength: number): string {

@@ -204,31 +204,10 @@ export function resolvePrefillModel(
 }
 
 /**
- * Resolve a prefill repository against the loaded repository list.
- * Match is **case-insensitive**; returns the **matched entry's
- * `fullName`** (GitHub's canonical casing). Returns `null` when
- * `prefill.repo` is absent or nothing matches.
- */
-export function resolvePrefillRepo(
-  repositories: { fullName: string }[],
-  prefill: NewSessionPrefill
-): string | null {
-  if (!prefill.repo) {
-    return null;
-  }
-
-  const lower = prefill.repo.toLowerCase();
-  const match = repositories.find(r => r.fullName.toLowerCase() === lower);
-  return match?.fullName ?? null;
-}
-
-/**
  * Resolve a prefill repository to a platform-qualified picker key
  * `platform:fullName`. Continuation prefill is GitHub-only (see
  * `buildContinuePrefillParams` + `isGitHubUrl`), so only a GitHub row may
  * satisfy it: a same-named GitLab/Bitbucket row must never be selected.
- * Kept separate from `resolvePrefillRepo`, which returns the bare matched
- * `fullName` and is used where a bare fullName is needed.
  */
 export function resolvePrefillRepoSelection(
   repositories: { platform: string; fullName: string }[],

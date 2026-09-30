@@ -10,7 +10,6 @@ import {
   type NewSessionPrefill,
   readNewSessionPrefill,
   resolvePrefillModel,
-  resolvePrefillRepo,
   resolvePrefillRepoSelection,
 } from './new-session-prefill';
 
@@ -227,29 +226,6 @@ describe('resolvePrefillModel', () => {
     { model: '' },
   ])('returns null when model="%s"', ({ model, catOverride }) => {
     const result = resolvePrefillModel(catOverride ?? catalog, { mode: 'code', model });
-    expect(result).toBeNull();
-  });
-});
-
-// ════════════════════════════════════════════════════════════════
-// resolvePrefillRepo
-// ════════════════════════════════════════════════════════════════
-
-describe('resolvePrefillRepo', () => {
-  const repos = [{ fullName: 'Kilo-Org/cloud' }, { fullName: 'kilo-org/mobile' }];
-
-  it('matches case-insensitively and returns canonical casing', () => {
-    const result = resolvePrefillRepo(repos, { mode: 'code', repo: 'kilo-org/cloud' });
-    expect(result).toBe('Kilo-Org/cloud');
-  });
-
-  it.each([
-    { repo: 'other/repo', reposOverride: undefined, desc: 'no match' },
-    { repo: 'Kilo-Org/cloud', reposOverride: [] as { fullName: string }[], desc: 'empty list' },
-    { repo: undefined, reposOverride: undefined, desc: 'absent' },
-    { repo: '', reposOverride: undefined, desc: 'empty string' },
-  ])('returns null when repo is $desc', ({ repo, reposOverride }) => {
-    const result = resolvePrefillRepo(reposOverride ?? repos, { mode: 'code', repo });
     expect(result).toBeNull();
   });
 });

@@ -41,6 +41,7 @@ const COPY: Record<string, string> = {
   'glanceable.needsInput': 'Needs input',
   'common.idle': 'Idle',
   'common.working': 'Working',
+  'common.scheduled': 'Scheduled',
   'glanceable.waiting': 'Waiting for agents',
   'glanceable.empty': 'No work in progress',
   'glanceable.expired': 'Status expired',
@@ -71,7 +72,7 @@ const formatAgo = (at: string): string => `ago:${at}`;
 const AGO = formatAgo(NEWEST_AT);
 
 function snapshotFor(
-  sessions: { status: string; statusUpdatedAt?: string }[],
+  sessions: { status: string; statusUpdatedAt?: string; scheduledAt?: string }[],
   revision = 0,
   status?: GlanceableAgentsSnapshot['status']
 ): GlanceableAgentsSnapshot {
@@ -159,6 +160,30 @@ function collectStyles(node: unknown): Record<string, unknown>[] {
 
 type Cell = { width: number; height?: number; rtl?: boolean };
 
+/** The count row whose own label is `label`, found through its direct children. */
+function countRowFor(node: unknown, label: string): MockElement | undefined {
+  return findElement(node, element => {
+    const children = element.props.children;
+    return (
+      Array.isArray(children) &&
+      children.some(child => (child as MockElement | null)?.props.text === label)
+    );
+  });
+}
+
+/**
+ * The scheduled row's wake slot: the child that reserves a numeric height and
+ * lays its own content out in a row. The state dot has a height too, so the
+ * direction is what tells the two apart.
+ */
+function wakeSlotStyle(row: MockElement | undefined): Record<string, unknown> | undefined {
+  return row === undefined
+    ? undefined
+    : collectStyles(row).find(
+        style => typeof style.height === 'number' && style.flexDirection === 'row'
+      );
+}
+
 function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
   const { width, height = 200, rtl = false } = cell;
   return renderActiveAgentsWidget(
@@ -175,7 +200,7 @@ function render(props: ReturnType<typeof buildAndroidWidgetProps>, cell: Cell) {
 }
 
 /** The three count rows as text, in rank order, with every state labelled. */
-const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+const COUNT_ROWS = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
 function propsWithNewest(): ReturnType<typeof buildAndroidWidgetProps> {
   return buildAndroidWidgetProps(
@@ -223,6 +248,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '1',
+      'Scheduled',
+      '0',
       'Idle',
       '0',
       'Approve',
@@ -246,6 +273,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
       'Approve',
     ]);
@@ -262,7 +291,17 @@ describe('renderActiveAgentsWidget', () => {
     const rep = render(props, { width: 120 });
     const text = collectText(rep.light);
 
-    expect(text).toEqual(['1', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
+    expect(text).toEqual([
+      '1',
+      'Needs input',
+      '2',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
   });
 
   it('shows every count, zeros included, at a wide width', () => {
@@ -277,14 +316,27 @@ describe('renderActiveAgentsWidget', () => {
     const text = collectText(rep.light);
 
     // The zero row draws so the rows hold still as work moves between states.
-    expect(text).toEqual(['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve']);
+    expect(text).toEqual([
+      '1',
+      'Needs input',
+      '1',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
   });
 
   // One cell tall: the counts run in a row instead of stacking. A short row
   // keeps the word only on the ranked state, a wide one labels all three.
   it.each([
-    { width: 250, visibleText: ['1', 'Needs input', '1', '0', 'Approve'] },
-    { width: 340, visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Idle', 'Approve'] },
+    { width: 250, visibleText: ['1', 'Needs input', '1', '0', '0', 'Approve'] },
+    {
+      width: 340,
+      visibleText: ['1', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'],
+    },
   ])(
     'runs the counts in a row at width $width and one cell of height',
     ({ width, visibleText }) => {
@@ -305,8 +357,14 @@ describe('renderActiveAgentsWidget', () => {
   // spoken label still says the counts are delayed. The large cell is the one
   // that has a footer to carry the warning.
   it.each([
-    { width: 120, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
-    { width: 250, visibleText: ['2', 'Needs input', '4', 'Working', '3', 'Idle', 'Approve'] },
+    {
+      width: 120,
+      visibleText: ['2', 'Needs input', '4', 'Working', '0', 'Scheduled', '3', 'Idle', 'Approve'],
+    },
+    {
+      width: 250,
+      visibleText: ['2', 'Needs input', '4', 'Working', '0', 'Scheduled', '3', 'Idle', 'Approve'],
+    },
   ])(
     'speaks stale numeric counts and keeps the deep link at width $width',
     ({ width, visibleText }) => {
@@ -370,6 +428,8 @@ describe('renderActiveAgentsWidget', () => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
       'Newest: Fix the flaky test',
     ]);
@@ -415,7 +475,16 @@ describe('renderActiveAgentsWidget', () => {
     const props = buildAndroidWidgetProps(snapshotFor([{ status: 'retry' }]), {}, translate);
     const light = render(props, { width: 250 }).light;
 
-    expect(collectText(light)).toEqual(['1', 'Needs input', '0', 'Working', '0', 'Idle']);
+    expect(collectText(light)).toEqual([
+      '1',
+      'Needs input',
+      '0',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+    ]);
     expect(findElement(light, element => element.props.clickAction === 'approve')).toBeUndefined();
   });
 
@@ -529,6 +598,8 @@ describe('the large widget cell', () => {
       'Needs input',
       '4',
       'Working',
+      '0',
+      'Scheduled',
       '3',
       'Idle',
       'Newest result',
@@ -563,6 +634,8 @@ describe('the large widget cell', () => {
       'Needs input',
       '4',
       'Working',
+      '0',
+      'Scheduled',
       '3',
       'Idle',
       'Newest result',
@@ -651,11 +724,63 @@ describe('the large widget cell', () => {
       '0',
       'Working',
       '1',
+      'Scheduled',
+      '0',
       'Idle',
       '0',
       'Newest result',
       AGO,
       'Working',
     ]);
+  });
+});
+
+// The scheduled count row: the marker takes its own color, the wake rides beside
+// the row, and the slot the wake fills is reserved whether or not it is known.
+describe('the scheduled count row', () => {
+  /** Two hours ahead of the suite's clock, so the stub formatter echoes it. */
+  const WAKE = new Date(NOW + 7_200_000).toISOString();
+
+  function propsFor(scheduledAt?: string) {
+    return buildAndroidWidgetProps(
+      snapshotFor(
+        [{ status: 'scheduled', ...(scheduledAt === undefined ? {} : { scheduledAt }) }],
+        0
+      ),
+      {},
+      translate,
+      String,
+      formatAgo
+    );
+  }
+
+  it('gives the scheduled marker its own color instead of the idle outline', () => {
+    const rep = render(propsFor(), { width: 250 });
+    const light = collectStyles(rep.light);
+    const dark = collectStyles(rep.dark);
+
+    // Filled in the muted-soft tone the session list's scheduled clock uses.
+    expect(light.some(style => style.backgroundColor === lightColors.mutedSoft)).toBe(true);
+    expect(dark.some(style => style.backgroundColor === darkColors.mutedSoft)).toBe(true);
+    // The idle marker stays an outline, so the two greys never read alike.
+    expect(light.some(style => style.borderColor === lightColors.foreground)).toBe(true);
+  });
+
+  it('draws the wake time beside the scheduled row', () => {
+    const row = countRowFor(render(propsFor(WAKE), { width: 250 }).light, 'Scheduled');
+
+    expect(collectText(row)).toEqual(['1', 'Scheduled', formatAgo(WAKE)]);
+  });
+
+  it('reserves the wake slot whether or not a wake is known', () => {
+    const withWakeRow = countRowFor(render(propsFor(WAKE), { width: 250 }).light, 'Scheduled');
+    const withoutWakeRow = countRowFor(render(propsFor(), { width: 250 }).light, 'Scheduled');
+    const withWake = wakeSlotStyle(withWakeRow);
+    const withoutWake = wakeSlotStyle(withoutWakeRow);
+
+    expect(withWake?.height).toBeGreaterThan(0);
+    expect(withoutWake?.height).toBe(withWake?.height);
+    // The slot is reserved empty: no time text until the CLI reports one.
+    expect(collectText(withoutWakeRow)).toEqual(['1', 'Scheduled']);
   });
 });

@@ -34,6 +34,7 @@ vi.mock('@/lib/active-sessions-live-sync', () => ({
 
 vi.mock('react-native', () => ({
   InteractionManager: { runAfterInteractions: vi.fn() },
+  AppState: { currentState: 'active', addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
 }));
 
 function createTrpcStub(infiniteQueryOptions: unknown) {
@@ -184,23 +185,28 @@ describe('buildAgentSessionSearchInput', () => {
 });
 
 describe('buildStoredSessionsQueryOptions', () => {
-  it('keeps the native window-focus refetch by default (Home and Share Gate)', () => {
+  it('leaves the native window-focus refetch off by default so the hook owns the foreground reconcile', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {});
 
+    // The hook registers its own `useAppLifecycle` foreground edge and
+    // reconciles page one; React Query's native window-focus refetch would
+    // instead re-request every retained page.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
-      expect.objectContaining({ refetchOnWindowFocus: true })
+      expect.objectContaining({ refetchOnWindowFocus: false })
     );
-    expect(result.refetchOnWindowFocus).toBe(true);
+    expect(result.refetchOnWindowFocus).toBe(false);
   });
 
-  it('disables the native window-focus refetch only for the Agents list configuration', () => {
+  it('keeps the native window-focus refetch off when the caller opts out of the hook edge', () => {
     const infiniteQueryOptions = vi.fn((_input: unknown, options: object) => options);
     const result = buildStoredSessionsQueryOptions(createTrpcStub(infiniteQueryOptions), {
       refetchOnWindowFocus: false,
     });
 
+    // The Agents list drives foreground through its own callback, so the
+    // native fan-out stays off there too.
     expect(infiniteQueryOptions).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 30 }),
       expect.objectContaining({ refetchOnWindowFocus: false })

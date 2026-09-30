@@ -26,6 +26,7 @@ import {
 } from '@/lib/service-fees/invoice-created';
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
 import {
   buildServiceFeeCommercialMetadata,
   getInvoiceLineInvoiceItemId,
@@ -1061,6 +1062,8 @@ export async function createOrganizationKiloPassCheckout(input: {
   tier: 'tier_19' | 'tier_49' | 'tier_199';
   allocations: { childOrganizationId: string; passCount: number }[];
   serviceFee?: Omit<OrganizationKiloPassServiceFeeAttachment, 'invoice' | 'subscription'>;
+  /** Bouncer context; omitted by callers that do not report a `charge.attempted`. */
+  attempt?: ChargeAttemptContext;
 }): Promise<
   { kind: 'payment_action'; clientSecret: string } | { kind: 'completed' } | { kind: 'pending' }
 > {
@@ -1170,6 +1173,17 @@ export async function createOrganizationKiloPassCheckout(input: {
     providerSeatAddOnItemId: passItem.id,
   });
   const invoice = typeof updated.latest_invoice === 'object' ? updated.latest_invoice : null;
+  if (input.attempt && invoice) {
+    reportChargeAttempted({
+      flow: 'kilo_pass',
+      userId: input.actorUserId,
+      orgId: input.organizationId,
+      amountCents: invoice.amount_due,
+      accountCreatedAt: input.attempt.accountCreatedAt,
+      ip: input.attempt.ip,
+      ipCountry: input.attempt.ipCountry,
+    });
+  }
   let feeResult: Awaited<ReturnType<typeof attachPreparedOrganizationKiloPassServiceFee>> | null =
     null;
   if (invoice && prepared.shouldAttach) {

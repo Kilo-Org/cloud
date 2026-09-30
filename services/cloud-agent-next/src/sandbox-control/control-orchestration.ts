@@ -35,6 +35,12 @@ export type ControlOrchestratorDeps = {
   maxSteps?: number;
   /** Optional sink for each committed, non-no-op transition the controller reports. */
   onTransition?: (transition: AllocationTransition) => void;
+  /**
+   * Runs after every `drain` completes, whether commands ran or the bound tripped.
+   * It sees the settled post-drain state. A failure here does not mask an error
+   * thrown by the drain body.
+   */
+  afterDrain?: () => Promise<void>;
 };
 
 export type ControlOrchestrator = {
@@ -76,20 +82,36 @@ export function createControlOrchestrator(deps: ControlOrchestratorDeps): Contro
     initial: readonly Command[],
     now: number
   ): Promise<AllocationDecision | undefined> {
-    let queue = [...initial];
     let decision: AllocationDecision | undefined;
-    let steps = 0;
-    while (queue.length > 0 && steps < maxSteps) {
-      steps += 1;
-      const feedback = await runCommands(deps.effects, queue, now, deps.shouldDeferRecovery);
-      queue = [];
-      for (const resultEvent of feedback) {
-        const next = await controller.dispatch(resultEvent, clock());
-        if (next === undefined) continue;
-        decision = next;
-        queue.push(...next.commands);
+    let failure: unknown;
+    let failed = false;
+    try {
+      let queue = [...initial];
+      let steps = 0;
+      while (queue.length > 0 && steps < maxSteps) {
+        steps += 1;
+        const feedback = await runCommands(deps.effects, queue, now, deps.shouldDeferRecovery);
+        queue = [];
+        for (const resultEvent of feedback) {
+          const next = await controller.dispatch(resultEvent, clock());
+          if (next === undefined) continue;
+          decision = next;
+          queue.push(...next.commands);
+        }
       }
+    } catch (error) {
+      failed = true;
+      failure = error;
     }
+    if (failed) {
+      try {
+        await deps.afterDrain?.();
+      } catch {
+        // A drain-body failure is authoritative; the post-drain hook must not mask it.
+      }
+      throw failure;
+    }
+    await deps.afterDrain?.();
     return decision;
   }
 

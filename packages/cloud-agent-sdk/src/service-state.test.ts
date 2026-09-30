@@ -146,6 +146,45 @@ describe('createServiceState', () => {
 
       expect(state.getStatus()).toEqual({ type: 'idle' });
     });
+
+    it('scheduled on root sets a scheduled status with its wake time and idles the activity', () => {
+      const state = createServiceState(makeConfig());
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'busy' } });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'root-1',
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      });
+
+      expect(state.getStatus()).toEqual({
+        type: 'scheduled',
+        scheduledAt: '2026-09-24T09:00:00.000Z',
+      });
+      expect(state.getActivity()).toEqual({ type: 'idle' });
+    });
+
+    it('scheduled without a wake time yields a scheduled status with no time', () => {
+      const state = createServiceState(makeConfig());
+
+      state.process({ type: 'session.status', sessionId: 'root-1', status: { type: 'scheduled' } });
+
+      expect(state.getStatus()).toEqual({ type: 'scheduled' });
+      expect(state.getStatus()).not.toHaveProperty('scheduledAt');
+    });
+
+    it('scheduled on a child does not repaint the root status', () => {
+      const state = createServiceState(makeConfig());
+      state.setStatus({ type: 'error', message: 'previous error' });
+
+      state.process({
+        type: 'session.status',
+        sessionId: 'child-1',
+        status: { type: 'scheduled' },
+      });
+
+      expect(state.getStatus()).toEqual({ type: 'error', message: 'previous error' });
+    });
   });
 
   describe('stopped', () => {

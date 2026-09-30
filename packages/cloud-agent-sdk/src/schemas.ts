@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
-import type { KiloSessionId } from './types';
+import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
 // ---------------------------------------------------------------------------
 // Wire-level envelope
@@ -47,6 +47,12 @@ export const sessionStatusSchema = z.discriminatedUnion('type', [
     message: z.string(),
     next: z.number(),
   }),
+  // A session that is scheduled to wake later and does nothing now. The wake
+  // time is optional: a CLI may report `scheduled` without one, and the reading
+  // then stays "scheduled" with no time. A producer that serializes the absent
+  // time as an explicit null, or sends a value that is not a time, reads as
+  // absent instead of failing the parse.
+  z.object({ type: z.literal('scheduled'), scheduledAt: z.string().optional().catch(undefined) }),
 ]);
 export type SessionStatus = z.infer<typeof sessionStatusSchema>;
 
@@ -460,10 +466,20 @@ export const activeSessionSchema = z
     gitBranch: z.string().optional(),
     parentSessionId: z.string().optional(),
     /**
+     * ISO-8601 wake time for a `scheduled` session, as advertised by the
+     * owning CLI in its `sessions.list` / `sessions.heartbeat` payload. Absent
+     * when the CLI reports `scheduled` without a wake time, and an explicit
+     * null from a producer that serializes the absent field reads the same way.
+     * Declared here so typed consumers (the mobile session list) can read it
+     * without a cast.
+     */
+    scheduledAt: z.string().optional().catch(undefined),
+    /**
      * Per-session capabilities advertised by the owning CLI in its
-     * `sessions.heartbeat` / `sessions.list` payload. `attachments: true`
-     * gates the remote-CLI attachment path; absent / false means the CLI
-     * either predates the capability or has not yet reported it.
+     * `sessions.heartbeat` / `sessions.list` payload. Only an explicit
+     * `attachments: false` closes the remote-CLI attachment path; absent
+     * (the CLI predates the capability or has not yet reported it) is
+     * treated as supported.
      *
      * Declared here (rather than relying on `.passthrough()`) so typed
      * consumers can reason about the shape without an extra `as` cast. The
@@ -555,7 +571,16 @@ export type ListDirectoriesV1 = z.infer<typeof listDirectoriesV1Schema>;
 // V2 session system events
 // ---------------------------------------------------------------------------
 
-export const sessionStatusValueSchema = z.enum(['idle', 'busy', 'question', 'permission', 'retry']);
+/**
+ * Permissive status value for v2 session rows and status-updated payloads.
+ *
+ * Deliberately `z.string()` rather than a closed enum: a newer CLI may report a
+ * status this SDK does not know yet, and that value must still parse so the
+ * event/row is never dropped and the value is never re-labelled. Known values
+ * (`idle`, `busy`, `question`, `permission`, `retry`, `scheduled`) keep working
+ * unchanged.
+ */
+export const sessionStatusValueSchema = z.string();
 
 export const sessionEventV2RowSchema = z.object({
   source: z.literal('v2'),
@@ -571,6 +596,7 @@ export const sessionEventV2RowSchema = z.object({
   worktreeId: z.string().nullable().optional(),
   status: sessionStatusValueSchema.nullable(),
   statusUpdatedAt: z.string().nullable(),
+  scheduledAt: z.string().nullable().optional(),
 });
 export type SessionEventV2Row = z.infer<typeof sessionEventV2RowSchema>;
 
@@ -588,6 +614,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     changedAt: z.string(),
   }),
   z.object({
@@ -596,6 +623,7 @@ export const sessionStatusUpdatedPayloadSchema = z.union([
     previousStatus: sessionStatusValueSchema.nullable(),
     status: sessionStatusValueSchema.nullable(),
     statusUpdatedAt: z.string().nullable(),
+    scheduledAt: z.string().nullable().optional(),
     updatedAt: z.string().optional(),
     changedAt: z.string(),
   }),
@@ -935,8 +963,16 @@ export const slashCommandInfoSchema = z.object({
 });
 export type SlashCommandInfo = z.infer<typeof slashCommandInfoSchema>;
 
+export const slashCommandCatalogStatusSchema: z.ZodType<SlashCommandCatalogStatus> = z.object({
+  dropped: z.number().int().nonnegative(),
+  overLimit: z.boolean(),
+});
+
 export const commandsAvailableDataSchema = z.object({
   commands: z.array(slashCommandInfoSchema),
+  // The notice is a nicety and the catalog is essential, so a malformed status
+  // is dropped instead of failing the whole event and losing the catalog.
+  catalogStatus: slashCommandCatalogStatusSchema.optional().catch(undefined),
 });
 export type CommandsAvailableData = z.infer<typeof commandsAvailableDataSchema>;
 

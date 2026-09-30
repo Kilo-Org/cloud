@@ -29,10 +29,11 @@ type SessionFilterButtonProps = {
  * carries `shrink-0`, so the header row cannot squeeze it under the audit's
  * 28dp floor.
  *
- * The sides are spelled out rather than a single uniform number: the row's
- * sibling control (`session-list-header-actions.tsx`) caps its facing right
- * slop against this control's left slop at the row's 14pt gap, and the test
- * that guards that invariant reads the insets.
+ * The sides are spelled out rather than a single uniform number: the agents
+ * header row caps this control's two horizontal sides at its `gap-4` gap (the
+ * row mirrors under RTL while `hitSlop` does not, so the cap cannot sit on one
+ * physical side) and passes the capped insets in through the prop below. The
+ * test that guards that invariant reads the insets.
  */
 const FILTER_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,

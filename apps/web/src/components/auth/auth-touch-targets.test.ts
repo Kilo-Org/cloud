@@ -16,10 +16,8 @@ import { resolve } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { DeviceAuthClient as DeviceAuthClientType } from '@/app/device-auth/DeviceAuthClient';
-import type {
-  AuthProviderId,
-  ProdNonSSOAuthProviders as ProdNonSSOAuthProvidersType,
-} from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { ProdNonSSOAuthProviders as ProdNonSSOAuthProvidersType } from '@/lib/auth/provider-metadata';
 import type { AuthErrorNotification as AuthErrorNotificationType } from './AuthErrorNotification';
 import type { MagicLinkSentConfirmation as MagicLinkSentConfirmationType } from './MagicLinkSentConfirmation';
 import type { SignInForm as SignInFormType } from './SignInForm';
@@ -62,10 +60,6 @@ jest.mock('@/components/AnimatedLogoMark', () => ({ AnimatedLogoMark: () => null
 // A CSS module is not loadable in the jest node environment; the provider
 // buttons are real, only their stylesheet name is stubbed.
 jest.mock('./sign-in/AuthProviderButtons.module.css', () => ({ anacondaButton: 'anacondaButton' }));
-
-jest.mock('@/hooks/useChatGptSignInAccess', () => ({
-  useChatGptSignInAccess: () => false,
-}));
 
 jest.mock('@/hooks/usePasskeySignIn', () => ({ usePasskeySignIn: () => mockPasskey }));
 

@@ -85,10 +85,17 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  useColorScheme: () => 'light',
 }));
 vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
   AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
 }));
+
+// The profile row's loading state is asserted as a `Skeleton` node. The real
+// component's Reanimated clock cannot load under Node's ESM loader
+// (react-native-worklets ships extensionless imports), and the string host
+// keeps the assertion type-exact without the animation stack.
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 

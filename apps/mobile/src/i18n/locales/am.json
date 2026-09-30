@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ወደ ኋላ ተመለስ",
     "idle": "በእረፍት",
+    "scheduled": "የተያዘ",
     "keepEditing": "ማርትዕህን ቀጥል",
     "keepRunning": "እንዲሠራ ተወው",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "የተሰረዘ ተጠቃሚ",
       "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
       "moreLinesAbove_one": "… ከላይ ተጨማሪ {{displayCount}} መስመር አለ።",
-      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።"
+      "moreLinesAbove_other": "… ከላይ ተጨማሪ {{displayCount}} መስመሮች አሉ።",
+      "deleteComment": "አስተያየት ሰርዝ",
+      "deleteCommentTitle": "አስተያየት ሰርዝ?",
+      "deleteCommentMessage": "ይህ አስተያየት ከዚህ የማዋሃድ ጥያቄ ይሰረዛል።",
+      "commentEditFailed": "አስተያየትህን ማስቀመጥ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+      "commentEditUnavailable": "ይህ አስተያየት ሊስተካከል አይችልም። ተሰርዞ ሊሆን ይችላል።",
+      "commentDeleteFailed": "አስተያየትህን መሰረዝ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።",
+      "commentDeleteUnavailable": "ይህ አስተያየት ሊሰረዝ አይችልም።"
     },
     "couldNotOpenGitHubAppSettings": "የGitHub መተግበሪያ ቅንብሮችን መክፈት አልተቻለም።",
     "installKiloGitHubApp": "የKilo GitHub መተግበሪያን ጫን",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
     "announce": {
       "commentPosted": "አስተያየት ተለጥፏል",
+      "commentUpdated": "አስተያየት ተዘምኗል",
+      "commentDeleted": "አስተያየት ተሰርዟል",
       "reviewSubmitted": "ግምገማ ቀርቧል",
       "autoMergeEnabled": "ራስ-ሰር ማዋሃድ ነቅቷል"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ንቁ ክፍለ ጊዜዎችን መጫን አልተቻለም።",
       "couldNotRefresh": "ማደስ አልተቻለም",
       "noSessionsYetDescription": "ከስልክህ ኮድ የመጻፍ ሥራ ጀምር። ክፍለ ጊዜዎችህ እዚህ ይታያሉ።",
+      "viewHistory": "የክፍለ ጊዜ ታሪክ",
       "noMatches": "የሚዛመዱ ክፍለ ጊዜዎች የሉም",
       "tryDifferentSearch": "ሌላ የፍለጋ ቃል ሞክር።",
       "tryAdjustFilters": "ማጣሪያዎችህን ለማስተካከል ወይም ለማጽዳት ሞክር።",
       "couldNotSearch": "ክፍለ ጊዜዎችን መፈለግ አልተቻለም።",
       "completedWillAppear": "የተጠናቀቁ ክፍለ ጊዜዎች እዚህ ይታያሉ።",
       "noPastSessions": "ምንም ያለፉ ክፍለ ጊዜዎች የሉም",
+      "pastSessions": "ያለፉ ክፈለ ጊዜዎች",
       "live": "ቀጥታ",
       "updating": "በማዘመን ላይ"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "የክፍለ ጊዜ ስም",
       "transcriptAccessibility": "የክፍለ ጊዜው የውይይት ግልባጭ",
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
+      "continueInNewSession": "በአዲስ ክፍለ ጊዜ ይቀጥሉ",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "የOpenAI Codex ክፍለ ጊዜ ግልባጭ አስገባ",
       "reviewDescription": "ለውጦችን ገምግም [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}}ን ይጠቀሙ",
+      "useSkillCommand": "/{{command}} ክህሎትን ይጠቀሙ",
+      "skillBadge": "ክህሎት",
+      "catalogFull": "የትዕዛዝ ካታሎጉ ሞልቷል፣ ስለዚህ አንዳንድ ትዕዛዞች ተደብቀዋል።",
+      "catalogOverLimit": "የክህሎት ካታሎጉ ከመጠን ገደቡ አልፏል፣ ስለዚህ ሁሉም ክህሎት ተዘርዝሯል።",
       "insert": "ያስገቡ",
       "upgradeRequiredFallback": "ይህን ትዕዛዝ ለመጠቀም እባክዎ CLIዎን ያዘምኑ።",
       "exitCapabilityUnavailable": "ከክፍለ ጊዜው ለመውጣት CLIዎን ያዘምኑ።",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "ወደ ኋላ ይመለሱና ይህን መምረጫ ከቀደመው ገጽ እንደገና ይክፈቱ።"
   },
   "sessionRow": {
-    "needsInput": "ምላሽ ይፈልጋል"
+    "needsInput": "ምላሽ ይፈልጋል",
+    "scheduled": "የተያዘ"
   },
   "voiceInput": {
     "listening": "በማዳመጥ ላይ...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
     "emptyDescription": "የአገናኝ አስተናጋጅን እንደታመነ ካደረጉት፣ አገናኞቹ እንደገና ሳይጠይቁዎት ይከፈታሉ።",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
+    "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።",
     "openSession": "ክፈት",
     "approveFailed": "ማጽደቅ አልተቻለም። እንደገና ለመሞከር $t(common.approve) ይንኩ።",
-    "newestResult": "አዲሱ ውጤት"
+    "newestResult": "አዲሱ ውጤት",
+    "scheduledWakes": "{{time}} ይነቃል"
   },
   "transcriptionModel": {
     "title": "የድምጽ ወደ ጽሑፍ ሞዴል",

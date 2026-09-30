@@ -7,7 +7,7 @@
       "instanceLifecycle": "သင့် instance တွင် အသစ်အဆန်း ရှိသည်",
       "scheduledAction": "စီစဉ်ထားသော လုပ်ဆောင်ချက်တွင် အသစ်အဆန်း ရှိသည်",
       "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "သင့်အသုံးစရိတ် အာရုံစိုက်ရန် လိုအပ်သည်",
       "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်",
       "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} လက်ကျန်သည် ${{minimumBalanceUsd}} အောက်သို့ ကျဆင်းသွားသည်"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "အသုံးစရိတ် သတိပေးချက်",
+      "body": "{{scopeName}} အသုံးစရိတ်သည် ${{amountUsd}} ကျော်လွန်သွားသည်"
     },
     "securityFindingNew": {
       "title": "လုံခြုံရေး တွေ့ရှိချက် အသစ် ({{severity}})",

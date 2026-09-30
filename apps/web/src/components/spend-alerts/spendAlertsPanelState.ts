@@ -70,6 +70,32 @@ export const THRESHOLD_FIELD_ERROR = 'Enter a limit over 0 and at most 1,000,000
 export const MULTIPLIER_FIELD_ERROR = 'Enter a spike multiplier between 1x and 50x.';
 
 /**
+ * The scope line under the panel title. It names the owner these settings
+ * belong to, because the panel renders for both the caller's own account and an
+ * organization and the copy alone does not say which one an alert watches.
+ */
+export const SPEND_ALERTS_PERSONAL_SCOPE_LABEL = 'Account';
+export const SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL = 'Organization';
+
+/**
+ * The line under the panel title that names the owner: `Account: <name>` for
+ * the caller's own account, `Organization: <name>` for an organization scope.
+ * The router returns both `scope` and `scopeName` for every readable scope.
+ *
+ * `null` when the query carries no name to show, so a caller that has not
+ * resolved a name renders no empty label.
+ */
+export function scopeLine(data: Pick<SpendAlertsQueryData, 'scope' | 'scopeName'>): string | null {
+  const name = data.scopeName?.trim();
+  if (name === undefined || name === '') return null;
+  const label =
+    data.scope === 'organization'
+      ? SPEND_ALERTS_ORGANIZATION_SCOPE_LABEL
+      : SPEND_ALERTS_PERSONAL_SCOPE_LABEL;
+  return `${label}: ${name}`;
+}
+
+/**
  * Where the web panel sends a viewer to fix a blocked push channel: the Kilo
  * mobile app page, which installs the app whose notification settings own the
  * spend-alerts category and whose device registration push delivery needs.
@@ -87,28 +113,44 @@ export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
  * at the card's own width and the dashboard below never moves when the settings
  * arrive, fail, or are refused.
  *
+ * The ready form reserves the worst of its two call-to-action branches, not the
+ * saved confirmation: a failed save replaces the 36px Save row with the
+ * save-error row, which is 58px and wraps taller than that below a 327px card.
+ * Both branches render inside one wrapper carrying
+ * {@link SPEND_ALERTS_CTA_SLOT_CLASS}, so the happy branch reserves the same
+ * height as the error row; the floors below reserve the measured worst case with
+ * the error row showing.
+ *
  * The ready form's height is a step function of the card width, not a single
  * number: the rule descriptions and the push channel note wrap differently
- * across a window of card widths, and how tall that window's step is varies
- * with the host's text metrics and with whether push is blocked. The bands
- * therefore reserve the *worst reported* ready-form height for their whole
- * range, not the common one — a form below the floor costs nothing but the
- * space the slot already holds.
+ * across a window of card widths, so every band reserves the *worst reported*
+ * ready-form height for its whole range, not the common one. The bands are cut
+ * at the measured wrap steps, so the floor stays close to the form instead of
+ * leaving dead space below Save.
  *
- * The `>= 580px` band was the one that shrank under the ready form: the e3 run
- * measured the loading slot at 47rem (752px) and the saved, enabled form at
- * 804px on the organization usage-details view at a 1024px viewport, so the
- * cards below the panel jumped 52px as the settings arrived
- * (`e3-slot-1024.log`). The e8 sweep recorded the same shape at 816px once the
- * push channel is blocked ("Get the mobile app" on both rules), and this band
- * has to cover both numbers under every resolution of the element query, so it
- * has no upper width boundary: a card whose width resolves the query to
- * `>= 580px` gets 52rem (832px). Narrower cards keep their own, larger floors
- * (measured worst 871.5px in 380-579px and 892.5px in 310-379px).
+ * The numbers were measured on 2026-09-23 with a headless-Chromium CDP probe of
+ * this worktree's web stack, on both the personal spend view and the
+ * organization usage-details view, with the settings saved, both rules enabled,
+ * the push channel blocked (the "Get the mobile app" note on both rules) and a
+ * failing `spendAlerts.save` (a route intercept) showing its error row — the
+ * tallest ready state. The measured worst ready-form height per band is
+ * 1087.09px at a 300px card, 1037.5px at 307px, 962.5px at 341px, 941.5px at
+ * 380px, 877.5px at 416px, 856.5px at 528px and 788.5px at 593px; each floor is
+ * that number rounded up to the next whole rem.
  *
- * Below a 310px card the form's height grows without bound as the copy wraps
- * one word per line (1101px at a 238px card, 1354px at 138px), so no finite
- * floor closes that band; it keeps the pre-existing 66rem.
+ * Two effects set the step positions. The form's own copy wraps at the card
+ * width, and the threshold rule's fields collapse to one column below the `sm`
+ * media breakpoint (640px viewport) whether or not the card is wide — so a card
+ * that is 380-592px wide is taller at a < 640px viewport than at a wider one,
+ * and the floor has to cover the taller resolution. Above 592px the card is only
+ * ever reached at a >= 640px viewport, so the step drops to 788.5px.
+ *
+ * Below a 300px card the form's height grows without bound as the copy wraps one
+ * word per line (1111.09px at a 298px card, 1261.09px at a 243px card), so no
+ * finite floor closes that band; its base band keeps the 68rem that also covers
+ * the 300px step, and the first step lands at 307px. The narrower spend views
+ * are a phone-width web layout this panel does not target for shift-free
+ * reservation.
  *
  * `spendAlertsPanelState.test.ts` parses this class and asserts that each band
  * covers the worst ready-form height recorded for it, so the numbers cannot
@@ -121,7 +163,21 @@ export const MOBILE_APP_SETUP_HREF = 'https://kilo.ai/mobile';
  * verbatim from the source.
  */
 export const SPEND_ALERTS_PANEL_SLOT_CLASS =
-  'min-h-[66rem] @min-[310px]:min-h-[58rem] @min-[380px]:min-h-[55rem] @min-[580px]:min-h-[52rem]';
+  'min-h-[68rem] @min-[307px]:min-h-[65rem] @min-[341px]:min-h-[61rem] @min-[380px]:min-h-[59rem] @min-[416px]:min-h-[55rem] @min-[528px]:min-h-[54rem] @min-[593px]:min-h-[50rem]';
+
+/**
+ * The reserved height of the panel's call-to-action area, one literal shared by
+ * both branches. The Save row's `h-control-default` button is 36px while the
+ * save-error row is at least 58px (`p-3` 12+12, the taller of the 21px
+ * `type-body` message and the 32px `size="sm"` Retry, and 1+1 border), so
+ * rendering both branches inside one wrapper that carries this class keeps the
+ * panel's height the same whether a save succeeds or fails.
+ *
+ * 3.625rem = 58px is the save-error row's unwrapped height. Below a 327px card
+ * the message and its Retry button wrap onto two lines and the row grows to
+ * 91px; the band floors above, not this floor, cover that taller case.
+ */
+export const SPEND_ALERTS_CTA_SLOT_CLASS = 'min-h-[3.625rem]';
 
 /** One rule as the router returns it: USD threshold, basis-point multiplier. */
 export type SpendAlertRuleWire = {
@@ -150,6 +206,13 @@ export type SpendAlertsQueryData = {
    * `apps/web/src/routers/spend-alert-router.ts`).
    */
   pushChannelBlocked: boolean;
+  /**
+   * Which scope these settings belong to. The router returns it for every
+   * readable scope; {@link scopeLine} turns it into the title's owner line.
+   */
+  scope?: 'personal' | 'organization';
+  /** The owner's display name: the account name or the organization name. */
+  scopeName?: string;
   enabled?: boolean;
   rules?: SpendAlertRuleWire[];
 };

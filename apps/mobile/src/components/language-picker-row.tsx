@@ -5,6 +5,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { Text } from '@/components/ui/text';
 import { type LanguagePickerItem } from '@/i18n/language-rows';
 import { type LanguagePreference } from '@/lib/hooks/use-language-preference';
+import { cn } from '@/lib/utils';
 
 type LanguagePickerRowProps = Readonly<{
   item: LanguagePickerItem;
@@ -34,6 +35,14 @@ export function LanguagePickerRow({
   const { t } = useTranslation();
   const dividerClass = showDivider ? 'border-b-[0.5px] border-hair-soft' : undefined;
   const textClass = `flex-1 ${isRtl ? 'pl-3' : 'pr-3'}`;
+  // iOS resolves `textAlign: 'auto'` from the paragraph's first strong
+  // character, so an Arabic endonym right-aligns itself inside an LTR
+  // interface while its Latin subtitle stays left — the two lines of one row
+  // then do not share an edge. Naming the physical start edge in LTR keeps
+  // them together. RTL needs no counterpart: `@/components/ui/text` names the
+  // paragraph direction there, and React Native swaps a physical `text-left`
+  // under an RTL layout, which would float it to the wrong edge.
+  const alignClass = isRtl ? undefined : 'text-left';
 
   if (item.kind === 'section') {
     return (
@@ -57,8 +66,10 @@ export function LanguagePickerRow({
         }}
       >
         <View className={textClass}>
-          <Text className="text-sm font-medium">{t('language.deviceLanguage')}</Text>
-          <Text variant="muted" className="mt-0.5 text-xs">
+          <Text className={cn('text-sm font-medium', alignClass)}>
+            {t('language.deviceLanguage')}
+          </Text>
+          <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
             {deviceEndonym}
           </Text>
         </View>
@@ -80,8 +91,8 @@ export function LanguagePickerRow({
             a Latin name under a right-aligned row must not jump to the left
             edge. Unicode bidi already renders each script correctly inside
             the line. */}
-        <Text className="text-sm font-medium">{item.row.endonym}</Text>
-        <Text variant="muted" className="mt-0.5 text-xs">
+        <Text className={cn('text-sm font-medium', alignClass)}>{item.row.endonym}</Text>
+        <Text variant="muted" className={cn('mt-0.5 text-xs', alignClass)}>
           {item.row.englishName}
         </Text>
       </View>

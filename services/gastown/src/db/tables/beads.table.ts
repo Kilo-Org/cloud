@@ -60,7 +60,6 @@ export const BeadRecord = z.object({
 
 export type BeadRecord = z.output<typeof BeadRecord>;
 
-// ── Per-type bead + metadata schemas ────────────────────────────────
 // Each narrows the `type` discriminant to a literal and extends with
 // the satellite metadata columns. Use these to parse JOIN query results.
 
@@ -107,8 +106,6 @@ export const BeadRecordWithMetadata = z.discriminatedUnion('type', [
   ConvoyBeadRecord,
 ]);
 export type BeadRecordWithMetadata = z.output<typeof BeadRecordWithMetadata>;
-
-// ── Table definition ────────────────────────────────────────────────
 
 export const beads = getTableFromZodSchema('beads', BeadRecord);
 

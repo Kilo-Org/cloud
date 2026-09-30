@@ -360,7 +360,9 @@ describe('stream handler handleStreamRequest', () => {
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream', {
@@ -379,13 +381,44 @@ describe('stream handler handleStreamRequest', () => {
     ]);
   });
 
+  it('replays the catalog bound status so a bounded catalog reaches the client', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+
+    const eq = makeFakeEventQueries([]);
+    const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+        catalogStatus: { dropped: 7, overLimit: false },
+      }),
+    });
+
+    const request = new Request('https://example.com/stream', {
+      headers: { Upgrade: 'websocket' },
+    });
+    await handler.handleStreamRequest(request);
+
+    const catalogMessage = serverWs.sentMessages.find(m => {
+      const parsed = JSON.parse(m) as Record<string, unknown>;
+      return parsed.streamEventType === 'commands.available';
+    });
+    expect(catalogMessage).toBeDefined();
+    const parsed = JSON.parse(catalogMessage!) as Record<string, unknown>;
+    expect(parsed.data).toEqual({
+      commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      catalogStatus: { dropped: 7, overLimit: false },
+    });
+  });
+
   it('skips commands.available on connect when eventTypes excludes it', async () => {
     const serverWs = makeFakeWebSocket();
     mockWebSocketPair(serverWs);
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream?eventTypes=output', {
@@ -406,7 +439,9 @@ describe('stream handler handleStreamRequest', () => {
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => [{ name: 'review', description: 'Review code', hints: [] }],
+      getAvailableCommands: async () => ({
+        commands: [{ name: 'review', description: 'Review code', hints: [] }],
+      }),
     });
 
     const request = new Request('https://example.com/stream?eventTypes=output,commands.available', {
@@ -427,7 +462,7 @@ describe('stream handler handleStreamRequest', () => {
 
     const eq = makeFakeEventQueries([]);
     const handler = createStreamHandler(makeFakeState(), eq, SESSION_ID, {
-      getAvailableCommands: async () => DEFAULT_SLASH_COMMANDS,
+      getAvailableCommands: async () => ({ commands: DEFAULT_SLASH_COMMANDS }),
     });
 
     const request = new Request('https://example.com/stream', {

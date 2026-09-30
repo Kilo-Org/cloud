@@ -133,6 +133,7 @@ import type {
   UserDeletionAuditDetails,
   UserDeletionActivityDetails,
   CustomLlmDefinition,
+  AutoFreeConfig,
   KiloClawAdminAuditAction,
   KiloClawScheduledActionStatus,
   KiloClawScheduledActionStageStatus,
@@ -5814,6 +5815,7 @@ export const ai_gateway_config = pgTable(
   {
     id: integer().primaryKey().default(1),
     config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    auto_free: jsonb().$type<AutoFreeConfig>(),
   },
   table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
 );

@@ -241,6 +241,7 @@
     "addPasskey": "একটি পাসকি যোগ করুন",
     "passkeyDefaultName": "পাসকি",
     "passkeyAddedOn": "{{date}} যোগ করা হয়েছে",
+    "passkeyLastUsedOn": "শেষ ব্যবহার {{date}}",
     "passkeyAdded": "পাসকি যোগ করা হয়েছে।",
     "passkeyAddFailed": "পাসকি যোগ করা যায়নি। আবার চেষ্টা করুন।",
     "passkeyAddUnsupported": "এই ডিভাইস পাসকি তৈরি করতে পারে না।",

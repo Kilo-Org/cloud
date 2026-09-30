@@ -241,6 +241,7 @@
     "addPasskey": "ප්‍රවේශ යතුරක් එක් කරන්න",
     "passkeyDefaultName": "ප්‍රවේශ යතුර",
     "passkeyAddedOn": "{{date}} එක් කරන ලදි",
+    "passkeyLastUsedOn": "අවසන් වරට භාවිතා කළේ {{date}}",
     "passkeyAdded": "ප්‍රවේශ යතුර එක් කරන ලදි.",
     "passkeyAddFailed": "ප්‍රවේශ යතුරක් එක් කළ නොහැකි විය. නැවත උත්සාහ කරන්න.",
     "passkeyAddUnsupported": "මෙම උපාංගයට ප්‍රවේශ යතුරු සෑදිය නොහැක.",

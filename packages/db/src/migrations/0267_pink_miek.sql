@@ -1,0 +1,1 @@
+ALTER TABLE "ai_gateway_config" ADD COLUMN "auto_free" jsonb;

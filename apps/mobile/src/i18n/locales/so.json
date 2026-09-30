@@ -241,6 +241,7 @@
     "addPasskey": "Ku dar furaha gelitaanka",
     "passkeyDefaultName": "Furaha gelitaanka",
     "passkeyAddedOn": "La daray {{date}}",
+    "passkeyLastUsedOn": "Markii ugu dambeysay la isticmaalay {{date}}",
     "passkeyAdded": "Furaha gelitaanka waa la daray.",
     "passkeyAddFailed": "Lama dari karin furaha gelitaanka. Isku day mar kale.",
     "passkeyAddUnsupported": "Qalabkan ma abuuri karo furahayaasha gelitaanka.",

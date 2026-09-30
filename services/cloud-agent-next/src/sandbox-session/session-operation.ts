@@ -5,17 +5,16 @@ import type {
 } from '../sandbox-control/socket.js';
 import type { EventQueries } from '../session/queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
+import { parseOperationPayload } from '../sandbox-control/frames.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sameSessionOperation,
-  sessionAttachPayloadSchema,
   sessionAttachResultSchema,
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
   sessionOperationLookupResultSchema,
-  sessionPromptPayloadSchema,
   sessionPromptResultSchema,
   type ControlError,
   type ResponseFrame,
@@ -258,11 +257,15 @@ export async function dispatchSessionOperation(
       if (released === undefined || !messages.commit(released)) return lookup;
     }
     assertAdmissionCurrent();
-    const payload = structuredClone(
-      kind === 'attach'
-        ? sessionAttachPayloadSchema.parse(input.payload)
-        : sessionPromptPayloadSchema.parse(input.payload)
-    );
+    const validatedPayload = parseOperationPayload(authorization.operation, input.payload);
+    if (!validatedPayload.ok) {
+      return {
+        state: 'rejected',
+        error: { ...validatedPayload.error, retryable: false },
+        rejectionReceived: true,
+      };
+    }
+    const payload = structuredClone(validatedPayload.payload);
     if (!record(true)) throw new Error('Session operation proof could not be persisted');
     assertDispatchedCurrent();
     try {

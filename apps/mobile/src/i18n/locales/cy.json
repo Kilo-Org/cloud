@@ -241,6 +241,7 @@
     "addPasskey": "Ychwanegu allwedd mynediad",
     "passkeyDefaultName": "Allwedd mynediad",
     "passkeyAddedOn": "Ychwanegwyd {{date}}",
+    "passkeyLastUsedOn": "Defnyddiwyd ddiwethaf {{date}}",
     "passkeyAdded": "Allwedd mynediad wedi'i hychwanegu.",
     "passkeyAddFailed": "Methwyd ychwanegu allwedd mynediad. Rhowch gynnig arall arni.",
     "passkeyAddUnsupported": "Ni all y ddyfais hon greu allweddi mynediad.",

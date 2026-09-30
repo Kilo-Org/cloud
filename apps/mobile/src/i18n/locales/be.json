@@ -241,6 +241,7 @@
     "addPasskey": "Дадаць ключ доступу",
     "passkeyDefaultName": "Ключ доступу",
     "passkeyAddedOn": "Дададзены {{date}}",
+    "passkeyLastUsedOn": "Апошняе выкарыстанне {{date}}",
     "passkeyAdded": "Ключ доступу дададзены.",
     "passkeyAddFailed": "Не ўдалося дадаць ключ доступу. Паспрабуйце яшчэ раз.",
     "passkeyAddUnsupported": "Гэта прылада не можа ствараць ключы доступу.",

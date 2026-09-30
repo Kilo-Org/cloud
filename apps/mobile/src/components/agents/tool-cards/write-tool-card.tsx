@@ -37,8 +37,32 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   if (content === '' && !isFinal) {
     // Pending or running: the write has not finished, so the file is not yet
     // known to be empty. `ToolPartDetailBody` already shows the status line.
-  } else if (isMarkdownPath(filePath)) {
+  } else if (isMarkdownPath(filePath) && content.length <= WRITE_CODE_CHARACTER_CAP) {
+    // At or under the cap the formatted markdown body renders whole; the branch
+    // below bounds anything larger.
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
+  } else if (isMarkdownPath(filePath)) {
+    // A large markdown write is bounded to WRITE_CODE_CHARACTER_CAP before it
+    // reaches `ChatMarkdownText`, which mounts its whole document in one commit
+    // and chunks nothing — the unbounded body was the hang this cap removes.
+    // The cap matches the read code body and the sibling code branch.
+    // `ReadMarkdownBody` has no Truncated marker of its own, and a notice below
+    // a 50,000-character document sits tens of screens down, so the notice
+    // renders ABOVE the body: it lands in the sheet's opening frame, where a
+    // check that reads only on-screen nodes finds it.
+    body = (
+      <View className="gap-1">
+        <Text
+          accessibilityLabel={t('common.contentTruncated')}
+          className="text-xs text-muted-foreground"
+        >
+          {t('common.truncated')}
+        </Text>
+        <ReadMarkdownBody
+          body={{ text: content.slice(0, WRITE_CODE_CHARACTER_CAP), footer: undefined }}
+        />
+      </View>
+    );
   } else if (content === '') {
     body = (
       <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>

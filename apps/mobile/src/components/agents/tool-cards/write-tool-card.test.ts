@@ -237,6 +237,60 @@ describe('WriteToolCardBody — smart render routing', () => {
     expect(findByType(root, 'ToolDiffPreview')).toHaveLength(0);
   });
 
+  it('caps markdown over the limit before ReadMarkdownBody and shows a top Truncated notice', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'BIG.md', content: 'a'.repeat(50_001) }),
+    }) as unknown as React.ReactElement;
+    const bodies = findByType(root, 'ReadMarkdownBody');
+    expect(bodies).toHaveLength(1);
+    const body = bodies[0];
+    if (!body) {
+      throw new Error('body not found');
+    }
+    // The body mounts only the capped prefix, never the whole document.
+    expect((body.props as { body: { text: string } }).body.text).toBe('a'.repeat(50_000));
+    // The notice is mounted above the body, in the sheet's first frame, so a
+    // check that reads only on-screen nodes finds it.
+    const notice = findByType(root, 'Text').find(
+      el => (el.props as { children?: unknown }).children === 'common.truncated'
+    );
+    expect(notice).toBeDefined();
+    expect((notice?.props as { accessibilityLabel?: string }).accessibilityLabel).toBe(
+      'common.contentTruncated'
+    );
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+  });
+
+  it('routes markdown just under the cap to ReadMarkdownBody', () => {
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'BIG.md', content: 'a'.repeat(49_999) }),
+    }) as unknown as React.ReactElement;
+    expect(findByType(root, 'ReadMarkdownBody')).toHaveLength(1);
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+  });
+
+  it('renders markdown at exactly the cap whole, without a Truncated notice', () => {
+    // At the cap nothing is dropped, so the body renders whole and no notice is
+    // shown; only a body larger than the cap is bounded and announced.
+    // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
+    const root = WriteToolCardBody({
+      part: makeWritePart({ filePath: 'EXACT.md', content: 'a'.repeat(50_000) }),
+    }) as unknown as React.ReactElement;
+    const body = findByType(root, 'ReadMarkdownBody')[0];
+    if (!body) {
+      throw new Error('body not found');
+    }
+    expect((body.props as { body: { text: string } }).body.text).toBe('a'.repeat(50_000));
+    expect(
+      findByType(root, 'Text').some(
+        el => (el.props as { children?: unknown }).children === 'common.truncated'
+      )
+    ).toBe(false);
+    expect(findByType(root, 'CodeBlock')).toHaveLength(0);
+  });
+
   it('routes a .mdx path to ReadMarkdownBody', () => {
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
     const root = WriteToolCardBody({

@@ -10,7 +10,11 @@ import { type MarkdownBody } from './read-tool-markdown';
 /**
  * Full markdown body of a read tool part, rendered directly in the detail sheet.
  * The sheet scrolls, so the complete file renders here — no inline cap, no nested
- * full-screen reader.
+ * full-screen reader. The read card relies on that: a read is already bounded by
+ * the read tool's own line window. A caller that holds an unbounded document — a
+ * `write` of a large markdown file — must cap the body itself before handoff:
+ * `ChatMarkdownText` mounts its whole document in one commit, so only a body
+ * that fits the caller's budget may route here.
  */
 export function ReadMarkdownBody({ body }: Readonly<{ body: MarkdownBody }>) {
   const textSelectable = useTranscriptTextSelectable();

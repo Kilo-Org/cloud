@@ -1,0 +1,151 @@
+name: Meta-janitor approval
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+concurrency:
+  group: meta-janitor-approve-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  approve:
+    if: >-
+      github.repository == 'Kilo-Org/cloud' &&
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == 'kilo-code-bot[bot]' &&
+      github.event.comment.user.type == 'Bot' &&
+      contains(github.event.comment.body, '<!-- meta-janitor-approve:v1 head=')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: read
+      checks: read
+      statuses: read
+      pull-requests: write
+    steps:
+      - name: Validate signal and approve reviewed commit
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const bot = 'kilo-code-bot[bot]';
+            const signalPattern = /^Meta Janitor: Safety review passed; requesting approval\.\n\n<!-- meta-janitor-approve:v1 head=([0-9a-f]{40}) -->\n?$/;
+            const cleanSummary = '**Status:** No Issues Found | **Recommendation:** Merge';
+            const cleanReview = body => {
+              const lines = (body ?? '').split('\n');
+              const verdicts = lines.filter(line => line.startsWith('**Status:'));
+              return lines[0] === '<!-- kilo-review -->' && lines[1] === '## Code Review Summary' &&
+                lines[2] === '' && lines[3] === cleanSummary &&
+                verdicts.every(line => line === cleanSummary);
+            };
+            const skip = reason => core.info(`Not approving: ${reason}`);
+            const { owner, repo } = context.repo;
+            const { issue, comment: eventComment } = context.payload;
+            if (context.eventName !== 'issue_comment' || context.payload.action !== 'created' ||
+                `${owner}/${repo}` !== 'Kilo-Org/cloud' || !issue?.pull_request ||
+                eventComment?.user?.login !== bot || eventComment.user.type !== 'Bot') {
+              return skip('event is outside the permitted scope');
+            }
+            const match = signalPattern.exec(eventComment.body ?? '');
+            if (!match) return skip('comment is not an exact SHA-bound approval signal');
+            const sha = match[1];
+            const params = { owner, repo, pull_number: issue.number };
+            const eligible = pr => pr.state === 'open' && pr.draft === false &&
+              pr.user?.login === bot && pr.user.type === 'Bot' &&
+              pr.base?.repo?.full_name === 'Kilo-Org/cloud' && pr.base.ref === 'main' &&
+              pr.head?.repo?.full_name === 'Kilo-Org/cloud' && pr.head.sha === sha &&
+              pr.labels?.some(label => label.name === 'janitor') && pr.auto_merge != null &&
+              pr.mergeable === true;
+            const validSignal = comment => comment.user?.login === bot && comment.user.type === 'Bot' &&
+              comment.body === eventComment.body && comment.created_at === comment.updated_at &&
+              comment.issue_url === `https://api.github.com/repos/${owner}/${repo}/issues/${issue.number}`;
+            const { data: pr } = await github.rest.pulls.get(params);
+            if (!eligible(pr)) return skip('PR eligibility, head SHA, auto-merge, or mergeability changed');
+            const commentParams = { owner, repo, comment_id: eventComment.id };
+            const { data: signal } = await github.rest.issues.getComment(commentParams);
+            if (!validSignal(signal)) return skip('approval signal was edited or is no longer valid');
+
+            const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {
+              owner, repo, branch: 'main', per_page: 100,
+            });
+            // SHA-bound reviews alone do not prevent an approval surviving a later push.
+            if (!rules.some(rule => rule.type === 'pull_request' &&
+                rule.parameters?.dismiss_stale_reviews_on_push === true)) {
+              core.setFailed('Enable dismissal of stale approvals in an active main branch ruleset before automated approval.');
+              return;
+            }
+            const requiredChecks = rules.filter(rule => rule.type === 'required_status_checks')
+              .flatMap(rule => rule.parameters.required_status_checks);
+            if (requiredChecks.length === 0) return skip('no required CI checks could be established');
+
+            const checks = await github.paginate(github.rest.checks.listForRef, {
+              owner, repo, ref: sha, filter: 'latest', per_page: 100,
+            });
+            const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+              owner, repo, ref: sha, per_page: 100,
+            });
+            const latestStatuses = [...new Map(statuses.map(status => [status.context, status]).reverse()).values()];
+            const passingCheck = check => check.head_sha === sha && check.status === 'completed' &&
+              ['success', 'neutral', 'skipped'].includes(check.conclusion);
+            if (checks.some(check => !passingCheck(check)) ||
+                latestStatuses.some(status => status.state !== 'success')) {
+              return skip('a current check or status is pending or unsuccessful');
+            }
+            for (const required of requiredChecks) {
+              const matchingChecks = checks.filter(check => check.name === required.context &&
+                (required.integration_id == null || check.app?.id === required.integration_id));
+              const matchingStatus = required.integration_id == null &&
+                latestStatuses.some(status => status.context === required.context && status.state === 'success');
+              if (!matchingChecks.length && !matchingStatus) return skip('a required check is missing');
+            }
+            const kiloCheck = checks.find(check => check.name === 'Kilo Code Review' &&
+              check.app?.slug === 'kilo-code-bot' && check.conclusion === 'success');
+            if (!kiloCheck?.started_at || !kiloCheck.completed_at ||
+                kiloCheck.completed_at > signal.created_at) {
+              return skip('Kilo review did not finish for this commit before the signal');
+            }
+
+            const reviews = await github.paginate(github.rest.pulls.listReviews, { ...params, per_page: 100 });
+            const inlineComments = await github.paginate(github.rest.pulls.listReviewComments, { ...params, per_page: 100 });
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: issue.number, per_page: 100,
+            });
+            if (inlineComments.length > 0 || reviews.some(review =>
+                review.state === 'CHANGES_REQUESTED' ||
+                (review.user?.login === bot && review.body?.trim() && !cleanReview(review.body)) ||
+                (review.user?.login !== bot && review.user?.login !== 'github-actions[bot]' &&
+                  review.body?.trim() && review.submitted_at > signal.created_at))) {
+              return skip('inline feedback or an adverse/unclear review exists');
+            }
+            const kiloSummaries = comments.filter(comment => comment.user?.login === bot &&
+              comment.user.type === 'Bot' && comment.body?.includes('<!-- kilo-review -->'));
+            if (kiloSummaries.some(comment => !cleanReview(comment.body)) ||
+                !kiloSummaries.some(comment => comment.updated_at >= kiloCheck.started_at &&
+                  comment.updated_at <= signal.created_at && cleanReview(comment.body))) {
+              return skip('Kilo feedback is adverse, unclear, or missing for the current review');
+            }
+            if (comments.some(comment => comment.user?.login !== bot &&
+                comment.user?.login !== 'github-actions[bot]' && comment.updated_at > signal.created_at)) {
+              return skip('new conversation feedback appeared after the safety assessment');
+            }
+            const actionsReviews = reviews.filter(review => review.user?.login === 'github-actions[bot]');
+            const lastActionsReview = actionsReviews.at(-1);
+            if (lastActionsReview?.state === 'APPROVED' && lastActionsReview.commit_id === sha) {
+              return skip('GitHub Actions already approved this commit');
+            }
+
+            const { data: currentSignal } = await github.rest.issues.getComment(commentParams);
+            const { data: currentPr } = await github.rest.pulls.get(params);
+            if (!validSignal(currentSignal) || !eligible(currentPr) || currentPr.base.sha !== pr.base.sha) {
+              return skip('signal or PR changed during validation; a fresh assessment is required');
+            }
+            await github.rest.pulls.createReview({
+              ...params,
+              commit_id: sha,
+              event: 'APPROVE',
+              body: `Meta-janitor safety approval for ${sha}. Signal: ${signal.html_url}. GitHub auto-merge remains responsible for merging.`,
+            });
+            core.info(`Approved PR #${issue.number} at ${sha}; no merge command was issued.`);

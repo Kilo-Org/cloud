@@ -241,6 +241,7 @@
     "addPasskey": "הוספת מפתח גישה",
     "passkeyDefaultName": "מפתח גישה",
     "passkeyAddedOn": "נוסף ב-{{date}}",
+    "passkeyLastUsedOn": "שימוש אחרון {{date}}",
     "passkeyAdded": "מפתח הגישה נוסף.",
     "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
     "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",

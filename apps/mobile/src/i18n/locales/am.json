@@ -241,6 +241,7 @@
     "addPasskey": "ፓስኪ ያክሉ",
     "passkeyDefaultName": "ፓስኪ",
     "passkeyAddedOn": "{{date}} ተጨምሯል",
+    "passkeyLastUsedOn": "በመጨረሻ ጥቅም ላይ የዋለው {{date}}",
     "passkeyAdded": "ፓስኪ ተጨምሯል።",
     "passkeyAddFailed": "ፓስኪ ማከል አልተቻለም። እንደገና ይሞክሩ።",
     "passkeyAddUnsupported": "ይህ መሣሪያ ፓስኪዎችን መፍጠር አይችልም።",

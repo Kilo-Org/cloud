@@ -70,13 +70,20 @@ export function createSecretRedactor(
     const authorization = /^(?:Bearer|Basic)\s+(.+)$/i.exec(value);
     if (authorization?.[1]) secrets.add(authorization[1]);
   };
-  const collect = (value: unknown): void => {
+  const collect = (value: unknown, inMcp = false, mcpCredentialValues = false): void => {
     if (Array.isArray(value)) {
-      for (const item of value) collect(item);
+      for (const item of value) collect(item, inMcp, mcpCredentialValues);
     } else if (isRecord(value)) {
       for (const [name, child] of Object.entries(value)) {
-        if (typeof child === 'string' && SECRET_NAME.test(name)) remember(child);
-        else collect(child);
+        if (typeof child === 'string' && (mcpCredentialValues || SECRET_NAME.test(name))) {
+          remember(child);
+        } else {
+          collect(
+            child,
+            inMcp || name === 'mcp',
+            inMcp && (name === 'headers' || name === 'environment')
+          );
+        }
       }
     }
   };

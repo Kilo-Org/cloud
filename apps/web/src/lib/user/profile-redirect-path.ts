@@ -4,7 +4,7 @@ import {
   getSingleUserOrganization,
   getUserOrganizationsWithSeats,
 } from '@/lib/organizations/organizations';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';

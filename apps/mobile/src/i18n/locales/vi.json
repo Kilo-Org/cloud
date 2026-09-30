@@ -241,6 +241,7 @@
     "addPasskey": "Thêm khóa truy cập",
     "passkeyDefaultName": "Khóa truy cập",
     "passkeyAddedOn": "Đã thêm {{date}}",
+    "passkeyLastUsedOn": "Dùng lần cuối {{date}}",
     "passkeyAdded": "Đã thêm khóa truy cập.",
     "passkeyAddFailed": "Không thể thêm khóa truy cập. Hãy thử lại.",
     "passkeyAddUnsupported": "Thiết bị này không thể tạo khóa truy cập.",

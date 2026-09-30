@@ -241,6 +241,7 @@
     "addPasskey": "Lisää pääsyavain",
     "passkeyDefaultName": "Pääsyavain",
     "passkeyAddedOn": "Lisätty {{date}}",
+    "passkeyLastUsedOn": "Viimeksi käytetty {{date}}",
     "passkeyAdded": "Pääsyavain lisätty.",
     "passkeyAddFailed": "Pääsyavainta ei voitu lisätä. Yritä uudelleen.",
     "passkeyAddUnsupported": "Tämä laite ei voi luoda pääsyavaimia.",

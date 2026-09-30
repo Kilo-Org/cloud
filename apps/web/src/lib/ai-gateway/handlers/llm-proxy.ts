@@ -39,7 +39,7 @@ import {
 import {
   accountForMicrodollarUsage,
   captureProxyError,
-  checkOrganizationModelRestrictions,
+  getOrganizationProviderPrivacy,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
   invalidPathResponse,
@@ -729,25 +729,9 @@ export async function handleLlmProxyRequest(
   }
 
   async function resolveAccessCheck(modelId: string) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
-      await balanceAndSettingsPromise;
+    const { balance, settings, balanceLimitedByUserAllowance } = await balanceAndSettingsPromise;
     const groupPolicy = await organizationGroupPolicyPromise;
-    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-      modelId,
-      settings,
-      organizationPlan: groupPolicy ? undefined : plan,
-    });
-    if (modelRestrictionError) {
-      return {
-        balance,
-        balanceLimitedByUserAllowance,
-        effectiveProviderConfig: providerConfig,
-        groupModelAllowed: true,
-        groupProvidersAllowed: true,
-        modelRestrictionError,
-        settings,
-      };
-    }
+    const providerConfig = getOrganizationProviderPrivacy(settings);
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
     let groupProvidersAllowed = true;
@@ -755,12 +739,7 @@ export async function handleLlmProxyRequest(
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
       if (groupDecision.eligibleProviderRoutes) {
-        const currentOnly = providerConfig?.only;
-        const only = withoutVirtualProvider(
-          currentOnly
-            ? currentOnly.filter(provider => groupDecision.eligibleProviderRoutes?.has(provider))
-            : [...groupDecision.eligibleProviderRoutes]
-        );
+        const only = withoutVirtualProvider([...groupDecision.eligibleProviderRoutes]);
         groupProvidersAllowed = only.length > 0;
         effectiveProviderConfig = { ...providerConfig, only };
       }
@@ -773,7 +752,6 @@ export async function handleLlmProxyRequest(
         : undefined,
       groupModelAllowed,
       groupProvidersAllowed,
-      modelRestrictionError,
       settings,
     };
   }
@@ -855,7 +833,6 @@ export async function handleLlmProxyRequest(
       effectiveProviderConfig,
       groupModelAllowed,
       groupProvidersAllowed,
-      modelRestrictionError,
     } = await accessCheckResolver.get();
 
     if (
@@ -870,12 +847,6 @@ export async function handleLlmProxyRequest(
         organizationId,
         balanceLimitedByUserAllowance,
       });
-    }
-
-    // Organization model/provider restrictions check
-    // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
-    if (modelRestrictionError) {
-      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
     }
 
     if (!groupModelAllowed) {

@@ -1,10 +1,6 @@
 // admin-router.ts
-import {
-  adminProcedure,
-  createTRPCRouter,
-  sessionViewerProcedure,
-  superadminProcedure,
-} from '@/lib/trpc/init';
+import { sessionViewerProcedure, superadminProcedure } from '@/lib/trpc/admin-procedures';
+import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { isEligibleForPlatformAdmin, platformAdminDomains } from '@/lib/admin/platform-admin';

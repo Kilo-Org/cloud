@@ -241,6 +241,7 @@
     "addPasskey": "パスキーを追加",
     "passkeyDefaultName": "パスキー",
     "passkeyAddedOn": "{{date}} に追加",
+    "passkeyLastUsedOn": "{{date}} に最終使用",
     "passkeyAdded": "パスキーを追加しました。",
     "passkeyAddFailed": "パスキーを追加できませんでした。もう一度お試しください。",
     "passkeyAddUnsupported": "このデバイスではパスキーを作成できません。",

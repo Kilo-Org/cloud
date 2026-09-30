@@ -241,6 +241,7 @@
     "addPasskey": "Fi passkey kún",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "A fi kún {{date}}",
+    "passkeyLastUsedOn": "Ìkẹyìn lílo {{date}}",
     "passkeyAdded": "A ti fi passkey kún.",
     "passkeyAddFailed": "A kò lè fi passkey kún. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "passkeyAddUnsupported": "Ẹ̀rọ yìí kò lè dá àwọn passkey.",

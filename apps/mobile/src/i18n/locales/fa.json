@@ -241,6 +241,7 @@
     "addPasskey": "افزودن کلید عبور",
     "passkeyDefaultName": "کلید عبور",
     "passkeyAddedOn": "افزوده‌شده در {{date}}",
+    "passkeyLastUsedOn": "آخرین استفاده {{date}}",
     "passkeyAdded": "کلید عبور افزوده شد.",
     "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
     "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",

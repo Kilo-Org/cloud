@@ -241,6 +241,7 @@
     "addPasskey": "رسائی کلید شامل کریں",
     "passkeyDefaultName": "رسائی کلید",
     "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyLastUsedOn": "آخری استعمال {{date}}",
     "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
     "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",

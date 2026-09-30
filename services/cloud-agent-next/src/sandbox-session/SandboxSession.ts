@@ -4531,7 +4531,7 @@ export class SandboxSession extends DurableObject<Env> {
         attachInPreparation = needsPreparation;
         const attachPayload = {
           ...status.attachment,
-          ...(hasModernRuntimeAuthorization(metadata)
+          ...(hasModernRuntimeAuthorization(metadata) || status.attachment?.mcp
             ? { runtimeIsolation: 'per-session' as const }
             : {}),
           ...(needsPreparation

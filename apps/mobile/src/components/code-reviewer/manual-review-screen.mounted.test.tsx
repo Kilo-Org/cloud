@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- cohesive mounted suite for the manual-review screen state contract */
+
 import { createElement, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -27,6 +29,13 @@ const status = vi.hoisted(() => ({
   pending: false,
   refetch: vi.fn(),
   push: vi.fn(),
+}));
+
+const permission = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'error' | 'ready',
+  canEdit: true,
+  refetch: vi.fn(),
+  isRetrying: false,
 }));
 
 vi.mock('react-native', () => ({
@@ -80,6 +89,7 @@ vi.mock('expo-haptics', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -129,6 +139,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: () => permission,
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({ mutate: vi.fn(), isPending: status.pending }),
@@ -146,9 +157,9 @@ function only<T>(items: T[], what: string): T {
   return item;
 }
 
-async function renderScreen() {
+async function renderScreen(scope = 'personal') {
   const { renderer, unmount } = await renderWithProviders(
-    createElement(ManualReviewScreen, { scope: 'personal' })
+    createElement(ManualReviewScreen, { scope })
   );
   return { renderer, unmount };
 }
@@ -183,6 +194,8 @@ beforeEach(() => {
   status.pending = false;
   status.refetch.mockClear();
   status.push.mockClear();
+  permission.status = 'ready';
+  permission.canEdit = true;
 });
 
 describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on %s', platform => {
@@ -355,6 +368,38 @@ describe('ManualReviewScreen connect provider CTA', () => {
     const className = String(action.props.className);
     expect(className).toContain('w-full');
     expect(className).toContain('mt-3');
+
+    unmount();
+  });
+
+  it('shows the read-only message instead of the connect action for a non-billing org member', async () => {
+    status.connected = false;
+    permission.status = 'ready';
+    permission.canEdit = false;
+    const { renderer, unmount } = await renderScreen('org-1');
+
+    // The member cannot connect the org's provider, so the dead-end CTA is
+    // replaced with the shared read-only copy from the platform overview.
+    expect(findAllOfType(renderer.root, 'EmptyState')).toHaveLength(0);
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    const center = only(findAllOfType(renderer.root, 'CenteredState'), 'read-only state');
+    const text = center
+      .findAll(node => String(node.type) === 'Text')
+      .flatMap(node => node.children.filter((child): child is string => typeof child === 'string'))
+      .join(' ');
+    expect(text).toContain('organization owners and billing managers can connect it');
+
+    unmount();
+  });
+
+  it('keeps the connect action for an org role that can manage the provider', async () => {
+    status.connected = false;
+    permission.status = 'ready';
+    permission.canEdit = true;
+    const { renderer, unmount } = await renderScreen('org-1');
+
+    expect(findAllOfType(renderer.root, 'EmptyState')).toHaveLength(1);
+    expect(findAllOfType(renderer.root, 'CenteredState')).toHaveLength(0);
 
     unmount();
   });

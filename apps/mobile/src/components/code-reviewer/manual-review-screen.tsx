@@ -1,13 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
-import { Check, GitPullRequest } from '@/components/ui/icons';
+import { Check } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, TextInput, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
-import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -25,12 +24,14 @@ import {
   useGitHubStatus,
   useGitLabStatus,
   useReviewConfig,
+  useReviewerPermission,
 } from '@/lib/hooks/use-code-reviewer';
 import { useCreateManualReview } from '@/lib/hooks/use-code-reviews';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
+import { ManualReviewConnectGate } from './manual-review-connect-gate';
 
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
@@ -64,6 +65,12 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const permission = useReviewerPermission(scope);
+  // Only a role that can manage the org's billing may connect a provider for
+  // it (mirrors the platform-overview and review-memory screens). A plain
+  // member who lands here with nothing connected otherwise gets a Connect
+  // GitHub CTA that dead-ends on the read-only provider screen.
+  const readOnly = permission.status === 'ready' && !permission.canEdit;
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
   const statusFor = { github: githubStatus, gitlab: gitlabStatus };
@@ -152,25 +159,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
           title={t('codeReviewer.manualReview.title')}
           eyebrow={t('common.codeReviewer')}
         />
-        <EmptyState
-          icon={GitPullRequest}
-          title={t('codeReviewer.manualReview.connectProvider')}
-          description={t('codeReviewer.manualReview.connectProviderDescription')}
-          action={
-            // `mt-3 w-full` matches the near-identical PR-review connect gate
-            // (pr-review-connect-gate.tsx) and the Code Reviewer
-            // ProviderConnectCard, so the same Connect GitHub action is styled
-            // the same wherever it appears.
-            <Button
-              className="mt-3 w-full"
-              onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
-              }}
-            >
-              <Text>{t('common.connectGithub')}</Text>
-            </Button>
-          }
-        />
+        <ManualReviewConnectGate scope={scope} readOnly={readOnly} />
       </View>
     );
   }

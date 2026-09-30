@@ -268,7 +268,7 @@ export function CloudSidebarLayout({
         : session
     );
   }, [currentSessionId, foregroundSessionStatus, sessions]);
-  const { activeSessions } = useActiveSessions();
+  const { activeSessions } = useActiveSessions(organizationId ?? null);
 
   // Session deletion (lightweight - no stream cleanup, container handles that on unmount)
   const trpc = useTRPC();

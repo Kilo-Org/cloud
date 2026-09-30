@@ -20,10 +20,16 @@ import { useUserWebConnection } from '../CloudAgentProvider';
  */
 export type ActiveSession = ActiveSessionWithConnectionData & {
   createdOnPlatform?: string;
-  platform?: string;
   createdAt?: string;
   updatedAt?: string;
   lastActivityAt?: string;
+  statusUpdatedAt?: string;
+  /**
+   * Owning organization; `null` = personal. Always emitted by the query, and
+   * absent from a connection payload, so the merge keeps the last attribution
+   * instead of treating a known row as unattributed.
+   */
+  organizationId?: string | null;
 };
 
 type CliConnectionPayload = {
@@ -62,13 +68,16 @@ function getCliConnectionPayload(value: unknown): CliConnectionPayload | null {
   return parsed.data;
 }
 
-/** Fields `activeSessions.list` enriches from `cli_sessions_v2` and a wire row lacks. */
+/**
+ * Fields the sidebar reads that `activeSessions.list` enriches from
+ * `cli_sessions_v2` and a connection payload never carries.
+ */
 const ENRICHED_FIELDS = [
   'createdOnPlatform',
-  'platform',
   'createdAt',
   'updatedAt',
   'lastActivityAt',
+  'statusUpdatedAt',
 ] as const;
 
 /**
@@ -89,9 +98,14 @@ function mergeCachedEnrichment(
   if (!cached) return incoming;
   const merged: ActiveSession = { ...incoming, title: cached.title };
   for (const field of ENRICHED_FIELDS) {
-    const value = cached[field] ?? incoming[field];
+    const value = cached[field] !== undefined ? cached[field] : incoming[field];
     if (value !== undefined) merged[field] = value;
   }
+  // `organizationId: null` is a real attribution (personal), so only an absent
+  // value falls through to the incoming row.
+  const organizationId =
+    cached.organizationId !== undefined ? cached.organizationId : incoming.organizationId;
+  if (organizationId !== undefined) merged.organizationId = organizationId;
   return merged;
 }
 
@@ -103,6 +117,10 @@ function mergeCachedEnrichment(
  * connection instead would move its rows ahead of every other connection on
  * every heartbeat, so two or more live connections reshuffle the sidebar every
  * few seconds and a row is never where the user last clicked it.
+ *
+ * A row another connection now owns is replaced in place rather than kept
+ * alongside the reported one: the connection list attributes each session to
+ * one connection, so a takeover must not render it twice.
  */
 export function applyActiveSessionsHeartbeat(
   currentSessions: ActiveSession[],
@@ -111,13 +129,13 @@ export function applyActiveSessionsHeartbeat(
   const reported = new Map(payload.sessions.map(session => [session.id, session]));
   const merged: ActiveSession[] = [];
   for (const session of currentSessions) {
-    if (session.connectionId !== payload.connectionId) {
-      merged.push(session);
+    const incoming = reported.get(session.id);
+    if (!incoming) {
+      // A row this connection no longer reports has ended on it. A row another
+      // connection owns is untouched here.
+      if (session.connectionId !== payload.connectionId) merged.push(session);
       continue;
     }
-    const incoming = reported.get(session.id);
-    // A row the heartbeat no longer reports has ended on that connection.
-    if (!incoming) continue;
     reported.delete(session.id);
     merged.push(mergeCachedEnrichment(session, incoming));
   }
@@ -125,6 +143,21 @@ export function applyActiveSessionsHeartbeat(
     merged.push(mergeCachedEnrichment(undefined, session));
   }
   return merged;
+}
+
+/**
+ * Merge the full connection snapshot into the cached list. The payload already
+ * carries every connection's rows in the server's order, so only the enriched
+ * fields the wire lacks have to be carried over.
+ */
+export function applyActiveSessionsList(
+  currentSessions: ActiveSession[],
+  incomingSessions: ActiveSession[]
+): ActiveSession[] {
+  const cachedById = new Map(currentSessions.map(session => [session.id, session]));
+  return incomingSessions.map(session =>
+    mergeCachedEnrichment(cachedById.get(session.id), session)
+  );
 }
 
 export function removeActiveSessionsForConnection(
@@ -138,15 +171,25 @@ type ActiveSessionsQueryData = {
   sessions: ActiveSession[];
 };
 
-export function useActiveSessions(): {
+/**
+ * Live sessions for one scope. `organizationId` mirrors the stored sidebar
+ * list: a uuid for an organization, `null` for personal. The connection
+ * payload is not org-scoped, so the cached attribution decides which live rows
+ * the sidebar may show.
+ */
+export function useActiveSessions(organizationId: string | null): {
   activeSessions: ActiveSession[];
   isLoading: boolean;
 } {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
-  const activeSessionsQueryOptions = trpc.activeSessions.list.queryOptions();
-  const activeSessionsQueryKey = useMemo(() => trpc.activeSessions.list.queryKey(), [trpc]);
+  const input = useMemo(() => ({ organizationId }), [organizationId]);
+  const activeSessionsQueryOptions = trpc.activeSessions.list.queryOptions(input);
+  const activeSessionsQueryKey = useMemo(
+    () => trpc.activeSessions.list.queryKey(input),
+    [trpc, input]
+  );
   const { data, isLoading, refetch } = useQuery({
     ...activeSessionsQueryOptions,
     refetchInterval: 10_000,
@@ -182,12 +225,7 @@ export function useActiveSessions(): {
       if (event.event === 'sessions.list') {
         const sessions = getRootSessionsFromListPayload(event.data);
         if (sessions) {
-          updateCachedSessions(current => {
-            const cachedById = new Map(current.map(session => [session.id, session]));
-            return sessions.map(session =>
-              mergeCachedEnrichment(cachedById.get(session.id), session)
-            );
-          });
+          updateCachedSessions(current => applyActiveSessionsList(current, sessions));
         }
       }
       if (event.event === 'sessions.heartbeat') {

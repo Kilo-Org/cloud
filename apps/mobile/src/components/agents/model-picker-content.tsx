@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { ModelPickerOptionRow } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
@@ -245,7 +246,10 @@ export function ModelPickerContent() {
           {favoritesError ? (
             <View className="mx-4 mb-3 flex-row items-center gap-1.5">
               <AlertCircle size={14} color={colors.destructive} />
-              <Text className="text-xs text-destructive">{favoritesError}</Text>
+              {/* The favorites hook silences its toast, so AccessibleStatus is
+                  the single announcement owner here: live region on Android,
+                  imperative announce on iOS, visuals preserved (tone error). */}
+              <AccessibleStatus message={favoritesError} className="text-xs" />
             </View>
           ) : null}
         </View>

@@ -48,7 +48,7 @@ const SHARED_INPUT_PATH = 'src/components/ui/input.tsx';
  * field in one of them is still a violation.
  */
 const ALLOWLIST: Readonly<Record<string, string>> = {
-  'src/app/(app)/(tabs)/(3_profile)/code-reviewer/[scope]/[platform]/(edit)/instructions.tsx':
+  'src/app/(app)/(tabs)/(0_home,3_profile)/code-reviewer/[scope]/[platform]/(edit)/instructions.tsx':
     'multiline instruction editor (`h-32`, `leading-5`)',
   'src/components/agents/chat-composer-input-row.tsx': 'multiline prompt composer',
   'src/components/agents/new-session-prompt.tsx':

@@ -25,7 +25,7 @@ export function ScopeListScreen() {
   } = useQuery(trpc.organizations.list.queryOptions());
 
   const openScope = (scope: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href);
+    router.push(`/(app)/(tabs)/code-reviewer/${scope}` as Href);
   };
 
   return (

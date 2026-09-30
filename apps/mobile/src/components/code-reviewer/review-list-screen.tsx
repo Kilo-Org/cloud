@@ -136,8 +136,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             onPress={() => {
               router.push(
                 (hasConnectedProvider
-                  ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+                  ? `/(app)/(tabs)/code-reviewer/${scope}/manual-review`
+                  : `/(app)/(tabs)/code-reviewer/${scope}`) as Href
               );
             }}
           >
@@ -184,9 +184,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${review.id}` as Href
-                );
+                router.push(`/(app)/(tabs)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>

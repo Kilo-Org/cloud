@@ -106,9 +106,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       {
         onSuccess: ({ reviewId }) => {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.replace(
-            `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${reviewId}` as Href
-          );
+          router.replace(`/(app)/(tabs)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
         },
       }
     );
@@ -164,7 +162,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             <Button
               className="mt-3 w-full"
               onPress={() => {
-                router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
+                router.push(`/(app)/(tabs)/code-reviewer/${scope}/github` as Href);
               }}
             >
               <Text>{t('common.connectGithub')}</Text>

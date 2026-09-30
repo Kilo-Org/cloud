@@ -20,7 +20,10 @@ export function getProfileAgentScope(
 }
 
 export function getCodeReviewerProfilePath(scope: string): Href {
-  return `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}` as Href;
+  // The code-reviewer stack is shared between the Home and Profile tabs, so the
+  // href intentionally omits the tab group: expo-router resolves it against the
+  // tab the user is on, keeping that tab selected (Home from the Explore list).
+  return `/(app)/(tabs)/code-reviewer/${scope}` as Href;
 }
 
 export function getPrReviewEntryPath(): Href {

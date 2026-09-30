@@ -50,13 +50,13 @@ beforeEach(() => {
 });
 
 describe('CodeReviewerReviewDetailRoute invalid scope', () => {
-  it('renders InvalidRouteState with the profile backTo when scope is undefined', () => {
+  it('renders InvalidRouteState with the reviewer entry backTo when scope is undefined', () => {
     useLocalSearchParamsMock.mockReturnValue({ scope: undefined, id: 'rev-1' });
     const renderer = mountRoute();
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/(3_profile)');
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/code-reviewer');
     expect(findByType(renderer.root, 'ReviewDetailScreen')).toHaveLength(0);
 
     act(() => {
@@ -64,13 +64,13 @@ describe('CodeReviewerReviewDetailRoute invalid scope', () => {
     });
   });
 
-  it('renders InvalidRouteState with the profile backTo when scope is an array', () => {
+  it('renders InvalidRouteState with the reviewer entry backTo when scope is an array', () => {
     useLocalSearchParamsMock.mockReturnValue({ scope: ['personal', 'org'], id: 'rev-1' });
     const renderer = mountRoute();
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/(3_profile)');
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/code-reviewer');
     expect(findByType(renderer.root, 'ReviewDetailScreen')).toHaveLength(0);
 
     act(() => {
@@ -86,9 +86,7 @@ describe('CodeReviewerReviewDetailRoute invalid id', () => {
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews'
-    );
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/code-reviewer/personal/reviews');
     expect(findByType(renderer.root, 'ReviewDetailScreen')).toHaveLength(0);
 
     act(() => {
@@ -102,9 +100,7 @@ describe('CodeReviewerReviewDetailRoute invalid id', () => {
 
     const invalid = findByType(renderer.root, 'InvalidRouteState');
     expect(invalid).toHaveLength(1);
-    expect(propOf(invalid[0], 'backTo')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/reviews'
-    );
+    expect(propOf(invalid[0], 'backTo')).toBe('/(app)/(tabs)/code-reviewer/personal/reviews');
     expect(findByType(renderer.root, 'ReviewDetailScreen')).toHaveLength(0);
 
     act(() => {

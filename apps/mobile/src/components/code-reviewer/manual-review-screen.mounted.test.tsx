@@ -337,9 +337,7 @@ describe.each(['android', 'ios'] as const)('ManualReviewScreen primary action on
     act(() => {
       action.props.onPress();
     });
-    expect(status.push).toHaveBeenCalledWith(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal/github'
-    );
+    expect(status.push).toHaveBeenCalledWith('/(app)/(tabs)/code-reviewer/personal/github');
     expect(findAllOfType(renderer.root, 'ScrollView')).toHaveLength(0);
     unmount();
   });

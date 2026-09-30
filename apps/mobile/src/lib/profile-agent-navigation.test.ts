@@ -40,12 +40,8 @@ describe('getProfileAgentScope', () => {
 
 describe('Profile agent paths', () => {
   it('builds direct Code Reviewer and Security Agent routes for a scope', () => {
-    expect(getCodeReviewerProfilePath('personal')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/personal'
-    );
-    expect(getCodeReviewerProfilePath('org-1')).toBe(
-      '/(app)/(tabs)/(3_profile)/code-reviewer/org-1'
-    );
+    expect(getCodeReviewerProfilePath('personal')).toBe('/(app)/(tabs)/code-reviewer/personal');
+    expect(getCodeReviewerProfilePath('org-1')).toBe('/(app)/(tabs)/code-reviewer/org-1');
     expect(getSecurityAgentPath('personal')).toBe(
       '/(app)/(tabs)/(3_profile)/security-agent/personal'
     );

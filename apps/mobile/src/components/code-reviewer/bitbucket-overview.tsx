@@ -113,7 +113,7 @@ export function BitbucketOverview({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/bitbucket/${field}` as Href);
+    router.push(`/(app)/(tabs)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const data = config.data;

@@ -1124,8 +1124,8 @@
       "includeExistingFindingsAnalysisSubtitle": "Também analisa as ocorrências já sincronizadas. Isso pode consumir créditos adicionais.",
       "includeExistingFindingsRemediationSubtitle": "Também adiciona à fila as ocorrências já analisadas que atendam aos critérios. PRs duplicados continuam bloqueados.",
       "minimumSeverity": "Gravidade mínima",
-      "queued": "{{displayCount}} problemas existentes foram adicionados à fila de análise.",
-      "queued_other": "{{displayCount}} problemas existentes foram adicionados à fila de análise.",
+      "queued": "{{displayCount}} ocorrências existentes foram adicionadas à fila de análise.",
+      "queued_other": "{{displayCount}} ocorrências existentes foram adicionadas à fila de análise.",
       "queued_one": "{{displayCount}} ocorrência existente adicionada à fila de análise.",
       "requireApproval": "Exigir aprovação antes da correção automática",
       "requireApprovalSubtitle": "A correção automática aguarda sua aprovação antes de abrir PRs.",
@@ -1134,7 +1134,7 @@
       "severityHighAndAbove": "Alta ou superior",
       "severityMediumAndAbove": "Média ou superior",
       "title": "Automação",
-      "queued_many": "{{displayCount}} problemas de segurança existentes foram colocados na fila para análise."
+      "queued_many": "{{displayCount}} ocorrências de segurança existentes foram colocadas na fila para análise."
     },
     "dashboard": {
       "actFirst": "Prioridades",
@@ -1203,16 +1203,16 @@
       "commentLabel": "Comentário (opcional)",
       "commentPlaceholder": "Contexto do descarte…",
       "couldNotCheckPermissions": "Não foi possível verificar as permissões para descartar ocorrências.",
-      "couldNotLoad": "Não foi possível carregar este problema.",
+      "couldNotLoad": "Não foi possível carregar esta ocorrência.",
       "notFoundDescription": "Esta ocorrência pode ter sido removida ou você não tem mais acesso a ela.",
-      "notFoundTitle": "Problema não encontrado",
+      "notFoundTitle": "Ocorrência não encontrada",
       "reason": "Motivo",
       "reasonFixStarted": "Correção já iniciada",
-      "reasonInaccurate": "Problema identificado incorretamente",
+      "reasonInaccurate": "Ocorrência imprecisa",
       "reasonNoBandwidth": "Sem tempo disponível",
       "reasonNotUsed": "Código vulnerável sem uso",
       "reasonTolerableRisk": "Risco tolerável",
-      "title": "Ignorar problema"
+      "title": "Ignorar ocorrência"
     },
     "findingDetail": {
       "tabAnalysis": "Análise",
@@ -1242,7 +1242,7 @@
       "reasonFixStarted": "correção já iniciada",
       "reasonNoBandwidth": "sem tempo disponível",
       "reasonTolerableRisk": "risco tolerável",
-      "reasonInaccurate": "problema identificado incorretamente",
+      "reasonInaccurate": "ocorrência imprecisa",
       "reasonNotUsed": "código vulnerável sem uso",
       "reasonAfterReview": "após a revisão"
     },
@@ -1303,7 +1303,7 @@
       },
       "queued": "Correção na fila",
       "retryQueued": "Nova tentativa de correção na fila",
-      "unavailable": "A correção não está disponível para este problema."
+      "unavailable": "A correção não está disponível para esta ocorrência."
     },
     "repositories": {
       "couldNotLoad": "Não foi possível carregar as configurações dos repositórios.",

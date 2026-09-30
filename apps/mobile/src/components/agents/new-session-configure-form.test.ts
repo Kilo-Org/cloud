@@ -1224,6 +1224,48 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollTo).toHaveBeenCalledWith({ y: 56, animated: false });
   });
 
+  // ── Case 16b: the remote launch-folder field is part of the reveal ──
+  it('reveals the remote launch-folder field below the composer once the keyboard opens', async () => {
+    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionConfigureForm({
+      ...defaultProps(),
+      runOnInstance: INSTANCE,
+    }) as Node;
+
+    const scrollView = findElementByType(element, 'ScrollView');
+    if (!scrollView) {
+      throw new Error('expected the form to render a ScrollView');
+    }
+    const scrollTo = vi.fn();
+    (scrollView.ref as { current: unknown }).current = { scrollTo };
+
+    (scrollView.onLayout as (event: unknown) => void)({
+      nativeEvent: { layout: { height: 380 } },
+    });
+
+    const onComposerLayout = findOnLayoutHandler(element);
+    if (!onComposerLayout) {
+      throw new Error('expected the composer wrapper to carry an onLayout');
+    }
+    onComposerLayout({ nativeEvent: { layout: { y: 16, height: 420 } } });
+
+    // The folder field is below the composer, so its own layout must feed the
+    // reveal; otherwise the viewport parks at the composer's bottom (y=56) and
+    // the selector stays clipped under the IME with only its label showing.
+    const folderField = findElementByType(element, 'LaunchFolderField');
+    if (!folderField) {
+      throw new Error('expected the form to render a LaunchFolderField');
+    }
+    const onFieldLayout = folderField.onFieldLayout as (bottom: number) => void;
+    expect(onFieldLayout).toEqual(expect.any(Function));
+    onFieldLayout(576);
+
+    keyboardSubscribers.show?.();
+    expect(scrollTo).toHaveBeenCalledWith({ y: 196, animated: false });
+  });
+
   // ── Case 17: the restore needs the user's live offset ──
   it('feeds the ScrollView onScroll into the composer reveal', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');

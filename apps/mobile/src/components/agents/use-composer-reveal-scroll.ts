@@ -30,6 +30,12 @@ export type ComposerRevealScroll = {
   onViewportLayout(height: number): void;
   /** Feed the composer card's layout (wire to its wrapper `onLayout`). */
   onComposerLayout(layout: { y: number; height: number }): void;
+  /**
+   * Feed the bottom edge (content coordinates) of a field below the composer
+   * that must also stay above the keyboard — the remote launch-folder field.
+   * `null` clears it when the target renders no such field.
+   */
+  onRequiredBottomLayout: (bottom: number | null) => void;
   /** Feed the user's live content offset (wire to the ScrollView `onScroll`). */
   onScroll(offset: number): void;
   /** The user grabbed the scroll body: their intent wins for this keyboard session. */
@@ -77,6 +83,13 @@ export type ComposerRevealScroll = {
  * attachment, a models error resolving) must not leave the body parked at the
  * old reveal offset: the reveal offset is valid only while the card is taller
  * than the viewport, so the shrink returns the user's own offset immediately.
+ *
+ * On a remote target a second field renders BELOW the composer: the launch
+ * folder. Parking the viewport at the composer's bottom leaves that field's
+ * selector clipped under the IME while its label shows. The required bottom
+ * (`onRequiredBottomLayout`) extends the reveal target to the greater of the
+ * composer's and that field's bottoms, so the field's selector stays above the
+ * keyboard too; a target with no such field clears it.
  */
 export function useComposerRevealScroll(): ComposerRevealScroll {
   const scrollRef = useRef<ScrollView | null>(null);
@@ -84,6 +97,7 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
   const userDraggedRef = useRef(false);
   const viewportHeightRef = useRef(0);
   const composerLayoutRef = useRef({ y: 0, height: 0 });
+  const requiredBottomRef = useRef<number | null>(null);
   const currentOffsetRef = useRef(0);
   const revealedRef = useRef(false);
   const preRevealOffsetRef = useRef<number | null>(null);
@@ -99,10 +113,17 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
       // so leave the offset alone and let the layout commit call again.
       return;
     }
+    const composerBottom = composerLayoutRef.current.y + composerHeight;
+    const requiredBottom = requiredBottomRef.current;
+    // The composer's bottom is always required; a field below it (the remote
+    // launch folder) raises the target so the reveal cannot park the viewport
+    // between that field's label and its selector.
+    const contentBottom =
+      requiredBottom === null ? composerBottom : Math.max(composerBottom, requiredBottom);
     const offset = resolveComposerRevealOffset({
       viewportHeight,
-      composerTop: composerLayoutRef.current.y,
-      composerHeight,
+      composerTop: 0,
+      composerHeight: contentBottom,
     });
     if (offset === 0) {
       // The card fits the lifted viewport again (lines deleted, an attachment
@@ -174,6 +195,18 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
     [reveal]
   );
 
+  const onRequiredBottomLayout = useCallback(
+    (bottom: number | null) => {
+      const next = bottom === null ? null : Math.max(Math.round(bottom), 0);
+      if (requiredBottomRef.current === next) {
+        return;
+      }
+      requiredBottomRef.current = next;
+      reveal();
+    },
+    [reveal]
+  );
+
   const onUserScroll = useCallback(() => {
     userDraggedRef.current = true;
   }, []);
@@ -182,5 +215,12 @@ export function useComposerRevealScroll(): ComposerRevealScroll {
     currentOffsetRef.current = offset;
   }, []);
 
-  return { scrollRef, onViewportLayout, onComposerLayout, onScroll, onUserScroll };
+  return {
+    scrollRef,
+    onViewportLayout,
+    onComposerLayout,
+    onRequiredBottomLayout,
+    onScroll,
+    onUserScroll,
+  };
 }

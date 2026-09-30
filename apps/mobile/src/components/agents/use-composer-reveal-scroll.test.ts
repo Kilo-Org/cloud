@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive suite for the composer reveal: the viewport/composer layout channels, drag scoping, shrink restore, and the remote launch-folder required bottom share one hook and one stubbed-React harness. */
 // Unit coverage for the composer-card reveal on the New session screen: with
 // the keyboard up the scroll body must park at the offset that puts the
 // composer card's bottom row (the mode/model pills) at the viewport's bottom,
@@ -82,6 +83,7 @@ vi.mock('react', () => ({
 type Mounted = {
   onViewportLayout: (height: number) => void;
   onComposerLayout: (layout: { y: number; height: number }) => void;
+  onRequiredBottomLayout: (bottom: number | null) => void;
   onScroll: (offset: number) => void;
   onUserScroll: () => void;
   scrollTo: ReturnType<typeof vi.fn>;
@@ -240,6 +242,62 @@ describe('useComposerRevealScroll', () => {
     onComposerLayout({ y: 16, height: 520 });
     expect(scrollTo).toHaveBeenCalledTimes(2);
     expect(scrollTo).toHaveBeenLastCalledWith({ y: 156, animated: false });
+    unmount();
+  });
+
+  it('raises the reveal to a required field below the composer', () => {
+    const { onViewportLayout, onComposerLayout, onRequiredBottomLayout, scrollTo, unmount } =
+      mountHook();
+    keyboardSubscribers.show?.();
+    onViewportLayout(380);
+    onComposerLayout({ y: 16, height: 420 });
+    // Composer-only would park at 56, leaving the remote launch-folder selector
+    // (which renders below the card) clipped under the IME.
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 56, animated: false });
+
+    onRequiredBottomLayout(576);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 196, animated: false });
+    unmount();
+  });
+
+  it('keeps the composer bottom when the required field sits above it', () => {
+    const { onViewportLayout, onComposerLayout, onRequiredBottomLayout, scrollTo, unmount } =
+      mountHook();
+    keyboardSubscribers.show?.();
+    onViewportLayout(380);
+    onComposerLayout({ y: 16, height: 420 });
+    // A field whose bottom is above the composer's own bottom adds nothing.
+    onRequiredBottomLayout(400);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 56, animated: false });
+    unmount();
+  });
+
+  it('clears the required bottom and returns to the composer-only reveal', () => {
+    const { onViewportLayout, onComposerLayout, onRequiredBottomLayout, scrollTo, unmount } =
+      mountHook();
+    keyboardSubscribers.show?.();
+    onViewportLayout(380);
+    onComposerLayout({ y: 16, height: 420 });
+    onRequiredBottomLayout(576);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 196, animated: false });
+
+    onRequiredBottomLayout(null);
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 56, animated: false });
+    unmount();
+  });
+
+  it('does not reveal a required bottom while the keyboard is hidden', () => {
+    const { onViewportLayout, onComposerLayout, onRequiredBottomLayout, scrollTo, unmount } =
+      mountHook();
+    onViewportLayout(380);
+    onComposerLayout({ y: 16, height: 420 });
+    onRequiredBottomLayout(576);
+    // The keyboard-down state is the untouched baseline: a required bottom is
+    // only a keyboard-up target.
+    expect(scrollTo).not.toHaveBeenCalled();
+
+    keyboardSubscribers.show?.();
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 196, animated: false });
     unmount();
   });
 

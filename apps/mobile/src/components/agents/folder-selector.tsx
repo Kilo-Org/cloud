@@ -68,21 +68,33 @@ function FolderSelector({
 /**
  * Labeled "Folder" field: the field title plus the chrome selector. Lives in
  * this module so the configure form stays under its line limit.
+ *
+ * `onFieldLayout` reports the field's bottom edge in scroll-content coordinates
+ * so the composer reveal can keep the selector above the soft keyboard on entry
+ * (the field renders below the composer, whose own reveal would otherwise park
+ * the viewport between this field's label and its selector).
  */
 export function LaunchFolderField({
   folderPath,
   runOnInstance,
   onChangeFolderPath,
   disabled,
+  onFieldLayout,
 }: {
   folderPath: string;
   runOnInstance: InstancePickerInstance;
   onChangeFolderPath: (path: string) => void;
   disabled: boolean;
+  onFieldLayout?: (bottom: number) => void;
 }) {
   const { t } = useTranslation();
   return (
-    <View className="mt-5">
+    <View
+      className="mt-5"
+      onLayout={event => {
+        onFieldLayout?.(event.nativeEvent.layout.y + event.nativeEvent.layout.height);
+      }}
+    >
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
         {t('agentChat.folderPicker.fieldLabel')}
       </Text>

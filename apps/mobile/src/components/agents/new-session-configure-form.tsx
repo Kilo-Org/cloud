@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -195,6 +195,17 @@ export function NewSessionConfigureForm({
     runOnInlineNote ??
     (showInstanceDisconnectedNote ? remoteSpawnInstanceDisconnectedNote() : null);
 
+  // The launch-folder field renders below the composer only on a remote target.
+  // Its own layout feeds the reveal the extra bottom it must keep above the
+  // keyboard; clearing it when the target leaves remote mode keeps a stale
+  // remote field from parking a cloud form at an old reveal offset.
+  const { onRequiredBottomLayout } = composerReveal;
+  useEffect(() => {
+    if (!isRemote) {
+      onRequiredBottomLayout(null);
+    }
+  }, [isRemote, onRequiredBottomLayout]);
+
   function handleScrollFrameLayout(event: LayoutChangeEvent) {
     const next = Math.max(Math.round(event.nativeEvent.layout.height), 0);
     setFrameHeight(current => (current === next ? current : next));
@@ -282,6 +293,7 @@ export function NewSessionConfigureForm({
           runOnInstance={runOnInstance}
           onChangeFolderPath={onChangeFolderPath}
           disabled={isStarting}
+          onFieldLayout={onRequiredBottomLayout}
         />
       ) : null}
 

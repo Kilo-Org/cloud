@@ -270,9 +270,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
-- `ABUSE_SERVICE_URL` - URL for the abuse detection service. [SERVER]
-- `ABUSE_SERVICE_CF_ACCESS_CLIENT_ID` - Cloudflare Access client ID for abuse service. [PUBLIC]
-- `ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET` - Cloudflare Access client secret for abuse service. `[SECRET]`
+- `BOUNCER_URL` - URL of the bouncer worker (report-only fraud, distillation, and rate verdicts). Defaults to https://bouncer.kiloapps.io in production. Usage reports and decide transport requests have 30-second trial budgets; gateway decide runs through `after()` and never delays inference. Credit reports keep their 5-second budget because Stripe webhooks await them. [SERVER]
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
@@ -352,6 +350,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_ACCESS_KEY_ID` - R2 access key ID for CLI session storage. `[SECRET]`
 - `R2_SECRET_ACCESS_KEY` - R2 secret access key for CLI session storage. `[SECRET]`
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
+- `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
+- `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
+- `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
 
 ## Services
 

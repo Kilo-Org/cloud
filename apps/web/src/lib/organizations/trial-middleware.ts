@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { getMostRecentSeatPurchase } from './organization-seats';
+import { getMostRecentSeatPurchase } from './organization-seat-purchases';
 import { getOrganizationById } from './organizations';
 import { classifyOrganizationEntitlement } from './trial-utils';
 

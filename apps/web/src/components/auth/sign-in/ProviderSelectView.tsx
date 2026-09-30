@@ -1,7 +1,7 @@
 'use client';
 
 import { AuthProviderButtons } from '@/components/auth/sign-in/AuthProviderButtons';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import React, { useState } from 'react';
 
 type ProviderSelectViewProps = {

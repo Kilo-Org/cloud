@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { GatewayRequest } from './providers/openrouter/types';
-import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from './latest-model-aliases';
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
 // `after()` post-response hook, which only works in a request context. Replace
@@ -26,243 +25,41 @@ jest.mock('./processUsage', () => ({
 }));
 
 import {
-  checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
+  getOrganizationProviderPrivacy,
+  lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
+  requestedLogprobs,
+  requestedSamples,
 } from './llm-proxy-helpers';
 
-describe('checkOrganizationModelRestrictions', () => {
-  it('does not forward the snapshot-only virtual provider upstream', () => {
-    const result = checkOrganizationModelRestrictions({
-      modelId: 'openai/text-embedding-3-small',
-      settings: { provider_allow_list: ['openai', 'virtual', 'azure'] },
-      organizationPlan: 'enterprise',
-    });
-
-    expect(result.providerConfig?.only).toEqual(['openai', 'azure']);
-  });
-
-  describe('enterprise plan - model deny list restrictions', () => {
-    it('should allow model when it is not in the deny list on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['openai/gpt-4'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should block model when it is in the deny list on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).not.toBeNull();
-      expect(result.error?.status).toBe(404);
-    });
-
-    it('applies model deny lists to latest aliases', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: CLAUDE_SONNET_LATEST_MODEL_ALIAS,
-        settings: {
-          model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
-          provider_allow_list: ['anthropic'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).not.toBeNull();
-      expect(result.error?.status).toBe(404);
-    });
-
-    it('should allow any model when deny list is empty on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: [],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should allow any model when deny list is undefined on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {},
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should block multiple denied models on enterprise plan', () => {
-      const settings = {
-        model_deny_list: ['anthropic/claude-3-opus', 'openai/gpt-3.5-turbo'],
-      };
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'anthropic/claude-3-opus',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).not.toBeNull();
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'openai/gpt-3.5-turbo',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).not.toBeNull();
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'openai/gpt-4',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).toBeNull();
+describe('getOrganizationProviderPrivacy', () => {
+  it.each(['allow', 'deny'] as const)('returns data_collection=%s', dataCollection => {
+    expect(getOrganizationProviderPrivacy({ data_collection: dataCollection })).toEqual({
+      data_collection: dataCollection,
     });
   });
 
-  describe('teams plan - model deny list should NOT apply', () => {
-    it('should allow any model on teams plan even with model_deny_list set', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
-        },
-        organizationPlan: 'teams',
-      });
-
-      expect(result.error).toBeNull();
-    });
+  it('leaves Enterprise model and provider restrictions to the member decision', () => {
+    expect(
+      getOrganizationProviderPrivacy({
+        provider_allow_list: ['openai', 'virtual'],
+        model_deny_list: ['anthropic/claude-3-opus'],
+        data_collection: 'deny',
+      })
+    ).toEqual({ data_collection: 'deny' });
   });
 
-  describe('no organization plan (individual users)', () => {
-    it('should allow any model when no organization plan is set', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
-        },
-      });
-
-      expect(result.error).toBeNull();
-    });
-  });
-
-  describe('provider policy - allow list applies for enterprise plans', () => {
-    it('should return provider config with only providers for enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: ['openai'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ only: ['openai'] });
-    });
-
-    it('should not return providerConfig for teams plan with provider_allow_list', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: ['openai'],
-        },
-        organizationPlan: 'teams',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toBeUndefined();
-    });
-
-    it('should return providerConfig when provider_allow_list is empty', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: [],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ only: [] });
-    });
-  });
-
-  describe('data collection - applies to all plans', () => {
-    it('should return data_collection in provider config when set to allow', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          data_collection: 'allow',
-        },
-        organizationPlan: 'teams',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ data_collection: 'allow' });
-    });
-
-    it('should return data_collection in provider config when set to deny', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          data_collection: 'deny',
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ data_collection: 'deny' });
-    });
-
-    it('should combine provider_allow_list and data_collection', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          provider_allow_list: ['openai'],
-          data_collection: 'deny',
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toEqual({ only: ['openai'], data_collection: 'deny' });
-    });
-  });
-
-  describe('no settings', () => {
-    it('should return no error and no provider config when settings is undefined', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: undefined,
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-      expect(result.providerConfig).toBeUndefined();
-    });
+  it('returns no provider config without privacy settings', () => {
+    expect(getOrganizationProviderPrivacy(undefined)).toBeUndefined();
+    expect(getOrganizationProviderPrivacy({ provider_allow_list: ['openai'] })).toBeUndefined();
   });
 });
 
@@ -1111,5 +908,96 @@ describe('extractHeaderAndLimitLength', () => {
     }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
 
     expect(extractHeaderAndLimitLength(request, 'x-long')).toBe('a'.repeat(500));
+  });
+});
+describe('lastUserPromptText', () => {
+  it('returns the last user message of a chat request', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'chat_completions',
+        body: {
+          messages: [
+            { role: 'system', content: 'be terse' },
+            { role: 'user', content: 'first' },
+            { role: 'assistant', content: 'ok' },
+            { role: 'user', content: 'second' },
+          ],
+        },
+      })
+    ).toBe('second');
+  });
+
+  it('joins the text parts of array content and ignores non-text parts', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'chat_completions',
+        body: {
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: 'look at this' },
+                { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
+                { type: 'text', text: 'and this' },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe('look at this\nand this');
+  });
+
+  it('reads a responses input string', () => {
+    expect(lastUserPromptText({ kind: 'responses', body: { input: 'plain prompt' } })).toBe(
+      'plain prompt'
+    );
+  });
+
+  it('reads the last user item of a responses input list, including input_text parts', () => {
+    expect(
+      lastUserPromptText({
+        kind: 'responses',
+        body: {
+          input: [
+            { role: 'user', content: [{ type: 'input_text', text: 'older' }] },
+            { role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] },
+            { role: 'user', content: [{ type: 'input_text', text: 'newest' }] },
+          ],
+        },
+      })
+    ).toBe('newest');
+  });
+
+  it('reads a FIM prompt', () => {
+    expect(lastUserPromptText({ kind: 'fim_completions', body: { prompt: 'fn main() {' } })).toBe(
+      'fn main() {'
+    );
+  });
+
+  it('returns null when the request has no user turn', () => {
+    expect(lastUserPromptText({ kind: 'chat_completions', body: { messages: [] } })).toBeNull();
+    expect(lastUserPromptText({ kind: 'messages', body: {} })).toBeNull();
+    expect(lastUserPromptText({ kind: 'responses', body: { input: 42 } })).toBeNull();
+  });
+});
+
+describe('requestedLogprobs', () => {
+  it('is true for logprobs, top_logprobs, or a non-empty logit_bias', () => {
+    expect(requestedLogprobs({ logprobs: true })).toBe(true);
+    expect(requestedLogprobs({ top_logprobs: 5 })).toBe(true);
+    expect(requestedLogprobs({ logit_bias: { '50256': -100 } })).toBe(true);
+  });
+
+  it('is false when the request asked for none of them', () => {
+    expect(requestedLogprobs({})).toBe(false);
+    expect(requestedLogprobs({ logprobs: false, top_logprobs: null, logit_bias: {} })).toBe(false);
+  });
+});
+
+describe('requestedSamples', () => {
+  it('returns the n sampling parameter, or null when it is absent', () => {
+    expect(requestedSamples({ n: 3 })).toBe(3);
+    expect(requestedSamples({})).toBeNull();
+    expect(requestedSamples({ n: null })).toBeNull();
   });
 });

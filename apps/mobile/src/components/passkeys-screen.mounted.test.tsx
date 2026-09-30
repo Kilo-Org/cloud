@@ -17,6 +17,7 @@ import {
   toastError,
   toastSuccess,
   UNNAMED,
+  USED,
 } from './passkeys-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -92,6 +93,22 @@ describe('PasskeysScreen', () => {
     expect(texts(view)).toContain('Passkey');
     expect(texts(view)).toContain('Added Jan 1, 2026');
     expect(nodes(view, 'KeyRound')).toHaveLength(2);
+    view.unmount();
+  });
+
+  it('shows the last-used date only on a passkey the server recorded a use for', async () => {
+    // One credential carries a last_used_at and one does not, so the test reads
+    // both sides of the condition from the same render.
+    store.rows = [USED, MACBOOK];
+    const view = await mount();
+    await waitFor(() => texts(view).includes('Work laptop'));
+
+    expect(texts(view)).toContain('Work laptop');
+    expect(texts(view)).toContain('MacBook');
+    expect(texts(view)).toContain('Added Jan 1, 2026');
+    // Only the recorded-use row carries the line; a credential the server has
+    // never seen used keeps the name-and-added pair.
+    expect(texts(view).filter(text => text === 'Last used Jan 1, 2026')).toHaveLength(1);
     view.unmount();
   });
 

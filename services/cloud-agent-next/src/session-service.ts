@@ -52,7 +52,6 @@ import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
   CloudAgentSessionState,
-  MCPServerConfig,
   RuntimeSkill,
   RuntimeAgent,
 } from './persistence/types.js';
@@ -64,8 +63,9 @@ import {
 import { withDORetry } from './utils/do-retry.js';
 import { resolveSessionStub } from './sandbox-session/session-stub.js';
 import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
-import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
-import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
+import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
+import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
+import { materializeMcpServers } from './mcp-config.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
 import {
@@ -880,86 +880,6 @@ export async function writeGlobalRules(
   await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
 }
 
-/**
- * CLI-native MCP config shape (env/header values as plain strings), ready to
- * JSON-encode into KILO_CONFIG_CONTENT.mcp.
- */
-type CliMcpServer =
-  | {
-      type: 'local';
-      command: string[];
-      environment?: Record<string, string>;
-      enabled?: boolean;
-      timeout?: number;
-    }
-  | {
-      type: 'remote';
-      url: string;
-      headers?: Record<string, string>;
-      enabled?: boolean;
-      timeout?: number;
-    };
-
-function materializeSecretValueRecord(
-  values: Record<string, MCPSecretValue> | undefined,
-  privateKey: string | undefined,
-  label: string
-): Record<string, string> | undefined {
-  if (!values || Object.keys(values).length === 0) return undefined;
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (typeof value === 'string') {
-      out[key] = value;
-      continue;
-    }
-    if (!privateKey) {
-      throw new Error(
-        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
-      );
-    }
-    out[key] = decryptWithPrivateKey(value, privateKey);
-  }
-  return out;
-}
-
-/** Materialize each MCP env/header value into its plaintext form for the CLI. */
-function materializeMcpServers(
-  mcpServers: Record<string, MCPServerConfig>,
-  privateKey: string | undefined
-): Record<string, CliMcpServer> {
-  const out: Record<string, CliMcpServer> = {};
-  for (const [name, server] of Object.entries(mcpServers)) {
-    if (server.type === 'local') {
-      const environment = materializeSecretValueRecord(
-        server.environment,
-        privateKey,
-        `MCP server "${name}" environment`
-      );
-      out[name] = {
-        type: 'local',
-        command: server.command,
-        ...(environment !== undefined && { environment }),
-        ...(server.enabled !== undefined && { enabled: server.enabled }),
-        ...(server.timeout !== undefined && { timeout: server.timeout }),
-      };
-    } else {
-      const headers = materializeSecretValueRecord(
-        server.headers,
-        privateKey,
-        `MCP server "${name}" headers`
-      );
-      out[name] = {
-        type: 'remote',
-        url: server.url,
-        ...(headers !== undefined && { headers }),
-        ...(server.enabled !== undefined && { enabled: server.enabled }),
-        ...(server.timeout !== undefined && { timeout: server.timeout }),
-      };
-    }
-  }
-  return out;
-}
-
 function shortHash(input: string): string {
   let hash = 5381;
   for (let i = 0; i < input.length; i++) {
@@ -1492,6 +1412,9 @@ export class SessionService {
       },
       autoupdate: false,
       snapshot: false,
+      // Codebase indexing would embed the repo and keep a local vector store
+      // alive for the session, which the sandbox does not budget for.
+      indexing: { enabled: false },
     };
     if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);

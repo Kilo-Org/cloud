@@ -9,26 +9,40 @@ import * as z from 'zod';
  * the partner guideline's usage-limit modal. The error body itself is passed
  * through to the caller unchanged: the client still sees the upstream failure.
  *
+ * The recorded event is a notice, never a gate: requests keep reaching OpenAI,
+ * which is the only authority on when the allowance returns. A request that
+ * then succeeds clears the record, because OpenAI reports no reset time for an
+ * app-specific limit and a reset the person applies in ChatGPT can restore the
+ * allowance before the recorded window ends.
+ *
  * Only a plan limit counts. A per-minute rate limit (`rate_limit_exceeded`)
  * clears on its own and must not tell a person their plan allowance ran out.
  */
 
 /**
- * The ChatGPT usage dashboard. OpenAI's "Using Codex with your ChatGPT plan"
- * article names it as the page that shows which allowance is exhausted, the
- * credit balance, and the reset time, which is what the guideline's "Manage
- * usage" action must open.
+ * The ChatGPT usage settings page. The partner guideline requires the
+ * usage-limit notice to open this page, and it is the only place that shows
+ * both the plan allowance and the weekly limit a person set for this app. An
+ * app-specific limit can be exhausted while the plan still has allowance, so
+ * the Codex-only dashboard would not name the limit that blocked the request.
  */
-export const CHATGPT_USAGE_SETTINGS_URL = 'https://chatgpt.com/codex/settings/usage';
+export const CHATGPT_USAGE_SETTINGS_URL = 'https://chatgpt.com/settings/usage';
 
 /** The only status that carries a plan limit. */
 const USAGE_LIMIT_STATUS = 429;
 
 /**
  * The upstream markers that mean the plan allowance is spent. `detail` is the
- * ChatGPT backend shape and `error` is the API shape, so both are read.
+ * ChatGPT backend shape and `error` is the API shape, so both are read. The
+ * `subscription_sharing_*` code is the documented one for this integration; it
+ * covers both the plan allowance and an app-specific weekly limit, which can be
+ * exhausted while the plan still has allowance.
  */
-const USAGE_LIMIT_MARKERS = new Set(['usage_limit_reached', 'insufficient_quota']);
+const USAGE_LIMIT_MARKERS: Record<string, true> = {
+  usage_limit_reached: true,
+  insufficient_quota: true,
+  subscription_sharing_usage_limit_exceeded: true,
+};
 
 /**
  * How long a recorded limit stays visible when OpenAI reported no reset delay.
@@ -73,7 +87,7 @@ export function readChatGptUsageLimit(
   if (!metadata) return null;
 
   const isPlanLimit = [metadata.type, metadata.code].some(
-    marker => marker !== undefined && USAGE_LIMIT_MARKERS.has(marker)
+    marker => marker !== undefined && USAGE_LIMIT_MARKERS[marker] === true
   );
   if (!isPlanLimit) return null;
 
@@ -86,7 +100,7 @@ export function readChatGptUsageLimit(
 /**
  * Whether a recorded limit is still current. An expired record stays in the row
  * and is ignored here instead of being cleared, so the read path never writes
- * and the next limit event or reconnect overwrites it.
+ * and the next limit event, a successful request, or a reconnect overwrites it.
  */
 export function isChatGptUsageLimitCurrent(
   reachedAt: string | Date | null | undefined,

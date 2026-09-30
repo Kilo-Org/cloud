@@ -94,7 +94,7 @@ describe('bitbucketRouter organization ownership', () => {
     const [{ bitbucketRouter }, { createCallerFactory }, { findUserById }] = await Promise.all([
       import('./bitbucket-router'),
       import('@/lib/trpc/init'),
-      import('@/lib/user'),
+      import('@/lib/user/find-user-by-id'),
     ]);
     const createDirectCaller = createCallerFactory(bitbucketRouter);
     createCallerForUser = async userId => {

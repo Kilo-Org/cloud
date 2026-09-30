@@ -484,10 +484,13 @@ export function AgentSessionListScreen() {
             // The count is an assertion about the current snapshot, so it is
             // withheld whenever that snapshot cannot be confirmed: while the
             // list is unresolved (loading or membership unknown) and while the
-            // live query is in an error state, exactly as the tab badge is.
-            // The cached rows themselves stay on screen, so a failed refresh
-            // never blanks the list it kept.
-            !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
+            // live query is in an error state, exactly as the tab badge is. An
+            // accepted-empty snapshot is confirmed but names no live sessions,
+            // so it withholds the count too, matching the badge's hide-at-zero,
+            // and the empty card below is the sole live-session content. The
+            // cached rows themselves stay on screen, so a failed refresh never
+            // blanks the list it kept.
+            !sessions.isLoading && !sessions.isError && hasLiveRows
               ? t('agents.liveCount', { count: activeSessions.length })
               : undefined
           }

@@ -12,6 +12,7 @@ jest.mock('remark-gfm', () =>
 
 import { BashToolCard } from './BashToolCard';
 import { BackgroundProcessToolCard } from './BackgroundProcessToolCard';
+import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { GenericToolCard } from './GenericToolCard';
 import { ToolCodeBlock } from './ToolOutput';
 
@@ -364,6 +365,140 @@ describe('BackgroundProcessToolCard', () => {
 
     expect(html).toContain('0 processes');
     expect(html).not.toContain('animate-spin');
+  });
+});
+
+describe('ScheduledTaskToolCard', () => {
+  it.each([
+    ['schedule_wakeup', {}, 'Schedule wakeup'],
+    ['cancel_wakeup', { action: 'list' }, 'List wakeups'],
+    ['cancel_wakeup', { action: 'cancel', id: 'wku-1' }, 'Cancel wakeup'],
+    ['cron_create', {}, 'Create cron task'],
+    ['cron_list', {}, 'List cron tasks'],
+    ['cron_delete', { id: 'wku-1' }, 'Delete cron task'],
+    ['unrecognized', {}, 'Scheduled task'],
+  ])('uses an identity-specific title for %s', (tool, input, expected) => {
+    const part = completedTool(tool, input, '');
+    const html = renderToStaticMarkup(
+      React.createElement(ScheduledTaskToolCard, { toolPart: part })
+    );
+
+    expect(html).toContain(expected);
+    expect(html).toContain('aria-expanded="false"');
+  });
+
+  it('parses a wakeup confirmation without leaking the raw sentence as output', () => {
+    const part = completedTool(
+      'schedule_wakeup',
+      { prompt: 'recheck the deploy', delay: '30m', reason: 'poll' },
+      'Scheduled wakeup wku_123, due 2026-09-30T22:05:43.781Z (in 30m).\nWhen it fires this session resumes with: recheck the deploy'
+    );
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('wku_123');
+    expect(html).toContain('due 2026-09-30T22:05:43.781Z (in 30m)');
+    expect(html).toContain('<code>recheck the deploy</code>');
+    expect(html).not.toContain('aria-label="Output"');
+    expect(html).toContain('poll');
+  });
+
+  it('parses a cron creation confirmation with its schedule', () => {
+    const part = completedTool(
+      'cron_create',
+      { prompt: 'nightly summary', cron: '0 3 * * *' },
+      'Scheduled cron task wku_456, schedule 0 3 * * *, next fire 2026-09-30T03:00:07.546Z (in 5h).\nWhen it fires this session resumes with: nightly summary'
+    );
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('wku_456');
+    expect(html).toContain('0 3 * * * · next 2026-09-30T03:00:07.546Z (in 5h)');
+    expect(html).toContain('<code>nightly summary</code>');
+  });
+
+  it('lists parsed rows and bounds the visible list', () => {
+    const lines = Array.from(
+      { length: 25 },
+      (_unused, index) =>
+        `wku_${index}  0 3 * * *  next 2026-09-30T03:00:07.546Z (in 5h)  prompt ${index}`
+    );
+    const part = completedTool('cron_list', {}, lines.join('\n'));
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('25 tasks');
+    expect(html).toContain('wku_0');
+    expect(html).toContain('wku_19');
+    expect(html).not.toContain('wku_20');
+    expect(html).toContain('+5 more');
+  });
+
+  it('shows the empty-list sentence as text instead of raw output', () => {
+    const part = completedTool('cron_list', {}, 'No scheduled cron tasks for this session.');
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('No scheduled cron tasks for this session.');
+    expect(html).not.toContain('aria-label="Output"');
+  });
+
+  it('keeps unrecognized list output bounded and copyable without claiming no tasks', () => {
+    const part = completedTool('cron_list', {}, 'Totally unexpected response');
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('aria-label="Output"');
+    expect(html).toContain('<code>Totally unexpected response</code>');
+    expect(html).toContain('aria-label="Copy output"');
+    expect(html).not.toContain('None scheduled');
+    expect(html).not.toContain('No scheduled tasks');
+  });
+
+  it('only treats the exact native empty-list phrase as an empty list', () => {
+    const empty = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session.'
+    );
+    const emptyHtml = expanded(ScheduledTaskToolCard({ toolPart: empty }));
+
+    expect(emptyHtml).toContain('None scheduled');
+    expect(emptyHtml).toContain('No pending wakeups for this session.');
+
+    const nearMiss = completedTool(
+      'cancel_wakeup',
+      { action: 'list' },
+      'No pending wakeups for this session? '
+    );
+    const nearMissHtml = expanded(ScheduledTaskToolCard({ toolPart: nearMiss }));
+
+    expect(nearMissHtml).not.toContain('None scheduled');
+    expect(nearMissHtml).toContain('aria-label="Output"');
+  });
+
+  it('renders a completed part with missing or malformed input', () => {
+    for (const malformed of [undefined, null, 'bad', 42]) {
+      const part = completedTool('schedule_wakeup', { prompt: 'x' }, '');
+      Object.defineProperty(part.state, 'input', { value: malformed, enumerable: true });
+      const html = renderToStaticMarkup(
+        React.createElement(ScheduledTaskToolCard, { toolPart: part })
+      );
+
+      expect(html).toContain('Schedule wakeup');
+      expect(html).toContain('aria-expanded="false"');
+    }
+  });
+
+  it('surfaces a failed state with no unbacked cancel or delete controls', () => {
+    const part = completedTool('schedule_wakeup', { prompt: 'x' }, '');
+    part.state = {
+      status: 'error',
+      input: { prompt: 'x' },
+      error: 'Scheduler unavailable',
+      time: { start: 1, end: 2 },
+    };
+    const html = expanded(ScheduledTaskToolCard({ toolPart: part }));
+
+    expect(html).toContain('Scheduler unavailable');
+    expect(html).toContain('text-destructive');
+    expect(html).not.toContain('aria-label="Cancel');
+    expect(html).not.toContain('aria-label="Delete');
   });
 });
 

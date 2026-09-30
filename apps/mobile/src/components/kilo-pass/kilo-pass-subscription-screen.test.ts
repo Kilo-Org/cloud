@@ -24,6 +24,7 @@ const mocks = vi.hoisted(() => ({
     errorMessage: null as string | null,
     storeConnectionError: false,
     isPending: false,
+    isRestoringPurchases: false,
     products: [] as unknown[],
     productsError: null as string | null,
     productsIsLoading: false,
@@ -284,6 +285,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.errorMessage = null;
     mocks.nativeIap.storeConnectionError = false;
     mocks.nativeIap.isPending = false;
+    mocks.nativeIap.isRestoringPurchases = false;
     mocks.nativeIap.products = [];
     mocks.nativeIap.productsError = null;
     mocks.nativeIap.productsIsLoading = false;
@@ -528,6 +530,14 @@ describe('KiloPassSubscriptionScreen', () => {
 
     expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).toContain('Manage');
+    // The label must be a Text child. A bare string bypasses TextClassContext
+    // and RN's text-in-View rule, so the web-managed Manage button would render
+    // unstyled against its card in dark mode.
+    expect(
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.children.includes('Manage')
+      )
+    ).toHaveLength(1);
     expect(productTiles(renderer)).toHaveLength(0);
     expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
 
@@ -891,6 +901,31 @@ describe('KiloPassSubscriptionScreen', () => {
 
     renderer.unmount();
   });
+
+  it.each([
+    { isRestoringPurchases: false, showsPurchaseBar: true },
+    { isRestoringPurchases: true, showsPurchaseBar: false },
+  ])(
+    'shows the Completing purchase bar only for a purchase, not a restore (restoring=$isRestoringPurchases)',
+    async ({ isRestoringPurchases, showsPurchaseBar }) => {
+      setNativeIapPresentation();
+      mocks.nativeIap.products = [];
+      mocks.nativeIap.isPending = true;
+      mocks.nativeIap.isRestoringPurchases = isRestoringPurchases;
+
+      const renderer = await renderScreen();
+
+      // The owner folds a restore into `isPending`, so the bar would otherwise
+      // claim "Completing purchase" while the tapped button says "Restoring
+      // Purchases". It must follow the restore flag, not `isPending` alone.
+      const purchaseBars = renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.children.includes('Completing purchase')
+      );
+      expect(purchaseBars.length > 0).toBe(showsPurchaseBar);
+
+      renderer.unmount();
+    }
+  );
 
   it('does not start the purchase when the screen unmounts during preflight', async () => {
     setNativeIapPresentation();

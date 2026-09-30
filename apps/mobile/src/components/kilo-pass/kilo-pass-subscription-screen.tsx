@@ -159,7 +159,7 @@ function KiloPassUnavailableScreen({
               }}
               variant="outline"
             >
-              {t('kiloPass.manage')}
+              <Text>{t('kiloPass.manage')}</Text>
             </Button>
           ) : null}
         </View>
@@ -180,6 +180,7 @@ function KiloPassNativeIapContent() {
     errorMessage,
     storeConnectionError,
     isPending,
+    isRestoringPurchases,
     products,
     productsError,
     productsIsLoading,
@@ -542,7 +543,11 @@ function KiloPassNativeIapContent() {
           </Text>
         </DetailScreenScrollView>
 
-        {isPending && (
+        {/* This bar reports a purchase in flight. The owner folds a restore into
+            the shared `isPending`, so without the `isRestoringPurchases` guard it
+            would claim "Completing purchase" over the restore the tapped button
+            is already labelling. */}
+        {isPending && !isRestoringPurchases && (
           <View style={{ paddingBottom: Math.max(insets.bottom, 16) }}>
             <Button
               accessibilityLabel={t('kiloPass.completingPurchaseAccessibility')}

@@ -9,7 +9,7 @@ import {
   type GitAuthorConfig,
   type ManagedGitHubFallbackReason,
 } from './types.js';
-import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
+import { generateSandboxId, getOutboundContainerId, isIsolatedSandboxId } from './sandbox-id.js';
 import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
 import {
   isLocalFakeDeterministicModel,
@@ -1181,6 +1181,7 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
+      sandboxId: context.sandboxId,
       env: opts.env,
       kiloCapability: opts.kiloCapability,
       kiloBackendBaseUrl: opts.kiloBackendBaseUrl,
@@ -1210,6 +1211,7 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
+      sandboxId,
       env,
       kiloCapability,
       kiloBackendBaseUrl,
@@ -1331,15 +1333,26 @@ export class SessionService {
       });
     }
 
+    // Isolated sandboxes host a single session and may reach the whole
+    // container filesystem. Shared sandboxes co-locate sessions, so they keep
+    // the workspace-scoped allowlist that separates co-tenant checkouts,
+    // attachments, and session homes. Command-guard policies stay scoped: the
+    // workspace root is their allowlist root and broadening it would weaken the
+    // read-only and remediation boundaries.
+    const externalDirectoryPermission =
+      sandboxId !== undefined && isIsolatedSandboxId(sandboxId) && !commandGuardPolicy
+        ? 'allow'
+        : {
+            '*': 'deny',
+            [`/tmp/${sessionId}/**`]: 'allow',
+            [`/tmp/attachments/${sessionId}/**`]: 'allow',
+            [`${workspacePath}/**`]: 'allow',
+            [`${sessionHome}/.kilocode/skills/**`]: 'allow',
+            ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
+          };
+
     const permission: Record<string, unknown> = {
-      external_directory: {
-        '*': 'deny',
-        [`/tmp/${sessionId}/**`]: 'allow',
-        [`/tmp/attachments/${sessionId}/**`]: 'allow',
-        [`${workspacePath}/**`]: 'allow',
-        [`${sessionHome}/.kilocode/skills/**`]: 'allow',
-        ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
-      },
+      external_directory: externalDirectoryPermission,
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
@@ -2072,6 +2085,7 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
+      sandboxId,
       env,
       kiloCapability,
       kiloBackendBaseUrl,
@@ -3026,6 +3040,7 @@ type GetSaferEnvVarsOptions = {
   sessionHome: string;
   sessionId: string;
   workspacePath: string;
+  sandboxId?: string;
   env: PersistenceEnv;
   kiloCapability: string;
   kiloBackendBaseUrl?: string;

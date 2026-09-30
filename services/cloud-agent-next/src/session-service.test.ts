@@ -3460,8 +3460,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('allowlists only the active session attachment directory for Kilo file access', async () => {
-    const result = await buildPromptWrapperRequests(createMetadata());
+  it('allowlists only the active session attachment directory for Kilo file access on a shared sandbox', async () => {
+    const metadata = createMetadata();
+    const result = await buildPromptWrapperRequests({
+      ...metadata,
+      workspace: { ...metadata.workspace, sandboxId: `usr-${'a'.repeat(48)}` },
+    });
     const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
 
     expect(config).toMatchObject({
@@ -3476,6 +3480,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config).not.toMatchObject({
       permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
     });
+  });
+
+  it('allows every external directory for an isolated sandbox', async () => {
+    const metadata = createMetadata();
+    const result = await buildPromptWrapperRequests({
+      ...metadata,
+      workspace: { ...metadata.workspace, sandboxId: `ses-${'a'.repeat(48)}` },
+    });
+    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+
+    expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
   });
 
   it.each(['cloud-agent-web', undefined, 'app-builder', 'code-review', 'slack'])(

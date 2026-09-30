@@ -90,13 +90,22 @@ async function run(data) {
   const failures = [];
   let prReads = 0;
   let signalReads = 0;
+  const listReads = new Map();
   const list = name => name;
   const github = {
     rest: {
       pulls: {
         get: async params => {
           calls.push(['pr', params]);
-          return { data: ++prReads > 1 ? (data.currentPr ?? data.pr) : data.pr };
+          prReads += 1;
+          return {
+            data:
+              prReads > 2
+                ? (data.finalPr ?? data.currentPr ?? data.pr)
+                : prReads > 1
+                  ? (data.currentPr ?? data.pr)
+                  : data.pr,
+          };
         },
         listReviews: list('reviews'),
         listReviewComments: list('inlineComments'),
@@ -105,7 +114,15 @@ async function run(data) {
       issues: {
         getComment: async params => {
           calls.push(['signal', params]);
-          return { data: ++signalReads > 1 ? (data.currentSignal ?? data.signal) : data.signal };
+          signalReads += 1;
+          return {
+            data:
+              signalReads > 2
+                ? (data.finalSignal ?? data.currentSignal ?? data.signal)
+                : signalReads > 1
+                  ? (data.currentSignal ?? data.signal)
+                  : data.signal,
+          };
         },
         listComments: list('comments'),
       },
@@ -116,7 +133,11 @@ async function run(data) {
       calls.push([route, params]);
       assert.equal(params.per_page, 100);
       if (data.apiFailure === route) throw new Error('GitHub API unavailable');
-      return data[typeof route === 'string' && route.startsWith('GET ') ? 'rules' : route];
+      const key = typeof route === 'string' && route.startsWith('GET ') ? 'rules' : route;
+      const readCount = (listReads.get(key) ?? 0) + 1;
+      listReads.set(key, readCount);
+      if (readCount > 1 && data.finalApiFailure === key) throw new Error('GitHub API unavailable');
+      return readCount > 1 ? (data.currentLists?.[key] ?? data[key]) : data[key];
     },
   };
   await execute(github, data.context, {
@@ -245,6 +266,11 @@ const rejectedCases = {
     (d.currentPr = { ...d.pr, head: { ...d.pr.head, sha: 'd'.repeat(40) } }),
   'signal edited before approval': d =>
     (d.currentSignal = { ...d.signal, updated_at: '2026-09-30T12:01:00Z' }),
+  'label removed during final evidence refresh': d => (d.finalPr = { ...d.pr, labels: [] }),
+  'head changed during final evidence refresh': d =>
+    (d.finalPr = { ...d.pr, head: { ...d.pr.head, sha: 'd'.repeat(40) } }),
+  'signal edited during final evidence refresh': d =>
+    (d.finalSignal = { ...d.signal, updated_at: '2026-09-30T12:01:00Z' }),
 };
 
 for (const [name, mutate] of Object.entries(rejectedCases)) {
@@ -336,4 +362,40 @@ test('API failure aborts without approval', async () => {
   const data = fixture();
   data.apiFailure = 'reviews';
   await assert.rejects(run(data), /GitHub API unavailable/);
+});
+
+for (const key of ['checks', 'statuses', 'reviews', 'inlineComments', 'comments']) {
+  test(`refreshes ${key} before approval and rejects late changes`, async () => {
+    const data = fixture();
+    data.currentLists = {
+      checks: data.checks.map(check => ({ ...check, conclusion: 'failure' })),
+      statuses: [{ context: 'external', state: 'failure' }],
+      reviews: [{ user: { login: 'human' }, state: 'CHANGES_REQUESTED' }],
+      inlineComments: [{ user: bot, body: 'New finding' }],
+      comments: [
+        ...data.comments,
+        { user: { login: 'human' }, updated_at: '2026-09-30T12:01:00Z' },
+      ],
+    };
+    data.currentLists = { [key]: data.currentLists[key] };
+    const result = await run(data);
+    assert.equal(result.approvals.length, 0);
+    assert.equal(result.calls.filter(([route]) => route === key).length, 2);
+  });
+}
+
+test('a second-pass API failure aborts without approval', async () => {
+  const data = fixture();
+  data.finalApiFailure = 'reviews';
+  await assert.rejects(run(data), /GitHub API unavailable/);
+});
+
+test('successful approval refreshes every mutable input', async () => {
+  const { calls, approvals } = await run(fixture());
+  assert.equal(approvals.length, 1);
+  for (const key of ['checks', 'statuses', 'reviews', 'inlineComments', 'comments']) {
+    assert.equal(calls.filter(([route]) => route === key).length, 2);
+  }
+  assert.equal(calls.filter(([route]) => route === 'pr').length, 3);
+  assert.equal(calls.filter(([route]) => route === 'signal').length, 3);
 });

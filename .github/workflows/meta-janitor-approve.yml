@@ -73,57 +73,68 @@ jobs:
               .flatMap(rule => rule.parameters.required_status_checks);
             if (requiredChecks.length === 0) return skip('no required CI checks could be established');
 
-            const checks = await github.paginate(github.rest.checks.listForRef, {
-              owner, repo, ref: sha, filter: 'latest', per_page: 100,
-            });
-            const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
-              owner, repo, ref: sha, per_page: 100,
-            });
-            const latestStatuses = [...new Map(statuses.map(status => [status.context, status]).reverse()).values()];
-            const passingCheck = check => check.head_sha === sha && check.status === 'completed' &&
-              ['success', 'neutral', 'skipped'].includes(check.conclusion);
-            if (checks.some(check => !passingCheck(check)) ||
-                latestStatuses.some(status => status.state !== 'success')) {
-              return skip('a current check or status is pending or unsuccessful');
-            }
-            for (const required of requiredChecks) {
-              const matchingChecks = checks.filter(check => check.name === required.context &&
-                (required.integration_id == null || check.app?.id === required.integration_id));
-              const matchingStatus = required.integration_id == null &&
-                latestStatuses.some(status => status.context === required.context && status.state === 'success');
-              if (!matchingChecks.length && !matchingStatus) return skip('a required check is missing');
-            }
-            const kiloCheck = checks.find(check => check.name === 'Kilo Code Review' &&
-              check.app?.slug === 'kilo-code-bot' && check.conclusion === 'success');
-            if (!kiloCheck?.started_at || !kiloCheck.completed_at ||
-                kiloCheck.completed_at > signal.created_at) {
-              return skip('Kilo review did not finish for this commit before the signal');
-            }
+            const validateApproval = async () => {
+              const checks = await github.paginate(github.rest.checks.listForRef, {
+                owner, repo, ref: sha, filter: 'latest', per_page: 100,
+              });
+              const statuses = await github.paginate(github.rest.repos.listCommitStatusesForRef, {
+                owner, repo, ref: sha, per_page: 100,
+              });
+              const latestStatuses = [...new Map(statuses.map(status => [status.context, status]).reverse()).values()];
+              const passingCheck = check => check.head_sha === sha && check.status === 'completed' &&
+                ['success', 'neutral', 'skipped'].includes(check.conclusion);
+              if (checks.some(check => !passingCheck(check)) ||
+                  latestStatuses.some(status => status.state !== 'success')) {
+                return skip('a current check or status is pending or unsuccessful');
+              }
+              for (const required of requiredChecks) {
+                const matchingChecks = checks.filter(check => check.name === required.context &&
+                  (required.integration_id == null || check.app?.id === required.integration_id));
+                const matchingStatus = required.integration_id == null &&
+                  latestStatuses.some(status => status.context === required.context && status.state === 'success');
+                if (!matchingChecks.length && !matchingStatus) return skip('a required check is missing');
+              }
+              const kiloCheck = checks.find(check => check.name === 'Kilo Code Review' &&
+                check.app?.slug === 'kilo-code-bot' && check.conclusion === 'success');
+              if (!kiloCheck?.started_at || !kiloCheck.completed_at ||
+                  kiloCheck.completed_at > signal.created_at) {
+                return skip('Kilo review did not finish for this commit before the signal');
+              }
 
-            const reviews = await github.paginate(github.rest.pulls.listReviews, { ...params, per_page: 100 });
-            const inlineComments = await github.paginate(github.rest.pulls.listReviewComments, { ...params, per_page: 100 });
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner, repo, issue_number: issue.number, per_page: 100,
-            });
-            if (inlineComments.length > 0 || reviews.some(review =>
-                review.state === 'CHANGES_REQUESTED' ||
-                (review.user?.login !== 'github-actions[bot]' && review.submitted_at > signal.created_at))) {
-              return skip('inline feedback, requested changes, or a post-assessment review exists');
-            }
-            if (comments.some(comment => comment.user?.login !== 'github-actions[bot]' &&
-                comment.updated_at > signal.created_at)) {
-              return skip('new conversation feedback appeared after the safety assessment');
-            }
-            const actionsReviews = reviews.filter(review => review.user?.login === 'github-actions[bot]');
-            const lastActionsReview = actionsReviews.at(-1);
-            if (lastActionsReview?.state === 'APPROVED' && lastActionsReview.commit_id === sha) {
-              return skip('GitHub Actions already approved this commit');
-            }
+              const reviews = await github.paginate(github.rest.pulls.listReviews, { ...params, per_page: 100 });
+              const inlineComments = await github.paginate(github.rest.pulls.listReviewComments, { ...params, per_page: 100 });
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: issue.number, per_page: 100,
+              });
+              if (inlineComments.length > 0 || reviews.some(review =>
+                  review.state === 'CHANGES_REQUESTED' ||
+                  (review.user?.login !== 'github-actions[bot]' && review.submitted_at > signal.created_at))) {
+                return skip('inline feedback, requested changes, or a post-assessment review exists');
+              }
+              if (comments.some(comment => comment.user?.login !== 'github-actions[bot]' &&
+                  comment.updated_at > signal.created_at)) {
+                return skip('new conversation feedback appeared after the safety assessment');
+              }
+              const actionsReviews = reviews.filter(review => review.user?.login === 'github-actions[bot]');
+              const lastActionsReview = actionsReviews.at(-1);
+              if (lastActionsReview?.state === 'APPROVED' && lastActionsReview.commit_id === sha) {
+                return skip('GitHub Actions already approved this commit');
+              }
+              return true;
+            };
+            if (!(await validateApproval())) return;
 
             const { data: currentSignal } = await github.rest.issues.getComment(commentParams);
             const { data: currentPr } = await github.rest.pulls.get(params);
             if (!validSignal(currentSignal) || !eligible(currentPr) || currentPr.base.sha !== pr.base.sha) {
               return skip('signal or PR changed during validation; a fresh assessment is required');
+            }
+            // GitHub has no atomic snapshot/approve API; refresh mutable evidence before writing.
+            if (!(await validateApproval())) return;
+            const { data: finalSignal } = await github.rest.issues.getComment(commentParams);
+            const { data: finalPr } = await github.rest.pulls.get(params);
+            if (!validSignal(finalSignal) || !eligible(finalPr) || finalPr.base.sha !== pr.base.sha) {
+              return skip('signal or PR changed during final validation');
             }
             await github.rest.pulls.createReview({
               ...params,

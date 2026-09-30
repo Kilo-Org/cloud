@@ -13,8 +13,10 @@ const query = vi.hoisted(() => ({
   isPending: false,
   isError: false,
   isFetching: false,
+  fetchStatus: 'idle' as 'idle' | 'fetching' | 'paused',
   refetch: vi.fn(),
 }));
+const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
 const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
@@ -46,6 +48,9 @@ vi.mock('@/lib/auth/auth-context', () => ({
   useAuth: () => ({ token: 'test-token', signOut: vi.fn() }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.status,
+}));
 vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => hosts,
   revokeHost: vi.fn(),
@@ -66,7 +71,9 @@ beforeEach(() => {
   query.isLoading = false;
   query.isPending = false;
   query.isError = false;
+  query.fetchStatus = 'idle';
   query.refetch.mockClear();
+  connectivity.status = 'online';
   hosts.hasLoaded = true;
   hosts.trustedHosts = [];
 });
@@ -150,6 +157,32 @@ describe('account surface states', () => {
     const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
     expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
+    unmount();
+  });
+
+  it('settles on the offline error when a confirmed-offline request is paused', async () => {
+    // NetInfo pauses the request while the device is offline, so the query stays
+    // pending with no data; the screen must leave the skeleton and surface the
+    // offline error, not shimmer forever (explorer-profile-offline).
+    query.isPending = true;
+    query.fetchStatus = 'paused';
+    connectivity.status = 'offline';
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    expect(error.props.variant).toBe('offline');
+    unmount();
+  });
+
+  it('keeps the skeleton while connectivity is still unknown', async () => {
+    // A paused query during the NetInfo boot is not a confirmed offline state;
+    // the screen keeps loading rather than claiming a failure it cannot know.
+    query.isPending = true;
+    query.fetchStatus = 'paused';
+    connectivity.status = 'unknown';
+    const { renderer, unmount } = await renderWithProviders(createElement(DeviceSessionsScreen));
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(12);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
     unmount();
   });
 

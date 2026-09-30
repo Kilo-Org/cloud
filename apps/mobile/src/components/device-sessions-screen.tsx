@@ -21,6 +21,7 @@ import {
   sortDeviceSessions,
 } from '@/lib/device-sessions';
 import { formatDate } from '@/lib/format';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
@@ -84,17 +85,25 @@ export function DeviceSessionsScreen() {
   const trpc = useTRPC();
   const { t } = useTranslation();
 
-  const { data, isPending, isError, isFetching, refetch } = useQuery({
+  const { data, isPending, isError, isFetching, refetch, fetchStatus } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
     enabled: token != null,
   });
 
+  // While the device is confirmed offline NetInfo pauses the request, so the
+  // query stays `pending` with no data and the screen would shimmer forever.
+  // Treat that paused state as an offline error once connectivity is known;
+  // `unknown` (NetInfo still booting) keeps the skeleton.
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const offline = data === undefined && fetchStatus === 'paused' && isConnectivityKnown;
+
   const state = classifyDeviceSessionsState({
     // `isPending`, not `isLoading`: React Query v5's `isLoading` is
     // `isPending && isFetching`, so it is false on the first render before the
-    // fetch starts and the cold open would classify as `empty`.
-    isPending,
-    isError: isError && data === undefined,
+    // fetch starts and the cold open would classify as `empty`. A confirmed
+    // offline pause is pending too, but it must classify as an error.
+    isPending: isPending && !offline,
+    isError: (isError && data === undefined) || offline,
     data,
   });
   const sessions = sortDeviceSessions(data ?? []);
@@ -149,7 +158,7 @@ export function DeviceSessionsScreen() {
   if (state === 'error') {
     body = (
       <QueryError
-        variant="server"
+        variant={offline ? 'offline' : 'server'}
         title={t('common.couldNotLoadSessions')}
         message={t('deviceSessions.couldNotLoadDescription')}
         onRetry={() => void refetch()}

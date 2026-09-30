@@ -9,7 +9,7 @@ import { createElement, type ElementType, type ReactNode } from 'react';
 import type * as ReactModule from 'react';
 import { Platform, Pressable } from 'react-native';
 import { act, type ReactTestRenderer } from '@/test/renderer';
-import { type QueryClient } from '@tanstack/react-query';
+import { onlineManager, type QueryClient } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -29,6 +29,7 @@ const currentUser = vi.hoisted(() => ({
   userId: undefined as string | undefined,
   isError: false,
 }));
+const connectivity = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
 /** Window the card lays out in; a narrow one must stack the credits header. */
 const windowDims = vi.hoisted(() => ({ width: 390, height: 844, fontScale: 1, scale: 2 }));
 
@@ -67,6 +68,11 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
     isError: currentUser.isError,
     refetch: refetchUserId,
   }),
+}));
+
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivity.status,
+  useOfflineBannerState: () => connectivity.status === 'offline',
 }));
 
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
@@ -257,6 +263,8 @@ beforeEach(() => {
   refetchUserId.mockReset();
   currentUser.userId = undefined;
   currentUser.isError = false;
+  connectivity.status = 'online';
+  onlineManager.setOnline(true);
   personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
 });
 
@@ -354,6 +362,40 @@ describe('CreditsCard balance state', () => {
     expect(texts()).toContain('SKELETON');
     expect(texts()).not.toContain('ADD_CREDITS_ROW');
     expect(texts()).not.toContain('$0.00');
+
+    unmount();
+  });
+
+  it('shows the failed-to-load copy when a confirmed-offline balance request is paused', async () => {
+    // NetInfo pauses the request while the device is offline, so the balance
+    // query stays pending with no data; the card must leave the skeleton and
+    // surface its error, not shimmer forever (explorer-profile-offline).
+    currentUser.userId = 'user-1';
+    connectivity.status = 'offline';
+    onlineManager.setOnline(false);
+    // A paused request never runs its queryFn; keep it unresolved to model that.
+    getContextBalanceQueryFn.mockReturnValue(new Promise(() => {}));
+
+    const { texts, unmount } = await mountCard();
+
+    expect(texts()).toContain('Failed to load balance. Tap to retry.');
+    expect(texts()).not.toContain('SKELETON');
+
+    unmount();
+  });
+
+  it('keeps the balance skeleton while connectivity is still unknown', async () => {
+    // A paused query during the NetInfo boot is not a confirmed offline state;
+    // the card keeps loading rather than claiming a failure it cannot know.
+    currentUser.userId = 'user-1';
+    connectivity.status = 'unknown';
+    onlineManager.setOnline(false);
+    getContextBalanceQueryFn.mockReturnValue(new Promise(() => {}));
+
+    const { texts, unmount } = await mountCard();
+
+    expect(texts()).toContain('SKELETON');
+    expect(texts()).not.toContain('Failed to load balance. Tap to retry.');
 
     unmount();
   });

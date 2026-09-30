@@ -17,6 +17,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { isNarrowLayout } from '@/lib/narrow-layout';
@@ -49,6 +50,13 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
+  // While the device is confirmed offline, NetInfo pauses the balance request
+  // and React Query keeps it `pending` forever. Treat that paused state as a
+  // failure once connectivity is known so the card settles on its error surface
+  // instead of shimmering indefinitely. `unknown` (NetInfo still booting) keeps
+  // the skeleton, matching the settings screens' boot behavior.
+  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+
   const balanceOptions = trpc.user.getContextBalance.queryOptions({
     organizationId: selectedOrgId,
   });
@@ -70,6 +78,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     isLoading: balanceLoading,
     isFetching: balanceFetching,
     isError: balanceQueryError,
+    fetchStatus: balanceFetchStatus,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
@@ -89,8 +98,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
-  // the balance error surface. Retry re-resolves the owner and re-fetches.
-  const balanceFailed = balanceQueryError || userIdError;
+  // the balance error surface. Retry re-resolves the owner and re-fetches. A
+  // confirmed-offline paused balance (no data) is the same "cannot load" state.
+  const balanceOffline =
+    balance === undefined && balanceFetchStatus === 'paused' && isConnectivityKnown;
+  const balanceFailed = balanceQueryError || userIdError || balanceOffline;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
   const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;

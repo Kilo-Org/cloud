@@ -3545,6 +3545,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config.agent?.title).toBeUndefined();
   });
 
+  it('disables snapshots and codebase indexing in the session config', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      snapshot?: boolean;
+      indexing?: { enabled?: boolean };
+    };
+
+    expect(config.snapshot).toBe(false);
+    expect(config.indexing).toEqual({ enabled: false });
+  });
+
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
     const service = new SessionService();
     const env = createEnv();

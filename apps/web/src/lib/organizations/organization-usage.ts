@@ -18,7 +18,8 @@ import {
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { db } from '@/lib/drizzle';
 import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';
-import { fromMicrodollars, toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { getBalanceForUser } from '@/lib/user/balance';

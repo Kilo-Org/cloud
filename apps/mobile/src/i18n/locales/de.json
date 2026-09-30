@@ -1584,6 +1584,7 @@
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
+      "continueInNewSession": "In einer neuen Sitzung fortsetzen",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",

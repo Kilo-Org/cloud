@@ -33,7 +33,7 @@ import {
   useOrganizationWithMembers,
 } from '@/app/api/organizations/hooks';
 import { usePostHog } from 'posthog-js/react';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail } from '@/lib/email-address';
 
 const emailSchema = z.email();
 

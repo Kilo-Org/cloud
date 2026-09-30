@@ -2153,6 +2153,7 @@
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
       "readOnly": "Tato relace je pouze pro čtení.",
+      "continueInNewSession": "Pokračovat v nové relaci",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",

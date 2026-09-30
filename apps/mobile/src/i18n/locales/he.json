@@ -1596,6 +1596,7 @@
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",
       "readOnly": "הסשן הזה מיועד לקריאה בלבד.",
+      "continueInNewSession": "המשך בסשן חדש",
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",

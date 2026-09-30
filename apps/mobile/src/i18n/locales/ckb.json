@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "ناوی سێشن",
       "transcriptAccessibility": "تۆماری سێشن",
       "readOnly": "ئەم سێشنە تەنها بۆ خوێندنەوەیە.",
+      "continueInNewSession": "بەردەوامبوون لە سێشنێکی نوێدا",
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",

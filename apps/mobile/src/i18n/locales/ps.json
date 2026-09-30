@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "د ناستې نوم",
       "transcriptAccessibility": "د ناستې متن",
       "readOnly": "دا ناسته یوازې لوستلی شئ.",
+      "continueInNewSession": "په نوي ناسته کې دوام ورکړئ",
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",

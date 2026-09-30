@@ -26,11 +26,6 @@ jest.mock('@/lib/posthog', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/abuse-service', () => ({
-  reportAuthEvent: jest.fn(),
-  reportEvents: jest.fn(),
-}));
-
 jest.mock('@/lib/ai-gateway/providerHash', () => ({
   generateOpenRouterUpstreamSafetyIdentifier: jest.fn(() => 'openrouter-upstream-test-id'),
   generateOpenRouterDownstreamSafetyIdentifier: jest.fn(() => 'openrouter-downstream-test-id'),

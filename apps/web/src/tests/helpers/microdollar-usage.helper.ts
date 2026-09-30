@@ -7,7 +7,7 @@ import {
 } from '@/lib/ai-gateway/processUsage';
 import { db } from '@/lib/drizzle';
 import { sql } from 'drizzle-orm';
-import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import type {
   CoreUsageWithMetaData,
   MicrodollarUsageContext,

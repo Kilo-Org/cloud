@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Pangalan ng sesyon",
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",
       "readOnly": "Mababasa lang ang sesyong ito.",
+      "continueInNewSession": "Magpatuloy sa bagong sesyon",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",

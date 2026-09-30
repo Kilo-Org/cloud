@@ -24,6 +24,9 @@ import {
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
 import crypto from 'node:crypto';
+import type * as bouncerClientModule from '@/lib/bouncer/client';
+import { reportCreditEvent } from '@/lib/bouncer/client';
+import Stripe from 'stripe';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
@@ -32,6 +35,16 @@ const toMicrodollars = (dollars: number) => dollars * 1_000_000;
 jest.mock('@/lib/email', () => ({
   sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
+
+// Bouncer is report-only. Capture its calls without any network access.
+jest.mock('@/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+  return {
+    __esModule: true,
+    ...actual,
+    reportCreditEvent: jest.fn(),
+  };
+});
 
 jest.mock('@/lib/stripe-client', () => {
   return {
@@ -723,6 +736,65 @@ describe('invoice metadata includes traceId', () => {
         amount: 5000,
         description: 'Kilo automatic top up',
       })
+    );
+    expect(reportCreditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'charge.attempted',
+        flow: 'auto_topup',
+        userId: user.id,
+        amountCents: 5000,
+        accountCreatedAt: user.created_at,
+      })
+    );
+  });
+
+  test('a declined off-session charge reports only charge.attempted', async () => {
+    const user = await insertTestUser({
+      auto_top_up_enabled: true,
+      stripe_customer_id: `cus_decline_${Date.now()}`,
+      total_microdollars_acquired: 0,
+      microdollars_used: toMicrodollars(10),
+    });
+
+    await db.insert(auto_top_up_configs).values({
+      owned_by_user_id: user.id,
+      stripe_payment_method_id: 'pm_decline_test',
+      amount_cents: 2000,
+      disabled_reason: null,
+    });
+
+    const { client } = await import('@/lib/stripe-client');
+    (client.invoices.create as jest.Mock).mockResolvedValue({
+      id: 'inv_decline_test',
+      created: 1_700_000_000,
+    });
+    (client.invoices.update as jest.Mock).mockResolvedValue({
+      id: 'inv_decline_test',
+      created: 1_700_000_000,
+    });
+    (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_decline_test' });
+    (client.invoices.pay as jest.Mock).mockRejectedValue(
+      new Stripe.errors.StripeCardError({
+        type: 'card_error',
+        message: 'Your card was declined.',
+      })
+    );
+
+    const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
+    await maybePerformAutoTopUp(user);
+
+    expect(reportCreditEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'charge.attempted',
+        flow: 'auto_topup',
+        userId: user.id,
+        amountCents: 2000,
+      })
+    );
+    // Stripe's `charge.failed` webhook reports the decline, with Stripe's event id; a local
+    // report would count the same decline twice.
+    expect(reportCreditEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'charge.failed' })
     );
   });
 });

@@ -1565,6 +1565,7 @@
       "renamePlaceholder": "Nome della sessione",
       "transcriptAccessibility": "Trascrizione della sessione",
       "readOnly": "Questa sessione è di sola lettura.",
+      "continueInNewSession": "Continua in una nuova sessione",
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",

@@ -2153,6 +2153,7 @@
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",
       "readOnly": "Táto relácia je iba na čítanie.",
+      "continueInNewSession": "Pokračovať v novej relácii",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",

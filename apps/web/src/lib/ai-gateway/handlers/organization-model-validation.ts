@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
-import { handleTRPCRequest } from '@/lib/trpc-route-handler';
+import { handleTRPCRequest } from '@/lib/organizations/organization-settings-route-handler';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 

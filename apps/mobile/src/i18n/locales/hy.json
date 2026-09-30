@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Նիստի անուն",
       "transcriptAccessibility": "Նիստի սղագրություն",
       "readOnly": "Այս նիստը հասանելի է միայն կարդալու համար։",
+      "continueInNewSession": "Շարունակել նոր նիստում",
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",

@@ -2153,6 +2153,7 @@
       "renamePlaceholder": "Назва сеанса",
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",
       "readOnly": "Гэты сеанс даступны толькі для чытання.",
+      "continueInNewSession": "Працягнуць у новым сеансе",
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",

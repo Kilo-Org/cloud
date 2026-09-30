@@ -662,7 +662,11 @@ async function allocateNewSession(
 
     if (initialTurn) {
       await createCloudAgentSessionReport(
-        { cloudAgentSessionId, kiloSessionId, initialMessageId: initialTurn.messageId },
+        {
+          cloudAgentSessionId,
+          kiloSessionId,
+          initialMessageId: initialTurn.messageId,
+        },
         ctx.env
       );
     }

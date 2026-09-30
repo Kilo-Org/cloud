@@ -14,6 +14,7 @@ import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-se
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
 import { showRenamePrompt, showSessionActionMenu } from './session-row-actions';
+import { formatScheduledWake } from './session-list-helpers';
 import { StoredSessionRow } from './session-row';
 
 // The share destination list renders through FlashList v2; the stub feeds the
@@ -281,6 +282,29 @@ describe('StoredSessionRow live speech', () => {
     }
   );
 
+  it('reads SCHEDULED (label only) for a stored scheduled row instead of Idle', () => {
+    // The scheduled branch keys off the status, not the live flag: a stored
+    // history row has no wake time, so it shows the label alone.
+    const renderer = mount(row({ session: { ...session, status: 'scheduled' } }));
+    expect(texts(renderer)).toContain('SCHEDULED');
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'scheduled' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, Scheduled, feature/live, and CLI'
+    );
+  });
+
+  it('appends the wake when a stored scheduled row carries a scheduledAt', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const renderer = mount(row({ session: { ...session, status: 'scheduled', scheduledAt } }));
+    const wake = formatScheduledWake(scheduledAt);
+    expect(wake).not.toBeNull();
+    expect(texts(renderer)).toContain(`SCHEDULED · ${wake}`);
+    expect(texts(renderer)).not.toContain('Idle');
+  });
+
   it.each(['New session - 2026-09-22T02:05:22.778Z', 'Child session - 2026-09-22T02:05:22.778Z'])(
     'paints the localized unnamed name instead of the backend placeholder %s',
     placeholder => {
@@ -512,7 +536,10 @@ describe('RemoteSessionRow live speech', () => {
     await i18n.changeLanguage('en');
   });
 
-  function mountRemote(overrides: Partial<ActiveSession> = {}) {
+  function mountRemote(
+    overrides: Partial<ActiveSession> = {},
+    onPress: (session: ActiveSession) => void = () => undefined
+  ) {
     return mount(
       createElement(
         QueryClientProvider,
@@ -529,7 +556,7 @@ describe('RemoteSessionRow live speech', () => {
             }),
             ...overrides,
           },
-          onPress: () => undefined,
+          onPress,
         })
       )
     );
@@ -585,6 +612,30 @@ describe('RemoteSessionRow live speech', () => {
     ]);
   });
 
+  it('reads SCHEDULED with the wake for a scheduled tray row, not Idle', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const renderer = mountRemote({ status: 'scheduled', scheduledAt });
+    const wake = formatScheduledWake(scheduledAt);
+    expect(wake).not.toBeNull();
+    expect(texts(renderer)).toContain(`SCHEDULED · ${wake}`);
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'scheduled' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Live work, Scheduled, feature/live, CLI, and ${wake}`
+    );
+  });
+
+  it('reads SCHEDULED alone for a scheduled tray row with no wake time', () => {
+    const renderer = mountRemote({ status: 'scheduled' });
+    expect(texts(renderer)).toContain('SCHEDULED');
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Scheduled, feature/live, and CLI'
+    );
+  });
+
   it('draws the idle tray row with the status glyph alone (no platform mark)', () => {
     // SPOT-DEFECT (e1): the finished row's status cluster showed a stray
     // second mark beside the idle circle — the platform glyph. The tray row
@@ -601,6 +652,23 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
       'Live work, Idle, feature/live, LIVE-REPO, and 5 minutes ago'
     );
+  });
+
+  it('hands the pressed row its own session', () => {
+    // The per-row closure moved inside the memo boundary: the row calls the
+    // shared handler with its own session instead of the parent closing over
+    // each item.
+    const onPress = vi.fn<(session: ActiveSession) => void>();
+    const renderer = mountRemote({}, onPress);
+    const button = hosts(renderer, 'Pressable')[0];
+    if (!button) {
+      throw new Error('Missing row pressable');
+    }
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+    expect(onPress.mock.calls).toHaveLength(1);
+    expect(onPress.mock.calls[0]?.[0]).toMatchObject({ id: 'remote-1' });
   });
 
   it('shows the untitled fallback for a creation placeholder title and never speaks the ISO instant', () => {

@@ -9,11 +9,12 @@
  * `record.containment` (with `providerRef`) and `stopTombstone.wrapperInstanceId`.
  */
 import { z } from 'zod';
-import type {
-  AllocationRecord,
-  AllocationState,
-  AllocationTarget,
-  ProviderCapabilities,
+import {
+  vercelAllocationConfigSchema,
+  type AllocationRecord,
+  type AllocationState,
+  type AllocationTarget,
+  type ProviderCapabilities,
 } from '../../model/allocation.js';
 import { POLICY } from '../../schedule.js';
 
@@ -31,21 +32,7 @@ export const legacyAllocationContainmentSchema = legacyCredentialContainmentSche
   providerRef: z.string().min(1),
 });
 
-export const legacyVercelConfigSchema = z
-  .object({
-    projectId: z.string().min(1).optional(),
-    snapshotId: z.string().min(1).optional(),
-    runtimeBuildId: z.string().min(1).optional(),
-    runtime: z.string().min(1).optional(),
-    resources: z
-      .object({
-        vcpus: z.number().int().positive(),
-        memory: z.number().int().positive(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
+export const legacyVercelConfigSchema = vercelAllocationConfigSchema;
 
 export const legacyCreateIntentSchema = z
   .object({

@@ -65,7 +65,6 @@ export type PrimeContext = {
   open_beads: Bead[];
 };
 
-// API response envelope
 export type ApiSuccess<T> = { success: true; data: T };
 export type ApiError = { success: false; error: string };
 export type ApiResponse<T> = ApiSuccess<T> | ApiError;
@@ -81,13 +80,11 @@ export type Rig = {
   updated_at: string;
 };
 
-// Sling result (bead + assigned agent)
 export type SlingResult = {
   bead: Bead;
   agent: Agent;
 };
 
-// Sling batch result (convoy + beads + agents)
 // agent is null for staged convoys (agents aren't assigned until gt_convoy_start)
 export type SlingBatchResult = {
   convoy: Convoy;
@@ -118,7 +115,6 @@ export type WastelandClaimResult = {
   };
 };
 
-// Convoy summary (returned by list and status endpoints)
 // Staging is tracked by the `staged` boolean, not the status field.
 // status tracks the convoy lifecycle: active (in progress) or landed (complete).
 export type Convoy = {
@@ -139,7 +135,6 @@ export type ConvoyStartResult = {
   beads: Array<{ bead: Bead; agent: Agent }>;
 };
 
-// Detailed convoy status with per-bead breakdown
 export type ConvoyDetail = Convoy & {
   beads: Array<{
     bead_id: string;

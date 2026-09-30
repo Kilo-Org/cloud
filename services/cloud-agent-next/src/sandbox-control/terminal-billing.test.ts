@@ -512,6 +512,68 @@ describe('validateContainersTerminalBillingRuntime', () => {
 
   it.each([
     {
+      sandboxClassName: 'SandboxContainersStandard4' as const,
+      service: 'cloud-agent-next-sandbox-containers-standard4',
+      sku: SANDBOX_USAGE_SKUS.SandboxContainersStandard4,
+    },
+    {
+      sandboxClassName: 'SandboxContainersStandard3' as const,
+      service: 'cloud-agent-next-sandbox-containers-standard3',
+      sku: SANDBOX_USAGE_SKUS.SandboxContainersStandard3,
+    },
+  ])('accepts a containment-enabled $sandboxClassName allocation', input => {
+    expect(
+      validateContainersTerminalBillingRuntime(
+        containersBillingInput({
+          sandboxClassName: input.sandboxClassName,
+          providerInstanceId: encodeCloudflareProviderRef({
+            sandboxId: CONTAINERS_ALLOCATION_ID,
+            containment: true,
+            instanceId: PROVIDER_CREATION_ID,
+          }),
+          context: containersContext({
+            service: input.service,
+            sku: input.sku,
+            metadata: {
+              container_class: input.sandboxClassName,
+              durable_object_id: CONTAINERS_DO_ID,
+              origin: 'cloud-agent',
+            },
+          }),
+        })
+      )
+    ).toEqual({ allowed: true });
+  });
+
+  it.each([
+    { name: 'class', sandboxClassName: 'SandboxContainersStandard3' as const },
+    { name: 'service', context: containersContext({ service: 'cloud-agent-next-sandbox' }) },
+    { name: 'sku', context: containersContext({ sku: SANDBOX_USAGE_SKUS.Sandbox }) },
+    { name: 'instanceId', context: containersContext({ instanceId: 'ses-other' }) },
+    { name: 'durable object', sandboxDurableObjectId: 'other-do' },
+    {
+      name: 'container class metadata',
+      context: containersContext({
+        metadata: { container_class: 'Sandbox', durable_object_id: CONTAINERS_DO_ID },
+      }),
+    },
+  ])('rejects a containment-enabled allocation with a mismatched $name', overrides => {
+    expect(
+      validateContainersTerminalBillingRuntime(
+        containersBillingInput({
+          ...overrides,
+          providerInstanceId: encodeCloudflareProviderRef({
+            sandboxId: CONTAINERS_ALLOCATION_ID,
+            containment: true,
+            instanceId: PROVIDER_CREATION_ID,
+          }),
+        })
+      )
+    ).toEqual({ allowed: false, reason: 'billing_runtime_mismatch' });
+  });
+
+  it.each([
+    {
       name: 'missing runtime',
       input: { ...containersBillingInput(), runtime: undefined },
       reason: 'billing_runtime_unavailable',
@@ -563,14 +625,6 @@ describe('validateContainersTerminalBillingRuntime', () => {
   });
 
   it.each([
-    {
-      name: 'contained reference',
-      providerInstanceId: encodeCloudflareProviderRef({
-        sandboxId: CONTAINERS_ALLOCATION_ID,
-        containment: true,
-        instanceId: PROVIDER_CREATION_ID,
-      }),
-    },
     {
       name: 'shared allocation',
       providerInstanceId: encodeCloudflareProviderRef({

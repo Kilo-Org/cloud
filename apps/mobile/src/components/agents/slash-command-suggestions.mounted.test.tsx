@@ -129,6 +129,15 @@ function descriptionLines(root: TestRenderer.ReactTestInstance): string[] {
     .map(node => node.props.children as string);
 }
 
+/** The skill badge of every row: the one Text that carries `uppercase`. */
+function skillBadges(root: TestRenderer.ReactTestInstance): string[] {
+  return findHost(root, 'Text')
+    .filter(
+      node => typeof node.props.className === 'string' && node.props.className.includes('uppercase')
+    )
+    .map(node => node.props.children as string);
+}
+
 /**
  * Sync-commit mount so the pre-resolution render is observable: the dynamic
  * import cannot resolve inside a synchronous `act`, which is exactly the
@@ -169,6 +178,26 @@ beforeEach(() => {
   writeMock.mockResolvedValue(undefined);
   clearToolSummaryTranslationMemory();
   setConfig({ enabled: false, model: MODEL });
+});
+
+describe('SlashCommandSuggestions skill rows', () => {
+  it('marks a skill row and leaves plain and MCP commands unmarked', () => {
+    const renderer = renderSuggestionsSync([REVIEW, MCP_TOOL, SKILL_TOOL]);
+
+    expect(skillBadges(renderer.root)).toEqual(['agentChat.slashCommands.skillBadge']);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('does not mark a local reserved command as a skill', () => {
+    const renderer = renderSuggestionsSync([LOCAL_NEW]);
+
+    expect(skillBadges(renderer.root)).toEqual([]);
+    act(() => {
+      renderer.unmount();
+    });
+  });
 });
 
 describe('SlashCommandSuggestions translation', () => {

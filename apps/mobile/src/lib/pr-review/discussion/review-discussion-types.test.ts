@@ -163,6 +163,14 @@ describe('selectThreadBadges', () => {
       fileLevel: true,
     });
   });
+
+  it('does not flag an outdated line thread (line null) as file-level', () => {
+    expect(selectThreadBadges(makeThread({ isOutdated: true, line: null }))).toEqual({
+      resolved: false,
+      outdated: true,
+      fileLevel: false,
+    });
+  });
 });
 
 describe('selectCommentAuthorName', () => {

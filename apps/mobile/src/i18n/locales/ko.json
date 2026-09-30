@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "뒤로 가기",
     "idle": "대기 중",
+    "scheduled": "예약됨",
     "keepEditing": "계속 편집",
     "keepRunning": "계속 실행",
     "kiloclaw": "KiloClaw",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "활성 세션을 불러오지 못했습니다.",
       "couldNotRefresh": "새로고침하지 못했습니다",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
+      "viewHistory": "세션 기록",
       "noMatches": "일치하는 세션 없음",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "tryAdjustFilters": "필터를 변경하거나 해제해 보세요.",
       "couldNotSearch": "세션을 검색하지 못했습니다.",
       "completedWillAppear": "완료된 세션이 여기에 표시됩니다.",
       "noPastSessions": "지난 세션 없음",
+      "pastSessions": "지난 세션",
       "live": "실시간",
       "updating": "업데이트 중"
     },
@@ -1581,6 +1584,7 @@
       "renamePlaceholder": "세션 이름",
       "transcriptAccessibility": "세션 기록",
       "readOnly": "읽기 전용 세션입니다.",
+      "continueInNewSession": "새 세션에서 계속하기",
       "emptyDescription": "아래에서 메시지를 보내 대화를 시작하세요.",
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
@@ -2094,6 +2098,10 @@
       "resumeCodexDescription": "OpenAI Codex 세션 기록 가져오기",
       "reviewDescription": "변경 사항 검토 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} 사용",
+      "useSkillCommand": "/{{command}} 스킬 사용",
+      "skillBadge": "스킬",
+      "catalogFull": "명령 카탈로그가 가득 찼으므로 일부 명령은 숨겨집니다.",
+      "catalogOverLimit": "스킬 카탈로그가 크기 한도를 초과하므로 모든 스킬을 표시합니다.",
       "insert": "삽입",
       "upgradeRequiredFallback": "이 명령을 사용하려면 CLI를 업그레이드하세요.",
       "exitCapabilityUnavailable": "세션을 종료하려면 CLI를 업데이트하세요.",
@@ -2252,7 +2260,8 @@
     "optionsExpiredDescription": "이전 화면으로 돌아가 선택 화면을 다시 여세요."
   },
   "sessionRow": {
-    "needsInput": "입력 필요"
+    "needsInput": "입력 필요",
+    "scheduled": "예약됨"
   },
   "voiceInput": {
     "listening": "음성 입력 중...",
@@ -2616,7 +2625,14 @@
       "deletedUser": "삭제된 사용자",
       "replyForbiddenTerm": "이 {{term}}에 답글을 달 권한이 없습니다.",
       "moreLinesAbove_one": "… 위에 {{displayCount}}줄이 더 있습니다.",
-      "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다."
+      "moreLinesAbove_other": "… 위에 {{displayCount}}줄이 더 있습니다.",
+      "deleteComment": "댓글 삭제",
+      "deleteCommentTitle": "댓글을 삭제할까요?",
+      "deleteCommentMessage": "이 댓글은 풀 리퀘스트에서 삭제됩니다.",
+      "commentEditFailed": "댓글을 저장하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "commentEditUnavailable": "이 댓글은 수정할 수 없습니다. 삭제되었을 수 있습니다.",
+      "commentDeleteFailed": "댓글을 삭제하지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.",
+      "commentDeleteUnavailable": "이 댓글은 삭제할 수 없습니다."
     },
     "entry": {
       "eyebrow": "URL로 풀 리퀘스트 또는 머지 요청 열기",
@@ -2929,6 +2945,8 @@
     "linkPasteNotAPullRequest": "풀 리퀘스트 또는 머지 요청 링크가 아닙니다",
     "announce": {
       "commentPosted": "댓글이 게시되었습니다",
+      "commentUpdated": "댓글이 수정되었습니다",
+      "commentDeleted": "댓글이 삭제되었습니다",
       "reviewSubmitted": "리뷰가 제출되었습니다",
       "autoMergeEnabled": "자동 병합이 켜졌습니다"
     },
@@ -3162,6 +3180,7 @@
     "emptyTitle": "신뢰하는 호스트 없음",
     "emptyDescription": "링크의 호스트를 신뢰하도록 설정하면 다음부터 확인 없이 링크가 열립니다.",
     "revoke": "{{host}} 신뢰 해제",
+    "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
     "backToPreferences": "환경설정으로 돌아가기"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요.",
     "openSession": "열기",
     "approveFailed": "승인하지 못했습니다. 다시 시도하려면 $t(common.approve)을 탭하세요.",
-    "newestResult": "최신 결과"
+    "newestResult": "최신 결과",
+    "scheduledWakes": "{{time}}에 깨어남"
   },
   "transcriptionModel": {
     "title": "음성 텍스트 변환 모델",

@@ -4,17 +4,14 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, TextInput, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
-
-import { UGC_AGE_POSTURE } from '@kilocode/app-shared/moderation';
+import { TextInput, View } from 'react-native';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { WEB_BASE_URL } from '@/lib/config';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -28,116 +25,10 @@ import {
   isPrOperationPersistenceFailed,
 } from '@/lib/pr-review/merge/pr-operation-ledger';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
-import { trpcClient } from '@/lib/trpc';
 
-/**
- * Outcome of the UGC Terms gate. `accepted` means the current version is
- * already accepted or the user accepted now (the caller may post).
- * `dismissed` means the user cancelled the gate. `outdated` means the accept
- * was rejected because the version is stale — terminal, the caller must not
- * post. `unknown` means the Terms status could not be read, so acceptance is
- * unconfirmed.
- */
-export type TermsGateOutcome =
-  | { kind: 'accepted' }
-  | { kind: 'dismissed' }
-  | { kind: 'outdated' }
-  | { kind: 'unknown' };
+import { ensureTermsAcceptedOutcome } from './terms-gate';
 
-/**
- * Best-effort UGC Terms gate. Returns `accepted` when the current version is
- * already accepted, or when the user accepts now. A transient accept failure
- * re-prompts with a Retry CTA; an outdated-version reject returns `outdated`
- * (terminal). A `getTermsStatus` failure returns `unknown`: the write may still
- * be attempted (the server enforces Terms), but a pending Terms error must stay
- * visible instead of being cleared as if acceptance was confirmed.
- */
-export async function ensureTermsAcceptedOutcome(): Promise<TermsGateOutcome> {
-  try {
-    const status = await trpcClient.moderation.getTermsStatus.query();
-    if (status.accepted) {
-      return { kind: 'accepted' };
-    }
-    return await promptTermsAcceptance(status.currentVersion);
-  } catch {
-    return { kind: 'unknown' };
-  }
-}
-
-async function promptTermsAcceptance(version: string): Promise<TermsGateOutcome> {
-  const outcome = await new Promise<TermsGateOutcome>(resolve => {
-    async function accept() {
-      try {
-        await trpcClient.moderation.acceptTerms.mutate({
-          version,
-          agePosture: UGC_AGE_POSTURE,
-        });
-        resolve({ kind: 'accepted' });
-      } catch (error) {
-        // A BAD_REQUEST reject is the server's stale-version marker: terminal.
-        // Anything else (network, 5xx) is transient and re-prompts with Retry.
-        if (classifyPrReviewMutationError(error).kind === 'bad-request') {
-          resolve({ kind: 'outdated' });
-        } else {
-          showRetry();
-        }
-      }
-    }
-    function showRetry() {
-      Alert.alert(
-        i18n.t('prReview.discussion.termsTitle'),
-        i18n.t('prReview.discussion.termsAcceptRetry'),
-        [
-          {
-            text: i18n.t('common.cancel'),
-            style: 'cancel',
-            onPress: () => {
-              resolve({ kind: 'dismissed' });
-            },
-          },
-          {
-            text: i18n.t('common.retry'),
-            onPress: () => {
-              void accept();
-            },
-          },
-        ],
-        { cancelable: false }
-      );
-    }
-    const show = () => {
-      Alert.alert(
-        i18n.t('prReview.discussion.termsTitle'),
-        i18n.t('prReview.discussion.termsCopy'),
-        [
-          {
-            text: i18n.t('common.cancel'),
-            style: 'cancel',
-            onPress: () => {
-              resolve({ kind: 'dismissed' });
-            },
-          },
-          {
-            text: i18n.t('prReview.discussion.viewTerms'),
-            onPress: () => {
-              void WebBrowser.openBrowserAsync(`${WEB_BASE_URL}/terms-app`);
-              show();
-            },
-          },
-          {
-            text: i18n.t('prReview.discussion.acceptTerms'),
-            onPress: () => {
-              void accept();
-            },
-          },
-        ],
-        { cancelable: false }
-      );
-    };
-    show();
-  });
-  return outcome;
-}
+export { ensureTermsAcceptedOutcome };
 
 type ReplyInputProps = {
   readonly owner: string;
@@ -184,6 +75,12 @@ export function ReplyInput({
   const [inlineErrorKind, setInlineErrorKind] = useState<
     'retryable' | 'bad-request' | 'forbidden' | 'reconnect' | null
   >(null);
+  // True when `inlineError` is a LOCAL validation error (the empty-body reject
+  // returns before the mutation runs), so no toast owns it and it must
+  // announce through AccessibleStatus. Mutation-classified errors are
+  // toast-owned (the reply mutation hook's onError) and stay visual-only so
+  // they never double-announce.
+  const [inlineErrorIsLocal, setInlineErrorIsLocal] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   // The provider platform as a stable primitive: the error effect words a
   // refusal after it without depending on the `provider` object identity.
@@ -218,6 +115,9 @@ export function ReplyInput({
   // without waiting for a re-fetch.
   useEffect(() => {
     if (reply.error) {
+      // A mutation failure is toast-owned (the hook's onError), so the inline
+      // mirror stays visual-only and never double-announces.
+      setInlineErrorIsLocal(false);
       // The ledger persistence-failure marker is retry-blocking: the row never
       // became `reconcile_pending`, so the same key must not be retried.
       if (isPrOperationPersistenceFailed(reply.error)) {
@@ -280,11 +180,21 @@ export function ReplyInput({
 
   const submit = async () => {
     const body = bodyRef.current.trim();
-    if (!body || reply.isPending) {
+    if (reply.isPending) {
+      return;
+    }
+    // Empty body is a local validation failure: surface it inline (same copy
+    // as the conversation-comment composer) instead of silently no-opping
+    // behind an enabled Reply button. Typing clears it via onChangeText.
+    if (!body) {
+      setInlineError(t('prReview.composer.bodyEmpty'));
+      setInlineErrorKind('bad-request');
+      setInlineErrorIsLocal(true);
       return;
     }
     setInlineError(null);
     setInlineErrorKind(null);
+    setInlineErrorIsLocal(false);
     // Confirmed offline: fail the submit at once with the retryable copy
     // instead of starting a request that hangs on the UI deadline behind a
     // spinner (uxs3 spot check, e6-offline-hang). The draft stays intact,
@@ -342,6 +252,7 @@ export function ReplyInput({
             if (inlineError) {
               setInlineError(null);
               setInlineErrorKind(null);
+              setInlineErrorIsLocal(false);
             }
           }}
           multiline
@@ -350,7 +261,14 @@ export function ReplyInput({
         />
       ) : null}
       {inlineError && inlineErrorKind !== 'reconnect' ? (
-        <Text className="text-xs text-destructive">{inlineError}</Text>
+        inlineErrorIsLocal ? (
+          // The local empty-body reject has no toast owner, so it announces
+          // through AccessibleStatus (polite live region / iOS imperative
+          // announce), mirroring the conversation-comment composer.
+          <AccessibleStatus message={inlineError} tone="error" className="text-xs" />
+        ) : (
+          <Text className="text-xs text-destructive">{inlineError}</Text>
+        )
       ) : null}
       {inlineErrorKind === 'reconnect' ? <PrReviewReconnectNotice /> : null}
       <View className="flex-row justify-end">

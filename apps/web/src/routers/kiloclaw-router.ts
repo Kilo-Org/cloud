@@ -31,6 +31,7 @@ import {
   MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
 } from '@/lib/kiloclaw/morning-briefing-interests';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
+import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   classifyKiloClawCommitTerm,
@@ -5046,6 +5047,21 @@ export const kiloclawRouter = createTRPCRouter({
       const successUrl = `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}&clawInstanceId=${anchorInstance.id}`;
       const cancelUrl = `${APP_URL}/claw?checkout=cancelled&clawInstanceId=${anchorInstance.id}`;
 
+      reportChargeAttempted({
+        flow: 'kiloclaw',
+        userId: ctx.user.id,
+        amountCents: Math.round(
+          getKiloClawPlanCostMicrodollars({
+            priceVersion: intendedPriceVersion,
+            plan: input.plan,
+            useStandardIntro,
+          }) / 10_000
+        ),
+        accountCreatedAt: ctx.user.created_at,
+        ip: ctx.ip,
+        ipCountry: ipCountryFromHeaders(ctx.headersList),
+      });
+
       const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         customer: stripeCustomerId,
@@ -5297,8 +5313,8 @@ export const kiloclawRouter = createTRPCRouter({
         userId: ctx.user.id,
         stripeCustomerId,
         metadata: sessionMetadata,
-        createSession: () =>
-          stripe.checkout.sessions.create(
+        createSession: async () => {
+          const session = await stripe.checkout.sessions.create(
             {
               mode: 'subscription',
               customer: stripeCustomerId,
@@ -5321,7 +5337,18 @@ export const kiloclawRouter = createTRPCRouter({
               metadata: sessionMetadata,
             },
             { timeout: 10_000 }
-          ),
+          );
+          // The upsell buys a Kilo Pass subscription; its first invoice total is the charged amount.
+          reportChargeAttempted({
+            flow: 'kilo_pass',
+            userId: ctx.user.id,
+            amountCents: session.amount_total ?? 0,
+            accountCreatedAt: ctx.user.created_at,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+          });
+          return session;
+        },
       });
     }),
 

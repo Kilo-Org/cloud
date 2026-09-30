@@ -1331,6 +1331,17 @@ export const CodeReviewAnalyticsCaptureStatus = {
 export type CodeReviewAnalyticsCaptureStatus =
   (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
 
+export const CodeReviewPublicationStatus = {
+  Published: 'published',
+  Unchanged: 'unchanged',
+  Missing: 'missing',
+  Unknown: 'unknown',
+  NotApplicable: 'not_applicable',
+} as const;
+
+export type CodeReviewPublicationStatus =
+  (typeof CodeReviewPublicationStatus)[keyof typeof CodeReviewPublicationStatus];
+
 export const CodeReviewAnalyticsChangeType = {
   BugFix: 'bug_fix',
   Feature: 'feature',
@@ -2363,6 +2374,14 @@ export const CODE_REVIEW_TERMINAL_REASONS = [
   'assistant_rate_limited_byok',
   'assistant_rate_limited_managed',
   'assistant_unavailable',
+  // `assistant_unavailable` collapsed two different gateway outcomes under one
+  // label: a real upstream provider connection failure, and the gateway's own
+  // `temporarily_unavailable` (our over-limit guard or our managed-provider
+  // payment failure). The gateway tags the origin in `error_type` on the
+  // response body; cloud-agent-next now maps it to a distinct reason so the
+  // admin split reflects which component actually failed.
+  'assistant_provider_disconnect',
+  'assistant_gateway_unavailable',
   'assistant_timeout',
   'assistant_unauthorized',
   'assistant_invalid_request',

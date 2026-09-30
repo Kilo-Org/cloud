@@ -7,7 +7,7 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 
 import { DiscussionThread } from './discussion-thread';
-import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { type ReviewThread } from '@/lib/pr-review/discussion/review-discussion-types';
 
 vi.mock('react-native', () => ({
@@ -102,8 +102,8 @@ describe('DiscussionThread resolve toggle touch target', () => {
     expect(resolveButton.props.className).toContain('h-11 w-11');
     expect(resolveButton.props.className).toContain('items-center');
     expect(resolveButton.props.className).toContain('justify-center');
-    expect(resolveButton.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
-    expect(COMPACT_CONTROL_FRAME_DP + 2 * COMPACT_CONTROL_HIT_SLOP_DP).toBeGreaterThanOrEqual(44);
+    expect(resolveButton.props.hitSlop).toBe(COMPACT_H11_HIT_SLOP_DP);
+    expect(COMPACT_H11_FRAME_DP + 2 * COMPACT_H11_HIT_SLOP_DP).toBeGreaterThanOrEqual(44);
 
     // The visible circle keeps its compact 28pt size inside the frame.
     const circle = resolveButton.find(

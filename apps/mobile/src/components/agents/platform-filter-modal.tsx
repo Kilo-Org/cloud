@@ -212,21 +212,29 @@ export function SessionFilterModal({
           </Text>
           <ScrollView className="shrink" showsVerticalScrollIndicator={false}>
             <View className="gap-4">
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  {t('common.platform')}
-                </Text>
-                {platforms.map(platform => (
-                  <FilterCheckboxRow
-                    key={platform}
-                    label={platformFilterLabel(platform)}
-                    isChecked={draftPlatforms.includes(platform)}
-                    onPress={() => {
-                      togglePlatform(platform);
-                    }}
-                  />
-                ))}
-              </View>
+              {/* The rows are derived from the live sessions, so a list whose
+                  rows all have an unknown origin (`liveSessionPlatformBucket`
+                  returns null) offers no platform at all and nothing is
+                  selected. Rendering the label then leaves an orphaned section
+                  header above PROJECT (spot defect e4-filter); the section is
+                  omitted exactly as PROJECT already is when it has no rows. */}
+              {platforms.length > 0 && (
+                <View className="gap-1">
+                  <Text variant="eyebrow" className="px-3">
+                    {t('common.platform')}
+                  </Text>
+                  {platforms.map(platform => (
+                    <FilterCheckboxRow
+                      key={platform}
+                      label={platformFilterLabel(platform)}
+                      isChecked={draftPlatforms.includes(platform)}
+                      onPress={() => {
+                        togglePlatform(platform);
+                      }}
+                    />
+                  ))}
+                </View>
+              )}
               {projectGroups.size > 0 && (
                 <View className="gap-1">
                   <Text variant="eyebrow" className="px-3">

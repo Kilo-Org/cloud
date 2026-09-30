@@ -48,6 +48,31 @@ const readModuleFile = (relativePath: string): string =>
 const kotlinSourcePath = (className: string): string =>
   `android/src/main/java/${className.replaceAll('.', '/')}.kt`;
 
+/** A Kotlin function body: the text between its opening and matching braces. */
+function functionBody(source: string, name: string): string {
+  const signature = new RegExp(String.raw`fun\s+${name}\s*\(`).exec(source);
+  if (signature === null) {
+    return '';
+  }
+  const open = source.indexOf('{', signature.index);
+  if (open === -1) {
+    return '';
+  }
+  let depth = 0;
+  for (let index = open; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '{') {
+      depth += 1;
+    } else if (character === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(open + 1, index);
+      }
+    }
+  }
+  return '';
+}
+
 const moduleConfig: {
   platforms: string[];
   android: { modules: string[] };
@@ -122,6 +147,46 @@ describe('artifacts DocumentsProvider contract', () => {
     expect(providerSource).toContain(
       'fun rootsUri(context: Context): Uri = DocumentsContract.buildRootsUri(authority(context))'
     );
+  });
+});
+
+// The manifest is memoised so a browse that resolves one document at a time does
+// not re-read and re-parse the whole index for every row. The stamp is the
+// manifest file's `lastModified()` plus `length()`: the mirror rewrites
+// `manifest.json` wholesale, so both change together on every rewrite.
+describe('artifacts manifest cache', () => {
+  const body = functionBody(providerSource, 'readSessions');
+
+  it('keys the parsed sessions on the manifest file stamp', () => {
+    // A cached-sessions field behind a stamp pair of the file's `lastModified()`
+    // and `length()`.
+    expect(providerSource).toContain('private var cachedSessions: List<ManifestSession>?');
+    expect(body).toContain('cachedSessions');
+    expect(body).toContain('cachedManifestStamp');
+    expect(body).toContain('manifest.lastModified()');
+    expect(body).toContain('manifest.length()');
+  });
+
+  it('serves the cached list while the stamp is unchanged', () => {
+    // The stamp comparison short-circuits to the stored list, so an unchanged
+    // file is never read or parsed again.
+    expect(body).toMatch(/stamp == cachedManifestStamp[\s\S]*?return cached/);
+  });
+
+  it('never serves a stale cache for a missing or unreadable manifest', () => {
+    // Both failure paths invalidate the cache before returning `emptyList()`: a
+    // missing or unreadable index is an empty location, never a stale one.
+    expect(body.match(/cachedSessions = null/g)).toHaveLength(2);
+    expect(body.match(/cachedManifestStamp = null/g)).toHaveLength(2);
+    expect(body).toContain('if (!manifest.isFile)');
+    expect(body).toContain('Log.w(TAG, "Ignoring unreadable artifact manifest", error)');
+  });
+
+  it('lists a session folder from one manifest read', () => {
+    // `queryChildDocuments` used to read the manifest once per branch; one local
+    // now feeds both the root listing and the parent-session lookup.
+    const childBody = functionBody(providerSource, 'queryChildDocuments');
+    expect(childBody.match(/readSessions\(\)/g)).toHaveLength(1);
   });
 });
 

@@ -4,7 +4,7 @@
  * boundary `as` casts so downstream code receives properly typed NormalizedEvents.
  */
 import { z } from 'zod';
-import type { Part, SessionStatus, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
+import type { Part, QuestionInfo, Message } from '@kilocode/app-shared/opencode';
 import type {
   SessionInfo,
   SessionGoal,
@@ -12,6 +12,7 @@ import type {
   CloudStatus,
   SuggestionAction,
   SlashCommandInfo,
+  SlashCommandCatalogStatus,
   PreparationStepSnapshot,
 } from './types';
 import {
@@ -51,6 +52,7 @@ import {
   cloudMessageCompletedDataSchema,
   cloudMessageFailedDataSchema,
   type CloudAgentEvent,
+  type SessionStatus,
 } from './schemas';
 
 /** Chat events — data mutations for messages and parts. */
@@ -179,7 +181,11 @@ export type ServiceEvent =
       cloudStatus?: CloudStatus | undefined;
       activeMessageId?: string | null | undefined;
     }
-  | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | {
+      type: 'commands.available';
+      commands: SlashCommandInfo[];
+      catalogStatus?: SlashCommandCatalogStatus | undefined;
+    }
   | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
@@ -608,7 +614,11 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);
       if (!r.success) return null;
-      return { type: 'commands.available', commands: r.data.commands };
+      return {
+        type: 'commands.available',
+        commands: r.data.commands,
+        ...(r.data.catalogStatus ? { catalogStatus: r.data.catalogStatus } : {}),
+      };
     }
 
     case 'cloud.message.queued': {

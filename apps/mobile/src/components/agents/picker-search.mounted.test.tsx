@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- The repository and model pickers' search, alignment and centering contracts share one mount harness. */
 import {
   act,
   createElement,
@@ -15,6 +16,13 @@ import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { type RepoOption } from '@/lib/picker-bridge';
 import { modelPickerSlot, repoPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import '@/i18n';
+
+// Live so a test can flip the interface direction before it mounts; the input
+// alignment helper reads `I18nManager.isRTL` when it composes the style.
+const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The one token the picker's search input passes inline; the assertions read
+// the same value the mock hands the component.
+const theme = vi.hoisted(() => ({ foreground: '#111111' }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The model picker renders its rows through FlashList v2; this stub renders
@@ -39,13 +47,11 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 vi.mock('react-native', () => ({
   FlatList: 'FlatList',
+  I18nManager: i18nManager,
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
   View: 'View',
-  // `@/components/ui/input` reads `I18nManager.isRTL` through
-  // `withRtlInputAlignment` on every render.
-  I18nManager: { isRTL: false },
 }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
@@ -72,7 +78,9 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
 }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ foreground: theme.foreground }),
+}));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),
 }));
@@ -89,6 +97,7 @@ const repo: RepoOption = { platform: 'github', fullName: 'org/repo', isPrivate: 
 
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  i18nManager.isRTL = false;
   modelPickerSlot.set(UNFENCED_ROUTE_KEY, {
     options: [model],
     currentValue: '',
@@ -167,13 +176,18 @@ describe('repository picker Bitbucket scope note', () => {
       throw new Error('Picker search input did not mount');
     }
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('org/repo');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Pressable')).toHaveLength(1);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
   });
@@ -208,6 +222,131 @@ describe('repository picker search placeholder', () => {
   });
 });
 
+// RN 0.86 does not resolve `textAlign: 'auto'` from the layout direction, so
+// without a named alignment both search queries stay on the physical left of a
+// row that mirrors (the finding). `lib/rtl-text.ts` owns the rule; these tests
+// pin that each field follows it, and that the overlay box — not the Text's own
+// alignment — places the repo placeholder at the start edge.
+const PHYSICAL_ALIGNMENT_CLASSES = new Set([
+  'text-left',
+  'text-right',
+  'text-center',
+  'text-justify',
+]);
+
+describe('picker search alignment follows the interface direction', () => {
+  const repositoryPlaceholder = 'Search repositories...';
+  const cases = [
+    { name: 'model', Component: ModelPickerContent },
+    { name: 'repository', Component: RepoPickerScreen },
+  ];
+
+  it.each(cases)(
+    'right-aligns the $name search input content in a right-to-left interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = true;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBe('right');
+    }
+  );
+
+  it.each(cases)(
+    'leaves the $name search input content unaligned in a left-to-right interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = false;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBeUndefined();
+    }
+  );
+
+  it.each([false, true])(
+    'places the repository placeholder at the field start edge as a row, never a physical text alignment (RTL=%s)',
+    async isRTL => {
+      i18nManager.isRTL = isRTL;
+      const renderer = await mount(RepoPickerScreen);
+      const placeholder = hosts(renderer, 'Text').find(
+        node => node.props.children === repositoryPlaceholder
+      );
+      if (!placeholder) {
+        throw new Error('Search placeholder overlay did not mount');
+      }
+      const wrapper = placeholder.parent;
+      if (!wrapper) {
+        throw new Error('Search placeholder overlay has no box');
+      }
+      // A `flex-row`'s start edge is the physical right in RTL and the physical
+      // left in LTR, and the hugging Text cannot float away from it.
+      const wrapperClasses = (wrapper.props.className as string).split(' ');
+      expect(wrapperClasses).toEqual(expect.arrayContaining(['flex-row', 'justify-start']));
+      const textClasses = (placeholder.props.className as string).split(' ');
+      expect(textClasses).toEqual(expect.arrayContaining(['shrink', 'max-w-full']));
+      expect(textClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
+    }
+  );
+});
+
+describe('repository picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the typed query to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query stays at the left edge while the clear and search controls
+    // sit at the right, leaving a dead gap between them.
+    i18nManager.isRTL = true;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual([
+      { textAlign: 'right' },
+      { color: theme.foreground },
+    ]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(RepoPickerScreen);
+    expect(searchInput(renderer).props.style).toEqual({ color: theme.foreground });
+  });
+});
+
+describe('model picker query alignment', () => {
+  function searchInput(renderer: Awaited<ReturnType<typeof mount>>) {
+    const input = hosts(renderer, 'TextInput')[0];
+    if (!input) {
+      throw new Error('Picker search input did not mount');
+    }
+    return input;
+  }
+
+  it('aligns the query and its native placeholder to the field start edge in RTL', async () => {
+    // `textAlign: 'auto'` resolves against the first strong character, so a
+    // Latin query and the Arabic placeholder stay at the left edge while the
+    // clear and search controls sit at the right, leaving a dead gap between
+    // them. The model picker had no alignment at all before this.
+    i18nManager.isRTL = true;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toEqual([{ textAlign: 'right' }, undefined]);
+  });
+
+  it('leaves the input style to the caller in LTR so English is unchanged', async () => {
+    i18nManager.isRTL = false;
+    const renderer = await mount(ModelPickerContent);
+    expect(searchInput(renderer).props.style).toBeUndefined();
+  });
+});
+
 async function mount(Component: () => ReactNode) {
   const mounted = await renderWithProviders(createElement(Component));
   onTestFinished(mounted.unmount);
@@ -216,6 +355,15 @@ async function mount(Component: () => ReactNode) {
 
 function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
+}
+
+/** The style RN flattens an input's array to, or nothing when it carries none. */
+function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unknown> {
+  const style = input.props.style;
+  if (style === undefined) {
+    return {};
+  }
+  return Object.assign({}, ...([style] as Record<string, unknown>[]).flat());
 }
 
 // The model picker hosts its rows in a FlashList and manages its own scrolling
@@ -244,8 +392,12 @@ describe.each([
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('no matching choice');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost)).toHaveLength(0);
     if (!hasShellScrollView) {
@@ -256,8 +408,9 @@ describe.each([
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
 
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);

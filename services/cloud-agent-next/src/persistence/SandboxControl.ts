@@ -34,6 +34,7 @@ import {
 import { getSandbox } from '@cloudflare/sandbox';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
+  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   getSandboxAllocationInstance,
   getSandboxAllocationResources,
   type CloudflareContainersInstance,
@@ -63,6 +64,11 @@ import {
   SessionForwardingError,
   type SessionForwardRunMember,
 } from '../sandbox-control/session-forwarding.js';
+import {
+  createSessionEventReplayQueue,
+  SESSION_EVENT_REPLAY_TTL_MS,
+  type SessionEventReplayEntry,
+} from '../sandbox-control/session-event-replay.js';
 import { errorResponse, parseOperationPayload } from '../sandbox-control/frames.js';
 import {
   generateSandboxCredential,
@@ -179,6 +185,7 @@ import {
   loadAllocation,
   loadAllocationSync,
   initialRuntimeMetadata,
+  sandboxTypeForContainersInstance,
   loadRuntimeMetadata,
   saveRuntimeMetadata,
   saveRuntimeMetadataSync,
@@ -233,6 +240,29 @@ import {
   vercelProviderLocatorSchema,
   type VercelProviderLocator,
 } from '../sandbox-control/vercel-provider.js';
+import {
+  DEFAULT_BILLING_HEARTBEAT_SECONDS,
+  clearBillingContext,
+  createContainerUsageClient,
+  getBillingContext,
+  installBillingHeartbeat,
+  type BillingContext,
+  type BillingHeartbeatController,
+} from '@kilocode/container-usage';
+import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
+import {
+  BillingScheduleTable,
+  type DueBillingSchedule,
+} from '../sandbox-control/billing-schedule.js';
+import {
+  VERCEL_BILLING_SETTLEMENT_CALLBACK,
+  VercelBilling,
+  deleteVercelBillingBinding,
+  loadVercelBillingBinding,
+  saveVercelBillingBinding,
+  type VercelBillingBinding,
+} from '../sandbox-control/vercel-billing.js';
+import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   parseVercelSandboxRuntimeConfig,
@@ -243,6 +273,7 @@ import {
   forceDestroyControlPlaneSandbox,
   getSandboxBillingRuntimeStatus,
   parseSandboxBillingInput,
+  vercelBillingIdentity,
   type SandboxBillingInput,
 } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
@@ -281,6 +312,29 @@ const BILLING_INPUT_KEY = 'billing_input';
 const ACQUISITION_RECEIPTS_KEY = 'acquisition_receipts';
 const CREDENTIAL_POLICY_DIRTY_KEY = 'credential_policy_dirty';
 const TERMINAL_CREDENTIAL_RENEWAL_WINDOW_MS = 60 * 60 * 1000;
+/** The lifecycle schedules this callback; the control alarm dispatches it. */
+const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
+const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
+
+/**
+ * A Vercel billing admission that may succeed once the outstanding generation
+ * settles. The caller's `isRetryableDeliveryError` accepts it because its own
+ * `retryable === true` field survives the DO RPC: the Worker's compatibility
+ * date is after enhanced error serialization. `reconstructControlRequestError`
+ * is not involved here; it only reconstructs `control.request` rejections, not
+ * `ensureReady`. The definite rejection keeps `AgentSandboxUnavailableError`,
+ * which is not retryable.
+ */
+class VercelBillingRetryableError extends Error {
+  readonly code = 'billing_blocked';
+  readonly retryable = true;
+  readonly admission = 'not-admitted';
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'VercelBillingRetryableError';
+  }
+}
 
 const sandboxAcquisitionSchema = z.object({
   id: z.string().min(1).max(128),
@@ -438,6 +492,14 @@ function sessionForwardFrameBytes(frame: unknown): number {
   return new TextEncoder().encode(JSON.stringify(frame)).byteLength;
 }
 
+function isSessionEventReplayFrame(frame: unknown): frame is SessionEventReplayFrame {
+  return (
+    typeof frame === 'object' &&
+    frame !== null &&
+    Array.isArray((frame as { items?: unknown }).items)
+  );
+}
+
 function batchOutcomes(
   payload: SandboxEventBatchPayload,
   status: SandboxEventBatchItemOutcome['status'],
@@ -458,6 +520,10 @@ type BatchForwardMember = {
   queuedAt: number;
 };
 
+// Batches admitted on the same connection, route and runtime coalesce into one
+// RPC while they wait behind an in-flight run. A merged run still returns one
+// result per constituent, and a retained member keeps its own replay entry, so
+// coalescing does not make one replay entry stand for two frames.
 function batchCoalescingIdentity(
   identity: SessionEventIdentity,
   connection: SandboxControlConnectionIdentity,
@@ -531,6 +597,46 @@ export type ControlRuntimeCredentialProxyFence = {
   wrapperInstanceId: string;
 };
 
+export type RuntimeQuarantineResult =
+  | { quarantined: true; disposition: 'native_retired' | 'native_pending' | 'physical_stopping' }
+  | { quarantined: false; disposition: 'physical_stopped' | 'wrapper_replaced' | 'unconfirmed' };
+
+// A session frame retained after its forwarding fence changed. It is re-driven
+// through the existing forward chain with the connection that is current when
+// the replay runs, but with the frame's original `wrapperInstanceId` so the
+// session DO's runtime gate stays authoritative.
+type PendingSessionReplay = {
+  identity: SessionEventIdentity;
+  eventType: string;
+  operation: ForwardOperation;
+  frame: unknown;
+  wrapperInstanceId?: string;
+  forward: (
+    route: SessionRoute,
+    diagnostic: ControlDiagnosticFields,
+    allocation: AllocationRecord,
+    deadlineAt: number,
+    wrapperInstanceId: string | undefined,
+    connection: SandboxControlConnectionIdentity
+  ) => Promise<ForwardedSessionFrame>;
+};
+
+// The result a forward callback returns. `attempted` is true only when the
+// session-DO RPC for the frame actually ran: a forward that bailed before its
+// send (`stale_before_send` and the pre-send guards) never reached the
+// destination, so its frame must stay retainable for replay.
+type ForwardedSessionFrame = SandboxControlEventResult & { attempted?: boolean };
+
+// The outcome of one forward attempt as `forwardRoutedSessionFrame` reports it.
+// `forwarded` distinguishes a fence rejection that happened before the frame
+// reached the session DO from one that happened after its RPC had run. A
+// forwarded frame must not be retained or restored for replay: the legacy
+// `session.event` path carries no receipt for the session DO to deduplicate, so
+// re-driving it would apply the event twice.
+type RoutedSessionFrameResult = SandboxControlEventResult & { forwarded?: boolean };
+
+type SessionEventReplayFrame = { items: unknown[] };
+
 export class SandboxControl extends DurableObject<Env> {
   readonly sandboxId: string;
   private socketHandler: SandboxControlSocketHandler;
@@ -541,6 +647,25 @@ export class SandboxControl extends DurableObject<Env> {
   private vercelResources: VercelSandboxResources | undefined;
   private containersInstance: CloudflareContainersInstance | undefined;
   private readonly sessionForwarding = createSessionForwarding();
+  private readonly sessionEventReplay = createSessionEventReplayQueue<PendingSessionReplay>();
+  // Guards the retained-event replay: one drain pass at a time, with a request
+  // that arrives during a pass folded into one follow-up pass.
+  private replayRunning = false;
+  private replayRequested = false;
+  // Sessions whose retained frames the running pass has shifted out of the replay
+  // queue and not finished with. A live frame for such a session is held behind
+  // them instead of being forwarded, so a frame the pass restores is never
+  // re-driven behind a live frame admitted while the pass was in flight.
+  private readonly replayingSessions = new Set<string>();
+  // The counters the forwarding diagnostics actually maintain. `settled`,
+  // `recovered`, `maxQueueWaitMs` and `maxTotalForwardMs` are assigned on every
+  // forward; queue depth lives in `sessionForwarding.stats()` on the heartbeat.
+  private readonly forwarding = {
+    settled: 0,
+    recovered: 0,
+    maxQueueWaitMs: 0,
+    maxTotalForwardMs: 0,
+  };
   private forwardSequence = 0;
   private credentialUpdates: Promise<void> = Promise.resolve();
   private provider: ProviderAdapter;
@@ -580,10 +705,30 @@ export class SandboxControl extends DurableObject<Env> {
   private readonly lifecycleOperations = new Set<Promise<unknown>>();
   private worktreeDeletionChain: Promise<unknown> = Promise.resolve();
   private operationalInitialization: Promise<void> | null = null;
+  /**
+   * The Vercel billing continuation table. It is constructed eagerly (storage and
+   * compose only) so `scheduleAlarm` can read its snapshot, and hydrated in
+   * `ensureOperationalInitialized` before any compose.
+   */
+  private readonly billingSchedule: BillingScheduleTable;
+  private vercelBilling:
+    | {
+        identity: BillingIdentity | undefined;
+        lifecycle: MeteredBillingLifecycle;
+        heartbeat: BillingHeartbeatController;
+        billing: VercelBilling;
+      }
+    | undefined;
+  private vercelBillingBuild: Promise<void> | undefined;
+  private readonly vercelDeliveriesInFlight = new Set<string>();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
+    this.billingSchedule = new BillingScheduleTable({
+      storage: ctx.storage,
+      recompose: () => this.scheduleAlarm(),
+    });
     this.provider = this.createProviderAdapter('cloudflare');
     this.ctx.setWebSocketAutoResponse(
       new WebSocketRequestResponsePair(SANDBOX_CONTROL_AUTO_PING, SANDBOX_CONTROL_AUTO_PONG)
@@ -613,6 +758,7 @@ export class SandboxControl extends DurableObject<Env> {
       resumable: this.provider.resumable,
       shouldDeferRecovery: () => this.shouldDeferRecovery(),
       onTransition: transition => this.recordAllocationTransition(transition),
+      afterDrain: () => this.afterAllocationDrain(),
     });
     this.healthController = createHealthController({
       dispatch: (event, now) => this.allocationOrchestrator.dispatch(event, now),
@@ -695,6 +841,8 @@ export class SandboxControl extends DurableObject<Env> {
       // One-time pre-cutover import, owned by the alarm module and run before
       // any anchor mutation at this boot boundary.
       await importLegacyControlAlarmAnchors(ctx.storage, Date.now());
+      // Hydrate the billing continuation before any compose reads its snapshot.
+      await this.billingSchedule.load();
       this.vercelLocator = vercelProviderLocatorSchema
         .optional()
         .parse(await ctx.storage.get(PROVIDER_LOCATOR_KEY));
@@ -777,7 +925,18 @@ export class SandboxControl extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.ensureOperationalInitialized();
-    if (this.runtimeDeleted) return;
+    if (this.runtimeDeleted) {
+      // The provider runtime is gone, but a billing continuation may still be
+      // unsettled. Run the settlement-only path: no provider, no getSession, no
+      // driveCanonicalStop. Rearm a retained continuation before returning.
+      await this.trackLifecycleOperation(
+        (async () => {
+          await this.runBillingAlarm(true);
+          await this.scheduleAlarm();
+        })()
+      );
+      return;
+    }
     await this.trackLifecycleOperation(this.runAlarm());
   }
 
@@ -813,6 +972,7 @@ export class SandboxControl extends DurableObject<Env> {
       });
     }
     await this.driveCanonicalDeadline(now);
+    await this.runBillingAlarm(false);
     await this.scheduleAlarm();
   }
 
@@ -1146,7 +1306,8 @@ export class SandboxControl extends DurableObject<Env> {
             payload: {
               ...adaptSessionAttachPayloadForWrapper(
                 sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true
+                this.socketHandler.supportsWorkingBranches?.() === true,
+                this.socketHandler.supportsGitAuthor?.() === true
               ),
               ...(this.supportsNativeRuntimeIdCapture()
                 ? { captureNativeRuntimeId: true as const }
@@ -1682,6 +1843,12 @@ export class SandboxControl extends DurableObject<Env> {
         record.state.kind === 'creating' ? record.state.target.allocationName : undefined;
       let timedOut = false;
       const startedAt = Date.now();
+      if (this.providerKind === 'vercel') {
+        // The owner of `createCommands` admits before the effect that calls
+        // `createSandbox`. The preflight is deliberately outside the try below,
+        // which maps an error to `CREATE_UNKNOWN`.
+        await this.runVercelCreatePreflight(record, billing);
+      }
       try {
         this.assertWorktreeAdmission(worktreeId);
         if (acquisition) assertAcquisitionDeadline(acquisition);
@@ -2004,6 +2171,27 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   /**
+   * The containers instance whose type the stored runtime metadata should project.
+   * `undefined` for every other provider, whose sandbox type is not an instance.
+   */
+  private containersInstanceForMetadata(): CloudflareContainersInstance | undefined {
+    return this.providerKind === 'cloudflare-containers'
+      ? (this.containersInstance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE)
+      : undefined;
+  }
+
+  /**
+   * Projects the containers instance type onto a stored runtime so storage
+   * converges with the launched instance. Other providers pass through unchanged.
+   */
+  private withContainersSandboxType(runtime: SandboxRuntimeMetadata): SandboxRuntimeMetadata {
+    const instance = this.containersInstanceForMetadata();
+    return instance === undefined
+      ? runtime
+      : { ...runtime, sandboxType: sandboxTypeForContainersInstance(instance) };
+  }
+
+  /**
    * Side effects of a canonical allocation commit: reset runtime metadata on a
    * fresh create, tear down the socket for an unavailable target, and re-arm the
    * control alarm. The committed transition itself is reported from the single
@@ -2026,7 +2214,10 @@ export class SandboxControl extends DurableObject<Env> {
         unavailable && (sameCanonicalAllocation(from, current) || current.state.kind === 'stopped');
       const cleanupCreating = creatingCleanup && sameCanonicalAllocation(to, current);
       if (cleanupCreating) {
-        saveRuntimeMetadataSync(kv, initialRuntimeMetadata(this.sandboxId));
+        saveRuntimeMetadataSync(
+          kv,
+          initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        );
       }
       if (cleanupCreating || cleanupUnavailable) {
         for (const key of [
@@ -2059,6 +2250,522 @@ export class SandboxControl extends DurableObject<Env> {
       }
     }
     await this.scheduleAlarm();
+    await this.afterVercelBillingTransition({ deliver: false });
+  }
+
+  /**
+   * The Vercel pre-create admission. A caller that owns `createCommands` opens
+   * the billing interval before `createSandbox`, arms the durable continuation
+   * and `scheduleControlAlarm` first, then either proceeds or releases the
+   * canonical create. Shadow continues with no interval; enforcement fails
+   * closed. It never issues `createCommands` itself.
+   */
+  private async runVercelCreatePreflight(
+    record: AllocationRecord,
+    billing: SandboxBillingInput | undefined
+  ): Promise<void> {
+    if (billing === undefined) return;
+    const enforced = billing.enforcementRequested === true;
+    const existing = await getBillingContext(this.ctx.storage);
+    if (existing !== undefined) {
+      // A fresh create demand cannot coexist with an open generation. Retain it,
+      // ensure its continuation is armed and settlement-due, release this create,
+      // and let the caller retry once the generation closes. Do not gate on
+      // `pendingStop` alone: prepare marks the continuation due first.
+      await this.ensureVercelContinuation(existing.generation);
+      await this.prepareVercelSettlement(existing.generation);
+      await this.scheduleAlarm();
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new VercelBillingRetryableError(
+        'A previous Vercel sandbox generation is still settling'
+      );
+    }
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined || runtime.identity === undefined) {
+      // Unsized Vercel resources: fail closed under enforcement, record nothing in shadow.
+      if (!enforced) return;
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox billing requires a sized resource allocation',
+        'billing_blocked'
+      );
+    }
+    const outcome = await runtime.lifecycle.openIntervalBeforeCreate(runtime.identity, billing);
+    await this.armVercelContinuation(outcome.generation);
+    if (outcome.kind === 'acked') return;
+    if (outcome.kind === 'definite_rejection') {
+      await this.clearVercelBillingGeneration(outcome.generation);
+      if (!enforced) return;
+      await this.failCanonicalCreate(record, 'billing_blocked');
+      throw new AgentSandboxUnavailableError(
+        'Vercel sandbox billing requires additional credits',
+        'billing_blocked'
+      );
+    }
+    if (!enforced) return;
+    await this.failCanonicalCreate(record, 'billing_blocked');
+    await this.prepareVercelSettlement(outcome.generation);
+    throw new VercelBillingRetryableError(
+      'Vercel sandbox billing admission is temporarily unavailable'
+    );
+  }
+
+  private async armVercelContinuation(generation: string): Promise<void> {
+    await this.ensureVercelContinuation(generation);
+    await this.scheduleAlarm();
+  }
+
+  /**
+   * Arm the continuation only when the generation has no entry. The no-clobber
+   * decision is owned by the schedule table, so it cannot overwrite a concurrent
+   * `markDue`/`deferRetry`.
+   */
+  private async ensureVercelContinuation(generation: string): Promise<void> {
+    await this.billingSchedule.ensure(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
+      generation
+    );
+  }
+
+  private async clearVercelBillingGeneration(generation: string): Promise<void> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context?.generation === generation) await clearBillingContext(this.ctx.storage);
+    await deleteVercelBillingBinding(this.ctx.storage, generation);
+    await this.billingSchedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, generation);
+  }
+
+  private async recordVercelBillingLifetime(evidence: {
+    providerRef: string;
+    createdAtMs?: number;
+    terminalAtMs?: number;
+  }): Promise<void> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return;
+    const existing = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+    // Never overwrite an existing binding with a different provider ref: delayed
+    // evidence for an older generation must not rebind the current one.
+    if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
+    const allocation = await this.readCanonicalAllocation();
+    const liveRef =
+      allocation.state.kind === 'stopped' ? null : (allocation.state.target?.providerRef ?? null);
+    if (liveRef !== null) {
+      if (evidence.providerRef !== liveRef) return;
+    } else {
+      // No live target ref: only an initial lifetime discovery (the create
+      // response or an adoption) may bind. A stopped allocation or an already
+      // bound generation must not be (re)written from stale evidence, and the
+      // evidence must belong to this allocation, not a predecessor's overlap.
+      if (allocation.state.kind === 'stopped') return;
+      if (existing !== undefined) return;
+      if (evidence.createdAtMs === undefined) return;
+      const allocationName = allocation.state.target?.allocationName ?? this.sandboxId;
+      const decoded = decodeVercelProviderRef(evidence.providerRef);
+      if (decoded === null || decoded.sandboxName !== allocationName) return;
+    }
+    const createdAtMs = evidence.createdAtMs ?? existing?.createdAtMs;
+    if (createdAtMs === undefined) return;
+    const terminalAtMs = evidence.terminalAtMs ?? existing?.terminalAtMs;
+    if (
+      existing !== undefined &&
+      existing.providerRef === evidence.providerRef &&
+      existing.createdAtMs === createdAtMs &&
+      existing.terminalAtMs === terminalAtMs
+    ) {
+      return;
+    }
+    const binding: VercelBillingBinding = {
+      generation: context.generation,
+      providerRef: evidence.providerRef,
+      createdAtMs,
+      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
+    };
+    await saveVercelBillingBinding(this.ctx.storage, binding);
+  }
+
+  /** Runs after every orchestrator drain; see `afterVercelBillingTransition`. */
+  private async afterAllocationDrain(): Promise<void> {
+    await this.afterVercelBillingTransition();
+  }
+
+  /**
+   * The drain-side reconcile. A terminal allocation settles the open generation
+   * (prepare, then launch deliver after the prepare returns); an allocated
+   * generation with a create-response lifetime pins the measurement cursor.
+   * `deliver: false` is the commit-side variant used when no drain ran: it only
+   * prepares and rearms, and the alarm launches the delivery.
+   */
+  private async afterVercelBillingTransition(options?: { deliver?: boolean }): Promise<void> {
+    if (this.providerKind !== 'vercel' && !this.runtimeDeleted) return;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return;
+    const generation = context.generation;
+    const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
+    const allocation = await this.readCanonicalAllocation();
+    if (!this.isVercelSettlementDue(context, binding, allocation)) {
+      if (
+        allocation.state.kind === 'allocated' &&
+        binding !== undefined &&
+        !context.measurementStarted
+      ) {
+        const runtime = await this.ensureVercelBillingRuntime();
+        if (runtime !== undefined) {
+          await runtime.lifecycle.pinMeasurementCursor(generation, binding.createdAtMs);
+        }
+      }
+      return;
+    }
+    await this.prepareVercelSettlement(generation);
+    if (options?.deliver === false) {
+      await this.scheduleAlarm();
+      return;
+    }
+    await this.launchVercelSettlement(generation);
+  }
+
+  /**
+   * The single settlement-state decision: a retained stop, retained terminal
+   * evidence, or a stopped allocation means the open generation must settle.
+   */
+  private isVercelSettlementDue(
+    context: BillingContext,
+    binding: VercelBillingBinding | undefined,
+    allocation: AllocationRecord
+  ): boolean {
+    return (
+      context.pendingStop !== undefined ||
+      binding?.terminalAtMs !== undefined ||
+      allocation.state.kind === 'stopped'
+    );
+  }
+
+  /** Persist terminal evidence and mark the generation's continuation due. */
+  private async prepareVercelSettlement(generation: string): Promise<void> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) return;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) return;
+    // `VercelBilling.prepareSettlement` reloads the binding, so pass no snapshot:
+    // a caller-held one could overwrite a newer `terminalAtMs`.
+    await runtime.billing.prepareSettlement({ generation });
+  }
+
+  /**
+   * Launch a settlement delivery only when the generation's continuation is
+   * eligible and no delivery is already in flight. It always rearms a retained
+   * continuation. Returns whether a delivery started.
+   */
+  private async launchVercelSettlement(generation: string): Promise<boolean> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) return false;
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) return false;
+    if (this.vercelDeliveriesInFlight.has(generation)) {
+      // A delivery is already running. Defer so the continuation is not left due:
+      // `runAlarm` always re-arms, so a due entry would re-enter this method on
+      // every wake and spin until the delivery settles.
+      await this.billingSchedule.deferRetry(
+        VERCEL_BILLING_SETTLEMENT_CALLBACK,
+        generation,
+        Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
+      );
+      return false;
+    }
+    await this.scheduleAlarm();
+    const eligible = (await this.billingSchedule.dueEntries()).some(
+      entry => entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK && entry.payload === generation
+    );
+    if (!eligible) return false;
+    this.vercelDeliveriesInFlight.add(generation);
+    this.ctx.waitUntil(
+      runtime.billing
+        .deliverSettlement(generation)
+        .catch(error => this.deferVercelDelivery(generation, error))
+        .finally(() => this.vercelDeliveriesInFlight.delete(generation))
+    );
+    return true;
+  }
+
+  private async deferVercelDelivery(generation: string, error: unknown): Promise<void> {
+    await this.billingSchedule.deferRetry(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      generation,
+      Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
+    );
+    this.logDiagnostic(
+      'vercel_billing_delivery',
+      {
+        generation,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'warn'
+    );
+  }
+
+  /**
+   * Remove a continuation whose generation no longer has an owning context, and
+   * the generation's binding with it. Used where the context is missing or
+   * mismatched; no provider calls.
+   */
+  private async dropOrphanVercelContinuation(
+    entry: DueBillingSchedule,
+    generation: string
+  ): Promise<void> {
+    await this.billingSchedule.completeDue(entry);
+    await deleteVercelBillingBinding(this.ctx.storage, generation);
+  }
+
+  /** The billing-only alarm body for a deleted runtime, and the normal dispatch. */
+  private async runBillingAlarm(settlementOnly: boolean): Promise<void> {
+    const due = await this.billingSchedule.dueEntries();
+    if (settlementOnly) {
+      const context = await getBillingContext(this.ctx.storage);
+      for (const entry of due) {
+        const entryGeneration = typeof entry.payload === 'string' ? entry.payload : undefined;
+        if (entry.callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        if (entryGeneration === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        if (context === undefined || context.generation !== entryGeneration) {
+          // A close callback failed: the context is gone but the continuation
+          // (and maybe the binding) survived. Reconcile the orphan without any
+          // provider calls.
+          await this.dropOrphanVercelContinuation(entry, entryGeneration);
+        }
+      }
+      if (context !== undefined) {
+        const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+        const allocation = await this.readCanonicalAllocation();
+        if (this.isVercelSettlementDue(context, binding, allocation)) {
+          await this.launchVercelSettlement(context.generation);
+        }
+      }
+      return;
+    }
+    for (const entry of due) {
+      const generation = typeof entry.payload === 'string' ? entry.payload : undefined;
+      if (entry.callback === VERCEL_BILLING_SETTLEMENT_CALLBACK) {
+        if (generation === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        await this.dispatchVercelContinuation(generation, entry);
+      } else if (entry.callback === VERCEL_BILLING_FORCE_STOP_CALLBACK) {
+        if (generation === undefined) {
+          await this.billingSchedule.completeDue(entry);
+          continue;
+        }
+        await this.dispatchVercelForceStop(generation, entry);
+      } else {
+        await this.billingSchedule.completeDue(entry);
+      }
+    }
+  }
+
+  private async dispatchVercelContinuation(
+    generation: string,
+    entry: DueBillingSchedule
+  ): Promise<void> {
+    // Ownership first: only a missing or mismatched context proves the entry is
+    // orphaned. A missing runtime does not.
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined || context.generation !== generation) {
+      await this.dropOrphanVercelContinuation(entry, generation);
+      return;
+    }
+    const runtime = await this.ensureVercelBillingRuntime();
+    if (runtime === undefined) {
+      // The generation still owns an open context and binding; the runtime just
+      // cannot be built (e.g. provider config is gone). Retain both and wake
+      // later instead of dropping valid lifetime evidence.
+      await this.deferVercelContinuation(generation);
+      return;
+    }
+    const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
+    const allocation = await this.readCanonicalAllocation();
+    if (this.isVercelSettlementDue(context, binding, allocation)) {
+      await this.launchVercelSettlement(generation);
+      return;
+    }
+    // Never measure before a real lifetime is pinned. Keep the generation but
+    // move the continuation off its expired timestamp so compose does not arm an
+    // immediate alarm on every wake.
+    if (context.measurementStarted !== true) {
+      await this.deferVercelContinuation(generation);
+      return;
+    }
+    try {
+      await runtime.heartbeat.billingHeartbeatTick(generation);
+    } catch (error) {
+      await this.deferVercelDelivery(generation, error);
+    }
+  }
+
+  /** Retain the generation's continuation and move its wake to a bounded future time. */
+  private async deferVercelContinuation(generation: string): Promise<void> {
+    await this.billingSchedule.schedule(
+      VERCEL_BILLING_SETTLEMENT_CALLBACK,
+      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
+      generation
+    );
+  }
+
+  private async dispatchVercelForceStop(
+    generation: string,
+    entry: DueBillingSchedule
+  ): Promise<void> {
+    const runtime = await this.ensureVercelBillingRuntime();
+    try {
+      if (runtime !== undefined && runtime.identity !== undefined) {
+        await runtime.lifecycle.billingForceStop(runtime.identity, generation);
+      }
+    } catch (error) {
+      this.logDiagnostic(
+        'vercel_billing_force_stop',
+        { generation, error: error instanceof Error ? error.message : String(error) },
+        'warn'
+      );
+    } finally {
+      await this.billingSchedule.completeDue(entry);
+    }
+  }
+
+  /**
+   * Build the Vercel billing runtime on first use. It needs a usage service: the
+   * sized identity supplies it, or, on a deleted runtime settling stored state,
+   * the open billing context does. A runtime with no service is not constructed.
+   */
+  private async ensureVercelBillingRuntime(): Promise<
+    | {
+        identity: BillingIdentity | undefined;
+        lifecycle: MeteredBillingLifecycle;
+        billing: VercelBilling;
+        heartbeat: BillingHeartbeatController;
+      }
+    | undefined
+  > {
+    if (this.vercelBilling !== undefined) return this.vercelBilling;
+    if (this.vercelBillingBuild !== undefined) {
+      await this.vercelBillingBuild;
+      return this.vercelBilling;
+    }
+    const sized = this.providerKind === 'vercel' && this.vercelResources !== undefined;
+    if (!sized && !this.runtimeDeleted) return undefined;
+    if (!sized && (await getBillingContext(this.ctx.storage)) === undefined) return undefined;
+    const build = this.buildVercelBillingRuntime();
+    this.vercelBillingBuild = build;
+    try {
+      await build;
+    } finally {
+      if (this.vercelBillingBuild === build) this.vercelBillingBuild = undefined;
+    }
+    return this.vercelBilling;
+  }
+
+  private async buildVercelBillingRuntime(): Promise<void> {
+    const vercelIdentity =
+      this.providerKind === 'vercel' && this.vercelResources !== undefined
+        ? vercelBillingIdentity(this.vercelResources)
+        : undefined;
+    const service = vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
+    if (service === undefined) return;
+    const identity: BillingIdentity | undefined =
+      vercelIdentity === undefined ? undefined : { sandboxClassName: vercelIdentity.className };
+    const usageClient = createContainerUsageClient(this.env.CONTAINER_USAGE_METER, { service });
+    const schedule = (delaySeconds: number, callback: string, payload?: unknown) =>
+      this.billingSchedule.schedule(callback, Date.now() + delaySeconds * 1_000, payload);
+    const deleteSchedules = (callback: string) => {
+      // Cancelling the heartbeat must not durably delete the shared settlement
+      // continuation: a reschedule replaces it. Only non-continuation callbacks
+      // (force stop) are removed here. The generation-close callback and a
+      // definite rejection own continuation removal.
+      if (callback === VERCEL_BILLING_SETTLEMENT_CALLBACK) return;
+      void this.billingSchedule.remove(callback).catch(() => undefined);
+    };
+    const getState = () => this.vercelBillingContainerState();
+    const lifecycle = new MeteredBillingLifecycle({
+      storage: this.ctx.storage,
+      usageClient,
+      schedule,
+      deleteSchedules,
+      getState,
+      isContainerRunning: () => !this.runtimeDeleted,
+      stopContainer: () => this.driveVercelBillingStop(),
+      destroyContainer: () => this.driveVercelBillingStop(),
+      durableObjectId: this.sandboxId,
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
+    const heartbeat = installBillingHeartbeat(
+      {
+        schedule,
+        deleteSchedules,
+        getState,
+      } as unknown as Parameters<typeof installBillingHeartbeat>[0],
+      {
+        client: usageClient,
+        storage: this.ctx.storage,
+        stopOnStoppedState: false,
+        deferBudgetStopFinalSettlement: true,
+        beforeHeartbeatDelivery: context => lifecycle.ensureStartAcknowledged(context),
+        beforeStopDelivery: context => lifecycle.ensureStartAcknowledged(context),
+        onGenerationClosed: context => this.vercelBilling?.billing.onGenerationClosed(context),
+        enforceBudgetStop: async (budget, expected) => {
+          if (identity === undefined) throw new Error('Vercel billing identity is unavailable');
+          await lifecycle.enforceBudgetStop(identity, budget, expected);
+        },
+        onBudgetWarning: async budget => {
+          if (identity !== undefined) await lifecycle.onBudgetWarning(identity, budget);
+        },
+      }
+    );
+    lifecycle.attachHeartbeat(heartbeat);
+    const billing = new VercelBilling({
+      storage: this.ctx.storage,
+      lifecycle,
+      heartbeat,
+      schedule: this.billingSchedule,
+    });
+    this.vercelBilling = { identity, lifecycle, heartbeat, billing };
+  }
+
+  /**
+   * The heartbeat's container state. A terminal binding is stopped at its
+   * retained terminal time; otherwise the observed session status decides. It
+   * never observes a deleted runtime.
+   */
+  private async vercelBillingContainerState(): Promise<{
+    status: string;
+    lastChange?: number;
+    exitCode?: number;
+  }> {
+    const context = await getBillingContext(this.ctx.storage);
+    if (context === undefined) return { status: 'running' };
+    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+    if (binding?.terminalAtMs !== undefined) {
+      return { status: 'stopped', lastChange: binding.terminalAtMs };
+    }
+    if (this.runtimeDeleted || this.providerKind !== 'vercel' || binding === undefined) {
+      return { status: 'running' };
+    }
+    try {
+      const observed = await this.provider.observe(binding.providerRef);
+      if (observed.status !== 'terminal') return { status: 'running' };
+      const refreshed = await loadVercelBillingBinding(this.ctx.storage, context.generation);
+      const lastChange =
+        refreshed?.terminalAtMs ?? context.usageMeasuredAtMs ?? binding.createdAtMs;
+      return { status: 'stopped', lastChange };
+    } catch {
+      return { status: 'running' };
+    }
+  }
+
+  private async driveVercelBillingStop(): Promise<void> {
+    if (this.runtimeDeleted) return;
+    await this.beginStop('billing_budget');
   }
 
   async updateNetworkPolicy(input: {
@@ -3062,14 +3769,16 @@ export class SandboxControl extends DurableObject<Env> {
     ownerId: string;
     provider: AgentSandboxProvider;
   }): Promise<SandboxStatusSnapshot> {
-    const [allocation, ownerId, provider, wrapperRuntime, routes, runtime] = await Promise.all([
-      loadAllocationResult(this.ctx.storage, this.provider.resumable),
-      this.readOwner(),
-      this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
-      this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
-      loadRouteTable(this.ctx.storage),
-      loadRuntimeMetadata(this.ctx.storage),
-    ]);
+    const [allocation, ownerId, provider, providerConfiguration, wrapperRuntime, routes, runtime] =
+      await Promise.all([
+        loadAllocationResult(this.ctx.storage, this.provider.resumable),
+        this.readOwner(),
+        this.ctx.storage.get<unknown>(PROVIDER_KIND_KEY),
+        this.ctx.storage.get<unknown>(PROVIDER_CONFIGURATION_KEY),
+        this.ctx.storage.get<unknown>(ACTIVE_WRAPPER_RUNTIME_KEY),
+        loadRouteTable(this.ctx.storage),
+        loadRuntimeMetadata(this.ctx.storage),
+      ]);
     const matches =
       ownerId !== null &&
       ownerId === input.ownerId &&
@@ -3079,11 +3788,28 @@ export class SandboxControl extends DurableObject<Env> {
     // canonical initial record must not read as a real sleeping allocation.
     const record =
       matches && allocation.ok && allocation.source !== 'initial' ? allocation.value : null;
+    // Observation must not persist metadata. The containers instance lives on
+    // `provider_configuration`, so project its type on read; a stored
+    // `isolated-small` from the id classification never reaches the client.
+    let projectedRuntime = runtime;
+    const configuration = sandboxProviderConfigurationSchema.safeParse(providerConfiguration);
+    if (
+      projectedRuntime !== undefined &&
+      configuration.success &&
+      configuration.data.provider === 'cloudflare-containers'
+    ) {
+      projectedRuntime = {
+        ...projectedRuntime,
+        sandboxType: sandboxTypeForContainersInstance(
+          configuration.data.instance ?? CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE
+        ),
+      };
+    }
     return projectStatusSnapshot({
       allocation: record,
       ownerId,
       provider: matches ? provider : undefined,
-      runtime,
+      runtime: projectedRuntime,
       routes: [...routes.values()],
       connection: readSandboxControlConnection(
         this.ctx,
@@ -3342,6 +4068,7 @@ export class SandboxControl extends DurableObject<Env> {
       return createVercelProviderAdapter({
         sandboxName: allocationName,
         config: config && locator ? { ...config, teamId: locator.teamId } : config,
+        billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
       });
     }
     if (kind === 'cloudflare-containers') {
@@ -3593,7 +4320,10 @@ export class SandboxControl extends DurableObject<Env> {
       )
         return false;
       await saveRuntimeMetadata(this.ctx.storage, {
-        ...(storedRuntime ?? initialRuntimeMetadata(this.sandboxId)),
+        ...this.withContainersSandboxType(
+          storedRuntime ??
+            initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+        ),
         wrapperVersion: safeSandboxRuntimeVersion(runtime?.wrapperVersion),
         kiloCliVersion: null,
       });
@@ -3617,6 +4347,7 @@ export class SandboxControl extends DurableObject<Env> {
         ? { expectedWrapperInstanceId: identity.wrapperInstanceId }
         : {}),
     });
+    this.scheduleSessionEventReplay(identity);
   }
 
   private async onWrapperReady(identity: SandboxControlConnectionIdentity): Promise<void> {
@@ -3664,6 +4395,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...diagnosticConnection(identity),
       heartbeatDeadlineAt: now + DEADLINE_MS.heartbeatExpiry,
     });
+    this.scheduleSessionEventReplay(identity);
   }
 
   private async onHeartbeat(
@@ -3737,8 +4469,10 @@ export class SandboxControl extends DurableObject<Env> {
         )
           return undefined;
         if (payload.kilo.version !== undefined) {
-          const runtime =
-            (await loadRuntimeMetadata(this.ctx.storage)) ?? initialRuntimeMetadata(this.sandboxId);
+          const runtime = this.withContainersSandboxType(
+            (await loadRuntimeMetadata(this.ctx.storage)) ??
+              initialRuntimeMetadata(this.sandboxId, this.containersInstanceForMetadata())
+          );
           const kiloCliVersion = safeSandboxRuntimeVersion(payload.kilo.version);
           if (!this.isCurrentConnection(identity)) return undefined;
           if (runtime.kiloCliVersion !== kiloCliVersion) {
@@ -3908,19 +4642,18 @@ export class SandboxControl extends DurableObject<Env> {
       'receiveSandboxControlEvent',
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      1,
-      (route, fields, allocation) =>
+      (route, fields, allocation, _deadlineAt, wrapperInstanceId, forwardConnection) =>
         this.forwardSessionFrame(
           route,
           allocation,
-          connection,
+          forwardConnection,
           fields,
           'receiveSandboxControlEvent',
           stub =>
             stub.receiveSandboxControlEvent({
               identity,
               payload,
-              wrapperInstanceId: connection.wrapperInstanceId,
+              wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined
@@ -3958,19 +4691,18 @@ export class SandboxControl extends DurableObject<Env> {
       'receiveSandboxControlPreparing',
       connection,
       { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
-      1,
-      (route, fields, allocation) =>
+      (route, fields, allocation, _deadlineAt, wrapperInstanceId, forwardConnection) =>
         this.forwardSessionFrame(
           route,
           allocation,
-          connection,
+          forwardConnection,
           fields,
           'receiveSandboxControlPreparing',
           stub =>
             stub.receiveSandboxControlPreparing({
               identity,
               payload,
-              wrapperInstanceId: connection.wrapperInstanceId,
+              wrapperInstanceId,
               ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined
@@ -4273,13 +5005,19 @@ export class SandboxControl extends DurableObject<Env> {
     operation: ForwardOperation,
     connection: SandboxControlConnectionIdentity,
     frame: unknown,
-    frameItems: number,
-    forward: (
-      route: SessionRoute,
-      diagnostic: ControlDiagnosticFields,
-      allocation: AllocationRecord
-    ) => Promise<SandboxControlEventResult>
-  ): Promise<SandboxControlEventResult> {
+    forward: PendingSessionReplay['forward'],
+    wrapperInstanceId: string | undefined = connection.wrapperInstanceId,
+    // A replayed frame is re-driven through the same chain as a live frame, but it
+    // is already bounded by the retained-event queue: it keeps its retention to the
+    // replay pass instead of the live drop path, starts its deadline when the chain
+    // reaches it instead of at enqueue time (it waits behind every other frame
+    // retained for its session), does not consume the shared admission budget, and
+    // is routed over the connection that is current when it runs. The last point is
+    // what keeps the replayed prefix ahead of live frames: it was enqueued before
+    // them, and a fence change during the pass routes it in place instead of
+    // failing, restoring it, and re-driving it behind a newer live frame.
+    replay = false
+  ): Promise<RoutedSessionFrameResult> {
     const diagnostic = {
       ...diagnosticConnection(connection),
       eventType: diagnosticEventType(eventType),
@@ -4292,12 +5030,14 @@ export class SandboxControl extends DurableObject<Env> {
       return { applied: false };
     }
     const queuedAt = Date.now();
+    const enqueueDeadlineAt = queuedAt + DEADLINE_MS.stopAttempt;
     const admission = this.resolveForwardingAdmission(identity);
     if (!admission) {
       this.recordForwardDrop('unroutable', diagnostic);
       return { applied: false };
     }
     this.forwardSequence++;
+    const frameItems = isSessionEventReplayFrame(frame) ? frame.items.length : 1;
     const fields = {
       ...diagnostic,
       sessionId: admission.sessionId,
@@ -4306,47 +5046,373 @@ export class SandboxControl extends DurableObject<Env> {
       frameItems,
       queuedAt,
     };
-    const next = this.sessionForwarding.enqueue<undefined, SandboxControlEventResult>({
+    // A live frame must not overtake its session's retained prefix. While a frame
+    // retained for this session is still in flight in a pass or queued for replay,
+    // hold the live frame behind it in the same FIFO queue: the replay path then
+    // delivers both in order, so a frame the pass restores is never re-driven
+    // after a newer live frame admitted while the pass was in flight.
+    if (!replay && this.sessionReplayPending(admission.sessionId)) {
+      this.retainSessionFrame({
+        sessionId: admission.sessionId,
+        bytes: frameBytes,
+        identity,
+        eventType,
+        operation,
+        frame,
+        wrapperInstanceId,
+        forward,
+        fields,
+      });
+      return { applied: false, retryable: true };
+    }
+    const next = this.sessionForwarding.enqueueFenced<ForwardedSessionFrame>({
       sessionId: admission.sessionId,
-      identity: null,
       bytes: frameBytes,
-      items: 1,
-      item: undefined,
-      run: async members => {
-        const eligibility = this.resolveForwardEligibility(identity, connection, admission);
-        if (!eligibility.ok) {
-          this.recordForwardDrop(eligibility.reason, { ...fields, ...eligibility.fields });
-          this.logSkippedForwardRun({
-            sessionId: fields.sessionId,
-            operation,
-            eventType: fields.eventType,
-            queueWaitMs: Date.now() - queuedAt,
-            sessionAdmissionDepth: members[0]?.admissionDepth ?? 0,
-            runMembers: 1,
-            sentItems: frameItems,
-            sentBytes: frameBytes,
-          });
-          return [eligibility.retryable ? { applied: false, retryable: true } : { applied: false }];
-        }
-        return [
-          await forward(
+      deadlineAt: replay ? Number.POSITIVE_INFINITY : enqueueDeadlineAt,
+      // A live frame is bound to the connection it was accepted on. A replayed frame
+      // stays valid across a hand-off, so it is fenced on any current connection and
+      // resolves the exact one when its turn comes.
+      fence: replay
+        ? async () => this.currentReplayConnection() !== null
+        : async () => this.isCurrentConnection(connection),
+      admissionExempt: replay,
+      // Only the forward result that actually invoked the session-DO RPC carries
+      // `attempted: true`; every guard below returns without attempting the send,
+      // so its frame stays retainable when the fence changes after it resolves.
+      delivered: result => result.attempted === true,
+      forward: async () => {
+        const forwardDeadlineAt = replay ? Date.now() + DEADLINE_MS.stopAttempt : enqueueDeadlineAt;
+        // A replayed frame is routed over the connection that is current when it
+        // runs, so it re-resolves after every storage read: a hand-off that lands
+        // during a read must not make it bail and drop out of its session's chain,
+        // which is what keeps older retained frames ahead of newer ones.
+        const resolveForwardConnection = (): SandboxControlConnectionIdentity =>
+          replay ? (this.currentReplayConnection() ?? connection) : connection;
+        let forwardConnection = resolveForwardConnection();
+        const queueWaitMs = Date.now() - queuedAt;
+        this.forwarding.maxQueueWaitMs = Math.max(this.forwarding.maxQueueWaitMs, queueWaitMs);
+        this.logDiagnostic('forward_started', {
+          ...fields,
+          queueWaitMs,
+          ...this.forwarding,
+        });
+        try {
+          // An async read before the fence check lets a hand-off that lands during
+          // the read surface as `stale_before_enqueue`, so the frame is retained for
+          // replay instead of being sent over a connection that is already gone.
+          await loadRouteTable(this.ctx.storage);
+          forwardConnection = resolveForwardConnection();
+          if (!this.isCurrentConnection(forwardConnection)) {
+            this.recordForwardDrop('stale_before_enqueue', fields);
+            return { applied: false, attempted: false };
+          }
+          const eligibility = this.resolveForwardEligibility(
+            identity,
+            forwardConnection,
+            admission
+          );
+          if (!eligibility.ok) {
+            this.recordForwardDrop(eligibility.reason, { ...fields, ...eligibility.fields });
+            this.logSkippedForwardRun({
+              sessionId: fields.sessionId,
+              operation,
+              eventType: fields.eventType,
+              queueWaitMs,
+              sessionAdmissionDepth: 0,
+              runMembers: 1,
+              sentItems: frameItems,
+              sentBytes: frameBytes,
+            });
+            return eligibility.retryable
+              ? { applied: false, retryable: true, attempted: false }
+              : { applied: false, attempted: false };
+          }
+          forwardConnection = resolveForwardConnection();
+          if (!this.isCurrentConnection(forwardConnection)) {
+            this.recordForwardDrop('stale_before_enqueue', fields);
+            return { applied: false, attempted: false };
+          }
+          return await forward(
             eligibility.route,
-            {
-              ...fields,
-              sessionId: eligibility.route.sessionId,
-              sessionAdmissionDepth: members[0]?.admissionDepth ?? 0,
-            },
-            eligibility.allocation
-          ),
-        ];
+            { ...fields, sessionId: eligibility.route.sessionId },
+            eligibility.allocation,
+            forwardDeadlineAt,
+            wrapperInstanceId,
+            forwardConnection
+          );
+        } finally {
+          this.forwarding.settled++;
+          const totalForwardMs = Date.now() - queuedAt;
+          this.forwarding.maxTotalForwardMs = Math.max(
+            this.forwarding.maxTotalForwardMs,
+            totalForwardMs
+          );
+          this.logDiagnostic('forward_settled', {
+            ...fields,
+            totalForwardMs,
+            ...this.forwarding,
+          });
+        }
       },
     });
     this.ctx.waitUntil(
       next.catch(error => {
-        this.recordForwardRejection(error, fields);
+        if (error instanceof SessionForwardingError && !error.retryable) {
+          this.recordForwardDrop('forwarding_frame_rejected', fields);
+          // A fence that changed after the session-DO RPC ran already delivered the
+          // frame. Replaying it would double-apply events for the legacy
+          // `session.event` path, which carries no receipt for the session DO to
+          // deduplicate. A forward that bailed before its send is not delivered, so
+          // its frame stays retained for the next handshake instead of being lost.
+          if (!replay && !error.forwarded)
+            this.retainSessionFrame({
+              sessionId: admission.sessionId,
+              bytes: frameBytes,
+              identity,
+              eventType,
+              operation,
+              frame,
+              wrapperInstanceId,
+              forward,
+              fields,
+            });
+          return;
+        }
+        this.recordForwardDrop('forwarding_capacity_exhausted', fields);
       })
     );
-    return next.catch(() => ({ applied: false, retryable: true }));
+    return next.then(
+      // `attempted` is routing state for the delivered predicate above; it is not
+      // part of the frame result the session-event callers see.
+      ({ applied, retryable }) => ({
+        applied,
+        ...(retryable === undefined ? {} : { retryable }),
+      }),
+      error => ({
+        applied: false,
+        retryable: true,
+        forwarded: error instanceof SessionForwardingError && error.forwarded,
+      })
+    );
+  }
+
+  // The connection a replayed frame routes over. A replay outlives the connection
+  // its pass started on, so it resolves whatever connection is current when the
+  // frame's turn on the forwarding chain comes. A replayed frame never requires a
+  // specific connection: it is bounded by the retained-event queue and fenced on
+  // any current connection, so it keeps its place ahead of live frames instead of
+  // being restored and re-driven behind one.
+  private currentReplayConnection(): SandboxControlConnectionIdentity | null {
+    const current = this.socketHandler.getConnectionIdentity();
+    return current !== null && this.isCurrentConnection(current) ? current : null;
+  }
+
+  // True while this session has retained frames that have not been re-driven yet:
+  // either queued for replay or shifted into the pass that is still running. A
+  // live frame for such a session is held behind them, so the replayed prefix
+  // stays ahead of newer live frames even when a pass restores a frame it could
+  // not deliver.
+  private sessionReplayPending(sessionId: string): boolean {
+    return this.replayingSessions.has(sessionId) || this.sessionEventReplay.has(sessionId);
+  }
+
+  // Retains one session frame behind its session's older entries. A frame the
+  // forward never reached the destination with is delivered in FIFO order by the
+  // next replay pass instead of being lost with the retired runtime.
+  private retainSessionFrame(input: {
+    sessionId: string;
+    bytes: number;
+    identity: SessionEventIdentity;
+    eventType: string;
+    operation: ForwardOperation;
+    frame: unknown;
+    wrapperInstanceId: string | undefined;
+    forward: PendingSessionReplay['forward'];
+    fields: ControlDiagnosticFields;
+  }): void {
+    const retained = this.sessionEventReplay.push({
+      sessionId: input.sessionId,
+      bytes: input.bytes,
+      expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
+      value: {
+        identity: input.identity,
+        eventType: input.eventType,
+        operation: input.operation,
+        frame: input.frame,
+        wrapperInstanceId: input.wrapperInstanceId,
+        forward: input.forward,
+      },
+    });
+    if (retained === 'overflow') this.recordForwardDrop('replay_overflow', input.fields);
+    else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
+  }
+
+  // Coalesces replay triggers: at most one pass drains the retained queue at a
+  // time, and a trigger that arrives while a pass is in flight folds into a single
+  // follow-up pass instead of stacking another pass over the same retained prefix.
+  private scheduleSessionEventReplay(connection: SandboxControlConnectionIdentity | null): void {
+    if (!connection || !this.isCurrentConnection(connection)) return;
+    if (this.replayRunning) {
+      this.replayRequested = true;
+      return;
+    }
+    this.ctx.waitUntil(this.drainSessionEventReplay(connection));
+  }
+
+  private async drainSessionEventReplay(
+    connection: SandboxControlConnectionIdentity
+  ): Promise<void> {
+    this.replayRunning = true;
+    try {
+      let current = connection;
+      do {
+        this.replayRequested = false;
+        // A pass that could not finish under its own connection (a fence change
+        // mid-replay) hands the untouched tail to whichever connection is current
+        // now instead of waiting for its next handshake. A pass that finished under
+        // a still-current connection keeps the tail queued, so a frame that cannot
+        // be applied does not spin.
+        const stable = await this.replayPendingSessionEvents(current);
+        if (!stable) this.replayRequested = true;
+        const next = this.socketHandler.getConnectionIdentity();
+        if (!next || !this.isCurrentConnection(next)) return;
+        current = next;
+      } while (this.replayRequested);
+    } finally {
+      this.replayRunning = false;
+    }
+  }
+
+  // Re-drives retained session frames through the existing forward chain once a
+  // wrapper connection is current again. Every frame retained for every session in
+  // the snapshot is shifted and enqueued before the first await, so a live frame
+  // that arrives while the replay is in flight queues behind the whole replayed
+  // prefix for its session instead of being delivered between two older frames or
+  // ahead of them (a per-session forwarding chain only orders frames enqueued
+  // before the live one). A frame the replay never reached the destination with is
+  // restored to the front of the queue with its original expiry, so a fence change
+  // mid-replay leaves the untouched tail queued instead of discarding it and a
+  // flip-flopping fence still cannot retain an entry indefinitely. A frame whose
+  // forward already reached the session DO is not restored, so a non-receipted
+  // event is never applied twice. Returns whether the pass ran to completion under
+  // its own connection.
+  private async replayPendingSessionEvents(
+    connection: SandboxControlConnectionIdentity | null
+  ): Promise<boolean> {
+    if (!connection || !this.isCurrentConnection(connection)) return false;
+    const now = Date.now();
+    for (const entry of this.sessionEventReplay.expire(now)) {
+      this.recordForwardDrop('replay_expired', {
+        ...diagnosticConnection(connection),
+        eventType: entry.eventType,
+      });
+    }
+    // Build the whole snapshot's replay list before awaiting anything. The
+    // forwarding chain is per session, so if a later session's entries were
+    // enqueued only when the loop reached it, a live frame for that session could
+    // be admitted during an earlier session's await and delivered before its
+    // retained prefix, applying an older frame after a newer one.
+    const passes = this.sessionEventReplay.sessions().map(sessionId => {
+      const entries: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
+      while (true) {
+        const entry = this.sessionEventReplay.shift(sessionId, Date.now());
+        if (!entry) break;
+        if (entry.expiresAt > Date.now()) entries.push(entry);
+        else
+          this.recordForwardDrop('replay_expired', {
+            ...diagnosticConnection(connection),
+            eventType: entry.value.eventType,
+          });
+      }
+      return {
+        sessionId,
+        replays: entries.map(entry => {
+          // Observe whether this frame's forward actually invoked the session-DO RPC.
+          // A resolved forward that never sent and a fence rejection before its send
+          // both left the frame undelivered, so it stays retained for the next
+          // handshake. A frame that did send must not be replayed: the legacy
+          // `session.event` path has no receipt for the session DO to deduplicate, so
+          // re-driving it would apply the event twice.
+          const reached = { current: false };
+          const forward: PendingSessionReplay['forward'] = async (
+            route,
+            fields,
+            physical,
+            deadlineAt,
+            frameWrapperInstanceId,
+            forwardConnection
+          ) => {
+            const outcome = await entry.value.forward(
+              route,
+              fields,
+              physical,
+              deadlineAt,
+              frameWrapperInstanceId,
+              forwardConnection
+            );
+            if (outcome.attempted === true) reached.current = true;
+            return outcome;
+          };
+          return {
+            entry,
+            reached,
+            result: this.forwardRoutedSessionFrame(
+              entry.value.identity,
+              entry.value.eventType,
+              entry.value.operation,
+              connection,
+              entry.value.frame,
+              forward,
+              entry.value.wrapperInstanceId,
+              true
+            ),
+          };
+        }),
+      };
+    });
+    // Mark every session whose retained prefix this pass owns. A live frame for
+    // such a session is held behind the prefix instead of being forwarded, so it
+    // cannot be delivered before a frame the pass has to restore.
+    for (const { sessionId } of passes) this.replayingSessions.add(sessionId);
+    try {
+      for (const { sessionId, replays } of passes) {
+        const unapplied: Array<SessionEventReplayEntry<PendingSessionReplay>> = [];
+        for (const { entry, reached, result } of replays) {
+          const outcome = await result;
+          if (outcome.applied !== true) {
+            if (!reached.current) unapplied.push(entry);
+            continue;
+          }
+          this.forwarding.recovered += isSessionEventReplayFrame(entry.value.frame)
+            ? entry.value.frame.items.length
+            : 1;
+          this.logDiagnostic('forward_recovered', {
+            ...diagnosticConnection(connection),
+            eventType: entry.value.eventType,
+            sessionId,
+            ...this.forwarding,
+          });
+        }
+        if (unapplied.length > 0) {
+          // Restore newest first so the front of the queue keeps FIFO order.
+          for (let index = unapplied.length - 1; index >= 0; index -= 1) {
+            const entry = unapplied[index];
+            const retained = this.sessionEventReplay.restore(sessionId, entry);
+            if (retained === 'overflow')
+              this.recordForwardDrop('replay_overflow', {
+                ...diagnosticConnection(connection),
+                eventType: entry.value.eventType,
+              });
+          }
+        }
+        // This session's frames have all resolved, so a live frame for it may be
+        // forwarded again; anything restored above is covered by the queue check.
+        this.replayingSessions.delete(sessionId);
+      }
+    } finally {
+      for (const { sessionId } of passes) this.replayingSessions.delete(sessionId);
+    }
+    return this.isCurrentConnection(connection);
   }
 
   private async forwardRoutedSessionBatch(
@@ -4380,9 +5446,25 @@ export class SandboxControl extends DurableObject<Env> {
       frameItems: payload.items.length,
       queuedAt,
     };
+    // A live batch must not overtake its session's retained prefix: see
+    // `sessionReplayPending`.
+    if (this.sessionReplayPending(admission.sessionId)) {
+      this.retainSessionBatch(
+        payload,
+        frameBytes,
+        admission.sessionId,
+        identity,
+        connection.wrapperInstanceId,
+        fields
+      );
+      return batchOutcomes(payload, 'unattempted', true);
+    }
     const member: BatchForwardMember = { payload, fields, queuedAt };
     const next = this.sessionForwarding.enqueue<BatchForwardMember, SandboxEventBatchResult>({
       sessionId: admission.sessionId,
+      // Compatible waiting batches coalesce into one RPC. Each constituent keeps
+      // its own payload, fields and replay entry, so a merged run is still
+      // retained and replayed frame by frame.
       identity: batchCoalescingIdentity(identity, connection, admission),
       bytes: frameBytes,
       items: payload.items.length,
@@ -4403,7 +5485,79 @@ export class SandboxControl extends DurableObject<Env> {
     identity: SessionEventIdentity,
     admission: { sessionId: string; nativeRuntimeId?: string }
   ): Promise<SandboxEventBatchResult[]> {
-    return this.deliverBatchRun(members, connection, identity, admission);
+    // No awaited storage read here: the batch hot path resolves eligibility from
+    // the in-memory route table so a real batch forward never blocks on storage.
+    // `deliverBatchRun` still re-checks the connection before its send, so a
+    // hand-off that landed before the run is observed as stale and the batch is
+    // retained for replay below instead of being sent over a gone connection.
+    const results = await this.deliverBatchRun(members, connection, identity, admission);
+    // A batch whose frame never reached the session DO is retained for replay once
+    // its fence moved, so a queued part delta is not lost with the retired runtime.
+    // A batch whose RPC already ran is never retained: it carries no receipt the
+    // session DO could deduplicate a replay against.
+    if (
+      !this.isCurrentConnection(connection) &&
+      results.every(result => result.outcomes.every(outcome => outcome.status === 'unattempted'))
+    )
+      for (const member of members)
+        this.retainSessionBatch(
+          member.item.payload,
+          member.bytes,
+          admission.sessionId,
+          identity,
+          connection.wrapperInstanceId,
+          member.item.fields
+        );
+    return results;
+  }
+
+  // Retains one batch frame for replay with its original wrapper instance, so the
+  // session DO's runtime gate stays authoritative when the replay runs.
+  private retainSessionBatch(
+    payload: SandboxEventBatchPayload,
+    bytes: number,
+    sessionId: string,
+    identity: SessionEventIdentity,
+    wrapperInstanceId: string | undefined,
+    fields: ControlDiagnosticFields
+  ): void {
+    const retained = this.sessionEventReplay.push({
+      sessionId,
+      bytes,
+      expiresAt: Date.now() + SESSION_EVENT_REPLAY_TTL_MS,
+      value: {
+        identity,
+        eventType: 'session.event.batch',
+        operation: 'receiveSandboxControlEventBatch',
+        frame: { items: payload.items },
+        wrapperInstanceId,
+        forward: (
+          route,
+          fields,
+          allocation,
+          _deadlineAt,
+          frameWrapperInstanceId,
+          forwardConnection
+        ) =>
+          this.forwardSessionFrame(
+            route,
+            allocation,
+            forwardConnection,
+            fields,
+            'receiveSandboxControlEventBatch',
+            async stub => {
+              const result = await stub.receiveSandboxControlEventBatch({
+                items: payload.items,
+                wrapperInstanceId: frameWrapperInstanceId,
+              });
+              return { applied: result.outcomes.every(outcome => outcome.status === 'applied') };
+            },
+            true
+          ),
+      },
+    });
+    if (retained === 'overflow') this.recordForwardDrop('replay_overflow', fields);
+    else this.scheduleSessionEventReplay(this.socketHandler.getConnectionIdentity());
   }
 
   private logForwardRun(fields: ControlDiagnosticFields, level: 'info' | 'warn' = 'info'): void {
@@ -4499,7 +5653,12 @@ export class SandboxControl extends DurableObject<Env> {
       return members.map(member => batchOutcomes(member.item.payload, 'unattempted', true));
     }
     const wrapperInstanceId = connection.wrapperInstanceId;
-    const items = members.flatMap(member => member.item.payload.items);
+    // A single batch keeps its own items array so a replay entry can address the
+    // exact frame it retained; only a merged run concatenates its members' items.
+    const items =
+      members.length === 1
+        ? members[0].item.payload.items
+        : members.flatMap(member => member.item.payload.items);
     const captured = new Array<SandboxEventBatchResult | undefined>(members.length);
     const delivery = await this.deliverSessionFrame(
       route,
@@ -4640,7 +5799,7 @@ export class SandboxControl extends DurableObject<Env> {
       stub: ReturnType<typeof getSandboxSessionStub>
     ) => Promise<{ applied: boolean; retryable?: boolean }>,
     requireApplied: boolean
-  ): Promise<SandboxControlEventResult> {
+  ): Promise<ForwardedSessionFrame> {
     const queueWaitMs =
       typeof diagnostic.queuedAt === 'number' ? Date.now() - diagnostic.queuedAt : undefined;
     if (!this.isCurrentSessionForward(route, connection, allocation)) {
@@ -4658,7 +5817,7 @@ export class SandboxControl extends DurableObject<Env> {
         sentItems: typeof diagnostic.frameItems === 'number' ? diagnostic.frameItems : 1,
         sentBytes: typeof diagnostic.frameBytes === 'number' ? diagnostic.frameBytes : 0,
       });
-      return { applied: false, retryable: true };
+      return { applied: false, retryable: true, attempted: false };
     }
     const delivery = await this.deliverSessionFrame(
       route,
@@ -4691,12 +5850,14 @@ export class SandboxControl extends DurableObject<Env> {
       },
       outcome.level
     );
-    if (delivery.failed) return { applied: false, retryable: true };
-    if (delivery.skipped) return { applied: false, retryable: true };
-    if (!requireApplied || delivery.applied === true) return { applied: true };
+    const attempted = delivery.attempts > 0;
+    if (delivery.failed) return { applied: false, retryable: true, attempted };
+    if (delivery.skipped) return { applied: false, retryable: true, attempted };
+    if (!requireApplied || delivery.applied === true) return { applied: true, attempted };
     return {
       applied: false,
       retryable: delivery.retryable === true || operation === 'receiveSandboxControlPreparing',
+      attempted,
     };
   }
 
@@ -5196,6 +6357,11 @@ export class SandboxControl extends DurableObject<Env> {
   }
 
   private async scheduleAlarm(): Promise<void> {
+    // A not-loaded snapshot is not empty: load it so compose never drops a
+    // continuation. A load failure propagates and leaves the alarm untouched.
+    if (this.billingSchedule.snapshotEarliestDue() === undefined) {
+      await this.billingSchedule.load();
+    }
     const record = await this.readCanonicalAllocation();
     const anchors = await loadControlAlarmAnchors(this.ctx.storage);
     await scheduleControlAlarm(
@@ -5207,6 +6373,7 @@ export class SandboxControl extends DurableObject<Env> {
         allocation: record,
         credentialExpiryAt: anchors.credentialExpiryAt,
         socketHandshakeAt: anchors.socketHandshakeAt,
+        billingDueAt: this.billingSchedule.snapshotEarliestDue() ?? null,
       }
     );
   }

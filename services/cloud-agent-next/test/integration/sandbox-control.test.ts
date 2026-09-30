@@ -367,7 +367,9 @@ async function seedGrant(
     ...(options.containmentEnabled === false ? { containmentEnabled: false as const } : {}),
     ...(provider === 'cloudflare'
       ? { outboundContainerId: `contained:${instance.sandboxId}` }
-      : {}),
+      : provider === 'cloudflare-containers'
+        ? { outboundContainerId: `containers:${instance.sandboxId}` }
+        : {}),
     members: [{ sessionId: input.sessionId, kiloSessionId: input.kiloSessionId }],
     kilo: {
       ...(options.containmentEnabled === false
@@ -531,6 +533,7 @@ function sendHello(
     nativeRuntimeIdCapture?: boolean;
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
+    gitAuthor?: boolean;
     connectionRecovery?: boolean;
     eventReceipts?: boolean;
   } = {}
@@ -542,6 +545,7 @@ function sendHello(
     ...(identity.nativeRuntimeIdCapture ? { nativeRuntimeIdCapture: true } : {}),
     ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
     ...(identity.workingBranches ? { workingBranches: true } : {}),
+    ...(identity.gitAuthor ? { gitAuthor: true } : {}),
     ...(identity.connectionRecovery ? { connectionRecovery: true } : {}),
     ...(identity.eventReceipts ? { eventReceipts: true, eventBatches: true } : {}),
   };
@@ -571,6 +575,7 @@ async function completeHello(
     nativeRuntimeIdCapture?: boolean;
     nativeRuntimeRetirement?: boolean;
     workingBranches?: boolean;
+    gitAuthor?: boolean;
     connectionRecovery?: boolean;
     eventReceipts?: boolean;
   } = {}
@@ -3016,6 +3021,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
         await completeHello(replacement, 'hello-replacement-wrapper', {
           providerInstanceId: replacementLaunch.env.PROVIDER_INSTANCE_ID,
           workingBranches: true,
+          gitAuthor: true,
         });
         signalWrapperReady(replacement);
         await waitFor(async () => {
@@ -3767,6 +3773,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
       url: 'https://github.com/acme/repo.git',
       platform: 'github',
       token: grant.scm?.alias,
+      author: { name: 'fixture bot', email: 'fixture@example.com' },
     });
     expect(payload.setupCommands).toEqual([`fixture-command --credential=${grant.kilo.alias}`]);
     expect(broker.kiloSubjects.get(grant.kilo.capabilities[input.sessionId].credential)).toEqual({
@@ -3811,6 +3818,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
       await completeHello(ws, 'hello-joined-containment', {
         providerInstanceId: providerRef,
         workingBranches: true,
+        gitAuthor: true,
       });
       const stale = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
       await rejectHello(
@@ -3868,6 +3876,7 @@ describe('SandboxControl mandatory worktree credentials', () => {
         sessionOperationResults: true,
         nativeRuntimeIdCapture: true,
         workingBranches: true,
+        gitAuthor: true,
       });
       signalWrapperReady(ws);
       await waitFor(async () => {
@@ -11599,6 +11608,16 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
       await waitForAccepted(session, 'msg_model_less');
+      // The queue drains one message per alarm pass, so the second admission is
+      // dispatched by a later pass and can still be queued here. Drive passes
+      // until it is accepted rather than racing the dispatch that promotes it.
+      await waitFor(async () => {
+        await runInDurableObject(session, instance => instance.alarm());
+        await expect(session.getMessageResult('msg_selected')).resolves.toMatchObject({
+          type: 'found',
+          result: { status: 'running' },
+        });
+      });
       const delivered = await admissionState(session);
       expect(delivered.messages[0]).toMatchObject({
         messageId: 'msg_invalid_model',
@@ -12683,131 +12702,137 @@ describe('SandboxControl terminal runtime coordination', () => {
     }
   });
 
-  it('authorizes containers terminals from the real billing lifecycle and denies a budget block', async () => {
-    const ownerId = 'github|oauth:user/containers-terminal';
-    const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
-    const sandboxId: SandboxId = 'ses-c0f7e1a2b3d4c5e6f708192a3b4c5d6e';
-    const intentId = 'intent_containers';
-    const credential = generateSandboxCredential();
-    const control = env.SANDBOX_CONTROL.getByName(sandboxId);
-    const allocationName = await deriveSandboxAllocationId(sandboxId, intentId);
-    const providerRef = encodeCloudflareProviderRef({
-      sandboxId: allocationName,
-      containment: false,
-      instanceId: intentId,
-    });
-    const wrapperInstanceId = crypto.randomUUID();
-    let runtimeStatus: Awaited<ReturnType<ContainersBilling['getBillingRuntimeStatus']>>;
+  it.each([
+    { label: 'uncontained', containment: false },
+    { label: 'contained', containment: true },
+  ])(
+    'authorizes containers terminals from the real billing lifecycle and denies a budget block ($label)',
+    async ({ containment }) => {
+      const ownerId = 'github|oauth:user/containers-terminal';
+      const sessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+      const sandboxId: SandboxId = 'ses-c0f7e1a2b3d4c5e6f708192a3b4c5d6e';
+      const intentId = 'intent_containers';
+      const credential = generateSandboxCredential();
+      const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+      const allocationName = await deriveSandboxAllocationId(sandboxId, intentId);
+      const providerRef = encodeCloudflareProviderRef({
+        sandboxId: allocationName,
+        containment,
+        instanceId: intentId,
+      });
+      const wrapperInstanceId = crypto.randomUUID();
+      let runtimeStatus: Awaited<ReturnType<ContainersBilling['getBillingRuntimeStatus']>>;
 
-    await runInDurableObject(control, async instance => {
-      await seedCreatingAllocation(instance['ctx'].storage, intentId, {
-        allocationName,
-        containment: getWorktreeCredentialContainment(false),
+      await runInDurableObject(control, async instance => {
+        await seedCreatingAllocation(instance['ctx'].storage, intentId, {
+          allocationName,
+          containment: getWorktreeCredentialContainment(containment),
+        });
+        await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
       });
-      await instance.setWrapperCredentialHash(await hashSandboxCredential(credential));
-    });
-    await installProvider(control, providerRef, 'cloudflare-containers');
-    await runInDurableObject(control, async (instance, state) => {
-      Object.assign(instance['env'], {
-        SANDBOX_CONTAINERS: {
-          idFromName: (id: string) => ({ toString: () => `containers:${id}` }),
-          getByName: () => ({
-            async getBillingRuntimeStatus() {
-              return runtimeStatus;
-            },
-          }),
-        },
-        CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
-        CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: ownerId,
-      });
-      Object.assign(instance, { providerKind: 'cloudflare-containers' });
-      await state.storage.put('provider_kind', 'cloudflare-containers');
-      await instance.initializeOwner(ownerId);
-      await seedCanonicalRunning(state.storage, providerRef, {
-        provider: 'cloudflare',
-        intentId,
-        allocationName,
-        containment: getWorktreeCredentialContainment(false),
-      });
-      const attachment = {
-        sessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/containers',
-        ownerId,
-      };
-      await seedGrant(instance, state, attachment, 'cloudflare-containers', {
-        containmentEnabled: false,
-      });
-      await instance.attachSession(attachment);
-    });
-
-    const socket = await connect(credential, sandboxId);
-    try {
-      await completeHello(socket, 'hello-containers-terminal', {
-        providerInstanceId: providerRef,
-        wrapperInstanceId,
-      });
-      signalWrapperReady(socket);
-      await waitFor(async () => {
-        await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
-      });
-
+      await installProvider(control, providerRef, 'cloudflare-containers');
       await runInDurableObject(control, async (instance, state) => {
-        const meter = new ContainersIntegrationMeter();
-        const container = {
-          schedule: async () => ({}),
-          deleteSchedules: () => {},
-          getState: async () => ({ status: 'running', lastChange: Date.now() }),
-          billingHeartbeatTick: undefined as ((generation?: string) => Promise<void>) | undefined,
-        };
-        const tasks: Promise<unknown>[] = [];
-        const billing = new ContainersBilling(containersBillingIdentity('standard-4'), {
-          container: container as unknown as ContainersBillingHost['container'],
-          storage: state.storage,
-          meter,
-          heartbeatSeconds: 300,
-          isContainerRunning: () => true,
-          stopContainer: async () => {},
-          destroyContainer: async () => {},
-          durableObjectId: `containers:${sandboxId}`,
-          waitUntil: promise => {
-            tasks.push(promise);
+        Object.assign(instance['env'], {
+          SANDBOX_CONTAINERS: {
+            idFromName: (id: string) => ({ toString: () => `containers:${id}` }),
+            getByName: () => ({
+              async getBillingRuntimeStatus() {
+                return runtimeStatus;
+              },
+            }),
           },
+          CLOUD_AGENT_CONTAINER_BILLING_ENABLED: 'true',
+          CLOUD_AGENT_CONTAINER_BILLING_USER_IDS: ownerId,
         });
-        const billingInput: SandboxBillingInput = {
-          sandboxId,
-          subject: { type: 'user', id: ownerId },
-          actor: { type: 'user', id: ownerId },
+        Object.assign(instance, { providerKind: 'cloudflare-containers' });
+        await state.storage.put('provider_kind', 'cloudflare-containers');
+        await instance.initializeOwner(ownerId);
+        await seedCanonicalRunning(state.storage, providerRef, {
+          provider: 'cloudflare',
+          intentId,
+          allocationName,
+          containment: getWorktreeCredentialContainment(containment),
+        });
+        const attachment = {
           sessionId,
-          metadata: { origin: 'cloud-agent' },
-          enforcementRequested: true,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/containers',
+          ownerId,
         };
-        await billing.configureBilling(billingInput);
-        await Promise.all(tasks.splice(0));
-        runtimeStatus = await billing.getBillingRuntimeStatus();
-        expect(runtimeStatus).toMatchObject({
-          sandboxClassName: 'SandboxContainersStandard4',
-          running: true,
-          blocked: false,
+        await seedGrant(instance, state, attachment, 'cloudflare-containers', {
+          containmentEnabled: containment,
         });
-
-        const access = { ownerId, sessionId, wrapperInstanceId };
-        await expect(instance.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
-
-        meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
-        await container.billingHeartbeatTick?.();
-        await Promise.all(tasks.splice(0));
-        runtimeStatus = await billing.getBillingRuntimeStatus();
-        expect(runtimeStatus).toMatchObject({ blocked: true });
-        await expect(instance.validateTerminalAccess(access)).resolves.toEqual({
-          allowed: false,
-          reason: 'billing_blocked',
-        });
+        await instance.attachSession(attachment);
       });
-    } finally {
-      socket.close();
+
+      const socket = await connect(credential, sandboxId);
+      try {
+        await completeHello(socket, 'hello-containers-terminal', {
+          providerInstanceId: providerRef,
+          wrapperInstanceId,
+        });
+        signalWrapperReady(socket);
+        await waitFor(async () => {
+          await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
+        });
+
+        await runInDurableObject(control, async (instance, state) => {
+          const meter = new ContainersIntegrationMeter();
+          const container = {
+            schedule: async () => ({}),
+            deleteSchedules: () => {},
+            getState: async () => ({ status: 'running', lastChange: Date.now() }),
+            billingHeartbeatTick: undefined as ((generation?: string) => Promise<void>) | undefined,
+          };
+          const tasks: Promise<unknown>[] = [];
+          const billing = new ContainersBilling(containersBillingIdentity('standard-4'), {
+            container: container as unknown as ContainersBillingHost['container'],
+            storage: state.storage,
+            meter,
+            heartbeatSeconds: 300,
+            isContainerRunning: () => true,
+            stopContainer: async () => {},
+            destroyContainer: async () => {},
+            durableObjectId: `containers:${sandboxId}`,
+            waitUntil: promise => {
+              tasks.push(promise);
+            },
+          });
+          const billingInput: SandboxBillingInput = {
+            sandboxId,
+            subject: { type: 'user', id: ownerId },
+            actor: { type: 'user', id: ownerId },
+            sessionId,
+            metadata: { origin: 'cloud-agent' },
+            enforcementRequested: true,
+          };
+          await billing.configureBilling(billingInput);
+          await Promise.all(tasks.splice(0));
+          runtimeStatus = await billing.getBillingRuntimeStatus();
+          expect(runtimeStatus).toMatchObject({
+            sandboxClassName: 'SandboxContainersStandard4',
+            running: true,
+            blocked: false,
+          });
+
+          const access = { ownerId, sessionId, wrapperInstanceId };
+          await expect(instance.validateTerminalAccess(access)).resolves.toEqual({ allowed: true });
+
+          meter.heartbeatBudget = { verdict: 'stop', remainingMicrodollars: 0 };
+          await container.billingHeartbeatTick?.();
+          await Promise.all(tasks.splice(0));
+          runtimeStatus = await billing.getBillingRuntimeStatus();
+          expect(runtimeStatus).toMatchObject({ blocked: true });
+          await expect(instance.validateTerminalAccess(access)).resolves.toEqual({
+            allowed: false,
+            reason: 'billing_blocked',
+          });
+        });
+      } finally {
+        socket.close();
+      }
     }
-  });
+  );
 
   it.each(['cloudflare', 'vercel'] as const)(
     'renews near-expiry and expired %s grants through authenticated terminal activity',
@@ -16768,7 +16793,7 @@ describe('SandboxControl event batch forwarding', () => {
     }
   });
 
-  it('keeps one pump per session and stops queued forwards at dispatch after the connection is replaced', async () => {
+  it('keeps one pump per session and retains queued forwards when the connection is replaced', async () => {
     const fixture = await worktreeFixture({ eventReceipts: true });
     const diagnostics = await captureControlDiagnostics(fixture.control);
     const receiver = await gateEventBatchReceiver(fixture.session);
@@ -16799,36 +16824,51 @@ describe('SandboxControl event batch forwarding', () => {
         )
       ).toBe(true);
 
-      // Replacing the connection before the held run drains must stop both
-      // queued forwards at the dispatch authority check.
+      // Replacing the connection before the held run drains stops both queued
+      // forwards at their dispatch authority check.
       await fixture.rotateSocket();
       receiver.release();
 
       const drops = () =>
         diagnostics.emissions.filter(emission => emission.event === 'forward_dropped');
+      // The held head had already passed the dispatch authority check when the
+      // connection changed, so it settles as a delivery-owned stale outcome.
       await vi.waitFor(() =>
         expect(
-          drops().filter(emission => emission.fields.reason === 'stale_before_enqueue')
-        ).toHaveLength(2)
+          drops().filter(emission => emission.fields.reason === 'stale_after_send')
+        ).toHaveLength(1)
       );
-
+      // The queued batch bails at its stale-before-enqueue guard; the queued
+      // single frame is fenced by the replaced connection.
       const staleBeforeDispatch = drops().filter(
         emission => emission.fields.reason === 'stale_before_enqueue'
       );
-      expect(
-        staleBeforeDispatch.map(emission => emission.fields.frameItems as number).sort()
-      ).toEqual([1, 2]);
-      for (const emission of staleBeforeDispatch) {
-        expect(emission.fields.sessionId).toBe(fixture.sessionId);
-        expect(emission.fields.forwardSequence).toEqual(expect.any(Number));
-      }
-      // The held head had already passed the dispatch authority check when the
-      // connection changed, so it settles as a delivery-owned stale outcome.
-      expect(
-        drops().filter(emission => emission.fields.reason === 'stale_after_send')
-      ).toHaveLength(1);
-      // Only the head reached the receiver; neither queued forward was dispatched.
-      expect(receiver.invocations()).toBe(1);
+      expect(staleBeforeDispatch).toHaveLength(1);
+      expect(staleBeforeDispatch[0]?.fields).toMatchObject({
+        sessionId: fixture.sessionId,
+        frameItems: 2,
+        forwardSequence: expect.any(Number),
+      });
+      const fencedDispatch = drops().filter(
+        emission => emission.fields.reason === 'forwarding_frame_rejected'
+      );
+      expect(fencedDispatch).toHaveLength(1);
+      expect(fencedDispatch[0]?.fields).toMatchObject({
+        sessionId: fixture.sessionId,
+        frameItems: 1,
+      });
+
+      // A fence change no longer discards the queued forwards: both are retained
+      // and replayed exactly once over the connection that is current when their
+      // replay runs.
+      await vi.waitFor(() => expect(receiver.invocations()).toBe(2));
+      await vi.waitFor(() =>
+        expect(
+          diagnostics.emissions.filter(
+            emission => emission.event === 'forward_recovered' && emission.fields.recovered === 3
+          )
+        ).not.toEqual([])
+      );
       await vi.waitFor(async () => {
         expect(
           await runInDurableObject(
@@ -16839,14 +16879,17 @@ describe('SandboxControl event batch forwarding', () => {
       });
 
       await runInDurableObject(fixture.session, (_instance, state) => {
-        expect(persistedKilocodeMarkers(state)).toEqual(['serialize_head']);
+        expect(persistedKilocodeMarkers(state)).toEqual([
+          'serialize_head',
+          'serialize_batch_a',
+          'serialize_batch_b',
+          'serialize_frame',
+        ]);
       });
 
       const skippedRuns = diagnostics.emissions.filter(
         emission => emission.event === 'forward_run' && emission.fields.result === 'skipped'
       );
-      expect(skippedRuns).toHaveLength(3);
-
       const batchSkipped = skippedRuns.filter(
         emission => emission.fields.operation === 'receiveSandboxControlEventBatch'
       );
@@ -16873,23 +16916,6 @@ describe('SandboxControl event batch forwarding', () => {
         rejectedCount: 0,
         unknownCount: 0,
         unattemptedCount: 2,
-      });
-
-      // The queued single frame never dispatched either, and is recorded as its
-      // own skipped run rather than silently dropped.
-      const singleSkipped = skippedRuns.filter(
-        emission => emission.fields.operation === 'receiveSandboxControlEvent'
-      );
-      expect(singleSkipped).toHaveLength(1);
-      expect(singleSkipped[0]?.fields).toMatchObject({
-        runMembers: 1,
-        sentItems: 1,
-        attempts: 0,
-        rpcWaitMs: 0,
-        appliedCount: 0,
-        rejectedCount: 0,
-        unknownCount: 0,
-        unattemptedCount: 1,
       });
     } finally {
       receiver.restore();

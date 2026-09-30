@@ -7,7 +7,7 @@
       "instanceLifecycle": "Dæmið þitt hefur uppfærslu",
       "scheduledAction": "Skipulögð aðgerð hefur uppfærslu",
       "lowBalance": "Staðan þín þarfnast athygli",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Útgjöldin þín þarfnast athygli",
       "securityFinding": "Öryggisfundur þarfnast athygli",
       "activeAgentsGlanceable": "Virk umboð hafa uppfærslu"
     }
@@ -44,8 +44,8 @@
       "body": "Staða {{organizationName}} fór niður fyrir ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Viðvörun um útgjöld",
+      "body": "Útgjöld {{scopeName}} fóru yfir ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Nýr öryggisfundur ({{severity}})",

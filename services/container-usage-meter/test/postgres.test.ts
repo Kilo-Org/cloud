@@ -807,6 +807,196 @@ describe('container usage PostgreSQL application', () => {
       .where(eq(container_usage_interval.id, recoveryId));
   });
 
+  it('clips a reported total that includes seconds before the interval receipt', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const clipContext = { ...context, instanceId: `clip-before-receipt-${suffix}` };
+    const clipFingerprint = await usageContextFingerprint(clipContext);
+    const clipId = `cloud-agent-next:${clipContext.instanceId}:1000`;
+    const startEpochMs = 1_000;
+    const receivedAtMs = 5_000;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...clipContext,
+        startEpochMs,
+        idempotencyKey: startIdempotencyKey(
+          clipContext.service,
+          clipContext.instanceId,
+          startEpochMs
+        ),
+      },
+      clipId,
+      clipFingerprint,
+      receivedAtMs
+    );
+
+    await applyHeartbeatWithDb(
+      client.db,
+      {
+        service: clipContext.service,
+        instanceId: clipContext.instanceId,
+        startEpochMs,
+        idempotencyKey: heartbeatIdempotencyKey(
+          clipContext.service,
+          clipContext.instanceId,
+          startEpochMs,
+          1
+        ),
+        seq: 1,
+        usageSinceLast: 50,
+        context: clipContext,
+      },
+      clipId,
+      clipFingerprint,
+      receivedAtMs + 10_000
+    );
+
+    const [interval] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, clipId));
+    expect(interval).toMatchObject({ status: 'open', confirmed_seconds: 10 });
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, clipId));
+    expect(segment).toMatchObject({ reported_seconds: 50, usage_seconds: 10 });
+    await client.db.delete(container_usage_interval).where(eq(container_usage_interval.id, clipId));
+  });
+
+  it('persists the full reported seconds when the report is entirely after the receipt', async () => {
+    await client.db
+      .update(cloud_billing_sku)
+      .set({ accepts_new_usage: true })
+      .where(eq(cloud_billing_sku.id, skuId));
+    const fullContext = { ...context, instanceId: `clip-after-receipt-${suffix}` };
+    const fullFingerprint = await usageContextFingerprint(fullContext);
+    const fullId = `cloud-agent-next:${fullContext.instanceId}:1000`;
+    const startEpochMs = 1_000;
+    await applyStartWithDb(
+      client.db,
+      {
+        ...fullContext,
+        startEpochMs,
+        idempotencyKey: startIdempotencyKey(
+          fullContext.service,
+          fullContext.instanceId,
+          startEpochMs
+        ),
+      },
+      fullId,
+      fullFingerprint,
+      startEpochMs
+    );
+
+    await applyHeartbeatWithDb(
+      client.db,
+      {
+        service: fullContext.service,
+        instanceId: fullContext.instanceId,
+        startEpochMs,
+        idempotencyKey: heartbeatIdempotencyKey(
+          fullContext.service,
+          fullContext.instanceId,
+          startEpochMs,
+          1
+        ),
+        seq: 1,
+        usageSinceLast: 50,
+        context: fullContext,
+      },
+      fullId,
+      fullFingerprint,
+      startEpochMs + 60_000
+    );
+
+    const [interval] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, fullId));
+    expect(interval).toMatchObject({ status: 'open', confirmed_seconds: 50 });
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, fullId));
+    expect(segment).toMatchObject({ reported_seconds: 50, usage_seconds: 50 });
+    await client.db.delete(container_usage_interval).where(eq(container_usage_interval.id, fullId));
+  });
+
+  it('recovers an unstored interval from the stop context and applies the stop segment', async () => {
+    const recoveryContext = { ...context, instanceId: `stop-context-recovery-${suffix}` };
+    const recoveryFingerprint = await usageContextFingerprint(recoveryContext);
+    const startEpochMs = 1_234;
+    const receivedAtMs = 20_000;
+    const recoveryId = `cloud-agent-next:${recoveryContext.instanceId}:${startEpochMs}`;
+    const stop = {
+      service: recoveryContext.service,
+      instanceId: recoveryContext.instanceId,
+      startEpochMs,
+      idempotencyKey: stopIdempotencyKey(
+        recoveryContext.service,
+        recoveryContext.instanceId,
+        startEpochMs
+      ),
+      seq: 1,
+      usageSinceLast: 300,
+      reason: 'exit' as const,
+      exitCode: 0,
+      context: recoveryContext,
+    };
+
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, receivedAtMs)
+    ).resolves.toEqual({
+      kind: 'applied',
+      dedup: false,
+      billingMode: 'shadow',
+      budget: { verdict: 'continue' },
+    });
+    await expect(
+      applyStopWithDb(client.db, stop, recoveryId, recoveryFingerprint, receivedAtMs + 1_000)
+    ).resolves.toMatchObject({ kind: 'applied', dedup: true, billingMode: 'shadow' });
+
+    const [recovered] = await client.db
+      .select()
+      .from(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+    expect(recovered).toMatchObject({
+      status: 'closed',
+      close_reason: 'exit',
+      start_epoch_ms: startEpochMs,
+      context_fingerprint: recoveryFingerprint,
+      subject_type: recoveryContext.subject.type,
+      subject_id: recoveryContext.subject.id,
+      actor_type: recoveryContext.actor.type,
+      actor_id: recoveryContext.actor.id,
+      confirmed_seconds: 0,
+    });
+    expect(new Date(recovered.started_at).getTime()).toBe(receivedAtMs);
+    expect(new Date(recovered.last_seen_at).getTime()).toBe(receivedAtMs);
+    const [segment] = await client.db
+      .select()
+      .from(container_usage_segment)
+      .where(eq(container_usage_segment.interval_id, recoveryId));
+    expect(segment).toMatchObject({
+      seq: 1,
+      idempotency_key: heartbeatIdempotencyKey(
+        recoveryContext.service,
+        recoveryContext.instanceId,
+        startEpochMs,
+        1
+      ),
+      reported_seconds: 300,
+      usage_seconds: 0,
+    });
+    await client.db
+      .delete(container_usage_interval)
+      .where(eq(container_usage_interval.id, recoveryId));
+  });
+
   it('rejects missing-interval recovery when a newer generation owns the open slot', async () => {
     await client.db
       .update(cloud_billing_sku)
@@ -965,6 +1155,12 @@ describe('container usage PostgreSQL application', () => {
       raceFingerprint,
       2_000
     );
+    // Attach the rejection assertion before releasing the blocker: otherwise the
+    // expected conflict can reject before it is awaited and Vitest reports it as
+    // an unhandled rejection.
+    const contenderRejection = expect(contender).rejects.toThrow(
+      'Another usage interval is already open'
+    );
     await expect
       .poll(async () => {
         const result = await client.pool.query<{ count: string }>(
@@ -980,7 +1176,7 @@ describe('container usage PostgreSQL application', () => {
     releaseBlocker();
     await blocker;
 
-    await expect(contender).rejects.toThrow('Another usage interval is already open');
+    await contenderRejection;
     const contenders = await client.db
       .select()
       .from(container_usage_interval)

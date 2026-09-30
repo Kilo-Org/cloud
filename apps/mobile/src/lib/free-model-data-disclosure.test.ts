@@ -7,6 +7,7 @@ import {
   hasUserByokAvailable,
   isFreeModelOption,
   mayTrainOnYourPrompts,
+  modelNameStatesFree,
 } from './free-model-data-disclosure';
 
 describe('free model data disclosure', () => {
@@ -56,6 +57,23 @@ describe('free model data disclosure', () => {
       })
     ).toBe(false);
     expect(hasUserByokAvailable({ id: 'anthropic/claude' })).toBe(false);
+  });
+
+  it('detects a displayed name that already states the model is free', () => {
+    expect(modelNameStatesFree('Laguna S 2.1 (free)')).toBe(true);
+    expect(modelNameStatesFree('Nemotron 3 Ultra (free)')).toBe(true);
+    expect(modelNameStatesFree('Auto Free')).toBe(true);
+    expect(modelNameStatesFree('Laguna S 2.1')).toBe(false);
+    expect(modelNameStatesFree('Auto Efficient')).toBe(false);
+  });
+
+  it('states free from the free Auto model identity even when the name does not', () => {
+    // Nine catalogs name the Auto Free model with a free word the free badge's
+    // own label does not literally contain (ru "Авто Бесплатный" vs
+    // "Бесплатно"), so the model's identity decides, not a substring of copy.
+    expect(modelNameStatesFree('Авто Бесплатный', 'kilo-auto/free')).toBe(true);
+    expect(modelNameStatesFree('Авто Бесплатный', 'kilocode/kilo-auto/free')).toBe(true);
+    expect(modelNameStatesFree('Auto Efficient', 'kilo-auto/efficient')).toBe(false);
   });
 
   it('adds a data collection phrase to accessibility labels', () => {

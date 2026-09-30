@@ -30,7 +30,7 @@ import {
   PlatformIntegrationNotFoundError,
   PlatformIntegrationUnavailableError,
 } from '@/lib/bot/platform-helpers';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import type { Thread } from 'chat';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 

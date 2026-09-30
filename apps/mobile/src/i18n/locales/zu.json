@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Buyela emuva",
     "idle": "Akumatasa",
+    "scheduled": "Kuhleliwe",
     "keepEditing": "Qhubeka uhlela",
     "keepRunning": "Yeka kuqhubeke",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "umsebenzisi osusiwe",
       "replyForbiddenTerm": "Awunayo imvume yokuphendula ku-{{term}}.",
       "moreLinesAbove_one": "… omunye umugqa ongu-{{displayCount}} ngenhla",
-      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla"
+      "moreLinesAbove_other": "… eminye imigqa engu-{{displayCount}} ngenhla",
+      "deleteComment": "Susa amazwana",
+      "deleteCommentTitle": "Susa amazwana?",
+      "deleteCommentMessage": "Lawa mazwana azosuswa esicelweni sokuhlanganisa.",
+      "commentEditFailed": "Asikwazanga ukulondoloza amazwana akho. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "commentEditUnavailable": "Lawa mazwana awakwazi ukuhlelwa. Kungenzeka asusiwe.",
+      "commentDeleteFailed": "Asikwazanga ukususa amazwana akho. Hlola ukuxhumana kwakho bese uzama futhi.",
+      "commentDeleteUnavailable": "Lawa mazwana awakwazi ukususwa."
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Lokhu akusiso isixhumanisi se-PR noma sesicelo sokuhlanganisa",
     "announce": {
       "commentPosted": "Amazwana athunyelwe",
+      "commentUpdated": "Amazwana abuyekezwe",
+      "commentDeleted": "Amazwana asusiwe",
       "reviewSubmitted": "Ukubuyekeza kuthunyelwe",
       "autoMergeEnabled": "Ukuhlanganisa okuzenzakalelayo kuvuliwe"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Asikwazanga ukulayisha iziseshini ezisebenzayo.",
       "couldNotRefresh": "Asikwazanga ukuvuselela",
       "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho. Iziseshini zakho zizovela lapha.",
+      "viewHistory": "Umlando weziseshini",
       "noMatches": "Azikho iziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
       "tryAdjustFilters": "Zama ukulungisa noma ukusula izihlungi zakho.",
       "couldNotSearch": "Asikwazanga ukusesha iziseshini.",
       "completedWillAppear": "Iziseshini eziqediwe zizovela lapha.",
       "noPastSessions": "Azikho iziseshini ezidlule",
+      "pastSessions": "Iziseshini ezidlule",
       "live": "BUKHOMA",
       "updating": "Kuyabuyekezwa"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "Igama leseshini",
       "transcriptAccessibility": "Umbhalo weseshini",
       "readOnly": "Le seshini ingafundwa kuphela.",
+      "continueInNewSession": "Qhubeka kuseshini entsha",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "ngenisa umbhalo weseshini ye-OpenAI Codex",
       "reviewDescription": "buyekeza izinguquko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sebenzisa /{{command}}",
+      "useSkillCommand": "Sebenzisa ikhono /{{command}}",
+      "skillBadge": "Ikhono",
+      "catalogFull": "Uhlu lwemiyalo lugcwele, ngakho eminye imiyalo ifihliwe.",
+      "catalogOverLimit": "Uhlu lamakhono ludlula umkhawulo wosayizi, ngakho wonke amakhono ayaboniswa.",
       "insert": "Faka",
       "upgradeRequiredFallback": "Sicela ubuyekeze i-CLI yakho ukuze usebenzise lo myalo.",
       "exitCapabilityUnavailable": "Buyekeza i-CLI yakho ukuze uphume eseshini.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "Buyela esikrinini sangaphambilini bese uvula kabusha lesi sikhethi."
   },
   "sessionRow": {
-    "needsInput": "KUDINGA IMPENDULO"
+    "needsInput": "KUDINGA IMPENDULO",
+    "scheduled": "KUHLELIWE"
   },
   "voiceInput": {
     "listening": "Kulalelwa...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "Abekho abasingathi abathenjwayo",
     "emptyDescription": "Uma uthemba umsingathi wesixhumanisi, isixhumanisi sivuleka ngaphandle kokucela imvume futhi.",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
+    "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe.",
     "openSession": "Vula",
     "approveFailed": "Asikwazanga ukugunyaza. Thepha $t(common.approve) ukuze uzame futhi.",
-    "newestResult": "Umphumela wakamuva"
+    "newestResult": "Umphumela wakamuva",
+    "scheduledWakes": "ivuka {{time}}"
   },
   "transcriptionModel": {
     "title": "Imodeli yokuguqula inkulumo",

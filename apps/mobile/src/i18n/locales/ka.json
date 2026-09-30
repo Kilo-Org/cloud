@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "უკან დაბრუნება",
     "idle": "უმოქმედოა",
+    "scheduled": "დაგეგმილი",
     "keepEditing": "რედაქტირების გაგრძელება",
     "keepRunning": "მუშაობის გაგრძელება",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "წაშლილი მომხმარებელი",
       "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
       "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
-      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
+      "deleteComment": "კომენტარის წაშლა",
+      "deleteCommentTitle": "წავშალო კომენტარი?",
+      "deleteCommentMessage": "ეს კომენტარი წაიშლება შერწყმის მოთხოვნიდან.",
+      "commentEditFailed": "კომენტარის შენახვა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentEditUnavailable": "ამ კომენტარის რედაქტირება შეუძლებელია. შესაძლოა ის წაშლილია.",
+      "commentDeleteFailed": "კომენტარის წაშლა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentDeleteUnavailable": "ამ კომენტარის წაშლა შეუძლებელია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
+      "commentUpdated": "კომენტარი განახლდა",
+      "commentDeleted": "კომენტარი წაიშალა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
       "autoMergeEnabled": "ავტომატური შერწყმა ჩართულია"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotRefresh": "განახლება ვერ მოხერხდა",
       "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
+      "viewHistory": "სესიების ისტორია",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",
       "tryAdjustFilters": "სცადე ფილტრების შეცვლა ან გასუფთავება.",
       "couldNotSearch": "სესიების ძიება ვერ მოხერხდა.",
       "completedWillAppear": "დასრულებული სესიები აქ გამოჩნდება.",
       "noPastSessions": "დასრულებული სესიები არ არის",
+      "pastSessions": "დასრულებული სესიები",
       "live": "აქტიური",
       "updating": "ახლდება"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "სესიის სახელი",
       "transcriptAccessibility": "სესიის ჩანაწერი",
       "readOnly": "ეს სესია მხოლოდ სანახავადაა.",
+      "continueInNewSession": "გაგრძელება ახალ სესიაში",
       "emptyDescription": "დასაწყებად ქვემოთ გაგზავნეთ შეტყობინება.",
       "scrollToBottom": "ბოლომდე გადახვევა",
       "emptyTitle": "შეტყობინებები ჯერ არ არის",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "OpenAI Codex-ის სესიის ტრანსკრიპტის იმპორტი",
       "reviewDescription": "ცვლილებების გადახედვა [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ბრძანების გამოყენება",
+      "useSkillCommand": "/{{command}} უნარის გამოყენება",
+      "skillBadge": "უნარი",
+      "catalogFull": "ბრძანებების კატალოგი სავსეა, ამიტომ ზოგიერთი ბრძანება დამალულია.",
+      "catalogOverLimit": "უნარების კატალოგი ზომის ზღვარს აღემატება, ამიტომ ყველა უნარი ნაჩვენებია.",
       "insert": "ჩასმა",
       "upgradeRequiredFallback": "ამ ბრძანების გამოსაყენებლად განაახლეთ CLI.",
       "exitCapabilityUnavailable": "სესიიდან გასასვლელად განაახლეთ CLI.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "დაბრუნდით წინა ეკრანზე და ხელახლა გახსენით არჩევის ეს ფანჯარა."
   },
   "sessionRow": {
-    "needsInput": "პასუხს ელის"
+    "needsInput": "პასუხს ელის",
+    "scheduled": "დაგეგმილი"
   },
   "voiceInput": {
     "listening": "გისმენ...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "სანდო ჰოსტები არ არის",
     "emptyDescription": "თუ ბმულის ჰოსტს სანდოდ მონიშნავთ, მისი ბმულები ხელახალი დადასტურების გარეშე გაიხსნება.",
     "revoke": "{{host}}-ის სანდო ჰოსტებიდან ამოღება",
+    "revokeMessage": "ამ ჰოსტის ბმულები კვლავ დადასტურებას მოითხოვს.",
     "backToPreferences": "პარამეტრებში დაბრუნება"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "newestResult": "უახლესი შედეგი"
+    "newestResult": "უახლესი შედეგი",
+    "scheduledWakes": "{{time}} იღვიძებს"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",

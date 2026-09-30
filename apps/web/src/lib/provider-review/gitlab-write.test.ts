@@ -646,6 +646,42 @@ describe('mergePullRequest', () => {
     });
   });
 
+  it('squashes the collected title and body into squash_commit_message', async () => {
+    const result = await mergePullRequest({
+      ...TARGET,
+      expectedHeadSha: 'sha-head',
+      squash: true,
+      commitTitle: 'Add nested deploy script',
+      commitMessage: 'Explain the deploy script.',
+    });
+
+    expect(result).toEqual({ done: true, replayed: false });
+    const { init } = lastRequest();
+    expect(JSON.parse(String(init.body))).toEqual({
+      sha: 'sha-head',
+      squash: true,
+      squash_commit_message: 'Add nested deploy script\n\nExplain the deploy script.',
+    });
+  });
+
+  it('uses the collected title and body as merge_commit_message when not squashing', async () => {
+    const result = await mergePullRequest({
+      ...TARGET,
+      expectedHeadSha: 'sha-head',
+      squash: false,
+      commitTitle: 'Add nested deploy script',
+      commitMessage: 'Explain the deploy script.',
+    });
+
+    expect(result).toEqual({ done: true, replayed: false });
+    const { init } = lastRequest();
+    expect(JSON.parse(String(init.body))).toEqual({
+      sha: 'sha-head',
+      squash: false,
+      merge_commit_message: 'Add nested deploy script\n\nExplain the deploy script.',
+    });
+  });
+
   it('refuses a stale revision with the exact reason and never merges', async () => {
     mockFetchGitLabMergeRequest.mockResolvedValue(openMrFixture('sha-moved'));
 

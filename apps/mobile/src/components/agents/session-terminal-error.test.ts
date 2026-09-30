@@ -202,6 +202,114 @@ describe('resolveSessionTerminalError', () => {
     });
   });
 
+  // A preparation failure writes the Durable Object's safe projection to the
+  // error atom through the SDK's `onError` as well as the status indicator, so
+  // the overlay must pass that reader copy through instead of showing the
+  // page-load line the atom normally names.
+  it('passes a Durable Object safe failure carried by the error atom through', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: 'Kilo server failed to start',
+        statusIndicator: { type: 'error', message: 'Kilo server failed to start' },
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Kilo server failed to start',
+      retryable: false,
+      detail: 'Kilo server failed to start',
+    });
+  });
+
+  // A preparation failure can also write two different copies: the Durable
+  // Object's safe projection reaches the status indicator, while a separate
+  // transport/stop event puts a generic line like "Session terminated" in the
+  // atom. The overlay must resolve the indicator's reader copy — the same one
+  // the transcript banner and child sheet show — not the page-load line, and
+  // the atom's transient stop event keeps the Retry the page-load line offered.
+  it('resolves the safe indicator copy over a generic error atom', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: 'Session terminated',
+        statusIndicator: { type: 'error', message: 'Kilo server failed to start' },
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Kilo server failed to start',
+      retryable: true,
+      detail: 'Kilo server failed to start',
+    });
+  });
+
+  // The Durable Object's safe failure reason survives on the failed
+  // preparation attempt when the transport's stop event has already replaced
+  // the status indicator's copy with the generic coded termination line. The
+  // overlay must name the preparation failure the reader can act on — never
+  // the page-load line — and keep the atom's Retry.
+  it('resolves a failed preparation attempt over a generic termination', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: 'Session terminated',
+        statusIndicator: {
+          type: 'error',
+          message: 'Session terminated',
+          code: 'session-terminated',
+        },
+        preparationFailure: 'Kilo server failed to start',
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Kilo server failed to start',
+      retryable: true,
+      detail: 'Kilo server failed to start',
+    });
+  });
+
+  it('shows the failed preparation attempt without an atom retry when nothing else failed', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: null,
+        preparationFailure: 'Repository authentication failed',
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Repository authentication failed',
+      retryable: false,
+      detail: 'Repository authentication failed',
+    });
+  });
+
+  // A stale failed attempt must not bury a failure the indicator names: a
+  // later turn can fail with its own classified reason while the preparation
+  // row from an earlier attempt stays in the transcript.
+  it('prefers a classified indicator over a stale failed preparation attempt', () => {
+    expect(
+      resolveSessionTerminalError({
+        error: null,
+        statusIndicator: {
+          type: 'error',
+          message: 'Assistant request failed: insufficient credits',
+        },
+        preparationFailure: 'Kilo server failed to start',
+        messageCount: 0,
+      })
+    ).toEqual({
+      variant: 'server',
+      title: "Couldn't load this session",
+      message: 'Not enough credits to run Cloud Agent. Add credits and try again.',
+      retryable: false,
+      detail: 'Assistant request failed: insufficient credits',
+    });
+  });
+
   it('classifies a permission indicator as non-retryable', () => {
     expect(
       resolveSessionTerminalError(indicatorFor('You are not authorized to use the Cloud Agent.'))
@@ -230,16 +338,27 @@ describe('resolveSessionTerminalError', () => {
     });
   });
 
-  it('classifies a coded session termination as non-retryable', () => {
-    expect(
-      resolveSessionTerminalError(codedIndicatorFor('Session terminated', 'session-terminated'))
-    ).toEqual({
+  // The status indicator and the overlay must resolve the same reader copy.
+  // A coded termination names the assistant-failure line — the same one the
+  // transcript banner shows through `sessionStatusErrorMessage` — never the
+  // page-load line a bare error atom falls back to.
+  it('resolves a coded session termination to the transcript banner copy', () => {
+    const indicator = {
+      type: 'error' as const,
+      message: 'Session terminated',
+      code: 'session-terminated' as const,
+    };
+    const resolved = resolveSessionTerminalError(
+      codedIndicatorFor(indicator.message, indicator.code)
+    );
+    expect(resolved).toEqual({
       variant: 'server',
       title: "Couldn't load this session",
-      message: 'Failed to load session details',
+      message: 'The response failed.',
       retryable: false,
       detail: 'Session terminated',
     });
+    expect(resolved?.message).toBe(sessionStatusErrorMessage(indicator));
   });
 
   it.each([

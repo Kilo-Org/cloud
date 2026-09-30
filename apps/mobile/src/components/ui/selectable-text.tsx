@@ -2,6 +2,7 @@ import { type LayoutChangeEvent, TextInput } from 'react-native';
 import { useContext } from 'react';
 
 import { TextClassContext } from '@/components/ui/text';
+import { hasRtlScript, withoutMonoFamily } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
 type SelectableTextProps = {
@@ -30,14 +31,20 @@ type SelectableTextProps = {
  * that is the platform's own behavior. When the part vanishes, the parent swaps
  * to its "unavailable" line and this input unmounts, which also ends the
  * selection. Neither case needs code here.
+ *
+ * JetBrains Mono ships no Arabic or Hebrew glyphs, so the inherited mono family
+ * is dropped for that copy exactly as `@/components/ui/text` does (see
+ * `withoutMonoFamily`): a tool card's bash command, argument field or row label
+ * in either script would otherwise draw one character at a time.
  */
 export function SelectableText({ children, className, onLayout }: Readonly<SelectableTextProps>) {
   const textClass = useContext(TextClassContext);
+  // Mirrors the base string of `textVariants` in ui/text.tsx, so the shared
+  // weight and size do not silently drop on a raw TextInput.
+  const classes = cn('text-foreground text-base font-medium', textClass, 'p-0', className);
   return (
     <TextInput
-      // Mirrors the base string of `textVariants` in ui/text.tsx, so the
-      // shared weight and size do not silently drop on a raw TextInput.
-      className={cn('text-foreground text-base font-medium', textClass, 'p-0', className)}
+      className={hasRtlScript(children) ? withoutMonoFamily(classes) : classes}
       editable={false}
       multiline
       scrollEnabled={false}

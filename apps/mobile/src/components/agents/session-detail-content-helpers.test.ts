@@ -1,14 +1,61 @@
+/* eslint-disable max-lines -- one suite covers every helper this screen composes its rows from. */
 import { describe, expect, it, vi } from 'vitest';
 
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 import {
   countInFlightMessages,
+  failedPreparationSafeFailure,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
 } from './session-detail-content-helpers';
 import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
 import { assistantMessage, userMessage } from './message-bubble-test-utils';
+
+const preparationAttempt = (input: Partial<PreparationAttempt>): PreparationAttempt => ({
+  id: 'attempt-1',
+  triggerMessageId: 'm1',
+  status: 'failed',
+  startedAt: 0,
+  revision: 1,
+  steps: [],
+  ...input,
+});
+
+describe('failedPreparationSafeFailure', () => {
+  it('returns null when no attempt failed', () => {
+    expect(
+      failedPreparationSafeFailure([
+        preparationAttempt({ id: 'a1', status: 'completed' }),
+        preparationAttempt({ id: 'a2', status: 'running' }),
+      ])
+    ).toBeNull();
+  });
+
+  it('returns null for an empty attempt list', () => {
+    expect(failedPreparationSafeFailure([])).toBeNull();
+  });
+
+  it('returns the last failed attempt with a safe reason', () => {
+    expect(
+      failedPreparationSafeFailure([
+        preparationAttempt({ id: 'a1', safeError: 'Workspace setup failed' }),
+        preparationAttempt({ id: 'a2', status: 'running' }),
+        preparationAttempt({ id: 'a3', safeError: 'Kilo server failed to start' }),
+      ])
+    ).toBe('Kilo server failed to start');
+  });
+
+  it('skips a failed attempt without a safe reason', () => {
+    expect(
+      failedPreparationSafeFailure([preparationAttempt({ id: 'a1', safeError: undefined })])
+    ).toBeNull();
+  });
+});
 
 describe('countInFlightMessages', () => {
   it('excludes a failed pending row from the in-flight count', () => {

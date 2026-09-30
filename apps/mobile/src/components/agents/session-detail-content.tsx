@@ -98,6 +98,7 @@ import {
 } from '@/components/agents/session-working-state';
 import {
   countInFlightMessages,
+  failedPreparationSafeFailure,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
   retryFailedMessage,
@@ -2533,6 +2534,7 @@ export function SessionDetailContent({
     const terminalError = resolveSessionTerminalError({
       error,
       statusIndicator,
+      preparationFailure: failedPreparationSafeFailure(preparationAttempts),
       messageCount: messages.length,
     });
     if (terminalError) {

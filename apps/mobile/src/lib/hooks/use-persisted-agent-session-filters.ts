@@ -11,8 +11,6 @@ import {
   parseStoredAgentSessionFilters,
 } from '@/lib/agent-session-filters';
 
-type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
-
 async function loadStoredFilters(storageKey: string): Promise<AgentSessionFilters> {
   const raw = await SecureStore.getItemAsync(storageKey);
   return parseStoredAgentSessionFilters(raw) ?? createDefaultAgentSessionFilters();
@@ -83,20 +81,6 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     setFiltersState(createDefaultAgentSessionFilters());
   }, []);
 
-  const setPlatformFilter = useCallback((updater: StringArrayUpdater) => {
-    setFiltersState(prev => ({
-      ...prev,
-      platformFilter: Array.isArray(updater) ? updater : updater(prev.platformFilter),
-    }));
-  }, []);
-
-  const setProjectFilter = useCallback((updater: StringArrayUpdater) => {
-    setFiltersState(prev => ({
-      ...prev,
-      projectFilter: Array.isArray(updater) ? updater : updater(prev.projectFilter),
-    }));
-  }, []);
-
   return {
     platformFilter: filters.platformFilter,
     projectFilter: filters.projectFilter,
@@ -104,7 +88,5 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     hasLoaded,
     setFilters,
     clearFilters,
-    setPlatformFilter,
-    setProjectFilter,
   };
 }

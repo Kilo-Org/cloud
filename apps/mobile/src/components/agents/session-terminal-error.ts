@@ -4,6 +4,7 @@ import { i18n } from '@/i18n';
 import { type QueryErrorVariant } from '@/components/query-error';
 
 import { type MessageFailure } from './message-failure-state';
+import { isSafeFailureMessage } from './session-safe-failure';
 
 /**
  * Terminal error class for a session startup failure. The session manager's
@@ -184,81 +185,6 @@ function errorClassForCode(code: SdkStatusMessageCode): TerminalErrorClass | und
 }
 
 /**
- * The reader's copy the Durable Object writes through its safe failure
- * projection (services/cloud-agent-next/src/session/safe-failure-projection.ts
- * and the assistant failures it re-exports from src/shared/assistant-failure.ts)
- * plus the lines session-service.ts supplies directly. None of them is raw
- * provider text, so the status line shows them as-is. A bounded workspace
- * failure appends its detail to the projection line, so a message that starts
- * with one of these plus ": " is the same copy.
- */
-const SAFE_FAILURE_MESSAGES = new Set([
-  // Generic failure codes.
-  'Could not connect to the sandbox',
-  'Workspace setup failed',
-  'Kilo server failed to start',
-  'Agent wrapper failed to start',
-  'The message could not be delivered',
-  'Session metadata is unavailable',
-  'No model was selected',
-  'Agent wrapper disconnected',
-  'Agent wrapper made no execution progress during the watchdog window',
-  'Agent wrapper stopped responding',
-  'Agent wrapper failed before processing the message',
-  'Assistant request failed',
-  'Agent wrapper failed while processing the message',
-  'No assistant reply was produced',
-  'Assistant request failed: insufficient credits',
-  'The message was interrupted by the user',
-  'The agent container shut down',
-  'The message was interrupted',
-  'The message failed',
-  // Workspace failure subtypes.
-  'Repository clone timed out',
-  'Repository checkout timed out',
-  'Repository authentication failed',
-  'Repository request was rate limited',
-  'Repository network request failed',
-  'Repository data is corrupt',
-  'Repository checkout conflict',
-  'Requested repository branch was not found',
-  'Workspace setup failed: sandbox storage full',
-  'Session import timed out',
-  'Session import failed',
-  'Setup command timed out',
-  'Setup command failed',
-  // Classified assistant failures.
-  'Assistant request was rate limited',
-  'Assistant request failed: model not found',
-  'Assistant request was not authorized',
-  'Assistant service is unavailable',
-  'Assistant request timed out',
-  'Assistant request was invalid',
-  'The model context limit was exceeded',
-  'The model output limit was reached',
-  'The model provider blocked the response under its content policy',
-  'The model response did not match the required format',
-  // Lines session-service.ts supplies as `safeFailureMessage`.
-  'GitHub repository authentication failed. Check that the GitHub App is installed and has access to this repository.',
-  'GitHub credential service is unavailable. Please try again.',
-  'GitHub credential resolution failed. Please try again.',
-  // The SDK's autocommit status.
-  'Commit failed',
-]);
-
-function isSafeFailureMessage(message: string): boolean {
-  if (SAFE_FAILURE_MESSAGES.has(message)) {
-    return true;
-  }
-  for (const safe of SAFE_FAILURE_MESSAGES) {
-    if (message.startsWith(`${safe}: `)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-/**
  * The reader's own copy for a session error in the transcript's status slot
  * (session-status-indicator.tsx). A code the SDK attaches to its own fixed copy
  * maps straight to catalog copy; a code for a failure the app can name maps to
@@ -398,52 +324,134 @@ export function describeSessionRuntimeFailure(message: string): SessionRuntimeFa
   };
 }
 
+/** A terminal error from a resolved class, the reader's copy and the original. */
+function terminalError(input: {
+  cls: TerminalErrorClass;
+  message: string;
+  detail: string;
+  retryable: boolean;
+}): SessionTerminalError {
+  const { cls, message, detail, retryable } = input;
+  return { variant: variantForClass(cls), title: titleForClass(cls), message, retryable, detail };
+}
+
+/**
+ * Retry rule for a terminal error whose copy is the Durable Object's safe
+ * failure projection. That copy classifies as `'unknown'` more often than not,
+ * and a Retry cannot recover most of the named failures it carries — but a
+ * generic transport line in the error atom (`"Session terminated"`) is the
+ * transient stop event the retryable page-load fallback covered, so that Retry
+ * is kept instead of leaving the reader with Copy and Back only.
+ */
+function retryableForSafeCopy(cls: TerminalErrorClass, atomError: string | null): boolean {
+  return (
+    retryableClass(cls) ||
+    (cls === 'unknown' && atomError !== null && !isSafeFailureMessage(atomError))
+  );
+}
+
 /**
  * Resolve the terminal error for a session with no messages. Returns `null`
  * when there is nothing terminal to show (loading, empty, or a live session).
  *
- * Precedence: a populated transcript never shows a terminal error; an
- * `errorAtom` value is a retryable server failure; a `statusIndicator` of type
- * `error` is classified by its message.
+ * Precedence: a populated transcript never shows a terminal error; a
+ * `statusIndicator` of type `error` whose failure the app can name resolves its
+ * copy through `sessionStatusErrorMessage`, the same resolver the transcript
+ * banner and child sheet use; the Durable Object's safe failure projection —
+ * the failed preparation attempt's reason or a projection carried by the
+ * `errorAtom` — passes through; only then does a non-safe `errorAtom` fall back
+ * to the retryable page-load line.
+ *
+ * The safe projection outranks a generic indicator and atom because a
+ * preparation failure carries two different copies: the Durable Object's safe
+ * reason survives on the failed preparation attempt (replayed snapshots keep it
+ * terminal), while the transport's stop event writes the generic
+ * `"Session terminated"` line into the atom and the transcript's status
+ * indicator. Preferring those named a page-load failure and contradicted the
+ * banner for a failure the reader can name; dropping the atom's Retry left a
+ * transient preparation failure with Copy and Back only.
  */
 export function resolveSessionTerminalError(input: {
   error: string | null;
   statusIndicator: { type: string; message: string; code?: SdkStatusMessageCode } | null;
+  /** The Durable Object's safe failure reason for the failed preparation attempt. */
+  preparationFailure?: string | null;
   messageCount: number;
 }): SessionTerminalError | null {
   if (input.messageCount > 0) {
     return null;
   }
-  if (input.error !== null) {
-    // The atom carries the transport's own English text. Show the reader a
-    // translated line and keep the original for the clipboard.
-    return {
-      variant: 'server',
-      title: i18n.t('agentChat.session.couldNotLoadThisSession'),
-      message: i18n.t('agentChat.session.failedToLoadDetails'),
-      retryable: true,
+  const indicator =
+    input.statusIndicator?.type === 'error'
+      ? {
+          message: input.statusIndicator.message,
+          code: input.statusIndicator.code,
+          cls:
+            (input.statusIndicator.code === undefined
+              ? undefined
+              : errorClassForCode(input.statusIndicator.code)) ??
+            classifyTerminalError(input.statusIndicator.message),
+        }
+      : null;
+  if (indicator !== null && indicator.cls !== 'unknown') {
+    // A failure the app can name: the reader gets its catalog copy, the
+    // original goes to Copy, and the class decides the Retry.
+    return terminalError({
+      cls: indicator.cls,
+      message: sessionStatusErrorMessage(indicator),
+      detail: indicator.message,
+      retryable: retryableClass(indicator.cls),
+    });
+  }
+  if (input.preparationFailure && isSafeFailureMessage(input.preparationFailure)) {
+    // The failed preparation attempt's own safe projection — the reason the
+    // Durable Object recorded for the failure. It is already the reader's copy,
+    // so pass it through exactly as the transcript banner and child sheet do.
+    const cls = classifyTerminalError(input.preparationFailure);
+    return terminalError({
+      cls,
+      message: sessionStatusErrorMessage({ message: input.preparationFailure }),
+      detail: input.preparationFailure,
+      retryable: retryableForSafeCopy(cls, input.error),
+    });
+  }
+  if (indicator !== null) {
+    // The indicator's copy is the reader's already (the safe projection) or a
+    // failure the app cannot name. Resolve it exactly as the transcript banner
+    // and the child sheet do, so the full-screen overlay cannot show the
+    // page-load line for a failure the reader can name.
+    return terminalError({
+      cls: indicator.cls,
+      message: sessionStatusErrorMessage(indicator),
+      detail: indicator.message,
+      retryable: retryableForSafeCopy(indicator.cls, input.error),
+    });
+  }
+  if (input.error === null) {
+    return null;
+  }
+  const cls = classifyTerminalError(input.error);
+  if (isSafeFailureMessage(input.error)) {
+    // A preparation failure can write the Durable Object's safe failure
+    // projection into the atom through the SDK's `onError`. It is already the
+    // reader's copy, so pass it through instead of naming a page-load failure
+    // the user did not hit.
+    return terminalError({
+      cls,
+      message: sessionStatusErrorMessage({ message: input.error }),
       detail: input.error,
-    };
+      retryable: retryableForSafeCopy(cls, input.error),
+    });
   }
-  if (input.statusIndicator?.type === 'error') {
-    const detail = input.statusIndicator.message;
-    const code = input.statusIndicator.code;
-    // The code names the failure without depending on the English message; a
-    // code the app has no class for falls back to the message, through the same
-    // classifier the child sheet's error surfaces use.
-    const codedClass = code === undefined ? undefined : errorClassForCode(code);
-    if (codedClass === undefined) {
-      return describeTerminalFailure(detail);
-    }
-    return {
-      variant: variantForClass(codedClass),
-      title: titleForClass(codedClass),
-      message: messageForClass(codedClass),
-      retryable: retryableClass(codedClass),
-      detail,
-    };
-  }
-  return null;
+  // The atom carries the transport's own English text. Show the reader a
+  // translated line and keep the original for the clipboard.
+  return {
+    variant: 'server',
+    title: i18n.t('agentChat.session.couldNotLoadThisSession'),
+    message: i18n.t('agentChat.session.failedToLoadDetails'),
+    retryable: true,
+    detail: input.error,
+  };
 }
 
 /**

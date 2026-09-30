@@ -11,7 +11,6 @@ import { useTRPC } from '@/lib/trpc';
 type EffectiveProfileCustomModes = {
   customOptions: ModeOption[];
   profileAgents: ReturnType<typeof visibleProfileAgents>;
-  isLoading: boolean;
 };
 
 /**
@@ -57,6 +56,5 @@ export function useEffectiveProfileCustomModes(
   return {
     customOptions,
     profileAgents,
-    isLoading: get.isLoading,
   };
 }

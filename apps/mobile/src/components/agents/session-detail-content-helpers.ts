@@ -1,8 +1,31 @@
-import { type MessageDeliveryState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
+import {
+  type MessageDeliveryState,
+  type PreparationAttempt,
+  type StoredMessage,
+} from '@kilocode/cloud-agent-sdk';
 
 import { type MessageFailure, selectMessageFailure } from './message-failure-state';
 import { firstHumanText } from './part-types';
 import { transcriptRendersMessage } from './session-transcript';
+
+/**
+ * The Durable Object's safe failure reason of the last failed preparation
+ * attempt, or null while every attempt is running or completed. Failed
+ * attempts stay terminal across reconnects — their snapshots are replayed on
+ * the next open — so this copy survives, unlike the status indicator, which a
+ * transport's stop event overwrites with the generic termination line.
+ */
+export function failedPreparationSafeFailure(
+  attempts: readonly PreparationAttempt[]
+): string | null {
+  for (let index = attempts.length - 1; index >= 0; index -= 1) {
+    const attempt = attempts[index];
+    if (attempt?.status === 'failed' && attempt.safeError) {
+      return attempt.safeError;
+    }
+  }
+  return null;
+}
 
 /**
  * Counts pending messages that are still in flight. A terminal delivery

@@ -1,11 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  getAgentsListBottomInset,
-  getEmptyStateFullHeight,
-  getEmptyStatePresentation,
-  SESSION_ROW_PITCH,
-} from '@/lib/agents-bottom-chrome';
+import { getEmptyStateFullHeight, getEmptyStatePresentation } from '@/lib/agents-bottom-chrome';
 
 // The 420dp-tall Android landscape window: the chrome above the body ends at
 // ~240dp, so the body keeps ~180dp and the full tab bar (81dp) + FAB band
@@ -13,45 +8,10 @@ import {
 const SHORT_AVAILABLE = 180;
 const TAB_BAR = 81;
 const FAB_BAND = 72;
-const FULL_BAND = TAB_BAR + FAB_BAND;
 // The gap a scrolled-content surface reserves below the bar. The tabs layout
 // keeps it content-only, but a surface that did reserve it must be measured
 // against that larger inset (see `getEmptyStatePresentation`).
 const TAB_GAP = 16;
-
-describe('getAgentsListBottomInset', () => {
-  it('reserves the whole band on the first, unmeasured frame', () => {
-    expect(
-      getAgentsListBottomInset({ available: null, tabBarHeight: TAB_BAR, fabBand: FAB_BAND })
-    ).toEqual({ frame: FULL_BAND, content: 0 });
-  });
-
-  it('keeps the whole band and puts nothing on the content in a tall window', () => {
-    expect(
-      getAgentsListBottomInset({ available: 500, tabBarHeight: TAB_BAR, fabBand: FAB_BAND })
-    ).toEqual({ frame: FULL_BAND, content: 0 });
-  });
-
-  it('clamps the frame to one row pitch in a short window and hands the rest to the content', () => {
-    const inset = getAgentsListBottomInset({
-      available: SHORT_AVAILABLE,
-      tabBarHeight: TAB_BAR,
-      fabBand: FAB_BAND,
-    });
-    // The viewport keeps exactly one row pitch above the reserve...
-    expect(inset.frame).toBe(SHORT_AVAILABLE - SESSION_ROW_PITCH);
-    // ...and the yielded part rides on the content so the last row can still
-    // be scrolled clear of the FAB.
-    expect(inset.content).toBe(FULL_BAND - inset.frame);
-    expect(inset.frame + inset.content).toBe(FULL_BAND);
-  });
-
-  it('keeps the tab bar as a hard clearance when the window is shorter than the bar alone', () => {
-    expect(
-      getAgentsListBottomInset({ available: 40, tabBarHeight: TAB_BAR, fabBand: FAB_BAND })
-    ).toEqual({ frame: TAB_BAR, content: FAB_BAND });
-  });
-});
 
 describe('getEmptyStateFullHeight', () => {
   it('builds the state from the app’s 14pt rem, not a 16pt one', () => {

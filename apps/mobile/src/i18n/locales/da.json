@@ -241,6 +241,7 @@
     "addPasskey": "Tilføj en adgangsnøgle",
     "passkeyDefaultName": "Adgangsnøgle",
     "passkeyAddedOn": "Tilføjet {{date}}",
+    "passkeyLastUsedOn": "Sidst brugt {{date}}",
     "passkeyAdded": "Adgangsnøgle tilføjet.",
     "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
     "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",

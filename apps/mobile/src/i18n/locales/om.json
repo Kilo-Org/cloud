@@ -241,6 +241,7 @@
     "addPasskey": "Furtuu seenii dabali",
     "passkeyDefaultName": "Furtuu seenii",
     "passkeyAddedOn": "{{date}} dabalaman",
+    "passkeyLastUsedOn": "Yeroo dhumaa itti fayyadame {{date}}",
     "passkeyAdded": "Furtuu seenii dabalaman.",
     "passkeyAddFailed": "Furtuu seenii dabaluun hin danda'amne. Irra deebi'ii yaali.",
     "passkeyAddUnsupported": "Meeshaan kun furtuu seenii uumuu hin danda'u.",

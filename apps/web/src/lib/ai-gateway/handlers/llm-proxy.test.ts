@@ -1738,6 +1738,6 @@ describe('auto-routing shadow classifier', () => {
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
     );
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
   });
 });

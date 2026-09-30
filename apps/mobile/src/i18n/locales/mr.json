@@ -241,6 +241,7 @@
     "addPasskey": "पासकी जोडा",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} रोजी जोडले",
+    "passkeyLastUsedOn": "शेवटचा वापर {{date}}",
     "passkeyAdded": "पासकी जोडली.",
     "passkeyAddFailed": "पासकी जोडता आली नाही. पुन्हा प्रयत्न करा.",
     "passkeyAddUnsupported": "हे डिव्हाइस पासकी तयार करू शकत नाही.",

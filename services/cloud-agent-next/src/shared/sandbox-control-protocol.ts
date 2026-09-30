@@ -510,6 +510,7 @@ export const sessionAttachPayloadSchema = z
       .strict()
       .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z

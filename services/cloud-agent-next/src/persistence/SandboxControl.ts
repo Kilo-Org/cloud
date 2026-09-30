@@ -1225,14 +1225,41 @@ export class SandboxControl extends DurableObject<Env> {
         admission: 'not-admitted',
       });
     }
-    if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
-      const payload = parseOperationPayload(input.operation, input.payload);
+    let outbound = input;
+    if (input.operation === 'session.attach') {
+      const parsed = parseOperationPayload(input.operation, input.payload);
+      if (!parsed.ok) throw new Error(parsed.error.message);
+      const attach = sessionAttachPayloadSchema.parse(parsed.payload);
+      if (attach.mcp && this.socketHandler.supportsMcpServers?.() !== true) {
+        throw new ControlRequestError({
+          code: 'protocol_error',
+          message: 'Sandbox wrapper does not support profile MCP servers',
+          retryable: false,
+          admission: 'not-admitted',
+        });
+      }
+      outbound = {
+        ...input,
+        payload: {
+          ...adaptSessionAttachPayloadForWrapper(
+            attach,
+            this.socketHandler.supportsWorkingBranches?.() === true,
+            this.socketHandler.supportsGitAuthor?.() === true
+          ),
+          ...(this.supportsNativeRuntimeIdCapture()
+            ? { captureNativeRuntimeId: true as const }
+            : {}),
+        },
+      };
+    }
+    if (outbound.operation === 'session.attach' || outbound.operation === 'session.prompt') {
+      const payload = parseOperationPayload(outbound.operation, outbound.payload);
       if (!payload.ok) throw new Error(payload.error.message);
-      const attach =
-        input.operation === 'session.attach'
+      const parsedAttach =
+        outbound.operation === 'session.attach'
           ? sessionAttachPayloadSchema.parse(payload.payload)
           : undefined;
-      if (attach?.runtimeIsolation === 'per-session') {
+      if (parsedAttach?.runtimeIsolation === 'per-session') {
         if (runtime.runtimeIsolation !== true) {
           throw new Error('Sandbox wrapper does not support per-session runtime isolation');
         }

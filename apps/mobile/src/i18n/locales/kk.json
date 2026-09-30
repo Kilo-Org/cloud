@@ -241,6 +241,7 @@
     "addPasskey": "Кіру кілтін қосу",
     "passkeyDefaultName": "Кіру кілті",
     "passkeyAddedOn": "{{date}} қосылды",
+    "passkeyLastUsedOn": "Соңғы рет пайдаланылды {{date}}",
     "passkeyAdded": "Кіру кілті қосылды.",
     "passkeyAddFailed": "Кіру кілтін қосу мүмкін болмады. Қайталап көріңіз.",
     "passkeyAddUnsupported": "Бұл құрылғы кіру кілттерін жасай алмайды.",

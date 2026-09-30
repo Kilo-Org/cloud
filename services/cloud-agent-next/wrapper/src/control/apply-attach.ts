@@ -415,7 +415,8 @@ async function executeSessionAttach(
       deps.canRefreshCredentials,
       attach.runtimeIsolation,
       deps.onMutation,
-      deps.onCleanupTarget
+      deps.onCleanupTarget,
+      attach.mcp
     );
     const signal = AbortSignal.any([taskSignal, attachment.signal]);
     const runtime = await withTimeoutAndAbort(attachment.ready, {

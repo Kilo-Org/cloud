@@ -1,11 +1,18 @@
 import { describe, expect, it } from 'vitest';
+import { generateKeyPairSync } from 'node:crypto';
+import { encryptWithPublicKey } from '@kilocode/encryption';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../shared/runtime-environment.js';
+import { sessionAttachPayloadSchema } from '../shared/sandbox-control-protocol.js';
 import { envVarsSchema } from '../types.js';
 import {
   adaptSessionAttachPayloadForWrapper,
   buildSessionAttachPayload,
 } from './attach-payload.js';
+
+const mcpKeyPair = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const mcpPublicKey = mcpKeyPair.publicKey.export({ type: 'pkcs1', format: 'pem' }).toString();
+const mcpPrivateKey = mcpKeyPair.privateKey.export({ type: 'pkcs1', format: 'pem' }).toString();
 
 describe('buildSessionAttachPayload', () => {
   it('packs directory, git clone, branch, snapshot identity, and session env', () => {
@@ -57,6 +64,129 @@ describe('buildSessionAttachPayload', () => {
       setupCommands: ['pnpm install'],
       preparation: { attemptId: 'att_1', triggerMessageId: 'msg_1' },
     });
+  });
+
+  it('materializes profile MCP servers for ordinary Bitbucket sessions before attach', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+      },
+      auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
+      agent: { mode: 'code', model: 'kilo/test' },
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/demo.git',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      },
+      profile: {
+        mcpServers: {
+          local: {
+            type: 'local',
+            command: ['npx', 'local-mcp'],
+            environment: {
+              API_TOKEN: encryptWithPublicKey('local-secret', mcpPublicKey),
+            },
+          },
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: {
+              Authorization: encryptWithPublicKey('Bearer remote-secret', mcpPublicKey),
+            },
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(buildSessionAttachPayload(metadata, undefined, mcpPrivateKey).mcp).toEqual({
+      local: {
+        type: 'local',
+        command: ['npx', 'local-mcp'],
+        environment: { API_TOKEN: 'local-secret' },
+      },
+      remote: {
+        type: 'remote',
+        url: 'https://mcp.example.test/connect',
+        headers: { Authorization: 'Bearer remote-secret' },
+      },
+    });
+  });
+
+  it('omits encrypted local and remote MCP servers for read-only Bitbucket reviews', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+        orgId: '123e4567-e89b-12d3-a456-426614174099',
+        createdOnPlatform: 'code-review',
+      },
+      auth: { kiloSessionId: 'kilo_1', kilocodeToken: 'cap_1' },
+      agent: { mode: 'code', model: 'kilo/test' },
+      repository: {
+        type: 'bitbucket',
+        url: 'https://bitbucket.org/acme/demo.git',
+        workspaceUuid: '123e4567-e89b-12d3-a456-426614174020',
+        repositoryUuid: '123e4567-e89b-12d3-a456-426614174021',
+      },
+      callback: {
+        target: {
+          url: 'https://kilo.example/api/internal/code-review-status/review_123?attemptId=attempt-1',
+        },
+      },
+      profile: {
+        mcpServers: {
+          local: {
+            type: 'local',
+            command: ['npx', 'local-mcp'],
+            environment: {
+              API_TOKEN: encryptWithPublicKey('local-secret', mcpPublicKey),
+            },
+          },
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: {
+              Authorization: encryptWithPublicKey('Bearer remote-secret', mcpPublicKey),
+            },
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(buildSessionAttachPayload(metadata)).not.toHaveProperty('mcp');
+  });
+
+  it('fails closed when an encrypted MCP value has no worker private key', () => {
+    const metadata = parseSessionMetadata({
+      metadataSchemaVersion: 2,
+      identity: {
+        sessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        userId: 'user-1',
+      },
+      auth: { kiloSessionId: 'kilo_1' },
+      profile: {
+        mcpServers: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: {
+              Authorization: encryptWithPublicKey('Bearer remote-secret', mcpPublicKey),
+            },
+          },
+        },
+      },
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+
+    expect(() => buildSessionAttachPayload(metadata)).toThrow(
+      'MCP server "remote" headers cannot be decrypted because the worker decryption key is unavailable'
+    );
   });
 
   it('marks a generated workspace branch as a working branch', () => {

@@ -14,8 +14,8 @@ import { getScheduledSeatDecrease } from '@/components/subscriptions/seats/sched
 import {
   getMostRecentSeatPurchase,
   getMostRecentEndedSeatPurchase,
-  getOrganizationSeatUsage,
-} from '@/lib/organizations/organization-seats';
+} from '@/lib/organizations/organization-seat-purchases';
+import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organization_seats_purchases, type OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { and, eq, desc, ne } from 'drizzle-orm';

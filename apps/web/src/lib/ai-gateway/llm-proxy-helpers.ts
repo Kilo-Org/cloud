@@ -15,10 +15,7 @@ import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@/lib/debugUtils';
-import type {
-  OrganizationSettings,
-  OrganizationPlan,
-} from '@/lib/organizations/organization-types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
@@ -28,7 +25,6 @@ import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { toMicrodollars } from '@/lib/microdollars';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
@@ -586,21 +582,11 @@ export async function captureProxyError(params: {
 // Shared Helper Functions
 // ============================================================================
 
-export type OrganizationRestrictionResult = {
-  error: NextResponse | null;
-  providerConfig?: OpenRouterProviderConfig;
-};
-
 /**
- * Checks organization-level restrictions for model and provider access.
- *
- * Provider allow list and model deny list restrictions only apply to Enterprise plans.
- * Data collection settings apply to all organization plans.
- *
- * @param params.modelId - The model ID being requested
- * @param params.settings - Organization settings (may be undefined for non-org users)
- * @param params.organizationPlan - The organization's plan type (undefined for non-org users)
- * @returns Object with error response (if blocked) and provider config to apply
+ * The organization's data collection setting as an upstream provider config.
+ * Enterprise model and provider restrictions are not applied here: the member
+ * model-access decision enforces them, including group grants that extend the
+ * organization baseline.
  */
 export function checkOrganizationModelRestrictions(params: {
   modelId: string;

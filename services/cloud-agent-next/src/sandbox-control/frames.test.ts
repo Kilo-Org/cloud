@@ -376,6 +376,243 @@ describe('sandbox control frames', () => {
     ).toBe(true);
   });
 
+  it.each([
+    [
+      'fractional timeout',
+      { mcp: { server: { type: 'local', command: ['node'], timeout: 1.5 } } },
+      'MCP server timeout must be a positive integer no greater than 3600000 ms',
+    ],
+    [
+      'too many command arguments',
+      { mcp: { server: { type: 'local', command: Array.from({ length: 51 }, () => 'node') } } },
+      'MCP server commands must contain between 1 and 50 arguments',
+    ],
+    [
+      'oversized command argument',
+      { mcp: { server: { type: 'local', command: ['x'.repeat(8193)] } } },
+      'MCP server command arguments must not exceed 8192 characters',
+    ],
+    [
+      'oversized URL',
+      {
+        mcp: {
+          server: { type: 'remote', url: `https://${'a'.repeat(4084)}.test` },
+        },
+      },
+      'MCP server URLs must not exceed 4096 characters',
+    ],
+    [
+      'too many headers',
+      {
+        mcp: {
+          server: {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: Object.fromEntries(
+              Array.from({ length: 51 }, (_, index) => [`H${index}`, 'x'])
+            ),
+          },
+        },
+      },
+      'An MCP server can have at most 50 environment variables or headers',
+    ],
+    [
+      'oversized header name',
+      {
+        mcp: {
+          server: {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: { ['h'.repeat(257)]: 'x' },
+          },
+        },
+      },
+      'MCP server header names must be between 1 and 256 characters',
+    ],
+    [
+      'empty header name',
+      {
+        mcp: {
+          server: {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: { '': 'private-header-value' },
+          },
+        },
+      },
+      'MCP server header names must be between 1 and 256 characters',
+    ],
+    [
+      'oversized header value',
+      {
+        mcp: {
+          server: {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: { Authorization: 'x'.repeat(8193) },
+          },
+        },
+      },
+      'MCP server header values must not exceed 8192 characters',
+    ],
+    [
+      'too many environment entries',
+      {
+        mcp: {
+          server: {
+            type: 'local',
+            command: ['node'],
+            environment: Object.fromEntries(
+              Array.from({ length: 51 }, (_, index) => [`E${index}`, 'x'])
+            ),
+          },
+        },
+      },
+      'An MCP server can have at most 50 environment variables or headers',
+    ],
+    [
+      'oversized environment name',
+      {
+        mcp: {
+          server: {
+            type: 'local',
+            command: ['node'],
+            environment: { ['e'.repeat(257)]: 'x' },
+          },
+        },
+      },
+      'MCP server environment variable names must be between 1 and 256 characters',
+    ],
+    [
+      'empty environment name',
+      {
+        mcp: {
+          server: {
+            type: 'local',
+            command: ['node'],
+            environment: { '': 'private-environment-value' },
+          },
+        },
+      },
+      'MCP server environment variable names must be between 1 and 256 characters',
+    ],
+    [
+      'oversized environment value',
+      {
+        mcp: {
+          server: {
+            type: 'local',
+            command: ['node'],
+            environment: { TOKEN: 'x'.repeat(8193) },
+          },
+        },
+      },
+      'MCP server environment variable values must not exceed 8192 characters',
+    ],
+    [
+      'empty server name',
+      { mcp: { '': { type: 'local', command: ['node'] } } },
+      'MCP server names must be between 1 and 100 characters',
+    ],
+    [
+      'too many servers',
+      {
+        mcp: Object.fromEntries(
+          Array.from({ length: 21 }, (_, index) => [
+            `server${index}`,
+            { type: 'local', command: ['node'] },
+          ])
+        ),
+      },
+      'A session can have at most 20 MCP servers',
+    ],
+  ])('returns a safe MCP reason for %s', (_name, payload, reason) => {
+    expect(parseOperationPayload('session.attach', payload)).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: `Invalid session.attach payload: ${reason}` },
+    });
+  });
+
+  it('reports the serialized MCP byte limit without exposing configuration values', () => {
+    const payload = {
+      mcp: Object.fromEntries(
+        Array.from({ length: 20 }, (_, index) => [
+          `server${index}`,
+          {
+            type: 'remote',
+            url: 'https://mcp.example.test',
+            headers: { Authorization: 'encoded-secret-value'.repeat(256) },
+          },
+        ])
+      ),
+    };
+
+    expect(parseOperationPayload('session.attach', payload)).toEqual({
+      ok: false,
+      error: {
+        code: 'protocol_error',
+        message:
+          'Invalid session.attach payload: Serialized MCP configuration exceeds the 80 KiB limit',
+      },
+    });
+  });
+
+  it('does not expose MCP values, dynamic names, or unknown properties', () => {
+    const result = parseOperationPayload('session.attach', {
+      mcp: {
+        'server-secret-name': {
+          type: 'remote',
+          url: 'https://mcp.example.test/private-url',
+          headers: { 'Header-secret-name': 'ciphertext-secret-value' },
+          timeout: 1.5,
+          unknownSecretProperty: 'private-body',
+        },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'protocol_error',
+        message:
+          'Invalid session.attach payload: MCP server timeout must be a positive integer no greater than 3600000 ms',
+      },
+    });
+    if (result.ok) throw new Error('Expected MCP payload rejection');
+    for (const value of [
+      'server-secret-name',
+      'Header-secret-name',
+      'ciphertext-secret-value',
+      'private-url',
+      'unknownSecretProperty',
+      'private-body',
+    ]) {
+      expect(result.error.message).not.toContain(value);
+    }
+  });
+
+  it('does not expose unknown MCP fields or invent a limit reason for unrelated validation failures', () => {
+    for (const server of [
+      { type: 'local', command: ['node'], 'private-property-name': 'private-value' },
+      { type: 'remote', url: 'private-invalid-url' },
+      { type: 'local', command: 'private-invalid-command' },
+    ]) {
+      expect(
+        parseOperationPayload('session.attach', { mcp: { 'private-server-name': server } })
+      ).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid session.attach payload' },
+      });
+    }
+  });
+
+  it('keeps non-MCP session.attach failures generic', () => {
+    expect(parseOperationPayload('session.attach', { directory: '' })).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid session.attach payload' },
+    });
+  });
+
   it('preserves an opaque gateway model in prompt and command frames', () => {
     for (const turn of [
       { type: 'prompt', prompt: 'hello' },

@@ -50,8 +50,8 @@ const CONTROL_ERROR_OWN_FIELDS = Object.keys(controlErrorSchema.shape);
  * Own-field reads also preserve the non-enumerable own `Error.message`, which
  * copying enumerable keys would drop. An already-local error is returned
  * unchanged, and a malformed value is passed through for transport handling.
- * `rejectionReceived` is never reconstructed: it is only set when a wrapper
- * response frame was seen (`controlRequestResult`).
+ * `rejectionReceived` is never reconstructed from peer-thrown errors: only a
+ * response frame or a locally verified pre-dispatch validation failure sets it.
  */
 export function reconstructControlRequestError(error: unknown): unknown {
   if (error instanceof ControlRequestError) return error;

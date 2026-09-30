@@ -9,7 +9,7 @@ import {
   isGatewayAccountRateLimited,
 } from '@/lib/ai-gateway/gateway-account-rate-limit';
 import {
-  checkOrganizationModelRestrictions,
+  getOrganizationProviderPrivacy,
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
@@ -60,7 +60,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -68,12 +68,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
   }
 
-  const { error, providerConfig } = checkOrganizationModelRestrictions({
-    modelId: TYPESAFE_MODEL,
-    settings,
-    organizationPlan: plan,
-  });
-  if (error) return error;
+  const providerConfig = getOrganizationProviderPrivacy(settings);
   const effectivePrivacy = getEffectiveProviderPrivacy(
     parsed.data.provider,
     settings?.data_collection

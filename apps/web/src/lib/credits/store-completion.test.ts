@@ -460,7 +460,7 @@ describe('completeStoreCreditPurchase', () => {
           WHERE wait_event_type = 'Lock'
             AND ${holderPid} = ANY(pg_blocking_pids(pid))
         `);
-        if (waiting.rowCount > 0) {
+        if (waiting.rows.length > 0) {
           blocked = true;
           break;
         }

@@ -1,4 +1,4 @@
-import type { Purchase } from 'expo-iap';
+import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act } from '@/test/renderer';

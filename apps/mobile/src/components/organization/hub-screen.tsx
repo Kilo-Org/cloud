@@ -145,9 +145,12 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           <KvRow
             label={t('organization.hub.organizationSeats')}
             // `requireSeats` is the enforcement switch; total is the raw
-            // purchased capacity and can legitimately be zero.
+            // purchased capacity and can legitimately be zero. A brand-new org
+            // has members but no purchased seats, so rendering `used / 0` would
+            // show a used count above its own total. Only append the total when
+            // there is capacity to compare against (matching the admin table).
             value={
-              org.requireSeats
+              org.requireSeats && org.seatCount.total > 0
                 ? `${formatNumber(org.seatCount.used, i18n.language)} / ${formatNumber(
                     org.seatCount.total,
                     i18n.language

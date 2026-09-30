@@ -22,7 +22,11 @@ const MIN_REACH_DP = 44;
 /** One Tailwind spacing unit, in dp. */
 const SPACING_UNIT_DP = 4;
 
-const boundary = vi.hoisted(() => ({ role: 'owner' as string }));
+const boundary = vi.hoisted(() => ({
+  role: 'owner' as string,
+  requireSeats: false,
+  seatCount: { used: 1, total: 1 },
+}));
 const routerPush = vi.hoisted(() => vi.fn());
 
 vi.mock('expo-router', () => ({
@@ -42,8 +46,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       organizationId: 'org-1',
       organizationName: 'Acme',
       balance: 5_000_000,
-      requireSeats: false,
-      seatCount: { used: 1, total: 1 },
+      requireSeats: boundary.requireSeats,
+      seatCount: boundary.seatCount,
     },
     isResolving: false,
   }),
@@ -178,6 +182,8 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.requireSeats = false;
+  boundary.seatCount = { used: 1, total: 1 };
   routerPush.mockClear();
 });
 
@@ -254,6 +260,34 @@ describe('OrganizationHubScreen rename control', () => {
 
     expect(findRenameControl(renderer.root)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'KvRow').length).toBeGreaterThan(0);
+    unmount();
+  });
+
+  it('shows only the used count when a new org has members but no purchased seats', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 2, total: 0 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root.findAll(
+      node => String(node.type) === 'KvRow' && node.props.label === 'Organization seats'
+    );
+    expect(seats).toHaveLength(1);
+    expect(seats[0]?.props.value).toBe('2');
+    unmount();
+  });
+
+  it('shows used over total once seats have been purchased', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 2, total: 5 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root.findAll(
+      node => String(node.type) === 'KvRow' && node.props.label === 'Organization seats'
+    );
+    expect(seats).toHaveLength(1);
+    expect(seats[0]?.props.value).toBe('2 / 5');
     unmount();
   });
 });

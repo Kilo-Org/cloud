@@ -118,17 +118,14 @@ export function resetTerminalPurchaseRejections(): void {
 }
 
 /**
- * Codes that make this exact payload permanently unacceptable. A positive list on
- * purpose. `isTerminalTrpcCode` also holds `FORBIDDEN`, which is the account
- * mismatch this screen tells the user to fix and retry, and `UNAUTHORIZED`, which
- * describes the session rather than the payload. A purchase refused for either
- * reason is genuinely payable after the user acts, so it must stay in the queue.
+ * Match only receipt-verification failures. The router also uses BAD_REQUEST
+ * for account-token and account-state refusals, which can succeed after the
+ * user changes accounts. Unknown failures stay retryable.
  */
-const PAYLOAD_TERMINAL_TRPC_CODES = new Set(['BAD_REQUEST', 'UNPROCESSABLE_CONTENT']);
-
-function isPayloadTerminalTrpcCode(code: string | undefined): boolean {
-  return code !== undefined && PAYLOAD_TERMINAL_TRPC_CODES.has(code);
-}
+const TERMINAL_PURCHASE_MESSAGES = {
+  'We could not verify this App Store purchase. Please try again.': true,
+  'We could not verify this Google Play purchase. Please try again.': true,
+};
 
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
@@ -320,7 +317,11 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       }
       return { completed: true };
     } catch (error) {
-      if (isPayloadTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
+      // Only a message that names a defect in this payload is worth remembering:
+      // an account or session refusal is payable after the user acts, so it stays
+      // in the store queue and is posted again.
+      const refusalMessage = readTrpcErrorField(error, 'message') ?? '';
+      if (Object.hasOwn(TERMINAL_PURCHASE_MESSAGES, refusalMessage)) {
         terminallyRejectedPurchaseIds.add(getPurchaseCompletionId(purchase));
       }
       const message = getKiloPassPurchaseErrorMessage(

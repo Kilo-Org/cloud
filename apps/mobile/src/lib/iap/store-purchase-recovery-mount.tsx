@@ -51,28 +51,9 @@ async function withStoreDeadline<T>(work: Promise<T>, label: string): Promise<T>
   }
 }
 
-/** One store connection per app process, shared by every recovery pass. */
-let storeConnection: Promise<unknown> | null = null;
-
-/** Test seam: forget the memoised connection, so a test starts the process over. */
-export function resetStoreConnection(): void {
-  storeConnection = null;
-}
-
-async function connectStoreOnce(): Promise<void> {
-  storeConnection ??= watchConnection(initConnection());
-  try {
-    await storeConnection;
-  } catch (error) {
-    // A later pass retries: the store may refuse a connection while it starts,
-    // or may not answer at all.
-    storeConnection = null;
-    throw error;
-  }
-}
-
-async function watchConnection(connection: Promise<unknown>): Promise<void> {
-  await withStoreDeadline(connection, 'the store connection');
+/** Purchase screens close the global connection on unmount; each pass reconnects. */
+async function connectStore(): Promise<void> {
+  await withStoreDeadline(initConnection(), 'the store connection');
 }
 
 /**
@@ -236,7 +217,7 @@ export function StorePurchaseRecoveryMount(): null {
     }
     passInFlightRef.current = true;
     try {
-      await connectStoreOnce();
+      await connectStore();
       const pendingPurchases = await withStoreDeadline(
         fetchPendingStorePurchases(storefront),
         'the pending purchase lookup'

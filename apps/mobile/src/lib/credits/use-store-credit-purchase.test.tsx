@@ -13,6 +13,7 @@ import {
   isRecoverableCreditPurchase,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
+  resetTerminalPurchaseRejections,
 } from './use-store-credit-purchase';
 
 vi.mock('expo-iap', () => ({
@@ -33,6 +34,10 @@ const GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
   'Google Play purchase account token does not match the signed-in user.';
 const STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
   'This purchase is already linked to another Kilo account.';
+const STORE_PURCHASE_VERIFICATION_FAILED_MESSAGE =
+  'We could not verify this store purchase. Please try again.';
+const STORE_PURCHASE_REFUNDED_MESSAGE =
+  'This store purchase has been refunded, so Kilo cannot credit it.';
 
 const APPLE_PRODUCT_ID = 'credits.usd10.v1';
 const GOOGLE_PRODUCT_ID = 'credits_usd10';
@@ -86,6 +91,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
+  resetTerminalPurchaseRejections();
 });
 
 describe('createStoreCreditPurchaseActions.purchase', () => {
@@ -467,11 +473,14 @@ describe('createStoreCreditPurchaseActions.recoverPurchases', () => {
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
-  it('leaves a purchase the backend refuses as another account unfinished', async () => {
+  it('reposts a wrong-account refusal, so the owning account can complete it', async () => {
     const purchase = createPurchase();
     const completeAppStorePurchase = vi
       .fn()
-      .mockRejectedValue(new Error(APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE));
+      .mockRejectedValueOnce({
+        data: { code: 'FORBIDDEN', message: APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
     const finishTransaction = vi.fn();
     const showError = vi.fn();
     const actions = createActions({
@@ -482,12 +491,44 @@ describe('createStoreCreditPurchaseActions.recoverPurchases', () => {
       },
     });
 
-    const recovered = await actions.recoverPurchases([purchase]);
-
-    expect(recovered).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
     expect(finishTransaction).not.toHaveBeenCalled();
     // Background recovery is silent: the purchase stays in the store queue.
     expect(showError).not.toHaveBeenCalled();
+
+    // Another account refused this receipt, which is not a defect in it: the
+    // account that owns it still signs in and completes the same purchase.
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: true });
+  });
+
+  it.each([STORE_PURCHASE_VERIFICATION_FAILED_MESSAGE, STORE_PURCHASE_REFUNDED_MESSAGE])(
+    'does not post the receipt the backend refused with %s a second time',
+    async message => {
+      const purchase = createPurchase();
+      const completeAppStorePurchase = vi
+        .fn()
+        .mockRejectedValue({ data: { code: 'BAD_REQUEST', message } });
+      const actions = createActions({ completeAppStorePurchase });
+
+      expect(await actions.recoverPurchases([purchase])).toEqual([]);
+      expect(await actions.recoverPurchases([purchase])).toEqual([]);
+      expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('retries after a session error, which is not about the receipt', async () => {
+    const purchase = createPurchase();
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({ data: { code: 'UNAUTHORIZED', message: 'Not signed in' } })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
   });
 
   it('matches backend catalog ids, not the store-fetched list', async () => {

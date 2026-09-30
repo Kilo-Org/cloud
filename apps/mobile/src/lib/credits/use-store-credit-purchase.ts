@@ -5,6 +5,7 @@ import { ErrorCode, type Purchase } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type StoreCreditProduct } from './store-products';
 
 /**
@@ -132,6 +133,39 @@ type SharedPurchaseCompletion = {
 };
 
 const sharedPurchaseCompletions = new Map<string, SharedPurchaseCompletion>();
+
+/**
+ * Refusals that make this exact receipt permanently unacceptable. Matched by
+ * message, never shown, whatever code carries them.
+ *
+ * A positive list on purpose. The completion router
+ * (`apps/web/src/routers/credits-router.ts`) answers `BAD_REQUEST` for a receipt
+ * the store will never let succeed — a revoked or wrong-bundle Apple transaction,
+ * a Play purchase that is not in a purchased state — and for a receipt tied to a
+ * processed refund. It answers account failures — an account-token mismatch, a
+ * purchase already linked to another account — and session failures separately,
+ * and those name something the user can change, so they must stay in the queue:
+ * only the messages naming the receipt itself are remembered.
+ */
+const TERMINAL_PURCHASE_MESSAGES = {
+  'We could not verify this store purchase. Please try again.': true,
+  'This store purchase has been refunded, so Kilo cannot credit it.': true,
+};
+
+/**
+ * Purchases the backend terminally refused in this process. The store keeps an
+ * unfinished transaction until the app finishes it, so without this memory every
+ * later recovery pass posts a payload the backend already rejected. Deliberately
+ * in-memory: the next app launch retries once, so a server-side change is never
+ * ignored forever.
+ */
+const terminallyRejectedPurchaseIds = new Set<string>();
+
+/** Test seam: forget the recorded rejections, so a test starts the process over. */
+export function resetTerminalPurchaseRejections(): void {
+  terminallyRejectedPurchaseIds.clear();
+}
+
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 export function resetPurchaseErrorToastDedup() {
@@ -258,6 +292,13 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
           })
         : deps.completeAppStorePurchase({ signedTransactionJws: token }));
     } catch (error) {
+      // Only a message that names a defect in the receipt itself is worth
+      // remembering: an account or session refusal is payable after the user acts,
+      // so it stays in the store queue and is posted again.
+      const refusalMessage = readTrpcErrorField(error, 'message') ?? '';
+      if (Object.hasOwn(TERMINAL_PURCHASE_MESSAGES, refusalMessage)) {
+        terminallyRejectedPurchaseIds.add(getPurchaseCompletionId(purchase));
+      }
       return {
         completed: false,
         errorMessageKey: getStoreCreditPurchaseErrorMessageKey(error, deps.storefront),
@@ -348,25 +389,29 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     const creditPackGoogleProductIds =
       options.creditPackGoogleProductIds ?? deps.creditPackGoogleProductIds;
     // One completion per store transaction: a store that lists the same
-    // transaction twice must not be completed twice.
+    // transaction twice must not be completed twice. A payload the backend named
+    // as defective is skipped too: posting it again can never succeed, and the
+    // store keeps re-delivering it. The next app launch retries it once.
     const seenCompletionIds = new Set<string>();
-    const eligiblePurchases = purchases.filter(purchase => {
-      if (
-        !isRecoverableCreditPurchase(
-          purchase,
-          creditPackAppleProductIds,
-          creditPackGoogleProductIds
-        )
-      ) {
-        return false;
-      }
-      const id = getPurchaseCompletionId(purchase);
-      if (seenCompletionIds.has(id)) {
-        return false;
-      }
-      seenCompletionIds.add(id);
-      return true;
-    });
+    const eligiblePurchases = purchases
+      .filter(purchase => !terminallyRejectedPurchaseIds.has(getPurchaseCompletionId(purchase)))
+      .filter(purchase => {
+        if (
+          !isRecoverableCreditPurchase(
+            purchase,
+            creditPackAppleProductIds,
+            creditPackGoogleProductIds
+          )
+        ) {
+          return false;
+        }
+        const id = getPurchaseCompletionId(purchase);
+        if (seenCompletionIds.has(id)) {
+          return false;
+        }
+        seenCompletionIds.add(id);
+        return true;
+      });
 
     const recoveryResults = await Promise.all(
       eligiblePurchases.map(async purchase => ({

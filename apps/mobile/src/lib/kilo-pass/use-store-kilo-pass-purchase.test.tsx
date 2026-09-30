@@ -690,17 +690,38 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
   });
 
   it('does not post a purchase the backend terminally rejected a second time', async () => {
-    const completeAppStorePurchase = vi
-      .fn()
-      .mockRejectedValue({
-        data: { code: 'BAD_REQUEST', message: 'Apple subscription transaction has expired' },
-      });
+    const completeAppStorePurchase = vi.fn().mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'We could not verify this App Store purchase. Please try again.',
+      },
+    });
     const actions = createActions({ completeAppStorePurchase });
     const purchase = createPurchase();
 
     expect(await actions.recoverPurchases([purchase])).toEqual([]);
     expect(await actions.recoverPurchases([purchase])).toEqual([]);
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a Play purchase the backend terminally rejected a second time', async () => {
+    const purchase = createPurchase({ store: 'google', productId: 'kilopass_tier19' });
+    const completePlayPurchase = vi.fn().mockRejectedValue({
+      data: {
+        code: 'BAD_REQUEST',
+        message: 'We could not verify this Google Play purchase. Please try again.',
+      },
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(1);
   });
 
   it('retries after a session error, which is not about the payload', async () => {
@@ -717,19 +738,48 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
   });
 
-  it('retries after the account mismatch, which the user can fix', async () => {
+  it('reposts a wrong-account refusal, so the owning account can complete it', async () => {
     const completeAppStorePurchase = vi
       .fn()
-      .mockRejectedValueOnce({ data: { code: 'FORBIDDEN', message: 'Account mismatch' } })
+      .mockRejectedValueOnce({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'App Store purchase account token does not match the signed-in user.',
+        },
+      })
       .mockResolvedValue({ alreadyProcessed: false });
     const finishTransaction = vi.fn();
     const actions = createActions({ completeAppStorePurchase, finishTransaction });
     const purchase = createPurchase();
 
+    // The account-token assertion keeps the shared assertion's default code, so
+    // the refusal is a `BAD_REQUEST` that names the account rather than the
+    // payload. Remembering it would freeze the transaction for the account that
+    // owns it, which is the account that signs in next.
     expect(await actions.recoverPurchases([purchase])).toEqual([]);
     expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
     expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+  });
+
+  it('reposts a refusal the account can outgrow', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'This App Store purchase cannot be used for your account.',
+        },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    // An account-domain refusal (an already-owned transaction, a subscription
+    // state) is not about the payload, so it must not be frozen for the process.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
   });
 
   it('invalidates Kilo Pass state once after recovering multiple purchases', async () => {
@@ -865,7 +915,10 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const completeAppStorePurchase = vi
       .fn()
       .mockRejectedValueOnce({
-        data: { code: 'BAD_REQUEST', message: 'Apple subscription transaction has expired' },
+        data: {
+          code: 'BAD_REQUEST',
+          message: 'We could not verify this App Store purchase. Please try again.',
+        },
       })
       .mockResolvedValue({ alreadyProcessed: false });
     const finishTransaction = vi.fn();

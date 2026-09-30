@@ -11,11 +11,13 @@ export const KILO_PASS_PRODUCT_ID = 'kilopass.pro.monthly';
 
 const mockedIap = vi.hoisted(() => ({
   finishTransaction: vi.fn(),
+  getAvailablePurchases: vi.fn(),
   getPendingTransactionsIOS: vi.fn(),
   initConnection: vi.fn(),
 }));
 
 const mockedLifecycle = vi.hoisted(() => ({ isActive: true }));
+const mockedPlatform = vi.hoisted(() => ({ OS: 'ios' }));
 const mockedAuth = vi.hoisted((): { token: string | null } => ({ token: 'session-token' }));
 
 const mockedQuery = vi.hoisted(
@@ -30,7 +32,7 @@ const mockedQuery = vi.hoisted(
   })
 );
 
-export { mockedIap, mockedLifecycle, mockedAuth, mockedQuery };
+export { mockedIap, mockedLifecycle, mockedAuth, mockedQuery, mockedPlatform };
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
@@ -39,13 +41,14 @@ vi.mock('expo-iap', () => ({
     UserCancelled: 'user-cancelled',
   },
   finishTransaction: mockedIap.finishTransaction,
+  getAvailablePurchases: mockedIap.getAvailablePurchases,
   getPendingTransactionsIOS: mockedIap.getPendingTransactionsIOS,
   initConnection: mockedIap.initConnection,
   requestPurchase: vi.fn(),
   restorePurchases: vi.fn(),
 }));
 
-vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
+vi.mock('react-native', () => ({ Platform: mockedPlatform }));
 
 vi.mock('@/lib/hooks/use-app-lifecycle', () => ({
   useAppLifecycle: () => ({ isActive: mockedLifecycle.isActive }),

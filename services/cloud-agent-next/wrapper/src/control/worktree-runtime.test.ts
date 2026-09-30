@@ -575,6 +575,18 @@ describe('worktree Kilo environments', () => {
     }
   );
 
+  it('forces background subagents off regardless of an attachment or inherited value', () => {
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/a',
+      auth,
+      { KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true' },
+      { ...inherited, KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true' }
+    );
+
+    expect(env.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+  });
+
   it('retains only the four trusted Bitbucket metadata keys from the attachment', () => {
     const env = buildWorktreeKiloEnvironment(
       '/workspace/a',

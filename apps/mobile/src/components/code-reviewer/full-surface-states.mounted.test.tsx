@@ -178,9 +178,9 @@ describe('Recent review bodies', () => {
     const { renderer, unmount } = await renderWithProviders(
       createElement(ReviewListScreen, { scope: 'personal' })
     );
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'Skeleton').length
-    ).toBeGreaterThan(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton').length).toBeGreaterThan(
+      0
+    );
     expect(renderer.root.findAll(node => String(node.type) === 'FlatList')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);

@@ -69,6 +69,28 @@ type SessionContextSheetProps = {
 const SHEET_RING_SIZE = 96;
 const SHEET_RING_STROKE = 8;
 
+/**
+ * Stable value for the transcript-derived breakdown while the sheet is hidden.
+ * The sheet stays mounted after its first open so `visible` can animate
+ * true → false, and every streaming transcript update re-renders it; skipping
+ * the per-message aggregation until it is shown keeps that work off the JS
+ * thread while the sheet is closed.
+ */
+const EMPTY_SESSION_COST_BREAKDOWN: SessionCostBreakdown = {
+  totals: {
+    input: 0,
+    output: 0,
+    reasoning: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    total: 0,
+    cacheRatePct: null,
+  },
+  models: [],
+  attributedCostUsd: 0,
+  subagentCostUsd: 0,
+};
+
 const TONE_TEXT_CLASS = {
   destructive: 'text-destructive',
   warning: 'text-warn',
@@ -192,10 +214,18 @@ export function SessionContextSheet({
   const content = getContextSheetContent(info, totalCostMicrodollars);
   const tone = getContextTone(info?.percentage);
   const arcFraction = getArcFraction(info?.percentage);
-  const breakdown = useMemo<SessionCostBreakdown>(
-    () => getSessionCostBreakdown(messages, breakdownCostUsd),
-    [messages, breakdownCostUsd]
-  );
+  // Keep the last shown breakdown while hidden so the closing animation does
+  // not flash zeros; only re-aggregate the transcript once the sheet is
+  // visible again.
+  const breakdownWhileHidden = useRef<SessionCostBreakdown>(EMPTY_SESSION_COST_BREAKDOWN);
+  const breakdown = useMemo<SessionCostBreakdown>(() => {
+    if (!visible) {
+      return breakdownWhileHidden.current;
+    }
+    const next = getSessionCostBreakdown(messages, breakdownCostUsd);
+    breakdownWhileHidden.current = next;
+    return next;
+  }, [visible, messages, breakdownCostUsd]);
   // Render-only filter: totals/subagent residual still use the full breakdown.
   const visibleModels = useMemo(
     () => getVisibleSessionCostModels(breakdown.models),

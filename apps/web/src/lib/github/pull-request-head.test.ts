@@ -42,6 +42,13 @@ describe('parseGitHubRepositoryCoordinates', () => {
   ])('rejects %p', fullName => {
     expect(parseGitHubRepositoryCoordinates(fullName)).toBeNull();
   });
+
+  it.each(['owner/.', 'owner/..', './repo', '../repo', './..'])(
+    'rejects %p, because relative segments URL-normalize out of a GitHub request path',
+    fullName => {
+      expect(parseGitHubRepositoryCoordinates(fullName)).toBeNull();
+    }
+  );
 });
 
 describe('buildGitHubPullRequestHead', () => {

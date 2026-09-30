@@ -19,7 +19,9 @@ export type GitHubPullRequestHead = {
 };
 
 const OWNER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
-const REPO_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
+// `.` and `..` match the character class but URL-normalize away when interpolated into a
+// request path, so they must be excluded explicitly.
+const REPO_PATTERN = /^(?!\.{1,2}$)[A-Za-z0-9._-]{1,100}$/;
 
 export function parseGitHubRepositoryCoordinates(
   fullName: string

@@ -19,7 +19,7 @@ const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 // height and line height. Like the single-line shape it sits before the
 // caller's `className`, so a caller's own `px-*`/`py-*` still wins through
 // tailwind-merge.
-const INPUT_MULTILINE_INSET_CLASS = 'px-3 py-2.5';
+export const INPUT_MULTILINE_INSET_CLASS = 'px-3 py-2.5';
 
 /** The one single-line box. Every single-line field renders this. */
 export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT_CLASS}`;

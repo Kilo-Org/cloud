@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { type TextInputProps } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Input, INPUT_BOX_CLASS } from './input';
+import { Input, INPUT_BOX_CLASS, INPUT_MULTILINE_INSET_CLASS } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
@@ -131,10 +131,18 @@ describe('Input single-line box', () => {
 });
 
 describe('Input multiline', () => {
+  it('keeps the shared inset free of a height floor and a fixed line height', () => {
+    // The inset is the single source of the multiline padding; a caller's own
+    // `px-*`/`py-*` overrides it through tailwind-merge. It must never carry
+    // `min-h-*`/`leading-*`, so the field's height and line box stay the
+    // caller's (the profile description keeps `min-h-20 leading-5`).
+    expect(INPUT_MULTILINE_INSET_CLASS).toBe('px-3 py-2.5');
+  });
+
   it('applies the shared inset while keeping the caller line height and vertical alignment', () => {
     const input = mountInput({ multiline: true, className: 'leading-6', textAlignVertical: 'top' });
 
-    expect(input.props.className).toBe('px-3 py-2.5 leading-6');
+    expect(input.props.className).toBe(`${INPUT_MULTILINE_INSET_CLASS} leading-6`);
     // No single-line box leaks into a multiline field: no min-height floor and
     // no re-asserted line height from `INPUT_BOX_CLASS`.
     expect(input.props.className).not.toContain('min-h-[44px]');
@@ -154,7 +162,7 @@ describe('Input multiline', () => {
   it('does not force an alignment when the caller sets none', () => {
     const input = mountInput({ multiline: true });
 
-    expect(input.props.className).toBe('px-3 py-2.5');
+    expect(input.props.className).toBe(INPUT_MULTILINE_INSET_CLASS);
     expect(input.props.className).not.toContain('min-h-[44px]');
     expect(input.props.className).not.toContain('leading-[normal]');
     expect(input.props.textAlignVertical).toBeUndefined();

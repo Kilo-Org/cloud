@@ -196,6 +196,38 @@ describe('FormField shared single-line box', () => {
   });
 });
 
+describe('FormField multiline inset', () => {
+  it('insets the profile description content while keeping the caller box and top alignment', () => {
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('profiles.descriptionLabel'),
+          placeholder: i18n.t('profiles.descriptionPlaceholder'),
+          multiline: true,
+          textAlignVertical: 'top',
+          className: 'min-h-20 leading-5',
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const input = renderer.root.findByType('TextInput');
+    // The field's chrome still comes from FormField; the shared inset supplies
+    // the padding the profile description's value and placeholder need, and the
+    // caller's own box (`min-h-20 leading-5`) survives the merge. The single
+    // line floor and line height never leak into a multiline field.
+    expect(input.props.className).toContain('px-3');
+    expect(input.props.className).toContain('py-2.5');
+    expect(input.props.className).toContain('min-h-20');
+    expect(input.props.className).toContain('leading-5');
+    expect(input.props.className).not.toContain('min-h-[44px]');
+    expect(input.props.className).not.toContain('leading-[normal]');
+    expect(input.props.textAlignVertical).toBe('top');
+    expect(input.props.placeholder).toBe(i18n.t('profiles.descriptionPlaceholder'));
+  });
+});
+
 describe('FormField direction-aware content alignment', () => {
   function mountInput(props: { style?: { textAlign: 'center' }; textAlign?: 'center' } = {}) {
     act(() => {

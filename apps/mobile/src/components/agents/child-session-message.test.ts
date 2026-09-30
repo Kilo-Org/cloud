@@ -14,13 +14,13 @@ import {
 import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
 import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
 import { ChildSessionModelLabel } from './child-session-model-label';
 import { MessageErrorBoundary } from './message-error-boundary';
 
-import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -304,8 +304,13 @@ describe('ChildSessionMessage completion', () => {
         await Promise.resolve();
       });
 
-      expect(texts()).toEqual(['General', 'child task', 'Test Model', 'completed']);
-      expect(button().props.accessibilityLabel).toContain('completed');
+      expect(texts()).toEqual([
+        'General',
+        'child task',
+        'Test Model',
+        i18n.t('codeReviewer.status.completed'),
+      ]);
+      expect(button().props.accessibilityLabel).toContain(i18n.t('codeReviewer.status.completed'));
       expect(button().props.accessibilityLabel).not.toContain('Considering next steps');
       expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(0);
       const { onPress } = button().props as { onPress: () => void };

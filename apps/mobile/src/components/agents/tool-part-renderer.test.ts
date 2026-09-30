@@ -7,10 +7,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 import { renderWithProviders } from '@/test/render-with-providers';
-
-import '@/i18n';
 
 import {
   BashToolCard,
@@ -30,6 +29,13 @@ import { SuggestToolCard } from './suggest-tool-card';
 import { ChildSessionMessage, ChildSessionSection } from './child-session-section';
 import { getChildSessionActivityLabel, getChildSessionCardState } from './child-session-card-state';
 import { ToolPartRenderer } from './tool-part-renderer';
+
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'codeReviewer.status.running',
+  completed: 'codeReviewer.status.completed',
+  error: 'common.failed',
+} as const;
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('react-native-reanimated', () => ({
@@ -282,6 +288,7 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
         const activeActivity = canOpen ? activity : 'Waiting for activity';
         const expectedActivity = active ? activeActivity : '';
         const modelLabel = childMessages.length > 0 ? 'Test Model' : '';
+        const statusLabel = i18n.t(STATUS_LABEL_KEY[status]);
         const projected = getChildSessionCardState(part, childMessages);
         expect(getChildSessionActivityLabel(projected.latestActivity)).toBe(expectedActivity);
 
@@ -305,13 +312,13 @@ describe.each(['top-level', 'nested'] as const)('%s child-card initial history',
         const { renderer, unmount } = await renderWithProviders(element);
         try {
           expect(textContent(renderer.root)).toBe(
-            `Generalchild task${modelLabel}${expectedActivity}${status}`
+            `Generalchild task${modelLabel}${expectedActivity}${statusLabel}`
           );
           expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(active ? 1 : 0);
           const button = renderer.root.findByType(Pressable);
           expect(button.props.accessibilityRole).toBe('button');
           expect(button.props.accessibilityLabel).toContain('General, child task');
-          expect(button.props.accessibilityLabel).toContain(status);
+          expect(button.props.accessibilityLabel).toContain(statusLabel);
           if (modelLabel) {
             expect(button.props.accessibilityLabel).toContain(modelLabel);
           }

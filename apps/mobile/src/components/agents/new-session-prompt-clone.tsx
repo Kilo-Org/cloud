@@ -71,7 +71,6 @@ export function NewSessionPromptClone({
       customOptions={customOptions}
       modelLocked={modelLocked}
       modelLockLabel={modelLockLabel}
-      wrap
       className="rounded-2xl border border-border bg-card px-3 py-3"
     />
   );

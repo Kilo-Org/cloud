@@ -796,7 +796,7 @@ export function useAgentAttachmentUpload(
           localUri: part.url,
           localFileOwned: false,
           status: 'uploaded',
-          progress: null,
+          progress: 1,
         };
       });
       // Restore replaces the current chips: the restored set is the canceled

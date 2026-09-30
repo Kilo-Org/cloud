@@ -32,12 +32,6 @@ type ChatToolbarProps = {
   /** Agent name shown in the locked model chip's accessibility label. */
   modelLockLabel?: string;
   className?: string;
-  /**
-   * Accepted for the new-session and clone callers that used to allow a second
-   * chip row (#6349); superseded. The toolbar now stays on one row everywhere —
-   * a long model name truncates inside its chip — so this prop has no effect.
-   */
-  wrap?: boolean;
   /** Forwards the row's layout, e.g. to measure the toolbar height. */
   onLayout?: (event: LayoutChangeEvent) => void;
 };

@@ -34,6 +34,18 @@ import { useOptionalSessionManager } from './session-manager-context';
 
 const MAX_NESTING_DEPTH = 5;
 
+/**
+ * Localized label for the card's status badge and accessibility announcement.
+ * Reuses the shared status copy rather than spelling the raw SDK enum, so a
+ * non-English reader never sees `pending`/`running`/`completed`/`error`.
+ */
+const STATUS_LABEL_KEY = {
+  pending: 'common.pending',
+  running: 'codeReviewer.status.running',
+  completed: 'codeReviewer.status.completed',
+  error: 'common.failed',
+} satisfies Record<ToolPart['state']['status'], string>;
+
 export type RenderPartFn = (props: {
   part: Part;
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -65,6 +77,7 @@ export function ChildSessionSection({
   const modelLabel = getChildSessionModelLabel(childMessages, modelOptions ?? []);
 
   const { status } = part.state;
+  const statusLabel = t(STATUS_LABEL_KEY[status]);
   const isRunning = status === 'running' || status === 'pending';
   const sessionId = getTaskToolSessionId(part);
 
@@ -91,7 +104,7 @@ export function ChildSessionSection({
           taskName: shownTaskName,
           modelLabel: modelLabel ? `, ${modelLabel}` : '',
           latestActivityLabel,
-          status,
+          status: statusLabel,
         })}
         accessibilityHint={sessionId ? t('agentChat.childSession.openHint') : undefined}
         accessibilityState={{ disabled: !sessionId }}
@@ -129,7 +142,7 @@ export function ChildSessionSection({
           ) : null}
         </View>
 
-        <StatusBadge status={status} />
+        <StatusBadge status={status} label={statusLabel} />
       </Pressable>
     </Animated.View>
   );
@@ -279,13 +292,13 @@ function getStatusBorderColor(status: string, colors: ThemeColors): string {
   return colors.info;
 }
 
-function StatusBadge({ status }: Readonly<{ status: string }>) {
+function StatusBadge({ status, label }: Readonly<{ status: string; label: string }>) {
   const bgClass = getStatusBgClass(status);
   const textClass = getStatusTextClass(status);
 
   return (
     <View className={`rounded px-1.5 py-0.5 ${bgClass}`}>
-      <Text className={`text-xs ${textClass}`}>{status}</Text>
+      <Text className={`text-xs ${textClass}`}>{label}</Text>
     </View>
   );
 }

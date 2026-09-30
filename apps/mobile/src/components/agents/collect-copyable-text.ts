@@ -1,31 +1,12 @@
-import {
-  type Part,
-  type ReasoningPart,
-  type TextPart,
-  type ToolPart,
-} from '@kilocode/cloud-agent-sdk';
+import { type Part, type TextPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
 
 import { i18n } from '@/i18n';
+
+import { isReasoningPart, isSnapshotProgressPart, isTextPart, isToolPart } from './part-types';
 
 type CopyableMessage = {
   parts: readonly Part[];
 };
-
-function isTextPart(part: Part): part is TextPart {
-  return part.type === 'text';
-}
-
-function isReasoningPart(part: Part): part is ReasoningPart {
-  return part.type === 'reasoning';
-}
-
-function isToolPart(part: Part): part is ToolPart {
-  return part.type === 'tool';
-}
-
-function isSnapshotProgressText(part: TextPart): boolean {
-  return part.synthetic === true && part.text.includes('Initializing snapshot');
-}
 
 function formatToolInput(input: Record<string, unknown>): string {
   const keys = Object.keys(input);
@@ -78,7 +59,7 @@ export function collectCopyableText(message: CopyableMessage): string {
   return message.parts
     .map(part => {
       if (isTextPart(part)) {
-        return isSnapshotProgressText(part) ? '' : part.text;
+        return isSnapshotProgressPart(part) ? '' : part.text;
       }
       if (isReasoningPart(part)) {
         return part.text;
@@ -104,7 +85,7 @@ export function collectCopyableText(message: CopyableMessage): string {
 export function hasCopyableText(message: CopyableMessage): boolean {
   return message.parts.some(part => {
     if (isTextPart(part)) {
-      return !isSnapshotProgressText(part) && part.text.length > 0;
+      return !isSnapshotProgressPart(part) && part.text.length > 0;
     }
     if (isReasoningPart(part)) {
       return part.text.length > 0;

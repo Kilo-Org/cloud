@@ -11,8 +11,6 @@ import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
-import { type BlockingInteraction } from './agent-interaction-policy';
-
 type BlockingCardKind = 'question' | 'permission';
 
 type BlockingCardUiState = 'happy' | 'retryable' | 'non-retryable';
@@ -55,24 +53,6 @@ export type BlockingCardA11yDeps = {
   announce: (message: string) => void;
   focus: (ref: RefObject<Component | null>) => boolean;
 };
-
-/**
- * Resolve the presentation for a blocking interaction card, or `null` when
- * no card is mounted. The function is pure: callers pass the current
- * `blocking` interaction kind and the optional submission error.
- */
-export function getBlockingCardPresentation(input: {
-  blocking: BlockingInteraction;
-  submissionError: BlockingCardSubmissionError | null;
-}): BlockingCardPresentation | null {
-  if (input.blocking === 'none') {
-    return null;
-  }
-  return getBlockingCardPresentationForKind({
-    kind: input.blocking,
-    submissionError: input.submissionError,
-  });
-}
 
 /**
  * Non-null variant for use by the question/permission card components, which

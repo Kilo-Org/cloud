@@ -81,10 +81,12 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
 }));
 
 // The mounted OrganizationProvider resolves its default from this list; an
-// empty settled list keeps the card's own selection assertions unchanged.
+// empty settled list keeps the card's own selection assertions unchanged, and
+// a test can swap in memberships to exercise the stale-selection state.
+const organizationsList = vi.hoisted(() => ({ data: [] as { organizationId: string }[] }));
 vi.mock('@/lib/hooks/use-organizations-list', () => ({
   useOrganizationsList: () => ({
-    data: [],
+    data: organizationsList.data,
     isFetched: true,
     isFetching: false,
     isError: false,
@@ -238,6 +240,7 @@ beforeEach(() => {
   windowDims.width = 390;
   savedMetadata.clear();
   saveCompletion = undefined;
+  organizationsList.data = [];
   storage.read.mockReset().mockImplementation(async (key: string) => {
     await Promise.resolve();
     return savedMetadata.get(key) ?? null;
@@ -436,6 +439,26 @@ describe('CreditsCard balance state', () => {
 
     expect(refetchUserId).toHaveBeenCalledTimes(1);
     expect(getContextBalanceQueryFn).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
+  it('shows the unavailable state instead of a balance error for a stale selection', async () => {
+    // A persisted org that is no longer in the membership list: the card must
+    // not scope a balance query to the dead id (it would error and Retry would
+    // refetch the same dead id forever). It shows the app's shared state.
+    organizationsList.data = [{ organizationId: 'org-a' }];
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'missing-org');
+    currentUser.userId = 'user-1';
+
+    const { texts, unmount } = await mountCard();
+
+    await waitFor(() => texts().includes('Organization unavailable'));
+    expect(texts()).toContain('Organization unavailable');
+    expect(texts()).not.toContain('Failed to load balance. Tap to retry.');
+    // The org-scoped credits query is the one gated on the selected org id, so
+    // it proves the card never scopes work to the dead id.
+    expect(orgCreditBlocksQueryFn).not.toHaveBeenCalled();
 
     unmount();
   });

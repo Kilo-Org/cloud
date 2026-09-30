@@ -42,8 +42,14 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const narrow = isNarrowLayout(width);
   const { t, i18n } = useTranslation();
   const { openPicker, picker } = useContextPicker(orgs);
-  const { organizationId, error, isSaving, retry } = useOrganization();
+  const { organizationId, error, isSaving, retry, isOrganizationUnavailable } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
+  // A persisted selection whose org is gone must never be scoped a balance
+  // query: `getContextBalance`/`getCreditBlocks` reject for the dead id and
+  // Retry refetches the same dead id forever. Show the app's shared
+  // "Organization unavailable" state instead, leaving the picker so the user
+  // can switch to Personal or a live org.
+  const organizationUnavailable = isOrganizationUnavailable;
 
   const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
@@ -73,18 +79,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
-    enabled: enabled && hasUserId,
+    enabled: enabled && hasUserId && !organizationUnavailable,
     placeholderData: keepPreviousData,
   });
 
   const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
     ...personalCreditOptions,
-    enabled: enabled && hasUserId && !selectedOrgId,
+    enabled: enabled && hasUserId && !selectedOrgId && !organizationUnavailable,
   });
 
   const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
     ...orgCreditOptions,
-    enabled: enabled && hasUserId && Boolean(selectedOrgId),
+    enabled: enabled && hasUserId && Boolean(selectedOrgId) && !organizationUnavailable,
     placeholderData: keepPreviousData,
   });
 
@@ -185,7 +191,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
 
-      {showBalanceSkeleton && (
+      {/* The persisted selection no longer resolves. The balance queries are
+          disabled for the dead id, so this replaces both the error and the
+          amount: it is the app's single "Organization unavailable" state, and
+          the header's account picker stays usable to switch off the dead org. */}
+      {organizationUnavailable && (
+        <View className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3">
+          <Text className="text-sm text-muted-foreground">
+            {t('organization.boundary.organizationUnavailable')}
+          </Text>
+        </View>
+      )}
+      {!organizationUnavailable && showBalanceSkeleton && (
         // Content-shaped skeleton (number bar + note bar in the card's own
         // bg-secondary shell): a plain block read as an empty box in the e5
         // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
@@ -200,7 +217,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           </View>
         </View>
       )}
-      {balanceFailed && (
+      {!organizationUnavailable && balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
           onPress={() => {
@@ -211,7 +228,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
-      {!showBalanceSkeleton && !balanceFailed && (
+      {!organizationUnavailable && !showBalanceSkeleton && !balanceFailed && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
             <View className="flex-row items-center gap-1">
@@ -262,7 +279,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>
       )}
-      {!balanceLoading &&
+      {!organizationUnavailable &&
+        !balanceLoading &&
         !balancePending &&
         !balanceFailed &&
         balanceDollars === 0 &&
@@ -272,7 +290,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
       {/* Personal-context IAP disclosure only — never show this personal "managed
           outside the iOS app" copy under an org context (org billing isn't personal
           IAP, and a non-money-role member just lacks access). */}
-      {!balanceLoading &&
+      {!organizationUnavailable &&
+        !balanceLoading &&
         !balancePending &&
         !balanceFailed &&
         balanceDollars === 0 &&
@@ -288,7 +307,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           skeleton, the KiloPass card reserves its slot quietly instead of
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
-      {enabled && !selectedOrgId ? (
+      {enabled && !selectedOrgId && !organizationUnavailable ? (
         <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
       ) : null}
     </View>

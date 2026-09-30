@@ -37,6 +37,13 @@ type OrganizationContextValue = {
   setOrganizationId: (id: string | null) => void;
   error: 'restore' | 'save' | null;
   retry: () => void;
+  /**
+   * The membership list settled and the persisted selection resolves to no
+   * membership (deleted org, removed member). The selection is deliberately
+   * kept, mirroring `ContextControl`'s "Organization unavailable" state, so
+   * consumers must not scope queries to the dead id.
+   */
+  isOrganizationUnavailable: boolean;
 };
 
 type OrganizationState = Pick<
@@ -291,10 +298,30 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       isLoaded: state.token === token && state.isLoaded,
       isSaving: state.token === token && state.isSaving,
       error: state.token === token ? state.error : null,
+      // A settled, error-free list that omits the persisted id means the
+      // selection is dead. Requiring a settled list keeps the flag false while
+      // the memberships load (and while a refetch is in flight), so consumers
+      // never flash "unavailable" over a valid selection.
+      isOrganizationUnavailable:
+        state.token === token &&
+        state.organizationId != null &&
+        organizationsFetched &&
+        !organizationsFetching &&
+        !organizationsError &&
+        !(organizations ?? []).some(org => org.organizationId === state.organizationId),
       setOrganizationId,
       retry,
     }),
-    [state, token, setOrganizationId, retry]
+    [
+      state,
+      token,
+      organizations,
+      organizationsFetched,
+      organizationsFetching,
+      organizationsError,
+      setOrganizationId,
+      retry,
+    ]
   );
 
   return <OrganizationContext value={value}>{children}</OrganizationContext>;

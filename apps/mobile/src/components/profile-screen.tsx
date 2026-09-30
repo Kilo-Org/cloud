@@ -78,7 +78,11 @@ export function ProfileScreen() {
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
+  const {
+    organizationId,
+    isLoaded: organizationContextLoaded,
+    isOrganizationUnavailable,
+  } = useOrganization();
   const isAuthenticated = token != null;
   // The account queries wait for the tab transition to settle, but the hook
   // bounds that wait: an interaction queue that never reports idle (an
@@ -245,6 +249,16 @@ export function ProfileScreen() {
                 onRetry={() => void refetchOrganizations()}
                 isRetrying={organizationsFetching}
               />
+            ) : isOrganizationUnavailable ? (
+              // The persisted selection resolves to no membership. Keep the
+              // section but name the state instead of a disabled, nameless
+              // "Manage organization" row; the credits card's picker is the
+              // way to switch off the dead org.
+              <View className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3">
+                <Text className="text-sm text-muted-foreground">
+                  {t('organization.boundary.organizationUnavailable')}
+                </Text>
+              </View>
             ) : (
               <ConfigureRow
                 icon={Building2}

@@ -140,6 +140,26 @@ describe('OrganizationProvider default organization', () => {
     expect(scope().organizationId).toBe('org-b');
   });
 
+  it('flags a stored organization absent from the settled list as unavailable', async () => {
+    savedMetadata.set(ORG_KEY, 'org-missing');
+    list.mockResolvedValue([orgA]);
+    await mount();
+    expect(scope()).toMatchObject({ organizationId: 'org-missing', isLoaded: true });
+    // The selection is kept (ContextControl's unavailable state needs it), but
+    // consumers are told not to scope work to the dead id.
+    await waitFor(() => scope().isOrganizationUnavailable);
+    expect(scope().organizationId).toBe('org-missing');
+    expect(scope().isOrganizationUnavailable).toBe(true);
+  });
+
+  it('never flags a selection the settled list still contains', async () => {
+    savedMetadata.set(ORG_KEY, 'org-a');
+    list.mockResolvedValue([orgA]);
+    await mount();
+    await waitFor(() => scope().organizationId === 'org-a' && scope().isLoaded);
+    expect(scope().isOrganizationUnavailable).toBe(false);
+  });
+
   it('defaults to the first organization when nothing is stored', async () => {
     list.mockResolvedValue([orgA, orgB]);
     await mount();

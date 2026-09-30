@@ -569,4 +569,42 @@ describe('getChildSessionStreaming', () => {
   it('returns false for an empty messages list', () => {
     expect(getChildSessionStreaming([], subagentSessionId)).toBe(false);
   });
+
+  it('returns true for a grandchild task running inside a running child task transcript', () => {
+    const grandchildSessionId = 'ses-grandchild' as KiloSessionId;
+    const parentTask = makeTaskPart('running');
+    const grandchildTask = makeToolPart('task', {
+      status: 'running',
+      input: { description: 'Nested work' },
+      time: { start: 1 },
+      metadata: { sessionId: grandchildSessionId },
+    });
+    const topLevel = [makeAssistantMessage([parentTask])];
+    const childTranscript = [makeAssistantMessage([grandchildTask])];
+    const getChildMessages = (sessionId: string) =>
+      sessionId === subagentSessionId ? childTranscript : [];
+    expect(getChildSessionStreaming(topLevel, grandchildSessionId, getChildMessages)).toBe(true);
+  });
+
+  it('does not descend through a completed child task when looking for a nested task', () => {
+    const grandchildSessionId = 'ses-grandchild' as KiloSessionId;
+    const completedParent = makeTaskPart('completed');
+    const grandchildTask = makeToolPart('task', {
+      status: 'running',
+      input: {},
+      time: { start: 1 },
+      metadata: { sessionId: grandchildSessionId },
+    });
+    const topLevel = [makeAssistantMessage([completedParent])];
+    const getChildMessages = () => [makeAssistantMessage([grandchildTask])];
+    expect(getChildSessionStreaming(topLevel, grandchildSessionId, getChildMessages)).toBe(false);
+  });
+
+  it('stops descending when the task graph cycles without finding the session', () => {
+    const otherSessionId = 'ses-other' as KiloSessionId;
+    const task = makeTaskPart('running');
+    const transcript = [makeAssistantMessage([task])];
+    const getChildMessages = () => transcript;
+    expect(getChildSessionStreaming(transcript, otherSessionId, getChildMessages)).toBe(false);
+  });
 });

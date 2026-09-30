@@ -141,14 +141,23 @@ export function getTaskToolSessionId(part: ToolPart): KiloSessionId | undefined 
 }
 
 /**
+ * The transcript accessor and the sessions already walked while looking for a
+ * running task. Bundled so the descent threads one piece of state and cannot
+ * loop on a cyclic task graph.
+ */
+type ChildTaskTraversal = {
+  getChildMessages: ((sessionId: string) => StoredMessage[]) | undefined;
+  visitedSessions: Set<string>;
+};
+
+/**
  * Whether this part is a running task for `childSessionId`, or a running task
  * whose child transcript (where a nested subagent's task lives) reaches it.
  */
 function runningTaskDescendsToSession(
   part: Part,
   childSessionId: KiloSessionId,
-  getChildMessages: ((sessionId: string) => StoredMessage[]) | undefined,
-  visitedSessions: Set<string>
+  traversal: ChildTaskTraversal
 ): boolean {
   if (!isToolPart(part) || part.tool !== 'task' || part.state.status !== 'running') {
     return false;
@@ -157,6 +166,7 @@ function runningTaskDescendsToSession(
   if (taskSessionId === childSessionId) {
     return true;
   }
+  const { getChildMessages, visitedSessions } = traversal;
   if (
     taskSessionId === undefined ||
     getChildMessages === undefined ||
@@ -165,12 +175,7 @@ function runningTaskDescendsToSession(
     return false;
   }
   visitedSessions.add(taskSessionId);
-  return transcriptHasRunningChildTask(
-    getChildMessages(taskSessionId),
-    childSessionId,
-    getChildMessages,
-    visitedSessions
-  );
+  return transcriptHasRunningChildTask(getChildMessages(taskSessionId), childSessionId, traversal);
 }
 
 /**
@@ -183,15 +188,12 @@ function runningTaskDescendsToSession(
 function transcriptHasRunningChildTask(
   messages: StoredMessage[],
   childSessionId: KiloSessionId,
-  getChildMessages: ((sessionId: string) => StoredMessage[]) | undefined,
-  visitedSessions: Set<string>
+  traversal: ChildTaskTraversal
 ): boolean {
   return messages.some(
     message =>
       message.info.role === 'assistant' &&
-      message.parts.some(part =>
-        runningTaskDescendsToSession(part, childSessionId, getChildMessages, visitedSessions)
-      )
+      message.parts.some(part => runningTaskDescendsToSession(part, childSessionId, traversal))
   );
 }
 
@@ -200,10 +202,8 @@ export function getChildSessionStreaming(
   childSessionId: KiloSessionId,
   getChildMessages?: (sessionId: string) => StoredMessage[]
 ): boolean {
-  // The sessions already covered by the passed transcript need no descent.
-  const visitedSessions = new Set<string>();
-  for (const message of messages) {
-    visitedSessions.add(message.info.sessionID);
-  }
-  return transcriptHasRunningChildTask(messages, childSessionId, getChildMessages, visitedSessions);
+  return transcriptHasRunningChildTask(messages, childSessionId, {
+    getChildMessages,
+    visitedSessions: new Set<string>(),
+  });
 }

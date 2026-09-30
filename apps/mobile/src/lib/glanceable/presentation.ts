@@ -107,30 +107,6 @@ export function glanceableStatusCopyKey(
   return status === 'happy' ? null : GLANCEABLE_STATUS_COPY_KEY[status];
 }
 
-/**
- * Ordered spoken-label parts: status words, counts, then Open agents. Never a
- * title, organization name, or id. Each part is a copy key the surface
- * resolves to its translated string.
- */
-export function glanceableSpokenLabelKeys(
-  snapshot: GlanceableAgentsSnapshot,
-  flags: GlanceableSurfaceFlags = {}
-): string[] {
-  const status = resolveGlanceableStatus(snapshot, flags);
-  const parts: string[] = [];
-  if (status === 'happy' || status === 'stale') {
-    // Zeros draw on the surfaces to hold the layout still, but "0 Working" is
-    // only noise to a screen reader, so the spoken label keeps the real counts.
-    for (const { key } of glanceableCountLines(snapshot).filter(line => line.count > 0)) {
-      parts.push(key);
-    }
-  } else {
-    parts.push(GLANCEABLE_STATUS_COPY_KEY[status]);
-  }
-  parts.push('glanceable.openAgents');
-  return parts;
-}
-
 /** Translated status, numeric counts in rank order, then the Open agents action. */
 export function glanceableSpokenLabel(
   snapshot: GlanceableAgentsSnapshot,

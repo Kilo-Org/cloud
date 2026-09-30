@@ -9,7 +9,6 @@ import {
   glanceableCountLines,
   glanceableScheduledAt,
   glanceableSpokenLabel,
-  glanceableSpokenLabelKeys,
   glanceableStatusCopyKey,
   primaryGlanceableCount,
   resolveGlanceableStatus,
@@ -152,28 +151,6 @@ describe('scheduled count and wake time', () => {
   });
 });
 
-describe('spoken label shape', () => {
-  it('speaks counts then Open agents for happy, never a title or id', () => {
-    const happy = snapshot({ sessions: [{ status: 'busy' }, { status: 'question' }] });
-    expect(glanceableSpokenLabelKeys(happy)).toEqual([
-      'glanceable.needsInput',
-      'common.working',
-      'glanceable.openAgents',
-    ]);
-    expect(glanceableSpokenLabelKeys(happy).join(' ')).not.toContain('u1');
-  });
-
-  it('speaks the status word then Open agents for non-happy statuses', () => {
-    expect(glanceableSpokenLabelKeys(snapshot({ status: 'empty' }))).toEqual([
-      'glanceable.empty',
-      'glanceable.openAgents',
-    ]);
-    expect(glanceableSpokenLabelKeys(snapshot({ status: 'signed_out' }))).toEqual([
-      'glanceable.signedOut',
-      'glanceable.openAgents',
-    ]);
-  });
-});
 describe('numeric spoken label', () => {
   it('speaks numeric counts then Open agents for happy', () => {
     const happy = snapshot({

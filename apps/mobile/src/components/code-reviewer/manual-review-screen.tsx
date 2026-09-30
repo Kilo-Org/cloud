@@ -3,7 +3,7 @@ import { type Href, useRouter } from 'expo-router';
 import { Check, GitPullRequest } from '@/components/ui/icons';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { matchesCodeReviewUrlSuffix } from '@kilocode/app-shared/code-review';
 import { ModelSelector } from '@/components/agents/model-selector';
@@ -12,8 +12,6 @@ import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-ke
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
-import { formFieldA11y } from '@/components/ui/form-field-a11y';
-import { Input } from '@/components/ui/input';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -31,6 +29,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
 import { ManualReviewActionFooter } from './manual-review-action-footer';
+import { ManualReviewFields } from './manual-review-fields';
 
 const MANUAL_REVIEW_PLATFORMS = ['github', 'gitlab'] as const;
 type ManualReviewPlatform = (typeof MANUAL_REVIEW_PLATFORMS)[number];
@@ -248,53 +247,19 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             )}
           </View>
 
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.manualReview.pullRequestUrl')}
-            </Text>
-            <Input
-              key={platform}
-              // The shared single-line box supplies the touch floor
-              // (`min-h-[44px]`, never a fixed height); the field keeps its
-              // own chrome, horizontal inset and line box.
-              className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
-              placeholder={URL_PLACEHOLDER[platform]}
-              placeholderTextColor={colors.mutedForeground}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              accessibilityLabel={formFieldA11y({
-                label: t('codeReviewer.manualReview.pullRequestUrl'),
-                error: urlError,
-              })}
-              onChangeText={value => {
-                urlRef.current = value;
-                if (urlError) {
-                  setUrlError(null);
-                }
-              }}
-            />
-            {urlError ? <Text className="text-xs text-destructive">{urlError}</Text> : null}
-          </View>
-
-          <View className="gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('codeReviewer.manualReview.instructions')}
-            </Text>
-            <TextInput
-              className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
-              multiline
-              textAlignVertical="top"
-              accessibilityLabel={formFieldA11y({
-                label: t('codeReviewer.manualReview.instructions'),
-              })}
-              placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
-              placeholderTextColor={colors.mutedForeground}
-              onChangeText={value => {
-                instructionsRef.current = value;
-              }}
-            />
-          </View>
+          <ManualReviewFields
+            urlPlaceholder={URL_PLACEHOLDER[platform]}
+            urlError={urlError}
+            onUrlChange={value => {
+              urlRef.current = value;
+              if (urlError) {
+                setUrlError(null);
+              }
+            }}
+            onInstructionsChange={value => {
+              instructionsRef.current = value;
+            }}
+          />
 
           <View className="gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

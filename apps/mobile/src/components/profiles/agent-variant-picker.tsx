@@ -38,6 +38,7 @@ export function AgentVariantPicker({
               key={option}
               className={cn(
                 'min-h-11 items-center justify-center rounded-full px-4 active:opacity-70',
+                'disabled:opacity-50',
                 selected ? 'bg-foreground' : 'bg-secondary'
               )}
               disabled={disabled}

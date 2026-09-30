@@ -20,10 +20,14 @@ import {
 const FORBIDDEN_CLIENT_ID_LITERAL = ['oaiapp', 'Abz1xcqSQAvvIwtxyemZbXBJ'].join('_');
 
 const openAiDir = __dirname;
+// The rest of the OpenAI OAuth code stays in apps/web; Jest runs from there.
+const webOpenAiDir = path.resolve(process.cwd(), 'src/lib/auth/openai');
 const scannerFiles = [
-  ...readdirSync(openAiDir)
-    .filter(file => file.endsWith('.ts'))
-    .map(file => path.join(openAiDir, file)),
+  ...[openAiDir, webOpenAiDir].flatMap(dir =>
+    readdirSync(dir)
+      .filter(file => file.endsWith('.ts'))
+      .map(file => path.join(dir, file))
+  ),
   path.resolve(openAiDir, '../../user/server.ts'),
   path.resolve(openAiDir, '../../config.server.ts'),
 ];
@@ -105,6 +109,7 @@ describe('OpenAI OAuth config', () => {
 
   test('never hard-codes the registered client id in server source', () => {
     expect(scannerFiles.some(file => file.endsWith(path.join('openai', 'config.ts')))).toBe(true);
+    expect(scannerFiles.some(file => file.endsWith(path.join('openai', 'connect.ts')))).toBe(true);
 
     for (const file of scannerFiles) {
       expect(readFileSync(file, 'utf8')).not.toContain(FORBIDDEN_CLIENT_ID_LITERAL);

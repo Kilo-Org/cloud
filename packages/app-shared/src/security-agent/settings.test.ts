@@ -8,7 +8,6 @@ import {
   getSettingsDirtyState,
   isSecurityConfigPatchDirty,
   isValidDayCount,
-  parseDayCount,
 } from './settings';
 
 describe('Security Agent helpers', () => {
@@ -102,24 +101,6 @@ describe('getSettingsBackGuardOptions', () => {
   });
 });
 
-describe('parseDayCount', () => {
-  it('parses a plain integer string', () => {
-    expect(parseDayCount('30')).toBe(30);
-  });
-
-  it('rejects non-digit input', () => {
-    expect(Number.isNaN(parseDayCount('abc'))).toBe(true);
-  });
-
-  it('rejects empty input', () => {
-    expect(Number.isNaN(parseDayCount(''))).toBe(true);
-  });
-
-  it('rejects decimal input', () => {
-    expect(Number.isNaN(parseDayCount('1.5'))).toBe(true);
-  });
-});
-
 describe('isValidDayCount', () => {
   it('accepts the 1-365 boundary values', () => {
     expect(isValidDayCount(1)).toBe(true);
@@ -168,7 +149,8 @@ describe('invalid day/lead-time input can never classify as dirty-valid', () => 
   ];
 
   it.each(cases)('$field = "$raw" forces dirty-invalid, never dirty-valid', ({ field, raw }) => {
-    const parsed = parseDayCount(raw);
+    const trimmed = raw.trim();
+    const parsed = /^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN;
     const valid = isValidDayCount(parsed);
     expect(valid).toBe(false);
     const patch: Partial<SlaConfig> = { [field]: parsed };

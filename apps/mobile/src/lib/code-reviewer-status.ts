@@ -93,6 +93,8 @@ export function classifyPermission(input: {
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
+  /** `organizations.list` resolved (possibly stale) org data, so a settled role is authoritative. */
+  hasData: boolean;
   role: string | undefined;
   refetch: () => void;
 }): PermissionState {
@@ -102,7 +104,10 @@ export function classifyPermission(input: {
   if (input.isLoading) {
     return { status: 'loading' };
   }
-  if (input.isError) {
+  // Like `classifyProviderState`/`useSecurityAgentCapability`, only an
+  // initial-load failure (no cached organizations yet) is a hard error. A
+  // failed background refetch must not blank out an already-resolved role.
+  if (input.isError && !input.hasData) {
     return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
   }
   return { status: 'ready', canEdit: canManageOrganizationBilling(input.role) };

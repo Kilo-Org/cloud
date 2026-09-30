@@ -145,6 +145,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: true,
         isFetching: true,
+        hasData: false,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -158,6 +159,7 @@ describe('classifyPermission', () => {
         isLoading: true,
         isError: false,
         isFetching: true,
+        hasData: false,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
@@ -171,6 +173,7 @@ describe('classifyPermission', () => {
       isLoading: false,
       isError: true,
       isFetching: false,
+      hasData: false,
       role: undefined,
       refetch,
     });
@@ -181,6 +184,22 @@ describe('classifyPermission', () => {
     }
   });
 
+  it('keeps a settled role ready when a background refetch fails', () => {
+    // Cached org data still resolves the role, so a failed background
+    // refetch must not replace the already-loaded screen with an error.
+    expect(
+      classifyPermission({
+        isPersonal: false,
+        isLoading: false,
+        isError: true,
+        isFetching: true,
+        hasData: true,
+        role: 'owner',
+        refetch: vi.fn<() => void>(),
+      })
+    ).toEqual({ status: 'ready', canEdit: true });
+  });
+
   it('grants edit for owner and billing_manager roles once loaded', () => {
     for (const role of ['owner', 'billing_manager']) {
       expect(
@@ -189,6 +208,7 @@ describe('classifyPermission', () => {
           isLoading: false,
           isError: false,
           isFetching: false,
+          hasData: true,
           role,
           refetch: vi.fn<() => void>(),
         })
@@ -203,6 +223,7 @@ describe('classifyPermission', () => {
         isLoading: false,
         isError: false,
         isFetching: false,
+        hasData: true,
         role: 'member',
         refetch: vi.fn<() => void>(),
       })
@@ -214,6 +235,7 @@ describe('classifyPermission', () => {
         isLoading: false,
         isError: false,
         isFetching: false,
+        hasData: true,
         role: undefined,
         refetch: vi.fn<() => void>(),
       })

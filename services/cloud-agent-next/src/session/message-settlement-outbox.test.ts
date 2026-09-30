@@ -744,6 +744,28 @@ describe('MessageSettlementOutbox', () => {
 
     expect(harness.callbackJobs).toHaveLength(1);
     expect(harness.callbackJobs[0].payload.lastSeenBranch).toBe(expectedBranch);
+    expect(harness.callbackJobs[0].payload.headRepoFullName).toBe('owner/repo');
+  });
+
+  it('omits headRepoFullName for a repository that is not addressable as owner/repo', async () => {
+    const harness = createHarness({
+      metadata: {
+        ...metadata,
+        repository: { type: 'gitlab', url: 'https://gitlab.com/owner/repo.git' },
+      },
+    });
+    await putSessionMessageState(
+      harness.storage,
+      acceptedMessageState(firstMessageId, { url: 'https://example.com/callback' })
+    );
+
+    await harness.outbox.terminalizeSessionMessageOnce(firstMessageId, {
+      kind: 'completed',
+      completionSource: 'assistant_message_event',
+    });
+
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload.headRepoFullName).toBeUndefined();
   });
 
   it('omits clientError from completed callback jobs', async () => {

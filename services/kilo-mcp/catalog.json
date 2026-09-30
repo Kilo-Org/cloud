@@ -15826,6 +15826,17 @@
     ],
     "searchBlob": "modelPreferences.setLastSelected Save the model and variant a user selected most recently, so the app can preselect it next time. modelpreferences setlastselected model variant model variant"
   },
+  "models.currentModelIds": {
+    "path": "models.currentModelIds",
+    "kind": "query",
+    "summary": "Get the current default model IDs for each model family (such as Claude Opus, Claude Sonnet, GPT Sol, GLM, GLM Flash, and Kimi), resolved to the latest available versions. Use this to look up which model slug is currently recommended for a family.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "currentmodelids"
+    ],
+    "searchBlob": "models.currentModelIds Get the current default model IDs for each model family (such as Claude Opus, Claude Sonnet, GPT Sol, GLM, GLM Flash, and Kimi), resolved to the latest available versions. Use this to look up which model slug is currently recommended for a family. models currentmodelids"
+  },
   "models.list": {
     "path": "models.list",
     "kind": "query",

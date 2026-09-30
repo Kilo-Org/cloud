@@ -49,7 +49,7 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**863 procedures** — **368 queries**, **495 mutations** — under **52 prefixes**.
+**864 procedures** — **369 queries**, **495 mutations** — under **52 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -95,6 +95,7 @@ each row's `summary` and `tags` are what the search matches.
 | `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
 | `mcpGatewayAuthorizations` | 2 | 1 | 1 |
+| `models` | 2 | 2 | 0 |
 | `openAiChatGpt` | 2 | 1 | 1 |
 | `spendAlerts` | 2 | 1 | 1 |
 | `appBuilderFeedback` | 1 | 0 | 1 |
@@ -102,7 +103,6 @@ each row's `summary` and `tags` are what the search matches.
 | `cloudAgentNextFeedback` | 1 | 0 | 1 |
 | `feedback` | 1 | 0 | 1 |
 | `kiloChat` | 1 | 1 | 0 |
-| `models` | 1 | 1 | 0 |
 | `platformIntegrations` | 1 | 1 | 0 |
 | `userFeedback` | 1 | 0 | 1 |
 

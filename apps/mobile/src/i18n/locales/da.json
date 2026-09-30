@@ -3235,7 +3235,7 @@
     "cloudOptionTitle": "$t(agentChat.instancePicker.cloudAgent)",
     "cloudOptionBody": "Kør Kilo i et isoleret cloud-miljø uden at du skal installere noget.",
     "remoteOptionTitle": "Din computer",
-    "remoteOptionBody": "Kør Kilo på din egen maskin via `kilo remote`-CLI'en.",
+    "remoteOptionBody": "Kør Kilo på din egen maskine via `kilo remote`-CLI'en.",
     "skip": "Spring omvisning over",
     "tutorialLabel": "Vejledning"
   },

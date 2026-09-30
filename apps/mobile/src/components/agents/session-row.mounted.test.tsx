@@ -282,6 +282,25 @@ describe('StoredSessionRow live speech', () => {
     }
   );
 
+  it.each([
+    ['idle', 'Idle'],
+    ['busy', 'Working'],
+  ])('speaks %s as %s for a live stored row instead of the static LIVE word', (status, word) => {
+    // The Agents history row draws the same shared status glyph as the Home
+    // card, so it must announce the same state word the glyph draws rather
+    // than the generic LIVE the history used for every live row.
+    const renderer = mount(
+      row({ session: { ...session, status }, live: true, metaWhileLive: true })
+    );
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: status === 'idle' ? 'idle' : 'running' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Fix login bug, ${word}, feature/live, CLI, and cost 12 cents, 5 minutes ago`
+    );
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).not.toContain('LIVE');
+  });
+
   it('reads SCHEDULED (label only) for a stored scheduled row instead of Idle', () => {
     // The scheduled branch keys off the status, not the live flag: a stored
     // history row has no wake time, so it shows the label alone.

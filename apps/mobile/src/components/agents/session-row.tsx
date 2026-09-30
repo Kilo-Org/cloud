@@ -148,6 +148,11 @@ export function StoredSessionRow({
   const isScheduled = session.status === 'scheduled';
   const scheduledWake =
     isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
+  // One derivation for the visible glyph and the spoken label, so a live stored
+  // row names the state its glyph draws (`Idle` / `Working`) instead of the
+  // static LIVE word the Agents history used to speak for every live row. A
+  // `null` status keeps the glyph's running fallback and the static LIVE word.
+  const statusKind = session.status === null ? null : glanceableStatusKind(session.status);
 
   const revision = useSessionAttentionRevision();
   const raiseId = session.status_updated_at ?? session.status ?? null;
@@ -253,9 +258,11 @@ export function StoredSessionRow({
           title,
           needsInput,
           live: variant === 'list' && live,
-          // Only the scheduled kind is named here: other stored rows keep the
-          // static LIVE word / no status word, unchanged.
-          statusKind: isScheduled ? 'scheduled' : null,
+          // Announce the state the glyph draws: `glanceableStatusKind` maps
+          // `idle`/`running`/`scheduled` to the glyph and its spoken word, so a
+          // live idle CLI row in Agents history speaks `Idle` like the Home
+          // card instead of the static LIVE word.
+          statusKind,
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.git_branch,
@@ -270,7 +277,7 @@ export function StoredSessionRow({
           subtitle={subtitle}
           meta={visibleMeta}
           live={live}
-          statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
+          statusKind={statusKind}
           scheduledWake={scheduledWake}
           metaWhileLive={metaWhileLive}
           needsInput={needsInput}

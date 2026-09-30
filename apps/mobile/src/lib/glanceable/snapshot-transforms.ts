@@ -50,8 +50,9 @@ export function withStatus(
 /**
  * True when two snapshot + newest-title pairs would draw the same native
  * surface. Compares the user-visible fields only — `status`, the counts, the
- * wait anchor, and the title the widget draws from the surface extras — so a
- * tray write whose only difference is `revision`/`updatedAt` does not
+ * wait anchor, the newest-result kind and time the widget draws as its glyph
+ * and relative line, and the title the widget draws from the surface extras —
+ * so a tray write whose only difference is `revision`/`updatedAt` does not
  * re-render the widget or update the ongoing notification / Live Activity.
  */
 export function hasSameGlanceableContent(
@@ -67,6 +68,8 @@ export function hasSameGlanceableContent(
     a.snapshot.scheduled === b.snapshot.scheduled &&
     a.snapshot.needsInputSince === b.snapshot.needsInputSince &&
     a.snapshot.scheduledAt === b.snapshot.scheduledAt &&
+    a.snapshot.newestResultKind === b.snapshot.newestResultKind &&
+    a.snapshot.newestResultAt === b.snapshot.newestResultAt &&
     a.newestSessionTitle === b.newestSessionTitle
   );
 }

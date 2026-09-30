@@ -1,4 +1,4 @@
-import { dirname, relative } from 'node:path';
+import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
@@ -3460,25 +3460,22 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('allowlists only the active session attachment directory for Kilo file access on a shared sandbox', async () => {
+  it('blocks sibling checkouts but allows the container by default on a shared sandbox', async () => {
     const metadata = createMetadata();
     const result = await buildPromptWrapperRequests({
       ...metadata,
       workspace: { ...metadata.workspace, sandboxId: `usr-${'a'.repeat(48)}` },
     });
-    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      permission: { external_directory: Record<string, string> };
+    };
 
-    expect(config).toMatchObject({
-      permission: {
-        external_directory: {
-          '*': 'deny',
-          '/tmp/agent_test/**': 'allow',
-          '/tmp/attachments/agent_test/**': 'allow',
-        },
-      },
-    });
-    expect(config).not.toMatchObject({
-      permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
+    expect(config.permission.external_directory).toEqual({
+      '*': 'allow',
+      '/workspace/user/sessions/*': 'deny',
+      '/workspace/user/worktrees/*': 'deny',
+      '/workspace/user/sessions/agent_test': 'allow',
+      '/workspace/user/sessions/agent_test/**': 'allow',
     });
   });
 
@@ -4122,21 +4119,13 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       permission: {
         bash: Record<string, 'allow' | 'deny'>;
         edit: Record<string, 'allow' | 'deny'>;
-        external_directory: Record<string, 'allow' | 'deny'>;
+        external_directory: string;
         task: string;
         lsp: string;
       };
     };
     const relativeInputPath = relative('/workspace/user/sessions/agent_test', inputPath);
-    expect(
-      resolveCommandGuardBashPermission(
-        config.permission.external_directory,
-        `${dirname(inputPath)}/*`
-      )
-    ).toBe('allow');
-    expect(resolveCommandGuardBashPermission(config.permission.external_directory, '/tmp/*')).toBe(
-      'deny'
-    );
+    expect(config.permission.external_directory).toBe('allow');
     expect(resolveCommandGuardBashPermission(config.permission.edit, relativeInputPath)).toBe(
       'allow'
     );

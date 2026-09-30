@@ -9,7 +9,7 @@ import {
   type GitAuthorConfig,
   type ManagedGitHubFallbackReason,
 } from './types.js';
-import { generateSandboxId, getOutboundContainerId, isIsolatedSandboxId } from './sandbox-id.js';
+import { generateSandboxId, getOutboundContainerId, isSharedSandboxId } from './sandbox-id.js';
 import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
 import {
   isLocalFakeDeterministicModel,
@@ -587,6 +587,25 @@ export function resolveCommandGuardBashPermission(
     if (matchesKiloPermissionPattern(command, pattern)) result = action;
   }
   return result;
+}
+
+/**
+ * Shared sandboxes co-locate sessions of one org/user, with each checkout under
+ * `<tenantRoot>/{sessions,worktrees}/<id>`. Allow the container by default and
+ * deny every sibling checkout; the session's own workspace is re-allowed last,
+ * since the CLI resolves overlapping patterns in favor of the final match.
+ */
+export function buildSharedExternalDirectoryPermission(
+  workspacePath: string
+): Record<string, 'allow' | 'deny'> {
+  const tenantRoot = dirname(dirname(workspacePath));
+  return {
+    '*': 'allow',
+    [`${tenantRoot}/sessions/*`]: 'deny',
+    [`${tenantRoot}/worktrees/*`]: 'deny',
+    [workspacePath]: 'allow',
+    [`${workspacePath}/**`]: 'allow',
+  };
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -1333,23 +1352,11 @@ export class SessionService {
       });
     }
 
-    // Isolated sandboxes host a single session and may reach the whole
-    // container filesystem. Shared sandboxes co-locate sessions, so they keep
-    // the workspace-scoped allowlist that separates co-tenant checkouts,
-    // attachments, and session homes. Command-guard policies stay scoped: the
-    // workspace root is their allowlist root and broadening it would weaken the
-    // read-only and remediation boundaries.
-    const externalDirectoryPermission =
-      sandboxId !== undefined && isIsolatedSandboxId(sandboxId) && !commandGuardPolicy
-        ? 'allow'
-        : {
-            '*': 'deny',
-            [`/tmp/${sessionId}/**`]: 'allow',
-            [`/tmp/attachments/${sessionId}/**`]: 'allow',
-            [`${workspacePath}/**`]: 'allow',
-            [`${sessionHome}/.kilocode/skills/**`]: 'allow',
-            ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
-          };
+    // Everything is reachable by default. Only shared sandboxes narrow this,
+    // and only to hide sibling sessions' checkouts (see the helper).
+    const externalDirectoryPermission = isSharedSandboxId(sandboxId ?? '')
+      ? buildSharedExternalDirectoryPermission(workspacePath)
+      : 'allow';
 
     const permission: Record<string, unknown> = {
       external_directory: externalDirectoryPermission,

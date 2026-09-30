@@ -12,6 +12,7 @@ import {
   composeActiveSessionSpokenMeta,
   composeActiveSessionVisibleMeta,
   composeSessionProvenanceSubtitle,
+  estimateSessionListHeaderActionsWidth,
   expandPlatformFilter,
   formatMeta,
   formatScheduledWake,
@@ -40,6 +41,44 @@ function makeActive(over: Partial<ActiveSession> = {}): ActiveSession {
     ...over,
   };
 }
+
+describe('estimateSessionListHeaderActionsWidth', () => {
+  const english = { sectionLabel: 'LIVE NOW', historyLabel: 'PAST SESSIONS', showFilter: true };
+  const croatian = {
+    sectionLabel: 'TRENUTAČNO AKTIVNO',
+    historyLabel: 'PRETHODNE SESIJE',
+    showFilter: true,
+  };
+
+  it('reserves enough width for the Croatian Agents row to reflow on a phone', () => {
+    // `shouldStackHeaderActions` reserves this against the 44dp gutter and the
+    // 12dp heading gap: 390 - 44 - 12 - estimate < 120 drops the row beneath the
+    // title instead of breaking "Agenti" mid-word (agents-header-hr-20260929).
+    expect(estimateSessionListHeaderActionsWidth(croatian)).toBeGreaterThan(214);
+  });
+
+  it('grows with a longer catalog and with the system font scale', () => {
+    expect(estimateSessionListHeaderActionsWidth(croatian)).toBeGreaterThan(
+      estimateSessionListHeaderActionsWidth(english)
+    );
+    expect(estimateSessionListHeaderActionsWidth({ ...english, fontScale: 2 })).toBeGreaterThan(
+      estimateSessionListHeaderActionsWidth(english)
+    );
+  });
+
+  it('counts the filter button and its gap only when the list can be filtered', () => {
+    const withoutFilter = estimateSessionListHeaderActionsWidth({ ...english, showFilter: false });
+    const withFilter = estimateSessionListHeaderActionsWidth(english);
+    // The 36dp button plus one 14dp `gap-4`.
+    expect(withFilter - withoutFilter).toBe(50);
+  });
+
+  it('drops the letterspacing the RTL display treatment drops', () => {
+    expect(estimateSessionListHeaderActionsWidth({ ...english, isRTL: true })).toBeLessThan(
+      estimateSessionListHeaderActionsWidth(english)
+    );
+  });
+});
 
 describe('composeSessionProvenanceSubtitle', () => {
   it('returns "branch · #N" when both branch and PR number exist', () => {

@@ -87,6 +87,84 @@ export function normalisePlatformSelection(filter: readonly string[]): string[] 
   return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
 }
 
+/** JetBrains Mono (the header labels' `font-mono-medium`) advances 0.6em per glyph. */
+const HEADER_MONO_ADVANCE_EM = 0.6;
+/**
+ * Any non-ASCII glyph is counted one em wide. The header labels are mono, but a
+ * CJK/Kana/Hangul ideograph is a full em where a Latin glyph is 0.6, so counting
+ * every non-ASCII codepoint at 1em keeps the estimate an upper bound for the
+ * scripts the catalogs cover (and merely over-counts accented Latin).
+ */
+const HEADER_WIDE_ADVANCE_EM = 1;
+/** The section label is the `Eyebrow` variant's `text-[10px]`. */
+const HEADER_SECTION_LABEL_FONT_SIZE = 10;
+/** The history link overrides the variant to `text-[11px]`. */
+const HEADER_HISTORY_LABEL_FONT_SIZE = 11;
+/** The labels' `tracking-[1.5px]`; dropped under RTL (see `EYEBROW_LATIN_DISPLAY`). */
+const HEADER_LABEL_TRACKING = 1.5;
+/** `SessionFilterButton`'s `h-[36px] w-[36px] shrink-0`. */
+const HEADER_FILTER_BUTTON_WIDTH = 36;
+/** The controls row's `gap-4`: NativeWind's rem is 14pt, not 16. */
+const HEADER_ACTIONS_GAP = 14;
+
+function headerLabelWidth(params: {
+  label: string;
+  fontSize: number;
+  fontScale: number;
+  tracking: number;
+}): number {
+  const { label, fontSize, fontScale, tracking } = params;
+  let width = 0;
+  for (const character of label) {
+    const advanceEm =
+      (character.codePointAt(0) ?? 0) > 127 ? HEADER_WIDE_ADVANCE_EM : HEADER_MONO_ADVANCE_EM;
+    width += advanceEm * fontSize * fontScale + tracking;
+  }
+  return width;
+}
+
+/**
+ * Conservative width (dp) the Agents header's controls row lays out at.
+ *
+ * `ScreenHeader` reserves this through `inlineActionsWidth` (see
+ * `shouldStackHeaderActions`): when the 30px title cannot keep its readable
+ * minimum beside the row, the row drops beneath the title instead of squeezing
+ * it into a mid-word break — the Croatian capture rendered "Agenti" as
+ * "Age" / "nti" beside the section label, history link, and filter button.
+ *
+ * The row is the section label, the history link, and (when the list can be
+ * filtered) the 36dp filter button, `gap-4` apart. The label widths are an
+ * upper bound, so the row reflows a hair early rather than leaving the title
+ * squeezed; the estimate scales with the system font because the labels do.
+ */
+export function estimateSessionListHeaderActionsWidth(params: {
+  sectionLabel: string;
+  historyLabel: string;
+  showFilter: boolean;
+  fontScale?: number;
+  isRTL?: boolean;
+}): number {
+  const { sectionLabel, historyLabel, showFilter, fontScale = 1, isRTL = false } = params;
+  const tracking = isRTL ? 0 : HEADER_LABEL_TRACKING;
+  const segments = [
+    headerLabelWidth({
+      label: sectionLabel,
+      fontSize: HEADER_SECTION_LABEL_FONT_SIZE,
+      fontScale,
+      tracking,
+    }),
+    headerLabelWidth({
+      label: historyLabel,
+      fontSize: HEADER_HISTORY_LABEL_FONT_SIZE,
+      fontScale,
+      tracking,
+    }),
+    ...(showFilter ? [HEADER_FILTER_BUTTON_WIDTH] : []),
+  ];
+  const gaps = Math.max(segments.length - 1, 0) * HEADER_ACTIONS_GAP;
+  return Math.ceil(segments.reduce((total, segment) => total + segment, 0) + gaps);
+}
+
 export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];

@@ -342,6 +342,51 @@ describe('ScreenHeader mounted', () => {
     expect(title.props.className).toContain('text-center');
   });
 
+  it('keeps the inlineActions on the title row when the cluster fits beside it', () => {
+    // 390 - 44 - 12 - 92 leaves the title 242dp, above its 120dp minimum, so
+    // the row is untouched.
+    const renderer = renderHeader({
+      title: 'Agenti',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      inlineActionsWidth: 92,
+    });
+
+    expect(renderer.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(renderer.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+  });
+
+  it('drops inlineActions to their own full-width row when they squeeze the title', () => {
+    // The Croatian Agents row: its two long labels and the filter button lay
+    // out at ~333dp, leaving the 30px title 1dp beside them — "Agenti" broke
+    // mid-word into "Age" / "nti" (owner capture, agents-header-hr-20260929).
+    const renderer = renderHeader({
+      title: 'Agenti',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      inlineActionsWidth: 333,
+    });
+
+    const stacked = renderer.root.findAll(isStackedActionsRow);
+    expect(stacked).toHaveLength(1);
+    const [stackedRow] = stacked;
+    expect(stackedRow?.children).toEqual(['ACTIONS']);
+    // The title row no longer carries the inline slot, and the heading keeps
+    // its full-width `min-w-0 flex-1` box, so the title cannot be squeezed.
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.props.className).toContain('min-w-0 flex-1');
+    expect(
+      renderer.root.findAll(
+        node =>
+          typeof node.type === 'string' &&
+          (node.type as string) === 'View' &&
+          /(^|\s)ms-3(\s|$)/.test(String(node.props.className ?? ''))
+      )
+    ).toHaveLength(0);
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 

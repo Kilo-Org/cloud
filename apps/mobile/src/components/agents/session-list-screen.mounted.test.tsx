@@ -25,6 +25,10 @@ type Org = { organizationId: string; organizationName: string };
 const state = vi.hoisted(() => ({
   focused: true,
   fontScale: 1,
+  // The window width `ScreenHeader` reads to decide whether the header's
+  // controls share the title's row. Undefined by default keeps every other case
+  // on the single-row layout; a case that sets it exercises the reflow.
+  windowWidth: undefined as number | undefined,
   // Mutable so a case can put the tree on Android: the platform decides
   // whether the floating pull-to-refresh indicator is safe (device defect
   // uxs1) or the reserved band carries the in-flight state instead.
@@ -114,7 +118,11 @@ vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  useWindowDimensions: () => ({ fontScale: state.fontScale, height: 844 }),
+  useWindowDimensions: () => ({
+    fontScale: state.fontScale,
+    width: state.windowWidth,
+    height: 844,
+  }),
   AppState: {
     addEventListener: (_event: string, listener: (next: string) => void) => {
       state.listeners.add(listener);
@@ -499,6 +507,7 @@ beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   state.focused = true;
   state.fontScale = 1;
+  state.windowWidth = undefined;
   state.platform.OS = 'ios';
   state.reducedMotion = false;
   i18nManager.isRTL = false;
@@ -1427,6 +1436,25 @@ describe('AgentSessionListScreen header and admission', () => {
     expect(
       nodes('Text').find(node => node.children.includes('Updating'))?.props.className
     ).toContain('absolute');
+  });
+
+  it('reflows the live controls under the title on a phone that cannot hold them beside it', async () => {
+    state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
+    state.windowWidth = 390;
+    await renderScreen();
+    // The screen declares the controls row's laid-out width, which ScreenHeader
+    // reserves before deciding to reflow: on a phone the Croatian row would
+    // leave the 30px title 1dp and break "Agenti" mid-word (owner capture,
+    // agents-header-hr-20260929).
+    expect(header().props.inlineActionsWidth).toBeGreaterThan(214);
+    const history = action(i18n.t('agents.sessionList.pastSessions'));
+    const actionsRow = history.parent;
+    const stackedRow = actionsRow?.parent;
+    const title = header().findByProps({ accessibilityRole: 'header' });
+    // The controls now sit beneath the title's row on their own full width
+    // instead of squeezing the title.
+    expect(stackedRow?.props.className).toContain('mt-2');
+    expect(stackedRow?.parent).not.toBe(title.parent?.parent?.parent);
   });
 
   it('keeps the list unresolved until the organization restores', async () => {

@@ -2269,8 +2269,6 @@ export const AutoFreeModelSchema = z.object({
   reasoning: z.object({
     enabled: z.boolean().optional(),
     effort: ReasoningEffortSchema.optional(),
-    max_tokens: z.number().int().positive().optional(),
-    exclude: z.boolean().optional(),
   }),
 });
 

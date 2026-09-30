@@ -15,7 +15,7 @@ import { BOUNCER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
 const MAX_ID_LENGTH = 128;
 
 /** Report calls run in `after()` or a webhook, off the user's path, so they get a generous budget. */
-const REPORT_TIMEOUT_MS = 5_000;
+const REPORT_TIMEOUT_MS = 30_000;
 
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
@@ -210,9 +210,8 @@ export async function reportUsageEvent(event: UsageEvent): Promise<void> {
 }
 
 /**
- * Asks bouncer for the combined verdict before an inference request. Start it as soon as the
- * account is known and await it just before the upstream call. Resolves to `null` on a timeout or
- * any error, so the gateway always sends the request.
+ * Asks bouncer for a report-only verdict. Resolves to `null` on a timeout or any error,
+ * so the gateway always sends the request.
  */
 export async function decide(
   request: DecideRequest,

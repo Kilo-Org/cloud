@@ -270,7 +270,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
-- `BOUNCER_URL` - URL of the bouncer worker (report-only fraud, distillation, and rate verdicts). Defaults to https://bouncer.kiloapps.io in production. [SERVER]
+- `BOUNCER_URL` - URL of the bouncer worker (report-only fraud, distillation, and rate verdicts). Defaults to https://bouncer.kiloapps.io in production. Report and decide transport requests have 30-second budgets; gateway decide runs through `after()` and never delays inference. [SERVER]
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`

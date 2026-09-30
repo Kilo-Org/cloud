@@ -22,7 +22,9 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  I18nManager: { isRTL: false },
   Platform: { OS: 'ios' },
+  Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
   View: 'View',
@@ -67,6 +69,10 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
+
+const openExternalUrlMock = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: openExternalUrlMock }));
 
 const voiceInputControllerMock = vi.hoisted(() => ({
   supportsOnDevice: vi.fn<() => boolean>(() => true),
@@ -290,6 +296,23 @@ describe('ConsentDetails copy', () => {
     expect(gateway?.what).toBe(
       'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
     );
+  });
+
+  it('opens the privacy policy through openExternalUrl with a retryable error', () => {
+    const renderer = mount();
+    const link = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props as { accessibilityLabel?: string }).accessibilityLabel === 'Kilo privacy policy'
+    );
+    TestRenderer.act(() => {
+      (link.props as { onPress: () => void }).onPress();
+    });
+    expect(openExternalUrlMock).toHaveBeenCalledWith('https://kilo.ai/privacy-app', {
+      label: 'Kilo privacy policy',
+      retryOnError: true,
+    });
   });
 });
 

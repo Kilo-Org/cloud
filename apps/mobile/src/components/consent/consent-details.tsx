@@ -1,18 +1,21 @@
-import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, ScrollView, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { Section } from '@/components/consent/section';
 import { type ConsentMode } from '@/components/consent/consent-mode';
 import { ScreenHeader } from '@/components/screen-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { INLINE_LINK_BOX_CLASS, inlineLinkHitSlop } from '@/lib/a11y/tap-target';
 import { PRIVACY_URL } from '@/lib/config';
+import { openExternalUrl } from '@/lib/external-link';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { cn } from '@/lib/utils';
 import { useGatewayTranscriptionPreference } from '@/lib/voice-input/gateway/gateway-transcription-preference';
 import { voiceInputController } from '@/lib/voice-input/native-voice-input';
 import {
@@ -162,13 +165,20 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
   const router = useRouter();
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
+  // The privacy-open failure is shown on the screen, not only as a toast: this
+  // screen is pushed inside the consent modal's native container, which sits
+  // above the app-root Toaster, so the toast never becomes visible here
+  // (app-root-providers D2). Tapping the link again is the retry.
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
   const contentContainerStyle = {
     paddingTop: 8,
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
 
-  const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+  const handleOpenPrivacy = async () => {
+    const label = t('consent.privacyPolicy');
+    const opened = await openExternalUrl(PRIVACY_URL, { label, retryOnError: true });
+    setPrivacyError(opened ? null : t('common.couldNotOpen', { label }));
   };
 
   return (
@@ -263,13 +273,26 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             footer={<VoiceTranscriptionControl />}
           />
 
-          <Text className="mt-6 text-xs text-muted-foreground">
-            {t('consent.retentionPrefix')}{' '}
-            <Text className="text-xs text-primary underline" onPress={handleOpenPrivacy}>
-              {t('consent.privacyPolicy')}
-            </Text>
-            .
-          </Text>
+          {/* Own accessibility node, not a nested text span: an accessibility
+              tap lands on the sentence centre and a span there never opens the
+              policy (same fix as the consent card's pinned link). */}
+          <View className="mt-6 flex-row flex-wrap items-center">
+            <Text className="text-xs text-muted-foreground">{t('consent.retentionPrefix')} </Text>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={t('consent.privacyPolicy')}
+              className={cn(INLINE_LINK_BOX_CLASS, 'active:opacity-70')}
+              hitSlop={inlineLinkHitSlop('end')}
+              onPress={() => {
+                void handleOpenPrivacy();
+              }}
+            >
+              <Text className="text-xs text-primary underline">{t('consent.privacyPolicy')}</Text>
+            </Pressable>
+            <Text className="text-xs text-muted-foreground">.</Text>
+          </View>
+
+          <AccessibleStatus message={privacyError} className="mt-2 text-xs" />
 
           <View className="mt-8">
             <Button

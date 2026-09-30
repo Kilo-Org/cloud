@@ -1,21 +1,20 @@
-import * as WebBrowser from 'expo-web-browser';
 import { type Href, useRouter } from 'expo-router';
 import { LineChart, MessageSquare, Shield, Smartphone, User } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Platform, Pressable, ScrollView, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ConsentCardFooter } from '@/components/consent/consent-card-footer';
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PRIVACY_URL } from '@/lib/config';
 import { acceptConsent, readConsent, revokeConsent, setOptionalConsent } from '@/lib/consent';
+import { openExternalUrl } from '@/lib/external-link';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -23,26 +22,10 @@ type ConsentCardProps = {
   readonly mode?: ConsentMode;
 };
 
-/**
- * Maximum font scale honoured by the pinned privacy disclosure.
- *
- * The disclosure sits in the card's pinned footer with the reserved error
- * line and two `size="lg"` buttons. Uncapped, the `text-xs` sentence grows
- * with Dynamic Type to several lines at the largest system text size, and
- * that height comes out of the sheet, not the scroll region: the footer has
- * no room left and the second action clips at the sheet bottom. Capped at
- * 1.6 the sentence stays within two bounded lines on the smallest supported
- * width, so the footer keeps a bounded height and the actions stay on
- * screen; scales below 1.6 pass through untouched, so a11y users keep most
- * of their preferred scale. Same cap and reasoning as the tour header (see
- * `tour-font-scale`).
- */
-export const CONSENT_DISCLOSURE_MAX_FONT_SCALE = 1.6;
-
 export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const router = useRouter();
   const colors = useThemeColors();
-  const { bottom, top } = useSafeAreaInsets();
+  const { top } = useSafeAreaInsets();
   const { signOut, token } = useAuth();
   const { userId } = useCurrentUserId({ enabled: token != null });
   const { t } = useTranslation();
@@ -51,14 +34,6 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const contentContainerStyle = {
     paddingTop: 24,
     paddingBottom: 24,
-  };
-  // The action buttons sit in a pinned footer below the ScrollView, not in
-  // the scroll content: the review modal is shorter than the card, and the
-  // primary CTA was clipping off the sheet bottom (b911 vr1 spot check,
-  // e2-pre-revoke.png / p1-declined-off.png). The footer keeps its own
-  // layout space, so scrolling never moves the actions.
-  const footerStyle = {
-    paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -180,8 +155,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     ]);
   };
 
-  const handleOpenPrivacy = () => {
-    void WebBrowser.openBrowserAsync(PRIVACY_URL);
+  const handleOpenPrivacy = async () => {
+    const label = t('consent.privacyPolicy');
+    const opened = await openExternalUrl(PRIVACY_URL, { label, retryOnError: true });
+    // The toast fires in the app root, behind this native modal, so it never
+    // becomes visible here (app-root-providers D2). The pinned footer's error
+    // line carries the failure where the person can see it; tapping the link
+    // again is the retry.
+    setError(opened ? null : t('common.couldNotOpen', { label }));
   };
 
   const handleToggleOptional = useCallback(
@@ -306,55 +287,18 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
         </View>
       </ScrollView>
 
-      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
-        {/* The error lives in the pinned footer, not the scroll content: the
-            footer draws over the scroll tail, so a content-placed error was
-            invisible behind the buttons (b911 vr2 device repro — staging
-            error measured at y=792 under the Back/Revoke footer). The
-            one-line slot is always reserved, so an error appears without
-            moving the actions. The privacy disclosure is pinned here too,
-            because at the foot of the scrolling body the footer edge cut the
-            sentence in half. Its font scale is capped so the pinned height
-            stays bounded (see CONSENT_DISCLOSURE_MAX_FONT_SCALE). */}
-        <Text
-          className="text-xs text-muted-foreground"
-          maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-        >
-          {t('consent.privacyPolicyPrefix')}{' '}
-          <Text
-            className="text-xs text-primary underline"
-            maxFontSizeMultiplier={CONSENT_DISCLOSURE_MAX_FONT_SCALE}
-            onPress={handleOpenPrivacy}
-          >
-            {t('consent.privacyPolicy')}
-          </Text>
-          .
-        </Text>
-        <View className="min-h-5 justify-center">
-          <AccessibleStatus message={error} className="text-sm" />
-        </View>
-        <Button
-          onPress={() => {
-            void handlePrimaryAction();
-          }}
-          size="lg"
-          accessibilityLabel={actions.primaryLabel}
-          disabled={pendingAction === 'secondary'}
-          loading={pendingAction === 'primary'}
-        >
-          <Text>{actions.primaryLabel}</Text>
-        </Button>
-        <Button
-          variant={mode === 'review' ? 'destructive' : 'outline'}
-          size="lg"
-          onPress={handleSecondaryAction}
-          accessibilityLabel={actions.secondaryLabel}
-          disabled={pendingAction === 'primary'}
-          loading={pendingAction === 'secondary'}
-        >
-          <Text>{actions.secondaryLabel}</Text>
-        </Button>
-      </View>
+      <ConsentCardFooter
+        mode={mode}
+        error={error}
+        pendingAction={pendingAction}
+        onOpenPrivacy={() => {
+          void handleOpenPrivacy();
+        }}
+        onPrimary={() => {
+          void handlePrimaryAction();
+        }}
+        onSecondary={handleSecondaryAction}
+      />
     </View>
   );
 }

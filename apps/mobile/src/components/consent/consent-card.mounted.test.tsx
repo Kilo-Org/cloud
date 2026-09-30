@@ -2,7 +2,8 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CONSENT_DISCLOSURE_MAX_FONT_SCALE, ConsentCard } from './consent-card';
+import { ConsentCard } from './consent-card';
+import { CONSENT_DISCLOSURE_MAX_FONT_SCALE } from './consent-card-footer';
 import { i18n } from '@/i18n';
 
 const mockedAcceptConsent = vi.hoisted(() => vi.fn());
@@ -10,6 +11,7 @@ const mockedReadConsent = vi.hoisted(() => vi.fn());
 const mockedSetOptionalConsent = vi.hoisted(() => vi.fn());
 const mockedRevokeConsent = vi.hoisted(() => vi.fn());
 const mockedSignOut = vi.hoisted(() => vi.fn());
+const mockedOpenExternalUrl = vi.hoisted(() => vi.fn());
 const currentUserId = vi.hoisted(() => ({ value: 'test-user-1' as string | undefined }));
 
 vi.mock('@/lib/consent', () => ({
@@ -41,6 +43,8 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ replace: mockedReplace, push: mockedPush, back: mockedBack }),
 }));
 vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: mockedOpenExternalUrl }));
 vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   LineChart: 'LineChart',
@@ -53,7 +57,10 @@ vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' })
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://kilo.ai' }));
+vi.mock('@/lib/config', () => ({
+  WEB_BASE_URL: 'https://kilo.ai',
+  PRIVACY_URL: 'https://kilo.ai/privacy-app',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     background: '#fff',
@@ -465,5 +472,22 @@ describe('ConsentCard', () => {
         CONSENT_DISCLOSURE_MAX_FONT_SCALE
       );
     }
+  });
+
+  it('opens the privacy policy through openExternalUrl with a retryable error', () => {
+    const renderer = mountCard('onboarding');
+    const link = renderer.root.find(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        (n.props.accessibilityLabel as string) === 'Kilo privacy policy'
+    );
+    act(() => {
+      (link.props.onPress as () => void)();
+    });
+    expect(mockedOpenExternalUrl).toHaveBeenCalledWith('https://kilo.ai/privacy-app', {
+      label: 'Kilo privacy policy',
+      retryOnError: true,
+    });
   });
 });

@@ -24,17 +24,25 @@ async function openUrl(url: string) {
   throw new Error('Unsupported URL scheme');
 }
 
+/**
+ * Opens `url` in the browser (https) or the platform handler (mailto/tel) and
+ * toasts a retryable failure, like every external link in the app. Returns
+ * whether the URL opened, so surfaces that sit above the app-root Toaster —
+ * native modals and sheets never show a sonner toast (see the D2 ground truth
+ * in `app-root-providers.tsx`) — can also report the failure inline.
+ */
 export async function openExternalUrl(
   url: string,
   { label = i18n.t('common.link'), retryOnError = false }: ExternalLinkOptions = {}
-) {
+): Promise<boolean> {
   try {
     await openUrl(url);
+    return true;
   } catch {
     const message = i18n.t('common.couldNotOpen', { label });
     if (!retryOnError) {
       toast.error(message);
-      return;
+      return false;
     }
 
     toast.error(message, {
@@ -45,5 +53,6 @@ export async function openExternalUrl(
         },
       },
     });
+    return false;
   }
 }

@@ -30,6 +30,7 @@ import {
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
+  getOrganizationProviderPrivacy,
   lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
@@ -39,107 +40,10 @@ import {
   requestedSamples,
 } from './llm-proxy-helpers';
 
-describe('checkOrganizationModelRestrictions', () => {
-  it('does not forward the snapshot-only virtual provider upstream', () => {
-    const result = checkOrganizationModelRestrictions({
-      modelId: 'openai/text-embedding-3-small',
-      settings: { provider_allow_list: ['openai', 'virtual', 'azure'] },
-      organizationPlan: 'enterprise',
-    });
-
-    expect(result.providerConfig?.only).toEqual(['openai', 'azure']);
-  });
-
-  describe('enterprise plan - model deny list restrictions', () => {
-    it('should allow model when it is not in the deny list on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['openai/gpt-4'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should block model when it is in the deny list on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: ['anthropic/claude-3-opus'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).not.toBeNull();
-      expect(result.error?.status).toBe(404);
-    });
-
-    it('applies model deny lists to latest aliases', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: CLAUDE_SONNET_LATEST_MODEL_ALIAS,
-        settings: {
-          model_deny_list: [CLAUDE_SONNET_LATEST_MODEL_ALIAS],
-          provider_allow_list: ['anthropic'],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).not.toBeNull();
-      expect(result.error?.status).toBe(404);
-    });
-
-    it('should allow any model when deny list is empty on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {
-          model_deny_list: [],
-        },
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should allow any model when deny list is undefined on enterprise plan', () => {
-      const result = checkOrganizationModelRestrictions({
-        modelId: 'anthropic/claude-3-opus',
-        settings: {},
-        organizationPlan: 'enterprise',
-      });
-
-      expect(result.error).toBeNull();
-    });
-
-    it('should block multiple denied models on enterprise plan', () => {
-      const settings = {
-        model_deny_list: ['anthropic/claude-3-opus', 'openai/gpt-3.5-turbo'],
-      };
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'anthropic/claude-3-opus',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).not.toBeNull();
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'openai/gpt-3.5-turbo',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).not.toBeNull();
-
-      expect(
-        checkOrganizationModelRestrictions({
-          modelId: 'openai/gpt-4',
-          settings,
-          organizationPlan: 'enterprise',
-        }).error
-      ).toBeNull();
+describe('getOrganizationProviderPrivacy', () => {
+  it.each(['allow', 'deny'] as const)('returns data_collection=%s', dataCollection => {
+    expect(getOrganizationProviderPrivacy({ data_collection: dataCollection })).toEqual({
+      data_collection: dataCollection,
     });
   });
 

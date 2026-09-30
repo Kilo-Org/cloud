@@ -10,8 +10,6 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 
 import { findUserById } from '@/lib/user/find-user-by-id';
-import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
-import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import { db, readDb } from '@/lib/drizzle';
 import type { NextAuthOptions, JWT, LoggerInstance } from 'next-auth';
 import { getServerSession } from 'next-auth';
@@ -30,8 +28,6 @@ import {
   emitAdminAccessEvent,
   routeFromHeaders,
 } from '@/lib/admin/admin-access-log';
-import { processSSOUserLogin } from '@/lib/user/sso';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
 import { z } from 'zod';
 import { v5 as uuidv5 } from 'uuid';
 import { isWebSessionCurrent } from '@/lib/web-session-revocation';

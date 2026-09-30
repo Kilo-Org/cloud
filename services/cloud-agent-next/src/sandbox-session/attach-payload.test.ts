@@ -239,6 +239,88 @@ describe('buildSessionAttachPayload', () => {
     });
   });
 
+  it('keeps MCP servers for a supported wrapper and isolates its runtime', () => {
+    const payload = {
+      directory: '/workspace/a',
+      mcp: { remote: { type: 'remote' as const, url: 'https://mcp.example.test/connect' } },
+    };
+
+    expect(adaptSessionAttachPayloadForWrapper(payload, true, true)).toEqual({
+      ...payload,
+      runtimeIsolation: 'per-session',
+    });
+  });
+
+  it('accepts only materialized MCP values in the attach protocol', () => {
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: { Authorization: 'Bearer secret' },
+          },
+        },
+      }).success
+    ).toBe(true);
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.test/connect',
+            headers: { Authorization: encryptWithPublicKey('Bearer secret', mcpPublicKey) },
+          },
+        },
+      }).success
+    ).toBe(false);
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          local: { type: 'local', command: ['node', '-e', ''] },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it.each(['\u96ea', '\n'])(
+    'bounds the UTF-8 serialized MCP configuration for %j values',
+    value => {
+      const result = sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          local: {
+            type: 'local',
+            command: ['node', '-e', ''],
+            environment: Object.fromEntries(
+              Array.from({ length: 12 }, (_, index) => [`VALUE_${index}`, value.repeat(4096)])
+            ),
+          },
+        },
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues.map(issue => issue.message)).toContain(
+          'Serialized MCP configuration exceeds the 80 KiB limit'
+        );
+      }
+    }
+  );
+
+  it.each(['local', 'remote'])('rejects fractional %s MCP request timeouts', type => {
+    expect(
+      sessionAttachPayloadSchema.safeParse({
+        mcp: {
+          server: {
+            type,
+            ...(type === 'local' ? { command: ['node'] } : { url: 'https://mcp.example.test' }),
+            timeout: 500.5,
+          },
+        },
+      }).success
+    ).toBe(false);
+  });
+
   for (const key of CONTROL_RUNTIME_RESERVED_ENV_VARS) {
     it(`rejects ${key} in public session environment variables`, () => {
       const result = envVarsSchema.safeParse({ [key]: 'user-controlled-secret' });

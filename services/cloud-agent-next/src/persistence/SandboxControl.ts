@@ -1326,22 +1326,6 @@ export class SandboxControl extends DurableObject<Env> {
     if (!usesMaintenanceChannel) await this.assertRequestWorktreeAdmission(input);
     if (recoveryInteraction) await this.assertRecoveryInteraction(input, runtime, allocation);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
-    const outbound =
-      input.operation === 'session.attach'
-        ? {
-            ...input,
-            payload: {
-              ...adaptSessionAttachPayloadForWrapper(
-                sessionAttachPayloadSchema.parse(input.payload),
-                this.socketHandler.supportsWorkingBranches?.() === true,
-                this.socketHandler.supportsGitAuthor?.() === true
-              ),
-              ...(this.supportsNativeRuntimeIdCapture()
-                ? { captureNativeRuntimeId: true as const }
-                : {}),
-            },
-          }
-        : input;
     return this.socketHandler.sendRequest(outbound);
   }
 

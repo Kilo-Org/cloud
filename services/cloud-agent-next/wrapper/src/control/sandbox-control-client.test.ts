@@ -407,6 +407,7 @@ describe('createSandboxControlClient', () => {
           scopedCleanupResult?: boolean;
           workingBranches?: boolean;
           gitAuthor?: boolean;
+          mcpServers?: boolean;
           nativeRuntimeIdCapture?: boolean;
         };
       };
@@ -428,6 +429,7 @@ describe('createSandboxControlClient', () => {
         scopedCleanupResult: true,
         workingBranches: true,
         gitAuthor: true,
+        mcpServers: true,
         nativeRuntimeIdCapture: true,
       },
     });

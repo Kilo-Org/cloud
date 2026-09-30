@@ -12,7 +12,6 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import { errorExceptInTest } from '@/lib/utils.server';
 import {
   captureProxyError,
-  checkOrganizationModelRestrictions,
   countAndStoreTranscriptionUsage,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
@@ -248,7 +247,7 @@ export async function handleAudioTranscriptionsRequest(
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -264,13 +263,6 @@ export async function handleAudioTranscriptionsRequest(
     });
   }
 
-  const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-    modelId: requestedModelLowerCased,
-    settings,
-    organizationPlan: plan,
-  });
-  if (modelRestrictionError) return modelRestrictionError;
-
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -278,14 +270,6 @@ export async function handleAudioTranscriptionsRequest(
       modelId: requestedModelLowerCased,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
-    const eligibleRoutes = decision.eligibleProviderRoutes;
-    if (eligibleRoutes) {
-      const currentOnly = providerConfig?.only;
-      const hasEligibleRoute = currentOnly
-        ? currentOnly.some(route => eligibleRoutes.has(route))
-        : eligibleRoutes.size > 0;
-      if (!hasEligibleRoute) return modelNotAllowedResponse();
-    }
   }
 
   sentryRootSpan()?.setAttribute(

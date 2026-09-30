@@ -353,6 +353,7 @@ type CredentialEnv = Parameters<typeof getOutboundContainerId>[0] &
       | 'GITHUB_LITE_APP_SLUG'
       | 'GITHUB_APP_BOT_USER_ID'
       | 'GITHUB_LITE_APP_BOT_USER_ID'
+      | 'AGENT_ENV_VARS_PRIVATE_KEY'
     >
   > &
   KiloTargetEnv;

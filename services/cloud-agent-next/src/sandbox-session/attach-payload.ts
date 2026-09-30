@@ -109,5 +109,6 @@ export function adaptSessionAttachPayloadForWrapper(
     const { author: _author, ...git } = adapted.git;
     adapted = { ...adapted, git };
   }
+  if (adapted.mcp) adapted = { ...adapted, runtimeIsolation: 'per-session' };
   return adapted;
 }

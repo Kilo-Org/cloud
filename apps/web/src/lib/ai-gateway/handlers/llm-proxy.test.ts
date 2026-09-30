@@ -43,8 +43,9 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-m
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import { decide } from '@/lib/bouncer/client';
+import { decide, type DecideVerdict } from '@/lib/bouncer/client';
 import { NextRequest } from 'next/server';
+import { handleLlmProxyRequest } from './llm-proxy';
 
 jest.mock('next/server', () => {
   return {
@@ -625,7 +626,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
-      { timeoutMs: 50 }
+      { timeoutMs: 30_000 }
     );
   });
 
@@ -651,7 +652,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledWith(
       expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
-      { timeoutMs: 50 }
+      { timeoutMs: 30_000 }
     );
   });
 
@@ -671,7 +672,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
       { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
-      { timeoutMs: 50 }
+      { timeoutMs: 30_000 }
     );
     // Bouncer has no account for an anonymous caller, so no usage event.
     expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
@@ -709,31 +710,59 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
   });
 
-  it('caps the decide wait and still calls upstream when bouncer hangs', async () => {
-    // A never-settling verdict must not hold the request open: the handler's
-    // own budget releases it and the upstream call still happens.
-    mockedDecide.mockReturnValueOnce(Promise.withResolvers<never>().promise);
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+  it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
 
-    const startedAt = Date.now();
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-    const elapsedMs = Date.now() - startedAt;
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    // The verdict is awaited, but only for its budget.
-    expect(elapsedMs).toBeGreaterThanOrEqual(45);
-    expect(elapsedMs).toBeLessThan(2_000);
+    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
+    expect(backgroundWork).toBeInstanceOf(Promise);
+    let finished = false;
+    void backgroundWork.then(() => {
+      finished = true;
+    });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    pending.resolve(null);
+    await expect(backgroundWork).resolves.toBeUndefined();
   });
 
-  it('serves the request when the decide call rejects', async () => {
-    mockedDecide.mockRejectedValueOnce(new Error('bouncer unreachable'));
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+  it('keeps decide alive when balance rejects a request before upstream', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(402);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
+    expect(backgroundWork).toBeInstanceOf(Promise);
+    pending.resolve(null);
+    await expect(backgroundWork).resolves.toBeUndefined();
+  });
+
+  it('serves the request and settles background work when decide rejects', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
 
     const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
 
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    pending.reject(new Error('bouncer unreachable'));
+    await expect(mockedAfter.mock.calls[0]?.[0]).resolves.toBeUndefined();
   });
 
   it('passes provider response transforms to the response rewriter', async () => {

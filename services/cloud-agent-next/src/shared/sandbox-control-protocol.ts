@@ -309,6 +309,7 @@ export const sandboxHelloPayloadSchema = z.object({
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
       gitAuthor: z.boolean().optional(),
+      mcpServers: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })
@@ -467,6 +468,41 @@ export const gitAuthorSchema = z
     email: z.string().min(1).max(320),
   })
   .strict();
+
+const sessionAttachMcpValueSchema = z.string().max(8192);
+const sessionAttachMcpValuesSchema = z
+  .record(z.string().min(1).max(256), sessionAttachMcpValueSchema)
+  .refine(values => Object.keys(values).length <= 50, {
+    message: 'An MCP server can have at most 50 environment variables or headers',
+  });
+const sessionAttachMcpServerSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      type: z.literal('local'),
+      command: z.array(z.string().max(8192)).min(1).max(50),
+      environment: sessionAttachMcpValuesSchema.optional(),
+      enabled: z.boolean().optional(),
+      timeout: z.number().int().positive().max(3_600_000).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('remote'),
+      url: z.string().url().max(4096),
+      headers: sessionAttachMcpValuesSchema.optional(),
+      enabled: z.boolean().optional(),
+      timeout: z.number().int().positive().max(3_600_000).optional(),
+    })
+    .strict(),
+]);
+export const sessionAttachMcpServersSchema = z
+  .record(z.string().min(1).max(100), sessionAttachMcpServerSchema)
+  .refine(servers => Object.keys(servers).length <= 20, {
+    message: 'A session can have at most 20 MCP servers',
+  })
+  .refine(servers => new TextEncoder().encode(JSON.stringify(servers)).byteLength <= 80 * 1024, {
+    message: 'Serialized MCP configuration exceeds the 80 KiB limit',
+  });
 
 export const sessionAttachPayloadSchema = z
   .object({
@@ -1141,6 +1177,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
       eventBatches: z.boolean().optional(),
       workingBranches: z.boolean().optional(),
       gitAuthor: z.boolean().optional(),
+      mcpServers: z.boolean().optional(),
       nativeRuntimeIdCapture: z.boolean().optional(),
       nativeRuntimeRetirement: z.boolean().optional(),
     })

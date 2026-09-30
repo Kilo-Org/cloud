@@ -157,7 +157,8 @@ export type WorktreeKiloRuntimes = NativeRuntimeControl & {
     canRefreshCredentials?: () => boolean,
     runtimeIsolation?: RuntimeIsolation,
     beforeMutation?: () => void,
-    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void,
+    mcp?: SessionAttachPayload['mcp']
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
   retireForRecovery(

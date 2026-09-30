@@ -86,11 +86,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
-      const only = withoutVirtualProvider(
-        providerConfig?.only
-          ? providerConfig.only.filter(route => decision.eligibleProviderRoutes?.has(route))
-          : [...decision.eligibleProviderRoutes]
-      );
+      const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
       if (only.length === 0) return modelNotAllowedResponse();
       providerPolicy = { ...providerPolicy, only };
     }

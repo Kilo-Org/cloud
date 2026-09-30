@@ -8,7 +8,7 @@
       "scheduledAction": "Azzjoni skedata għandha aġġornament",
       "lowBalance": "Il-bilanċ tiegħek għandu bżonn attenzjoni",
       "spendAlert": "L-infiq tiegħek għandu bżonn attenzjoni",
-      "securityFinding": "Seba ta' sigurtà għandu bżonn attenzjoni",
+      "securityFinding": "Sejba ta' sigurtà għandha bżonn attenzjoni",
       "activeAgentsGlanceable": "L-aġenti attivi għandhom aġġornament"
     }
   },
@@ -48,7 +48,7 @@
       "body": "L-infiq ta' {{scopeName}} qabeż ${{amountUsd}}"
     },
     "securityFindingNew": {
-      "title": "Seba ta' sigurtà ġdid ({{severity}})",
+      "title": "Sejba ta' sigurtà ġdida ({{severity}})",
       "body": "{{findingTitle}} f'{{repoFullName}}"
     },
     "securityFindingSlaWarning": {
@@ -61,7 +61,7 @@
     },
     "securityLifecycle": {
       "title": "Kilo",
-      "body": "Seba ta' sigurtà għandu bżonn attenzjoni"
+      "body": "Sejba ta' sigurtà għandha bżonn attenzjoni"
     }
   },
   "instanceLifecycle": {

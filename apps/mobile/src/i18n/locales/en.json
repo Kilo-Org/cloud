@@ -2221,7 +2221,7 @@
       "advancedConfigDescription": "Select a profile to load saved configurations, and manually configure additional environment variables and setup commands",
       "saveAsProfile": "Save as Profile",
       "saveProfileDescription": "Save the current environment variables and setup commands as a reusable profile.",
-      "profileSummary": "{{vars}} environment variables · {{commands}} setup commands",
+      "profileSummary": "Environment variables: {{vars}} · Setup commands: {{commands}}",
       "profileSaved": "Profile \"{{name}}\" saved",
       "organizationProfiles": "Organization Profiles",
       "personalProfiles": "Personal Profiles",

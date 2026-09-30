@@ -296,7 +296,7 @@ describe('AdvancedConfigPanel', () => {
     addVariable(renderer, 'API_KEY', 'abc');
 
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    expect(texts(renderer)).toContain('1 environment variables · 0 setup commands');
+    expect(texts(renderer)).toContain('Environment variables: 1 · Setup commands: 0');
   });
 
   it('caps manual setup commands at the server list and row bounds', () => {
@@ -355,7 +355,7 @@ describe('AdvancedConfigPanel', () => {
     press(byLabel(renderer, 'Advanced Configuration'));
 
     expect(texts(renderer)).toContain('Backend');
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('Environment variables: 3 · Setup commands: 1');
   });
 
   it('names the effective default in the no-override row when one applies', () => {
@@ -385,7 +385,7 @@ describe('AdvancedConfigPanel', () => {
 
     expect(onSelectProfile).toHaveBeenCalledWith('backend');
     expect(texts(renderer)).toContain('Backend');
-    expect(texts(renderer)).toContain('3 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('Environment variables: 3 · Setup commands: 1');
   });
 
   it('reports No profile through onSelectProfile(null) and clears the row', () => {
@@ -450,7 +450,7 @@ describe('AdvancedConfigPanel', () => {
     // setup commands to the inline ones, so a kept draft would run them twice.
     expect(texts(renderer)).not.toContain('API_KEY');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
-    expect(texts(renderer)).toContain('1 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('Environment variables: 1 · Setup commands: 1');
   });
 
   it('keeps the save sheet open and the typed name when the save fails', async () => {

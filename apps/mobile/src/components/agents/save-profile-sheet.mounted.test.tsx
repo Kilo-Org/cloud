@@ -94,9 +94,18 @@ describe('SaveProfileSheet', () => {
     const renderer = mount();
 
     expect(header(renderer).props.title).toBe('Save as Profile');
-    expect(texts(renderer)).toContain('2 environment variables · 1 setup commands');
+    expect(texts(renderer)).toContain('Environment variables: 2 · Setup commands: 1');
     expect(texts(renderer)).toContain('Secrets are encrypted before storage.');
     expect(renderer.root.findByType('Lock' as never)).toBeTruthy();
+  });
+
+  it('shows a singular count without inflecting the unit label', () => {
+    const renderer = mount({
+      envVars: [{ key: 'REGION', value: 'eu', isSecret: false }],
+      setupCommands: ['pnpm install'],
+    });
+
+    expect(texts(renderer)).toContain('Environment variables: 1 · Setup commands: 1');
   });
 
   it('hides the secrets note when no variable is a secret', () => {

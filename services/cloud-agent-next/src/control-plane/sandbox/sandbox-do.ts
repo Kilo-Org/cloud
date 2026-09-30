@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { getSandbox } from '@cloudflare/sandbox';
+import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import {
   clearBillingContext,
@@ -87,6 +88,16 @@ import {
   worktreePrepareDeletionResultSchema,
   type SessionAttachPayload,
 } from '../../shared/sandbox-control-protocol.js';
+import { MCPServerConfigSchema } from '../../persistence/schemas.js';
+import {
+  McpAttachValidationError,
+  McpConfigurationError,
+  mcpConfigurationFailureReason,
+  mcpValidationMessage,
+  materializeMcpServers,
+  parseSessionAttachMcpServers,
+  type CliMcpServer,
+} from '../../mcp-config.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -1633,7 +1644,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   ): ControlPlaneRouteSpec {
     // Explicit projection: token-bearing fields come only from the issued grant,
-    // never from the input spec (B3 review 4).
+    // never from the input spec (B3 review 4). MCP plaintext is never projected
+    // here; the Sandbox DO adds it only to a `session.prepare` frame.
     return {
       sessionId: spec.sessionId,
       kiloSessionId: spec.kiloSessionId,
@@ -1977,24 +1989,70 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Decrypts the DO-private credential-source `mcpServers` snapshot immediately
+   * before an authenticated `session.prepare` frame. The plaintext never touches
+   * a persisted route row. A missing key, invalid envelope or over-limit payload
+   * throws so the fenced attempt fails fast (`workspace_setup_failed`) instead of
+   * sending a frame the wrapper would drop while the route waits out its
+   * preparation timeout.
+   */
+  private materializeRouteMcp(route: RouteRecord): ControlPlaneRouteSpec['mcp'] {
+    const encrypted = route.credentialSource?.mcpServers;
+    if (encrypted === undefined || Object.keys(encrypted).length === 0) return undefined;
+    const servers = z.record(z.string().min(1).max(100), MCPServerConfigSchema).parse(encrypted);
+    let materialized: Record<string, CliMcpServer>;
+    try {
+      materialized = materializeMcpServers(servers, this.env.AGENT_ENV_VARS_PRIVATE_KEY);
+    } catch (error) {
+      if (error instanceof McpConfigurationError) {
+        throw new McpAttachValidationError(
+          mcpValidationMessage(mcpConfigurationFailureReason(error))
+        );
+      }
+      throw error;
+    }
+    const validated = parseSessionAttachMcpServers(materialized);
+    if (!validated.success) throw new McpAttachValidationError(validated.reason);
+    return validated.data;
+  }
+
   private sendSessionPrepare(state: AllocationState, route: RouteRecord): void {
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
+    let mcp: ControlPlaneRouteSpec['mcp'];
+    try {
+      mcp = this.materializeRouteMcp(route);
+    } catch (error) {
+      // Preserve the sanitized, bounded MCP reason for diagnosis; the route
+      // contract has no MCP-specific reason, so the attempt fails immediately as
+      // `workspace_setup_failed` rather than waiting out its deadline.
+      logger
+        .withFields({
+          sandboxId: this.sandboxId,
+          reason: error instanceof McpAttachValidationError ? error.reason : 'unknown',
+        })
+        .warn('MCP materialization failed before session.prepare');
+      this.ctx.waitUntil(this.failPrepareAttempt(route.sessionId, route.attemptId));
+      return;
+    }
     if (route.grant.kilo.runtimeProxy !== undefined) {
       // R1: minting the runtime credential proxy handle is a Session DO call that
       // must stay off this DO's serial queue; the frame is sent once the handle
       // is minted and bound. A mint failure fails the attempt closed.
-      this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
+      this.ctx.waitUntil(
+        this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId, mcp)
+      );
       return;
     }
     // The frame carries the wrapper-safe spec plus the issued credential
     // material only; the credential source stays DO-private.
     this.trySendFrame(socket, {
       type: 'session.prepare',
-      spec: route.spec,
+      spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
       credentials: this.prepareCredentials(route.grant, route.sessionId),
     });
   }
@@ -2016,7 +2074,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
    */
   private async sendSessionPrepareWithRuntimeProxy(
     sessionId: string,
-    attemptId: string
+    attemptId: string,
+    mcp: ControlPlaneRouteSpec['mcp']
   ): Promise<void> {
     try {
       let route = await readRoute(this.db, sessionId);
@@ -2099,7 +2158,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // material only; the credential source stays DO-private.
       this.trySendFrame(socket, {
         type: 'session.prepare',
-        spec: route.spec,
+        spec: mcp === undefined ? route.spec : { ...route.spec, mcp },
         credentials: this.prepareCredentials(route.grant, sessionId),
       });
     } catch {

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { SessionAttachPayload } from '../../shared/sandbox-control-protocol.js';
 import {
   controlPlanePromptPayloadSchema,
+  controlPlaneRouteSpecSchema,
   type ControlPlaneCredentialSource,
   type ControlPlaneRouteSpec,
 } from '../../shared/control-plane-protocol.js';
@@ -11,6 +12,13 @@ import {
 } from './sandbox-selection.js';
 import { credentialSourceFromMetadata } from '../../sandbox-control/session-credentials.js';
 import { buildSessionAttachPayload } from '../../sandbox-session/attach-payload.js';
+import {
+  McpAttachValidationError,
+  McpConfigurationError,
+  mcpConfigurationFailureReason,
+  mcpValidationMessage,
+  parseSessionAttachMcpServers,
+} from '../../mcp-config.js';
 import {
   CurrentSessionMetadataSchema,
   type SessionMetadata,
@@ -73,6 +81,11 @@ function withoutRawKiloToken(
  * is deliberately not applied. Token-bearing `git.token` is dropped — the
  * Sandbox DO's grant issuance supplies the `git`/`kilo` aliases in the projected
  * spec (B3 N3).
+ *
+ * `payload.mcp` is materialized only to prove it decrypts and to force
+ * per-session isolation; the plaintext is deliberately not copied into the
+ * persisted spec. The Sandbox DO materializes the encrypted credential-source
+ * `mcpServers` immediately before the authenticated `session.prepare` frame.
  */
 export function controlPlaneRouteSpecFromAttachPayload(
   payload: SessionAttachPayload,
@@ -89,6 +102,10 @@ export function controlPlaneRouteSpecFromAttachPayload(
           ...(payload.git.platform ? { platform: payload.git.platform } : {}),
         };
   const env = withoutRawKiloToken(payload.env);
+  // Materialized MCP servers are per-session user config: sharing a runtime
+  // would let one session's servers leak into another, so they force isolation
+  // (legacy `adaptSessionAttachPayloadForWrapper`).
+  const runtimeIsolation = payload.mcp ? 'per-session' : options?.runtimeIsolation;
   return {
     sessionId: ids.sessionId,
     kiloSessionId: ids.kiloSessionId,
@@ -98,21 +115,42 @@ export function controlPlaneRouteSpecFromAttachPayload(
     ...(git ? { git } : {}),
     ...(env ? { env } : {}),
     ...(payload.setupCommands ? { setupCommands: payload.setupCommands } : {}),
-    ...(options?.runtimeIsolation ? { runtimeIsolation: options.runtimeIsolation } : {}),
+    ...(runtimeIsolation ? { runtimeIsolation } : {}),
     // The Sandbox DO replaces this with its own route attempt id; the field is
     // only a protocol placeholder until an attempt starts.
     attemptId: `${ids.sessionId}-requested`,
   };
 }
 
+function materializeAttachPayload(
+  metadata: SessionMetadata,
+  mcpPrivateKey: string | undefined
+): SessionAttachPayload {
+  try {
+    return buildSessionAttachPayload(metadata, undefined, mcpPrivateKey);
+  } catch (error) {
+    if (error instanceof McpConfigurationError) {
+      throw new McpAttachValidationError(
+        mcpValidationMessage(mcpConfigurationFailureReason(error))
+      );
+    }
+    throw error;
+  }
+}
+
 /**
  * Builds the DO registration from grouped metadata and the Worker's selection.
  * One owner: the DO records the given selection rather than re-deriving it (H2).
- * `runtimeIsolation` follows modern runtime authorization (M1).
+ * `runtimeIsolation` follows modern runtime authorization (M1) or materialized
+ * MCP servers. `mcpPrivateKey` decrypts `profile.mcpServers` transiently to fail
+ * closed before any route is prepared; the encrypted snapshot rides the
+ * DO-private credential source and only the Sandbox DO decrypts it before a
+ * frame.
  */
 export function buildControlPlaneSessionRegistration(
   metadata: SessionMetadata,
-  sandboxSelection: ControlPlaneSandboxSelection
+  sandboxSelection: ControlPlaneSandboxSelection,
+  mcpPrivateKey?: string
 ): ControlPlaneSessionRegistration {
   const kiloSessionId = metadata.auth.kiloSessionId;
   if (kiloSessionId === undefined || kiloSessionId.length === 0) {
@@ -141,15 +179,25 @@ export function buildControlPlaneSessionRegistration(
   if (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxId !== sandboxId) {
     throw new Error('Sandbox selection billing does not match the session sandbox');
   }
-  const payload = buildSessionAttachPayload(metadata);
-  const spec = controlPlaneRouteSpecFromAttachPayload(
-    payload,
-    { sessionId: metadata.identity.sessionId, kiloSessionId },
-    hasModernRuntimeAuthorization(metadata) ? { runtimeIsolation: 'per-session' } : undefined
+  const payload = materializeAttachPayload(metadata, mcpPrivateKey);
+  if (payload.mcp !== undefined) {
+    const validated = parseSessionAttachMcpServers(payload.mcp);
+    if (!validated.success) throw new McpAttachValidationError(validated.reason);
+  }
+  const spec = controlPlaneRouteSpecSchema.parse(
+    controlPlaneRouteSpecFromAttachPayload(
+      payload,
+      { sessionId: metadata.identity.sessionId, kiloSessionId },
+      hasModernRuntimeAuthorization(metadata) ? { runtimeIsolation: 'per-session' } : undefined
+    )
   );
+  // `payload.mcp` is present only when materialization was not omitted for a
+  // read-only Bitbucket review, so the encrypted snapshot is gated on it too.
+  const encryptedMcpServers = payload.mcp === undefined ? undefined : metadata.profile?.mcpServers;
   const credentials: ControlPlaneCredentialSource = {
     ...credentialSourceFromMetadata(metadata),
     scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
   };
   return { sandboxId, spec, credentials, sandboxSelection };
 }

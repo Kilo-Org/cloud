@@ -12,8 +12,9 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { ExecResult } from '../utils.js';
+import type { ExecResult, ProcessOutputStream } from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
+import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 
 function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
   return {
@@ -71,10 +72,14 @@ type Harness = {
   restoreCalls: () => number;
   restoreOptions: () => Array<Record<string, unknown> | undefined>;
   setEnsureRejects: (value: boolean) => void;
+  setEnsureError: (value: unknown) => void;
   setEnsureHung: (value: boolean) => void;
   setUnavailable: (key: string, value: boolean) => void;
   setBootstrapMarker: (value: boolean) => void;
   setSetupResult: (value: ExecResult) => void;
+  setSetupOutput: (
+    value: (onOutput: (stream: ProcessOutputStream, output: string) => void) => void
+  ) => void;
 };
 
 function createHarness(
@@ -104,10 +109,14 @@ function createHarness(
   });
   const restoreArgs: Array<Record<string, unknown> | undefined> = [];
   let ensureRejects = false;
+  let ensureError: unknown;
   let ensureHung = false;
   let ensureCalls = 0;
   let ensureSessionCalls = 0;
   let setupResult = result(0);
+  let setupOutput:
+    | ((onOutput: (stream: ProcessOutputStream, output: string) => void) => void)
+    | undefined;
   let bootstrapMarker = false;
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
@@ -119,6 +128,7 @@ function createHarness(
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
       await options.beforeEnsure?.();
       if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
+      if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
       return {
         serverUrl: 'http://127.0.0.1:1',
@@ -169,7 +179,10 @@ function createHarness(
       }
       return result(0);
     },
-    runSetup: async () => setupResult,
+    runSetup: async (_command, _directory, _env, onOutput) => {
+      setupOutput?.(onOutput ?? (() => undefined));
+      return setupResult;
+    },
     restore: (async (...args: unknown[]) => {
       restoreArgs.push(args[3] as Record<string, unknown> | undefined);
       return restore();
@@ -215,6 +228,9 @@ function createHarness(
     setEnsureRejects: value => {
       ensureRejects = value;
     },
+    setEnsureError: value => {
+      ensureError = value;
+    },
     setEnsureHung: value => {
       ensureHung = value;
     },
@@ -227,6 +243,9 @@ function createHarness(
     },
     setSetupResult: value => {
       setupResult = value;
+    },
+    setSetupOutput: value => {
+      setupOutput = value;
     },
   };
 }
@@ -321,6 +340,53 @@ describe('createPreparationManager', () => {
       await harness.manager.prepare(spec);
       expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
     }
+  });
+
+  it('materializes MCP servers into the runtime env and redacts them from setup output', async () => {
+    const secret = 'mcp-secret-header-value';
+    const harness = createHarness();
+    harness.setSetupOutput(onOutput => onOutput('stdout', `leaked ${secret}\n`));
+    const spec = routeSpec({
+      runtimeIsolation: 'per-session',
+      setupCommands: ['echo hi'],
+      mcp: {
+        github: {
+          type: 'remote',
+          url: 'https://mcp.example.com/github',
+          headers: { 'X-Neutral-Header': secret },
+        },
+      },
+    });
+
+    await harness.manager.prepare(spec);
+
+    const runtimeEnv = harness.ensureInputs[0]?.env;
+    expect(runtimeEnv).toBeDefined();
+    const config = JSON.parse(runtimeEnv!.KILO_CONFIG_CONTENT ?? '{}') as {
+      mcp?: Record<string, unknown>;
+    };
+    expect(config.mcp).toEqual(spec.mcp);
+    // The materialized header value is a live secret: setup output must not leak it.
+    expect(JSON.stringify(harness.frames)).not.toContain(secret);
+    const setupOutput = harness.frames.find(
+      frame =>
+        frame.type === 'session.events' &&
+        frame.events.some(event => event.type === 'session.setup.output')
+    );
+    expect(setupOutput).toBeDefined();
+  });
+
+  it('fails a per-session route without retrying when the warm runtime MCP config drifted', async () => {
+    const harness = createHarness();
+    harness.setEnsureError(new KiloWorktreeMcpMismatchError());
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    const failed = harness.frames.find(frame => frame.type === 'session.failed');
+    expect(failed).toBeDefined();
   });
 
   it('suppresses failed and runtime retries after release during a rejected startup', async () => {

@@ -11,6 +11,7 @@ import {
   cleanupStaleKiloPidfiles,
   createKiloRuntime,
   createKiloRuntimes,
+  KiloWorktreeMcpMismatchError,
   parseKiloPidfile,
   type KiloFeedCallbacks,
   type KiloProcess,
@@ -1304,6 +1305,55 @@ describe('createKiloRuntimes', () => {
     releaseShutdown.resolve();
     await retire;
     expect(runtimes.get('dir')).not.toBe(first);
+  });
+
+  it('reuses a warm runtime for the same MCP config and rejects drift', async () => {
+    let created = 0;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-mcp-test-pids',
+      createRuntime: options => {
+        created += 1;
+        return {
+          directory: options.directory,
+          env: options.env,
+          client: {},
+          ensure: async () => ({}),
+          installCredentials: async () => undefined,
+          applyPendingCredentials: async () => false,
+          isSuspected: () => false,
+          isRestarting: () => false,
+          isUnavailable: () => false,
+          shutdown: async () => undefined,
+        } as unknown as KiloRuntime;
+      },
+    });
+    const config = (mcp: unknown, token = 'alias-a') => ({
+      KILO_CONFIG_CONTENT: JSON.stringify({ auth: { token }, mcp }),
+    });
+    const input = (mcp: unknown, token?: string) => ({
+      key: 'session-a',
+      directory: '/tmp/dir',
+      env: config(mcp, token),
+    });
+
+    await runtimes.ensure(input({ a: 1 }));
+    await runtimes.ensure(input({ a: 1 }));
+    expect(created).toBe(1);
+
+    // A credential rotation changes the Kilo alias, not the MCP set: reuse.
+    await runtimes.ensure(input({ a: 1 }, 'alias-b'));
+    expect(created).toBe(1);
+
+    let drift: unknown;
+    try {
+      await runtimes.ensure(input({ a: 2 }));
+    } catch (error) {
+      drift = error;
+    }
+    expect(drift).toBeInstanceOf(KiloWorktreeMcpMismatchError);
+    // Drift must not silently recreate the runtime with the changed servers.
+    expect(created).toBe(1);
   });
 });
 

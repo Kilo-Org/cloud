@@ -29,6 +29,7 @@ import {
 } from '../control/worktree-runtime.js';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
 import { stripAnsi } from '../event-parser.js';
+import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
@@ -514,7 +515,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        if (!isCurrent()) throw error;
+        // A per-session MCP drift is permanent for this key; retrying would drop
+        // the existing runtime and accept the changed servers.
+        if (!isCurrent() || error instanceof KiloWorktreeMcpMismatchError) throw error;
         lastError = error;
         // M1: a hung spawn leaves `ensure` returning the same pending promise,
         // so drop the runtime before the retry starts a fresh one.
@@ -555,19 +558,23 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       targets: credentials?.proxy?.targets ?? kiloConfig.targets,
     };
     const home = homeFor(homeKey(spec), directory, homeRoot);
-    const env = buildWorktreeKiloEnvironment(
-      directory,
-      home,
-      kiloAuth,
-      spec.env ?? {},
-      inheritedEnv
-    );
-    const redact = createSecretRedactor(inheritedEnv, spec.env ?? {}, {
-      ...env,
-      ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-    });
 
     try {
+      // Built inside the failure scope: an over-limit CLI config must surface as
+      // `session.failed`, not reject the prepare promise (which the caller
+      // swallows while the route waits out its timeout).
+      const env = buildWorktreeKiloEnvironment(
+        directory,
+        home,
+        kiloAuth,
+        spec.env ?? {},
+        inheritedEnv,
+        spec.mcp
+      );
+      const redact = createSecretRedactor(inheritedEnv, spec.env ?? {}, {
+        ...env,
+        ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+      });
       const needsWorkspace = Boolean(spec.git) || (spec.setupCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
       // directory and re-check the marker so a waiting session skips the work.
@@ -657,7 +664,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         targets: credentials.proxy?.targets ?? route.kilo.targets,
       },
       route.spec.env ?? {},
-      inheritedEnv
+      inheritedEnv,
+      route.spec.mcp
     );
     route.env = nextEnv;
     await deps.runtimes.installCredentials(route.key, nextEnv);

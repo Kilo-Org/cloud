@@ -594,7 +594,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     if (!validated.success) return createFailure('BAD_REQUEST', 'Invalid session metadata');
     let registration: ControlPlaneSessionRegistration;
     try {
-      registration = buildControlPlaneSessionRegistration(validated.data, sandboxSelection);
+      registration = buildControlPlaneSessionRegistration(
+        validated.data,
+        sandboxSelection,
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY
+      );
     } catch (error) {
       return createFailure('BAD_REQUEST', errorMessage(error));
     }
@@ -648,7 +652,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     }
     let registration: ControlPlaneSessionRegistration;
     try {
-      registration = buildControlPlaneSessionRegistration(metadata, sandboxSelection);
+      registration = buildControlPlaneSessionRegistration(
+        metadata,
+        sandboxSelection,
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY
+      );
     } catch (error) {
       return createFailure('BAD_REQUEST', errorMessage(error));
     }

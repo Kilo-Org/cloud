@@ -1277,7 +1277,7 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
-  const payload = buildSessionAttachPayload(metadata);
+  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
   return prepareCredentialGrant({
     env,
     source: credentialSourceFromMetadata(metadata),

@@ -1,4 +1,5 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { generateKeyPairSync } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -16,6 +17,7 @@ import type {
 } from '../../src/sandbox-control/provider.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
   createFakeCredentialBroker,
   installFakeCredentialEnv,
@@ -256,6 +258,99 @@ describe('SandboxControlV2 routes and forwarding', () => {
       sessionId: SESSION,
       view: { state: 'ready', attemptId: expect.any(String) },
     });
+  });
+
+  it('materializes encrypted credential-source MCP into the frame without persisting plaintext', async () => {
+    const { publicKey, privateKey } = generateKeyPairSync('rsa', {
+      modulusLength: 2048,
+      publicKeyEncoding: { type: 'spki', format: 'pem' },
+      privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+    });
+    const secret = 'live-mcp-secret-value';
+    const envelope = encryptWithPublicKey(secret, publicKey);
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const peer = new FakeSessionPeer();
+    const stub = sandboxNamespace.getByName(SANDBOX_ID);
+    await runInDurableObject(stub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, broker, { AGENT_ENV_VARS_PRIVATE_KEY: privateKey });
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+        sessionPeerFor: (_ownerId: string, sessionId: string) => peer.forSession(sessionId),
+      });
+    });
+
+    const input = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        ...prepareInput(SESSION).credentials,
+        mcpServers: {
+          github: {
+            type: 'remote' as const,
+            url: 'https://mcp.example.com/github',
+            headers: { 'X-Neutral-Header': envelope },
+          },
+        },
+      },
+    };
+    const view = await stub.prepare(input);
+    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+
+    const { wrapper } = await connectAndHello(provider);
+    const frame = await wrapper.next();
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.mcp).toEqual({
+      github: {
+        type: 'remote',
+        url: 'https://mcp.example.com/github',
+        headers: { 'X-Neutral-Header': secret },
+      },
+    });
+
+    // At rest the route row keeps the envelope only; the durable spec has no MCP.
+    const row = await readRouteRow(stub, SESSION);
+    expect(row?.spec).not.toContain(secret);
+    expect(row?.spec).not.toContain('mcp');
+    expect(row?.credential_source).toContain(envelope.encryptedData);
+    expect(row?.credential_source).not.toContain(secret);
+  });
+
+  it('fails the attempt immediately when credential-source MCP cannot be decrypted', async () => {
+    const provider = createFakeProvider();
+    // No AGENT_ENV_VARS_PRIVATE_KEY binding: decryption fails at send time.
+    const { stub, peer } = await setup(provider);
+    const input = {
+      spec: routeSpec(SESSION),
+      credentials: {
+        ...prepareInput(SESSION).credentials,
+        mcpServers: {
+          github: {
+            type: 'remote' as const,
+            url: 'https://mcp.example.com/github',
+            headers: {
+              Authorization: {
+                encryptedData: 'ZW5jcnlwdGVk',
+                encryptedDEK: 'ZGVr',
+                algorithm: 'rsa-aes-256-gcm' as const,
+                version: 1 as const,
+              },
+            },
+          },
+        },
+      },
+    };
+    await stub.prepare(input);
+    await connectAndHello(provider);
+
+    // Fail fast, not after the route preparation deadline.
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'failed', reason: 'workspace_setup_failed' })
+      )
+    );
+    expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
   });
 
   it('refuses to prepare a route whose worktree is mid-deletion', async () => {

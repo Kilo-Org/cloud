@@ -4,7 +4,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
-import { gitAuthorSchema } from './sandbox-control-protocol.js';
+import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
   sessionTerminalConnectPayloadSchema,
@@ -172,6 +172,13 @@ export const controlPlaneRouteSpecSchema = z
     git: controlPlaneRouteGitSchema.optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
+    /**
+     * Materialized (plaintext) MCP servers for `KILO_CONFIG_CONTENT.mcp`. Only
+     * the Sandbox DO adds this to the `session.prepare` frame; it is never stored
+     * in a route spec or the Session DO registration. The durable metadata keeps
+     * only the encrypted envelopes.
+     */
+    mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
@@ -236,6 +243,13 @@ export const controlPlaneCredentialSourceSchema = z
       .optional(),
     createdOnPlatform: z.string().max(100).optional(),
     repository: controlPlaneCredentialRepositorySchema.optional(),
+    /**
+     * Worker-encrypted `profile.mcpServers` snapshot. Persisted only inside this
+     * DO-private source; the Sandbox DO re-validates it and decrypts it only when
+     * building a `session.prepare` frame. Opaque here so the shared schema (and
+     * the wrapper bundle) never imports the worker persistence schema.
+     */
+    mcpServers: z.record(z.string().min(1).max(100), z.unknown()).optional(),
     /** Credential scope (worktree id); defaults to the route's session id. */
     scopeId: z.string().min(1).max(256).optional(),
   })
@@ -266,6 +280,13 @@ export const controlPlanePrepareInputSchema = z
         code: 'custom',
         path: ['spec', 'kilo'],
         message: 'prepare spec must not carry kilo credential material',
+      });
+    }
+    if (value.spec.mcp !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'mcp'],
+        message: 'prepare spec must not carry materialized MCP servers',
       });
     }
   });

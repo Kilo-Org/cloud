@@ -855,6 +855,36 @@ export type KiloRuntimes = {
 };
 
 /**
+ * A per-session route asked to reuse a warm runtime whose materialized MCP
+ * servers differ. The route must fail rather than silently accept the change
+ * (legacy `worktree-runtime.ts` `mcpSignature` drift rejection). Non-retryable:
+ * the caller must not drop and recreate the runtime to "fix" it.
+ */
+export class KiloWorktreeMcpMismatchError extends Error {
+  constructor() {
+    super('Kilo worktree MCP configuration mismatch');
+    this.name = 'KiloWorktreeMcpMismatchError';
+  }
+}
+
+/**
+ * The MCP portion of the runtime configuration. Credential refreshes rotate the
+ * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
+ * false-positive; only `mcp` identifies the session's server set.
+ */
+function mcpConfigurationSignature(env: Record<string, string>): string {
+  const raw = env.KILO_CONFIG_CONTENT;
+  if (raw === undefined) return '';
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return raw;
+    return JSON.stringify((parsed as { mcp?: unknown }).mcp ?? {});
+  } catch {
+    return raw;
+  }
+}
+
+/**
  * One Kilo runtime per directory (or per session under per-session isolation).
  * A fresh `ensure` after the restart budget is spent replaces the runtime,
  * which resets the budget (spec §7 "Preparation": a re-prepare starts fresh).
@@ -869,7 +899,14 @@ export function createKiloRuntimes(options: KiloRuntimesOptions): KiloRuntimes {
   return {
     async ensure(input) {
       const existing = runtimes.get(input.key);
-      if (existing && !existing.isUnavailable()) return existing.ensure();
+      if (existing && !existing.isUnavailable()) {
+        // A per-session MCP route must own its runtime: reuse only when the
+        // materialized servers are unchanged.
+        if (mcpConfigurationSignature(existing.env) !== mcpConfigurationSignature(input.env)) {
+          throw new KiloWorktreeMcpMismatchError();
+        }
+        return existing.ensure();
+      }
       if (existing) {
         // Retire the old runtime before awaiting its shutdown: a second session
         // on the same key must not see the shutting-down runtime (`stopped`

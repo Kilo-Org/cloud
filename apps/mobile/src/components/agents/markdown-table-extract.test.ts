@@ -68,8 +68,13 @@ async function loadSplitter() {
 }
 
 describe('splitMarkdownTables', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    // The splitter shares a module-level, value-keyed lex/result cache with the
+    // other markdown paths, so a value cached by an earlier test would make the
+    // lex-count assertions below read 0. Start every case from an empty cache.
+    const { clearMarkdownParseCache } = await import('./markdown-parse-cache');
+    clearMarkdownParseCache();
   });
 
   it('returns text and table segments in source order with ordinal keys', async () => {

@@ -21,6 +21,7 @@ import {
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
+import { clearMarkdownParseCache } from './markdown-parse-cache';
 import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownText } from './markdown-text';
 
@@ -56,6 +57,17 @@ vi.mock('react-native-marked', async () => {
     useMarkdown: vi.fn((value: string) => [
       React.createElement('MarkdownOutput', { key: 'output', value }),
     ]),
+  };
+});
+// MarkdownSegment parses cached tokens through useMarkdownElements, which
+// deep-imports react-native-marked's real Parser. This suite stubs the element
+// renderer and react-native, so route the hook through the same mocked
+// `useMarkdown` the routing assertions already observe.
+vi.mock('./markdown-elements', async () => {
+  const marked = await import('react-native-marked');
+  return {
+    useMarkdownElements: (value: string, options?: Parameters<typeof marked.useMarkdown>[1]) =>
+      marked.useMarkdown(value, options),
   };
 });
 vi.mock('react-native-render-html', () => ({ default: 'RenderHTML' }));
@@ -106,6 +118,7 @@ const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
 const AnchorType = 'Anchor' as unknown as ComponentType;
 const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
 const MarkdownTableType = 'MarkdownTable' as unknown as ComponentType;
+const MarkdownOutputType = 'MarkdownOutput' as unknown as ComponentType;
 const TextType = 'Text' as unknown as ComponentType;
 const ViewType = 'View' as unknown as ComponentType;
 
@@ -156,6 +169,10 @@ function requiredRenderer(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // The markdown paths share a module-level, value-keyed lex/result cache; a
+  // value cached by an earlier test would make the exact lex-count assertions
+  // read one too few. Start every case from an empty cache.
+  clearMarkdownParseCache();
 });
 
 describe('MarkdownText HTML routing', () => {
@@ -206,6 +223,21 @@ describe('MarkdownText HTML routing', () => {
       renderer.update(<MarkdownText value={value} selectable={false} />);
     });
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+  });
+
+  it('lexes a completed markdown value once across a remount', async () => {
+    // Regression: every mount lexed the whole value again (react-native-marked
+    // runs `marked.lexer` inside a per-instance memo, and the split snapshots
+    // were per instance), so a transcript row re-entering the list window
+    // re-parsed its message from scratch. The shared, value-keyed lex cache
+    // makes a remount of an unchanged value reuse the tokens.
+    const value = 'Hello **world**\n\n```html\n<div>code only</div>\n```';
+    const first = await mount(<MarkdownText value={value} />);
+    const second = await mount(<MarkdownText value={value} />);
+
+    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+    expect(first.root.findAllByType(MarkdownOutputType)).toHaveLength(1);
+    expect(second.root.findAllByType(MarkdownOutputType)).toHaveLength(1);
   });
 
   it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {

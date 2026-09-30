@@ -100,6 +100,13 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Pressable: 'Pressable',
+  // useMarkdownElements deep-imports react-native-marked's real getStyles,
+  // which builds its styles with StyleSheet.create/flatten.
+  StyleSheet: {
+    create: (styles: Record<string, unknown>) => styles,
+    flatten: (style: unknown) => style,
+    hairlineWidth: 1,
+  },
   Text: 'Text',
   View: 'View',
   useColorScheme: () => 'light',

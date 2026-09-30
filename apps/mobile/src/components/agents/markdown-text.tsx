@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import { useColorScheme, View } from 'react-native';
-import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { useMarkdownElements } from './markdown-elements';
 import {
   MarkdownHtml,
   type MarkdownHtmlSnapshot,
@@ -145,7 +145,8 @@ function MarkdownContent({
   onLongPressCode,
 }: Readonly<MarkdownContentProps>) {
   // Tables are extracted before any renderer runs: each table becomes a chip
-  // (parsed on open), and the remaining markdown runs render through useMarkdown.
+  // (parsed on open), and the remaining markdown runs render through
+  // useMarkdownElements.
   const [snapshot, setSnapshot] = useState(() => ({
     value,
     segments: splitTableSegments(value),
@@ -243,7 +244,7 @@ function MarkdownSegment({
     [palette, selectable, onLongPressLink, onPressLink, onCopyCode, onLongPressCode, value]
   );
 
-  const elements = useMarkdown(value, {
+  const elements = useMarkdownElements(value, {
     colorScheme,
     theme,
     styles,

@@ -17,10 +17,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren } from './code-block-chunk-content';
 import {
-  chunkTokenLines,
+  chunkSourceLines,
+  CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
-  nextChunkMountCount,
-  tokenizeCodeLines,
 } from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
@@ -86,13 +85,13 @@ const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
  * ceiling documented in `highlight.ts`). A fence renders one `RNText` per chunk
  * of source lines, mirroring the shipped `DiffLine` pattern, and a single line
  * denser than the chunk's run budget is split across chunks so no `Text` holds
- * an unbounded run set (see `chunkTokenLines`).
+ * an unbounded run set (see `chunkSourceLines`).
  * Android builds one `SpannableStringBuilder` per `ReactTextView` and runs
  * `SetSpanOperation.execute` once per span on the UI thread, so a fence
  * rendered as one `RNText` made the span count scale with the whole fence — a
  * long file blocked input dispatch. A chunk bounds the spans one `Text` holds
  * and still needs a small fraction of the views a `Text` per line would cost
- * (see `chunkTokenLines`); the chunk's lines lay out together in one
+ * (see `chunkSourceLines`); the chunk's lines lay out together in one
  * `StaticLayout` instead of the whole fence doing so.
  *
  * A SELECTABLE fence renders those same chunks. Android can only select across
@@ -118,6 +117,8 @@ const CODE_LINE_CLASSNAME = 'font-mono text-xs leading-4';
  * while the rest arrives. A streamed fence keeps the mounts it already has and
  * batches only its new lines; only a replaced fence restarts from the first
  * paint, so a growing transcript fence never drops and re-applies its spans.
+ * Each batch highlights only the source lines its chunks need, so a mount that
+ * paints the first paint never tokenizes the rest of a long fence.
  *
  * Accessibility: the fence is ONE element whether or not it is selectable. The
  * chunk `RNText`s sit in one accessible `View`: `Text` defaults to an
@@ -169,13 +170,9 @@ function CodeBlockImpl({
   // tokens would silently flip against their surface.
   const isDark = useColorScheme() === 'dark';
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
-  const tokenLines = useMemo(
-    () => tokenizeCodeLines(displayText, language),
-    [displayText, language]
-  );
-  // Memoized so the chunk array keeps its identity and the code content below
-  // is not rebuilt (and its spans re-applied) on an unrelated re-render.
-  const tokenChunks = useMemo(() => chunkTokenLines(tokenLines), [tokenLines]);
+  // The fence's source lines. Highlighting and chunking happen lazily per
+  // mounted chunk below, through the per-line `highlightLine` cache.
+  const sourceLines = useMemo(() => displayText.split('\n'), [displayText]);
   // How much of the fence is mounted right now, remembered with the text it was
   // mounted for. The first paint mounts CODE_FIRST_PAINT_CHUNKS chunks — 128
   // lines, about a screen at this leading — so the sheet shows its header and
@@ -200,27 +197,34 @@ function CodeBlockImpl({
     setMountProgress({ text: displayText, chunks: CODE_FIRST_PAINT_CHUNKS });
   }
   const mountedChunkCount = sameFence ? mountProgress.chunks : CODE_FIRST_PAINT_CHUNKS;
-  // Add one batch per commit until the fence is fully mounted. Each batch is
-  // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay
-  // bounded however long the file is.
+  // Highlight only the source lines the mounted chunks need, and keep the chunk
+  // array's identity so the code content below is not rebuilt (and its spans
+  // re-applied) on an unrelated re-render. `consumed` is false while the fence
+  // still has lines the mounted chunks have not reached; a later batch raises
+  // the count and re-chunks, reusing the lines already highlighted for this
+  // source-line array through `chunkSourceLines`'s per-fence memo, so the walk
+  // only pays for the lines the new batch reaches.
+  const { chunks: mountedChunks, consumed } = useMemo(
+    () => chunkSourceLines(sourceLines, language, mountedChunkCount),
+    [sourceLines, language, mountedChunkCount]
+  );
+  // Add one batch per commit until the fence is fully chunked. Each batch is
+  // CODE_CHUNK_MOUNT_BATCH chunks, so the lines highlighted and the spans
+  // applied in one frame stay bounded however long the file is.
   useEffect(() => {
-    if (mountedChunkCount >= tokenChunks.length) {
+    if (consumed) {
       return undefined;
     }
     const timer = setTimeout(() => {
       setMountProgress({
         text: displayText,
-        chunks: nextChunkMountCount(mountedChunkCount, tokenChunks.length),
+        chunks: mountedChunkCount + CODE_CHUNK_MOUNT_BATCH,
       });
     }, 0);
     return () => {
       clearTimeout(timer);
     };
-  }, [displayText, mountedChunkCount, tokenChunks.length]);
-  const mountedChunks = useMemo(
-    () => tokenChunks.slice(0, Math.min(mountedChunkCount, tokenChunks.length)),
-    [tokenChunks, mountedChunkCount]
-  );
+  }, [displayText, consumed, mountedChunkCount]);
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   // Content-space Y of the revealed copy action; null means hidden. The action
   // is anchored to the tap, not the block top: a long fence is many screens

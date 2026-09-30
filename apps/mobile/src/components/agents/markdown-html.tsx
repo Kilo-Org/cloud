@@ -24,6 +24,7 @@ import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
+import { createMarkdownResultCache, getLexedMarkdown } from './markdown-parse-cache';
 import {
   getMarkdownHeadingStyles,
   getMarkdownHtmlTagStyles,
@@ -198,9 +199,15 @@ function tokenSegment(token: Token): MarkdownHtmlSegment {
   return { type: 'markdown', raw: token.raw };
 }
 
+const cachedMarkdownHtmlSegments = createMarkdownResultCache<MarkdownHtmlSegment[]>();
+const cachedMarkdownHtmlSplit = createMarkdownResultCache<MarkdownHtmlSplit>();
+
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
-  // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-  const tokens = MarkedLexer(value, { gfm: true });
+  return cachedMarkdownHtmlSegments(value, () => splitMarkdownHtmlSegments(value));
+}
+
+function splitMarkdownHtmlSegments(value: string): MarkdownHtmlSegment[] {
+  const tokens = getLexedMarkdown(value);
   const segments: MarkdownHtmlSegment[] = [];
   for (const token of tokens) {
     pushSegment(segments, tokenSegment(token));
@@ -427,8 +434,17 @@ export function splitMarkdownHtmlIncremental(
 
   // No reusable prefix: lex the whole value once and keep every token before
   // the boundary as the head, so the next publish starts from a token boundary.
-  // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-  const tokens = MarkedLexer(value, { gfm: true });
+  // A mount with no previous snapshot is value-pure, so its whole result is
+  // cached; a stream that fell through here still shares the lexed tokens but
+  // keeps building its own snapshot.
+  if (previous === undefined) {
+    return cachedMarkdownHtmlSplit(value, () => splitMarkdownHtmlWholeValue(value));
+  }
+  return splitMarkdownHtmlWholeValue(value);
+}
+
+function splitMarkdownHtmlWholeValue(value: string): MarkdownHtmlSplit {
+  const tokens = getLexedMarkdown(value);
   const headSegments: MarkdownHtmlSegment[] = [];
   const { segments, tailStart } = appendTokens(tokens, headSegments, 0);
   return {

@@ -1,11 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+import * as highlightModule from '@/lib/pr-review/diff/highlight';
 
 import {
+  chunkSourceLines,
   chunkTokenLines,
+  CODE_CHUNK_MOUNT_BATCH,
   CODE_CHUNK_TOKENS,
+  CODE_FIRST_PAINT_CHUNKS,
   normalizeFenceLanguage,
   tokenizeCodeLines,
 } from './code-block-model';
+
+// Count the highlighter's work: the lazy path must not re-run `highlightLine`
+// for lines a previous batch already highlighted. The mock delegates to the
+// real highlighter (and its per-line LRU) but records every invocation.
+vi.mock('@/lib/pr-review/diff/highlight', async importOriginal => {
+  const actual = await importOriginal<typeof highlightModule>();
+  return { ...actual, highlightLine: vi.fn(actual.highlightLine) };
+});
 
 describe('normalizeFenceLanguage', () => {
   it('returns null for undefined, empty, and whitespace-only info strings', () => {
@@ -100,5 +113,38 @@ describe('chunkTokenLines', () => {
     expect(chunks).toHaveLength(2);
     expect(chunks[0]).toHaveLength(32);
     expect(chunks[1]).toHaveLength(8);
+  });
+});
+
+describe('chunkSourceLines', () => {
+  it('highlights a bounded first paint, then only the lines each later batch reaches', () => {
+    // Regression: every batch re-ran the lazy generator from line 0 and called
+    // `highlightLine` for every line before its own. A long fence was
+    // O(lines²/batch) highlighter work, and once the fence passed the per-line
+    // LRU cap each batch re-tokenized the whole fence in one commit. The
+    // per-fence memo makes the walk over already-highlighted lines free.
+    const code = Array.from({ length: 5000 }, (_, index) => `const value${index} = ${index};`);
+    const mocked = vi.mocked(highlightModule.highlightLine);
+    mocked.mockClear();
+
+    const first = chunkSourceLines(code, 'typescript', CODE_FIRST_PAINT_CHUNKS);
+    expect(first.consumed).toBe(false);
+    expect(first.chunks).toHaveLength(CODE_FIRST_PAINT_CHUNKS);
+    const firstPaintCalls = mocked.mock.calls.length;
+    expect(firstPaintCalls).toBeLessThanOrEqual(
+      first.chunks.flat().length + CODE_FIRST_PAINT_CHUNKS
+    );
+    expect(firstPaintCalls).toBeLessThan(code.length / 10);
+
+    let result = first;
+    let maxChunks = CODE_FIRST_PAINT_CHUNKS;
+    while (!result.consumed) {
+      maxChunks += CODE_CHUNK_MOUNT_BATCH;
+      result = chunkSourceLines(code, 'typescript', maxChunks);
+    }
+
+    // Every source line was highlighted at most once across every batch.
+    expect(mocked.mock.calls.length).toBe(code.length);
+    expect(result.chunks.length).toBeGreaterThan(1);
   });
 });

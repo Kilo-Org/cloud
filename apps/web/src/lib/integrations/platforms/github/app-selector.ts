@@ -9,6 +9,9 @@ import { Octokit } from '@octokit/rest';
  */
 export type GitHubAppType = 'standard' | 'lite';
 
+/**
+ * Credentials for a GitHub App
+ */
 export type GitHubAppCredentials = {
   appId: string;
   privateKey: string;
@@ -36,9 +39,16 @@ export async function getGitHubAppTypeForOrganization(
     return 'standard';
   }
 
+  // Use the github_app_type from organization settings
   return organization.settings?.github_app_type ?? 'standard';
 }
 
+/**
+ * Gets the credentials for the specified GitHub App type.
+ *
+ * @param appType - The type of app to get credentials for
+ * @returns The credentials for the specified app type
+ */
 export function getGitHubAppCredentials(appType: GitHubAppType): GitHubAppCredentials {
   if (appType === 'lite') {
     return {

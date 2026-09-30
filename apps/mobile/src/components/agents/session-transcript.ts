@@ -9,15 +9,36 @@ import {
 
 import { isSameLocalDay, isValidTranscriptTime } from './message-time-label';
 import { messageRendersContent, partRendersContent } from './message-visibility';
-import { memoizedMessageItem, memoizedPreparationItem } from './session-transcript-memo';
-import {
-  type SessionTranscriptItem,
-  type SessionTranscriptTimeMarker,
-  type TranscriptItemKeysByPart,
-} from './session-transcript-types';
 import { isCondensableToolPart } from './session-tool-run';
 
-export type { SessionTranscriptItem, TranscriptItemKeysByPart } from './session-transcript-types';
+/**
+ * A burst-opening time marker. It rides on the first item a message row emits so
+ * a prepend can never add, remove, or re-key a row that is already on screen: the
+ * marker moves to the older message while every message keeps its `info.id` key.
+ */
+type SessionTranscriptTimeMarker = { created: number; dayChanged: boolean };
+
+export type SessionTranscriptItem =
+  | {
+      type: 'message';
+      message: StoredMessage;
+      /**
+       * The exact subset of `message.parts` to render, set only when a condensed
+       * run split the message around its visible parts. Omitted for an unchanged
+       * message, whose full part list is rendered.
+       */
+      parts?: Part[];
+      timeMarker?: SessionTranscriptTimeMarker;
+    }
+  | { type: 'preparation'; attempt: PreparationAttempt }
+  | {
+      type: 'tool-run';
+      id: string;
+      /** The run's first part's message id, for resume-anchor matching. */
+      messageId: string;
+      parts: ToolPart[];
+      timeMarker?: SessionTranscriptTimeMarker;
+    };
 
 /**
  * A time marker opens a run of messages. Below this gap the messages belong to the
@@ -55,6 +76,15 @@ export function getSessionTranscriptItemKey(item: SessionTranscriptItem): string
   }
   return item.id;
 }
+
+/**
+ * The item key each rendered part had in one transcript build, keyed by part id.
+ * A condensed row's key is derived from the parts it holds, so a later build
+ * cannot recompute the key a row was born with from its parts alone. Carrying
+ * this map from the previous build lets `condenseTranscriptToolRuns` keep a row's
+ * existing key when a prepend or a streaming part changes the run's first part.
+ */
+export type TranscriptItemKeysByPart = ReadonlyMap<string, string>;
 
 /**
  * Records, for every part an item renders, the key of the item that renders it.
@@ -173,7 +203,7 @@ export function mergeSessionTranscript(
       const created = message.info.time.created;
       // One validity rule, shared with the marker component: a timestamp the label
       // cannot format must never produce a marker.
-      let timeMarker: SessionTranscriptTimeMarker | undefined = undefined;
+      let timeMarker: { created: number; dayChanged: boolean } | undefined = undefined;
       if (isValidTranscriptTime(created)) {
         const dayChanged =
           previousCreated !== undefined && !isSameLocalDay(created, previousCreated);
@@ -186,17 +216,15 @@ export function mergeSessionTranscript(
         }
         previousCreated = created;
       }
-      items.push(
-        memoizedMessageItem(message, timeMarker, deliveryStates?.get(message.info.id)?.status)
-      );
+      items.push({ type: 'message', message, ...(timeMarker ? { timeMarker } : {}) });
     }
     for (const attempt of byMessageId.get(message.info.id) ?? []) {
-      items.push(memoizedPreparationItem(attempt));
+      items.push({ type: 'preparation', attempt });
     }
   }
   for (const attempt of visibleAttempts) {
     if (!messageIds.has(attempt.triggerMessageId)) {
-      items.push(memoizedPreparationItem(attempt));
+      items.push({ type: 'preparation', attempt });
     }
   }
   return items;

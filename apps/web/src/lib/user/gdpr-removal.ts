@@ -1,4 +1,4 @@
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 
 export type GdprRemovalActor = {

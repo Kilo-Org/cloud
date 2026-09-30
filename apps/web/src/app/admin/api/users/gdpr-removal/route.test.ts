@@ -3,7 +3,7 @@ import { join } from 'path';
 import { NextRequest, NextResponse } from 'next/server';
 import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
 import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
@@ -12,7 +12,6 @@ import { GET, POST } from './route';
 
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/user');
-jest.mock('@/lib/user/find-user-by-id');
 jest.mock('@/lib/user/deletion', () => ({
   getUserDeletionRequestById: jest.fn(),
   getUserDeletionRequestForUser: jest.fn(),

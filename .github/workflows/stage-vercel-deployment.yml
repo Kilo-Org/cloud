@@ -11,11 +11,6 @@ on:
         description: 'Name of the GitHub variable containing the Vercel project ID to deploy'
         required: true
         type: string
-      source_sha:
-        description: 'Exact tested commit to deploy (defaults to the caller SHA)'
-        required: false
-        default: ''
-        type: string
     outputs:
       deployment_url:
         description: 'Staged Vercel deployment URL'
@@ -48,7 +43,6 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
-          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Install Vercel CLI
         run: npm install -g vercel@${{ env.VERCEL_VERSION }}

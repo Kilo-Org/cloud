@@ -41,6 +41,10 @@ export async function fetchGitHubInstallationRequests(
   }));
 }
 
+/**
+ * Verifies GitHub webhook signature
+ * @param appType - The type of GitHub App to verify against (defaults to 'standard')
+ */
 export function verifyGitHubWebhookSignature(
   payload: string,
   signature: string,
@@ -57,6 +61,10 @@ export function verifyGitHubWebhookSignature(
   }
 }
 
+/**
+ * Generates GitHub App installation token
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function generateGitHubInstallationToken(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -96,6 +104,10 @@ export async function generateGitHubInstallationTokenForMaintenance(
   };
 }
 
+/**
+ * Deletes a GitHub App installation
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function deleteGitHubInstallation(
   installationId: string,
   appType: GitHubAppType = 'standard'
@@ -106,6 +118,7 @@ export async function deleteGitHubInstallation(
     throw new Error(`GitHub ${appType} App credentials not configured`);
   }
 
+  // Create app-level authentication (not installation-level)
   const auth = createAppAuth({
     appId: credentials.appId,
     privateKey: credentials.privateKey,
@@ -114,6 +127,7 @@ export async function deleteGitHubInstallation(
   const { token } = await auth({ type: 'app' });
   const octokit = new Octokit({ auth: token });
 
+  // Delete the installation
   await octokit.apps.deleteInstallation({
     installation_id: parseInt(installationId),
   });
@@ -180,6 +194,10 @@ type GitHubBranch = {
   isDefault: boolean;
 };
 
+/**
+ * Fetches all repositories accessible by a GitHub App installation
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function fetchGitHubRepositories(
   installationId: string,
   appType: GitHubAppType = 'standard',
@@ -194,6 +212,7 @@ export async function fetchGitHubRepositories(
   );
   const octokit = new Octokit({ auth: tokenData.token });
 
+  // Fetch all repositories accessible by the installation using pagination
   const repositories: GitHubRepository[] = [];
   let page = 1;
   const perPage = 100;
@@ -204,6 +223,7 @@ export async function fetchGitHubRepositories(
       page,
     });
 
+    // Filter out archived repositories
     repositories.push(
       ...data.repositories
         .filter(repo => !repo.archived)
@@ -250,6 +270,10 @@ export async function fetchGitHubRepositoriesForMaintenance(
   return repositories;
 }
 
+/**
+ * Fetches all branches for a GitHub repository
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function fetchGitHubBranches(
   installationId: string,
   repositoryFullName: string,
@@ -267,12 +291,14 @@ export async function fetchGitHubBranches(
 
   const [owner, repo] = repositoryFullName.split('/');
 
+  // Fetch the repository to get the default branch
   const { data: repoData } = await octokit.repos.get({
     owner,
     repo,
   });
   const defaultBranch = repoData.default_branch;
 
+  // Fetch all branches using pagination
   const branches: GitHubBranch[] = [];
   let page = 1;
   const perPage = 100;
@@ -299,6 +325,11 @@ export async function fetchGitHubBranches(
   return branches;
 }
 
+/*
+ * Fetches GitHub App installation details including permissions
+ * Uses app-level authentication to get installation info
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function fetchGitHubInstallationDetails(
   installationId: string,
   appType: GitHubAppType = 'standard'
@@ -320,6 +351,7 @@ export async function fetchGitHubInstallationDetails(
     throw new Error(`GitHub ${appType} App credentials not configured`);
   }
 
+  // Create app-level authentication (not installation-level)
   const auth = createAppAuth({
     appId: credentials.appId,
     privateKey: credentials.privateKey,
@@ -347,7 +379,9 @@ export async function fetchGitHubInstallationDetails(
 }
 
 /**
- * Used to show that Kilo is reviewing a PR (e.g., 👀 eyes reaction).
+ * Adds a reaction to a PR (or issue)
+ * Used to show that Kilo is reviewing a PR (e.g., 👀 eyes reaction)
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function addReactionToPR(
   installationId: string,
@@ -417,7 +451,9 @@ export async function hasPRCommentWithMarker(
 }
 
 /**
- * Used to acknowledge @kilo fix mentions on inline review comments.
+ * Adds a reaction to a PR review comment
+ * Used to acknowledge @kilo fix mentions on inline review comments
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function addReactionToPRReviewComment(
   installationId: string,
@@ -439,8 +475,10 @@ export async function addReactionToPRReviewComment(
 }
 
 /**
+ * Checks the collaborator permission level for a user on a repository.
  * Returns the permission string ('admin' | 'write' | 'read' | 'none') or null
  * if the lookup fails (e.g. the App lacks permission to query collaborators).
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export type CollaboratorPermission = 'admin' | 'write' | 'read' | 'none';
 
@@ -473,6 +511,11 @@ export async function getCollaboratorPermissionLevel(
   }
 }
 
+/**
+ * Replies to a PR review comment thread
+ * Used by auto-fix to post completion/failure replies on review threads
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function replyToReviewComment(
   installationId: string,
   owner: string,
@@ -503,8 +546,9 @@ const GitHubOAuthTokenResponseSchema = z.object({
 });
 
 /**
- * Used during installation request flow to identify the GitHub user.
- *
+ * Exchange GitHub OAuth code for user information
+ * Used during installation request flow to identify the GitHub user
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  * @param codeVerifier - The PKCE code verifier, required when the
  *   authorization request that produced `code` included a code_challenge
  *   (as `beginConnection` does). GitHub rejects redemption of such a code
@@ -589,8 +633,11 @@ const KILO_REVIEW_COMMENTS_PER_PAGE = 100;
 const MAX_KILO_REVIEW_COMMENT_PAGES = 5;
 
 /**
- * Looks for the <!-- kilo-review --> marker in issue comments.
- * Falls back to detecting older Kilo comments by patterns if no marker found.
+ * Finds an existing Kilo review comment on a PR
+ * Looks for the <!-- kilo-review --> marker in issue comments
+ * Falls back to detecting older Kilo comments by patterns if no marker found
+ * Returns the most recent comment ID and body if found, null otherwise
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function findKiloReviewComment(
   installationId: string,
@@ -626,9 +673,11 @@ export async function findKiloReviewComment(
     totalComments: comments.length,
   });
 
+  // Primary: Look for comments with the kilo-review marker
   const markedComments = comments.filter(c => c.body?.includes('<!-- kilo-review -->'));
 
   if (markedComments.length > 0) {
+    // Sort by updated_at descending and pick the latest
     const latestComment = markedComments.sort((a, b) => {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     })[0];
@@ -657,6 +706,10 @@ export async function findKiloReviewComment(
   return null;
 }
 
+/**
+ * Updates an existing Kilo review comment on a GitHub PR
+ * Used to append usage footer (model + token count) after review completion
+ */
 export async function updateKiloReviewComment(
   installationId: string,
   owner: string,
@@ -683,7 +736,9 @@ export async function updateKiloReviewComment(
 }
 
 /**
- * Used to detect duplicates and track outdated inline comments.
+ * Fetches existing inline review comments on a PR
+ * Used to detect duplicates and track outdated comments
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
  */
 export async function fetchPRInlineComments(
   installationId: string,
@@ -750,6 +805,11 @@ export async function fetchPRInlineComments(
   return comments;
 }
 
+/**
+ * Gets the HEAD commit SHA for a PR
+ * Required for creating inline comments via gh api
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function getPRHeadCommit(
   installationId: string,
   owner: string,
@@ -982,6 +1042,9 @@ export async function getGitHubReviewComment(
   }
 }
 
+/**
+ * Type guard to check if an error is an HTTP error from Octokit
+ */
 function isHttpError(error: unknown): error is { status: number; message: string } {
   return (
     typeof error === 'object' &&
@@ -1215,6 +1278,15 @@ export async function fetchPullRequestReviewDecision(args: {
   return results.get('pr0') ?? null;
 }
 
+/**
+ * Get repository details including whether it's empty.
+ * Used to validate target repo before migration.
+ *
+ * @param installationId - The GitHub App installation ID
+ * @param repoFullName - The full name of the repository (owner/repo)
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @returns Repository details or null if not found/not accessible
+ */
 export async function getRepositoryDetails(
   installationId: string,
   repoFullName: string,
@@ -1240,6 +1312,8 @@ export async function getRepositoryDetails(
       repo,
     });
 
+    // Check if repo is empty by trying to get commits
+    // An empty repo has no commits
     let isEmpty = false;
     try {
       const { data: commits } = await octokit.repos.listCommits({
@@ -1271,6 +1345,7 @@ export async function getRepositoryDetails(
       isPrivate: repoData.private,
     };
   } catch (error) {
+    // 404 means repo doesn't exist or not accessible
     if (isHttpError(error) && error.status === 404) {
       return null;
     }
@@ -1279,8 +1354,12 @@ export async function getRepositoryDetails(
 }
 
 /**
- * The installation settings page is where users grant access to newly
- * created repos.
+ * Get the URL to the GitHub App installation settings page.
+ * Users may need to grant access to newly created repos here.
+ *
+ * @param installationId - The GitHub App installation ID
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ * @returns The URL to the installation settings page
  */
 export async function getInstallationSettingsUrl(
   installationId: string,
@@ -1292,6 +1371,7 @@ export async function getInstallationSettingsUrl(
     throw new Error(`GitHub ${appType} App credentials not configured`);
   }
 
+  // Create app-level authentication to get installation details
   const auth = createAppAuth({
     appId: credentials.appId,
     privateKey: credentials.privateKey,
@@ -1304,15 +1384,24 @@ export async function getInstallationSettingsUrl(
     installation_id: parseInt(installationId),
   });
 
+  // The account type determines the URL format
   const accountLogin = (data.account as { login?: string })?.login ?? '';
   const accountType = (data.account as { type?: string })?.type ?? 'User';
 
+  // GitHub App installation settings URL format
+  // For orgs: https://github.com/organizations/{org}/settings/installations/{id}
+  // For users: https://github.com/settings/installations/{id}
   if (accountType === 'Organization') {
     return `https://github.com/organizations/${accountLogin}/settings/installations/${installationId}`;
   }
   return `https://github.com/settings/installations/${installationId}`;
 }
 
+/**
+ * Check if user already has a fork of a repository
+ * @param accountLogin - The GitHub username of the account where the fork would be created
+ * @param appType - The type of GitHub App to use (defaults to 'standard')
+ */
 export async function checkExistingFork(
   installationId: string,
   accountLogin: string,
@@ -1324,11 +1413,13 @@ export async function checkExistingFork(
   const octokit = new Octokit({ auth: tokenData.token });
 
   try {
+    // Check if the user has a repo with the same name as the source
     const { data: repo } = await octokit.repos.get({
       owner: accountLogin,
       repo: sourceRepo,
     });
 
+    // Verify it's actually a fork of the source repo
     if (repo.fork && repo.parent?.full_name === `${sourceOwner}/${sourceRepo}`) {
       return {
         exists: true,
@@ -1340,12 +1431,17 @@ export async function checkExistingFork(
     // This is an edge case - the fork will be created with a different name
     return { exists: false, fullName: null };
   } catch (error) {
+    // 404 means the repo doesn't exist - no existing fork
     if (isHttpError(error) && error.status === 404) {
       return { exists: false, fullName: null };
     }
     throw error;
   }
 }
+
+// ============================================================================
+// Commit Inspection
+// ============================================================================
 
 /**
  * Checks whether a commit is a merge commit (has 2+ parents).
@@ -1388,6 +1484,10 @@ export async function isMergeCommit(
     return false;
   }
 }
+
+// ============================================================================
+// Check Runs API (PR gate checks)
+// ============================================================================
 
 /**
  * Conclusion values for a completed GitHub Check Run.

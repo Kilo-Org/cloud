@@ -11,11 +11,11 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   acceptOrganizationInvite,
   addUserToOrganization,
   createOrganization,
+  removeUserFromOrganization,
 } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { ensureVerifiedDomainOrganizationMembership } from './verified-domain-membership';

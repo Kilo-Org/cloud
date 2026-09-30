@@ -1,3 +1,10 @@
+/**
+ * GitLab API Adapter
+ *
+ * Provides OAuth-based authentication and API operations for GitLab.
+ * Supports both GitLab.com and self-hosted GitLab instances.
+ */
+
 import { getEnvVariable } from '@/lib/dotenvx';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { PlatformRepository } from '@/lib/integrations/core/types';
@@ -245,6 +252,9 @@ function responseHeadersToHeaders(headers: http.IncomingHttpHeaders): Headers {
   return responseHeaders;
 }
 
+/**
+ * GitLab OAuth scopes required for the integration
+ */
 export const GITLAB_OAUTH_SCOPES = [
   'api', // Full API access (needed for MR comments, reactions)
   'read_user', // Read user info
@@ -252,6 +262,9 @@ export const GITLAB_OAUTH_SCOPES = [
   'write_repository', // Push branches (for auto-fix)
 ] as const;
 
+/**
+ * GitLab API response types
+ */
 export type GitLabUser = {
   id: number;
   username: string;
@@ -292,11 +305,21 @@ export type GitLabOAuthTokens = {
   scope: string;
 };
 
+/**
+ * OAuth credentials type for self-hosted GitLab instances
+ */
 export type GitLabOAuthCredentials = {
   clientId: string;
   clientSecret: string;
 };
 
+/**
+ * Builds the GitLab OAuth authorization URL
+ *
+ * @param state - State parameter for CSRF protection (e.g., "org_xxx" or "user_xxx")
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @param customCredentials - Optional custom OAuth credentials for self-hosted instances
+ */
 export function buildGitLabOAuthUrl(
   state: string,
   instanceUrl: string = DEFAULT_GITLAB_URL,
@@ -324,6 +347,13 @@ export function buildGitLabOAuthUrl(
   return buildGitLabUrl(normalizedInstanceUrl, '/oauth/authorize', Object.fromEntries(params));
 }
 
+/**
+ * Exchanges an OAuth authorization code for access and refresh tokens
+ *
+ * @param code - The authorization code from the OAuth callback
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @param customCredentials - Optional custom OAuth credentials for self-hosted instances
+ */
 export async function exchangeGitLabOAuthCode(
   code: string,
   instanceUrl: string = DEFAULT_GITLAB_URL,
@@ -373,6 +403,12 @@ export async function exchangeGitLabOAuthCode(
   return tokens;
 }
 
+/**
+ * Fetches the authenticated GitLab user's information
+ *
+ * @param accessToken - OAuth access token
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function fetchGitLabUser(
   accessToken: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
@@ -392,6 +428,12 @@ export async function fetchGitLabUser(
   return (await response.json()) as GitLabUser;
 }
 
+/**
+ * Fetches all projects (repositories) accessible by the authenticated user
+ *
+ * @param accessToken - OAuth access token
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function fetchGitLabProjects(
   accessToken: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
@@ -447,6 +489,13 @@ export async function fetchGitLabProjects(
   return projects;
 }
 
+/**
+ * Fetches all branches for a GitLab project
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function fetchGitLabBranches(
   accessToken: string,
   projectId: string | number,
@@ -480,6 +529,7 @@ export async function fetchGitLabBranches(
     const data = (await response.json()) as GitLabBranch[];
     branches.push(...data);
 
+    // Check if there are more pages
     const totalPages = parseInt(response.headers.get('x-total-pages') || '1', 10);
     if (page >= totalPages) break;
     page++;
@@ -533,13 +583,27 @@ export async function fetchGitLabRootTextFileAtRef(
   return await response.text();
 }
 
+/**
+ * Calculates the expiration timestamp from GitLab OAuth response
+ *
+ * @param createdAt - Unix timestamp when token was created
+ * @param expiresIn - Seconds until expiration
+ */
 export function calculateTokenExpiry(createdAt: number, expiresIn: number): string {
   const expiresAtMs = (createdAt + expiresIn) * 1000;
   return new Date(expiresAtMs).toISOString();
 }
 
+// ============================================================================
+// Webhook Verification
+// ============================================================================
+
 /**
- * GitLab uses a simple secret token comparison (not HMAC like GitHub).
+ * Verifies GitLab webhook token
+ * GitLab uses a simple secret token comparison (not HMAC like GitHub)
+ *
+ * @param token - The token from X-Gitlab-Token header
+ * @param expectedToken - The expected webhook secret (optional, uses env var if not provided)
  */
 export function verifyGitLabWebhookToken(token: string, expectedToken?: string): boolean {
   if (!expectedToken) {
@@ -554,6 +618,10 @@ export function verifyGitLabWebhookToken(token: string, expectedToken?: string):
     return false;
   }
 }
+
+// ============================================================================
+// Webhook Management API Functions
+// ============================================================================
 
 /**
  * Custom error class for webhook permission issues
@@ -570,6 +638,9 @@ export class GitLabWebhookPermissionError extends Error {
   }
 }
 
+/**
+ * GitLab Project Webhook type
+ */
 export type GitLabWebhook = {
   id: number;
   url: string;
@@ -626,6 +697,7 @@ export async function listProjectWebhooks(
       projectId,
     });
 
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
     if (response.status === 401 || response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
@@ -698,6 +770,7 @@ export async function createProjectWebhook(
       projectId,
     });
 
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
     if (response.status === 401 || response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
@@ -781,6 +854,7 @@ export async function updateProjectWebhook(
       hookId,
     });
 
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
     if (response.status === 401 || response.status === 403) {
       throw new GitLabWebhookPermissionError(
         projectId,
@@ -849,16 +923,31 @@ export async function deleteProjectWebhook(
   });
 }
 
+/**
+ * Normalizes a URL for comparison by decoding percent-encoded characters
+ * and ensuring consistent formatting
+ */
 function normalizeUrlForComparison(url: string): string {
   try {
+    // Decode the URL to handle percent-encoded characters
     const decoded = decodeURIComponent(url);
+    // Parse and re-stringify to normalize the URL format
     const parsed = new URL(decoded);
     return parsed.toString();
   } catch {
+    // If URL parsing fails, return the original URL
     return url;
   }
 }
 
+/**
+ * Finds an existing Kilo webhook on a GitLab project by URL
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param kiloWebhookUrl - The Kilo webhook URL to search for
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function findKiloWebhook(
   accessToken: string,
   projectId: string | number,
@@ -867,8 +956,10 @@ export async function findKiloWebhook(
 ): Promise<GitLabWebhook | null> {
   const webhooks = await listProjectWebhooks(accessToken, projectId, instanceUrl);
 
+  // Normalize the target URL for comparison
   const normalizedTargetUrl = normalizeUrlForComparison(kiloWebhookUrl);
 
+  // Find webhook by comparing normalized URLs
   const kiloWebhook = webhooks.find(
     hook => normalizeUrlForComparison(hook.url) === normalizedTargetUrl
   );
@@ -887,6 +978,10 @@ export async function findKiloWebhook(
 
   return kiloWebhook || null;
 }
+
+// ============================================================================
+// Commit Inspection
+// ============================================================================
 
 /**
  * Checks whether a commit is a merge commit (has 2+ parent IDs).
@@ -944,6 +1039,13 @@ export async function isMergeCommit(
   }
 }
 
+// ============================================================================
+// Merge Request API Functions
+// ============================================================================
+
+/**
+ * GitLab MR Note (comment) type
+ */
 export type GitLabNote = {
   id: number;
   body: string;
@@ -977,12 +1079,18 @@ export type GitLabNote = {
   };
 };
 
+/**
+ * GitLab MR Discussion type (threaded comments)
+ */
 export type GitLabDiscussion = {
   id: string;
   individual_note: boolean;
   notes: GitLabNote[];
 };
 
+/**
+ * GitLab Merge Request type
+ */
 export type GitLabMergeRequest = {
   id: number;
   iid: number;
@@ -1039,7 +1147,13 @@ export async function fetchGitLabMergeRequest(params: {
 }
 
 /**
- * Looks for the <!-- kilo-review --> marker in MR notes.
+ * Finds an existing Kilo review note on a GitLab MR
+ * Looks for the <!-- kilo-review --> marker in MR notes
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
  */
 export async function findKiloReviewNote(
   accessToken: string,
@@ -1088,9 +1202,11 @@ export async function findKiloReviewNote(
     totalNotes: notes.length,
   });
 
+  // Look for notes with the kilo-review marker
   const markedNotes = notes.filter(n => n.body?.includes('<!-- kilo-review -->') && !n.system);
 
   if (markedNotes.length > 0) {
+    // Sort by updated_at descending and pick the latest
     const latestNote = markedNotes.sort((a, b) => {
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     })[0];
@@ -1114,6 +1230,10 @@ export async function findKiloReviewNote(
   return null;
 }
 
+/**
+ * Updates an existing Kilo review note on a GitLab MR
+ * Used to append usage footer (model + token count) after review completion
+ */
 export async function updateKiloReviewNote(
   accessToken: string,
   projectId: string | number,
@@ -1152,6 +1272,9 @@ export async function updateKiloReviewNote(
   });
 }
 
+/**
+ * Creates a new top-level note on a GitLab MR.
+ */
 export async function createMRNote(
   accessToken: string,
   projectId: string | number,
@@ -1235,7 +1358,13 @@ export async function hasMRNoteWithMarker(
 }
 
 /**
- * Used to detect duplicates and track outdated inline comments.
+ * Fetches existing inline comments (discussions) on a GitLab MR
+ * Used to detect duplicates and track outdated comments
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1288,6 +1417,7 @@ export async function fetchMRInlineComments(
     page++;
   }
 
+  // Extract inline comments from discussions
   const inlineComments: Array<{
     id: number;
     discussionId: string;
@@ -1299,9 +1429,11 @@ export async function fetchMRInlineComments(
   }> = [];
 
   for (const discussion of discussions) {
+    // Skip individual notes (non-threaded comments)
     if (discussion.individual_note) continue;
 
     for (const note of discussion.notes) {
+      // Only include notes with position (inline comments)
       if (note.position) {
         inlineComments.push({
           id: note.id,
@@ -1327,6 +1459,14 @@ export async function fetchMRInlineComments(
   return inlineComments;
 }
 
+/**
+ * Gets the HEAD commit SHA for a GitLab MR
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function getMRHeadCommit(
   accessToken: string,
   projectId: string | number,
@@ -1363,7 +1503,13 @@ export async function getMRHeadCommit(
 }
 
 /**
- * The diff refs are required for creating inline comments.
+ * Gets the diff refs (base, head, start SHA) for a GitLab MR
+ * Required for creating inline comments
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
  */
 export async function getMRDiffRefs(
   accessToken: string,
@@ -1407,7 +1553,14 @@ export async function getMRDiffRefs(
 }
 
 /**
- * Used to show that Kilo is reviewing an MR (e.g., 👀 eyes reaction).
+ * Adds an award emoji (reaction) to a GitLab MR
+ * Used to show that Kilo is reviewing an MR (e.g., 👀 eyes reaction)
+ *
+ * @param accessToken - OAuth access token
+ * @param projectId - GitLab project ID or path (URL-encoded)
+ * @param mrIid - Merge request internal ID
+ * @param emoji - Emoji name (e.g., 'eyes', 'thumbsup', 'thumbsdown')
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
  */
 export async function addReactionToMR(
   accessToken: string,
@@ -1457,6 +1610,13 @@ export async function addReactionToMR(
   });
 }
 
+/**
+ * Gets a GitLab project by path
+ *
+ * @param accessToken - OAuth access token
+ * @param projectPath - Project path (e.g., "group/project")
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function getGitLabProject(
   accessToken: string,
   projectPath: string,
@@ -1529,6 +1689,13 @@ function readGitLabRepositorySizeBytes(data: unknown): number | null {
   return typeof repositorySize === 'number' ? repositorySize : null;
 }
 
+// ============================================================================
+// Instance Validation
+// ============================================================================
+
+/**
+ * GitLab version response type
+ */
 export type GitLabVersion = {
   version: string;
   revision: string;
@@ -1540,6 +1707,9 @@ export type GitLabVersion = {
   enterprise: boolean;
 };
 
+/**
+ * Result of validating a GitLab instance
+ */
 export type GitLabInstanceValidationResult = {
   valid: boolean;
   version?: string;
@@ -1549,8 +1719,13 @@ export type GitLabInstanceValidationResult = {
 };
 
 /**
+ * Validates that a URL points to a valid GitLab instance
+ *
  * Uses the public /api/v4/version endpoint which doesn't require authentication.
  * This allows users to verify their self-hosted GitLab URL before attempting OAuth.
+ *
+ * @param instanceUrl - The GitLab instance URL to validate
+ * @returns Validation result with version info if successful
  */
 export async function validateGitLabInstance(
   instanceUrl: string
@@ -1566,12 +1741,14 @@ export async function validateGitLabInstance(
   }
 
   try {
+    // The /api/v4/version endpoint is public and doesn't require authentication
     const response = await fetchGitLab(buildGitLabUrl(normalizedUrl, '/api/v4/version'), {
       method: 'GET',
       headers: {
         Accept: 'application/json',
       },
       redirect: 'manual',
+      // Set a reasonable timeout for the request
       signal: AbortSignal.timeout(10000),
     });
 
@@ -1603,6 +1780,7 @@ export async function validateGitLabInstance(
 
     const data = (await response.json()) as GitLabVersion;
 
+    // Validate that the response looks like a GitLab version response
     if (!data.version || typeof data.version !== 'string') {
       return {
         valid: false,
@@ -1630,6 +1808,7 @@ export async function validateGitLabInstance(
       };
     }
 
+    // Handle timeout
     if (error instanceof Error && error.name === 'TimeoutError') {
       return {
         valid: false,
@@ -1637,6 +1816,7 @@ export async function validateGitLabInstance(
       };
     }
 
+    // Handle network errors
     if (error instanceof TypeError && error.message.includes('fetch')) {
       return {
         valid: false,
@@ -1655,6 +1835,10 @@ export async function validateGitLabInstance(
     };
   }
 }
+
+// ============================================================================
+// Project Access Token (PrAT) Management
+// ============================================================================
 
 /**
  * GitLab access level constants
@@ -1763,6 +1947,7 @@ export async function createProjectAccessToken(
       projectId,
     });
 
+    // 401/403 indicate permission issues - user doesn't have Maintainer+ role
     if (response.status === 401 || response.status === 403) {
       throw new GitLabProjectAccessTokenPermissionError(
         projectId,
@@ -2053,6 +2238,7 @@ export async function findKiloProjectAccessToken(
 ): Promise<GitLabProjectAccessToken | null> {
   const tokens = await listProjectAccessTokens(accessToken, projectId, instanceUrl);
 
+  // Find active token with matching name
   const kiloToken = tokens.find(t => t.name === tokenName && t.active && !t.revoked);
 
   if (kiloToken) {
@@ -2072,7 +2258,11 @@ export async function findKiloProjectAccessToken(
 }
 
 /**
- * GitLab allows max 1 year expiration.
+ * Calculates the expiration date for a new Project Access Token
+ * GitLab allows max 1 year expiration
+ *
+ * @param daysFromNow - Number of days from now (default: 365, max: 365)
+ * @returns Date string in YYYY-MM-DD format
  */
 export function calculateProjectAccessTokenExpiry(daysFromNow: number = 365): string {
   const maxDays = 365;
@@ -2084,6 +2274,13 @@ export function calculateProjectAccessTokenExpiry(daysFromNow: number = 365): st
   return expiryDate.toISOString().split('T')[0];
 }
 
+/**
+ * Checks if a Project Access Token is expiring soon (within specified days)
+ *
+ * @param expiresAt - Expiration date in YYYY-MM-DD format
+ * @param withinDays - Number of days to consider "soon" (default: 7)
+ * @returns true if token expires within the specified days
+ */
 export function isProjectAccessTokenExpiringSoon(
   expiresAt: string,
   withinDays: number = 7
@@ -2098,14 +2295,22 @@ export function isProjectAccessTokenExpiringSoon(
 }
 
 /**
- * Checks whether a stored token is still valid on GitLab
- * (e.g., it might have been manually revoked by the user).
+ * Validates a Project Access Token by making a test API call
+ *
+ * This is useful to check if a stored token is still valid on GitLab
+ * (e.g., it might have been manually revoked by the user)
+ *
+ * @param token - The Project Access Token to validate
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @returns true if the token is valid, false otherwise
  */
 export async function validateProjectAccessToken(
   token: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
 ): Promise<boolean> {
   try {
+    // Use the /user endpoint to validate the token
+    // This is a lightweight call that works with any valid token
     const response = await fetchGitLab(buildGitLabUrl(instanceUrl, '/api/v4/user'), {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -2143,6 +2348,10 @@ export async function validateProjectAccessToken(
   }
 }
 
+// ============================================================================
+// Personal Access Token (PAT) Validation
+// ============================================================================
+
 /**
  * Required scopes for PAT-based authentication
  * - api: Full API access (needed for webhooks, MR comments, PrAT creation)
@@ -2171,6 +2380,9 @@ export type GitLabPersonalAccessTokenInfo = {
   expires_at: string | null;
 };
 
+/**
+ * Result of validating a Personal Access Token
+ */
 export type GitLabPATValidationResult = {
   valid: boolean;
   user?: GitLabUser;
@@ -2187,6 +2399,19 @@ export type GitLabPATValidationResult = {
   warnings?: string[];
 };
 
+/**
+ * Validates a GitLab Personal Access Token
+ *
+ * This function:
+ * 1. Calls /api/v4/personal_access_tokens/self to get token info (requires GitLab 14.0+)
+ * 2. Validates that 'api' scope is present
+ * 3. Fetches user info from /api/v4/user
+ * 4. Checks for expiration and adds warnings if expiring soon
+ *
+ * @param token - The Personal Access Token to validate
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ * @returns Validation result with user info, scopes, and any warnings
+ */
 export async function validatePersonalAccessToken(
   token: string,
   instanceUrl: string = DEFAULT_GITLAB_URL
@@ -2205,7 +2430,8 @@ export async function validatePersonalAccessToken(
     };
   }
 
-  // /api/v4/personal_access_tokens/self requires GitLab 14.0+
+  // Step 1: Get token info from /api/v4/personal_access_tokens/self
+  // This endpoint requires GitLab 14.0+
   let tokenInfoResponse: Response;
   try {
     tokenInfoResponse = await fetchGitLab(tokenInfoUrl, {
@@ -2255,6 +2481,7 @@ export async function validatePersonalAccessToken(
 
   const tokenInfo = (await tokenInfoResponse.json()) as GitLabPersonalAccessTokenInfo;
 
+  // Check if token is revoked or inactive
   if (tokenInfo.revoked || !tokenInfo.active) {
     logExceptInTest('[validatePersonalAccessToken] Token is revoked or inactive', {
       revoked: tokenInfo.revoked,
@@ -2266,6 +2493,7 @@ export async function validatePersonalAccessToken(
     };
   }
 
+  // Step 2: Validate required scopes
   const missingScopes = GITLAB_PAT_REQUIRED_SCOPES.filter(
     scope => !tokenInfo.scopes.includes(scope)
   );
@@ -2283,6 +2511,7 @@ export async function validatePersonalAccessToken(
     };
   }
 
+  // Step 3: Check expiration and add warnings
   if (tokenInfo.expires_at) {
     const expiresAt = new Date(tokenInfo.expires_at);
     const now = new Date();
@@ -2307,6 +2536,7 @@ export async function validatePersonalAccessToken(
     }
   }
 
+  // Step 4: Fetch user info
   let userResponse: Response;
   try {
     userResponse = await fetchGitLab(userUrl, {
@@ -2364,6 +2594,10 @@ export async function validatePersonalAccessToken(
   };
 }
 
+// ============================================================================
+// Commit Status API (MR gate checks)
+// ============================================================================
+
 /**
  * GitLab commit status states.
  * @see https://docs.gitlab.com/ee/api/commits.html#set-the-pipeline-status-of-a-commit
@@ -2371,12 +2605,21 @@ export async function validatePersonalAccessToken(
 export type GitLabCommitStatusState = 'pending' | 'running' | 'success' | 'failed' | 'canceled';
 
 /**
+ * Sets (creates or updates) a commit status on a GitLab commit.
+ *
  * GitLab commit statuses are idempotent by (sha, name): posting the same
  * name+sha combination updates the existing status rather than creating
  * a duplicate. This means we don't need to track a status ID like GitHub.
  *
  * The status appears in the MR pipeline widget and can be configured as
  * a required external approval in merge request approval rules.
+ *
+ * @param accessToken - OAuth or Project Access Token
+ * @param projectId - GitLab project ID or path
+ * @param sha - The commit SHA to attach the status to
+ * @param state - Status state
+ * @param options - Additional options (targetUrl, description)
+ * @param instanceUrl - GitLab instance URL
  */
 export async function setCommitStatus(
   accessToken: string,

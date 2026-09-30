@@ -21,7 +21,7 @@ import {
 } from '@kilocode/db/operation-ledger';
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@/lib/utils';
 import { getMonthlyPriceUsd } from './bonus';
 import { dayjs } from './dayjs';
 import {

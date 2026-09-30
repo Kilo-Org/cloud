@@ -75,7 +75,7 @@ import type {
   GatewayResponsesRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import {
   buildOpenAiChatGptProvider,
   checkOpenAiChatGptByok,

@@ -8,16 +8,6 @@
  * a fragment the web accepts is accepted here with the same validation.
  */
 
-/**
- * Placeholder the server returns in place of each stored env/header value.
- * Mirrors `MASKED_SECRET_VALUE` in `@kilocode/cloud-agent-profile`; the mobile
- * app does not depend on that server-only package, so the value is repeated
- * here. The MCP update procedure reuses a stored secret only when the input
- * value is exactly this string, so an edit must send it back unchanged for the
- * keys the user is not rotating.
- */
-export const MASKED_MCP_VALUE = '\u2022\u2022\u2022\u2022';
-
 /** The parse result: a `Record<string,string>`, or why the text is not one. */
 export type ParsedRecord =
   | { ok: true; value: Record<string, string> | undefined }
@@ -68,8 +58,8 @@ export function parseRecord(raw: string): ParsedRecord {
 /**
  * Render a masked fragment back into the text area. A server's masked values
  * round-trip verbatim: the update procedure keeps each stored secret whose
- * input is `MASKED_MCP_VALUE`, so the keys stay visible and the user can rotate
- * only the ones they retype.
+ * input is still the masked placeholder, so the keys stay visible and the user
+ * can rotate only the ones they retype.
  */
 export function formatRecord(record: Record<string, string> | undefined): string {
   if (record === undefined || Object.keys(record).length === 0) {

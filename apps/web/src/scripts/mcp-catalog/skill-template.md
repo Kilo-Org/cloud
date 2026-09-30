@@ -34,16 +34,6 @@ The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
 it, and the catalog wins when the two disagree — read the catalog, not this
 file, for current detail.
 
-## Reporting feedback and bugs
-
-Report bugs, confusing behavior, and feature requests about the Kilo platform
-through `feedback.submit` — the HTTP `POST /feedback` endpoint does the same
-thing. Batch everything you want to report into one submission instead of
-sending several: the endpoint accepts one submission per authenticated user per
-minute, and a second call within a minute is refused with a message asking you
-to batch. MCP error responses also point agents here, so treat this as the place
-to send platform feedback and bug reports rather than a support channel.
-
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:

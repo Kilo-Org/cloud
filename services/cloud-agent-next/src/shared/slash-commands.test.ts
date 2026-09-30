@@ -288,9 +288,6 @@ describe('mobile catalogue contract', () => {
     const defaults = commandsOrDefault([]);
     const reported = new Map(defaults.map(command => [command.name, command.description]));
     for (const command of defaults) {
-      // Skill rows are not localized built-ins: the composer shows their
-      // reported description with a skill badge.
-      if (command.source === 'skill') continue;
       expect(MOBILE_BUILT_IN_DESCRIPTION_KEYS).toHaveProperty(command.name);
     }
     for (const [name, key] of Object.entries(MOBILE_BUILT_IN_DESCRIPTION_KEYS)) {

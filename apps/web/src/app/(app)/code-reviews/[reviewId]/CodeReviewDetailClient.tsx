@@ -9,10 +9,6 @@ import { CouncilGovernancePanel } from '@/components/code-reviews/CouncilGoverna
 import { formatTokenCount } from '@/lib/code-reviews/summary/usage-footer';
 import { getCodeReviewJobsHref } from '@/lib/code-reviews/code-review-links';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
-import {
-  formatSessionCost,
-  isRenderableSessionCost,
-} from '@/components/cloud-agent-next/session-cost-breakdown';
 import { ExternalLink, GitPullRequest, Loader2, ArrowLeft, RotateCcw, Ban } from 'lucide-react';
 import { getCodeReviewStatusIcon } from '@/components/code-reviews/code-review-status-icons';
 import { useTRPC } from '@/lib/trpc/utils';
@@ -132,10 +128,6 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
   const canCancel = isCancellableReviewStatus(status);
   const prLabel = review.platform === 'gitlab' ? 'MR' : 'PR';
   const jobsHref = getCodeReviewJobsHref(review.platform, review.owned_by_organization_id);
-  // Billing-derived session cost is authoritative when available; fall back to the
-  // orchestrator-accumulated review cost when the billing lookup has nothing (no
-  // linked session, an in-flight review, or a failed lookup).
-  const sessionCostMusd = data.sessionCostMusd ?? review.total_cost_musd;
   const isSupersededCancellation =
     status === 'cancelled' &&
     (review.terminal_reason === 'superseded' ||
@@ -272,10 +264,10 @@ export function CodeReviewDetailClient({ reviewId }: CodeReviewDetailClientProps
                 </dd>
               </div>
             )}
-            {sessionCostMusd != null && isRenderableSessionCost(sessionCostMusd / 1_000_000) && (
+            {review.total_cost_musd != null && review.total_cost_musd > 0 && (
               <div>
                 <dt className="text-muted-foreground">Cost</dt>
-                <dd>{formatSessionCost(sessionCostMusd / 1_000_000)}</dd>
+                <dd>${(review.total_cost_musd / 1_000_000).toFixed(4)}</dd>
               </div>
             )}
             <div>

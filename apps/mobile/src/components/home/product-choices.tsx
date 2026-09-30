@@ -34,7 +34,6 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
               icon={GitPullRequest}
               title={t('common.codeReviewer')}
               subtitle={t('profile.codeReviewerSubtitle')}
-              hue="honey"
               className="rounded-lg bg-secondary px-3"
               onPress={() => {
                 router.push(getCodeReviewerProfilePath(scope));
@@ -44,7 +43,6 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
               icon={ShieldCheck}
               title={t('common.securityAgent')}
               subtitle={t('profile.securityAgentSubtitle')}
-              hue="honey"
               className="rounded-lg bg-secondary px-3"
               last={!prReviewEnabled}
               onPress={() => {
@@ -58,7 +56,6 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
             icon={GitMerge}
             title={t('common.prReview')}
             subtitle={t('profile.prReviewSubtitle')}
-            hue="gold"
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {

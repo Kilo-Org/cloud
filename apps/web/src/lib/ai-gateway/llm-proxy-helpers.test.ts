@@ -32,13 +32,10 @@ import {
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
-  lastUserPromptText,
   makeErrorReadable,
   parseEmbeddingUsageFromResponse,
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
-  requestedLogprobs,
-  requestedSamples,
 } from './llm-proxy-helpers';
 
 describe('checkOrganizationModelRestrictions', () => {
@@ -1114,96 +1111,5 @@ describe('extractHeaderAndLimitLength', () => {
     }) as unknown as Parameters<typeof extractHeaderAndLimitLength>[0];
 
     expect(extractHeaderAndLimitLength(request, 'x-long')).toBe('a'.repeat(500));
-  });
-});
-describe('lastUserPromptText', () => {
-  it('returns the last user message of a chat request', () => {
-    expect(
-      lastUserPromptText({
-        kind: 'chat_completions',
-        body: {
-          messages: [
-            { role: 'system', content: 'be terse' },
-            { role: 'user', content: 'first' },
-            { role: 'assistant', content: 'ok' },
-            { role: 'user', content: 'second' },
-          ],
-        },
-      })
-    ).toBe('second');
-  });
-
-  it('joins the text parts of array content and ignores non-text parts', () => {
-    expect(
-      lastUserPromptText({
-        kind: 'chat_completions',
-        body: {
-          messages: [
-            {
-              role: 'user',
-              content: [
-                { type: 'text', text: 'look at this' },
-                { type: 'image_url', image_url: { url: 'https://example.com/a.png' } },
-                { type: 'text', text: 'and this' },
-              ],
-            },
-          ],
-        },
-      })
-    ).toBe('look at this\nand this');
-  });
-
-  it('reads a responses input string', () => {
-    expect(lastUserPromptText({ kind: 'responses', body: { input: 'plain prompt' } })).toBe(
-      'plain prompt'
-    );
-  });
-
-  it('reads the last user item of a responses input list, including input_text parts', () => {
-    expect(
-      lastUserPromptText({
-        kind: 'responses',
-        body: {
-          input: [
-            { role: 'user', content: [{ type: 'input_text', text: 'older' }] },
-            { role: 'assistant', content: [{ type: 'output_text', text: 'ok' }] },
-            { role: 'user', content: [{ type: 'input_text', text: 'newest' }] },
-          ],
-        },
-      })
-    ).toBe('newest');
-  });
-
-  it('reads a FIM prompt', () => {
-    expect(lastUserPromptText({ kind: 'fim_completions', body: { prompt: 'fn main() {' } })).toBe(
-      'fn main() {'
-    );
-  });
-
-  it('returns null when the request has no user turn', () => {
-    expect(lastUserPromptText({ kind: 'chat_completions', body: { messages: [] } })).toBeNull();
-    expect(lastUserPromptText({ kind: 'messages', body: {} })).toBeNull();
-    expect(lastUserPromptText({ kind: 'responses', body: { input: 42 } })).toBeNull();
-  });
-});
-
-describe('requestedLogprobs', () => {
-  it('is true for logprobs, top_logprobs, or a non-empty logit_bias', () => {
-    expect(requestedLogprobs({ logprobs: true })).toBe(true);
-    expect(requestedLogprobs({ top_logprobs: 5 })).toBe(true);
-    expect(requestedLogprobs({ logit_bias: { '50256': -100 } })).toBe(true);
-  });
-
-  it('is false when the request asked for none of them', () => {
-    expect(requestedLogprobs({})).toBe(false);
-    expect(requestedLogprobs({ logprobs: false, top_logprobs: null, logit_bias: {} })).toBe(false);
-  });
-});
-
-describe('requestedSamples', () => {
-  it('returns the n sampling parameter, or null when it is absent', () => {
-    expect(requestedSamples({ n: 3 })).toBe(3);
-    expect(requestedSamples({})).toBeNull();
-    expect(requestedSamples({ n: null })).toBeNull();
   });
 });

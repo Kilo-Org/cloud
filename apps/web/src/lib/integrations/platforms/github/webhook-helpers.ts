@@ -4,6 +4,13 @@ import type {
   PendingApprovalMetadata,
 } from '@/lib/integrations/core/types';
 
+/**
+ * Helper functions for GitHub webhook processing
+ */
+
+/**
+ * Extract pending approval metadata from a platform integration record
+ */
 export function extractPendingApprovalMetadata(
   integration: PlatformIntegration
 ): PendingApprovalMetadata | null {
@@ -12,6 +19,9 @@ export function extractPendingApprovalMetadata(
   return pendingApproval || null;
 }
 
+/**
+ * Build installation data object from GitHub webhook payload
+ */
 export function buildInstallationData(installation: {
   id: number;
   account: {

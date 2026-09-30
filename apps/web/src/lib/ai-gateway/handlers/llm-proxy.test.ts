@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
-import { simHash64 } from '@/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -43,7 +42,6 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-m
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
-import { decide } from '@/lib/bouncer/client';
 import { NextRequest } from 'next/server';
 
 jest.mock('next/server', () => {
@@ -126,13 +124,6 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
     applyResolvedAutoModel: jest.fn(),
   };
 });
-// Bouncer is report-only and never changes the response; mock it so the decide
-// call shape and its failure modes can be asserted.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
-  decide: jest.fn(async () => null),
-  reportUsageEvent: jest.fn(async () => undefined),
-}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
@@ -156,7 +147,6 @@ const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitB
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
-const mockedDecide = jest.mocked(decide);
 
 const provider = {
   id: 'openrouter',
@@ -612,128 +602,6 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         responseTransforms: null,
       })
     );
-  });
-
-  it('asks bouncer to decide with the paid tier, the user account and the request id', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(), { 'x-vercel-id': 'iad1::iad1::request-id' }) as never
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockedDecide).toHaveBeenCalledTimes(1);
-    expect(mockedDecide).toHaveBeenCalledWith(
-      { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
-      { timeoutMs: 50 }
-    );
-  });
-
-  it('classifies an organization on a team plan as the team tier', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: {
-        id: 'user-123',
-        google_user_email: 'test@example.com',
-        microdollars_used: 0,
-      } as User,
-      authFailedResponse: null,
-      organizationId: 'org-1',
-    });
-    mockedGetBalanceAndOrgSettings.mockResolvedValue({
-      balance: 1000,
-      settings: undefined,
-      plan: 'teams',
-    });
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(200);
-    expect(mockedDecide).toHaveBeenCalledWith(
-      expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
-      { timeoutMs: 50 }
-    );
-  });
-
-  it('asks bouncer to decide for an anonymous caller with the client IP', async () => {
-    mockedGetUserFromAuth.mockResolvedValue({
-      user: null,
-      authFailedResponse: new Response('unauthorized', { status: 401 }),
-      organizationId: undefined,
-    } as unknown as AuthResult);
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
-    );
-
-    expect(response.status).toBe(200);
-    expect(mockedDecide).toHaveBeenCalledTimes(1);
-    expect(mockedDecide).toHaveBeenCalledWith(
-      { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
-      { timeoutMs: 50 }
-    );
-    // Bouncer has no account for an anonymous caller, so no usage event.
-    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
-  });
-
-  it('carries the bouncer usage-event fields into the usage context', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const response = await handleLlmProxyRequest(
-      makeRequest(
-        {
-          model: 'openai/gpt-4o',
-          messages: [
-            { role: 'user', content: 'first question' },
-            { role: 'assistant', content: 'an answer' },
-            { role: 'user', content: 'explain the failing test' },
-          ],
-          tools: [{ type: 'function', function: { name: 'read_file' } }],
-          logprobs: true,
-          n: 2,
-        },
-        { 'x-vercel-id': 'iad1::usage-request-id', 'x-kilocode-feature': 'vscode-extension' }
-      ) as never
-    );
-
-    expect(response.status).toBe(200);
-    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
-    expect(usageContext?.bouncer).toEqual({
-      requestId: 'iad1::usage-request-id',
-      occurredAt: expect.any(Date),
-      clientAttributed: true,
-      requestedLogprobs: true,
-      samples: 2,
-      promptSimHash: simHash64('explain the failing test'),
-    });
-  });
-
-  it('caps the decide wait and still calls upstream when bouncer hangs', async () => {
-    // A never-settling verdict must not hold the request open: the handler's
-    // own budget releases it and the upstream call still happens.
-    mockedDecide.mockReturnValueOnce(Promise.withResolvers<never>().promise);
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const startedAt = Date.now();
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-    const elapsedMs = Date.now() - startedAt;
-
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    // The verdict is awaited, but only for its budget.
-    expect(elapsedMs).toBeGreaterThanOrEqual(45);
-    expect(elapsedMs).toBeLessThan(2_000);
-  });
-
-  it('serves the request when the decide call rejects', async () => {
-    mockedDecide.mockRejectedValueOnce(new Error('bouncer unreachable'));
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
-
-    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
-
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 
   it('passes provider response transforms to the response rewriter', async () => {

@@ -149,7 +149,7 @@ export function ProfileAgentsScreen({
       await deleteAgent.mutateAsync({ profileId, agentId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.agents.saveFailed'));
+        toast.error(t('profiles.agents.deleteFailed'));
       }
     }
   };

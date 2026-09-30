@@ -6,7 +6,7 @@ import {
   rewriteModelResponse_Responses,
   rewriteModelResponse,
   logUnrewrittenResponse,
-  redactApiRequestLogRequest,
+  sanitizeApiRequestLogRequest,
   type RequestLoggingParams,
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
@@ -15,19 +15,6 @@ import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import { ReasoningDetailsTransform } from '@/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { api_request_log } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
-import { eq } from 'drizzle-orm';
-import { PutObjectCommand } from '@aws-sdk/client-s3';
-
-jest.mock('@/lib/r2/client', () =>
-  jest
-    .requireActual<{
-      createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@/tests/helpers/fake-r2.helper')
-    .createFakeR2ClientModule()
-);
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
@@ -1233,7 +1220,7 @@ function makeLogging(overrides?: Partial<RequestLoggingParams>): RequestLoggingP
   };
 }
 
-describe('redactApiRequestLogRequest', () => {
+describe('sanitizeApiRequestLogRequest', () => {
   test('replaces gateway BYOK credentials without mutating the upstream request', () => {
     const request = {
       kind: 'chat_completions',
@@ -1260,7 +1247,7 @@ describe('redactApiRequestLogRequest', () => {
       },
     } satisfies RequestLoggingParams['request'];
 
-    expect(redactApiRequestLogRequest(request)).toEqual({
+    expect(sanitizeApiRequestLogRequest(request)).toEqual({
       model: 'zai/glm-5.2',
       messages: [{ role: 'user', content: 'hello' }],
       providerOptions: {
@@ -1469,119 +1456,6 @@ describe('rewriteModelResponse', () => {
 
     expect(mockedAfter).not.toHaveBeenCalled();
     expect(mockedOptIn).toHaveBeenCalledWith({ accountId: null, organizationId: null });
-  });
-});
-
-describe('api_request_log storage', () => {
-  const { fakeR2 } = jest.requireMock<FakeR2ClientModule>('@/lib/r2/client');
-  const vercelRequestId = 'api-request-log-r2-storage-test';
-  const bucket = 'test-api-request-log';
-
-  async function runScheduledLogInsert() {
-    expect(mockedAfter).toHaveBeenCalledTimes(1);
-    const task = mockedAfter.mock.calls[0][0];
-    await (typeof task === 'function' ? task() : task);
-  }
-
-  async function selectLoggedRow() {
-    const rows = await db
-      .select()
-      .from(api_request_log)
-      .where(eq(api_request_log.vercel_request_id, vercelRequestId));
-    expect(rows).toHaveLength(1);
-    return rows[0];
-  }
-
-  async function logUpstreamError() {
-    mockedOptIn.mockResolvedValueOnce(true);
-    await logUnrewrittenResponse({
-      response: jsonResponse({ error: 'upstream error' }, 400),
-      model: 'kilo-internal/my-model',
-      providerId: 'custom',
-      logging: makeLogging({
-        vercel_request_id: vercelRequestId,
-        request: {
-          kind: 'chat_completions',
-          body: {
-            model: 'kilo-internal/my-model',
-            messages: [{ role: 'user', content: 'hello' }],
-            providerOptions: { gateway: { byok: { friendli: [{ apiKey: 'secret-key' }] } } },
-          },
-        },
-      }),
-    });
-    await runScheduledLogInsert();
-  }
-
-  beforeEach(() => {
-    fakeR2.objects.clear();
-  });
-
-  afterEach(async () => {
-    jest.restoreAllMocks();
-    await db.delete(api_request_log).where(eq(api_request_log.vercel_request_id, vercelRequestId));
-  });
-
-  test('stores the redacted request and raw response in R2', async () => {
-    await logUpstreamError();
-
-    expect(fakeR2.credentials).toEqual({
-      accessKeyId: 'mock-test-api-request-log-access-key',
-      secretAccessKey: 'mock-test-api-request-log-secret-key',
-    });
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      status_code: 400,
-      provider: 'custom',
-      request: null,
-      response: null,
-      error: null,
-    });
-    expect(row.request_r2_key).toMatch(/^\d{4}-\d{2}-\d{2}\/[0-9a-f-]{36}\/request\.json$/);
-    expect(row.response_r2_key).toBe(row.request_r2_key?.replace('request.json', 'response.txt'));
-    expect(JSON.parse(fakeR2.objects.get(`${bucket}/${row.request_r2_key}`) ?? '')).toEqual({
-      model: 'kilo-internal/my-model',
-      messages: [{ role: 'user', content: 'hello' }],
-      providerOptions: { gateway: { byok: { friendli: [{ apiKey: '[redacted]' }] } } },
-    });
-    expect(fakeR2.objects.get(`${bucket}/${row.response_r2_key}`)).toBe(
-      JSON.stringify({ error: 'upstream error' })
-    );
-  });
-
-  test('keeps the log row and records the failure when the R2 upload fails', async () => {
-    jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
-
-    await logUpstreamError();
-
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      status_code: 400,
-      request_r2_key: null,
-      response_r2_key: null,
-      error: {
-        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
-      },
-    });
-  });
-
-  test('records the key of a body that was uploaded when the other upload fails', async () => {
-    const send = fakeR2.send.bind(fakeR2);
-    jest.spyOn(fakeR2, 'send').mockImplementation(async command => {
-      if (command instanceof PutObjectCommand && command.input.Key?.endsWith('/response.txt')) {
-        throw new Error('R2 unavailable');
-      }
-      return send(command);
-    });
-
-    await logUpstreamError();
-
-    const row = await selectLoggedRow();
-    expect(row).toMatchObject({
-      response_r2_key: null,
-      error: { r2_upload_error: 'response: Error: R2 unavailable' },
-    });
-    expect(fakeR2.objects.has(`${bucket}/${row.request_r2_key}`)).toBe(true);
   });
 });
 

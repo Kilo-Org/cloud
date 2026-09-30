@@ -14,8 +14,6 @@ import {
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { client as stripe } from '@/lib/stripe-client';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -233,23 +231,12 @@ export const organizationKiloPassRouter = createTRPCRouter({
       }).strict()
     )
     .output(CheckoutOutputSchema)
-    .mutation(async ({ input, ctx }) => {
-      const organization = await getOrganizationById(input.organizationId);
-      return organizationKiloPassService.createCheckout(
+    .mutation(async ({ input, ctx }) =>
+      organizationKiloPassService.createCheckout(
         { ...input, actorUserId: ctx.user.id },
-        params =>
-          createOrganizationKiloPassCheckout({
-            ...params,
-            attempt: organization
-              ? {
-                  accountCreatedAt: organization.created_at,
-                  ip: ctx.ip,
-                  ipCountry: ipCountryFromHeaders(ctx.headersList),
-                }
-              : undefined,
-          })
-      );
-    }),
+        createOrganizationKiloPassCheckout
+      )
+    ),
 
   reconcilePayment: organizationParentBillingProcedure
     .output(z.object({ activated: z.boolean() }))

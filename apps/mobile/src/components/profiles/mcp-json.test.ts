@@ -1,12 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatRecord, MASKED_MCP_VALUE, parseRecord } from '@/components/profiles/mcp-json';
+import { formatRecord, parseRecord } from '@/components/profiles/mcp-json';
 
-describe('MASKED_MCP_VALUE', () => {
-  it('is the four-bullet placeholder the server round-trips', () => {
-    expect(MASKED_MCP_VALUE).toBe('\u2022\u2022\u2022\u2022');
-  });
-});
+/** The masked placeholder the server returns in place of each stored value. */
+const MASKED_MCP_VALUE = '\u2022\u2022\u2022\u2022';
 
 describe('parseRecord', () => {
   it('treats blank text as an empty fragment', () => {

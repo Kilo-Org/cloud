@@ -10,7 +10,7 @@ import {
   userTarget,
   type SupportServiceOutcome,
 } from '@/lib/admin/admin-access-log';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { getUserDeletionRequestById } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';

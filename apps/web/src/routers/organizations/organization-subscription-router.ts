@@ -32,7 +32,6 @@ import * as z from 'zod';
 import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
@@ -280,11 +279,6 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         cancelUrl: input.cancelUrl,
         plan: plan ?? org.plan,
         billingCycle: input.billingCycle,
-        attempt: {
-          accountCreatedAt: org.created_at,
-          ip: ctx.ip,
-          ipCountry: ipCountryFromHeaders(ctx.headersList),
-        },
       });
       return { url: result };
     }),
@@ -337,7 +331,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
   updateSeatCount: organizationBillingMutationProcedure
     .input(UpdateSeatCountInputSchema)
     .output(UpdateSeatCountResponseSchema)
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ input }) => {
       const { organizationId, newSeatCount } = input;
 
       const { used, total } = await getOrganizationSeatUsage(organizationId);
@@ -364,13 +358,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       const result = await handleUpdateSeatCount(
         purchase.subscription_stripe_id,
         newSeatCount,
-        total,
-        {},
-        {
-          userId: ctx.user.id,
-          ip: ctx.ip,
-          ipCountry: ipCountryFromHeaders(ctx.headersList),
-        }
+        total
       );
       if (result.success && newSeatCount < total) {
         await scheduleOrganizationPassCapacity({ organizationId, paidSeatCount: newSeatCount });

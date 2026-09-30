@@ -1,3 +1,10 @@
+/**
+ * GitLab Webhook Sync
+ *
+ * Handles automatic creation and deletion of webhooks when users
+ * configure code reviews for their GitLab repositories.
+ */
+
 import { APP_URL } from '@/lib/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import {
@@ -11,27 +18,42 @@ import {
 const DEFAULT_GITLAB_URL = 'https://gitlab.com';
 
 /**
+ * Encodes a webhook URL for GitLab API.
  * GitLab requires special characters like colons to be percent-encoded.
+ *
+ * @param url - The webhook URL to encode
+ * @returns The encoded URL
  */
 function encodeWebhookUrl(url: string): string {
   try {
     const parsed = new URL(url);
+    // Encode the host (which includes the port with colon)
     // GitLab requires the colon in "localhost:3000" to be encoded as %3A
     const encodedHost = encodeURIComponent(parsed.host);
     return `${parsed.protocol}//${encodedHost}${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
+    // If URL parsing fails, return the original URL
     return url;
   }
 }
 
+/**
+ * Kilo webhook URL for GitLab (encoded for GitLab API)
+ */
 export const KILO_GITLAB_WEBHOOK_URL = encodeWebhookUrl(`${APP_URL}/api/webhooks/gitlab`);
 
+/**
+ * Configured webhook info stored in integration metadata
+ */
 export type ConfiguredWebhook = {
   hook_id: number;
   created_at: string;
   updated_at?: string;
 };
 
+/**
+ * Result of a webhook sync operation
+ */
 export type WebhookSyncResult = {
   created: Array<{ projectId: number; hookId: number }>;
   updated: Array<{ projectId: number; hookId: number }>;
@@ -39,6 +61,20 @@ export type WebhookSyncResult = {
   errors: Array<{ projectId: number; error: string; operation: 'create' | 'update' | 'delete' }>;
 };
 
+/**
+ * Syncs webhooks for the given repositories.
+ *
+ * - Creates webhooks for newly selected repositories
+ * - Deletes webhooks for repositories that were removed from selection
+ * - Updates webhooks if they already exist but need reconfiguration
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role on projects)
+ * @param webhookSecret - The webhook secret for this integration
+ * @param selectedRepositoryIds - Currently selected repository IDs
+ * @param previousRepositoryIds - Previously selected repository IDs
+ * @param configuredWebhooks - Map of project ID to webhook info from metadata
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function syncWebhooksForRepositories(
   accessToken: string,
   webhookSecret: string,
@@ -57,10 +93,13 @@ export async function syncWebhooksForRepositories(
     errors: [],
   };
 
+  // Clone the configured webhooks to track updates
   const updatedWebhooks: Record<string, ConfiguredWebhook> = { ...configuredWebhooks };
 
+  // Find repos that were added (need webhook creation)
   const addedRepos = selectedRepositoryIds.filter(id => !previousRepositoryIds.includes(id));
 
+  // Find repos that were removed (need webhook deletion)
   const removedRepos = previousRepositoryIds.filter(id => !selectedRepositoryIds.includes(id));
 
   logExceptInTest('[syncWebhooksForRepositories] Starting sync', {
@@ -71,8 +110,10 @@ export async function syncWebhooksForRepositories(
     webhookUrl: KILO_GITLAB_WEBHOOK_URL,
   });
 
+  // Create webhooks for added repos
   for (const projectId of addedRepos) {
     try {
+      // Check if webhook already exists (e.g., from a previous configuration)
       const existingWebhook = await findKiloWebhook(
         accessToken,
         projectId,
@@ -81,6 +122,7 @@ export async function syncWebhooksForRepositories(
       );
 
       if (existingWebhook) {
+        // Update existing webhook to ensure it has the correct secret
         const updated = await updateProjectWebhook(
           accessToken,
           projectId,
@@ -102,6 +144,7 @@ export async function syncWebhooksForRepositories(
           hookId: updated.id,
         });
       } else {
+        // Create new webhook
         const created = await createProjectWebhook(
           accessToken,
           projectId,
@@ -122,6 +165,7 @@ export async function syncWebhooksForRepositories(
         });
       }
     } catch (error) {
+      // Provide a more user-friendly error message for permission errors
       let errorMessage: string;
       if (error instanceof GitLabWebhookPermissionError) {
         errorMessage = `Permission denied: You need Maintainer role or higher on this project to configure webhooks automatically. You can still configure the webhook manually in GitLab.`;
@@ -143,10 +187,12 @@ export async function syncWebhooksForRepositories(
     }
   }
 
+  // Delete webhooks for removed repos
   for (const projectId of removedRepos) {
     const webhookInfo = configuredWebhooks[String(projectId)];
 
     if (!webhookInfo) {
+      // No webhook was configured for this project, skip
       logExceptInTest('[syncWebhooksForRepositories] No webhook to delete', { projectId });
       continue;
     }
@@ -169,6 +215,7 @@ export async function syncWebhooksForRepositories(
         operation: 'delete',
       });
 
+      // Still remove from our tracking since we can't manage it
       delete updatedWebhooks[String(projectId)];
 
       logExceptInTest('[syncWebhooksForRepositories] Failed to delete webhook', {
@@ -189,6 +236,15 @@ export async function syncWebhooksForRepositories(
   return { result, updatedWebhooks };
 }
 
+/**
+ * Creates webhooks for all selected repositories.
+ * Used for initial setup when auto-configure is enabled.
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role on projects)
+ * @param webhookSecret - The webhook secret for this integration
+ * @param repositoryIds - Repository IDs to create webhooks for
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function createWebhooksForRepositories(
   accessToken: string,
   webhookSecret: string,
@@ -211,6 +267,14 @@ export async function createWebhooksForRepositories(
   }));
 }
 
+/**
+ * Deletes all configured webhooks.
+ * Used when disabling code reviews or disconnecting the integration.
+ *
+ * @param accessToken - OAuth access token (requires Maintainer+ role on projects)
+ * @param configuredWebhooks - Map of project ID to webhook info from metadata
+ * @param instanceUrl - GitLab instance URL (defaults to gitlab.com)
+ */
 export async function deleteAllWebhooks(
   accessToken: string,
   configuredWebhooks: Record<string, ConfiguredWebhook>,

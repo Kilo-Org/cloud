@@ -39,6 +39,10 @@ import { APP_URL } from '@/lib/constants';
 import { getCodeReviewActionRequiredState } from '@/lib/code-reviews/action-required';
 
 /**
+ * GitHub Pull Request Event Handler
+ * Handles: opened, synchronize, reopened
+
+/**
  * Handles pull request events that trigger code review
  * (opened, synchronize, reopened)
  * Triggers cloud agent code review if agent config is enabled
@@ -67,6 +71,7 @@ export async function handlePullRequestCodeReview(
       checkoutRef: checkoutRef.checkoutRef,
     });
 
+    // Skip draft PRs - only trigger code review for ready PRs
     if (pull_request.draft === true) {
       logExceptInTest('Skipping draft PR:', {
         pr_number: pull_request.number,
@@ -75,6 +80,7 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped draft PR' }, { status: 200 });
     }
 
+    // Debug: Log integration fields
     logExceptInTest('Integration fields:', {
       id: integration.id,
       owned_by_organization_id: integration.owned_by_organization_id,
@@ -82,6 +88,8 @@ export async function handlePullRequestCodeReview(
       kilo_requester_user_id: integration.kilo_requester_user_id,
     });
 
+    // 1. Determine owner from integration
+    // For orgs: use bot user, fallback to integration creator
     const orgBotUserId = integration.owned_by_organization_id
       ? await getBotUserId(integration.owned_by_organization_id, 'code-review')
       : null;
@@ -90,6 +98,7 @@ export async function handlePullRequestCodeReview(
       ? {
           type: 'org',
           id: integration.owned_by_organization_id,
+          // Use bot user if available, fallback to integration creator
           userId: (orgBotUserId ?? integration.kilo_requester_user_id) as string,
         }
       : {
@@ -98,6 +107,7 @@ export async function handlePullRequestCodeReview(
           userId: integration.owned_by_user_id as string,
         };
 
+    // Validate we have a valid user ID
     if (!owner.userId) {
       logExceptInTest('No valid user ID found for integration:', {
         integrationId: integration.id,
@@ -111,6 +121,7 @@ export async function handlePullRequestCodeReview(
       );
     }
 
+    // 2. Check if code review agent is enabled for this owner
     const agentConfig = await getAgentConfigForOwner(owner, 'code_review', 'github');
 
     if (!agentConfig || !agentConfig.is_enabled || getCodeReviewActionRequiredState(agentConfig)) {
@@ -127,10 +138,11 @@ export async function handlePullRequestCodeReview(
       `Code review agent enabled for ${owner.type} ${owner.id}, processing ${repository.full_name}#${pull_request.number}`
     );
 
+    // 3. Check if repository is in allowed list (when using selected repositories mode)
     const config = agentConfig.config as CodeReviewAgentConfig;
 
-    // Bot PRs are skipped by default (enforced below). Compute the decision up front so the
-    // merge-commit path also defers to it: otherwise a bot PR whose head is a merge commit
+    // Bot PRs are skipped by default (enforced at step 5b). Compute the decision up front so the
+    // merge-commit path (step 4) also defers to it: otherwise a bot PR whose head is a merge commit
     // would be re-pointed to a new SHA with a fresh check run, keeping alive a review the guardrail
     // is meant to skip. When true, the PR falls through to cancellation + skip instead.
     const skipBotPullRequests = config.skip_bot_pull_requests ?? true;
@@ -168,7 +180,7 @@ export async function handlePullRequestCodeReview(
     const headFullName = checkoutRef.headRepoFullName ?? repository.full_name;
     const [headOwner, headRepoName] = headFullName.split('/');
 
-    // Skip merge commits on synchronize (e.g. merging base branch into feature branch).
+    // 4. Skip merge commits on synchronize (e.g. merging base branch into feature branch).
     // Runs before cancellation so that an in-flight review at an earlier SHA is preserved:
     // a merge commit introduces no new feature work and should not supersede the existing review.
     if (
@@ -211,7 +223,7 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped merge commit' }, { status: 200 });
     }
 
-    // Cancel any existing reviews for this PR (different SHA).
+    // 5. Cancel any existing reviews for this PR (different SHA)
     // This prevents spam when user pushes multiple commits quickly
     const cancelledReviews = await cancelSupersededReviewsForPR(reviewScope, pull_request.head.sha);
 
@@ -285,12 +297,12 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
+    // 5b. Feature-level guardrail: by default, skip automated reviews of bot-authored PRs
     // (dependabot/renovate/etc.) — high-volume, low-value dependency bumps otherwise consume review
-    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests`. Applies to
-    // standard and council reviews; manual reviews never reach this handler. Runs AFTER
-    // supersession so a bot push still cancels any stale in-flight review and resolves its
-    // check run, instead of leaving it stuck.
+    // compute and clutter the PR. Configurable per org via `skip_bot_pull_requests` (see the
+    // decision computed before step 4). Applies to standard and council reviews; manual reviews
+    // never reach this handler. Runs AFTER supersession (step 5) so a bot push still cancels any
+    // stale in-flight review and resolves its check run, instead of leaving it stuck.
     if (isBotPullRequestSkip) {
       logExceptInTest('Skipping bot-authored PR:', {
         pr_number: pull_request.number,
@@ -300,6 +312,7 @@ export async function handlePullRequestCodeReview(
       return NextResponse.json({ message: 'Skipped bot-authored PR' }, { status: 200 });
     }
 
+    // 6. Check for duplicate review (same repo, PR, SHA)
     const existingReview = await findExistingReview(reviewScope, pull_request.head.sha);
 
     if (existingReview) {
@@ -316,7 +329,7 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // Decide standard vs council for this automated review. Council is a per-repo opt-in and
+    // 6b. Decide standard vs council for this automated review. Council is a per-repo opt-in and
     // requires an active council config + entitlement. The entitlement lookup is a DB call, so it
     // is gated behind the two cheap local checks (most webhooks are standard and skip it). Falls
     // back to 'standard' if any condition is missing, so a bad/absent council config never blocks.
@@ -358,7 +371,7 @@ export async function handlePullRequestCodeReview(
       );
     }
 
-    // The review record's session_id is updated async.
+    // 7. Create review record (session_id will be updated async)
     const reviewId = await createCodeReview({
       owner,
       reviewType,
@@ -382,6 +395,7 @@ export async function handlePullRequestCodeReview(
 
     const [repoOwner, repoName] = repository.full_name.split('/');
 
+    // 8. Create GitHub Check Run (PR gate) — skip for lite (read-only) app
     if (appType !== 'lite') {
       let checkRunId: number | undefined;
       try {
@@ -430,6 +444,7 @@ export async function handlePullRequestCodeReview(
       }
     }
 
+    // 9. Post 👀 reaction to show Kilo is reviewing
     try {
       await addReactionToPR(
         integration.platform_installation_id as string,
@@ -444,6 +459,7 @@ export async function handlePullRequestCodeReview(
       logExceptInTest('Failed to add eyes reaction:', reactionError);
     }
 
+    // 10. Try to dispatch pending reviews (including this new one)
     // Review is created with status='pending' and dispatch will pick it up if slots available
     try {
       const dispatchResult = await tryDispatchPendingReviews(owner);
@@ -468,6 +484,7 @@ export async function handlePullRequestCodeReview(
       // Don't throw - review record created as pending, will be picked up later
     }
 
+    // 11. Return 202 Accepted (always succeeds, review queued as pending)
     return NextResponse.json(
       {
         message: 'Code review queued',
@@ -602,6 +619,9 @@ async function migrateInFlightReviewsToMergeCommitHead(args: {
   }
 }
 
+/**
+ * Main router for pull request events
+ */
 export async function handlePullRequest(
   payload: PullRequestPayload,
   integration: PlatformIntegration

@@ -96,10 +96,26 @@ async function isAvailableForDeferredGitHubDispatch(integration: {
   }
 }
 
+/**
+ * Shared GitHub App Webhook Handler
+ *
+ * Handles webhooks for both standard and lite GitHub Apps.
+ * Thin routing layer that:
+ * 1. Verifies webhook signature
+ * 2. Parses the event
+ * 3. Routes to appropriate handler
+ * 4. Handles errors
+ *
+ * All business logic is in handler files
+ *
+ * @param request - The incoming Next.js request
+ * @param appType - 'standard' for full-featured app, 'lite' for read-only OSS app
+ */
 export async function handleGitHubWebhook(
   request: NextRequest,
   appType: GitHubAppType
 ): Promise<Response> {
+  // Helper for app-specific logging
   const logSuffix = appType === 'lite' ? ' (lite app)' : '';
   const sentryPrefix = appType === 'lite' ? 'github_lite_' : 'github_';
 
@@ -112,6 +128,7 @@ export async function handleGitHubWebhook(
   let deliveryAction: string | undefined;
 
   try {
+    // 1. Verify signature
     const rawBody = await request.text();
     const signature = request.headers.get('x-hub-signature-256') || '';
 
@@ -120,6 +137,7 @@ export async function handleGitHubWebhook(
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    // 2. Parse JSON payload
     let payload: unknown;
     try {
       payload = JSON.parse(rawBody);
@@ -132,6 +150,7 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
     }
 
+    // 3. Get event type and action from headers
     eventType = request.headers.get('x-github-event') || '';
     const eventSignature = request.headers.get('x-github-delivery');
     deliveryId = eventSignature;
@@ -162,11 +181,13 @@ export async function handleGitHubWebhook(
       );
     }
 
+    // 4. Helper function to log webhook events
     const logWebhook = async (
       integration: { owned_by_organization_id: string | null; owned_by_user_id: string | null },
       action: string
     ) => {
       try {
+        // Determine owner from integration
         const owner = integration.owned_by_organization_id
           ? { type: 'org' as const, id: integration.owned_by_organization_id }
           : ({ type: 'user' as const, id: integration.owned_by_user_id } as Owner);
@@ -237,6 +258,8 @@ export async function handleGitHubWebhook(
       return response;
     };
 
+    // 5. Route based on event type with type-safe Zod parsing
+
     if (eventType === GITHUB_EVENT.APP_AUTHORIZATION) {
       const parseResult = GitHubAppAuthorizationRevokedPayloadSchema.safeParse(payload);
       if (!parseResult.success) {
@@ -250,6 +273,7 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Authorization revoked' }, { status: 200 });
     }
 
+    // Handle installation events
     if (eventType === GITHUB_EVENT.INSTALLATION) {
       const action = (payload as { action?: string }).action || '';
 
@@ -345,6 +369,7 @@ export async function handleGitHubWebhook(
 
           const result = await handleInstallationSuspend(parseResult.data, appType);
 
+          // Mark webhook event as processed
           if (logResult.webhookEventId) {
             try {
               await updateWebhookEvent(logResult.webhookEventId, {
@@ -400,6 +425,7 @@ export async function handleGitHubWebhook(
 
           const result = await handleInstallationUnsuspend(parseResult.data, appType);
 
+          // Mark webhook event as processed
           if (logResult.webhookEventId) {
             try {
               await updateWebhookEvent(logResult.webhookEventId, {
@@ -491,6 +517,7 @@ export async function handleGitHubWebhook(
       return result;
     }
 
+    // Handle installation_repositories events
     if (eventType === GITHUB_EVENT.INSTALLATION_REPOSITORIES) {
       const parseResult = InstallationRepositoriesPayloadSchema.safeParse(payload);
       if (!parseResult.success) {
@@ -553,6 +580,7 @@ export async function handleGitHubWebhook(
       return result;
     }
 
+    // For other events, verify integration exists and is not suspended
     const installation = (payload as { installation?: { id?: number } }).installation;
     const installationId = installation?.id?.toString();
 
@@ -594,6 +622,7 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 
+    // Handle push events
     if (eventType === GITHUB_EVENT.PUSH) {
       const parseResult = PushEventPayloadSchema.safeParse(payload);
       if (!parseResult.success) {
@@ -606,6 +635,7 @@ export async function handleGitHubWebhook(
       }
 
       if (!parseResult.data.deleted) {
+        // Process async
         after(async () => {
           if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await handlePushEvent(parseResult.data, integration);
@@ -614,6 +644,7 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 
+    // Handle pull_request events
     if (eventType === GITHUB_EVENT.PULL_REQUEST) {
       const parseResult = PullRequestPayloadSchema.safeParse(payload);
       if (!parseResult.success) {
@@ -710,6 +741,7 @@ export async function handleGitHubWebhook(
       return result;
     }
 
+    // Handle pull_request_review events — update cached review decision.
     if (eventType === GITHUB_EVENT.PULL_REQUEST_REVIEW) {
       const parseResult = PullRequestReviewPayloadSchema.safeParse(payload);
       if (!parseResult.success) {

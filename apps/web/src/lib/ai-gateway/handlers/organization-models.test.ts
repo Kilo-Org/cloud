@@ -1,12 +1,10 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { handleTRPCRequest } from '@/lib/organizations/organization-settings-route-handler';
+import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { handleOrganizationModelsRequest } from './organization-models';
 
-jest.mock('@/lib/organizations/organization-settings-route-handler', () => ({
-  handleTRPCRequest: jest.fn(),
-}));
+jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));

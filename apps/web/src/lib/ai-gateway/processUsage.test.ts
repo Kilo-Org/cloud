@@ -11,12 +11,10 @@ import {
   logMicrodollarUsage,
   insertUsageRecord,
   processOpenRouterUsage,
-  processTokenData,
   stripNulBytesInPlace,
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
 } from './processUsage';
-import { reportUsageEvent } from '@/lib/bouncer/client';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '../../tests/helpers/approval.helper';
 import { insertTestUser } from '../../tests/helpers/user.helper';
@@ -37,10 +35,9 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '../user';
 import { Readable } from 'node:stream';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { toMicrodollars } from '@/lib/microdollars';
+import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
@@ -49,15 +46,6 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
   captureMessage: jest.fn(),
 }));
-
-// Bouncer is report-only and its client resolves on any failure; mock it so the
-// usage-event payload can be asserted without a network call.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
-  reportUsageEvent: jest.fn(async () => undefined),
-}));
-
-const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
 
 describe('processOpenRouterUsage', () => {
   const coreProps = {
@@ -1340,59 +1328,6 @@ describe('logMicrodollarUsage', () => {
       .from(microdollar_usage_daily)
       .where(eq(microdollar_usage_daily.kilo_user_id, user.id));
     expect(dailyRows).toHaveLength(0);
-  });
-
-  test('reports the bouncer usage event with the final tokens and request flags', async () => {
-    const user = await insertTestUser({
-      id: 'test-bouncer-usage-user',
-      microdollars_used: 0,
-      google_user_email: 'bouncer-usage@example.com',
-    });
-    // No `messageId`, so the (network) generation lookup is skipped.
-    const usageStats: MicrodollarUsageStats = { ...BASE_USAGE_STATS, messageId: null };
-    const usageContext: MicrodollarUsageContext = {
-      ...createBaseUsageContext(user),
-      has_tools: true,
-      bouncer: {
-        requestId: 'req-bouncer-1',
-        occurredAt: new Date('2026-09-29T10:00:00.000Z'),
-        clientAttributed: true,
-        requestedLogprobs: true,
-        samples: 2,
-        promptSimHash: 'a1b2c3d4e5f60718',
-      },
-    };
-
-    await processTokenData(usageStats, usageContext);
-
-    expect(mockedReportUsageEvent).toHaveBeenCalledWith({
-      requestId: 'req-bouncer-1',
-      occurredAt: new Date('2026-09-29T10:00:00.000Z'),
-      accountId: `user:${user.id}`,
-      inputTokens: 100,
-      outputTokens: 50,
-      clientAttributed: true,
-      feature: 'vscode-extension',
-      hasTools: true,
-      requestedLogprobs: true,
-      samples: 2,
-      promptSimHash: 'a1b2c3d4e5f60718',
-    });
-  });
-
-  test('does not report a bouncer usage event without the bouncer context', async () => {
-    mockedReportUsageEvent.mockClear();
-    const user = await insertTestUser({
-      id: 'test-bouncer-usage-absent-user',
-      microdollars_used: 0,
-      google_user_email: 'bouncer-absent@example.com',
-    });
-
-    await processTokenData({ ...BASE_USAGE_STATS, messageId: null }, createBaseUsageContext(user));
-
-    // The classifier overhead row and anonymous requests build contexts without
-    // a bouncer account, and must not reach the worker.
-    expect(mockedReportUsageEvent).not.toHaveBeenCalled();
   });
 });
 

@@ -28,11 +28,6 @@ import {
 } from '@/lib/service-fees/checkout';
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { APP_URL } from '@/lib/constants';
-import {
-  reportChargeAttempted,
-  ipCountryFromHeaders,
-  type ChargeAttemptContext,
-} from '@/lib/bouncer/credit-events';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -85,7 +80,7 @@ import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@/lib/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,
@@ -1345,8 +1340,6 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
-  /** Bouncer context; omitted by tests that only exercise the checkout shape. */
-  attempt?: ChargeAttemptContext;
 }): Promise<CheckoutSessionLike> {
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
@@ -1357,17 +1350,6 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     stripe: requireTopUpPriceReader(deps.stripe),
     priceId: params.priceId,
   });
-
-  if (params.attempt) {
-    reportChargeAttempted({
-      flow: 'kilo_pass',
-      userId: params.kiloUserId,
-      amountCents: principalMinor,
-      accountCreatedAt: params.attempt.accountCreatedAt,
-      ip: params.attempt.ip,
-      ipCountry: params.attempt.ipCountry,
-    });
-  }
 
   const prepared = await prepareTopUpCheckoutFee({
     flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
@@ -2989,11 +2971,6 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
-            attempt: {
-              accountCreatedAt: ctx.user.created_at,
-              ip: ctx.ip,
-              ipCountry: ipCountryFromHeaders(ctx.headersList),
-            },
           }),
       });
     }),

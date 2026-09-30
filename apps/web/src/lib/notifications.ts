@@ -6,7 +6,7 @@ import type { UserOrganizationWithSeats } from '@/lib/organizations/organization
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
 
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@/lib/utils';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {

@@ -1,8 +1,7 @@
-import { after, type NextResponse } from 'next/server';
+import type { NextResponse } from 'next/server';
 
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
-  clearOpenAiChatGptUsageLimit,
   recordOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
 } from '@/lib/ai-gateway/openai-chatgpt/store';
@@ -13,7 +12,7 @@ import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-mod
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 
 type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;
@@ -88,7 +87,7 @@ export async function sendUpstreamAttempt({
   if (result.type === 'error') return result;
 
   if (providerContext.provider.id === OPENAI_CHATGPT_PROVIDER_ID) {
-    await syncChatGptUsageLimit(result.response, providerContext.provider.chatGptOwner);
+    await recordChatGptUsageLimitIfReached(result.response, providerContext.provider.chatGptOwner);
   }
 
   return {
@@ -98,46 +97,21 @@ export async function sendUpstreamAttempt({
 }
 
 /**
- * Keeps the stored ChatGPT plan limit in step with what the delegated upstream
- * says about it, so the web app can show the partner guideline's usage-limit
- * message while it applies and drop it as soon as it stops applying.
+ * Records a ChatGPT plan limit so the web app can show the partner guideline's
+ * usage-limit message on the next page load. The response is cloned before it
+ * is read, so the original body still streams to the caller unchanged, and
+ * recording is best-effort: a database failure must never change the request's
+ * outcome, which is the upstream error the caller already has.
  *
- * A 429 records the limit. The response is cloned before it is read, so the
- * original body still streams to the caller unchanged. A response that
- * succeeded clears the record: OpenAI is the only authority on when the
- * allowance returns, and neither the recorded window nor a reconnect can know
- * that a person applied a reset in ChatGPT. The clear runs after the response,
- * so it never adds latency to a request that worked.
- *
- * The owner is the connection the provider named, so the record lands on the
+ * The owner is the connection the provider named, so the limit lands on the
  * exact row that served the request: the organization's shared-services
- * connection for a service run, and the caller's own row otherwise. Both
- * directions are best-effort: a database failure must never change the
- * request's outcome, which is the upstream response the caller already has.
+ * connection for a service run, and the caller's own row otherwise.
  */
-async function syncChatGptUsageLimit(
+async function recordChatGptUsageLimitIfReached(
   response: Response,
   owner: OpenAiChatGptOwner | undefined
 ): Promise<void> {
-  if (!owner) return;
-
-  if (response.status < 400) {
-    try {
-      after(async () => {
-        try {
-          await clearOpenAiChatGptUsageLimit(owner);
-        } catch {
-          // Best-effort, exactly like the record path below.
-        }
-      });
-    } catch {
-      // `after` needs a request scope. Without one the request keeps its
-      // outcome, and the next request through the connection clears the record.
-    }
-    return;
-  }
-
-  if (response.status !== 429) return;
+  if (response.status !== 429 || !owner) return;
 
   try {
     const limit = readChatGptUsageLimit(response.status, await response.clone().json());

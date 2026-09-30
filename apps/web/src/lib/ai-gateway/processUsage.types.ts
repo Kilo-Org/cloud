@@ -1,6 +1,6 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import type { GatewayApiKind, MicrodollarUsage, Organization } from '@kilocode/db';
 import type { OpenAI } from 'openai';
 
@@ -155,32 +155,6 @@ export type MicrodollarUsageContext = {
    * do not need to know about it.
    */
   clientRequestId?: string | null;
-  /**
-   * Report-only bouncer telemetry. Set on gateway inference requests that must
-   * report a usage event; absent where one must not be sent (the classifier
-   * overhead row, anonymous requests, the FIM and edit builders).
-   */
-  bouncer?: BouncerUsageContext;
-};
-
-/**
- * Report-only bouncer telemetry for the usage event. Bouncer's verdict never
- * changes billing or the response, and the client resolves even when the worker
- * is unreachable.
- */
-export type BouncerUsageContext = {
-  /** Per-request id, also sent to bouncer's `decide` for the same request. */
-  requestId: string;
-  /** Wall-clock time the request started. */
-  occurredAt: Date;
-  /** A known Kilo feature value or a Kilo client version header was sent. */
-  clientAttributed: boolean;
-  /** The request set `logprobs`, `top_logprobs`, or a non-empty `logit_bias`. */
-  requestedLogprobs: boolean;
-  /** The `n` sampling parameter, or null when the request did not set one. */
-  samples: number | null;
-  /** SimHash of the last user turn. The context never carries the prompt text itself. */
-  promptSimHash: string | null;
 };
 
 export type CoreUsageWithMetaData = {

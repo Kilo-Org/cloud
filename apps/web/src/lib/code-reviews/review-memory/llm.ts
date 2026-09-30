@@ -8,7 +8,7 @@ import { DEFAULT_CODE_REVIEW_MODEL } from '@/lib/code-reviews/core/constants';
 import { APP_URL } from '@/lib/constants';
 import { FEATURE_HEADER } from '@/lib/feature-detection';
 import { generateApiToken } from '@/lib/tokens';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import type { User } from '@kilocode/db/schema';
 import type { ReviewMemoryPlatform } from '@kilocode/db/schema-types';
 import type { ReviewMemoryOwner } from './db';

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   buildProfileSections,
   isEffectiveDefault,
-  profileCounts,
   profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 
@@ -102,16 +101,6 @@ describe('isEffectiveDefault', () => {
   it('falls back to the profile flag when no default is resolved', () => {
     expect(isEffectiveDefault(profile({ id: 'a', isDefault: true }), null)).toBe(true);
     expect(isEffectiveDefault(profile({ id: 'b' }), null)).toBe(false);
-  });
-});
-
-describe('profileCounts', () => {
-  it('returns the var / MCP / skill triple, not setup commands', () => {
-    expect(
-      profileCounts(
-        profile({ id: 'a', varCount: 3, commandCount: 9, mcpServerCount: 2, skillCount: 1 })
-      )
-    ).toEqual({ varCount: 3, mcpServerCount: 2, skillCount: 1 });
   });
 });
 

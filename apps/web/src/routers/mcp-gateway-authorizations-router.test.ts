@@ -11,7 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { eq } from 'drizzle-orm';
 

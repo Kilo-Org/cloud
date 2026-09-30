@@ -28,7 +28,6 @@ import {
   updateCodeReviewAttemptForCallback,
   getLatestCodeReviewAttempt,
   createInfraRetryAttemptIfMissing,
-  recordCodeReviewAttemptPublicationStatus,
 } from '@/lib/code-reviews/db/code-reviews';
 import { tryDispatchPendingReviews } from '@/lib/code-reviews/dispatch/dispatch-pending-reviews';
 import { settleCodeReviewLedgerRow } from '@/lib/code-reviews/code-review-ledger';
@@ -59,10 +58,6 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
-import {
-  classifyCodeReviewPublication,
-  type CodeReviewPublicationObservation,
-} from '@/lib/code-reviews/summary/publication-status';
 import {
   getGitLabInstanceUrl,
   resolveGitLabAccessToken,
@@ -1325,20 +1320,6 @@ export async function POST(
       });
     }
 
-    const recordPublication = async (
-      attemptId: string,
-      observation: CodeReviewPublicationObservation
-    ): Promise<void> => {
-      try {
-        await recordCodeReviewAttemptPublicationStatus(
-          attemptId,
-          classifyCodeReviewPublication(observation)
-        );
-      } catch {
-        // Recording is best-effort; it must not change the callback result.
-      }
-    };
-
     const modelNotFoundRuntimeDiagnostics = getModelNotFoundRuntimeDiagnostics(
       rawPayload,
       terminalReason
@@ -1623,14 +1604,6 @@ export async function POST(
         ? await getIntegrationById(review.platform_integration_id)
         : null;
 
-    if (status === 'completed') {
-      if (!shouldPublishToProvider) {
-        await recordPublication(attempt.id, { kind: 'not_applicable' });
-      } else if (!integration) {
-        await recordPublication(attempt.id, { kind: 'unknown' });
-      }
-    }
-
     // Resolve GitLab token once, shared between gate check and reaction/footer logic
     const reviewPlatform = parseCodeReviewPlatform(review.platform);
     const isGitLab = reviewPlatform === PLATFORM.GITLAB;
@@ -1824,12 +1797,6 @@ export async function POST(
                   review.pr_number,
                   appType
                 );
-                await recordPublication(attempt.id, {
-                  kind: 'summary',
-                  summaryBody: existing?.body ?? null,
-                  previousSummaryBody: review.previous_summary_body,
-                  previousSummaryObserved: review.previous_summary_observed,
-                });
                 if (existing) {
                   // Inject the code-owned Council Review section first (no-op for non-council),
                   // then history + footer, so the whole comment updates in a single PATCH.
@@ -1923,12 +1890,6 @@ export async function POST(
                   review.pr_number,
                   instanceUrl
                 );
-                await recordPublication(attempt.id, {
-                  kind: 'summary',
-                  summaryBody: existing?.body ?? null,
-                  previousSummaryBody: review.previous_summary_body,
-                  previousSummaryObserved: review.previous_summary_observed,
-                });
                 if (existing) {
                   // Inject the code-owned Council Review section first (no-op for non-council),
                   // then history + footer, so the whole note updates in a single PUT.
@@ -1960,18 +1921,12 @@ export async function POST(
                 }
               }
             } else if (platform === PLATFORM.BITBUCKET) {
-              if (status === 'completed') {
-                await recordPublication(attempt.id, { kind: 'unknown' });
-              }
               logExceptInTest(
                 '[code-review-status] Skipping deferred Bitbucket provider completion actions',
                 { reviewId }
               );
             }
           } catch (postCompletionError) {
-            if (status === 'completed') {
-              await recordPublication(attempt.id, { kind: 'unknown' });
-            }
             // Non-blocking - log but don't fail the callback
             logExceptInTest(
               '[code-review-status] Failed to add completion reaction or summary metadata:',

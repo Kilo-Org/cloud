@@ -451,19 +451,6 @@ describe('resolveOpenAiChatGptAccessToken', () => {
     expect(persisted.expires_at).toBe(0);
   });
 
-  it('treats the token_expired refresh failure as terminal', async () => {
-    storedRow = encryptedRow(buildConnection());
-    fetchMock.mockResolvedValue(jsonResponse({ error: 'token_expired' }, 400));
-
-    await expect(resolveOpenAiChatGptAccessToken(USER_OWNER)).resolves.toEqual({
-      kind: 'terminal',
-    });
-
-    // One attempt only: the code names an unusable refresh token, so the person
-    // is told to reconnect instead of the request moving to another billing path.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
   it('writes the terminal state inside the row lock so a concurrent reconnect survives', async () => {
     storedRow = encryptedRow(buildConnection());
     fetchMock.mockResolvedValue(jsonResponse({ error: 'invalid_grant' }, 400));

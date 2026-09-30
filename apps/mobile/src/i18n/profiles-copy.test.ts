@@ -141,6 +141,7 @@ const EXPECTED_PROFILES = {
     visibilitySubagent: 'Subagent — only callable from others',
     visibilityAll: 'All — both',
     saveFailed: "Couldn't save agent",
+    deleteFailed: "Couldn't delete agent",
     nameRequired: 'Enter an agent name',
     slugRequired: 'Enter an agent slug',
     slugInvalid: 'Slug must start with a letter and use only lowercase letters, digits, and dashes',

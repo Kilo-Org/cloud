@@ -6,7 +6,6 @@ import { EmptyState } from '@/components/empty-state';
 import {
   buildProfileSections,
   isEffectiveDefault,
-  profileCounts,
   profileListCountItems,
 } from '@/components/profiles/profile-list-model';
 import { profileOrganizationId, profileOwnerType } from '@/components/profiles/profile-owner-model';
@@ -173,7 +172,7 @@ export function ProfilesListScreen() {
                 {section.profiles.map((profile, index) => {
                   const subtitle = formatProfileCountItemsShort(
                     t,
-                    profileListCountItems(profileCounts(profile))
+                    profileListCountItems(profile)
                   ).join(' · ');
                   return (
                     <ConfigureRow

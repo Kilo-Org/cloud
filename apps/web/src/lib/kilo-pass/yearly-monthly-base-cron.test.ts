@@ -19,7 +19,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
 import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@/lib/utils';
 
 function stripeSubscriptionFields(): {
   provider_subscription_id: string;

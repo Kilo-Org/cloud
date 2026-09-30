@@ -1,5 +1,5 @@
 import { SignInButton } from '@/components/auth/SigninButton';
-import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 import { getProviderById, ProdNonSSOAuthProviders } from '@/lib/auth/provider-metadata';
 import styles from './AuthProviderButtons.module.css';
 

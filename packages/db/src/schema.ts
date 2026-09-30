@@ -101,7 +101,6 @@ import {
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
-  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -304,7 +303,6 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
   CodeReviewAnalyticsCaptureStatus,
-  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -2831,18 +2829,12 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
-    /** Unused and always empty; the request body is stored in R2 under `request_r2_key`. */
     request: jsonb(),
-    /** Unused and always empty; the response body is stored in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
-    request_r2_key: text(),
-    response_r2_key: text(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
-
-export type ApiRequestLog = typeof api_request_log.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -5913,7 +5905,6 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
-    previous_summary_observed: boolean(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
@@ -5955,24 +5946,6 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
-    // Outcome-time windows and the start-latency sample each range-scan their own
-    // timestamp; the missing-outcome-time aggregate matches only null completed_at
-    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
-    // non-null completed_at index can serve.
-    index('idx_cloud_agent_code_reviews_completed_at')
-      .on(table.completed_at)
-      .concurrently()
-      .where(isNotNull(table.completed_at)),
-    index('idx_cloud_agent_code_reviews_started_at')
-      .on(table.started_at)
-      .concurrently()
-      .where(isNotNull(table.started_at)),
-    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
-      .on(table.status)
-      .concurrently()
-      .where(
-        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
-      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
@@ -6103,7 +6076,6 @@ export const cloud_agent_code_review_attempts = pgTable(
     terminal_reason: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    publication_status: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6126,11 +6098,6 @@ export const cloud_agent_code_review_attempts = pgTable(
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
-    ),
-    enumCheck(
-      'cloud_agent_code_review_attempts_publication_status_check',
-      table.publication_status,
-      CodeReviewPublicationStatus
     ),
   ]
 );
@@ -7125,11 +7092,10 @@ export const openai_chatgpt_connections = pgTable(
     is_shared_services: boolean().default(false).notNull(),
     /**
      * The last time OpenAI answered a delegated request with a plan usage
-     * limit. The gateway writes it, a request through the same connection that
-     * succeeds clears it, and a reconnect clears it. It is request state, not
-     * credential state, so it stays out of the encrypted payload. It gates
-     * nothing: `readOpenAiChatGptUsageLimit` hides a record once the reset time
-     * OpenAI reported has passed, and routing never reads it.
+     * limit. The gateway writes it and a reconnect clears it. It is request
+     * state, not credential state, so it stays out of the encrypted payload. A
+     * recorded limit is not cleared by success: `readOpenAiChatGptUsageLimit`
+     * hides it once the reset time OpenAI reported has passed.
      */
     usage_limit_reached_at: timestamp({ withTimezone: true, mode: 'string' }),
     /** The reset time OpenAI reported with the limit, when it reported one. */

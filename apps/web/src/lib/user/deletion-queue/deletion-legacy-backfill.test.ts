@@ -26,7 +26,7 @@ import {
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { sendAccountDeletionCompletedEmail } from '@/lib/email';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import { enqueueHistoricalUserDeletion } from '@/lib/user/deletion-queue/deletion-legacy-backfill';
@@ -44,6 +44,9 @@ jest.mock('@/lib/config.server', () => ({
   USER_DELETION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
 }));
 jest.mock('@/lib/r2/cli-sessions', () => ({ deleteBlobs: jest.fn(async () => undefined) }));
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: jest.fn(async () => undefined),
+}));
 jest.mock('@/lib/email', () => ({ sendAccountDeletionCompletedEmail: jest.fn() }));
 
 const code = 'user_id_only_backfill_2026_08_26';

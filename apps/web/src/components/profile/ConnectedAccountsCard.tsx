@@ -10,8 +10,7 @@ import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { AuthProvider } from './LoginMethodsCard';
 import { UnlinkAccountDialog } from './UnlinkAccountDialog';
-import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { getProviderById } from '@/lib/auth/provider-metadata';
+import { type AuthProviderId, getProviderById } from '@/lib/auth/provider-metadata';
 
 type ConnectedAccountsCardProps = {
   providers: AuthProvider[];

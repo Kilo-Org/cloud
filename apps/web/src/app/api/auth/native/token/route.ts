@@ -15,9 +15,9 @@ import {
 } from '@/lib/auth/magic-link-tokens';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
-import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
+  findUserById,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
   type CreateOrUpdateUserArgs,

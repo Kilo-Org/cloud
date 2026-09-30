@@ -4,6 +4,7 @@ import { kilo_pass_audit_log, kilo_pass_subscriptions } from '@kilocode/db/schem
 
 import { db } from '@/lib/drizzle';
 import { and, eq, sql } from 'drizzle-orm';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { captureException } from '@sentry/nextjs';
 
 import { KiloPassError } from '@/lib/kilo-pass/errors';
@@ -47,6 +48,10 @@ export async function handleKiloPassSubscriptionEvent(params: {
     );
   }
 
+  let finalStatus: string | undefined;
+  let finalStreakMonths: number | undefined;
+  let finalKiloUserId: string | undefined;
+  let finalTier: string | undefined;
   let wasDuplicateDelivery = false;
 
   try {
@@ -137,6 +142,11 @@ export async function handleKiloPassSubscriptionEvent(params: {
       if (!row)
         throw new Error(`Failed to reconcile Kilo Pass subscription ${eventSubscription.id}`);
 
+      finalStatus = stripeStatus;
+      finalStreakMonths = row.current_streak_months;
+      finalKiloUserId = kiloUserId;
+      finalTier = tier;
+
       const pauseCollection = currentSubscription.pause_collection;
       if (pauseCollection?.behavior) {
         await openPauseEvent(tx, {
@@ -185,4 +195,20 @@ export async function handleKiloPassSubscriptionEvent(params: {
     });
     throw error;
   }
+
+  if (wasDuplicateDelivery) return;
+
+  void reportEvents({
+    events: [
+      {
+        type: 'billing.kilo_pass_changed',
+        data: {
+          kilo_user_id: finalKiloUserId ?? eventMetadata.kiloUserId,
+          tier: finalTier ?? eventMetadata.tier,
+          status: finalStatus ?? null,
+          streak_months: finalStreakMonths,
+        },
+      },
+    ],
+  }).catch(captureException);
 }

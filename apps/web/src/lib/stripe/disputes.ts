@@ -32,6 +32,7 @@ import { goneOrDeletingBlockedReasonSql } from '@kilocode/db/user-soft-delete';
 import { and, desc, eq, inArray, isNotNull, isNull, lt, not, or, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { terminateCodingPlanImmediately } from '@/lib/coding-plans';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
@@ -39,7 +40,7 @@ import { createKiloClawAdminAuditLog } from '@/lib/kiloclaw/admin-audit-log';
 import { workerInstanceId } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import { client } from '@/lib/stripe-client';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@/lib/utils';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import { blockUser } from '@/lib/user/block';
@@ -534,6 +535,21 @@ async function blockUserForAcceptedDispute(params: {
 
   await revokeWebSessions(userId);
   await revokeGatewayGrantsForBlockedUser(userId);
+
+  if (didBlock) {
+    void reportEvents({
+      events: [
+        {
+          type: 'user.blocked',
+          data: {
+            kilo_user_id: userId,
+            reason,
+            actor_email: params.actor.google_user_email,
+          },
+        },
+      ],
+    });
+  }
 
   return {
     status: StripeDisputeActionStatus.Completed,

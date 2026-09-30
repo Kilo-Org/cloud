@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 
-import { MASKED_MCP_VALUE } from '@/components/profiles/mcp-json';
 import {
   buildMcpServerPayload,
   commandParts,
@@ -13,6 +12,9 @@ import {
   mcpServerSummary,
   validateMcpForm,
 } from '@/components/profiles/profile-mcp-model';
+
+/** The masked placeholder the server returns in place of each stored value. */
+const MASKED_MCP_VALUE = '\u2022\u2022\u2022\u2022';
 
 function localSource(overrides: Partial<McpServerSource> = {}): McpServerSource {
   return {

@@ -88,15 +88,6 @@ export function isEffectiveDefault(
   return effectiveDefaultId === null ? profile.isDefault : profile.id === effectiveDefaultId;
 }
 
-/** Read the counts triple off a profile summary. */
-export function profileCounts(profile: ProfileCounts): ProfileCounts {
-  return {
-    varCount: profile.varCount,
-    mcpServerCount: profile.mcpServerCount,
-    skillCount: profile.skillCount,
-  };
-}
-
 /**
  * The non-zero counts a row subtitle shows, in web order (vars, MCP,
  * skills). The caller localizes them with the compact unit suffixes and joins

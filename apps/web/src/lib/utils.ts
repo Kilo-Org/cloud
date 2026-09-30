@@ -4,10 +4,38 @@ import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { ZodType } from 'zod';
 
-export { formatCents, formatDollars } from '@kilocode/app-shared/utils';
+export { formatCents, formatDollars, fromMicrodollars } from '@kilocode/app-shared/utils';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Checks if a string starts with a required prefix and removes it.
+ * @param str The input string to check
+ * @param prefix The required prefix to check for and remove
+ * @returns The string with the prefix removed if it starts with the prefix, otherwise null
+ */
+export function stripRequiredPrefix(str: string, prefix: string): string | null {
+  if (str.startsWith(prefix)) {
+    return str.slice(prefix.length);
+  }
+  return null;
+}
+
+const parseFloatOrNull = (value: string | null) => (value === null ? null : parseFloat(value));
+export const EmptyFraudDetectionHeaders = getFraudDetectionHeaders(new Headers());
+export type FraudDetectionHeaders = ReturnType<typeof getFraudDetectionHeaders>;
+export function getFraudDetectionHeaders(headers: Headers) {
+  return {
+    http_x_forwarded_for: headers.get('x-forwarded-for'),
+    http_x_vercel_ip_city: headers.get('x-vercel-ip-city'),
+    http_x_vercel_ip_country: headers.get('x-vercel-ip-country'),
+    http_x_vercel_ip_latitude: parseFloatOrNull(headers.get('x-vercel-ip-latitude')),
+    http_x_vercel_ip_longitude: parseFloatOrNull(headers.get('x-vercel-ip-longitude')),
+    http_x_vercel_ja4_digest: headers.get('x-vercel-ja4-digest'),
+    http_user_agent: headers.get('user-agent'),
+  };
 }
 
 export function getInitials(user: User) {
@@ -103,6 +131,10 @@ export function formatIsoDateTime_IsoOrderNoSeconds(dateString: string | Date | 
   return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
+export function toMicrodollars(amount: number): number {
+  return Math.round(amount * 1000000);
+}
+
 export function formatLargeNumber(num: number, shorten: boolean = false): string {
   if (num < 1000000) {
     return num.toLocaleString();
@@ -160,6 +192,40 @@ export async function parseResultJsonWithZodSchema<T>(
   const jsonData = await response.json();
 
   return schema.parse(jsonData);
+}
+
+export function getLowerDomainFromEmail(email: string): string | null {
+  return email?.split('@').pop()?.toLowerCase() || null;
+}
+
+/**
+ * Normalizes an email address for duplicate detection.
+ * - Lowercases the entire address
+ * - Strips `+` aliases (e.g. `user+tag@example.com` → `user@example.com`)
+ * - For Gmail/Googlemail: removes dots from the local part
+ * - Normalizes `googlemail.com` → `gmail.com` (same mailbox)
+ */
+export function normalizeEmail(email: string): string {
+  const trimmed = email.trim().toLowerCase();
+  const atIndex = trimmed.lastIndexOf('@');
+  if (atIndex === -1) return trimmed;
+
+  let local = trimmed.slice(0, atIndex);
+  const domain = trimmed.slice(atIndex + 1);
+
+  // Strip +alias suffix
+  const plusIndex = local.indexOf('+');
+  if (plusIndex !== -1) {
+    local = local.slice(0, plusIndex);
+  }
+
+  // Gmail and Googlemail are the same mailbox; normalize dots and domain
+  const isGmail = domain === 'gmail.com' || domain === 'googlemail.com';
+  if (isGmail) {
+    local = local.replace(/\./g, '');
+  }
+
+  return `${local}@${isGmail ? 'gmail.com' : domain}`;
 }
 
 /**

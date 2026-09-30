@@ -13,7 +13,6 @@ import { ScrollView } from 'react-native-gesture-handler';
 
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren } from './code-block-chunk-content';
@@ -43,13 +42,6 @@ type CodeBlockProps = {
       The markdown renderer passes palette.textColor so code inside user
       variant bubbles keeps its designed ink color (lime/primary surfaces). */
   baseColor?: string;
-  /**
-   * Token scheme for the syntax-highlighted runs, derived by the caller from
-   * the card the block is painted on (`tokenSchemeForSurface`). The markdown
-   * renderer passes its palette's scheme; tool cards omit it and fall back to
-   * the app color scheme, since they render on the app `card` surface.
-   */
-  tokenScheme?: TokenScheme;
   /**
    * When provided, a single tap on the block reveals an inline "Copy" action
    * that hands the full source (before the display cap) back to the caller.
@@ -162,7 +154,6 @@ function CodeBlockImpl({
   maxLength,
   selectable,
   baseColor,
-  tokenScheme,
   onCopyCode,
   onLongPressCode,
 }: Readonly<CodeBlockProps>) {
@@ -177,9 +168,6 @@ function CodeBlockImpl({
   // background-token equality: the generated palette can change, and the
   // tokens would silently flip against their surface.
   const isDark = useColorScheme() === 'dark';
-  // Tool cards render on the app `card` surface, whose brightness tracks the
-  // app scheme; the markdown renderer passes the scheme of its own code card.
-  const effectiveTokenScheme = tokenScheme ?? (isDark ? 'onDark' : 'onLight');
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
   const tokenLines = useMemo(
     () => tokenizeCodeLines(displayText, language),
@@ -386,7 +374,7 @@ function CodeBlockImpl({
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- base ink for untagged runs
             style={{ color: textBase }}
           >
-            {renderChunkChildren(chunk, effectiveTokenScheme, keepBlankLineBox)}
+            {renderChunkChildren(chunk, isDark, keepBlankLineBox)}
           </RNText>
         ))}
       </View>
@@ -399,7 +387,7 @@ function CodeBlockImpl({
       copyAccessibilityActions,
       canCopyCode,
       handleCopyAccessibilityAction,
-      effectiveTokenScheme,
+      isDark,
     ]
   );
 

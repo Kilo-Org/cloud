@@ -1,7 +1,7 @@
 import 'server-only';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 import { generateApiToken } from '@/lib/tokens';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import type { Owner } from '@/lib/integrations/core/types';
 
 /**

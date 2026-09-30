@@ -2,6 +2,7 @@ import { describe, expect, it, jest } from '@jest/globals';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import {
+  applyAnthropicThinkingDefault,
   applyGatewayModelsFallback,
   applyPreferredProvider,
   applyProviderSpecificLogic,
@@ -16,7 +17,7 @@ import {
   type ProviderId,
 } from '@/lib/ai-gateway/providers/types';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {
   public_id: 'test/non-flex-exclusive',
@@ -68,16 +69,62 @@ function makeProvider(responseTransforms: Provider['responseTransforms']): Provi
   };
 }
 
-function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'messages' }> {
+type MessagesThinking = Extract<GatewayRequest, { kind: 'messages' }>['body']['thinking'];
+
+function makeMessagesRequest(
+  model: string,
+  thinking?: MessagesThinking
+): Extract<GatewayRequest, { kind: 'messages' }> {
   return {
     kind: 'messages',
     body: {
       model,
       max_tokens: 2_048,
       messages: [{ role: 'user', content: 'hello' }],
+      thinking,
     },
   };
 }
+
+describe('applyAnthropicThinkingDefault', () => {
+  it.each(['z-ai/glm-5.2', 'minimax/minimax-m3'])('disables implicit thinking for %s', model => {
+    const request = makeMessagesRequest(model);
+
+    applyAnthropicThinkingDefault(model, request);
+
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
+
+  it.each([{ type: 'enabled' as const, budget_tokens: 1_024 }, { type: 'adaptive' as const }])(
+    'preserves explicitly enabled thinking %p',
+    thinking => {
+      const request = makeMessagesRequest('z-ai/glm-5.2', thinking);
+
+      applyAnthropicThinkingDefault('z-ai/glm-5.2', request);
+
+      expect(request.body.thinking).toEqual(thinking);
+    }
+  );
+
+  it('does not add thinking to unrelated models', () => {
+    const request = makeMessagesRequest('vendor/unrelated-model');
+
+    applyAnthropicThinkingDefault('vendor/unrelated-model', request);
+
+    expect(request.body.thinking).toBeUndefined();
+  });
+
+  it.each(['z-ai/glm-5.1', 'moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast'])(
+    'does not add thinking to %s',
+    model => {
+      const request = makeMessagesRequest(model);
+
+      applyAnthropicThinkingDefault(model, request);
+
+      expect(request.body.thinking).toBeUndefined();
+    }
+  );
+});
 
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
@@ -392,14 +439,12 @@ describe('applyPreferredProvider', () => {
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('applies the Claude provider order to Fable', () => {
+  it('does not set a provider order for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 
     applyPreferredProvider('anthropic/claude-fable-5', request.body);
 
-    expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
-    });
+    expect(request.body.provider).toBeUndefined();
   });
 
   it('preserves valid provider options when adding order', () => {

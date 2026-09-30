@@ -11,8 +11,12 @@ import {
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
-import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
-import { removeUserFromOrganization } from './organization-member-removal';
+import {
+  createOrganization,
+  addUserToOrganization,
+  removeUserFromOrganization,
+  getOrganizationMembers,
+} from './organizations';
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,

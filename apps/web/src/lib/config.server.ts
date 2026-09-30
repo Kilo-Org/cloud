@@ -304,10 +304,26 @@ export const SLACK_DEPLOY_THREAT_WEBHOOK_URL = getEnvVariable('SLACK_DEPLOY_THRE
 // AI Attribution Service
 export const AI_ATTRIBUTION_ADMIN_SECRET = getEnvVariable('AI_ATTRIBUTION_ADMIN_SECRET');
 
-// Bouncer: report-only fraud, distillation, and rate verdicts (Kilo-Org/bouncer).
-export const BOUNCER_URL =
-  getEnvVariable('BOUNCER_URL') ||
-  (process.env.NODE_ENV === 'production' ? 'https://bouncer.kiloapps.io' : null);
+// Abuse Detection Service
+export const ABUSE_SERVICE_CF_ACCESS_CLIENT_ID = getEnvVariable(
+  'ABUSE_SERVICE_CF_ACCESS_CLIENT_ID'
+);
+export const ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET = getEnvVariable(
+  'ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET'
+);
+export const ABUSE_SERVICE_URL =
+  getEnvVariable('ABUSE_SERVICE_URL') ||
+  (process.env.NODE_ENV === 'production' ? 'https://abuse.kiloapps.io' : null);
+
+// Validate CF Access credentials are present in production (not test/preview environments)
+if (process.env.NODE_ENV === 'production') {
+  if (!ABUSE_SERVICE_CF_ACCESS_CLIENT_ID) {
+    throw new Error('ABUSE_SERVICE_CF_ACCESS_CLIENT_ID is required in production');
+  }
+  if (!ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET) {
+    throw new Error('ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET is required in production');
+  }
+}
 
 /**
  * RSA public key used for encrypting agent environment profile secrets.

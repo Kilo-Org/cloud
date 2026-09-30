@@ -29,15 +29,17 @@ import { auto_deleted_at, db, sql } from '@/lib/drizzle';
 import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@/lib/constants';
 import { randomUUID } from 'crypto';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars, getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { classifyOrganizationEntitlement } from './trial-utils';
-import { logExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
+import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
+import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { APP_URL } from '@/lib/constants';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { captureOrganizationMemberJoined } from '@/lib/organizations/organization-member-analytics';
 import { failureResult, successResult } from '@/lib/maybe-result';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
 
 export async function getOrganizationById(
@@ -284,6 +286,23 @@ export async function createOrganization(
     return org;
   });
 
+  if (userId) {
+    void reportEvents({
+      events: [
+        {
+          type: 'org.created',
+          data: {
+            kilo_user_id: userId,
+            organization_id: organization.id,
+            role: 'owner',
+            plan: organization.plan ?? null,
+            in_free_trial: organization.free_trial_end_at != null,
+          },
+        },
+      ],
+    });
+  }
+
   return organization;
 }
 
@@ -331,6 +350,14 @@ export async function addUserToOrganization(
   // inserted.
   if (added) {
     await bumpOrganizationGroupPolicyRevision(txn, organizationId, userId);
+    void reportEvents({
+      events: [
+        {
+          type: 'org.member_added',
+          data: { kilo_user_id: userId, organization_id: organizationId, role },
+        },
+      ],
+    });
   }
   return added;
 }
@@ -379,6 +406,117 @@ export async function addSsoUserToOrganization(
 
     return added;
   });
+}
+
+export async function removeUserFromOrganization(
+  organizationId: Organization['id'],
+  userId: User['id'],
+  removedBy?: User['id'],
+  txn?: DrizzleTransaction
+): Promise<{ rowCount: number | null }> {
+  const run = async (tx: DrizzleTransaction) => {
+    await lockOrganizationMembershipMutation(tx, organizationId, userId);
+    await bumpOrganizationGroupPolicyRevision(tx, organizationId, removedBy ?? userId);
+    const [membership] = await tx
+      .select({ role: organization_memberships.role })
+      .from(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(organization_memberships.kilo_user_id, userId)
+        )
+      );
+
+    const result = await tx
+      .delete(organization_memberships)
+      .where(
+        and(
+          eq(organization_memberships.organization_id, organizationId),
+          eq(organization_memberships.kilo_user_id, userId)
+        )
+      );
+
+    // Record the removal so webhook handlers don't re-add the user (Subscription Lifecycle 2)
+    if (membership && (result.rowCount ?? 0) > 0) {
+      await tx
+        .insert(organization_membership_removals)
+        .values({
+          organization_id: organizationId,
+          kilo_user_id: userId,
+          removed_by: removedBy,
+          previous_role: membership.role,
+        })
+        .onConflictDoUpdate({
+          target: [
+            organization_membership_removals.organization_id,
+            organization_membership_removals.kilo_user_id,
+          ],
+          set: {
+            removed_at: sql`now()`,
+            removed_by: removedBy,
+            previous_role: membership.role,
+          },
+        });
+
+      void reportEvents({
+        events: [
+          {
+            type: 'org.member_removed',
+            data: {
+              kilo_user_id: userId,
+              organization_id: organizationId,
+              role: membership.role,
+            },
+          },
+        ],
+      });
+    }
+
+    return result;
+  };
+
+  const result = txn ? await run(txn) : await db.transaction(run);
+
+  // Session access invalidation is a best-effort network call and must not run
+  // inside a caller-provided transaction; the caller handles it after commit.
+  if (!txn && (result.rowCount ?? 0) > 0) {
+    await invalidateRemovedMemberSessionAccess(organizationId, userId);
+  }
+
+  return result;
+}
+
+/**
+ * Best-effort: a removed member loses cached Session Ingest access within the
+ * cache TTL even when this call fails, so removal never fails on it.
+ */
+async function invalidateRemovedMemberSessionAccess(
+  organizationId: Organization['id'],
+  userId: User['id']
+): Promise<void> {
+  try {
+    await invalidateOrganizationSessionAccess(userId, organizationId);
+  } catch (error) {
+    errorExceptInTest(
+      'Failed to invalidate cached session access for removed organization member',
+      {
+        organizationId,
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      }
+    );
+  }
+
+  // Best-effort: close the removed member's live Cloud Agent stream sockets.
+  try {
+    await closeCloudAgentOrgStreams(userId, organizationId);
+  } catch (error) {
+    errorExceptInTest('Failed to close Cloud Agent streams for removed organization member', {
+      organizationId,
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 export async function updateUserRoleInOrganization(
@@ -804,6 +942,18 @@ export async function acceptOrganizationInvite(
     });
 
     if (result.success && result.membershipInserted) {
+      void reportEvents({
+        events: [
+          {
+            type: 'org.member_added',
+            data: {
+              kilo_user_id: userId,
+              organization_id: result.organizationId,
+              role: result.role,
+            },
+          },
+        ],
+      });
       if (joinedDistinctId) {
         captureOrganizationMemberJoined(joinedDistinctId, result.role);
       }

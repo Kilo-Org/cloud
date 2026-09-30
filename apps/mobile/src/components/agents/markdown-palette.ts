@@ -1,11 +1,6 @@
 import { type MarkedStyles } from 'react-native-marked';
 
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
-import {
-  compositeOver,
-  type TokenScheme,
-  tokenSchemeForSurface,
-} from '@/lib/pr-review/diff/syntax-colors';
 
 export type MarkdownVariant = 'assistant' | 'kilo-chat-user' | 'user';
 
@@ -17,13 +12,6 @@ export type MarkdownPalette = {
   // The bubble surface this palette's ink is designed to sit on. Needed when
   // palette-colored content renders outside its bubble (e.g. the table modal).
   surfaceColor: string;
-  // The syntax token scheme for code fences in this variant, derived from the
-  // real code-card surface — the bubble tinted by `codeBackground`
-  // (`compositeOver`), classified by `tokenSchemeForSurface` — rather than the
-  // app color scheme: a dark-theme user bubble is bright lime while a
-  // light-theme kilo-chat bubble is dark olive. Optional so hand-written test
-  // palettes can omit it and fall back to the app scheme in `CodeBlock`.
-  codeTokenScheme?: TokenScheme;
 };
 
 // Derive a translucent variant of a theme token so we can tint dividers and
@@ -50,31 +38,23 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
   if (variant === 'kilo-chat-user') {
     // kilo-chat user bubbles sit on bg-primary; use primary-foreground ink.
     const ink = colors.primaryForeground;
-    const codeBackground = withAlpha(ink, 0.1);
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),
-      codeBackground,
+      codeBackground: withAlpha(ink, 0.1),
       borderColor: withAlpha(ink, 0.2),
       surfaceColor: colors.primary,
-      // Classify the real code card, not the bare bubble: the 10% ink tint is
-      // enough to move the card (the light-theme white tint lifts the olive
-      // primary #4F5A10 to #616B28, where the `dark` token values must clear
-      // 4.5:1 to stay legible).
-      codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.primary)),
     };
   }
   if (variant === 'user') {
     // Agent chat user bubbles sit on accent-soft (lime); use ink-on-lime.
     const ink = colors.accentSoftForeground;
-    const codeBackground = withAlpha(ink, 0.1);
     return {
       textColor: ink,
       mutedTextColor: withAlpha(ink, 0.7),
-      codeBackground,
+      codeBackground: withAlpha(ink, 0.1),
       borderColor: withAlpha(ink, 0.2),
       surfaceColor: colors.accentSoft,
-      codeTokenScheme: tokenSchemeForSurface(compositeOver(codeBackground, colors.accentSoft)),
     };
   }
   return {
@@ -83,7 +63,6 @@ export function getPalette(variant: MarkdownVariant, colors: ThemeColors): Markd
     codeBackground: colors.muted,
     borderColor: colors.border,
     surfaceColor: colors.card,
-    codeTokenScheme: tokenSchemeForSurface(colors.muted),
   };
 }
 

@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires -- Jest node-environment mocks must be registered before loading the component. */
-// The sign-in landing keeps the email prompt but must offer the same OAuth
-// provider group as sign-up, 'Continue with ChatGPT' included. The ChatGPT
-// button is not decided from the visitor's address: it renders on the first
-// screen, before the visitor takes the email step. The provider buttons and the
+// The sign-in landing keeps the email prompt but must also offer the OAuth
+// providers (including 'Continue with ChatGPT'), the same group the sign-up page
+// renders. The ChatGPT option is behind the PostHog flag, which for a
+// signed-out visitor is evaluated against the email the visitor typed; the hook
+// is stubbed here and the filter is asserted. The provider buttons and the
 // email form are stubbed the way `SignInForm.test.ts` stubs them (their CSS
 // module cannot load in jest), but the stubs render the real provider labels
 // and the form's submit label.
@@ -13,9 +14,18 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 let mockFlowEmail = '';
 let mockHintEmail = '';
+let mockChatGptAllowed = false;
+let mockHookEmail: string | null = null;
 
 jest.mock('@/components/AnimatedLogoMark', () => ({
   AnimatedLogoMark: () => null,
+}));
+
+jest.mock('@/hooks/useChatGptSignInAccess', () => ({
+  useChatGptSignInAccess: (email: string | null) => {
+    mockHookEmail = email;
+    return mockChatGptAllowed;
+  },
 }));
 
 jest.mock('@/hooks/useSignInFlow', () => ({
@@ -89,37 +99,89 @@ const { SignInForm } = require('./SignInForm') as {
 beforeEach(() => {
   mockFlowEmail = '';
   mockHintEmail = '';
+  mockChatGptAllowed = false;
+  mockHookEmail = null;
 });
 
 describe('SignInForm sign-in options', () => {
-  it('offers ChatGPT with the other OAuth providers before the email step', () => {
+  it('hides ChatGPT on sign-in when the flag is off for the submitted email', () => {
     const html = renderToStaticMarkup(
       createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
     );
 
-    // No address is known and the visitor has not submitted one, so the button
-    // cannot come from the ChatGPT access flag: it is a plain sign-in option.
+    expect(html).not.toContain('Continue with ChatGPT');
+    expect(html).toContain('Continue with Google');
+    expect(html).toContain('Continue with Email');
+    // Nothing is known before a submit, so the hook gets no address.
+    expect(mockHookEmail).toBe(null);
+  });
+
+  it('offers ChatGPT on sign-in when the flag is on for the submitted email', () => {
+    mockFlowEmail = 'person@kilo.ai';
+    mockChatGptAllowed = true;
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, { searchParams: {}, title: 'Welcome.' })
+    );
+
     expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
-    // It renders inside the provider group, in the shared provider order, so it
-    // reads as one option beside the others rather than a lone button.
-    expect(html.indexOf('Continue with Google')).toBeLessThan(
-      html.indexOf('Continue with ChatGPT')
-    );
+    // Typing alone is not evaluated; the hook waits for the submit.
+    expect(mockHookEmail).toBe(null);
   });
 
-  it('offers ChatGPT on the first sign-up screen', () => {
-    const html = renderToStaticMarkup(
+  it('evaluates a prefilled ?email= address before the providers render', () => {
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
       createElement(SignInForm, {
-        searchParams: {},
-        isSignUp: true,
-        title: 'Create your account',
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
       })
     );
 
-    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
+  });
+
+  it('evaluates a stored returning-user address', () => {
+    mockFlowEmail = 'returning@kilo.ai';
+    mockHintEmail = 'returning@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(createElement(SignInForm, { searchParams: {}, title: 'Welcome.' }));
+
+    expect(mockHookEmail).toBe('returning@kilo.ai');
+  });
+
+  it('evaluates the query prefill over a stored returning-user address', () => {
+    mockFlowEmail = 'prefill@kilo.ai';
+    mockHintEmail = 'hint@kilo.ai';
+    mockChatGptAllowed = true;
+    renderToStaticMarkup(
+      createElement(SignInForm, {
+        searchParams: { email: 'prefill@kilo.ai' },
+        title: 'Welcome.',
+      })
+    );
+
+    expect(mockHookEmail).toBe('prefill@kilo.ai');
+  });
+
+  it('hides ChatGPT on sign-up when the flag is off for the typed email', () => {
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
+    );
+
+    expect(html).not.toContain('Continue with ChatGPT');
     expect(html).toContain('Continue with Google');
     expect(html).toContain('Continue with Email');
+  });
+
+  it('offers ChatGPT on sign-up when the flag is on for the typed email', () => {
+    mockFlowEmail = 'person@openai.com';
+    mockChatGptAllowed = true;
+    const html = renderToStaticMarkup(
+      createElement(SignInForm, { searchParams: {}, isSignUp: true, title: 'Create your account' })
+    );
+
+    expect(html.match(/Continue with ChatGPT/g)).toHaveLength(1);
   });
 });

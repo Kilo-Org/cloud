@@ -14,8 +14,7 @@ import {
 import { and, eq, gte, isNotNull, sql } from 'drizzle-orm';
 import * as z from 'zod';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
-import { toMicrodollars } from '@/lib/microdollars';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { toMicrodollars, fromMicrodollars } from '@/lib/utils';
 import { captureException } from '@sentry/nextjs';
 
 const TEAM_LOGIN_CONFIG_SCHEMA = z.union([

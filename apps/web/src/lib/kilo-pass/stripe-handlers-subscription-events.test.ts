@@ -16,12 +16,20 @@ import type Stripe from 'stripe';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mockStripeSubscriptionsRetrieve = jest.fn<any>();
+const mockReportEvents = jest.fn(async (...args: unknown[]) => {
+  void args;
+});
+
 jest.mock('@/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       retrieve: (...args: unknown[]) => mockStripeSubscriptionsRetrieve(...args),
     },
   },
+}));
+
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: (...args: unknown[]) => mockReportEvents(...args),
 }));
 
 function ensureKiloPassStripePriceIdEnv(): void {
@@ -83,6 +91,7 @@ beforeEach(async () => {
   await cleanupDbForTest();
   // Default: no pause_collection
   mockStripeSubscriptionsRetrieve.mockResolvedValue({ pause_collection: null });
+  mockReportEvents.mockClear();
 });
 
 afterEach(() => {
@@ -553,6 +562,19 @@ describe('handleKiloPassSubscriptionEvent', () => {
     });
     expect(row?.kilo_user_id).toBe(currentUser.id);
     expect(row?.tier).toBe(KiloPassTier.Tier49);
+    expect(mockReportEvents).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'billing.kilo_pass_changed',
+          data: {
+            kilo_user_id: currentUser.id,
+            tier: KiloPassTier.Tier49,
+            status: 'active',
+            streak_months: 0,
+          },
+        },
+      ],
+    });
   });
 
   test('temporary Stripe retrieval failure leaves local state unchanged and throws', async () => {

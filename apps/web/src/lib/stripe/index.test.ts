@@ -18,7 +18,6 @@ const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import type * as creditsModule from '@/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
 
 // Allow spying on processTopUp / processTopupForOrganization inside stripe.ts.
 // The mock delegates to the real implementation by default so existing tests are unaffected.
@@ -54,16 +53,9 @@ jest.mock(
   }),
   { virtual: true }
 );
-
-// Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
-  return {
-    __esModule: true,
-    ...actual,
-    reportCreditEvent: jest.fn(),
-  };
-});
+jest.mock('@/lib/ai-gateway/abuse-service', () => ({
+  reportEvents: jest.fn(async () => undefined),
+}));
 import {
   type StripeTopupMetadata,
   ensurePaymentMethodStored,
@@ -72,10 +64,8 @@ import {
   handleUpdateSeatCount,
   isCardFingerprintEligibleForFreeCredits,
   KNOWN_SEAT_PRICE_IDS,
-  getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
 import { client } from '@/lib/stripe-client';
-import { reportCreditEvent } from '@/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
   type ServiceFeeAssessmentRecord,
@@ -132,7 +122,10 @@ import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handl
 import { cleanupDbForTest } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
+import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
+
+const reportEventsMock = jest.mocked(reportEvents);
 
 const sampleStripePaymentMethod = (): Stripe.PaymentMethod => ({
   id: `pm_test_${Math.random().toString(36).substring(7)}`,
@@ -176,6 +169,48 @@ const sampleStripeCard = (): Stripe.PaymentMethod.Card => ({
   wallet: null,
   display_brand: 'Visa',
   regulated_status: 'unregulated',
+});
+
+const sampleStripePaymentIntent = (): Stripe.PaymentIntent => ({
+  id: 'pi_test_123',
+  object: 'payment_intent',
+  amount: 1000,
+  amount_capturable: 0,
+  amount_received: 1000,
+  application: null,
+  application_fee_amount: null,
+  automatic_payment_methods: null,
+  canceled_at: null,
+  cancellation_reason: null,
+  capture_method: 'automatic',
+  client_secret: 'pi_test_123_secret_test',
+  confirmation_method: 'automatic',
+  created: 1234567890,
+  currency: 'usd',
+  customer: null,
+  description: null,
+  last_payment_error: null,
+  latest_charge: null,
+  livemode: false,
+  metadata: {},
+  next_action: null,
+  on_behalf_of: null,
+  payment_method: null,
+  payment_method_configuration_details: null,
+  payment_method_options: null,
+  payment_method_types: ['card'],
+  processing: null,
+  receipt_email: null,
+  review: null,
+  setup_future_usage: null,
+  shipping: null,
+  source: null,
+  statement_descriptor: null,
+  statement_descriptor_suffix: null,
+  status: 'succeeded',
+  transfer_data: null,
+  transfer_group: null,
+  excluded_payment_method_types: null,
 });
 
 const baseStripeEvent = () => ({
@@ -443,6 +478,14 @@ function sampleEarlyFraudWarningEvent(params: {
   } as unknown as Stripe.Event;
 }
 
+async function waitForReportEventsCall() {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (reportEventsMock.mock.calls.length > 0) return;
+    await new Promise(resolve => setImmediate(resolve));
+  }
+  throw new Error('Timed out waiting for reportEvents to be called');
+}
+
 describe('ensurePaymentMethodStored', () => {
   let testUser: User;
   let mockStripePaymentMethod: Stripe.PaymentMethod;
@@ -707,6 +750,7 @@ describe('processStripePaymentEventHook', () => {
   let mockStripePaymentMethod: Stripe.PaymentMethod;
 
   beforeEach(async () => {
+    reportEventsMock.mockClear();
     testUser = await insertTestUser();
     mockStripePaymentMethod = sampleStripePaymentMethod();
     mockStripePaymentMethod.customer = testUser.stripe_customer_id!;
@@ -798,7 +842,91 @@ describe('processStripePaymentEventHook', () => {
     expect(storedPaymentMethod[0].deleted_at).not.toBeNull();
   });
 
-  test('radar.early_fraud_warning.created persists a personal observation', async () => {
+  test('payment_intent.succeeded reports customer and amount to abuse service', async () => {
+    const paymentIntent = sampleStripePaymentIntent();
+    paymentIntent.customer = testUser.stripe_customer_id;
+    paymentIntent.amount = 1500;
+    paymentIntent.amount_received = 1400;
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_payment_intent_succeeded',
+      data: {
+        object: paymentIntent,
+        previous_attributes: {},
+      },
+      type: 'payment_intent.succeeded',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    const paymentMethodExists = await db.query.payment_methods.findFirst({
+      where: eq(payment_methods.user_id, testUser.id),
+    });
+
+    expect(paymentMethodExists).toBeUndefined();
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.payment_intent.succeeded',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_payment_intent_succeeded',
+            type: 'payment_intent.succeeded',
+            payment_intent: 'pi_test_123',
+            customer: testUser.stripe_customer_id,
+            amount: 1400,
+          },
+        },
+      ],
+    });
+  });
+
+  test('charge.failed reports customer and decline code to abuse service', async () => {
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_charge_failed',
+      data: {
+        object: sampleStripeCharge({
+          id: 'ch_failed_123',
+          customer: testUser.stripe_customer_id,
+          outcome: {
+            advice_code: null,
+            network_advice_code: null,
+            network_decline_code: null,
+            network_status: 'declined_by_network',
+            reason: 'insufficient_funds',
+            risk_level: 'normal',
+            risk_score: 12,
+            seller_message: 'The bank returned the decline code `insufficient_funds`.',
+            type: 'issuer_declined',
+          },
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.failed',
+    };
+
+    await processStripePaymentEventHook(event);
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.failed',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_charge_failed',
+            type: 'charge.failed',
+            charge: 'ch_failed_123',
+            customer: testUser.stripe_customer_id,
+            decline_code: 'insufficient_funds',
+          },
+        },
+      ],
+    });
+  });
+
+  test('radar.early_fraud_warning.created persists a personal observation and preserves abuse telemetry', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
     const { client } = await import('@/lib/stripe-client');
@@ -821,6 +949,7 @@ describe('processStripePaymentEventHook', () => {
         charge: 'ch_radar_123',
       })
     );
+    await waitForReportEventsCall();
 
     const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
     const actions = await db.select().from(stripe_early_fraud_warning_actions);
@@ -844,6 +973,22 @@ describe('processStripePaymentEventHook', () => {
     expect(actions).toHaveLength(0);
     expect(retrieveSpy).toHaveBeenCalledTimes(1);
     expect(retrieveSpy).toHaveBeenCalledWith('ch_radar_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.radar.early_fraud_warning.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_radar_warning',
+            type: 'radar.early_fraud_warning.created',
+            charge: 'ch_radar_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_radar_123',
+            early_fraud_warning: 'issfr_123',
+          },
+        },
+      ],
+    });
 
     retrieveSpy.mockRestore();
   });
@@ -1203,6 +1348,7 @@ describe('processStripePaymentEventHook', () => {
         paymentIntent: 'pi_retrieval_failed',
       })
     );
+    await waitForReportEventsCall();
 
     const [fraudCase] = await db.select().from(stripe_early_fraud_warning_cases);
     expect(fraudCase).toEqual(
@@ -1218,11 +1364,75 @@ describe('processStripePaymentEventHook', () => {
     );
     expect(await db.select().from(stripe_early_fraud_warning_actions)).toHaveLength(0);
     expect(retrieveSpy).toHaveBeenCalledTimes(1);
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.radar.early_fraud_warning.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_retrieval_failed',
+            type: 'radar.early_fraud_warning.created',
+            charge: 'ch_retrieval_failed',
+            payment_intent: 'pi_retrieval_failed',
+            early_fraud_warning: 'issfr_retrieval_failed',
+          },
+        },
+      ],
+    });
 
     retrieveSpy.mockRestore();
   });
 
-  test('charge.dispute.created persists the dispute case with the charge customer', async () => {
+  test('charge.dispute.funds_withdrawn resolves charge customer for abuse service', async () => {
+    const { client } = await import('@/lib/stripe-client');
+    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
+      sampleStripeChargeResponse(
+        sampleStripeCharge({
+          id: 'ch_dispute_withdrawn_123',
+          customer: testUser.stripe_customer_id,
+          payment_intent: 'pi_dispute_withdrawn_123',
+        })
+      )
+    );
+
+    const event: Stripe.Event = {
+      ...baseStripeEvent(),
+      id: 'evt_dispute_withdrawn',
+      data: {
+        object: sampleStripeDispute({
+          id: 'dp_withdrawn_123',
+          charge: 'ch_dispute_withdrawn_123',
+        }),
+        previous_attributes: {},
+      },
+      type: 'charge.dispute.funds_withdrawn',
+    };
+
+    await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
+
+    expect(retrieveSpy).toHaveBeenCalledWith('ch_dispute_withdrawn_123');
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.funds_withdrawn',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_withdrawn',
+            type: 'charge.dispute.funds_withdrawn',
+            charge: 'ch_dispute_withdrawn_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_withdrawn_123',
+            dispute: 'dp_withdrawn_123',
+          },
+        },
+      ],
+    });
+
+    retrieveSpy.mockRestore();
+  });
+
+  test('charge.dispute.created resolves charge customer for abuse service', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
@@ -1258,6 +1468,7 @@ describe('processStripePaymentEventHook', () => {
     };
 
     await processStripePaymentEventHook(event);
+    await waitForReportEventsCall();
 
     const [disputeCase] = await db.select().from(stripe_dispute_cases);
     expect(disputeCase).toEqual(
@@ -1276,6 +1487,23 @@ describe('processStripePaymentEventHook', () => {
         status: StripeDisputeCaseStatus.NeedsAction,
       })
     );
+
+    expect(reportEventsMock).toHaveBeenCalledWith({
+      events: [
+        {
+          type: 'stripe.charge.dispute.created',
+          occurred_at: 1234567890000,
+          data: {
+            id: 'evt_dispute_created_abuse',
+            type: 'charge.dispute.created',
+            charge: 'ch_dispute_created_123',
+            customer: testUser.stripe_customer_id,
+            payment_intent: 'pi_dispute_created_123',
+            dispute: 'dp_created_123',
+          },
+        },
+      ],
+    });
 
     retrieveSpy.mockRestore();
   });
@@ -4809,325 +5037,5 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
     expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('exemption');
     expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('assessment-insert');
     expect(calls.slice(transactionStart, transactionEnd + 1)).not.toContain('attach');
-  });
-});
-
-describe('processStripePaymentEventHook bouncer credit events', () => {
-  let testUser: User;
-
-  beforeEach(async () => {
-    jest.restoreAllMocks();
-    await cleanupDbForTest();
-    testUser = await insertTestUser();
-    (reportCreditEvent as jest.Mock).mockClear();
-  });
-
-  test('charge.succeeded reports a standalone charge once, with the payer and card', async () => {
-    const charge = sampleStripeCharge({
-      id: 'ch_bouncer_ok',
-      amount: 2500,
-      customer: testUser.stripe_customer_id,
-      payment_intent: {
-        id: 'pi_bouncer_ok',
-        metadata: { type: 'not-a-known-flow' },
-      } as unknown as Stripe.PaymentIntent,
-      payment_method_details: {
-        card: { fingerprint: 'fp_ok' },
-      } as unknown as Stripe.Charge.PaymentMethodDetails,
-    });
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_ok',
-      type: 'charge.succeeded',
-      data: { object: charge },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.succeeded',
-        eventId: 'evt_bouncer_ok',
-        userId: testUser.id,
-        orgId: null,
-        cardFingerprint: 'fp_ok',
-        amountCents: 2500,
-      })
-    );
-  });
-
-  test('charge.succeeded skips a charge tied to an invoice', async () => {
-    const charge = sampleStripeCharge({
-      id: 'ch_bouncer_invoiced',
-      amount: 2500,
-      customer: testUser.stripe_customer_id,
-      payment_intent: {
-        id: 'pi_bouncer_invoiced',
-        metadata: { type: 'not-a-known-flow' },
-      } as unknown as Stripe.PaymentIntent,
-    });
-    (charge as { invoice?: string }).invoice = 'in_bouncer_invoiced';
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_invoiced',
-      type: 'charge.succeeded',
-      data: { object: charge },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).not.toHaveBeenCalled();
-  });
-
-  test('charge.failed reports the failing payer', async () => {
-    const charge = sampleStripeCharge({
-      id: 'ch_bouncer_failed',
-      customer: testUser.stripe_customer_id,
-      payment_method_details: {
-        card: { fingerprint: 'fp_failed' },
-      } as unknown as Stripe.Charge.PaymentMethodDetails,
-    });
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_failed',
-      type: 'charge.failed',
-      data: { object: charge },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.failed',
-        eventId: 'evt_bouncer_failed',
-        userId: testUser.id,
-        cardFingerprint: 'fp_failed',
-      })
-    );
-  });
-
-  test('charge.failed is skipped when no owner resolves', async () => {
-    const charge = sampleStripeCharge({
-      id: 'ch_bouncer_orphan',
-      customer: 'cus_bouncer_orphan',
-    });
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_orphan',
-      type: 'charge.failed',
-      data: { object: charge },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).not.toHaveBeenCalled();
-  });
-
-  test('a bouncer failure does not fail the webhook', async () => {
-    // Stripe retries a failed webhook, and later work in the delivery would be skipped.
-    jest.mocked(reportCreditEvent).mockRejectedValueOnce(new Error('bouncer down'));
-    const charge = sampleStripeCharge({
-      id: 'ch_bouncer_down',
-      customer: testUser.stripe_customer_id,
-    });
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_down',
-      type: 'charge.failed',
-      data: { object: charge },
-    } as unknown as Stripe.Event;
-
-    await expect(processStripePaymentEventHook(event)).resolves.not.toThrow();
-    expect(reportCreditEvent).toHaveBeenCalled();
-  });
-
-  test('charge.dispute.created reports the disputed payer', async () => {
-    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
-      sampleStripeChargeResponse(
-        sampleStripeCharge({
-          id: 'ch_bouncer_disp',
-          customer: testUser.stripe_customer_id,
-          payment_intent: 'pi_bouncer_disp',
-          payment_method_details: {
-            card: { fingerprint: 'fp_disp' },
-          } as unknown as Stripe.Charge.PaymentMethodDetails,
-        })
-      )
-    );
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_disp',
-      type: 'charge.dispute.created',
-      data: {
-        object: sampleStripeDispute({ id: 'dp_bouncer_disp', charge: 'ch_bouncer_disp' }),
-        previous_attributes: {},
-      },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.disputed',
-        eventId: 'evt_bouncer_disp',
-        userId: testUser.id,
-        disputeId: 'dp_bouncer_disp',
-        cardFingerprint: 'fp_disp',
-      })
-    );
-
-    retrieveSpy.mockRestore();
-  });
-
-  test('charge.dispute.closed reports a won dispute with the disputed payer and card', async () => {
-    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
-      sampleStripeChargeResponse(
-        sampleStripeCharge({
-          id: 'ch_bouncer_won',
-          customer: testUser.stripe_customer_id,
-          payment_intent: 'pi_bouncer_won',
-          payment_method_details: {
-            card: { fingerprint: 'fp_won' },
-          } as unknown as Stripe.Charge.PaymentMethodDetails,
-        })
-      )
-    );
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_won',
-      type: 'charge.dispute.closed',
-      data: {
-        object: sampleStripeDispute({
-          id: 'dp_bouncer_won',
-          charge: 'ch_bouncer_won',
-          status: 'won',
-        }),
-        previous_attributes: {},
-      },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.dispute_won',
-        eventId: 'evt_bouncer_won',
-        userId: testUser.id,
-        disputeId: 'dp_bouncer_won',
-        cardFingerprint: 'fp_won',
-      })
-    );
-
-    retrieveSpy.mockRestore();
-  });
-
-  test('radar.early_fraud_warning.created reports the warned payer', async () => {
-    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
-      sampleStripeChargeResponse(
-        sampleStripeCharge({
-          id: 'ch_bouncer_efw',
-          customer: testUser.stripe_customer_id,
-          payment_intent: 'pi_bouncer_efw',
-          payment_method_details: {
-            card: { fingerprint: 'fp_efw' },
-          } as unknown as Stripe.Charge.PaymentMethodDetails,
-        })
-      )
-    );
-
-    await processStripePaymentEventHook(
-      sampleEarlyFraudWarningEvent({
-        eventId: 'evt_bouncer_efw',
-        warningId: 'issfr_bouncer_efw',
-        charge: 'ch_bouncer_efw',
-      })
-    );
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.early_fraud_warning',
-        eventId: 'evt_bouncer_efw',
-        userId: testUser.id,
-        cardFingerprint: 'fp_efw',
-      })
-    );
-
-    retrieveSpy.mockRestore();
-  });
-
-  test('invoice.paid reports a subscription invoice once, with the charge fingerprint', async () => {
-    const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
-      sampleStripeChargeResponse(
-        sampleStripeCharge({
-          id: 'ch_bouncer_inv',
-          payment_method_details: {
-            card: { fingerprint: 'fp_inv' },
-          } as unknown as Stripe.Charge.PaymentMethodDetails,
-        })
-      )
-    );
-    const invoice = {
-      id: 'in_bouncer_paid',
-      object: 'invoice',
-      amount_paid: 4900,
-      customer: testUser.stripe_customer_id,
-      charge: 'ch_bouncer_inv',
-      metadata: {},
-      parent: {
-        subscription_details: {
-          metadata: { type: 'seats', kiloUserId: testUser.id, organizationId: 'org_bouncer_inv' },
-        },
-      },
-    } as unknown as Stripe.Invoice;
-    const event = {
-      ...baseStripeEvent(),
-      id: 'evt_bouncer_inv',
-      type: 'invoice.paid',
-      data: { object: invoice },
-    } as unknown as Stripe.Event;
-
-    await processStripePaymentEventHook(event);
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'charge.succeeded',
-        eventId: 'evt_bouncer_inv',
-        userId: testUser.id,
-        orgId: 'org_bouncer_inv',
-        amountCents: 4900,
-        cardFingerprint: 'fp_inv',
-      })
-    );
-
-    retrieveSpy.mockRestore();
-  });
-});
-
-describe('getStripeSeatsCheckoutUrl bouncer charge.attempted', () => {
-  test.each([
-    // Teams seats cost $18/month billed monthly and $15/month billed annually ($180/year).
-    ['monthly', 18_00 * 3],
-    ['annual', 180_00 * 3],
-  ] as const)('reports the amount the %s checkout charges', async (billingCycle, amountCents) => {
-    const createSpy = jest.spyOn(client.checkout.sessions, 'create').mockResolvedValue({
-      url: 'https://checkout.stripe.test/s',
-    } as Stripe.Response<Stripe.Checkout.Session>);
-    jest.mocked(reportCreditEvent).mockClear();
-
-    await getStripeSeatsCheckoutUrl({
-      kiloUserId: 'user-seats',
-      stripeCustomerId: 'cus_seats',
-      quantity: 3,
-      organizationId: 'org-seats',
-      cancelUrl: 'https://app.test/cancel',
-      plan: 'teams',
-      billingCycle,
-      attempt: { accountCreatedAt: '2026-01-01T00:00:00.000Z' },
-    });
-
-    expect(reportCreditEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'charge.attempted', flow: 'seats', amountCents })
-    );
-    createSpy.mockRestore();
   });
 });

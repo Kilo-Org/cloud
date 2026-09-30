@@ -384,7 +384,7 @@ describe('review health aggregate against the database', () => {
     expect(snapshot?.missingCompletedAt).toBe(beforeCount + 1);
   });
 
-  it('logs two collection rows and no counts when the select always throws', async () => {
+  it('logs three collection rows and no counts when the select always throws', async () => {
     const failingDb = {
       select: () => {
         throw new Error('injected review query failure');

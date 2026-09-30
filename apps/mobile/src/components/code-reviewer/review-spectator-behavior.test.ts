@@ -129,8 +129,7 @@ describe('resolveReviewSpectatorMode', () => {
           organizationId: 'org-1',
           cloudAgentSessionId: 'agent-1',
         },
-        'running',
-        0
+        'running'
       )
     ).toEqual({
       isTerminal: false,
@@ -148,8 +147,7 @@ describe('resolveReviewSpectatorMode', () => {
           status: 'running',
           cloudAgentSessionId: 'agent-1',
         },
-        'running',
-        0
+        'running'
       )
     ).toEqual({
       isTerminal: false,
@@ -168,10 +166,31 @@ describe('resolveReviewSpectatorMode', () => {
           organizationId: 'org-1',
           cloudAgentSessionId: 'agent-1',
         },
-        'completed',
-        0
+        'completed'
       )
     ).toMatchObject({
+      isTerminal: true,
+      shouldPollMessages: false,
+      shouldLoadHistory: true,
+      liveCloudId: null,
+    });
+  });
+
+  it('loads the persisted transcript when a personal review turns terminal', () => {
+    // A personal v2 review streamed live rows, then the review turned terminal.
+    // History must load regardless of the live rows already displayed, so the
+    // sheet reconciles with the completed transcript the socket may have
+    // truncated.
+    expect(
+      resolveReviewSpectatorMode(
+        {
+          agentVersion: 'v2',
+          status: 'completed',
+          cloudAgentSessionId: 'agent-1',
+        },
+        'completed'
+      )
+    ).toEqual({
       isTerminal: true,
       shouldPollMessages: false,
       shouldLoadHistory: true,

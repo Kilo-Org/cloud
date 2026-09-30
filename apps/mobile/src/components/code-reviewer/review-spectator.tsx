@@ -80,7 +80,7 @@ export function ReviewSpectator({
 
   const info = streamInfo.data?.success ? streamInfo.data : null;
   const { isTerminal, shouldPollMessages, shouldLoadHistory, liveCloudId } =
-    resolveReviewSpectatorMode(info, status, liveRows.length);
+    resolveReviewSpectatorMode(info, status);
   const isLiveCloud = liveCloudId !== null;
 
   const sessionMessages = useQuery({

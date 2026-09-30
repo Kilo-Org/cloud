@@ -82,8 +82,11 @@ export function buildOverviewRows({
         data.focusAreas.length > 0
           ? formatList(
               // An area the app does not know yet reads as its raw code.
+              // Object.hasOwn, not `in`: an area named after an inherited member
+              // like 'constructor' must fall through to its raw code, not leak
+              // the prototype's function/object as the label.
               data.focusAreas.map(area =>
-                area in focusAreaLabels
+                Object.hasOwn(focusAreaLabels, area)
                   ? i18n.t(focusAreaLabels[area as keyof typeof focusAreaLabels])
                   : area
               ),

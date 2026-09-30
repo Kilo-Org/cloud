@@ -11,6 +11,7 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
+import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -58,19 +59,25 @@ export function BitbucketOverview({
     connected: readiness.data?.connected,
     hasData: readiness.data !== undefined,
     refetch: () => void readiness.refetch(),
+    errorCode: (readiness.error as { data?: { code?: string } } | null)?.data?.code,
   });
 
   if (providerState.status === 'error') {
     return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
-        <QueryError
-          onRetry={() => {
-            providerState.refetch();
-          }}
-          isRetrying={providerState.isRetrying}
-        />
-      </View>
+      <PlatformErrorScreen
+        title={capabilities.label}
+        eyebrow={t('common.codeReviewer')}
+        variant={providerState.variant}
+        // A permission/not-found error can't be fixed by retrying — hide retry.
+        onRetry={
+          providerState.permanent
+            ? undefined
+            : () => {
+                providerState.refetch();
+              }
+        }
+        isRetrying={providerState.isRetrying}
+      />
     );
   }
 

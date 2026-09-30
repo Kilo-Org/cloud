@@ -79,8 +79,7 @@ type ReviewSpectatorMode = {
 
 export function resolveReviewSpectatorMode(
   info: StreamInfo | null,
-  parentStatus: string,
-  liveRowCount: number
+  parentStatus: string
 ): ReviewSpectatorMode {
   const parentIsTerminal = TERMINAL_REVIEW_STATUSES.has(parentStatus);
   if (info === null) {
@@ -99,7 +98,10 @@ export function resolveReviewSpectatorMode(
   return {
     isTerminal: displayBehavior.isTerminal,
     shouldPollMessages: displayBehavior.shouldPollMessages,
-    shouldLoadHistory: displayBehavior.shouldLoadMessages && liveRowCount === 0,
+    // A terminal flip must reconcile the sheet with the persisted completed
+    // transcript even after live rows streamed: those rows can be partial when
+    // the socket dropped, so history load is not gated on an empty live list.
+    shouldLoadHistory: displayBehavior.shouldLoadMessages,
     liveCloudId:
       displayBehavior.shouldLoadMessages || info.cloudAgentSessionId === null
         ? null

@@ -8,23 +8,6 @@ import { isSystemSearchFamilyLink } from './system-search-families';
 const AGENTS_TAB_HREF = '/(app)/(tabs)/(2_agents)';
 
 /**
- * Extract the query portion of a raw URL so C13 return-outcome params can be
- * stored before `resolveIncomingUrl` strips them.
- */
-function getQueryFromRaw(raw: string): string | null {
-  const q = raw.indexOf('?');
-  if (q === -1) {
-    return null;
-  }
-  let end = raw.length;
-  const h = raw.indexOf('#');
-  if (h !== -1 && h < end) {
-    end = h;
-  }
-  return raw.slice(q, end);
-}
-
-/**
  * expo-router `+native-intent` `redirectSystemPath` implementation.
  *
  * Load-bearing facts (past critical findings):
@@ -59,13 +42,13 @@ export function redirectSystemPath({
 
     // C13 return-outcome: extract query params before resolveIncomingResume
     // strips them.  Store so the agents tab can show the outcome state.
+    // `URL.search` keeps the leading `?` that `parseGitHubReturnParams`
+    // accepts and drops any `#` fragment, so no hand-rolled index/length scan
+    // is needed.
     if (href === AGENTS_TAB_HREF) {
-      const query = getQueryFromRaw(path);
-      if (query) {
-        const outcome = parseGitHubReturnParams(query);
-        if (outcome) {
-          setGitHubInstallReturnOutcome(outcome);
-        }
+      const outcome = parseGitHubReturnParams(new URL(path).search);
+      if (outcome) {
+        setGitHubInstallReturnOutcome(outcome);
       }
     }
 

@@ -1640,7 +1640,7 @@
       "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
       "branchPickerTitle": "Selecionar branch",
       "branchDefault": "Padrão",
-      "branchAccessibility": "Branch: {{label}}",
+      "branchAccessibility": "Ramificação: {{label}}",
       "branchLoading": "Carregando branches",
       "branchLoadError": "Não foi possível carregar os branches",
       "branchUnavailable": "Não há branches disponíveis para este repositório. Verifique seu acesso com o provedor e escolha outro repositório.",

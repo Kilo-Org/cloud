@@ -284,6 +284,31 @@ async function startSessionUnified(
 }
 
 /**
+ * Register a callback target on a session created through the unified `start`
+ * procedure. The unified input does not accept `callbackTarget`; the control
+ * plane reads the target from session metadata, and `updateSession` is the
+ * retained internal mutation that rewrites that field.
+ */
+export async function registerSessionCallback(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  callbackTarget: CallbackTarget,
+  signal?: AbortSignal
+): Promise<void> {
+  if (!config.internalApiSecret) {
+    throw new Error(
+      'registerSessionCallback requires the e2e INTERNAL_API_SECRET (from .dev.vars for the Docker profile, or the resolved e2e secret for the deployed/local-HTTP profile)'
+    );
+  }
+  await trpcCall<{ success: boolean }>(
+    config,
+    'updateSession',
+    { cloudAgentSessionId, callbackTarget },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+}
+
+/**
  * Dispatch the `prepareSession` procedure to the internal
  * `/trpc/prepareSession` endpoint with the shared internal API secret. Both
  * callers of the procedure — the legacy start and the browser-equivalent

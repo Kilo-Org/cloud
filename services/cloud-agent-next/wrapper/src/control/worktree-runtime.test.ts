@@ -177,6 +177,9 @@ function createKiloStub(
         heldPrompts.get(sessionId)?.resolve();
         return Response.json(true);
       }
+      if (request.method === 'POST' && /\/kilocode\/session\/[^/]+\/drain$/.test(url.pathname)) {
+        return Response.json(true);
+      }
       if (request.method === 'POST' && /\/session\/[^/]+\/(message|command)$/.test(url.pathname)) {
         const sessionId = decodeURIComponent(url.pathname.split('/')[2] ?? '');
         const directory = requests.at(-1)?.directory ?? '';
@@ -1420,9 +1423,19 @@ describe('worktree Kilo runtime registry', () => {
             body: { messageID: messageId },
           },
           {
+            pathname: `/kilocode/session/${identity.kiloSessionId}/drain`,
+            directory: identity.directory,
+            body: { token: expect.any(String) },
+          },
+          {
             pathname: `/session/${identity.kiloSessionId}/command`,
             directory: identity.directory,
             body: { messageID: `command_${identity.kiloSessionId}`, command: 'review' },
+          },
+          {
+            pathname: `/kilocode/session/${identity.kiloSessionId}/drain`,
+            directory: identity.directory,
+            body: { token: expect.any(String) },
           },
           {
             pathname: '/permission',

@@ -54,6 +54,7 @@ export function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKil
     summarizeSession: async () => true,
     generateCommitMessage: async () => ({ message: 'Apply normal control turn' }),
     abortSession: async () => true,
+    drainSession: async () => true,
     answerPermission: async () => true,
     answerQuestion: async () => true,
     rejectQuestion: async () => true,

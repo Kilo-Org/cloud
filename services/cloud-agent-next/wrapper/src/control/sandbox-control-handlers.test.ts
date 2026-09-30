@@ -14,7 +14,12 @@ import {
   type SessionRequestIdentity,
   type SessionGitSummaryResult,
 } from '../../../src/shared/sandbox-control-protocol';
-import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
+import {
+  createWrapperKiloClient,
+  DrainSessionError,
+  type WrapperKiloClient,
+  type WrapperPty,
+} from '../kilo-api';
 import { STABLE_ROOT_IDLE_MS } from '../lifecycle';
 import { materializeMessageAttachments } from '../session-bootstrap';
 import { runProcess, withTimeoutAndAbort } from '../utils';
@@ -100,6 +105,7 @@ function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient
     summarizeSession: async () => true,
     generateCommitMessage: async () => ({ message: 'Apply normal control turn' }),
     abortSession: async () => true,
+    drainSession: async () => true,
     answerPermission: async () => true,
     answerQuestion: async () => true,
     rejectQuestion: async () => true,
@@ -2592,6 +2598,423 @@ describe('owned control execution', () => {
 
     running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
     await waitForTasks(handlerDeps);
+  });
+
+  it('completes a primary prompt only after the accepted drain returns true', async () => {
+    const drainCalls: unknown[] = [];
+    const events: SessionEventPayload[] = [];
+    const pending = Promise.withResolvers<boolean>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        drainSession: async options => {
+          drainCalls.push(options);
+          return pending.promise;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(events).toEqual([]);
+    expect(handlerDeps.operations.active(session.kiloSessionId)?.locallyComplete).toBe(false);
+    expect(drainCalls).toEqual([
+      {
+        sessionId: session.kiloSessionId,
+        directory: session.directory,
+        signal: expect.any(AbortSignal),
+      },
+    ]);
+
+    pending.resolve(true);
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+  });
+
+  it('keeps a follow-up batch incomplete until the timer-started drain returns true', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const pending = Promise.withResolvers<boolean>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        drainSession: () => pending.promise,
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps
+    );
+    running.resolve(completion());
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    expect(events).toEqual([]);
+
+    pending.resolve(true);
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+  });
+
+  it('fails a primary prompt on an immediate definitive 404 drain without a hang', async () => {
+    const events: SessionEventPayload[] = [];
+    let aborts = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        drainSession: async () => {
+          throw new DrainSessionError('definitive', 'HTTP 404', { status: 404 });
+        },
+        abortSession: async () => {
+          aborts += 1;
+          return true;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    await waitForTasks(handlerDeps);
+
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: {
+          messageId: 'msg_1',
+          status: 'failed',
+          reason: 'Session drain failed: HTTP 404',
+        },
+      },
+    ]);
+    expect(aborts).toBe(1);
+    expect(handlerDeps.operations.counts().active).toBe(0);
+  });
+
+  it('fails a follow-up batch on a timer-started 404 even before sendPrompt resolves', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        drainSession: async () => {
+          throw new DrainSessionError('definitive', 'HTTP 404', { status: 404 });
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps
+    );
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    expect(events).toEqual([]);
+
+    running.resolve(completion());
+    await waitForTasks(handlerDeps);
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: {
+          messageId: 'msg_1',
+          status: 'failed',
+          reason: 'Session drain failed: HTTP 404',
+        },
+      },
+    ]);
+  });
+
+  it('fails a primary auto-commit when the second timer-started drain 404s', async () => {
+    let drains = 0;
+    let finalizations = 0;
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        drainSession: async () => {
+          drains += 1;
+          if (drains === 1) return true;
+          throw new DrainSessionError('definitive', 'HTTP 404', { status: 404 });
+        },
+      }),
+      runAutoCommit: async () => {
+        finalizations += 1;
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps
+    );
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+
+    expect(finalizations).toBe(0);
+    expect(drains).toBe(2);
+    expect(events.at(-1)).toEqual({
+      type: 'session.message.outcome',
+      properties: {
+        messageId: 'msg_1',
+        status: 'failed',
+        reason: 'Session drain failed: HTTP 404',
+      },
+    });
+  });
+
+  it('keeps a failure when execution authority is lost before any drain true without aborting', async () => {
+    const events: SessionEventPayload[] = [];
+    let drains = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: async () => {
+          const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
+          if (runtime) (runtime as { kiloClient: WrapperKiloClient }).kiloClient = fakeKilo();
+          return completion();
+        },
+        drainSession: async () => {
+          drains += 1;
+          return true;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'accepted' } });
+    const record = handlerDeps.operations.active(session.kiloSessionId);
+    await waitForTasks(handlerDeps);
+
+    expect(drains).toBe(0);
+    expect(record?.signal.aborted).toBe(false);
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: { messageId: 'msg_1', status: 'failed', reason: 'Kilo execution failed' },
+      },
+    ]);
+  });
+
+  it.each(['cancel', 'busy', 'follow-up'] as const)(
+    'does not complete from a late true when the primary drain was invalidated by %s',
+    async kind => {
+      const drained = Promise.withResolvers<boolean>();
+      const drainStarted = Promise.withResolvers<void>();
+      const events: SessionEventPayload[] = [];
+      const handlerDeps = deps({
+        kiloClient: fakeKilo({
+          drainSession: () => {
+            drainStarted.resolve();
+            return drained.promise;
+          },
+        }),
+        emitSessionEvent: (_session, event) => events.push(event),
+      });
+      const completed = () =>
+        events.filter(
+          event =>
+            event.type === 'session.message.outcome' && event.properties.status === 'completed'
+        ).length;
+
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await drainStarted.promise;
+
+      if (kind === 'cancel') {
+        handlerDeps.operations.active(session.kiloSessionId)?.cancel('User stop', 'cancelled');
+      } else if (kind === 'busy') {
+        handlerDeps.operations.observeRootEvent({
+          type: 'session.status',
+          sessionID: session.kiloSessionId,
+          properties: { status: { type: 'busy' } },
+        });
+      } else {
+        await handleControlRequest(
+          'session.prompt',
+          session,
+          { ...promptPayload, messageId: 'next' },
+          handlerDeps
+        );
+      }
+
+      drained.resolve(true);
+      await new Promise(resolve => setImmediate(resolve));
+      expect(completed()).toBe(0);
+
+      if (kind === 'cancel') {
+        await waitForTasks(handlerDeps);
+        expect(events.at(-1)).toMatchObject({
+          type: 'session.message.outcome',
+          properties: { status: 'cancelled' },
+        });
+        return;
+      }
+
+      handlerDeps.operations.observeRootEvent({
+        type: 'session.idle',
+        sessionID: session.kiloSessionId,
+      });
+      await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+      await waitForTasks(handlerDeps);
+      expect(completed()).toBe(1);
+    }
+  );
+
+  it('does not start a drain after cancel and still completes a pending native success', async () => {
+    const prompt = Promise.withResolvers<Completion>();
+    const idleEmitted = Promise.withResolvers<void>();
+    const events: SessionEventPayload[] = [];
+    let drains = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => prompt.promise,
+        drainSession: async () => {
+          drains += 1;
+          throw new DrainSessionError('definitive', 'HTTP 404', { status: 404 });
+        },
+        abortSession: async () => {
+          handlerDeps.operations.observeRootEvent({
+            type: 'session.idle',
+            sessionID: session.kiloSessionId,
+          });
+          idleEmitted.resolve();
+          return true;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    const aborting = handleControlRequest(
+      'session.abort',
+      session,
+      { messageId: 'msg_1' },
+      handlerDeps
+    );
+    await idleEmitted.promise;
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 500);
+    expect(drains).toBe(0);
+
+    prompt.resolve(completion());
+    await aborting;
+    await waitForTasks(handlerDeps);
+
+    expect(drains).toBe(0);
+    expect(events).toEqual([
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ]);
+  });
+
+  it('does not start a post-abort drain when cancel races a pending primary drain', async () => {
+    const drained = Promise.withResolvers<boolean>();
+    const drainStarted = Promise.withResolvers<void>();
+    const events: SessionEventPayload[] = [];
+    let drains = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        drainSession: () => {
+          drains += 1;
+          drainStarted.resolve();
+          return drained.promise;
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    await drainStarted.promise;
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    handlerDeps.operations.active(session.kiloSessionId)?.cancel('User stop', 'cancelled');
+
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 300);
+    drained.resolve(true);
+    await waitForTasks(handlerDeps);
+
+    expect(drains).toBe(1);
+    expect(
+      events.some(
+        event => event.type === 'session.message.outcome' && event.properties.status === 'completed'
+      )
+    ).toBe(false);
+    expect(events.at(-1)).toMatchObject({
+      type: 'session.message.outcome',
+      properties: { status: 'cancelled' },
+    });
+  });
+
+  it('fails a follow-up batch when the timer-started 404 arrives while execute waits for the seal', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const events: SessionEventPayload[] = [];
+    let drains = 0;
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: () => running.promise,
+        drainSession: async () => {
+          drains += 1;
+          throw new DrainSessionError('definitive', 'HTTP 404', { status: 404 });
+        },
+      }),
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'next' },
+      handlerDeps
+    );
+    running.resolve(completion());
+    await Bun.sleep(50);
+    expect(drains).toBe(0);
+
+    handlerDeps.operations.observeRootEvent({
+      type: 'session.idle',
+      sessionID: session.kiloSessionId,
+    });
+    await Bun.sleep(STABLE_ROOT_IDLE_MS + 100);
+    await waitForTasks(handlerDeps);
+
+    expect(drains).toBe(1);
+    expect(events).toEqual([
+      {
+        type: 'session.message.outcome',
+        properties: {
+          messageId: 'msg_1',
+          status: 'failed',
+          reason: 'Session drain failed: HTTP 404',
+        },
+      },
+    ]);
   });
 
   it('emits one message-scoped outcome even when completion precedes delivery of the acknowledgement', async () => {

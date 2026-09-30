@@ -35,6 +35,14 @@ const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
 
+const alerts = vi.hoisted(() => ({
+  calls: [] as { buttons?: { style?: string; onPress?: () => void }[] }[],
+}));
+
+const offline = vi.hoisted(() => ({ status: 'online' as 'online' | 'offline' | 'unknown' }));
+
+const mutations = vi.hoisted(() => ({ cancel: vi.fn(), retrigger: vi.fn() }));
+
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
 }));
@@ -83,7 +91,15 @@ vi.mock('react-native', () => ({
   // the form-sheet detents do (src/lib/form-sheet.ts).
   StatusBar: { currentHeight: 24 },
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
-  Alert: { alert: vi.fn() },
+  Alert: {
+    alert: (
+      _title: unknown,
+      _message: unknown,
+      buttons?: { style?: string; onPress?: () => void }[]
+    ) => {
+      alerts.calls.push({ buttons });
+    },
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
@@ -155,8 +171,11 @@ vi.mock('@/lib/code-reviewer-config', () => ({
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useReviewDetail: () => detail,
-  useCancelReview: () => ({ isPending: false, mutate: vi.fn() }),
-  useRetriggerReview: () => ({ isPending: false, mutate: vi.fn() }),
+  useCancelReview: () => ({ isPending: false, mutate: mutations.cancel }),
+  useRetriggerReview: () => ({ isPending: false, mutate: mutations.retrigger }),
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => offline.status,
 }));
 vi.mock('@/lib/utils', () => ({
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
@@ -295,6 +314,10 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  alerts.calls = [];
+  offline.status = 'online';
+  mutations.cancel.mockClear();
+  mutations.retrigger.mockClear();
   viewRenders.list = [];
   modalRenders.list = [];
   nativePlatform.OS = 'ios';
@@ -577,6 +600,41 @@ describe('ReviewDetailScreen error states', () => {
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
+  });
+});
+
+describe('ReviewDetailScreen offline retry', () => {
+  it('shows the retry error and starts no run when Retry review is confirmed offline', () => {
+    // A retry confirmed while the app is committed offline must fail at once
+    // with the retryable copy. Otherwise React Query pauses the write, the
+    // review stays Failed with unchanged timestamps and no error, and the only
+    // visible change is the disabled Retry control (explorer finding:
+    // retry-review-while-offline does nothing).
+    statusHelpers.retriggerable = true;
+    offline.status = 'offline';
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+
+    const retry = buttons.rendered.find(button => buttonText(button) === 'Retry review');
+    expect(retry?.onPress).toBeDefined();
+    act(() => {
+      retry?.onPress?.();
+    });
+
+    // Confirm the native alert's Retry action.
+    const confirm = alerts.calls.at(-1)?.buttons?.find(button => button.onPress);
+    expect(confirm).toBeDefined();
+    act(() => {
+      confirm?.onPress?.();
+    });
+
+    expect(mutations.retrigger).not.toHaveBeenCalled();
+    expect(collectText(renderer.toJSON())).toContain('Something went wrong');
   });
 });
 

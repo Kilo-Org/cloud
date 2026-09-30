@@ -34,6 +34,7 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
+import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
@@ -75,6 +76,9 @@ export function ReviewDetailScreen({
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
+  // Retry failure surfaced inline. A confirmed-offline Retry must show the
+  // retryable copy here instead of leaving the review unchanged with no error.
+  const [retryError, setRetryError] = useState<string | null>(null);
 
   if (isLoading) {
     return (
@@ -307,10 +311,22 @@ export function ReviewDetailScreen({
               disabled={retriggerReview.isPending}
               onPress={() => {
                 confirmRetry(() => {
+                  // Confirmed offline: fail the retry at once with the
+                  // retryable copy instead of starting a write React Query
+                  // pauses silently. Without this the review stays Failed with
+                  // unchanged timestamps, no run starts, and the only visible
+                  // change is the disabled Retry control (explorer finding:
+                  // retry-review-while-offline does nothing).
+                  if (getCommittedConnectivityStatus() === 'offline') {
+                    setRetryError(t('common.somethingWentWrong'));
+                    return;
+                  }
+                  setRetryError(null);
                   retriggerReview.mutate(
                     { reviewId },
                     {
                       onSuccess: () => {
+                        setRetryError(null);
                         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                       },
                     }
@@ -320,6 +336,10 @@ export function ReviewDetailScreen({
             >
               <Text>{t('codeReviewer.reviewDetail.retryReview')}</Text>
             </Button>
+          ) : null}
+
+          {retryError ? (
+            <Text className="text-center text-xs text-destructive">{retryError}</Text>
           ) : null}
         </View>
       </TabScreenScrollView>

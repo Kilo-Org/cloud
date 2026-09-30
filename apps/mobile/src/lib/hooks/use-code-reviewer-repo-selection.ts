@@ -79,6 +79,21 @@ function sameSelection(a: (number | string)[] | null, b: (number | string)[] | n
   return a.every(id => b.includes(id));
 }
 
+// Applies a settled save's own delta to the confirmed baseline. A save must
+// advance `serverSelection` by the delta it actually sent, not by adopting its
+// optimistic selection: a superseded in-flight save may have failed, so the
+// optimistic selection can contain ids this save never sent. Adopting it would
+// mark those ids server-confirmed and the reconciliation diff would never
+// re-send them.
+function applyDelta(
+  base: (number | string)[],
+  delta: RepoSelectionDelta
+): (number | string)[] {
+  const removed = new Set(delta.remove);
+  const kept = base.filter(id => !removed.has(id));
+  return [...kept, ...delta.add.filter(id => !kept.includes(id))];
+}
+
 // Schedules the trailing-edge 500ms send. The delta is computed at fire time
 // from the module-level pending and projected/server selections, so no
 // intermediate rapid toggle is lost and a refetch that clobbers the optimistic
@@ -193,7 +208,12 @@ function useSaveReviewConfigDelta(scope: string, platform: ReviewerPlatform) {
     },
     onSuccess: (_result, vars) => {
       const sender = getRepoSelectionSender(saveChainKey);
-      sender.serverSelection = vars.optimisticSelection;
+      // Advance the confirmed baseline by this save's own delta, not by
+      // adopting its optimistic selection. A superseded in-flight save may have
+      // failed, so the optimistic selection can contain ids this save never
+      // sent; treating those as confirmed would hide them from the
+      // reconciliation diff below and drop the user's still-intended selection.
+      sender.serverSelection = applyDelta(sender.serverSelection ?? [], vars);
       sender.inflightSaves = Math.max(0, sender.inflightSaves - 1);
       if (sender.inflightSaves === 0) {
         // No save is in flight; the confirmed baseline is authoritative again.

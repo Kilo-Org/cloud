@@ -323,6 +323,48 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
     expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
   });
 
+  it('re-sends an earlier in-flight save\'s ids when that save fails and a later save succeeds', () => {
+    vi.useFakeTimers();
+    seedReviewConfigCache([1, 2]);
+    const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');
+
+    // Save A carries add 3 and stays in flight.
+    toggleRepo(3);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).toHaveBeenCalledTimes(1);
+    const addThreeVars = mutateMock.mock.calls[0]?.[0];
+
+    // Save B is diffed against A's projection, so it only carries add 4.
+    toggleRepo(4);
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+    expect(mutateMock).toHaveBeenCalledTimes(2);
+    expect(mutateMock.mock.calls[1]?.[0]).toEqual({
+      add: [4],
+      remove: [],
+      optimisticSelection: [1, 2, 3, 4],
+    });
+    const addFourVars = mutateMock.mock.calls[1]?.[0];
+
+    // A fails and B succeeds. The server never received 3, so B's optimistic
+    // selection must not be treated as confirmed and 3 must be re-sent.
+    deltaOptions.onError?.(new Error('Network unreachable'), addThreeVars);
+    deltaOptions.onSuccess?.({ success: true, webhookSync: null }, addFourVars);
+
+    vi.advanceTimersByTime(REPO_SELECTION_DEBOUNCE_MS);
+
+    expect(mutateMock).toHaveBeenCalledTimes(3);
+    expect(mutateMock.mock.calls[2]?.[0]).toEqual({
+      add: [3],
+      remove: [],
+      optimisticSelection: [1, 2, 3, 4],
+    });
+
+    const resendVars = mutateMock.mock.calls[2]?.[0];
+    deltaOptions.onSuccess?.({ success: true, webhookSync: null }, resendVars);
+
+    expect(reviewConfigCache?.selectedRepositoryIds).toEqual([1, 2, 3, 4]);
+  });
+
   it('re-sends a toggle made during the settle-to-refetch window so it stays visible', () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);

@@ -285,6 +285,9 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
               className="h-24 rounded-lg bg-secondary p-3 text-sm leading-5 text-foreground"
               multiline
               textAlignVertical="top"
+              accessibilityLabel={formFieldA11y({
+                label: t('codeReviewer.manualReview.instructions'),
+              })}
               placeholder={t('codeReviewer.manualReview.instructionsPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               onChangeText={value => {

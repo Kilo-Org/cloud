@@ -5,6 +5,7 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
+import { formFieldA11y } from '@/components/ui/form-field-a11y';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { useConnectBitbucket } from '@/lib/hooks/use-code-reviewer';
@@ -46,6 +47,9 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         // (`min-h-[44px]`, never a fixed height or `py-*`); the field keeps
         // its own chrome, horizontal inset and line box.
         className="rounded-md border border-input bg-background px-3 text-sm leading-[normal] text-foreground"
+        accessibilityLabel={formFieldA11y({
+          label: t('codeReviewer.bitbucketConnect.tokenPlaceholder'),
+        })}
         placeholder={t('codeReviewer.bitbucketConnect.tokenPlaceholder')}
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"

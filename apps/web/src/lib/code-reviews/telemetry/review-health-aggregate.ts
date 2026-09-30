@@ -32,7 +32,13 @@ type TerminalReviewStatus = (typeof TERMINAL_REVIEW_STATUSES)[number];
 const KNOWN_REASON_SET: ReadonlySet<string> = new Set(CODE_REVIEW_TERMINAL_REASONS);
 const BENIGN_REASON_SET: ReadonlySet<string> = new Set(CODE_REVIEW_BENIGN_TERMINAL_REASONS);
 
-type StatusReasonRow = { status: string; terminalReason: string | null; rowCount: number };
+type StatusReasonRow = {
+  status: string;
+  terminalReason: string | null;
+  rowCount: number;
+  durationCount: number;
+  durationMs: number;
+};
 type StartedLatencyRow = {
   startedSampleCount: number;
   startedWithinFiveMinutes: number;
@@ -72,6 +78,8 @@ export function reviewOutcomeStatusQuery(database: Database, window: ReviewWindo
       status: cloud_agent_code_reviews.status,
       terminalReason: cloud_agent_code_reviews.terminal_reason,
       rowCount: sql<number>`count(*)::int`,
+      durationCount: sql<number>`(count(*) filter (where ${cloud_agent_code_reviews.status} = 'completed' and ${cloud_agent_code_reviews.started_at} is not null and ${cloud_agent_code_reviews.completed_at} >= ${cloud_agent_code_reviews.started_at}))::int`,
+      durationMs: sql<number>`(coalesce(sum(extract(epoch from (${cloud_agent_code_reviews.completed_at} - ${cloud_agent_code_reviews.started_at})) * 1000) filter (where ${cloud_agent_code_reviews.status} = 'completed' and ${cloud_agent_code_reviews.started_at} is not null and ${cloud_agent_code_reviews.completed_at} >= ${cloud_agent_code_reviews.started_at}), 0))::double precision`,
     })
     .from(cloud_agent_code_reviews)
     .where(
@@ -176,6 +184,8 @@ export function classifyReviewReason(reason: string): ReviewReasonClass {
 export function assembleReviewOutcome(rows: StatusReasonRow[]): {
   headline: ReviewOutcomeHeadline;
   reasons: ReviewReasonRow[];
+  durationCount: number;
+  durationMs: number;
 } {
   const headline: ReviewOutcomeHeadline = {
     completed: 0,
@@ -184,11 +194,15 @@ export function assembleReviewOutcome(rows: StatusReasonRow[]): {
     interrupted: 0,
   };
   let unrecognizedCount = 0;
+  let durationCount = 0;
+  let durationMs = 0;
   const reasonTallies = new Map<string, number>();
 
   for (const row of rows) {
     if (!isTerminalStatus(row.status)) continue;
     headline[row.status] += row.rowCount;
+    durationCount += Number(row.durationCount);
+    durationMs += Number(row.durationMs);
     if (row.status === 'completed') continue;
     if (row.terminalReason === null || !KNOWN_REASON_SET.has(row.terminalReason)) {
       unrecognizedCount += row.rowCount;
@@ -211,7 +225,7 @@ export function assembleReviewOutcome(rows: StatusReasonRow[]): {
     left.reason < right.reason ? -1 : left.reason > right.reason ? 1 : 0
   );
 
-  return { headline, reasons };
+  return { headline, reasons, durationCount, durationMs };
 }
 
 export function reviewWindow(now: Date): ReviewWindow {
@@ -231,7 +245,7 @@ async function collectReviewOutcome(
 ): Promise<CodeReviewCollectionStatus> {
   try {
     const rows = await selectStatusReasonRows(database, window);
-    const { headline, reasons } = assembleReviewOutcome(rows);
+    const { headline, reasons, durationCount, durationMs } = assembleReviewOutcome(rows);
     console.log(
       JSON.stringify({
         metric: REVIEW_OUTCOME_METRIC,
@@ -240,6 +254,8 @@ async function collectReviewOutcome(
         windowStart: window.start,
         windowEnd: window.end,
         ...headline,
+        durationCount,
+        durationMs,
       })
     );
     for (const reason of reasons) {

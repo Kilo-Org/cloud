@@ -46,7 +46,6 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { findUserById } from '@/lib/user/find-user-by-id';
 import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
 import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -807,20 +806,6 @@ export const organizationAdminRouter = createTRPCRouter({
           .where(eq(organizations.id, organizationId));
       });
 
-      if (amountMicrodollars > 0 && existingOrg.created_by_kilo_user_id) {
-        void reportEvents({
-          events: [
-            {
-              type: 'billing.credit_purchased',
-              data: {
-                kilo_user_id: existingOrg.created_by_kilo_user_id,
-                microdollars_acquired: amountMicrodollars,
-              },
-            },
-          ],
-        });
-      }
-
       return {
         message: `Successfully granted $${amount_usd} credits to organization ${existingOrg.name}`,
         amount_usd,
@@ -1057,20 +1042,6 @@ export const organizationAdminRouter = createTRPCRouter({
         });
       }
       throw error;
-    }
-
-    if (existingOrg.created_by_kilo_user_id) {
-      void reportEvents({
-        events: [
-          {
-            type: 'org.deleted',
-            data: {
-              kilo_user_id: existingOrg.created_by_kilo_user_id,
-              organization_id: organizationId,
-            },
-          },
-        ],
-      });
     }
 
     return successResult();

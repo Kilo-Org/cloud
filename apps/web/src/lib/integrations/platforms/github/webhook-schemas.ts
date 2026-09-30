@@ -1,11 +1,5 @@
 import * as z from 'zod';
 
-/**
- * Zod schemas for GitHub webhook payload validation
- * These ensure we receive the expected data structure from GitHub
- */
-
-// Common schemas used across multiple webhook types
 const GitHubAccountSchema = z.object({
   id: z.number(),
   login: z.string(),
@@ -38,7 +32,6 @@ export const GitHubAppAuthorizationRevokedPayloadSchema = z.object({
   }),
 });
 
-// installation.created webhook payload
 export const InstallationCreatedPayloadSchema = z.object({
   action: z.literal('created'),
   installation: GitHubInstallationSchema,
@@ -46,7 +39,6 @@ export const InstallationCreatedPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation.deleted webhook payload
 export const InstallationDeletedPayloadSchema = z.object({
   action: z.literal('deleted'),
   installation: z.object({
@@ -59,7 +51,6 @@ export const InstallationDeletedWebhookPayloadSchema = InstallationDeletedPayloa
   installation: InstallationDeletedPayloadSchema.shape.installation.nullable(),
 });
 
-// installation.suspend webhook payload
 export const InstallationSuspendPayloadSchema = z.object({
   action: z.literal('suspend'),
   installation: z.object({
@@ -68,7 +59,6 @@ export const InstallationSuspendPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation.unsuspend webhook payload
 export const InstallationUnsuspendPayloadSchema = z.object({
   action: z.literal('unsuspend'),
   installation: z.object({
@@ -77,7 +67,6 @@ export const InstallationUnsuspendPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// installation_target.renamed webhook payload
 export const InstallationTargetRenamedPayloadSchema = z.object({
   action: z.literal('renamed'),
   installation: z.object({
@@ -88,7 +77,6 @@ export const InstallationTargetRenamedPayloadSchema = z.object({
   target_type: z.string(),
 });
 
-// installation_repositories webhook payload
 export const InstallationRepositoriesPayloadSchema = z.object({
   action: z.enum(['added', 'removed']),
   installation: z.object({
@@ -116,7 +104,6 @@ export const InstallationRepositoriesPayloadSchema = z.object({
     .optional(),
 });
 
-// push webhook payload
 export const PushEventPayloadSchema = z.object({
   ref: z.string(),
   repository: z.object({
@@ -125,7 +112,6 @@ export const PushEventPayloadSchema = z.object({
   deleted: z.boolean(),
 });
 
-// pull_request webhook payload
 export const GitHubRepositorySchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -185,7 +171,6 @@ export const PullRequestPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// issues webhook payload
 export const IssuePayloadSchema = z.object({
   action: z.string(),
   issue: z.object({
@@ -237,7 +222,6 @@ export const GitHubAuthorAssociationSchema = z.enum([
   'OWNER',
 ]);
 
-// pull_request_review_comment webhook payload
 export const PullRequestReviewCommentPayloadSchema = z.object({
   action: z.string(),
   comment: z.object({
@@ -277,7 +261,6 @@ export const PullRequestReviewCommentPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
-// pull_request_review webhook payload
 export const PullRequestReviewPayloadSchema = z.object({
   action: z.enum(['submitted', 'edited', 'dismissed']),
   review: z.object({
@@ -312,7 +295,6 @@ export const PullRequestReviewPayloadSchema = z.object({
   installation: z.object({ id: z.number() }),
 });
 
-// Type exports for use in the webhook handler
 export type GitHubAppAuthorizationRevokedPayload = z.infer<
   typeof GitHubAppAuthorizationRevokedPayloadSchema
 >;

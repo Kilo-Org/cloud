@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { simHash64 } from '@/lib/bouncer/simhash';
 import type { User } from '@kilocode/db/schema';
 import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
@@ -42,7 +43,9 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-m
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
+import { decide, type DecideVerdict } from '@/lib/bouncer/client';
 import { NextRequest } from 'next/server';
+import { handleLlmProxyRequest } from './llm-proxy';
 
 jest.mock('next/server', () => {
   return {
@@ -124,6 +127,13 @@ jest.mock('@/lib/ai-gateway/auto-model/resolution', () => {
     applyResolvedAutoModel: jest.fn(),
   };
 });
+// Bouncer is report-only and never changes the response; mock it so the decide
+// call shape and its failure modes can be asserted.
+jest.mock('@/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(async () => null),
+  reportUsageEvent: jest.fn(async () => undefined),
+}));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
@@ -147,6 +157,7 @@ const mockedCheckFreeModelRateLimitByUser = jest.mocked(checkFreeModelRateLimitB
 const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
+const mockedDecide = jest.mocked(decide);
 
 const provider = {
   id: 'openrouter',
@@ -602,6 +613,156 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
         responseTransforms: null,
       })
     );
+  });
+
+  it('asks bouncer to decide with the paid tier, the user account and the request id', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(), { 'x-vercel-id': 'iad1::iad1::request-id' }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedDecide).toHaveBeenCalledTimes(1);
+    expect(mockedDecide).toHaveBeenCalledWith(
+      { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
+      { timeoutMs: 30_000 }
+    );
+  });
+
+  it('classifies an organization on a team plan as the team tier', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: undefined,
+      plan: 'teams',
+    });
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedDecide).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'team', accountId: 'org:org-1' }),
+      { timeoutMs: 30_000 }
+    );
+  });
+
+  it('asks bouncer to decide for an anonymous caller with the client IP', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as AuthResult);
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id)) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedDecide).toHaveBeenCalledTimes(1);
+    expect(mockedDecide).toHaveBeenCalledWith(
+      { requestId: expect.any(String), tier: 'anonymous', ip: '127.0.0.1' },
+      { timeoutMs: 30_000 }
+    );
+    // Bouncer has no account for an anonymous caller, so no usage event.
+    expect(mockedAccountForMicrodollarUsage.mock.calls[0]?.[1].bouncer).toBeUndefined();
+  });
+
+  it('carries the bouncer usage-event fields into the usage context', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(
+        {
+          model: 'openai/gpt-4o',
+          messages: [
+            { role: 'user', content: 'first question' },
+            { role: 'assistant', content: 'an answer' },
+            { role: 'user', content: 'explain the failing test' },
+          ],
+          tools: [{ type: 'function', function: { name: 'read_file' } }],
+          logprobs: true,
+          n: 2,
+        },
+        { 'x-vercel-id': 'iad1::usage-request-id', 'x-kilocode-feature': 'vscode-extension' }
+      ) as never
+    );
+
+    expect(response.status).toBe(200);
+    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+    expect(usageContext?.bouncer).toEqual({
+      requestId: 'iad1::usage-request-id',
+      occurredAt: expect.any(Date),
+      clientAttributed: true,
+      requestedLogprobs: true,
+      samples: 2,
+      promptSimHash: simHash64('explain the failing test'),
+    });
+  });
+
+  it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
+    expect(backgroundWork).toBeInstanceOf(Promise);
+    let finished = false;
+    void backgroundWork.then(() => {
+      finished = true;
+    });
+    await Promise.resolve();
+    expect(finished).toBe(false);
+    pending.resolve(null);
+    await expect(backgroundWork).resolves.toBeUndefined();
+  });
+
+  it('keeps decide alive when balance rejects a request before upstream', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 0,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedIsAutoTopUpInFlight.mockResolvedValue(false);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(402);
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    const backgroundWork = mockedAfter.mock.calls[0]?.[0] as Promise<void>;
+    expect(backgroundWork).toBeInstanceOf(Promise);
+    pending.resolve(null);
+    await expect(backgroundWork).resolves.toBeUndefined();
+  });
+
+  it('serves the request and settles background work when decide rejects', async () => {
+    const pending = Promise.withResolvers<DecideVerdict | null>();
+    mockedDecide.mockReturnValueOnce(pending.promise);
+    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+    pending.reject(new Error('bouncer unreachable'));
+    await expect(mockedAfter.mock.calls[0]?.[0]).resolves.toBeUndefined();
   });
 
   it('passes provider response transforms to the response rewriter', async () => {
@@ -1606,6 +1767,6 @@ describe('auto-routing shadow classifier', () => {
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
     );
-    expect(mockedAfter).not.toHaveBeenCalled();
+    expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
   });
 });

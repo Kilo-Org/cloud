@@ -2,6 +2,8 @@ import { createElement, type ElementType } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
+import hrCatalog from '@/i18n/locales/hr.json';
 import { HOME_TAB_ROOT } from '@/lib/tour/tour-dismiss';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -82,9 +84,19 @@ vi.mock('expo-router', async () => {
   };
 });
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
-}));
+vi.mock('react-i18next', async () => {
+  // The reviewed catalogs still wrap `kilo remote` in authoring backticks. The
+  // screen owns stripping them before the native `Text` draws the card, so this
+  // stub hands the real Croatian catalog value to the body under test and echoes
+  // the key everywhere else.
+  const hrModule = await import('@/i18n/locales/hr.json');
+  const remoteOptionBody: string = hrModule.default.tour.remoteOptionBody;
+  return {
+    useTranslation: () => ({
+      t: (key: string) => (key === 'tour.remoteOptionBody' ? remoteOptionBody : key),
+    }),
+  };
+});
 
 // The push + post-transition cleanup that keeps Android's native stack alive is
 // covered by src/lib/navigation/stack-safe-replace.mounted.test.tsx; here it
@@ -206,6 +218,26 @@ describe('TourScreen', () => {
     const screenHeader = renderer.root.findByType('ScreenHeader' as ElementType);
     expect(screenHeader.props).not.toHaveProperty('eyebrow');
     expect(renderer.root.findByType(TourStepHeader).props.eyebrow).toBe('tour.eyebrow');
+
+    unmount();
+  });
+
+  it('renders the computer card body as plain text when the catalog carries authoring markers', async () => {
+    const { renderer, unmount } = await mountTour();
+
+    // The English catalog ships the words plain, but the reviewed translations
+    // still wrap `kilo remote` in backticks, and nothing in the app draws that
+    // markup. The card must show the reader the plain copy with no backtick
+    // glyph, so the screen has to run the catalog value through the plain-copy
+    // path instead of forwarding it unchanged.
+    const catalogValue = hrCatalog.tour.remoteOptionBody;
+    expect(catalogValue).toContain('`kilo remote`');
+    const visible = stripInlineCodeMarkers(catalogValue);
+    expect(visible).not.toContain('`');
+    expect(visible).toContain('kilo remote');
+
+    expect(hasText(renderer, visible)).toBe(true);
+    expect(hasText(renderer, catalogValue)).toBe(false);
 
     unmount();
   });

@@ -44,7 +44,13 @@ type ForkOptionProps = {
   onPress: () => void;
 };
 
-/** One selectable fork card: icon tile, title, body. */
+/**
+ * One selectable fork card: icon tile, title, body.
+ *
+ * The card owns stripping the catalogs' authoring backticks, so a body handed
+ * in from any call site reaches the reader as plain copy. The native `Text` has
+ * no markdown renderer, so a marker that got this far would be drawn literally.
+ */
 function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionProps>) {
   const colors = useThemeColors();
 
@@ -58,9 +64,11 @@ function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionPro
         <Icon size={22} color={colors.foreground} />
       </View>
       <View className="flex-1 gap-0.5">
-        <Text className="text-base font-semibold text-foreground">{title}</Text>
+        <Text className="text-base font-semibold text-foreground">
+          {stripInlineCodeMarkers(title)}
+        </Text>
         <Text variant="muted" className="text-sm">
-          {body}
+          {stripInlineCodeMarkers(body)}
         </Text>
       </View>
     </ChoiceRow>
@@ -105,7 +113,7 @@ function ForkStep({ onChoose }: Readonly<ForkStepProps>) {
         <ForkOption
           icon={Monitor}
           title={t('tour.remoteOptionTitle')}
-          body={stripInlineCodeMarkers(t('tour.remoteOptionBody'))}
+          body={t('tour.remoteOptionBody')}
           onPress={() => {
             onChoose('remote');
           }}

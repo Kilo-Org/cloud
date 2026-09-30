@@ -9,7 +9,7 @@ export function isGptOssModel(requestedModel: string) {
   return requestedModel.includes('gpt-oss');
 }
 
-export const GPT_SOL_CURRENT_MODEL_ID = 'openai/gpt-6-sol';
+export const GPT_SOL_CURRENT_MODEL_ID = 'openai/gpt-6.1-sol';
 
 export const GPT_MINI_CURRENT_MODEL_ID = 'openai/gpt-5.4-mini';
 

@@ -2,7 +2,6 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { successResult, type CustomResult } from '@/lib/maybe-result';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { revokeGatewayGrantsForBlockedUsers } from '@/lib/mcp-gateway/blocking-service';
 
 export type BulkBlockResponse = CustomResult<
@@ -71,12 +70,6 @@ export async function bulkBlockUsers(
 
   if (updated.length > 0) {
     await revokeGatewayGrantsForBlockedUsers(updated.map(u => u.id));
-    void reportEvents({
-      events: updated.map(u => ({
-        type: 'user.blocked' as const,
-        data: { kilo_user_id: u.id, reason, actor_email: null },
-      })),
-    });
   }
 
   // A short update count means some of the selected users were concurrently
@@ -119,15 +112,6 @@ export async function unblockBulkBlockedUsers(
       )
     )
     .returning({ id: kilocode_users.id });
-
-  if (rows.length > 0) {
-    void reportEvents({
-      events: rows.map(u => ({
-        type: 'user.unblocked' as const,
-        data: { kilo_user_id: u.id },
-      })),
-    });
-  }
 
   return { updatedCount: rows.length };
 }

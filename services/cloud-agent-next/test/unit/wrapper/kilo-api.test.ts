@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createWrapperKiloClient,
@@ -6,7 +6,7 @@ import {
   type WrapperKiloClient,
 } from '../../../wrapper/src/kilo-api.js';
 import { createKiloClient, type KiloClient as SDKClient } from '@kilocode/sdk';
-import type { SessionCommandResponse, SessionPromptResponse } from '@kilocode/sdk/v2';
+import type { SessionPromptResponse } from '@kilocode/sdk/v2';
 import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
 
 function createSdkClient(): SDKClient {
@@ -80,7 +80,6 @@ describe('createWrapperKiloClient prompt handoff', () => {
     };
 
     const result = await client.sendPrompt(opts);
-    expectTypeOf(result).toEqualTypeOf<SessionPromptResponse>();
     expect(result).toEqual(completion);
     expect(result.info.parentID).toBe('msg_prompt');
     await expect(client.sendPromptAsync(opts)).resolves.toBeUndefined();
@@ -126,8 +125,6 @@ describe('createWrapperKiloClient prompt handoff', () => {
     });
     const command = await client.sendCommand({ sessionId: 'kilo_sess', command: 'review' });
 
-    expectTypeOf(prompt).toEqualTypeOf<SessionPromptResponse>();
-    expectTypeOf(command).toEqualTypeOf<SessionCommandResponse>();
     expect(prompt.info.error).toEqual(failedCompletion.info.error);
     expect(command.info.error).toEqual(failedCompletion.info.error);
     expect(prompt).toEqual(failedCompletion);

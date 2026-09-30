@@ -17,6 +17,7 @@ import type { UserForBalance } from '@/lib/user/balance-types';
 import { findUserById } from '@/lib/user/find-user-by-id';
 import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
+import { reportChargeAttempted } from '@/lib/bouncer/credit-events';
 import { sendAutoTopUpFailedEmail } from '@/lib/email';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
@@ -27,6 +28,7 @@ import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS,
+  SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@/lib/autoTopUpConstants';
 import {
   attachPreparedAutoTopUpInvoiceFee,
@@ -233,6 +235,7 @@ async function performAutoTopUpForEntity(
       stripe_payment_method_id: auto_top_up_configs.stripe_payment_method_id,
       amount_cents: auto_top_up_configs.amount_cents,
       attempt_started_at: auto_top_up_configs.attempt_started_at,
+      created_by_user_id: auto_top_up_configs.created_by_user_id,
     });
 
   if (!config) {
@@ -253,7 +256,7 @@ async function performAutoTopUpForEntity(
   // (another request may have completed a top-up while we were waiting for the lock)
   // We fetch fresh data from DB and compute balance directly to avoid
   // calling getBalanceForUser which would create a cycle (it calls maybePerformAutoTopUp)
-  const { currentBalance_USD, stripe_customer_id } =
+  const { currentBalance_USD, stripe_customer_id, accountCreatedAt } =
     await getEntityBalanceAndStripeCustomer(entity);
   const threshold =
     entity.type === 'user' ? AUTO_TOP_UP_THRESHOLD_DOLLARS : ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS;
@@ -277,6 +280,12 @@ async function performAutoTopUpForEntity(
 
   const amountCents = config.amount_cents ?? DEFAULT_AUTO_TOP_UP_AMOUNT_CENTS;
   const entityLabel = entity.type === 'user' ? `user ${ownerId}` : `organization ${ownerId}`;
+  // Bouncer's payer for an org charge is the org; the user id is the org's billing actor.
+  const bouncerUserId =
+    entity.type === 'user'
+      ? entity.user.id
+      : (config.created_by_user_id ?? SYSTEM_AUTO_TOP_UP_USER_ID);
+  const bouncerOrgId = entity.type === 'organization' ? entity.organization.id : undefined;
 
   try {
     // Create a proper invoice (with PDF) and pay it off-session.
@@ -344,6 +353,13 @@ async function performAutoTopUpForEntity(
     });
 
     // Pay the invoice. The PaymentIntent is created during payment, not finalization.
+    reportChargeAttempted({
+      flow: 'auto_topup',
+      userId: bouncerUserId,
+      orgId: bouncerOrgId,
+      amountCents,
+      accountCreatedAt,
+    });
     const paidInvoice = await client.invoices.pay(invoice.id, {
       payment_method: config.stripe_payment_method_id,
       off_session: true,
@@ -405,21 +421,31 @@ async function performAutoTopUpForEntity(
 /**
  * Get fresh balance and stripe customer ID for an entity.
  */
-async function getEntityBalanceAndStripeCustomer(
-  entity: AutoTopUpEntity
-): Promise<{ currentBalance_USD: number; stripe_customer_id: string | null }> {
+async function getEntityBalanceAndStripeCustomer(entity: AutoTopUpEntity): Promise<{
+  currentBalance_USD: number;
+  stripe_customer_id: string | null;
+  accountCreatedAt: string;
+}> {
   if (entity.type === 'user') {
     const freshUser = await findUserById(entity.user.id);
     if (!freshUser) throw new Error('User not found:' + entity.user.id);
     const currentBalance_USD =
       (freshUser.total_microdollars_acquired - freshUser.microdollars_used) / 1_000_000;
-    return { currentBalance_USD, stripe_customer_id: freshUser.stripe_customer_id };
+    return {
+      currentBalance_USD,
+      stripe_customer_id: freshUser.stripe_customer_id,
+      accountCreatedAt: freshUser.created_at,
+    };
   } else {
     const freshOrg = await getOrganizationById(entity.organization.id);
     if (!freshOrg) throw new Error('Organization not found:' + entity.organization.id);
     const currentBalance_USD =
       (freshOrg.total_microdollars_acquired - freshOrg.microdollars_used) / 1_000_000;
-    return { currentBalance_USD, stripe_customer_id: freshOrg.stripe_customer_id };
+    return {
+      currentBalance_USD,
+      stripe_customer_id: freshOrg.stripe_customer_id,
+      accountCreatedAt: freshOrg.created_at,
+    };
   }
 }
 

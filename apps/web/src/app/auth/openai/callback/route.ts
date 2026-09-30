@@ -1,4 +1,5 @@
-import { getUserFromSession, nextAuthHttpHandler } from '@/lib/user/server';
+import { nextAuthHttpHandler } from '@/lib/user/next-auth-options';
+import { getUserFromSession } from '@/lib/user/server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
 import { NextRequest, NextResponse } from 'next/server';

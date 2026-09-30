@@ -90,6 +90,7 @@ import {
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
+import { bouncerAccountId, reportUsageEvent } from '@/lib/bouncer/client';
 
 const posthogClient = PostHogClient();
 
@@ -1316,7 +1317,36 @@ export async function processTokenData(
     usageStats.cacheDiscount_mUsd = 0;
   }
 
-  return logMicrodollarUsage(usageStats, usageContext);
+  const usageRecord = await logMicrodollarUsage(usageStats, usageContext);
+  await reportBouncerUsageEvent(usageStats, usageContext);
+  return usageRecord;
+}
+
+/**
+ * Reports this request to bouncer's report-only usage ledger, after the billing
+ * write so the final token counts are in hand. The client never rejects, and
+ * the verdict is not read back. The prompt SimHash is computed here, off the
+ * hot path.
+ */
+async function reportBouncerUsageEvent(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<void> {
+  const bouncer = usageContext.bouncer;
+  if (!bouncer) return;
+  await reportUsageEvent({
+    requestId: bouncer.requestId,
+    occurredAt: bouncer.occurredAt,
+    accountId: bouncerAccountId(usageContext.kiloUserId, usageContext.organizationId),
+    inputTokens: usageStats.inputTokens,
+    outputTokens: usageStats.outputTokens,
+    clientAttributed: bouncer.clientAttributed,
+    feature: usageContext.feature,
+    hasTools: usageContext.has_tools,
+    requestedLogprobs: bouncer.requestedLogprobs,
+    samples: bouncer.samples,
+    promptSimHash: bouncer.promptSimHash,
+  });
 }
 
 async function getGenerationLookupProvider(

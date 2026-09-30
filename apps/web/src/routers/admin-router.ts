@@ -103,7 +103,6 @@ import {
   inferRowlessAuthProviders,
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
 import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -878,21 +877,6 @@ export const adminRouter = createTRPCRouter({
 
         if (didTransition && isBlocking) {
           await revokeGatewayGrantsForBlockedUser(input.userId);
-        }
-
-        if (didTransition) {
-          void reportEvents({
-            events: [
-              {
-                type: isBlocking ? 'user.blocked' : 'user.unblocked',
-                data: {
-                  kilo_user_id: input.userId,
-                  reason: input.blocked_reason ?? null,
-                  actor_email: ctx.user.google_user_email,
-                },
-              },
-            ],
-          });
         }
 
         return successResult();

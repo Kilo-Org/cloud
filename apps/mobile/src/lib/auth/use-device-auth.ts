@@ -148,12 +148,6 @@ export function useDeviceAuth(): DeviceAuthResult {
           headers: { 'Content-Type': 'application/json', ...buildClientMetadataHeaders() },
           signal: startAbort.signal,
         });
-        // The timeout guards ONLY the POST. This function stays suspended on
-        // `await openAuthBrowser(...)` for as long as the auth sheet is open,
-        // so a timer still running past this point would fire mid-sign-in and
-        // stomp the live pending/idle state with a bogus error.
-        clearTimeout(startTimeout);
-
         // Cancel can race request completion — if it landed while awaiting,
         // the user is back on the idle screen; don't revive the flow.
         if (startAbort.signal.aborted) {
@@ -226,6 +220,13 @@ export function useDeviceAuth(): DeviceAuthResult {
           // Android) needs its own dismissal.
           browserKind: resolveAuthBrowserKind(browserUrl),
         });
+
+        // The timeout stays armed through the body read so a response whose
+        // headers arrive but whose body stalls is still aborted. This function
+        // then stays suspended on `await openAuthBrowser(...)` for as long as
+        // the auth sheet is open, so the timer must be disarmed before then or
+        // it would fire mid-sign-in and stomp the live pending/idle state.
+        clearTimeout(startTimeout);
 
         await openAuthBrowser(browserUrl);
       } catch (error: unknown) {

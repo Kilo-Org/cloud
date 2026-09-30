@@ -26,6 +26,7 @@ type ProviderIndexCacheState = {
   expiresAtMs: number;
   index: ModelIdToProviderSlugsIndex;
   dataCollectionRequiredModelIds: ReadonlySet<string>;
+  systemOneModelIds: ReadonlySet<string>;
 };
 
 export type FetchModelsByProviderSnapshot = () => Promise<NormalizedOpenRouterResponse | undefined>;
@@ -129,6 +130,17 @@ export function buildDataCollectionRequiredModelIds(
   );
 }
 
+/** Exact gateway model ids of System One models, which output `decisions` instead of text. */
+export function buildSystemOneModelIds(snapshot: NormalizedOpenRouterResponse): Set<string> {
+  return new Set(
+    snapshot.providers.flatMap(provider =>
+      provider.models
+        .filter(model => model.output_modalities.includes('decisions'))
+        .map(getSnapshotModelVariantId)
+    )
+  );
+}
+
 export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOptions) {
   let cache: ProviderIndexCacheState | undefined;
   let inFlight: Promise<ProviderIndexCacheState> | undefined;
@@ -148,13 +160,14 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
         const snapshot = await options.fetchSnapshot().catch(() => undefined);
 
         return {
-          // A failed read retries on the next call so an empty data-collection
-          // set does not stick for the TTL; callers fall back to best-effort checks.
+          // A failed read retries on the next call so empty derived sets do not
+          // stick for the TTL; callers fall back to best-effort checks.
           expiresAtMs: snapshot ? options.nowMs() + options.ttlMs : options.nowMs(),
           index: snapshot ? buildModelIdToProviderSlugsIndex(snapshot) : new Map(),
           dataCollectionRequiredModelIds: snapshot
             ? buildDataCollectionRequiredModelIds(snapshot)
             : new Set(),
+          systemOneModelIds: snapshot ? buildSystemOneModelIds(snapshot) : new Set(),
         };
       } finally {
         inFlight = undefined;
@@ -171,6 +184,10 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
 
   async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
     return (await loadState()).dataCollectionRequiredModelIds;
+  }
+
+  async function getSystemOneModelIds(): Promise<ReadonlySet<string>> {
+    return (await loadState()).systemOneModelIds;
   }
 
   /**
@@ -208,6 +225,7 @@ export function createModelsByProviderIndexLoader(options: ProviderIndexLoaderOp
     getIndex: loadIndex,
     getProviderSlugsForModel,
     getDataCollectionRequiredModelIds,
+    getSystemOneModelIds,
   };
 }
 
@@ -243,4 +261,8 @@ export async function getModelIdToProviderSlugsIndex(): Promise<ModelIdToProvide
 
 export async function getDataCollectionRequiredModelIds(): Promise<ReadonlySet<string>> {
   return defaultLoader.getDataCollectionRequiredModelIds();
+}
+
+export async function getSystemOneModelIds(): Promise<ReadonlySet<string>> {
+  return defaultLoader.getSystemOneModelIds();
 }

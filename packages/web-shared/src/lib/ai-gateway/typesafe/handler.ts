@@ -22,20 +22,30 @@ import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import {
-  systemOneRequestSchema,
-  systemOneResponseSchema,
-  SYSTEM_ONE_MODEL_PROVIDERS,
-} from '@/lib/ai-gateway/typesafe/schemas';
+import { systemOneRequestSchema, systemOneResponseSchema } from '@/lib/ai-gateway/typesafe/schemas';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
 import { toMicrodollars } from '@/lib/microdollars';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import type { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import {
+  getProviderSlugsForModel,
+  getSystemOneModelIds,
+} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
+}
+
+async function isSystemOneModel(modelId: string) {
+  const systemOneModelIds = await getSystemOneModelIds();
+  if (systemOneModelIds.size === 0) {
+    // OpenRouter's System One endpoint still rejects models it cannot serve.
+    warnExceptInTest('[isSystemOneModel] no System One models in the snapshot, assuming valid');
+    return true;
+  }
+  return systemOneModelIds.has(modelId);
 }
 
 export async function handleSystemOneRequest(request: NextRequest) {
@@ -62,6 +72,13 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
+  if (!(await isSystemOneModel(requestedModel))) {
+    return errorResponse(
+      `The requested model '${requestedModel}' is not a System One model`,
+      'model_not_found',
+      404
+    );
+  }
 
   const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
@@ -85,7 +102,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
       organizationId,
       kiloUserId: user.id,
       modelId: requestedModel,
-      providerLookup: async () => new Set([SYSTEM_ONE_MODEL_PROVIDERS[requestedModel]]),
+      providerLookup: getProviderSlugsForModel,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {

@@ -13,16 +13,9 @@ export type LiveSidebarSession = {
    * origin the session was created on.
    */
   createdOnPlatform?: string;
-  /**
-   * Owning organization; `null` = personal, and absent only on a row the query
-   * never attributed — which the server treats as personal too.
-   */
-  organizationId?: string | null;
 };
 
 export type LiveSidebarQuery = {
-  /** Scope the sidebar is showing. `null` = personal. */
-  organizationId: string | null;
   platformFilter: readonly string[];
   projectFilter: readonly string[];
   searchQuery: string;
@@ -81,10 +74,10 @@ function matchesLiveSearch(session: LiveSidebarSession, needle: string): boolean
 }
 
 /**
- * Client-side filter for the live (Remote) rows: scope, origin, repository,
- * and free text, combined with AND. An empty selection or an empty query
- * means "no filter". The live rows are already in memory, so this filters
- * locally — the stored list is filtered by the same selections server-side.
+ * Client-side filter for the live (Remote) rows: origin, repository, and free
+ * text, combined with AND. An empty selection or an empty query means "no
+ * filter". The live rows are already in memory, so this filters locally — the
+ * stored list is filtered by the same selections server-side.
  *
  * Repository comparison normalizes both sides: the option comes from a stored
  * row while the live row carries the URL the connection reported, and the two
@@ -97,12 +90,10 @@ export function filterLiveSidebarSessions<T extends LiveSidebarSession>(
   const needle = query.searchQuery.trim().toLowerCase();
   const selectedProjects = new Set(query.projectFilter.map(normalizeGitUrl));
   return sessions.filter(session => {
-    const scopeMatches = (session.organizationId ?? null) === query.organizationId;
     const projectMatches =
       selectedProjects.size === 0 ||
       (session.gitUrl != null && selectedProjects.has(normalizeGitUrl(session.gitUrl)));
     return (
-      scopeMatches &&
       matchesLivePlatformFilter(session, query.platformFilter) &&
       projectMatches &&
       (!needle || matchesLiveSearch(session, needle))

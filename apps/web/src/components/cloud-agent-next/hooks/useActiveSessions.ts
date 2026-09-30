@@ -24,12 +24,6 @@ export type ActiveSession = ActiveSessionWithConnectionData & {
   updatedAt?: string;
   lastActivityAt?: string;
   statusUpdatedAt?: string;
-  /**
-   * Owning organization; `null` = personal. Always emitted by the query, and
-   * absent from a connection payload, so the merge keeps the last attribution
-   * instead of treating a known row as unattributed.
-   */
-  organizationId?: string | null;
 };
 
 type CliConnectionPayload = {
@@ -101,11 +95,6 @@ function mergeCachedEnrichment(
     const value = cached[field] !== undefined ? cached[field] : incoming[field];
     if (value !== undefined) merged[field] = value;
   }
-  // `organizationId: null` is a real attribution (personal), so only an absent
-  // value falls through to the incoming row.
-  const organizationId =
-    cached.organizationId !== undefined ? cached.organizationId : incoming.organizationId;
-  if (organizationId !== undefined) merged.organizationId = organizationId;
   return merged;
 }
 
@@ -171,25 +160,15 @@ type ActiveSessionsQueryData = {
   sessions: ActiveSession[];
 };
 
-/**
- * Live sessions for one scope. `organizationId` mirrors the stored sidebar
- * list: a uuid for an organization, `null` for personal. The connection
- * payload is not org-scoped, so the cached attribution decides which live rows
- * the sidebar may show.
- */
-export function useActiveSessions(organizationId: string | null): {
+export function useActiveSessions(): {
   activeSessions: ActiveSession[];
   isLoading: boolean;
 } {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const sharedConnection = useUserWebConnection();
-  const input = useMemo(() => ({ organizationId }), [organizationId]);
-  const activeSessionsQueryOptions = trpc.activeSessions.list.queryOptions(input);
-  const activeSessionsQueryKey = useMemo(
-    () => trpc.activeSessions.list.queryKey(input),
-    [trpc, input]
-  );
+  const activeSessionsQueryOptions = trpc.activeSessions.list.queryOptions();
+  const activeSessionsQueryKey = useMemo(() => trpc.activeSessions.list.queryKey(), [trpc]);
   const { data, isLoading, refetch } = useQuery({
     ...activeSessionsQueryOptions,
     refetchInterval: 10_000,

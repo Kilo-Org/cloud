@@ -12,11 +12,15 @@ vi.mock('@sentry/react-native', () => sentryMock);
 // module registry.
 const configMock = vi.hoisted(() => ({
   latencyIngestUrl: 'https://latency.kiloapps.io' as string | undefined,
+  apiBaseUrl: 'https://api.example.com',
 }));
 
 vi.mock('@/lib/config', () => ({
   get LATENCY_INGEST_URL() {
     return configMock.latencyIngestUrl;
+  },
+  get API_BASE_URL() {
+    return configMock.apiBaseUrl;
   },
 }));
 
@@ -40,6 +44,7 @@ beforeEach(() => {
   sentryMock.captureException.mockClear();
   sentryMock.captureMessage.mockClear();
   configMock.latencyIngestUrl = 'https://latency.kiloapps.io';
+  configMock.apiBaseUrl = 'https://api.example.com';
   baseFetch.mockReset();
   vi.stubGlobal('fetch', baseFetch);
   vi.stubGlobal(INSTALLED_FLAG, undefined);
@@ -188,6 +193,34 @@ describe('installErrorReporting', () => {
 
     await globalThis.fetch('https://latency-staging.example.com/v1/latency', { method: 'POST' });
 
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+  });
+
+  // KILO-APP-B1: the offline-reachability probe (use-offline-banner-state.ts)
+  // HEADs the bare API base and treats a failure as the offline signal, so its
+  // expected failure must not be filed as a network error.
+  it('skips the offline-reachability probe so its expected failure is not reported', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    const failure = new TypeError('Network request failed');
+    baseFetch.mockRejectedValueOnce(failure);
+
+    await expect(globalThis.fetch(configMock.apiBaseUrl, { method: 'HEAD' })).rejects.toBe(failure);
+
+    expect(sentryMock.captureException).not.toHaveBeenCalled();
+    expect(sentryMock.captureMessage).not.toHaveBeenCalled();
+  });
+
+  it('skips a >=400 response from the offline-reachability probe', async () => {
+    const install = await loadInstallErrorReporting();
+    install();
+
+    baseFetch.mockResolvedValueOnce(new Response('unknown', { status: 503 }));
+
+    const response = await globalThis.fetch(configMock.apiBaseUrl, { method: 'HEAD' });
+
+    expect(response.status).toBe(503);
     expect(sentryMock.captureException).not.toHaveBeenCalled();
   });
 

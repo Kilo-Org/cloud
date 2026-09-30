@@ -8,12 +8,14 @@
  * carry their own reporting (see lib/trpc.ts), so this wrapper skips
  * `/api/trpc` URLs to avoid double-reporting. It also skips the app's own
  * telemetry transports — the SDK vendors and the latency sink — because their
- * failures are never user-facing (see `isTelemetryHost`).
+ * failures are never user-facing (see `isTelemetryHost`), and the offline
+ * banner's reachability probe, whose expected failure is the offline signal
+ * (KILO-APP-B1).
  */
 
 import * as Sentry from '@sentry/react-native';
 
-import { LATENCY_INGEST_URL } from '@/lib/config';
+import { API_BASE_URL, LATENCY_INGEST_URL } from '@/lib/config';
 import { setTelemetrySink } from '@/lib/telemetry/error-sink';
 import { createNetworkErrorFetch } from '@/lib/telemetry/network-errors';
 import { LATENCY_INGEST_URL_DEFAULT } from '@/lib/url-contract';
@@ -81,9 +83,25 @@ function isTelemetryHost(url: string): boolean {
   }
 }
 
+/**
+ * The offline-reachability probe (`use-offline-banner-state.ts`) issues a HEAD
+ * to the bare API base and treats any failure as the offline signal. When the
+ * device is offline that failure is expected, so the wrapper must not file it
+ * as a network error (KILO-APP-B1); the probe, not the reporter, owns that
+ * outcome. The probe is the only caller that requests the API base itself, so
+ * excluding that exact URL is precise and does not silence a path the app
+ * relies on reaching.
+ */
+function isOfflineProbeUrl(url: string): boolean {
+  return url === API_BASE_URL;
+}
+
 /** True for app http(s) requests this wrapper owns (not tRPC, not telemetry). */
 function isReportableAppUrl(url: string): boolean {
   if (!HTTP_URL_PATTERN.test(url)) {
+    return false;
+  }
+  if (isOfflineProbeUrl(url)) {
     return false;
   }
   if (url.includes(TRPC_PATH)) {

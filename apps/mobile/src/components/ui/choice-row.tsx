@@ -18,6 +18,13 @@ type ChoiceRowProps = {
   busy?: boolean;
   /** Renders `accessibilityRole="checkbox"` instead of `"radio"`. */
   multi?: boolean;
+  /**
+   * Overrides the announced role. Use `"button"` for a row that navigates
+   * instead of selecting, so assistive tech does not announce an unselected
+   * radio/checkbox that can never be selected. A button row reports no
+   * `checked` state.
+   */
+  role?: 'radio' | 'checkbox' | 'button';
   /** Extra classes on the row container, e.g. a divider border. */
   className?: string;
   /** Custom row content instead of the default label/description text — e.g. an icon-prefixed row. */
@@ -36,10 +43,13 @@ export function ChoiceRow({
   disabled,
   busy,
   multi,
+  role,
   className,
   children,
 }: Readonly<ChoiceRowProps>) {
   const colors = useThemeColors();
+
+  const resolvedRole = role ?? (multi ? 'checkbox' : 'radio');
 
   return (
     <Pressable
@@ -53,8 +63,12 @@ export function ChoiceRow({
         void Haptics.selectionAsync();
         onPress();
       }}
-      accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityState={{ checked: selected, disabled: Boolean(disabled), busy }}
+      accessibilityRole={resolvedRole}
+      accessibilityState={
+        resolvedRole === 'button'
+          ? { disabled: Boolean(disabled), busy }
+          : { checked: selected, disabled: Boolean(disabled), busy }
+      }
     >
       {children ?? (
         <View className="flex-1 pr-3">

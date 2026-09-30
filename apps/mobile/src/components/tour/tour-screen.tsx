@@ -44,13 +44,14 @@ type ForkOptionProps = {
   onPress: () => void;
 };
 
-/** One selectable fork card: icon tile, title, body. */
+/** One fork card: icon tile, title, body. Navigates, so it is announced as a button, not a selection. */
 function ForkOption({ icon: Icon, title, body, onPress }: Readonly<ForkOptionProps>) {
   const colors = useThemeColors();
 
   return (
     <ChoiceRow
       selected={false}
+      role="button"
       onPress={onPress}
       className="gap-3 rounded-xl border border-border bg-card px-4"
     >

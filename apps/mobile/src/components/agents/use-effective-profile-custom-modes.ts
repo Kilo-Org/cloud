@@ -54,9 +54,21 @@ export function useEffectiveProfileCustomModes(
   const profileAgents = visibleProfileAgents(get.data?.agents ?? []);
   const customOptions = dedupeCustomModeOptions(customModeOptionsFromProfileAgents(profileAgents));
 
+  // Gate on `isPending`, not `isLoading`: in React Query v5 `isLoading` is
+  // `isPending && isFetching`, so a paused (offline) first fetch reports
+  // `isLoading: false` while still unsettled. `isPending` stays true until a
+  // query settles. The list query resolves the effective id and only then is
+  // `get` enabled, so a disabled (unresolved) `get` stays pending forever and
+  // must not leak into the flag, or an empty default would read as loading.
+  // Mirror `useEffectiveAgentProfile`: keep successful background refreshes
+  // out of loading and only surface error retries.
+  const listQuery = organizationId ? listCombined : list;
+  const listLoading = listQuery.isPending || (listQuery.isError && listQuery.isFetching);
+  const getLoading = Boolean(effectiveId) && (get.isPending || (get.isError && get.isFetching));
+
   return {
     customOptions,
     profileAgents,
-    isLoading: get.isLoading,
+    isLoading: listLoading || getLoading,
   };
 }

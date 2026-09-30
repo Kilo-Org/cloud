@@ -241,6 +241,7 @@
     "addPasskey": "Ավելացնել մուտքի բանալի",
     "passkeyDefaultName": "Մուտքի բանալի",
     "passkeyAddedOn": "Ավելացվել է {{date}}",
+    "passkeyLastUsedOn": "Վերջին օգտագործումը {{date}}",
     "passkeyAdded": "Մուտքի բանալին ավելացվել է։",
     "passkeyAddFailed": "Չհաջողվեց ավելացնել մուտքի բանալի։ Փորձեք կրկին։",
     "passkeyAddUnsupported": "Այս սարքը չի կարող ստեղծել մուտքի բանալիներ։",

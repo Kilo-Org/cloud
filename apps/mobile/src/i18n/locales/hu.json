@@ -241,6 +241,7 @@
     "addPasskey": "Jelkulcs hozzáadása",
     "passkeyDefaultName": "Jelkulcs",
     "passkeyAddedOn": "Hozzáadva: {{date}}",
+    "passkeyLastUsedOn": "Utoljára használva {{date}}",
     "passkeyAdded": "Jelkulcs hozzáadva.",
     "passkeyAddFailed": "Nem sikerült jelkulcsot hozzáadni. Próbáld újra.",
     "passkeyAddUnsupported": "Ez az eszköz nem tud jelkulcsokat létrehozni.",

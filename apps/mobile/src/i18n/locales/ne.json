@@ -241,6 +241,7 @@
     "addPasskey": "पासकी थप्नुहोस्",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} मा थपियो",
+    "passkeyLastUsedOn": "पछिल्लो पटक प्रयोग {{date}}",
     "passkeyAdded": "पासकी थपियो।",
     "passkeyAddFailed": "पासकी थप्न सकिएन। फेरि प्रयास गर्नुहोस्।",
     "passkeyAddUnsupported": "यो यन्त्रले पासकी बनाउन सक्दैन।",

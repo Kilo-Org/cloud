@@ -22,6 +22,7 @@ import {
   type PasskeySignInTicket,
 } from '@kilocode/db/schema';
 
+import assetLinks from '../../../public/.well-known/assetlinks.json';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 
@@ -29,20 +30,61 @@ import { db } from '@/lib/drizzle';
  * WebAuthn ceremonies for passkey registration and sign-in.
  *
  * The relying party is fixed by configuration, never by the request: `rpId` is
- * the host of `NEXTAUTH_URL` without the port and the accepted origin is that
- * URL's origin. A request-derived rpId would be `api.kilo.ai` for the mobile
- * app (which reaches these routes through `API_BASE_URL`), and neither that
- * host nor its origin can satisfy the associated-domain/credential binding the
- * browser or platform authenticator created against `app.kilo.ai`.
+ * the host of `NEXTAUTH_URL` without the port, and the accepted origins are
+ * that URL's origin plus the origins of the Kilo mobile app. A request-derived
+ * rpId would be `api.kilo.ai` for the mobile app (which reaches these routes
+ * through `API_BASE_URL`), and neither that host nor a request-derived origin
+ * can satisfy the associated-domain/credential binding the browser or platform
+ * authenticator created against `app.kilo.ai`.
  *
  * Resolved per ceremony rather than at module load: `@/lib/user/server` imports
  * this module for the sign-in provider, so importing it must not require a
  * WebAuthn configuration. A process without a relying party still loads the
  * route graph and only fails when a ceremony actually runs.
  */
-function getRelyingParty(): { rpId: string; expectedOrigin: string } {
+const ANDROID_PACKAGE_NAME = 'com.kilocode.kiloapp';
+
+/**
+ * The certificate the CI dev client is signed with. It is a debug key, so its
+ * origin is accepted only outside production: a debug-signed build must never
+ * be able to register or use a production credential.
+ */
+const ANDROID_DEBUG_CERT_FINGERPRINT =
+  'FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C';
+
+/**
+ * Android platform authenticators report their origin as
+ * `android:apk-key-hash:<hash>`, where `<hash>` is the unpadded base64url
+ * SHA-256 of the calling app's signing certificate. The authenticator binds
+ * the credential to that certificate, so a native app's response can only
+ * verify when the certificate it was signed with is among the accepted
+ * origins. These are derived from the release fingerprints Digital Asset Links
+ * publishes in `public/.well-known/assetlinks.json`; the two must not drift.
+ */
+function fingerprintToAndroidOrigin(fingerprint: string): string {
+  const bytes = Buffer.from(fingerprint.replace(/:/g, ''), 'hex');
+  return `android:apk-key-hash:${bytes.toString('base64url')}`;
+}
+
+function getReleaseAndroidOrigins(): string[] {
+  const origins: string[] = [];
+  for (const entry of assetLinks) {
+    if (entry.target.namespace !== 'android_app') continue;
+    if (entry.target.package_name !== ANDROID_PACKAGE_NAME) continue;
+    for (const fingerprint of entry.target.sha256_cert_fingerprints) {
+      origins.push(fingerprintToAndroidOrigin(fingerprint));
+    }
+  }
+  return origins;
+}
+
+function getRelyingParty(): { rpId: string; expectedOrigins: string[] } {
   const url = new URL(NEXTAUTH_URL);
-  return { rpId: url.hostname, expectedOrigin: url.origin };
+  const expectedOrigins = [url.origin, ...getReleaseAndroidOrigins()];
+  if (process.env.NODE_ENV !== 'production') {
+    expectedOrigins.push(fingerprintToAndroidOrigin(ANDROID_DEBUG_CERT_FINGERPRINT));
+  }
+  return { rpId: url.hostname, expectedOrigins };
 }
 
 const rpName = 'Kilo Code';
@@ -218,7 +260,7 @@ export async function verifyRegistration(
   challengeId: string,
   response: RegistrationResponseJSON
 ): Promise<PasskeyCredential> {
-  const { rpId, expectedOrigin } = getRelyingParty();
+  const { rpId, expectedOrigins } = getRelyingParty();
 
   const challenge = await consumeChallenge(challengeId, 'registration');
 
@@ -238,7 +280,7 @@ export async function verifyRegistration(
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challenge.challenge,
-      expectedOrigin,
+      expectedOrigin: expectedOrigins,
       expectedRPID: rpId,
       // The options ask for `userVerification: 'preferred'`, so an
       // authenticator that skipped verification is still a legitimate user.
@@ -336,7 +378,7 @@ export async function verifyAuthentication(
     throw new PasskeyVerificationError('VERIFICATION_FAILED');
   }
 
-  const { rpId, expectedOrigin } = getRelyingParty();
+  const { rpId, expectedOrigins } = getRelyingParty();
 
   const challenge = await consumeChallenge(challengeId, 'authentication');
 
@@ -359,7 +401,7 @@ export async function verifyAuthentication(
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challenge.challenge,
-      expectedOrigin,
+      expectedOrigin: expectedOrigins,
       expectedRPID: rpId,
       credential: {
         id: credential.credential_id,

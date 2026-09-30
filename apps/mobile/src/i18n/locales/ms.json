@@ -241,6 +241,7 @@
     "addPasskey": "Tambah kunci laluan",
     "passkeyDefaultName": "Kunci laluan",
     "passkeyAddedOn": "Ditambah {{date}}",
+    "passkeyLastUsedOn": "Terakhir digunakan {{date}}",
     "passkeyAdded": "Kunci laluan ditambah.",
     "passkeyAddFailed": "Kunci laluan tidak dapat ditambah. Cuba lagi.",
     "passkeyAddUnsupported": "Peranti ini tidak boleh mencipta kunci laluan.",

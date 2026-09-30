@@ -241,6 +241,7 @@
     "addPasskey": "เพิ่มพาสคีย์",
     "passkeyDefaultName": "พาสคีย์",
     "passkeyAddedOn": "เพิ่มเมื่อ {{date}}",
+    "passkeyLastUsedOn": "ใช้ล่าสุด {{date}}",
     "passkeyAdded": "เพิ่มพาสคีย์แล้ว",
     "passkeyAddFailed": "เพิ่มพาสคีย์ไม่สำเร็จ ลองอีกครั้ง",
     "passkeyAddUnsupported": "อุปกรณ์นี้สร้างพาสคีย์ไม่ได้",

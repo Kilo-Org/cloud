@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   useSecurityAgentCapability,
+  useSecurityAgentConfig,
   useTrackSecurityAgentInteraction,
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityDismissDraft } from '@/lib/hooks/use-security-dismiss-draft';
@@ -60,6 +61,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
   const analysisQuery = useSecurityAnalysis(scope, findingId);
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
   const capability = useSecurityAgentCapability(scope);
+  // A scope with SLA tracking disabled has no deadlines, so the details panel
+  // must not report an SLA state that does not apply.
+  const config = useSecurityAgentConfig(scope);
+  const slaEnabled = config.data?.slaEnabled ?? true;
   const dismissDraft = useSecurityDismissDraft(scope, findingId);
   const { refresh: refreshDismissDraft } = dismissDraft;
 
@@ -247,7 +252,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       </View>
       {tab === 'details' && (
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-2">
-          <FindingDetailsPanel finding={finding} scope={scope} />
+          <FindingDetailsPanel finding={finding} scope={scope} slaEnabled={slaEnabled} />
         </TabScreenScrollView>
       )}
       {tab === 'analysis' && (

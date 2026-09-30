@@ -26,6 +26,8 @@ import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 type FindingDetailsPanelProps = {
   finding: SecurityFinding;
   scope: string;
+  /** From the scope's Security Agent config; false hides every SLA deadline. */
+  slaEnabled?: boolean;
 };
 
 // Catalog keys for app-shared presentation codes. The mobile app maps a
@@ -123,13 +125,21 @@ function DismissalOrSupersessionNote({
 // source, package, repository, severity/status, timestamps, and
 // dismissal/supersession context as plain facts rather than the web's
 // hero + next-step action card (Task 7 owns actions).
-export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
+export function FindingDetailsPanel({
+  finding,
+  scope,
+  slaEnabled = true,
+}: Readonly<FindingDetailsPanelProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
-  const deadline = getSecurityDeadlinePresentation(finding);
-  const deadlineCopy = getDeadlineCopy(deadline.state);
+  // A scope with SLA tracking disabled has no deadline to report, so the whole
+  // deadline presentation is dropped rather than rendered as "Deadline not
+  // set" — the same gate the findings list row and web detail use.
+  const deadline = slaEnabled ? getSecurityDeadlinePresentation(finding) : null;
+  const deadlineCopy = deadline ? getDeadlineCopy(deadline.state) : null;
+  const showSlaDeadline = slaEnabled && Boolean(finding.sla_due_at);
   const supersedingFindingId = getSupersedingFindingId(finding);
   // A code the app does not know yet reads as the raw code, the same way
   // packages/app-shared renders it for web. A word like "Unknown" would hide
@@ -157,11 +167,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
             {statusLabel}
           </Text>
-          <FindingStatusBadge
-            icon={deadline.icon}
-            label={deadlineCopy.label}
-            tone={deadline.tone}
-          />
+          {deadline && deadlineCopy ? (
+            <FindingStatusBadge
+              icon={deadline.icon}
+              label={deadlineCopy.label}
+              tone={deadline.tone}
+            />
+          ) : null}
         </View>
         {finding.description ? (
           <Text variant="muted" className="text-sm" selectable>
@@ -228,16 +240,16 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <KvRow
           label={t('common.updated')}
           value={timeAgo(parseTimestamp(finding.updated_at))}
-          last={!finding.fixed_at && !finding.sla_due_at}
+          last={!finding.fixed_at && !showSlaDeadline}
         />
         {finding.fixed_at ? (
           <KvRow
             label={t('securityAgent.filter.fixed')}
             value={timeAgo(parseTimestamp(finding.fixed_at))}
-            last={!finding.sla_due_at}
+            last={!showSlaDeadline}
           />
         ) : null}
-        {finding.sla_due_at ? (
+        {showSlaDeadline && deadline && deadlineCopy ? (
           <KvRow
             label={t('securityAgent.findingDetails.slaDeadline')}
             value={deadlineCopy.detail}

@@ -42,6 +42,8 @@ const analysis = vi.hoisted(() => ({
 
 const capability = vi.hoisted(() => ({ canManage: true }));
 
+const config = vi.hoisted(() => ({ data: { slaEnabled: true } as { slaEnabled: boolean } }));
+
 const trackInteraction = vi.hoisted(() => ({ mutate: vi.fn() }));
 const navigation = vi.hoisted(() => ({ history: [] as string[] }));
 
@@ -87,6 +89,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
+  useSecurityAgentConfig: () => config,
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-security-findings', () => ({

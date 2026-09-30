@@ -34,15 +34,17 @@ import { cn } from '@/lib/utils';
 
 type NotificationSeverity = SecurityAgentConfig['newFindingNotificationMinSeverity'];
 
-// Labels mirror the shared NOTIFICATION_SEVERITY_OPTIONS in
-// apps/web/src/components/security-agent/SecurityConfigSections.tsx — this
-// is a distinct 4-value enum from the auto-analysis/remediation severity
-// (no 'all' tier; 'low' is the catch-all instead).
+// Threshold copy, not the finding-filter severity words: each option is the
+// lowest severity that still notifies, so the server treats 'low' as every
+// severity and 'high' as high plus critical. These reuse the shared
+// securityAgent.automation severity-threshold labels — this is a distinct
+// 4-value enum from the auto-analysis/remediation severity (no 'all' tier;
+// 'low' is the catch-all instead).
 const NOTIFICATION_SEVERITY_OPTIONS = [
-  { value: 'critical', labelKey: 'common.critical' },
-  { value: 'high', labelKey: 'securityAgent.filter.severityHigh' },
-  { value: 'medium', labelKey: 'securityAgent.filter.severityMedium' },
-  { value: 'low', labelKey: 'securityAgent.filter.severityLow' },
+  { value: 'critical', labelKey: 'securityAgent.automation.severityCriticalOnly' },
+  { value: 'high', labelKey: 'securityAgent.automation.severityHighAndAbove' },
+  { value: 'medium', labelKey: 'securityAgent.automation.severityMediumAndAbove' },
+  { value: 'low', labelKey: 'securityAgent.automation.severityAll' },
 ] as const satisfies readonly { value: NotificationSeverity; labelKey: string }[];
 
 function NotificationSettingsSkeleton() {

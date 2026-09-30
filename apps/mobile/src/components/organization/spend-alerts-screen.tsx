@@ -429,7 +429,9 @@ function SpendAlertsForm({
       </View>
 
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        <Text className="text-sm font-medium">
+          {enabled ? t('common.enabled') : t('common.disabled')}
+        </Text>
         <Switch
           accessibilityLabel={t('spendAlerts.enable')}
           value={enabled}

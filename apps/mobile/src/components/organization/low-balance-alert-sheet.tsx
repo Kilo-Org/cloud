@@ -89,7 +89,9 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
   return (
     <>
       <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-        <Text className="text-sm font-medium">{t('common.enabled')}</Text>
+        <Text className="text-sm font-medium">
+          {enabled ? t('common.enabled') : t('common.disabled')}
+        </Text>
         <Switch
           accessibilityLabel={t('organization.lowBalanceAlert.enableA11y')}
           value={enabled}

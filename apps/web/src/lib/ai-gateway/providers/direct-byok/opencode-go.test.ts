@@ -1,4 +1,4 @@
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import type { GatewayRequest } from '../openrouter/types';
 import type { TransformRequestContext } from '../types';

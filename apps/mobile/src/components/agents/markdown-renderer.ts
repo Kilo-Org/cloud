@@ -216,7 +216,6 @@ export class MarkdownRenderer extends Renderer {
         language: normalizeFenceLanguage(language),
         selectable: this.selectable,
         baseColor: this.palette.textColor,
-        tokenScheme: this.palette.codeTokenScheme,
         maxLength: MARKDOWN_CODE_CHARACTER_CAP,
         onCopyCode: this.onCopyCode,
         onLongPressCode: this.onLongPressCode,

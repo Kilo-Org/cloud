@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, jest, test } from '@jest/globals';
 import type { saveUsageRelatedDataLocally as saveUsageRelatedDataLocallyType } from './processUsage';
 import type { defineMicrodollarUsage as defineMicrodollarUsageType } from '@/tests/helpers/microdollar-usage.helper';
 import type { insertTestUser as insertTestUserType } from '@/tests/helpers/user.helper';
-import type { findUserById as findUserByIdType } from '@/lib/user/find-user-by-id';
+import type { findUserById as findUserByIdType } from '@/lib/user';
 
 /**
  * `processUsage` resolves its PostHog client once at module scope, so the client
@@ -44,7 +44,7 @@ beforeAll(async () => {
   ({ saveUsageRelatedDataLocally } = await import('./processUsage'));
   ({ defineMicrodollarUsage } = await import('@/tests/helpers/microdollar-usage.helper'));
   ({ insertTestUser } = await import('@/tests/helpers/user.helper'));
-  ({ findUserById } = await import('@/lib/user/find-user-by-id'));
+  ({ findUserById } = await import('@/lib/user'));
 });
 
 describe('first-usage analytics for a redelivered usage write', () => {

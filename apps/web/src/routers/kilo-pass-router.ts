@@ -80,7 +80,7 @@ import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@/lib/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,

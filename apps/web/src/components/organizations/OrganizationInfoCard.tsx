@@ -39,8 +39,7 @@ import { TrialEndDateDialog } from '@/app/admin/components/OrganizationAdmin/Tri
 import { OssSponsorshipDialog } from '@/app/admin/components/OrganizationAdmin/OssSponsorshipDialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
+import { formatDollars, formatIsoDateTime_IsoOrderNoSeconds, fromMicrodollars } from '@/lib/utils';
 import { SpendingAlertsModal } from './SpendingAlertsModal';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useExpiringCredits } from './useExpiringCredits';

@@ -6,6 +6,11 @@ import { GITHUB_ACTION } from '@/lib/integrations/core/constants';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { GitHubAppType } from '../app-selector';
 
+/**
+ * GitHub Installation Repositories Event Handler
+ * Handles: repositories added/removed
+ */
+
 export async function handleInstallationRepositories(
   payload: InstallationRepositoriesPayload,
   appType: GitHubAppType

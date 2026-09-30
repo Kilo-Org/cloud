@@ -18,10 +18,24 @@ import Link from 'next/link';
 import { SquareUserRound } from 'lucide-react';
 import React from 'react';
 import type { SignInFormInitialState } from '@/hooks/useSignInFlow';
-import { OAuthProviderIds } from '@/lib/auth/provider-metadata';
+import { useChatGptSignInAccess } from '@/hooks/useChatGptSignInAccess';
+import { OAuthProviderIds, type AuthProviderId } from '@/lib/auth/provider-metadata';
 import { buildEnterpriseSsoHref, buildNormalSignInHref } from '@/lib/auth/sign-in-navigation';
 import type { SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 import getSignInCallbackUrl from '@/lib/getSignInCallbackUrl';
+
+/**
+ * 'Sign in with ChatGPT' is restricted by the PostHog flag's email allow-list.
+ * A signed-out visitor is not known to PostHog, so the sign-in page evaluates
+ * the flag against the email the visitor typed and hides the ChatGPT button
+ * when the flag is off for that email.
+ */
+function withoutChatGptWhenUnavailable(
+  providers: readonly AuthProviderId[],
+  chatGptAllowed: boolean
+): AuthProviderId[] {
+  return chatGptAllowed ? [...providers] : providers.filter(id => id !== 'openai');
+}
 
 type SignInFormProps = {
   searchParams: Record<string, string>;
@@ -55,6 +69,18 @@ export function SignInForm({
     isSignUp,
     storybookInitialState,
   });
+  // The ChatGPT option is decided from the address the visitor submits, or from
+  // an address already known without typing. A `?email=` prefill wins over a
+  // stored returning-user hint: the flow auto-triggers Turnstile for the
+  // prefill and shows it on the provider screen, so the prefill is the address
+  // in use. Typing alone never evaluates, so one address costs one reload.
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
+  const knownEmail = (searchParams.email || flow.hint?.lastEmail || '').trim();
+  const chatGptAllowed = useChatGptSignInAccess(submittedEmail ?? (knownEmail || null));
+  const handleEmailSubmit = (event: React.FormEvent) => {
+    setSubmittedEmail(flow.email);
+    flow.handleEmailSubmit(event);
+  };
 
   // An Enterprise SSO request for a different address than the signed-in
   // session cannot proceed; offer the one-tap switch before any normal
@@ -134,7 +160,7 @@ export function SignInForm({
         {errorNotification}
         <ProviderSelectView
           email={flow.email}
-          providers={flow.availableProviders}
+          providers={withoutChatGptWhenUnavailable(flow.availableProviders, chatGptAllowed)}
           onProviderSelect={flow.handleProviderSelect}
           onBack={flow.handleBack}
           purpose={flow.isNewUser ? 'sign-up' : 'sign-in'}
@@ -215,9 +241,17 @@ export function SignInForm({
                     ? { email: 'Email me a magic link' }
                     : undefined;
 
-                // The remembered provider is the whole list; "see other
-                // sign-in methods" below opens the full group.
-                const displayedProviders = [lastAuthMethod];
+                // A returning ChatGPT user keeps the shortcut only while the
+                // flag allows it; otherwise the full, filtered group is offered
+                // so they are not left with a single hidden button.
+                const preferredProviders = withoutChatGptWhenUnavailable(
+                  [lastAuthMethod],
+                  chatGptAllowed
+                );
+                const displayedProviders =
+                  preferredProviders.length > 0
+                    ? preferredProviders
+                    : withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed);
 
                 return (
                   <div className="mx-auto max-w-md space-y-4">
@@ -249,7 +283,7 @@ export function SignInForm({
               <EmailInputForm
                 email={flow.email}
                 emailValidation={flow.emailValidation}
-                onSubmit={flow.handleEmailSubmit}
+                onSubmit={handleEmailSubmit}
                 onEmailChange={flow.handleEmailChange}
                 placeholder="you@example.com"
                 autoFocus={true}
@@ -299,7 +333,7 @@ export function SignInForm({
                   <EmailInputForm
                     email={flow.email}
                     emailValidation={flow.emailValidation}
-                    onSubmit={flow.handleEmailSubmit}
+                    onSubmit={handleEmailSubmit}
                     onEmailChange={flow.handleEmailChange}
                     placeholder="you@example.com"
                     autoFocus={true}
@@ -330,9 +364,7 @@ export function SignInForm({
                     <>
                       {/* The sign-in page keeps the email prompt first, but the
                           OAuth providers (including 'Sign in with ChatGPT') are
-                          offered beside it, as they are on sign-up. ChatGPT is a
-                          plain provider here: the access flag gates the BYOK
-                          connection, not this option. */}
+                          offered beside it, as they are on sign-up. */}
                       <div className="my-6 flex items-center gap-3">
                         <Separator className="flex-1" />
                         <span className="text-muted-foreground text-xs font-medium">or</span>
@@ -340,7 +372,10 @@ export function SignInForm({
                       </div>
                       <div className="space-y-2">
                         <AuthProviderButtons
-                          providers={OAuthProviderIds}
+                          providers={withoutChatGptWhenUnavailable(
+                            OAuthProviderIds,
+                            chatGptAllowed
+                          )}
                           onProviderClick={flow.handleOAuthClick}
                         />
                       </div>
@@ -366,7 +401,7 @@ export function SignInForm({
                     <PasskeySignInButton callbackUrl={passkeyCallbackUrl} />
                     {/* OAuth provider buttons - Google first */}
                     <AuthProviderButtons
-                      providers={OAuthProviderIds}
+                      providers={withoutChatGptWhenUnavailable(OAuthProviderIds, chatGptAllowed)}
                       onProviderClick={flow.handleOAuthClick}
                     />
                     <SignInButton onClick={flow.handleShowEmailInput}>

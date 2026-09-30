@@ -17,7 +17,7 @@ import { Text } from '@/components/ui/text';
 
 import { MessageDetailsSheet } from './message-details-sheet';
 
-const native = vi.hoisted(() => ({ clipboard: '', copyFails: false, announce: vi.fn() }));
+const native = vi.hoisted(() => ({ clipboard: '', announce: vi.fn() }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000', mutedForeground: '#999' }),
 }));
@@ -72,13 +72,8 @@ vi.mock('@/components/ui/selectable-text', () => ({
   SelectableText: 'SelectableText',
 }));
 vi.mock('expo-clipboard', () => ({
-  setStringAsync: async (text: string) => {
-    if (native.copyFails) {
-      throw new Error('clipboard unavailable');
-    }
+  setStringAsync: (text: string) => {
     native.clipboard = text;
-    await Promise.resolve();
-    return true;
   },
 }));
 vi.mock('expo-haptics', () => ({
@@ -89,7 +84,6 @@ vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } })
 
 beforeEach(() => {
   native.clipboard = '';
-  native.copyFails = false;
   native.announce.mockClear();
   vi.mocked(Alert.alert).mockClear();
 });
@@ -386,65 +380,6 @@ describe('MessageDetailsSheet mounted', () => {
       );
     });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
-    await unmount(renderer);
-  });
-
-  it('shows inline Copy success and failure feedback and clears it on close', async () => {
-    const message = storedMessage(assistantInfo(), [textPart('copy this response')]);
-    const renderer = await mountSheet(message);
-    const feedback = () => findByTestID(renderer.root, 'message-details-copy-feedback')[0];
-
-    expect(feedback()).toBeUndefined();
-
-    await act(async () => {
-      press(findByTestID(renderer.root, 'message-details-copy')[0]);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(native.clipboard).toBe('copy this response');
-    expect(feedback()?.props.children).toBe('Copied to clipboard');
-
-    native.copyFails = true;
-    await act(async () => {
-      press(findByTestID(renderer.root, 'message-details-copy')[0]);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(feedback()?.props.children).toBe('Could not copy to clipboard');
-
-    // Closing clears the inline status so a reopen starts from the call to action.
-    await act(async () => {
-      renderer.update(sheetElement(message, { visible: false }));
-      await Promise.resolve();
-    });
-    expect(feedback()).toBeUndefined();
-
-    await unmount(renderer);
-  });
-
-  it('clears inline Copy feedback when the message switches', async () => {
-    const renderer = await mountSheet(storedMessage(assistantInfo(), [textPart('first reply')]));
-
-    await act(async () => {
-      press(findByTestID(renderer.root, 'message-details-copy')[0]);
-      await Promise.resolve();
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    expect(findByTestID(renderer.root, 'message-details-copy-feedback')[0]?.props.children).toBe(
-      'Copied to clipboard'
-    );
-
-    await act(async () => {
-      renderer.update(
-        sheetElement(storedMessage(assistantInfo({ id: 'msg-2' }), [textPart('second reply')]))
-      );
-      await Promise.resolve();
-    });
-    expect(findByTestID(renderer.root, 'message-details-copy-feedback')).toHaveLength(0);
-
     await unmount(renderer);
   });
 

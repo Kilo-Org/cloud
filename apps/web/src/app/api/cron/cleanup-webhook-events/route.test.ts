@@ -16,11 +16,10 @@ import { webhook_events } from '@kilocode/db/schema';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { GET, maxDuration } from './route';
+import { GET } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
-const BATCH_SIZE = 2_500;
-const MAX_BATCHES_PER_RUN = 2;
+const BATCH_SIZE = 500;
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1_000).toISOString();
@@ -36,10 +35,6 @@ function makeRequest(headers?: Record<string, string>) {
 describe('GET /api/cron/cleanup-webhook-events', () => {
   beforeEach(() => jest.clearAllMocks());
   afterEach(cleanupDbForTest);
-
-  it('exports maxDuration of 300 seconds', () => {
-    expect(maxDuration).toBe(300);
-  });
 
   it('rejects requests without authorization', async () => {
     const response = await GET(makeRequest());
@@ -89,7 +84,7 @@ describe('GET /api/cron/cleanup-webhook-events', () => {
     expect(remaining.map(event => event.event_signature)).toEqual(['cleanup-event-1']);
   });
 
-  it('drains a second batch when the first reports more expired events', async () => {
+  it('deletes only one batch and reports remaining expired events', async () => {
     const user = await insertTestUser();
     await db.insert(webhook_events).values(
       Array.from({ length: BATCH_SIZE + 1 }, (_, index) => ({
@@ -106,32 +101,7 @@ describe('GET /api/cron/cleanup-webhook-events', () => {
     const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
     const body = await response.json();
 
-    expect(body.deletedCount).toBe(BATCH_SIZE + 1);
-    expect(body.batchesRun).toBe(2);
-    expect(body.hasMore).toBe(false);
-    const remaining = await db.select({ id: webhook_events.id }).from(webhook_events);
-    expect(remaining).toHaveLength(0);
-  });
-
-  it('caps deletion at MAX_BATCHES_PER_RUN batches and reports remaining expired events', async () => {
-    const user = await insertTestUser();
-    await db.insert(webhook_events).values(
-      Array.from({ length: BATCH_SIZE * MAX_BATCHES_PER_RUN + 1 }, (_, index) => ({
-        owned_by_user_id: user.id,
-        platform: 'github',
-        event_type: 'push',
-        payload: {},
-        headers: {},
-        event_signature: `cleanup-max-${index}`,
-        created_at: daysAgo(61),
-      }))
-    );
-
-    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
-    const body = await response.json();
-
-    expect(body.deletedCount).toBe(BATCH_SIZE * MAX_BATCHES_PER_RUN);
-    expect(body.batchesRun).toBe(MAX_BATCHES_PER_RUN);
+    expect(body.deletedCount).toBe(BATCH_SIZE);
     expect(body.hasMore).toBe(true);
     const remaining = await db.select({ id: webhook_events.id }).from(webhook_events);
     expect(remaining).toHaveLength(1);

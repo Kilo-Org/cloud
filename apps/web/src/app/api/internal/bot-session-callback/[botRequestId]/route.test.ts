@@ -79,7 +79,7 @@ jest.mock('@/lib/bot/platforms', () => ({
   },
 }));
 jest.mock('@/lib/bot/agent-runner', () => ({ runBotAgent: jest.fn() }));
-jest.mock('@/lib/user/find-user-by-id', () => ({ findUserById: jest.fn() }));
+jest.mock('@/lib/user', () => ({ findUserById: jest.fn() }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';

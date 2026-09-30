@@ -7,8 +7,7 @@ import { Plus, Mail } from 'lucide-react';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useMutation } from '@tanstack/react-query';
 import { signIn } from 'next-auth/react';
-import type { AuthProviderId } from '@kilocode/db/schema-types';
-import { LinkableAuthProviders } from '@/lib/auth/provider-metadata';
+import { type AuthProviderId, LinkableAuthProviders } from '@/lib/auth/provider-metadata';
 
 export type AuthProvider = {
   provider: AuthProviderId;

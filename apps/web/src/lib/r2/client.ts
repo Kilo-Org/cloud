@@ -27,22 +27,18 @@ if (!R2_CLI_SESSIONS_BUCKET_NAME) {
 }
 
 /**
- * Creates an S3 client for Cloudflare R2 in the `R2_ACCOUNT_ID` account.
+ * Singleton S3 client configured for Cloudflare R2.
  *
  * R2 is Cloudflare's S3-compatible object storage service.
+ * The client is configured with R2-specific endpoint and credentials.
  */
-export function createR2Client(credentials: { accessKeyId: string; secretAccessKey: string }) {
-  return new S3Client({
-    region: 'auto',
-    endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-    credentials,
-  });
-}
-
-/** Singleton R2 client using the shared `R2_ACCESS_KEY_ID` credentials. */
-export const r2Client = createR2Client({
-  accessKeyId: R2_ACCESS_KEY_ID,
-  secretAccessKey: R2_SECRET_ACCESS_KEY,
+export const r2Client = new S3Client({
+  region: 'auto',
+  endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: R2_ACCESS_KEY_ID,
+    secretAccessKey: R2_SECRET_ACCESS_KEY,
+  },
 });
 
 export const r2CliSessionsBucketName = R2_CLI_SESSIONS_BUCKET_NAME;

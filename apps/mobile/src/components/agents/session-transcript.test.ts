@@ -714,46 +714,6 @@ describe('session transcript', () => {
     const transient = mergeSessionTranscript([message('msg_transient')], []);
     expect(keysOf(transient)).toEqual(['msg_transient']);
   });
-
-  it('keeps every unchanged item identity when only the last message changes', () => {
-    const base = 1_000_000_000;
-    const first = userMessageAt('msg_first', base);
-    const second = assistantToolOnlyMessageAt('msg_second', base + 60_000, ['t2']);
-    const attempts = [attempt('attempt_1', 'msg_first')];
-
-    const before = mergeSessionTranscript([first, second], attempts);
-
-    // Only the last message's object changes; the other message and the
-    // preparation attempt keep their identity.
-    const changed = assistantToolOnlyMessageAt('msg_second', base + 60_000, ['t2', 't3']);
-    const after = mergeSessionTranscript([first, changed], attempts);
-
-    expect(after[0]).toBe(before[0]);
-    expect(after[0]).toMatchObject({ type: 'message', message: first });
-    expect(after[1]).toBe(before[1]);
-    expect(after[1]).toMatchObject({ type: 'preparation' });
-    expect(after[2]).not.toBe(before[2]);
-    expect(after[2]).toMatchObject({ type: 'message', message: changed });
-    // Reusing the item carries its time marker object along with it.
-    expect(after[0]?.type === 'message' ? after[0].timeMarker : undefined).toBe(
-      before[0]?.type === 'message' ? before[0].timeMarker : undefined
-    );
-  });
-
-  it('rebuilds a message item when a prepend moves its time marker', () => {
-    const base = 1_000_000_000;
-    const page = [userMessageAt('m2', base)];
-    const before = mergeSessionTranscript(page, []);
-
-    // A message inside the same burst as `m2` opens the marker; `m2` now sits
-    // inside that burst and must lose its marker rather than keep the stale one.
-    const after = mergeSessionTranscript([userMessageAt('m1', base - 1000), ...page], []);
-
-    expect(before[0]).toMatchObject({ type: 'message', timeMarker: { created: base } });
-    expect(after[1]).not.toBe(before[0]);
-    expect(after[1]).toMatchObject({ type: 'message', message: page[0] });
-    expect(after[1]?.type === 'message' ? after[1].timeMarker : undefined).toBeUndefined();
-  });
 });
 
 describe('condenseTranscriptToolRuns', () => {

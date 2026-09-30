@@ -346,7 +346,6 @@ describe('prepareReviewPayload', () => {
     expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
       body: null,
       headSha: null,
-      observed: true,
     });
     expect(mockUpdateRepositoryReviewInstructionsMetadata).toHaveBeenCalledWith(review.id, {
       used: true,
@@ -383,138 +382,9 @@ describe('prepareReviewPayload', () => {
     expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
       body: previousSummaryBody,
       headSha: 'previous-head-sha',
-      observed: true,
     });
     expect(mockUpdatePreviousReviewSummary.mock.invocationCallOrder[0]).toBeLessThan(
       mockGenerateReviewPrompt.mock.invocationCallOrder[0]
-    );
-  });
-
-  it('snapshots a resolved GitHub summary when a sibling lookup rejects', async () => {
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(defineReview(testUser.id, integration.id))
-      .returning();
-    const summaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
-    mockFindKiloReviewComment.mockResolvedValueOnce({ commentId: 99, body: summaryBody });
-    mockFetchPRInlineComments.mockRejectedValueOnce(new Error('inline lookup failed'));
-
-    await prepareReviewPayload({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { config: baseAgentConfig },
-      platform: 'github',
-    });
-
-    expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
-    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
-      body: summaryBody,
-      headSha: null,
-      observed: true,
-    });
-    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO,
-      123,
-      expect.objectContaining({ existingReviewState: null })
-    );
-  });
-
-  it('snapshots observed false when the GitHub summary lookup rejects', async () => {
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(defineReview(testUser.id, integration.id))
-      .returning();
-    mockFindKiloReviewComment.mockRejectedValueOnce(new Error('summary lookup failed'));
-
-    await prepareReviewPayload({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { config: baseAgentConfig },
-      platform: 'github',
-    });
-
-    expect(mockFindKiloReviewComment).toHaveBeenCalledTimes(1);
-    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
-      body: null,
-      headSha: null,
-      observed: false,
-    });
-    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO,
-      123,
-      expect.objectContaining({ existingReviewState: null })
-    );
-  });
-
-  it('snapshots a resolved GitLab summary when a sibling lookup rejects', async () => {
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        defineReview(testUser.id, gitlabIntegration.id, {
-          platform: 'gitlab',
-          platform_project_id: 456,
-          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
-        })
-      )
-      .returning();
-    const summaryBody = '<!-- kilo-review -->\n## Code Review Summary\n\nOld findings';
-    mockFindKiloReviewNote.mockResolvedValueOnce({ noteId: 88, body: summaryBody });
-    mockGetMRDiffRefs.mockRejectedValueOnce(new Error('diff refs lookup failed'));
-
-    await prepareReviewPayload({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { config: baseAgentConfig },
-      platform: 'gitlab',
-    });
-
-    expect(mockFindKiloReviewNote).toHaveBeenCalledTimes(1);
-    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
-      body: summaryBody,
-      headSha: null,
-      observed: true,
-    });
-    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO,
-      123,
-      expect.objectContaining({ existingReviewState: null })
-    );
-  });
-
-  it('snapshots observed false when the GitLab summary lookup rejects', async () => {
-    const [review] = await db
-      .insert(cloud_agent_code_reviews)
-      .values(
-        defineReview(testUser.id, gitlabIntegration.id, {
-          platform: 'gitlab',
-          platform_project_id: 456,
-          pr_url: `https://gitlab.example.com/${REPO}/-/merge_requests/123`,
-        })
-      )
-      .returning();
-    mockFindKiloReviewNote.mockRejectedValueOnce(new Error('summary lookup failed'));
-
-    await prepareReviewPayload({
-      reviewId: review.id,
-      owner: { type: 'user', id: testUser.id, userId: testUser.id },
-      agentConfig: { config: baseAgentConfig },
-      platform: 'gitlab',
-    });
-
-    expect(mockFindKiloReviewNote).toHaveBeenCalledTimes(1);
-    expect(mockUpdatePreviousReviewSummary).toHaveBeenCalledWith(review.id, {
-      body: null,
-      headSha: null,
-      observed: false,
-    });
-    expect(mockGenerateReviewPrompt).toHaveBeenCalledWith(
-      expect.any(Object),
-      REPO,
-      123,
-      expect.objectContaining({ existingReviewState: null })
     );
   });
 

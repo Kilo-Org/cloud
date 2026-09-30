@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import type { UserDeletionRequest, UserDeletionStep } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getUserDeletionRequestById, getUserDeletionRequestForUser } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';

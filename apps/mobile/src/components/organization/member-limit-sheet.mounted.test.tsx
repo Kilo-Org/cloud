@@ -101,6 +101,34 @@ describe('organization sheet surfaces', () => {
     unmount();
   });
 
+  it('shows the skeleton while the members query is pending for a resolved organization', async () => {
+    boundary.organizationId = 'org-1';
+    boundary.org = { organizationId: 'org-1' };
+    query.isPending = true;
+    query.data = undefined;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(0);
+    expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    unmount();
+  });
+
+  it('falls through to the boundary when a pending query has no organization', async () => {
+    boundary.organizationId = null;
+    boundary.org = null;
+    query.isPending = true;
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(MemberLimitSheet, { memberId: 'member-1' })
+    );
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'OrganizationBoundary')
+    ).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    unmount();
+  });
+
   it.each([...sheets, { name: 'invite', element: createElement(InviteMemberSheet) }])(
     'keeps the $name context boundary outside a scroller',
     async ({ element }) => {

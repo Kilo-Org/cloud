@@ -1582,7 +1582,6 @@
       "committed": "कमिट हो गया",
       "commitFailed": "कमिट विफल रहा",
       "readOnly": "इस सत्र को केवल पढ़ा जा सकता है।",
-      "continueInNewSession": "नए सत्र में जारी रखें",
       "renamePlaceholder": "सत्र का नाम",
       "renameSession": "सत्र का नाम बदलें",
       "scrollToBottom": "सबसे नीचे स्क्रॉल करें",

@@ -31,9 +31,7 @@ import type { PgColumn } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 import { AdminCreditTransactionSchema, OrganizationsApiGetResponseSchema } from '@/types/admin';
 import { STRIPE_SUBSCRIPTION_STATUS_VALUES } from '@/lib/admin/stripe-subscription-statuses';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
-import { toMicrodollars } from '@/lib/microdollars';
-import { isValidUUID } from '@/lib/utils';
+import { getLowerDomainFromEmail, isValidUUID, toMicrodollars } from '@/lib/utils';
 import { millisecondsInHour } from 'date-fns/constants';
 import {
   createOrganization,
@@ -43,7 +41,7 @@ import {
 } from '@/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { TRPCError } from '@trpc/server';
 import { successResult } from '@/lib/maybe-result';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';

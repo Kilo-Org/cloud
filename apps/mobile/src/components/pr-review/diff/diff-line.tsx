@@ -204,7 +204,7 @@ function DiffLineImpl({ line, language, onTap, isSelected }: Readonly<DiffLinePr
         >
           {/* Untagged runs are raw strings inside this Text, so only the
               highlighter's tagged runs cost an Android span. */}
-          {highlightRunChildren(tokens, isDark ? 'onDark' : 'onLight')}
+          {highlightRunChildren(tokens, isDark)}
           {line.noNewlineAtEndOfFile ? (
             // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color for no-newline marker
             <RNText style={{ ...noNewlineBase, color: noNewlineColor }}>{noNewlineLabel}</RNText>

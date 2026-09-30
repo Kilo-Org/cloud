@@ -7,6 +7,9 @@
 
 import { z } from 'zod';
 
+/**
+ * GitLab User schema (common across events)
+ */
 const GitLabUserSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -15,6 +18,9 @@ const GitLabUserSchema = z.object({
   avatar_url: z.string().optional(),
 });
 
+/**
+ * GitLab Project schema (common across events)
+ */
 const GitLabProjectSchema = z.object({
   id: z.number(),
   name: z.string(),
@@ -33,6 +39,9 @@ const GitLabProjectSchema = z.object({
   http_url: z.string().optional(),
 });
 
+/**
+ * GitLab Repository schema
+ */
 const GitLabRepositorySchema = z.object({
   name: z.string(),
   url: z.string(),
@@ -40,6 +49,9 @@ const GitLabRepositorySchema = z.object({
   homepage: z.string().optional(),
 });
 
+/**
+ * GitLab Commit schema
+ */
 const GitLabCommitSchema = z.object({
   id: z.string(),
   message: z.string(),
@@ -54,6 +66,9 @@ const GitLabCommitSchema = z.object({
     .optional(),
 });
 
+/**
+ * GitLab Label schema
+ */
 const GitLabLabelSchema = z.object({
   id: z.number(),
   title: z.string(),
@@ -67,6 +82,9 @@ const GitLabLabelSchema = z.object({
   group_id: z.number().nullable().optional(),
 });
 
+/**
+ * Merge Request object attributes schema
+ */
 const MergeRequestObjectAttributesSchema = z.object({
   id: z.number(),
   iid: z.number(), // Internal ID - equivalent to PR number
@@ -119,6 +137,10 @@ const MergeRequestObjectAttributesSchema = z.object({
   first_contribution: z.boolean().optional(),
 });
 
+/**
+ * Merge Request Webhook Payload Schema
+ * Triggered when a merge request is created, updated, merged, or closed
+ */
 export const MergeRequestPayloadSchema = z.object({
   object_kind: z.literal('merge_request'),
   event_type: z.literal('merge_request'),
@@ -161,6 +183,10 @@ export const MergeRequestPayloadSchema = z.object({
 
 export type MergeRequestPayload = z.infer<typeof MergeRequestPayloadSchema>;
 
+/**
+ * Push Event Webhook Payload Schema
+ * Triggered when commits are pushed to a repository
+ */
 export const PushEventPayloadSchema = z.object({
   object_kind: z.literal('push'),
   event_name: z.literal('push').optional(),
@@ -198,6 +224,10 @@ export const PushEventPayloadSchema = z.object({
 
 export type PushEventPayload = z.infer<typeof PushEventPayloadSchema>;
 
+/**
+ * Note (Comment) Event Webhook Payload Schema
+ * Triggered when a comment is made on a commit, merge request, issue, or snippet
+ */
 export const NoteEventPayloadSchema = z.object({
   object_kind: z.literal('note'),
   event_type: z.literal('note'),
@@ -273,6 +303,9 @@ export const NoteEventPayloadSchema = z.object({
 
 export type NoteEventPayload = z.infer<typeof NoteEventPayloadSchema>;
 
+/**
+ * Pipeline Event Webhook Payload Schema (for future use)
+ */
 export const PipelineEventPayloadSchema = z.object({
   object_kind: z.literal('pipeline'),
   object_attributes: z.object({

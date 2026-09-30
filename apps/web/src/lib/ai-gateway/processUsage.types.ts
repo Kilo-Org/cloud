@@ -1,6 +1,6 @@
 import type { FeatureValue } from '@/lib/feature-detection';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import type { GatewayApiKind, MicrodollarUsage, Organization } from '@kilocode/db';
 import type { OpenAI } from 'openai';
 

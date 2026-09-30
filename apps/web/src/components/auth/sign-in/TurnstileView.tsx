@@ -2,8 +2,8 @@
 
 import Turnstile from 'react-turnstile';
 import React from 'react';
-import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { getProviderById } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 
 if (!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)
   throw new Error('NEXT_PUBLIC_TURNSTILE_SITE_KEY is missing');

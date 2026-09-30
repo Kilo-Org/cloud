@@ -1,4 +1,4 @@
-export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-5.5';
+export const CLAUDE_SONNET_CURRENT_MODEL_ID = 'anthropic/claude-sonnet-5';
 export const CLAUDE_OPUS_CURRENT_MODEL_ID = 'anthropic/claude-opus-5.5';
 export const CLAUDE_OPUS_FALLBACK_MODEL_ID = 'anthropic/claude-opus-4.8';
 export const CLAUDE_HAIKU_CURRENT_MODEL_ID = 'anthropic/claude-haiku-4.5';

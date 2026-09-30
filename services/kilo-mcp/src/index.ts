@@ -298,20 +298,6 @@ function grantKiloToken(authorization: string): string {
   return authorization.replace(/^Bearer\s+/i, '');
 }
 
-/**
- * The one pointer every agent gets to the Kilo feedback endpoint. The
- * initialize instructions name it, and every tools/call error response carries
- * it in `error.data.feedback`, so an agent that hit an unknown path, a schema
- * violation, or an ambiguous upstream failure knows where to report it instead
- * of retrying blindly. The URL is built from the deploy's web base URL so dev
- * and prod each point at their own app; the endpoint accepts at most one
- * submission per minute, so the guidance asks the agent to batch.
- */
-function feedbackPointer(webBaseUrl: string): string {
-  const url = new URL('/feedback', webBaseUrl).toString();
-  return `For bugs or feedback about Kilo, submit to ${url} and batch everything into one submission: the endpoint accepts at most one submission per minute.`;
-}
-
 /** An MCP tools/call success payload. */
 type ToolResult = {
   content: Array<{ type: 'text'; text: string }>;
@@ -681,10 +667,6 @@ async function handleRpcMessage(
     return withCorsHeaders(new Response(null, { status: 202 }));
   }
 
-  // The shared feedback pointer: named in the initialize instructions and
-  // attached to every tools/call error response below.
-  const feedback = feedbackPointer(deps.webBaseUrl);
-
   try {
     switch (method) {
       case 'initialize': {
@@ -708,8 +690,8 @@ async function handleRpcMessage(
           capabilities: { tools: {} },
           serverInfo: SERVER_INFO,
           instructions: canUseProtectedActions(auth)
-            ? `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns. ${feedback}`
-            : `This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. ${feedback}`,
+            ? 'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying. This connection may also run admin and debug endpoints: use call_protected to submit one, then submit_otp with the code the user reads from their authenticator app to approve it. The endpoint and payload are fixed once call_protected returns.'
+            : 'This server exposes the Kilo API through two tools: search (find catalog endpoints) and call (invoke one by path). Search before every call. Each result carries a kind: "query" reads data, "mutation" changes it. Call a mutation path only when the user asked for that change, and if it fails with an ambiguous transport error, check the current state before retrying.',
         });
       }
       case 'ping':
@@ -775,14 +757,7 @@ async function handleRpcMessage(
               ...(path !== undefined ? { path } : {}),
             });
           }
-          // Point every failed tools/call at the feedback endpoint: an
-          // unknown-path, schema-invalid, or upstream/ambiguous failure thrown
-          // by call.ts carries `error.data.feedback` so the agent knows where
-          // to report it (batched) instead of retrying blindly. The code, the
-          // message, and any existing structured data are preserved.
-          throw error instanceof JsonRpcFailure
-            ? new JsonRpcFailure(error.code, error.message, { ...error.data, feedback })
-            : error;
+          throw error;
         }
       }
       default:

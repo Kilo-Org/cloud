@@ -15,7 +15,7 @@ import {
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import {
   USER_DELETION_CATALOG_VERSION,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,

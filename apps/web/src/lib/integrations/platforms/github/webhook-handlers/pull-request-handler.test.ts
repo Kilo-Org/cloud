@@ -504,14 +504,14 @@ describe('handlePullRequest', () => {
     it('routes a bot PR with a merge-commit head through skip, not merge-commit migration', async () => {
       mockGetBotUserId.mockResolvedValue('bot-user-1');
       mockGetAgentConfigForOwner.mockResolvedValue({ is_enabled: true, config: {} });
-      // A non-bot PR here would hit the merge-commit path and return 'Skipped merge commit'.
+      // A non-bot PR here would hit the merge-commit path (step 4) and return 'Skipped merge commit'.
       mockIsMergeCommit.mockResolvedValue(true);
 
       const payload = pullRequestPayload();
       payload.pull_request.user.type = 'Bot';
       const response = await handlePullRequest(payload, platformIntegration());
 
-      // The bot-skip decision defers the merge-commit path, so the PR is skipped as a bot PR (not re-pointed to a
+      // The bot-skip decision defers step 4, so the PR is skipped as a bot PR (not re-pointed to a
       // new SHA with a fresh check run by migrateInFlightReviewsToMergeCommitHead).
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ message: 'Skipped bot-authored PR' });

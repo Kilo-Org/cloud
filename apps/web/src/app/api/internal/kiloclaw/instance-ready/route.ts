@@ -16,7 +16,7 @@ import { z } from 'zod';
 import { and, eq, isNull, or } from 'drizzle-orm';
 import { INTERNAL_API_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { send as sendEmail } from '@/lib/email';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { db } from '@/lib/drizzle';
 import { kiloclaw_email_log } from '@kilocode/db/schema';
 import { completeAutoResumeIfReady } from '@/lib/kiloclaw/instance-lifecycle';

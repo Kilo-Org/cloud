@@ -1,3 +1,8 @@
+/**
+ * GitHub Webhook Handlers
+ * Exports all webhook event handlers
+ */
+
 export {
   handleInstallationCreated,
   handleInstallationDeleted,

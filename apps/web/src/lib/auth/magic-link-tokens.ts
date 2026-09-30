@@ -5,7 +5,7 @@ import * as z from 'zod';
 import 'server-only';
 import { NEXTAUTH_SECRET, NEXTAUTH_URL } from '@/lib/config.server';
 import { randomBytes, randomInt, randomUUID, createHash, createHmac } from 'crypto';
-import { normalizeEmail } from '@/lib/email-address';
+import { normalizeEmail } from '@/lib/utils';
 import { captureMessage } from '@sentry/nextjs';
 
 const SIGN_IN_CODE_EXPIRY_MINUTES = 10;

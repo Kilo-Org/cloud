@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { sentryLogger } from '@/lib/utils.server';
 import { verifyTurnstileJWT } from '@/lib/auth/verify-turnstile-jwt';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail } from '@/lib/utils';
 import { getAllUserProviders, getWorkOSOrganization } from '@/lib/user';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import {

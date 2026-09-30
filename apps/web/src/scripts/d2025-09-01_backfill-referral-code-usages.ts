@@ -10,7 +10,7 @@ import {
 import { eq, and, isNull, gt } from 'drizzle-orm';
 import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { successResult } from '@/lib/maybe-result';
 
 type ReferredUserNotLoggedEvent = {

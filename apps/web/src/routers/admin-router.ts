@@ -95,17 +95,15 @@ import {
   min,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   findUsersByIds,
+  findUserById,
   getCrossAccountEmailConflicts,
   inferRowlessAuthProviders,
 } from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { toNonNullish } from '@/lib/utils';
 import { TRPCError } from '@trpc/server';
 import { assertNoError, successResult } from '@/lib/maybe-result';
@@ -119,6 +117,7 @@ import {
   microdollar_usage,
 } from '@kilocode/db/schema';
 import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
+import { fromMicrodollars } from '@/lib/utils';
 import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
@@ -128,6 +127,7 @@ import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
@@ -2444,9 +2444,8 @@ export const adminRouter = createTRPCRouter({
 
         return {
           ...session,
-          // V1 doesn't have git_branch or per-session cost — null them out for a consistent shape
+          // V1 doesn't have git_branch — null it out for a consistent shape
           git_branch: null,
-          total_cost_microdollars: null,
           user: user
             ? {
                 id: user.id,

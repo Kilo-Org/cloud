@@ -24,7 +24,7 @@ import { type KiloPassIssuanceSource } from './enums';
 import type { db as defaultDb } from '@/lib/drizzle';
 import { processTopUp } from '@/lib/credits';
 import { grantCreditForCategory, type GrantCreditOptions } from '@/lib/promotionalCredits';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@/lib/utils';
 import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';

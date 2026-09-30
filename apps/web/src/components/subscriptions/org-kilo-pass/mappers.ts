@@ -1,5 +1,5 @@
 import type { inferRouterOutputs } from '@trpc/server';
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
+import { fromMicrodollars } from '@/lib/utils';
 import type { RootRouter } from '@/routers/root-router';
 import type {
   OrgKiloPassAllocation,

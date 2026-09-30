@@ -10,20 +10,16 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 
 import type * as AutoModelResolution from './resolution';
 import {
-  FRONTIER_CODE_MODEL,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 
-const { resolveAutoModel, applyResolvedAutoModel } =
-  jest.requireActual<typeof AutoModelResolution>('./resolution');
+const { resolveAutoModel } = jest.requireActual<typeof AutoModelResolution>('./resolution');
 
 const baseParams = {
   model: KILO_AUTO_EFFICIENT_MODEL.id,
@@ -743,64 +739,5 @@ describe('resolveAutoModel — Organization Auto branch', () => {
       kind: 'organization_auto_configuration_error',
       message: 'Organization Auto cannot target itself.',
     });
-  });
-});
-
-describe('applyResolvedAutoModel', () => {
-  it('replaces reasoning_effort with the resolved reasoning config for chat completions', async () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: KILO_AUTO_FRONTIER_MODEL.id,
-        messages: [],
-        reasoning_effort: 'high',
-      },
-    };
-
-    await applyResolvedAutoModel(
-      {
-        ...baseParams,
-        model: KILO_AUTO_FRONTIER_MODEL.id,
-        modeHeader: 'code',
-        apiKind: 'chat_completions',
-      },
-      request,
-      nullUserPromise,
-      zeroBalancePromise
-    );
-
-    expect(request.body).toMatchObject({
-      model: FRONTIER_CODE_MODEL.model,
-      reasoning: FRONTIER_CODE_MODEL.reasoning,
-    });
-    expect(request.body).not.toHaveProperty('reasoning_effort');
-  });
-
-  it('keeps reasoning_effort for chat completions when no reasoning config is resolved', async () => {
-    const request: GatewayRequest = {
-      kind: 'chat_completions',
-      body: {
-        model: KILO_AUTO_EFFICIENT_MODEL.id,
-        messages: [],
-        reasoning_effort: 'high',
-      },
-    };
-
-    await applyResolvedAutoModel(
-      {
-        ...baseParams,
-        apiKind: 'chat_completions',
-        efficientDecision: async () => sampleDecision,
-      },
-      request,
-      nullUserPromise,
-      zeroBalancePromise
-    );
-
-    expect(request.body).toMatchObject({
-      model: sampleDecision.model,
-      reasoning_effort: 'high',
-    });
-    expect(request.body).not.toHaveProperty('reasoning');
   });
 });

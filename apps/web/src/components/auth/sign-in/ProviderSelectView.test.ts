@@ -5,7 +5,7 @@ import * as React from 'react';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { AuthProviderId } from '@kilocode/db/schema-types';
+import type { AuthProviderId } from '@/lib/auth/provider-metadata';
 
 jest.mock('@/components/auth/sign-in/AuthProviderButtons', () => ({
   AuthProviderButtons: ({

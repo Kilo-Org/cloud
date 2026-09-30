@@ -456,7 +456,6 @@ export const codeReviewRouter = createTRPCRouter({
         },
         attempts: visibleAttempts,
         tokenUsage,
-        sessionCostMusd: billingUsage?.totalCostMusd ?? null,
       });
     } catch (error) {
       if (error instanceof TRPCError) {

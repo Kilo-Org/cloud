@@ -1,6 +1,6 @@
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   updateUserRoleInOrganization,
+  removeUserFromOrganization,
   addUserToOrganization,
   getOrganizationById,
   getOrganizationMembers,
@@ -33,7 +33,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { successResult } from '@/lib/maybe-result';
 import { destroyOrgInstancesForUser } from '@/lib/kiloclaw/instance-registry';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';

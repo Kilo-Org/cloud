@@ -1492,9 +1492,6 @@ export class SessionService {
       },
       autoupdate: false,
       snapshot: false,
-      // Codebase indexing would embed the repo and keep a local vector store
-      // alive for the session, which the sandbox does not budget for.
-      indexing: { enabled: false },
     };
     if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);

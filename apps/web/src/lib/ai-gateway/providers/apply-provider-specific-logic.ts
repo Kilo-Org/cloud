@@ -30,7 +30,7 @@ import {
 } from '@/lib/ai-gateway/providers/types';
 import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
 import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import { applyTrackingIds } from '@/lib/ai-gateway/providerHash';
 import {
   repairChatCompletionsTools,
@@ -42,6 +42,7 @@ import {
   addCacheBreakpoints,
   enableReasoningSummaries,
   fixResponsesRequest,
+  isReasoningExplicitlyEnabled,
   mapReasoningDetailsToReasoningContent,
   scrubOpenCodeSpecificProperties,
 } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
@@ -135,7 +136,8 @@ export function getPreferredProviderOrder(requestedModel: string): string[] {
   if (isOpenAiModel(requestedModel)) {
     return [OpenRouterInferenceProviderIdSchema.enum.openai];
   }
-  if (isClaudeModel(requestedModel)) {
+  if (isClaudeModel(requestedModel) && !isFableModel(requestedModel)) {
+    // specifying this for fable breaks the opus fallback on vercel
     return [
       OpenRouterInferenceProviderIdSchema.enum['amazon-bedrock'],
       OpenRouterInferenceProviderIdSchema.enum.anthropic,
@@ -208,6 +210,24 @@ export async function applyGatewayModelsFallback(
   }
 
   delete requestToMutate.body.models;
+}
+
+export function applyAnthropicThinkingDefault(
+  requestedModel: string,
+  requestToMutate: GatewayRequest
+) {
+  const defaultsToThinking =
+    (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
+    requestedModel === 'z-ai/glm-5.2';
+  if (
+    defaultsToThinking &&
+    requestToMutate.kind === 'messages' &&
+    !isReasoningExplicitlyEnabled(requestToMutate)
+  ) {
+    // The Anthropic provider omits thinking:disabled when reasoning is not enabled, but these
+    // models can default to thinking when the field is absent.
+    requestToMutate.body.thinking = { type: 'disabled' };
+  }
 }
 
 export function removeUnsupportedRequestServiceTier(
@@ -329,6 +349,8 @@ export async function applyProviderSpecificLogic(
   if (isQwenExplicitCacheModel(requestedModel)) {
     addCacheBreakpoints(requestToMutate);
   }
+
+  applyAnthropicThinkingDefault(requestedModel, requestToMutate);
 
   await provider.transformRequest({
     provider,

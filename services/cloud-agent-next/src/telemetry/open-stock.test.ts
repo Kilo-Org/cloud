@@ -16,8 +16,11 @@ const { getPgDbMock, loggerMock } = vi.hoisted(() => ({
 vi.mock('../db/pg.js', () => ({ getPgDb: getPgDbMock }));
 vi.mock('../logger.js', () => ({ logger: loggerMock }));
 
-import { AGENT_OPEN_METRIC, COLLECTION_METRIC } from './outcome-aggregate.js';
+import { COVERAGE_LABEL } from './outcome-aggregate.js';
 import {
+  OPEN_STOCK_CONTRACT_VERSION,
+  OPEN_STOCK_LIMITATIONS,
+  OPEN_STOCK_METRIC,
   assembleOpenStock,
   readOpenStock,
   runCloudAgentOpenStockCollection,
@@ -25,7 +28,7 @@ import {
 } from './open-stock.js';
 
 const retentionCutoffIso = '2025-11-03T00:10:00.000Z';
-const observedAt = '2026-02-01T00:10:00.000Z';
+const now = '2026-02-01T00:10:00.000Z';
 
 type QueryResult = OpenStockQueryRow[] | Error;
 
@@ -37,9 +40,11 @@ function queryRow(
 ): OpenStockQueryRow {
   return {
     turns: 0,
-    origin: 'unknown',
+    sessions: 0,
     oldestQueuedEpochMs: null,
     oldestAcceptedEpochMs: null,
+    queuedMissingAgeTurns: 0,
+    acceptedMissingAgeTurns: 0,
     ...input,
   };
 }
@@ -54,7 +59,6 @@ function makeDb(result: QueryResult) {
   const chain = {
     from: () => chain,
     innerJoin: () => chain,
-    leftJoin: () => chain,
     where: (arg: unknown) => {
       state.where = arg;
       return chain;
@@ -117,94 +121,81 @@ beforeEach(() => {
 });
 
 describe('cloud agent open stock assembly', () => {
-  it('emits six generation-by-origin cells including zeros', () => {
-    const cells = assembleOpenStock([], observedAt);
-    expect(cells).toHaveLength(6);
-    expect(cells.map(cell => `${cell.generation}/${cell.productOrigin}`)).toEqual([
-      'legacy/code-review',
-      'legacy/other',
-      'legacy/unknown',
-      'control/code-review',
-      'control/other',
-      'control/unknown',
-    ]);
-    for (const cell of cells) {
-      expect(cell).toMatchObject({
+  it('reports both generations as empty stock with null ages', () => {
+    const generations = assembleOpenStock([], now);
+
+    expect(generations.map(entry => entry.generation)).toEqual(['legacy', 'control']);
+    for (const entry of generations) {
+      expect(entry).toEqual({
+        generation: entry.generation,
         queuedTurns: 0,
+        queuedSessions: 0,
         acceptedTurns: 0,
+        acceptedSessions: 0,
         oldestQueuedAgeMs: null,
         oldestAcceptedAgeMs: null,
+        queuedMissingAgeTurns: 0,
+        acceptedMissingAgeTurns: 0,
       });
     }
   });
 
-  it('keeps a null age when the cell has no timestamp but still counts the turn', () => {
-    const cells = assembleOpenStock(
+  it('preserves queued counts and the missing-age count without inventing an age', () => {
+    const generations = assembleOpenStock(
       [
         queryRow({
           generation: 'legacy',
           status: 'queued',
           turns: 3,
-          origin: 'code-review',
+          sessions: 2,
           oldestQueuedEpochMs: null,
+          queuedMissingAgeTurns: 3,
         }),
       ],
-      observedAt
+      now
     );
 
-    const cell = cells.find(
-      entry => entry.generation === 'legacy' && entry.productOrigin === 'code-review'
-    );
-    expect(cell?.queuedTurns).toBe(3);
-    expect(cell?.oldestQueuedAgeMs).toBeNull();
+    const legacy = generations[0];
+    expect(legacy.queuedTurns).toBe(3);
+    expect(legacy.queuedSessions).toBe(2);
+    expect(legacy.oldestQueuedAgeMs).toBeNull();
+    expect(legacy.queuedMissingAgeTurns).toBe(3);
+    expect(legacy.acceptedTurns).toBe(0);
+    expect(legacy.oldestAcceptedAgeMs).toBeNull();
   });
 
-  it('derives each age from that cell own minimum timestamp, not another origin', () => {
+  it('derives queued and accepted ages from their own timestamps', () => {
     const queuedEpochMs = Date.parse('2026-02-01T00:00:00.000Z');
     const acceptedEpochMs = Date.parse('2026-01-31T23:55:00.000Z');
-    const otherEpochMs = Date.parse('2026-01-31T00:00:00.000Z');
-    const cells = assembleOpenStock(
+    const generations = assembleOpenStock(
       [
         queryRow({
           generation: 'legacy',
           status: 'queued',
-          origin: 'code-review',
           turns: 1,
+          sessions: 1,
           oldestQueuedEpochMs: queuedEpochMs,
         }),
         queryRow({
           generation: 'legacy',
           status: 'accepted',
-          origin: 'code-review',
           turns: 2,
+          sessions: 2,
           oldestAcceptedEpochMs: acceptedEpochMs,
         }),
-        queryRow({
-          generation: 'legacy',
-          status: 'queued',
-          origin: 'other',
-          turns: 4,
-          oldestQueuedEpochMs: otherEpochMs,
-        }),
       ],
-      observedAt
+      now
     );
 
-    const review = cells.find(
-      entry => entry.generation === 'legacy' && entry.productOrigin === 'code-review'
-    );
-    const other = cells.find(
-      entry => entry.generation === 'legacy' && entry.productOrigin === 'other'
-    );
-    expect(review?.oldestQueuedAgeMs).toBe(Date.parse(observedAt) - queuedEpochMs);
-    expect(review?.oldestAcceptedAgeMs).toBe(Date.parse(observedAt) - acceptedEpochMs);
-    expect(other?.oldestQueuedAgeMs).toBe(Date.parse(observedAt) - otherEpochMs);
-    expect(other?.oldestQueuedAgeMs).not.toBe(review?.oldestQueuedAgeMs);
+    const legacy = generations[0];
+    expect(legacy.oldestQueuedAgeMs).toBe(Date.parse(now) - queuedEpochMs);
+    expect(legacy.oldestAcceptedAgeMs).toBe(Date.parse(now) - acceptedEpochMs);
+    expect(legacy.oldestAcceptedAgeMs).not.toBe(legacy.oldestQueuedAgeMs);
   });
 });
 
 describe('cloud agent open stock query shape', () => {
-  it('narrows to non-terminal queued/accepted runs of retained sessions without session or age-missing counters', async () => {
+  it('narrows to non-terminal queued/accepted runs of retained sessions', async () => {
     const fake = makeDb([]);
     await readOpenStock(fake.db as never, { retentionCutoff: retentionCutoffIso });
 
@@ -216,79 +207,85 @@ describe('cloud agent open stock query shape', () => {
     expect(selectSql.sql).toMatch(
       /left\("cloud_agent_session_runs"\."cloud_agent_session_id", \$1\) = \$2/
     );
-    expect(selectSql.sql).toContain('count(*)::int');
+    expect(selectSql.sql).toContain(
+      'count(distinct "cloud_agent_session_runs"."cloud_agent_session_id"))::int'
+    );
     expect(selectSql.sql).toContain('extract(epoch from');
     expect(selectSql.sql).toContain('::double precision');
-    expect(selectSql.sql).not.toContain('count(distinct');
-    expect(selectSql.sql).not.toContain('"queued_at" is null');
-    expect(selectSql.sql).not.toContain('"dispatch_accepted_at" is null');
+    expect(selectSql.sql).toContain(
+      `count(*) filter (where "cloud_agent_session_runs"."status" = 'queued' and "cloud_agent_session_runs"."queued_at" is null)`
+    );
+    expect(selectSql.sql).toContain(
+      `count(*) filter (where "cloud_agent_session_runs"."status" = 'accepted' and "cloud_agent_session_runs"."dispatch_accepted_at" is null)`
+    );
 
     expect(whereSql.sql).toContain('"status" in ($1, $2)');
     expect(whereSql.sql).toContain('"terminal_at" is null');
     expect(whereSql.sql).toContain('created_at" > $3');
-    expect(whereSql.sql).toContain('group by 1, 2, 3');
+    expect(whereSql.sql).toContain('group by 1, 2');
     expect(whereSql.params).toEqual(['queued', 'accepted', retentionCutoffIso]);
   });
 });
 
 describe('runCloudAgentOpenStockCollection emission', () => {
-  it('emits exactly six agent_open rows including zeros', async () => {
+  it('emits one complete record with the stock envelope and two generations', async () => {
     getPgDbMock.mockReturnValue(makeDb([]).db);
 
-    await runCloudAgentOpenStockCollection({} as never, new Date(observedAt));
+    await runCloudAgentOpenStockCollection({} as never, new Date(now));
 
-    expect(loggerMock.info).toHaveBeenCalledTimes(6);
+    expect(loggerMock.info).toHaveBeenCalledTimes(1);
     expect(loggerMock.error).not.toHaveBeenCalled();
-    const records = loggerMock.withFields.mock.calls.map(
-      ([fields]) => fields as Record<string, unknown>
-    );
-    expect(records).toHaveLength(6);
-    for (const record of records) {
-      expect(record.metric).toBe(AGENT_OPEN_METRIC);
-      expect(record.observedAt).toBe(observedAt);
-      expect(record.queuedTurns).toBe(0);
-      expect(record.acceptedTurns).toBe(0);
-      expect(record.oldestQueuedAgeMs).toBeNull();
-      expect(record.oldestAcceptedAgeMs).toBeNull();
-      expect(record).not.toHaveProperty('environment');
-      expect(record).not.toHaveProperty('sessions');
-      expect(record).not.toHaveProperty('windowStart');
-      expect(record).not.toHaveProperty('windowEnd');
-      expect(record).not.toHaveProperty('role');
-    }
+    const record = loggerMock.withFields.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(record.metric).toBe(OPEN_STOCK_METRIC);
+    expect(record.logTag).toBe(OPEN_STOCK_METRIC);
+    expect(record.contractVersion).toBe(OPEN_STOCK_CONTRACT_VERSION);
+    expect(record.service).toBe('cloud-agent-next');
+    expect(record.environment).toBeNull();
+    expect(record.evaluationId).toBe(`${OPEN_STOCK_METRIC}:${now}`);
+    expect(record.collectionTimestamp).toBe(now);
+    expect(typeof record.queryElapsedMs).toBe('number');
+    expect(record.coverage).toBe(COVERAGE_LABEL);
+    expect(record.retentionCutoff).toBe(retentionCutoffIso);
+    expect(record.expectedGenerations).toEqual(['legacy', 'control']);
+    expect(record.limitations).toEqual([...OPEN_STOCK_LIMITATIONS]);
+    expect(record.collectionStatus).toBe('complete');
+    expect(record.generations).toHaveLength(2);
+    expect(record.windowMinutes).toBeUndefined();
+    expect(record.windowStart).toBeUndefined();
+    expect(record.windowEnd).toBeUndefined();
+    expect(record.reportingDelayMs).toBeUndefined();
   });
 
-  it('logs one agent_open collection row and no count rows when the query rejects', async () => {
+  it('emits exactly one failed record with no generations when the query rejects', async () => {
     getPgDbMock.mockReturnValue(makeDb(new Error('stock query failed')).db);
 
     await expect(
-      runCloudAgentOpenStockCollection({} as never, new Date(observedAt))
+      runCloudAgentOpenStockCollection({} as never, new Date(now))
     ).resolves.toBeUndefined();
 
-    expect(loggerMock.info).not.toHaveBeenCalled();
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
-    const record = loggerMock.withFields.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(record).toEqual({
-      metric: COLLECTION_METRIC,
-      collector: AGENT_OPEN_METRIC,
-      observedAt,
-      status: 'failed',
-    });
+    expect(loggerMock.info).not.toHaveBeenCalled();
+    const record = loggerMock.withFields.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(record.collectionStatus).toBe('failed');
+    expect(record.failureKind).toBe('db_query_failed');
+    expect(record.generations).toBeUndefined();
+    expect(record.limitations).toEqual([...OPEN_STOCK_LIMITATIONS]);
   });
 
-  it('logs one agent_open collection row when the database binding throws', async () => {
+  it('emits a failed record when the database binding throws', async () => {
     getPgDbMock.mockImplementation(() => {
       throw new Error('HYPERDRIVE binding missing');
     });
 
     await expect(
-      runCloudAgentOpenStockCollection({} as never, new Date(observedAt))
+      runCloudAgentOpenStockCollection({} as never, new Date(now))
     ).resolves.toBeUndefined();
 
-    expect(loggerMock.info).not.toHaveBeenCalled();
     expect(loggerMock.error).toHaveBeenCalledTimes(1);
-    const record = loggerMock.withFields.mock.calls[0]?.[0] as Record<string, unknown>;
-    expect(record.metric).toBe(COLLECTION_METRIC);
-    expect(record.collector).toBe(AGENT_OPEN_METRIC);
+    expect(loggerMock.info).not.toHaveBeenCalled();
+    const record = loggerMock.withFields.mock.calls.at(-1)?.[0] as Record<string, unknown>;
+    expect(record.collectionStatus).toBe('failed');
+    expect(record.failureKind).toBe('db_query_failed');
+    expect(record.generations).toBeUndefined();
   });
 });

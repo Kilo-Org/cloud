@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
+import { and, eq, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
@@ -257,29 +257,6 @@ export async function recordOpenAiChatGptUsageLimit(
         limit.resetsAt === null ? null : new Date(limit.resetsAt).toISOString(),
     })
     .where(openAiChatGptOwnerWhere(owner));
-}
-
-/**
- * Clears the recorded plan limit after a delegated request succeeded on that
- * connection. OpenAI reports no reset time for an app-specific weekly limit,
- * and a reset a person applies in ChatGPT restores the allowance before the
- * recorded window ends, so a request that reached OpenAI and succeeded is the
- * only signal that proves the limit no longer applies. Waiting for the recorded
- * window instead would keep the notice up after the person can work again.
- *
- * The update matches only a row that still carries a record, so a success on a
- * connection that never hit a limit writes nothing.
- */
-export async function clearOpenAiChatGptUsageLimit(owner: OpenAiChatGptOwner): Promise<void> {
-  await db
-    .update(openai_chatgpt_connections)
-    .set({ usage_limit_reached_at: null, usage_limit_resets_at: null })
-    .where(
-      and(
-        openAiChatGptOwnerWhere(owner),
-        isNotNull(openai_chatgpt_connections.usage_limit_reached_at)
-      )
-    );
 }
 
 /**

@@ -1,6 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  CHATGPT_USAGE_SETTINGS_URL,
   USAGE_LIMIT_UNKNOWN_RESET_WINDOW_MS,
   isChatGptUsageLimitCurrent,
   readChatGptUsageLimit,
@@ -36,38 +35,6 @@ describe('readChatGptUsageLimit', () => {
     expect(limit).toEqual({ resetsAt: null });
   });
 
-  it('reads the documented sharing code of a delegated request', () => {
-    const limit = readChatGptUsageLimit(
-      429,
-      {
-        error: {
-          code: 'subscription_sharing_usage_limit_exceeded',
-          message: 'You have reached your usage limit for sharing',
-        },
-      },
-      NOW
-    );
-
-    // OpenAI reports no reset time for this code, and the notice must not claim
-    // one: the recorded window only bounds how long the message stays up.
-    expect(limit).toEqual({ resetsAt: null });
-  });
-
-  it('reads the sharing code when the body carries a reset delay', () => {
-    const limit = readChatGptUsageLimit(
-      429,
-      {
-        error: {
-          code: 'subscription_sharing_usage_limit_exceeded',
-          resets_in_seconds: 3600,
-        },
-      },
-      NOW
-    );
-
-    expect(limit).toEqual({ resetsAt: NOW + 3_600_000 });
-  });
-
   it('ignores a per-minute rate limit', () => {
     expect(readChatGptUsageLimit(429, { error: { code: 'rate_limit_exceeded' } }, NOW)).toBeNull();
   });
@@ -82,15 +49,6 @@ describe('readChatGptUsageLimit', () => {
     expect(readChatGptUsageLimit(429, { detail: { type: 'server_error' } }, NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, 'not json', NOW)).toBeNull();
     expect(readChatGptUsageLimit(429, null, NOW)).toBeNull();
-  });
-});
-
-describe('CHATGPT_USAGE_SETTINGS_URL', () => {
-  it('opens the page that lists the app-specific limit too', () => {
-    // The guideline's notice must open the usage settings page: an app-specific
-    // weekly limit can be exhausted while the plan still has allowance, and
-    // only that page names it.
-    expect(CHATGPT_USAGE_SETTINGS_URL).toBe('https://chatgpt.com/settings/usage');
   });
 });
 

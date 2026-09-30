@@ -15,7 +15,7 @@ import {
   referralRedeemingBonus,
   referralReferringBonus,
 } from '@/lib/promoCreditCategories';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { warnExceptInTest } from '@/lib/utils.server';
 
 function getRandomBase64String(): string {

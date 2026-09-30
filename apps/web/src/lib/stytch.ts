@@ -6,7 +6,7 @@ import type { User } from '@kilocode/db/schema';
 import { stytch_fingerprints } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { blockUser } from '@/lib/user/block';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { getFraudDetectionHeaders } from './utils';
 import { captureException } from '@sentry/nextjs';
 import { updateStytchValidation } from './customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';

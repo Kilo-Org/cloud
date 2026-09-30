@@ -1,6 +1,6 @@
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@/lib/utils';
 import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
 import {
   ReasoningDetailsTransform,

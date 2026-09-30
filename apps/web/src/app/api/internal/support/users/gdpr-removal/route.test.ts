@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@/lib/user';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getUserDeletionRequestById } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
@@ -21,7 +21,7 @@ jest.mock('@/lib/config.server', () => {
   };
 });
 
-jest.mock('@/lib/user/find-user-by-id', () => ({
+jest.mock('@/lib/user', () => ({
   findUserById: jest.fn(),
 }));
 

@@ -26,7 +26,7 @@ import {
   TYPESAFE_MODEL,
 } from '@/lib/ai-gateway/typesafe/schemas';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@/lib/utils';
 import { errorExceptInTest } from '@/lib/utils.server';
 import type { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';

@@ -50,6 +50,7 @@ const AllAuthProviders = [
 
 const AuthProviderIds = AllAuthProviders.map(p => p.id);
 export const AuthProviderIdSchema = z.enum(AuthProviderIds);
+export type { AuthProviderId } from '@kilocode/db/schema-types';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
 
 // Subset used for account linking (excludes SSO, email, passkeys, and dev-only

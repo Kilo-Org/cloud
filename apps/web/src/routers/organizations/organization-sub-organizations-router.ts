@@ -29,7 +29,7 @@ import {
   SubOrganizationModelPolicyOutputSchema,
   summarizeSubOrganizationModelPolicies,
 } from '@/lib/organizations/sub-organizations/model-policy';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@/lib/utils';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { organizationBillingProcedure } from '@/routers/organizations/utils';
 

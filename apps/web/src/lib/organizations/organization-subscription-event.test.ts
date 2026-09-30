@@ -11,9 +11,9 @@ import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   createOrganization,
+  removeUserFromOrganization,
   inviteUserToOrganization,
   acceptOrganizationInvite,
   addUserToOrganization,

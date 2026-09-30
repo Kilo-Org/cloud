@@ -177,10 +177,15 @@ export function startDeviceAuthPoll(params: {
       if (error instanceof Error && error.name === 'AbortError') {
         return;
       }
-      cleanup();
-      setState(previous =>
-        errorDeviceAuthState(code, i18n.t('authErrors.networkError'), previous.verificationUrl)
-      );
+      // A thrown fetch (offline, DNS failure, connection reset) is a transient
+      // network condition, not the server's verdict: the user may already have
+      // approved in the browser, so keep polling within the overall budget
+      // instead of terminally failing the sign-in. Back off like a throttled
+      // poll, capped by the time left so the timeout still surfaces at the
+      // budget rather than after a later tick.
+      retryDelay = Math.min(retryDelay * 2, POLL_MAX_INTERVAL_MS);
+      const remaining = POLL_OVERALL_TIMEOUT_MS - (Date.now() - startedAt);
+      scheduleNext(Math.min(retryDelay, Math.max(0, remaining)));
     }
   };
 

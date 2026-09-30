@@ -3147,7 +3147,6 @@
     "startSignInFailed": "Sisselogimise alustamine ebaõnnestus. Proovi uuesti.",
     "couldNotOpenBrowser": "Brauseri avamine ebaõnnestus. Proovi uuesti.",
     "signInTimedOut": "Sisselogimine aegus. Proovi uuesti.",
-    "networkError": "Võrguviga. Proovi uuesti.",
     "accessDeniedByUser": "Kasutaja keelas juurdepääsu.",
     "codeExpired": "Kood on aegunud.",
     "tooManySignInAttempts": "Liiga palju sisselogimiskatseid. Oota hetk ja proovi uuesti."

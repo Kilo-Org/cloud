@@ -146,8 +146,13 @@ export function getPartDetailTitle(part: Part): PartDetailTitle {
     // empty subtitle, and an empty header tells the user nothing about the
     // call; fall back to the tool title the row's prefix would have shown.
     const hasSubtitle = Boolean(display.subtitle);
+    // getToolDisplay falls back to the tool title as the subtitle when a call
+    // has no content to show (an errored read with no filePath projects
+    // `subtitle: title`). Keep the prefix only when it differs from the text,
+    // so the header never repeats the title as `read: read`.
+    const hasDistinctSubtitle = hasSubtitle && display.subtitle !== display.title;
     return {
-      prefix: display.subtitle ? display.title : null,
+      prefix: hasDistinctSubtitle ? display.title : null,
       // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty subtitle must fall back to the tool title; ?? keeps the blank header
       text: display.subtitle || display.title,
       translatable: hasSubtitle && display.translatable,

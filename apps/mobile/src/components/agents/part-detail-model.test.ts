@@ -127,6 +127,13 @@ describe('getPartDetailTitle', () => {
     expect(getPartDetailTitle(makeToolPart())).toEqual(untranslated('bash'));
   });
 
+  it('drops the prefix when the subtitle falls back to the tool title', () => {
+    // An errored read with no filePath projects `subtitle: title`; the header
+    // must not render the duplicated `read: read`.
+    getToolDisplay.mockReturnValue({ title: 'read', subtitle: 'read', translatable: false });
+    expect(getPartDetailTitle(makeToolPart({ tool: 'read' }))).toEqual(untranslated('read'));
+  });
+
   it('never marks reasoning or other part types translatable', () => {
     expect(getPartDetailTitle(makeReasoningPart('reasoning', false))).toEqual(
       untranslated('Thinking')

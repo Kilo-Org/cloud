@@ -77,7 +77,7 @@
     "reactions",
     "tokens"
   ],
-  "ca": ["block", "closed", "comment", "merge", "open", "open pull request", "review"],
+  "ca": ["block", "closed", "comment", "commit", "merge", "open", "open pull request", "review"],
   "ckb": ["added", "commit", "deleted", "open"],
   "cs": [
     "comment",

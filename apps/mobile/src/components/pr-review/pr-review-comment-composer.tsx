@@ -297,17 +297,21 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     if (block === null) {
       return;
     }
-    bodyRef.current = block;
-    setHasBody(block.trim().length > 0);
+    // Add the fence after any text already typed instead of replacing the body
+    // (and its draft) with the fence; the block starts its own paragraph.
+    const existing = bodyRef.current;
+    const next = existing.length > 0 ? `${existing}\n\n${block}` : block;
+    bodyRef.current = next;
+    setHasBody(next.trim().length > 0);
     clearBadRequestOnBodyEdit();
     // Persist the inserted suggestion like a typed change, so a process kill
     // after Insert (with no later keystroke) does not lose the suggestion.
     if (draftUserId) {
-      saveDraft(draftUserId, commentDraftKey, block);
+      saveDraft(draftUserId, commentDraftKey, next);
     }
     bodyInputRef.current?.setNativeProps({
-      text: block,
-      selection: { start: block.length, end: block.length },
+      text: next,
+      selection: { start: next.length, end: next.length },
     });
     bodyInputRef.current?.focus();
   }

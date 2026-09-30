@@ -720,7 +720,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Yaada yeroon darbee fi erguuf eegamaa jiru {{location}} irratti gulaali",
       "editA11y": "Yaada erguuf eegamaa jiru {{location}} irratti gulaali",
-      "staleHint": "pR kun erga kana barreessitee booda jijjiirameera.",
+      "staleHint": "PR kun erga kana barreessitee booda jijjiirameera.",
       "deleteA11y": "Yaada erguuf eegamaa jiru {{location}} irratti haqi",
       "deletedAnnouncement": "Yaadni erguuf eegamaa ture haqameera",
       "noCommentsQueued": "Yaadni tarree keessa hin jiru. Gamaaggamni gocha armaan olii qofa waliin dhiheeffama.",

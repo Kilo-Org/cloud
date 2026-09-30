@@ -11,6 +11,7 @@ import { MarkViewedToggle } from '@/components/pr-review/diff/pr-diff-file-rows'
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
+import { LTR_LAYOUT_DIRECTION, LTR_TEXT_DIRECTION } from '@/lib/rtl-text';
 
 function splitPath(path: string) {
   const slash = path.lastIndexOf('/');
@@ -47,19 +48,23 @@ export function NavigatorFileRow({
         className="min-h-11 min-w-0 flex-1 flex-row items-center active:opacity-70"
       >
         <View className="min-w-0 flex-1">
-          <View className="min-w-0 flex-row items-baseline">
+          <View className="min-w-0 flex-row items-baseline" style={LTR_LAYOUT_DIRECTION}>
             {dir.length > 0 ? (
               <Text
                 variant="muted"
                 className="min-w-0 shrink text-sm"
                 // eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic muted color
-                style={{ color: colors.mutedForeground }}
+                style={{ color: colors.mutedForeground, ...LTR_TEXT_DIRECTION }}
                 numberOfLines={1}
               >
                 {dir}
               </Text>
             ) : null}
-            <Text className="shrink-0 text-sm font-medium text-foreground" numberOfLines={1}>
+            <Text
+              className="shrink-0 text-sm font-medium text-foreground"
+              style={LTR_TEXT_DIRECTION}
+              numberOfLines={1}
+            >
               {basename}
             </Text>
           </View>

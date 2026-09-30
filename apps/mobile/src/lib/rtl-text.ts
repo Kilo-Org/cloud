@@ -1,5 +1,5 @@
 import { isValidElement, type ReactNode } from 'react';
-import { I18nManager, type StyleProp, type TextStyle } from 'react-native';
+import { I18nManager, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
  * RN 0.86 does not resolve `textAlign: 'auto'` from the native layout
@@ -104,6 +104,18 @@ export function withRtlWritingDirection(style: TextStyle | undefined): TextStyle
  * view's children too (it would move the diff gutter to the left).
  */
 export const LTR_TEXT_DIRECTION: TextStyle = { direction: 'ltr', writingDirection: 'ltr' };
+
+/**
+ * Base layout direction for a `View` whose children are written left to right
+ * whatever the interface language — a filesystem path's directory and basename
+ * segments are the case in hand. An RTL interface mirrors a `flex-row`, so
+ * without this the basename segment draws before the directory; `direction` on
+ * the row restores the path's order. This is deliberately not
+ * `LTR_TEXT_DIRECTION`: `direction` on a `View` mirrors its children, which is
+ * exactly what a path row needs and what a diff gutter's wrapper must not take
+ * (see the note above).
+ */
+export const LTR_LAYOUT_DIRECTION: ViewStyle = { direction: 'ltr' };
 
 /**
  * A joined script's letters connect into one shape, so `letter-spacing` — a

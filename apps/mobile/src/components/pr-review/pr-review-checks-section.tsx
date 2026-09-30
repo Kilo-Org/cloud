@@ -411,7 +411,7 @@ export function PrReviewChecksSection({
               <View key={`${run.name}-${runIndex}`}>
                 <CheckRow run={run} />
                 {runIndex < group.runs.length - 1 ? (
-                  <View className="ml-4 border-b-[0.5px] border-hair-soft" />
+                  <View className="ms-4 border-b-[0.5px] border-hair-soft" />
                 ) : null}
               </View>
             ))}

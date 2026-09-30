@@ -28,8 +28,8 @@ vi.mock('react-i18next', async importOriginal => {
   return {
     ...actual,
     useTranslation: () => {
-      const i18n = actual.getI18n();
-      return { t: i18n.t.bind(i18n), i18n };
+      const i18nInstance = actual.getI18n();
+      return { t: i18nInstance.t.bind(i18nInstance), i18n: i18nInstance };
     },
   };
 });

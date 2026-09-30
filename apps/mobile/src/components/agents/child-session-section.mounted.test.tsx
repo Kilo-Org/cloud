@@ -427,9 +427,7 @@ describe('ChildSessionSection live task status', () => {
     const pendingRenderer = await renderCard(storedTaskPart(storage));
     expect(statusBadge(pendingRenderer.root).props.children).toBe(i18n.t('common.pending'));
     expect(findByType(pendingRenderer.root, 'SpinningIcon')).toHaveLength(1);
-    expect(textValues(pendingRenderer.root)).not.toContain(
-      i18n.t('codeReviewer.status.completed')
-    );
+    expect(textValues(pendingRenderer.root)).not.toContain(i18n.t('codeReviewer.status.completed'));
 
     feedTaskPart(storage, taskPart('running'), LIVE_RUNNING_AT);
     expect(storedTaskPart(storage).state.status).toBe('running');
@@ -440,9 +438,7 @@ describe('ChildSessionSection live task status', () => {
     expect(statusBadge(runningRenderer.root).props.className).toContain('text-info');
     expect(findByType(runningRenderer.root, 'SpinningIcon')).toHaveLength(1);
     expect(textValues(runningRenderer.root)).toContain(i18n.t('agentChat.partDetail.thinking'));
-    expect(textValues(runningRenderer.root)).not.toContain(
-      i18n.t('codeReviewer.status.completed')
-    );
+    expect(textValues(runningRenderer.root)).not.toContain(i18n.t('codeReviewer.status.completed'));
   });
 
   it('cannot be flipped to completed by a stale or unordered terminal replay', async () => {

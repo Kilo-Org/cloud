@@ -2365,17 +2365,27 @@ describe('child transcript requests', () => {
   );
 
   it.each([
-    [SELECTED_ID, NESTED_ID, 'completed', i18n.t('codeReviewer.status.completed')],
-    [
-      kiloId('ses-sibling-0'),
-      kiloId('ses-nested-sibling'),
-      'running',
-      i18n.t('codeReviewer.status.running'),
-    ],
-    [kiloId('ses-sibling-1'), kiloId('ses-nested-failed'), 'error', i18n.t('common.failed')],
+    {
+      selectedId: SELECTED_ID,
+      nestedId: NESTED_ID,
+      status: 'completed',
+      statusLabel: i18n.t('codeReviewer.status.completed'),
+    },
+    {
+      selectedId: kiloId('ses-sibling-0'),
+      nestedId: kiloId('ses-nested-sibling'),
+      status: 'running',
+      statusLabel: i18n.t('codeReviewer.status.running'),
+    },
+    {
+      selectedId: kiloId('ses-sibling-1'),
+      nestedId: kiloId('ses-nested-failed'),
+      status: 'error',
+      statusLabel: i18n.t('common.failed'),
+    },
   ] as const)(
-    'opens %s and its nested sheet immediately without requesting siblings',
-    async (selectedId, nestedId, status, statusLabel) => {
+    'opens $selectedId and its nested sheet immediately without requesting siblings',
+    async ({ selectedId, nestedId, status, statusLabel }) => {
       const isRunning = status === 'running';
       const view = await mountDetails();
       pressCard(view.renderer, selectedId);

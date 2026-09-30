@@ -55,7 +55,7 @@ function spawnSupervisor(harness: Harness, options: SpawnOptions): Bun.Subproces
   return Bun.spawn(['sh', SUPERVISOR_PATH], {
     env: {
       ...process.env,
-      CONTROL_PLANE_WRAPPER_COMMAND: `bun ${harness.fake}`,
+      CONTROL_PLANE_WRAPPER_COMMAND: `exec bun ${harness.fake}`,
       CONTROL_PLANE_SUPERVISOR_BACKOFF_MIN_MS: String(options.backoffMinMs ?? 0),
       CONTROL_PLANE_SUPERVISOR_BACKOFF_MAX_MS: String(options.backoffMaxMs ?? 0),
       CONTROL_PLANE_TIMER_DIVISOR: String(options.divisor ?? 1),
@@ -169,6 +169,7 @@ describe('control-plane-supervisor.sh', () => {
       // Let the current child reach its sleep so TERM has a live child to kill.
       await Bun.sleep(200);
       const childPid = Number(await readFile(harness.pidFile, 'utf8'));
+      expect(isAlive(childPid)).toBe(true);
       process.kill(proc.pid, 'SIGTERM');
       expect(await waitForExit(proc, 5_000)).toBe(0);
       expect(isAlive(childPid)).toBe(false);

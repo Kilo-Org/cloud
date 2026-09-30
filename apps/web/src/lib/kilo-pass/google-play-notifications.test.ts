@@ -25,6 +25,7 @@ import {
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
+import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
 const mockAcknowledge = jest
@@ -1233,17 +1234,22 @@ describe('processGooglePlayKiloPassNotification', () => {
       })
     ).toBeUndefined();
 
-    // A grant keyed by the purchase token and one keyed by the order id are both
-    // refused: the voided notification records the order id while Play reports
-    // no order id for a one-time purchase, so the completion may hold either.
-    for (const key of [purchaseToken, orderId]) {
+    // A grant keyed by the order id and one keyed by the token digest are both
+    // refused. Play reported no order id when the purchase completed, so the
+    // grant may hold the digest while the voided notification names the order
+    // id; the refund lookup matches the raw token the store-event table stores,
+    // which never becomes the ledger key.
+    const tokenKey = googlePlayCreditProviderTransactionId({ purchaseToken });
+    for (const grant of [
+      { providerTransactionId: orderId, googlePlayPurchaseToken: purchaseToken },
+      { providerTransactionId: tokenKey, googlePlayPurchaseToken: purchaseToken },
+    ]) {
       await expect(
         completeStoreCreditPurchase({
           user,
           purchase: {
             paymentProvider: KiloPassPaymentProvider.GooglePlay,
             productId: 'credits_usd10',
-            providerTransactionId: key,
             appAccountToken: user.app_store_account_token,
             quantity: 1,
             amountUsd: 10,
@@ -1251,6 +1257,7 @@ describe('processGooglePlayKiloPassNotification', () => {
             purchasedAtIso: '2026-05-15T00:00:00.000Z',
             environment: 'Production',
             rawPayload: {},
+            ...grant,
           },
         })
       ).rejects.toThrow(STORE_PURCHASE_REFUNDED_MESSAGE);
@@ -1260,7 +1267,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       await db.query.credit_transactions.findFirst({
         where: eq(
           credit_transactions.stripe_payment_id,
-          storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, purchaseToken)
+          storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, tokenKey)
         ),
       })
     ).toBeUndefined();
@@ -1418,6 +1425,7 @@ describe('processGooglePlayKiloPassNotification', () => {
     const { user } = await insertGooglePlayUser();
     const orderId = `GPA.${crypto.randomUUID()}`;
     const purchaseToken = crypto.randomUUID();
+    const tokenKey = googlePlayCreditProviderTransactionId({ purchaseToken });
     const amountMicrodollars = toMicrodollars(10);
     await db.insert(credit_transactions).values({
       kilo_user_id: user.id,
@@ -1425,9 +1433,9 @@ describe('processGooglePlayKiloPassNotification', () => {
       is_free: false,
       description: 'Credit purchase via Google Play',
       // Play reported no order id when the purchase completed, so the grant is
-      // keyed by the purchase token while the voided notification still carries
-      // an order id.
-      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, purchaseToken),
+      // keyed by a digest of the purchase token — never the token itself —
+      // while the voided notification still carries an order id.
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, tokenKey),
     });
     await db
       .update(kilocode_users)
@@ -1469,7 +1477,7 @@ describe('processGooglePlayKiloPassNotification', () => {
     const reversal = await db.query.credit_transactions.findFirst({
       where: eq(
         credit_transactions.credit_category,
-        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${purchaseToken}`
+        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${tokenKey}`
       ),
     });
     expect(reversal).toMatchObject({

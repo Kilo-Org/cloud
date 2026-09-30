@@ -23,6 +23,7 @@ const backend = vi.hoisted(() => ({
 const owner = vi.hoisted(() => ({
   connected: true,
   fetchStoreProducts: vi.fn(),
+  reconnectStore: vi.fn(),
   purchase: vi.fn(),
   completingProductId: null as string | null,
   errorMessageKey: null as string | null,
@@ -208,6 +209,7 @@ describe('CreditPurchaseScreen', () => {
     };
     owner.connected = true;
     owner.fetchStoreProducts.mockResolvedValue(STORE_LISTINGS);
+    owner.reconnectStore.mockResolvedValue(true);
     owner.purchase.mockResolvedValue(true);
     owner.completingProductId = null;
     owner.errorMessageKey = null;
@@ -555,6 +557,46 @@ describe('CreditPurchaseScreen', () => {
     expect(
       (busyRow?.props as { accessibilityLabel?: string } | undefined)?.accessibilityLabel
     ).toBe('Add $10.00 of credits, Completing purchase');
+    expect(
+      rows.every(
+        row =>
+          (row.props as { disabled?: boolean }).disabled === true &&
+          (row.props as { accessibilityState?: { disabled?: boolean } }).accessibilityState
+            ?.disabled === true
+      )
+    ).toBe(true);
+    unmount();
+  });
+
+  it('keeps every priced row disabled while the IAP owner is not connected', async () => {
+    const { renderer, queryClient, unmount } = await renderWithProviders(
+      createElement(CreditPurchaseScreen)
+    );
+    await waitFor(() => packRows(renderer).length === 4);
+    const update = () => {
+      renderer.update(
+        createElement(
+          QueryClientProvider,
+          { client: queryClient },
+          createElement(CreditPurchaseScreen)
+        )
+      );
+    };
+    expect(
+      packRows(renderer).every(row => (row.props as { disabled?: boolean }).disabled === false)
+    ).toBe(true);
+
+    // expo-iap drops its purchase-update listeners when initialization fails, so
+    // a priced row the owner cannot complete stays disabled until it reconnects.
+    owner.connected = false;
+    await act(async () => {
+      update();
+      await Promise.resolve();
+    });
+
+    expect(allText(renderer)).toContain('$10.99');
+    const rows = packRows(renderer);
+    expect(rows).toHaveLength(4);
     expect(
       rows.every(
         row =>

@@ -2,6 +2,7 @@ import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 
 import { processAppStoreKiloPassNotification } from '@/lib/kilo-pass/apple-store-notifications';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 
 const AppStoreNotificationBodySchema = z.object({
   signedPayload: z.string().min(1),
@@ -25,7 +26,11 @@ export async function POST(request: Request) {
     }
     return Response.json(result);
   } catch (error) {
-    captureException(error, { tags: { source: 'app_store_kilo_pass_notification' } });
+    // The failure may be a database error that quotes the bound parameters of a
+    // store-credential lookup, so it is sanitized before it is reported.
+    captureException(sanitizeErrorForTelemetry(error), {
+      tags: { source: 'app_store_kilo_pass_notification' },
+    });
     return Response.json({ error: 'Failed to process notification' }, { status: 500 });
   }
 }

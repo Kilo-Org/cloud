@@ -4,8 +4,14 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type * as Sentry from '@sentry/nextjs';
 
+import { DrizzleQueryError } from 'drizzle-orm';
+
 import type { ValidatedStoreCreditPurchase } from '@/lib/credits/store-verifier';
 import { STORE_CREDIT_PRODUCTS } from '@/lib/credits/store-products';
+import {
+  StoreCreditPurchaseOwnedByAnotherAccountError,
+  StoreVerificationError,
+} from '@/lib/credits/store-purchase-errors';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE } from '@/lib/credits/store-account-token';
 import type { TRPCContext } from '@/lib/trpc/init';
@@ -102,6 +108,20 @@ function granted(amountUsd: number, alreadyProcessed = false) {
   };
 }
 
+/**
+ * Everything Sentry would serialize off the captured value, cause chain
+ * included. `JSON.stringify` alone sees none of an Error's message or stack.
+ */
+function captureText(captured: unknown): string {
+  let text = `${JSON.stringify(captured)} `;
+  let current: unknown = captured;
+  for (let depth = 0; depth < 6 && current instanceof Error; depth++) {
+    text += `${current.name}: ${current.message}\n${current.stack ?? ''}\n`;
+    current = current.cause;
+  }
+  return text;
+}
+
 beforeAll(async () => {
   createCaller = await buildCallerFactory();
 });
@@ -170,7 +190,7 @@ describe('creditsRouter.completeAppStorePurchase', () => {
 
   it('surfaces a completion that belongs to another user as non-retryable', async () => {
     mockCompleteStoreCreditPurchase.mockRejectedValue(
-      new Error('Store transaction already belongs to another user')
+      new StoreCreditPurchaseOwnedByAnotherAccountError()
     );
 
     await expect(
@@ -180,12 +200,52 @@ describe('creditsRouter.completeAppStorePurchase', () => {
 
   it('reports a terminal verification failure as non-retryable', async () => {
     mockVerifyAppleCreditPurchase.mockRejectedValue(
-      new Error('Apple transaction is missing identifiers')
+      new StoreVerificationError('Apple transaction is missing identifiers')
     );
 
     await expect(
       callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  // Only the error type decides terminal versus retryable: a failure that
+  // merely reads like a store refusal must stay retryable, or the mobile client
+  // records the purchase as terminally rejected and stops recovering a charge
+  // the user already paid for.
+  it('keeps a transient database failure retryable when its SQL names credit_transactions', async () => {
+    mockCompleteStoreCreditPurchase.mockRejectedValue(
+      new DrizzleQueryError(
+        'insert into "credit_transactions" ("id", "stripe_payment_id") values ($1, $2)',
+        ['tx-1', 'store-credit:app_store:tx-1'],
+        new Error('deadlock detected')
+      )
+    );
+
+    await expect(
+      callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+  });
+
+  it('keeps a provider failure that names a product retryable', async () => {
+    mockVerifyAppleCreditPurchase.mockRejectedValue(
+      new Error('product lookup failed at the store')
+    );
+
+    await expect(
+      callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+  });
+
+  it('never reports the signed transaction it was given', async () => {
+    mockCompleteStoreCreditPurchase.mockRejectedValue(
+      new Error('Failed query: select 1 from credit_transactions\nparams: signed-jws')
+    );
+
+    await expect(
+      callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    expect(captureText(captureExceptionMock().mock.calls[0]?.[0])).not.toContain('signed-jws');
   });
 
   it('reports a refunded purchase as terminal and does not report it as an incident', async () => {
@@ -270,7 +330,7 @@ describe('creditsRouter.completePlayPurchase', () => {
 
   it('surfaces a completion that belongs to another user as non-retryable', async () => {
     mockCompleteStoreCreditPurchase.mockRejectedValue(
-      new Error('Store transaction already belongs to another user')
+      new StoreCreditPurchaseOwnedByAnotherAccountError()
     );
 
     await expect(
@@ -280,6 +340,46 @@ describe('creditsRouter.completePlayPurchase', () => {
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockAcknowledgeGooglePlayCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  // A failed query quotes the parameters it was built from, and the purchase
+  // token is a bearer credential, so it may not reach Sentry.
+  it('never reports the purchase token of a failed grant', async () => {
+    mockCompleteStoreCreditPurchase.mockRejectedValue(
+      new DrizzleQueryError(
+        'insert into "credit_transactions" ("id", "stripe_payment_id") values ($1, $2)',
+        ['tx-1', 'store-credit:google_play:play-purchase-token'],
+        new Error('play-purchase-token was rejected')
+      )
+    );
+
+    await expect(
+      callerForUser().completePlayPurchase({
+        productId: 'credits_usd10',
+        purchaseToken: 'play-purchase-token',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    const captured = captureExceptionMock().mock.calls[0]?.[0];
+    expect(captured).toBeInstanceOf(Error);
+    expect(captureText(captured)).not.toContain('play-purchase-token');
+  });
+
+  it('never reports the purchase token of a failed consume', async () => {
+    mockAcknowledgeGooglePlayCreditPurchase.mockRejectedValue(
+      new Error('Request failed for /tokens/play-purchase-token')
+    );
+
+    await expect(
+      callerForUser().completePlayPurchase({
+        productId: 'credits_usd10',
+        purchaseToken: 'play-purchase-token',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+
+    expect(captureText(captureExceptionMock().mock.calls[0]?.[0])).not.toContain(
+      'play-purchase-token'
+    );
   });
 
   it('reports a refunded purchase as terminal and never consumes it', async () => {

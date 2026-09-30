@@ -44,6 +44,7 @@ export function CreditPurchaseScreen() {
     connected,
     fetchStoreProducts,
     purchase,
+    reconnectStore,
     completingProductId,
     errorMessageKey: purchaseErrorMessageKey,
     completedPurchaseCount,
@@ -54,9 +55,10 @@ export function CreditPurchaseScreen() {
     isLoading,
     isRefetching,
     storeUnavailable,
+    catalogEmpty,
     errorMessageKey: productsErrorMessageKey,
     refetch,
-  } = useStoreCreditProducts({ connected, fetchStoreProducts });
+  } = useStoreCreditProducts({ connected, fetchStoreProducts, reconnectStore });
   // The screen renders purchase errors inline, so they must not also toast.
   useInlinePurchaseErrorOwnership();
 
@@ -81,7 +83,10 @@ export function CreditPurchaseScreen() {
   }, [completedPurchaseCount, refetchBalance, t]);
 
   const purchasing = completingProductId !== null;
-  const packsEmpty = !isLoading && !storeUnavailable && products.length === 0;
+  // Only a catalog the backend answered as empty is the empty state: a store
+  // query that is pending, paused or failed must not hide the packs the backend
+  // catalog named.
+  const packsEmpty = !isLoading && catalogEmpty;
   const balancePending = balanceQuery.isPending;
   const balanceFailed = balanceQuery.isError;
   // The card's title and its default body come from one per-store source, so
@@ -196,7 +201,10 @@ export function CreditPurchaseScreen() {
               const hasStorePrice = pack.storeProductId !== null && pack.displayPrice !== null;
               const rowCompleting =
                 completingProductId !== null && completingProductId === pack.storeProductId;
-              const disabled = purchasing || !hasStorePrice;
+              // A disconnected owner has no purchase-update listeners (expo-iap
+              // drops them when initialization fails), so even a priced row
+              // cannot complete: keep every row disabled until it reconnects.
+              const disabled = purchasing || !connected || !hasStorePrice;
               const priceLabel = rowCompleting
                 ? t('kiloPass.completingPurchase')
                 : (pack.displayPrice ?? t('credits.priceUnavailable'));

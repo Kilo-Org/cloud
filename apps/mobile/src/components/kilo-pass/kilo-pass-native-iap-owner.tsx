@@ -31,6 +31,7 @@ import {
 } from '@/lib/analytics/posthog';
 import { i18n } from '@/i18n';
 import { useAuth } from '@/lib/auth/auth-context';
+import { isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
 import {
   type AppStoreKiloPassProduct,
@@ -387,12 +388,14 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         setPendingPurchaseCompletedCallback: onCompleted => {
           pendingPurchaseCompletedCallbackRef.current = onCompleted;
         },
+        isAccountCurrent: () => isCurrentAuthEpoch(authEpoch),
         showError: message => {
           showDedupedPurchaseError(message);
           setIapError({ message, storeConnection: false });
         },
       }),
     [
+      authEpoch,
       completeAppStorePurchase.mutateAsync,
       completePlayPurchase.mutateAsync,
       enabledAppleProductIds,

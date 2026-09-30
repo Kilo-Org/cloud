@@ -1,5 +1,5 @@
 import { NotificationTypeV2 } from '@apple/app-store-server-library';
-import { and, eq, or, sql } from 'drizzle-orm';
+import { and, desc, eq, or, sql } from 'drizzle-orm';
 
 import { credit_transactions, kilocode_users, kilo_pass_store_events } from '@kilocode/db/schema';
 import type { db, DrizzleTransaction } from '@/lib/drizzle';
@@ -9,6 +9,12 @@ import { storeCreditPaymentId } from './store-products';
 
 export type StoreCreditReversalResult = {
   reversed: boolean;
+  creditTransactionId: string | null;
+  amountMicrodollars: number;
+};
+
+export type StoreCreditRestorationResult = {
+  restored: boolean;
   creditTransactionId: string | null;
   amountMicrodollars: number;
 };
@@ -43,22 +49,64 @@ const STORE_REFUND_NOTIFICATION_TYPES: Record<KiloPassPaymentProvider, readonly 
 };
 
 /**
- * The processed refund event for a store credit pack, or null when the store
- * never refunded it.
+ * The notification types that mean the store reinstated a refund it had
+ * reversed. Apple requires the reversed purchase's content back, consumables
+ * included, so a reversal undoes the clawback of the refund it reverses and
+ * stops that refund from blocking a later grant. Neither Stripe nor Play
+ * reports a refund reversal.
+ */
+const STORE_REFUND_REVERSED_NOTIFICATION_TYPES: Record<KiloPassPaymentProvider, readonly string[]> =
+  {
+    [KiloPassPaymentProvider.Stripe]: [],
+    [KiloPassPaymentProvider.AppStore]: [NotificationTypeV2.REFUND_REVERSED],
+    [KiloPassPaymentProvider.GooglePlay]: [],
+  };
+
+/**
+ * The order key of a processed store event: the store's own signed date, in
+ * milliseconds, when the event carries one, and when Kilo processed it
+ * otherwise.
+ *
+ * Notifications arrive out of order, so Kilo's processing order says nothing
+ * about the store's chronology: a reversal delivered before the refund it
+ * reverses must not be overwritten by that older refund. The signed date is the
+ * chronology the store itself asserts, and every App Store notification
+ * payload carries one.
+ */
+const storeEventOrderKeyMs = sql<number>`COALESCE(
+  (${kilo_pass_store_events.payload_json}->>'signedDate')::double precision,
+  EXTRACT(EPOCH FROM ${kilo_pass_store_events.processed_at}) * 1000
+)::double precision`;
+
+type ProcessedStoreRefundDelivery = StoreCreditRefundEvent & { orderKeyMs: number };
+
+/**
+ * The refund or reinstatement delivery the store sent last for a store credit
+ * pack, or null when the store never sent one. A refund and a reversal signed
+ * in the same millisecond keep the refund, which can only refuse a grant, never
+ * grant twice.
  *
  * A store credit pack is one purchase, but Play names it by two ids: the order
  * id and the purchase token. A completion keys the grant by whichever the Play
  * API returned first, and a voided-purchase notification always carries an
  * order id, so every id the purchase is known by is matched here.
  */
-export async function findProcessedStoreCreditRefundEvent(
+async function findLatestProcessedStoreRefundDelivery(
   dbOrTx: DrizzleTransaction | typeof db,
   params: { paymentProvider: KiloPassPaymentProvider; providerTransactionIds: string[] }
-): Promise<StoreCreditRefundEvent | null> {
-  const notificationTypes = STORE_REFUND_NOTIFICATION_TYPES[params.paymentProvider];
+): Promise<ProcessedStoreRefundDelivery | null> {
+  const refundTypes = STORE_REFUND_NOTIFICATION_TYPES[params.paymentProvider];
+  const reversedTypes = STORE_REFUND_REVERSED_NOTIFICATION_TYPES[params.paymentProvider];
   const keys = [...new Set(params.providerTransactionIds)].sort();
-  if (notificationTypes.length === 0 || keys.length === 0) return null;
+  if (refundTypes.length === 0 || keys.length === 0) return null;
 
+  const notificationType = sql`(${kilo_pass_store_events.payload_json}->>'notificationType')`;
+  const typeList = (types: readonly string[]) =>
+    sql`(${sql.join(
+      types.map(type => sql`${type}`),
+      sql`, `
+    )})`;
+  const refundTypeFilter = sql`${notificationType} IN ${typeList(refundTypes)}`;
   const keyFilter = keys.flatMap(key => [
     eq(kilo_pass_store_events.provider_transaction_id, key),
     // Only Play keys a purchase by a token; an App Store `provider_subscription_id`
@@ -74,22 +122,63 @@ export async function findProcessedStoreCreditRefundEvent(
       notificationType: sql<
         string | null
       >`${kilo_pass_store_events.payload_json}->>'notificationType'`,
+      orderKeyMs: storeEventOrderKeyMs,
     })
     .from(kilo_pass_store_events)
     .where(
       and(
         eq(kilo_pass_store_events.payment_provider, params.paymentProvider),
         sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
-        sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN (${sql.join(
-          notificationTypes.map(type => sql`${type}`),
-          sql`, `
-        )})`,
+        sql`${notificationType} IN ${typeList([...refundTypes, ...reversedTypes])}`,
         keyFilter.length === 1 ? keyFilter[0] : or(...keyFilter)
       )
     )
+    .orderBy(desc(storeEventOrderKeyMs), sql`${refundTypeFilter} DESC`)
     .limit(1);
 
   return events[0] ?? null;
+}
+
+/**
+ * The effective refund event for a store credit pack, or null when the store
+ * never refunded it or has since reinstated the refund.
+ *
+ * A refund the store later reversed is no longer effective, so the refunds and
+ * their reversals are read together and the one the store signed last decides.
+ * The refund handler asks the same question before it claws credits back: a
+ * refund the store already reversed must not be applied over the reversal, and
+ * a reversal must not undo a refund the store signed after it.
+ */
+export async function findEffectiveStoreCreditRefundEvent(
+  dbOrTx: DrizzleTransaction | typeof db,
+  params: { paymentProvider: KiloPassPaymentProvider; providerTransactionIds: string[] }
+): Promise<StoreCreditRefundEvent | null> {
+  const latestEvent = await findLatestProcessedStoreRefundDelivery(dbOrTx, params);
+  const refundTypes = STORE_REFUND_NOTIFICATION_TYPES[params.paymentProvider];
+  if (!latestEvent?.notificationType) return null;
+  if (!refundTypes.includes(latestEvent.notificationType)) return null;
+  return { eventId: latestEvent.eventId, notificationType: latestEvent.notificationType };
+}
+
+/**
+ * Whether a delivery the store signed earlier than one Kilo has already
+ * processed is superseded, and must therefore be applied without touching
+ * credits.
+ *
+ * A notification with no store signed date is treated as arriving now, which is
+ * what an unprocessed event row means.
+ */
+export async function isStoreRefundDeliverySuperseded(
+  dbOrTx: DrizzleTransaction | typeof db,
+  params: {
+    paymentProvider: KiloPassPaymentProvider;
+    providerTransactionIds: string[];
+    signedDateMs: number | null;
+  }
+): Promise<boolean> {
+  const latestEvent = await findLatestProcessedStoreRefundDelivery(dbOrTx, params);
+  if (!latestEvent) return false;
+  return latestEvent.orderKeyMs > (params.signedDateMs ?? Date.now());
 }
 
 /**
@@ -125,6 +214,114 @@ function creditPackReversalDescription(provider: KiloPassPaymentProvider): strin
   return provider === KiloPassPaymentProvider.AppStore
     ? 'App Store credit pack refund clawback'
     : 'Google Play credit pack refund clawback';
+}
+
+function creditPackRestorationDescription(provider: KiloPassPaymentProvider): string {
+  return provider === KiloPassPaymentProvider.AppStore
+    ? 'App Store credit pack refund restoration'
+    : 'Google Play credit pack refund restoration';
+}
+
+/**
+ * The uniqueness key of a refund clawback on a store credit pack, scoped to the
+ * purchase (`<provider>:<providerTransactionId>`), since one pack is one
+ * purchase. A purchase the store refunds, reverses, and refunds again gets one
+ * clawback per refund cycle, numbered from the first.
+ */
+function storeCreditRefundCategory(params: {
+  paymentProvider: KiloPassPaymentProvider;
+  providerTransactionId: string;
+  cycle: number;
+}): string {
+  const base = `store-credit-refund:${params.paymentProvider}:${params.providerTransactionId}`;
+  return params.cycle <= 1 ? base : `${base}:${params.cycle}`;
+}
+
+/** The mirror key of the compensating grant that reinstates such a clawback. */
+function storeCreditRefundReversalCategory(params: {
+  paymentProvider: KiloPassPaymentProvider;
+  providerTransactionId: string;
+  cycle: number;
+}): string {
+  const base = `store-credit-refund-reversal:${params.paymentProvider}:${params.providerTransactionId}`;
+  return params.cycle <= 1 ? base : `${base}:${params.cycle}`;
+}
+
+type StoreCreditRefundCycle = {
+  creditTransactionId: string;
+  amountMicrodollars: number;
+  isFree: boolean;
+  kiloUserId: string;
+  microdollarsUsed: number;
+};
+
+/**
+ * The refund cycles a store credit pack has been through, oldest first: every
+ * clawback a refund wrote and every restoration a reversal wrote, each keyed by
+ * the purchase and numbered from one.
+ *
+ * A clawback without its restoration is the refund currently in force, so the
+ * handlers read this state before they write: a redelivered refund finds its
+ * clawback already in force and does nothing, and a refund the store issued
+ * *after* a reversal finds the pair settled and claws the pack back again under
+ * the next cycle. The cycle suffix never splits the purchase's state: a cycle
+ * key is matched exactly, or by its own `:<cycle>` suffix, so a purchase whose
+ * store id happens to be a prefix of another's never absorbs its rows.
+ */
+async function findStoreCreditRefundCycles(
+  dbOrTx: DrizzleTransaction | typeof db,
+  params: {
+    paymentProvider: KiloPassPaymentProvider;
+    providerTransactionId: string;
+    kiloUserId: string;
+  }
+): Promise<{ clawbacks: StoreCreditRefundCycle[]; restorations: StoreCreditRefundCycle[] }> {
+  const clawbackPrefix = storeCreditRefundCategory({ ...params, cycle: 1 });
+  const restorationPrefix = storeCreditRefundReversalCategory({ ...params, cycle: 1 });
+  const purchaseCycles = (prefix: string) => [
+    sql`${credit_transactions.credit_category} = ${prefix}`,
+    sql`starts_with(${credit_transactions.credit_category}, ${`${prefix}:`})`,
+  ];
+  const rows = await dbOrTx
+    .select({
+      creditTransactionId: credit_transactions.id,
+      amountMicrodollars: credit_transactions.amount_microdollars,
+      creditCategory: credit_transactions.credit_category,
+      isFree: credit_transactions.is_free,
+      kiloUserId: credit_transactions.kilo_user_id,
+      microdollarsUsed: kilocode_users.microdollars_used,
+    })
+    .from(credit_transactions)
+    .innerJoin(kilocode_users, eq(credit_transactions.kilo_user_id, kilocode_users.id))
+    .where(
+      and(
+        // A purchase has one owner and its clawback and restoration rows are
+        // written for that owner, so this narrows the scan to the only rows that
+        // can hold the purchase's cycles.
+        eq(credit_transactions.kilo_user_id, params.kiloUserId),
+        or(...purchaseCycles(clawbackPrefix), ...purchaseCycles(restorationPrefix))
+      )
+    )
+    .orderBy(credit_transactions.created_at);
+
+  const clawbacks: StoreCreditRefundCycle[] = [];
+  const restorations: StoreCreditRefundCycle[] = [];
+  for (const row of rows) {
+    const cycle = {
+      creditTransactionId: row.creditTransactionId,
+      amountMicrodollars: row.amountMicrodollars,
+      isFree: row.isFree,
+      kiloUserId: row.kiloUserId,
+      microdollarsUsed: row.microdollarsUsed,
+    };
+    const isClawback =
+      row.creditCategory === clawbackPrefix ||
+      (row.creditCategory?.startsWith(`${clawbackPrefix}:`) ?? false);
+    if (isClawback) clawbacks.push(cycle);
+    else restorations.push(cycle);
+  }
+
+  return { clawbacks, restorations };
 }
 
 async function findStoreCreditGrant(
@@ -182,18 +379,22 @@ export async function getStoreCreditConsumptionMilliunits(
 }
 
 /**
- * Reverse the refunded share of a store credit pack, exactly once.
+ * Reverse the refunded share of a store credit pack, exactly once per refund
+ * cycle.
  *
  * A credit pack is granted by `completeStoreCreditPurchase` under the
  * `store-credit:<provider>:<providerTransactionId>` payment id. The reversal is
  * `granted * refundedMilliunits / 100000` (refunded over paid), with the share
  * clamped to 0..100000 so the reversal stays within 0..granted, rounded to the
- * nearest microdollar, and is written as one negative row keyed by the
- * store transaction id. The amount depends only on the grant and the store's
- * refund share, never on the balance, and the key makes a replayed refund
- * notification a no-op, so the stored amount can never change. The store
- * refunded a purchase Kilo never granted against (no grant row) is a no-op,
- * not an error.
+ * nearest microdollar, and is written as one negative row keyed by the store
+ * transaction id. The amount depends only on the grant and the store's refund
+ * share, never on the balance, and a clawback already in force makes a replayed
+ * refund notification a no-op, so the stored amount can never change.
+ *
+ * The store refunded a purchase Kilo never granted against (no grant row) is a
+ * no-op, not an error. A refund the store issues *after* a reversal settled the
+ * previous one claws the pack back again under the next numbered cycle: the
+ * refund is in force again and the credits must not stay granted.
  */
 export async function reverseStoreCreditPurchase(
   tx: DrizzleTransaction,
@@ -220,8 +421,26 @@ export async function reverseStoreCreditPurchase(
     return { reversed: false, creditTransactionId: null, amountMicrodollars: 0 };
   }
 
+  const { clawbacks, restorations } = await findStoreCreditRefundCycles(tx, {
+    ...params,
+    kiloUserId: granted.kiloUserId,
+  });
+  const clawbackInForce = clawbacks[restorations.length];
+  if (clawbacks.length > restorations.length) {
+    // A refund is already in force, so this delivery is a replay: return the
+    // clawback that stands without touching the balance again.
+    return {
+      reversed: false,
+      creditTransactionId: clawbackInForce?.creditTransactionId ?? null,
+      amountMicrodollars: 0,
+    };
+  }
+
   const creditTransactionId = crypto.randomUUID();
-  const creditCategory = `store-credit-refund:${params.paymentProvider}:${params.providerTransactionId}`;
+  const creditCategory = storeCreditRefundCategory({
+    ...params,
+    cycle: clawbacks.length + 1,
+  });
   const insertResult = await tx
     .insert(credit_transactions)
     .values({
@@ -237,8 +456,8 @@ export async function reverseStoreCreditPurchase(
     .onConflictDoNothing();
 
   if ((insertResult.rowCount ?? 0) === 0) {
-    // Already reversed by an earlier delivery of the same refund. Return the
-    // existing reversal so the caller can record it without touching the balance.
+    // Another delivery of this cycle won the insert. Return its clawback so the
+    // caller can record it without touching the balance.
     const existingRows = await tx
       .select({ id: credit_transactions.id })
       .from(credit_transactions)
@@ -267,5 +486,105 @@ export async function reverseStoreCreditPurchase(
     reversed: true,
     creditTransactionId,
     amountMicrodollars: reversalMicrodollars,
+  };
+}
+
+/**
+ * Restore the credits a refund clawed back from a store credit pack, exactly
+ * once per refund cycle.
+ *
+ * The App Store reinstates a refund it reversed with `REFUND_REVERSED`, and
+ * Apple requires the reversed purchase's content back, consumables included, so
+ * the credits the refund took are owed again. The restore is the exact inverse
+ * of the clawback: it reads the clawback still in force and writes the positive
+ * mirror under the same cycle, keyed
+ * `store-credit-refund-reversal:<provider>:<providerTransactionId>`. The first
+ * delivery credits the balance back, and a redelivered reversal finds the pair
+ * settled and does nothing, so it can never restore twice.
+ *
+ * The amount is the clawback's stored amount, never a recomputed share, so a
+ * prorated refund restores exactly the share it took. A purchase Kilo never
+ * clawed back — never granted, or refunded without a grant — restores nothing:
+ * the reversal has nothing to undo. This mirrors `reverseStoreCreditPurchase`;
+ * both handlers hold the same per-purchase lock, so the pair is ordered rather
+ * than racing.
+ */
+export async function restoreStoreCreditPurchase(
+  tx: DrizzleTransaction,
+  params: { paymentProvider: KiloPassPaymentProvider; providerTransactionId: string }
+): Promise<StoreCreditRestorationResult> {
+  const granted = await findStoreCreditGrant(tx, params);
+  if (!granted) {
+    // Only a granted pack is ever clawed back, so there is nothing to restore.
+    return { restored: false, creditTransactionId: null, amountMicrodollars: 0 };
+  }
+
+  const { clawbacks, restorations } = await findStoreCreditRefundCycles(tx, {
+    ...params,
+    kiloUserId: granted.kiloUserId,
+  });
+  const clawback = clawbacks[restorations.length] ?? null;
+  if (!clawback || clawback.amountMicrodollars >= 0) {
+    // Nothing is clawed back: the pack was never granted, or this reversal
+    // already settled the cycle. Return the restoration that stands, if any, so
+    // the caller records the delivery without crediting the balance again.
+    return {
+      restored: false,
+      creditTransactionId: restorations.at(-1)?.creditTransactionId ?? null,
+      amountMicrodollars: 0,
+    };
+  }
+
+  const amountMicrodollars = -clawback.amountMicrodollars;
+  const creditTransactionId = crypto.randomUUID();
+  const creditCategory = storeCreditRefundReversalCategory({
+    ...params,
+    cycle: restorations.length + 1,
+  });
+  const insertResult = await tx
+    .insert(credit_transactions)
+    .values({
+      id: creditTransactionId,
+      kilo_user_id: clawback.kiloUserId,
+      amount_microdollars: amountMicrodollars,
+      is_free: clawback.isFree,
+      description: creditPackRestorationDescription(params.paymentProvider),
+      credit_category: creditCategory,
+      check_category_uniqueness: true,
+      original_baseline_microdollars_used: clawback.microdollarsUsed,
+    })
+    .onConflictDoNothing();
+
+  if ((insertResult.rowCount ?? 0) === 0) {
+    // Another delivery of this cycle won the insert. Return its restoration
+    // without touching the balance again.
+    const existingRows = await tx
+      .select({ id: credit_transactions.id })
+      .from(credit_transactions)
+      .where(
+        and(
+          eq(credit_transactions.kilo_user_id, clawback.kiloUserId),
+          eq(credit_transactions.credit_category, creditCategory)
+        )
+      )
+      .limit(1);
+    return {
+      restored: false,
+      creditTransactionId: existingRows[0]?.id ?? null,
+      amountMicrodollars: 0,
+    };
+  }
+
+  await tx
+    .update(kilocode_users)
+    .set({
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${amountMicrodollars}`,
+    })
+    .where(eq(kilocode_users.id, clawback.kiloUserId));
+
+  return {
+    restored: true,
+    creditTransactionId,
+    amountMicrodollars,
   };
 }

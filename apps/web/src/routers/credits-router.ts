@@ -2,12 +2,17 @@ import { captureException } from '@sentry/nextjs';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   assertAppStoreAccountTokenMatchesUser,
   assertGooglePlayAccountTokenMatchesUser,
 } from '@/lib/credits/store-account-token';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
+import {
+  StoreCreditPurchaseOwnedByAnotherAccountError,
+  StoreVerificationError,
+} from '@/lib/credits/store-purchase-errors';
 import { STORE_PURCHASE_REFUNDED_MESSAGE } from '@/lib/credits/store-refund';
 import { STORE_CREDIT_PRODUCTS } from '@/lib/credits/store-products';
 import {
@@ -61,13 +66,20 @@ const STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
  * state, a product that is not a credit pack) is terminal too, and is reported
  * as such so a caller does not replay it forever — this mirrors the Kilo Pass
  * completion routers. Every other failure (a store or API failure, including a
- * consume that did not complete) is retryable: the grant is idempotent, so the
- * client can safely replay the purchase.
+ * consume that did not complete, and any database failure) is retryable: the
+ * grant is idempotent, so the client can safely replay the purchase.
+ *
+ * Terminal versus retryable is decided by the error *type*. Classifying by
+ * message text made a transient database error whose SQL happens to name
+ * `credit_transactions` look like a refused receipt, and the mobile client
+ * records a terminal refusal for the rest of the process: a database blip could
+ * strand a purchase the user had already paid for.
  */
 function mapCreditCompletionError(
   error: unknown,
   userId: string,
-  operation: 'complete-app-store-purchase' | 'complete-play-purchase'
+  operation: 'complete-app-store-purchase' | 'complete-play-purchase',
+  secrets: readonly string[]
 ): TRPCError {
   if (error instanceof TRPCError) {
     return error;
@@ -84,7 +96,10 @@ function mapCreditCompletionError(
     });
   }
 
-  captureException(error, {
+  // A store credential is never part of the report: a database or provider
+  // error quotes the parameters it was built from, and a Play purchase token is
+  // a bearer credential.
+  captureException(sanitizeErrorForTelemetry(error, secrets), {
     tags: {
       area: 'credits',
       operation,
@@ -94,23 +109,17 @@ function mapCreditCompletionError(
     },
   });
 
-  const message = error instanceof Error ? error.message : '';
-  if (message.includes('already belongs')) {
-    return new TRPCError({
-      code: 'FORBIDDEN',
-      message: STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE,
-    });
-  }
-
-  const isVerificationFailure =
-    message.startsWith('Apple ') ||
-    message.startsWith('Google Play ') ||
-    message.includes('transaction') ||
-    message.includes('product');
-  if (isVerificationFailure) {
+  if (error instanceof StoreVerificationError) {
     return new TRPCError({
       code: 'BAD_REQUEST',
       message: 'We could not verify this store purchase. Please try again.',
+    });
+  }
+
+  if (error instanceof StoreCreditPurchaseOwnedByAnotherAccountError) {
+    return new TRPCError({
+      code: 'FORBIDDEN',
+      message: STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE,
     });
   }
 
@@ -146,7 +155,9 @@ export const creditsRouter = createTRPCRouter({
         const result = await completeStoreCreditPurchase({ user: ctx.user, purchase });
         return { amountUsd: result.amountUsd, alreadyProcessed: result.alreadyProcessed };
       } catch (error) {
-        throw mapCreditCompletionError(error, ctx.user.id, 'complete-app-store-purchase');
+        throw mapCreditCompletionError(error, ctx.user.id, 'complete-app-store-purchase', [
+          input.signedTransactionJws,
+        ]);
       }
     }),
 
@@ -172,7 +183,9 @@ export const creditsRouter = createTRPCRouter({
         await acknowledgeGooglePlayCreditPurchase(input.productId, input.purchaseToken);
         return { amountUsd: result.amountUsd, alreadyProcessed: result.alreadyProcessed };
       } catch (error) {
-        throw mapCreditCompletionError(error, ctx.user.id, 'complete-play-purchase');
+        throw mapCreditCompletionError(error, ctx.user.id, 'complete-play-purchase', [
+          input.purchaseToken,
+        ]);
       }
     }),
 });

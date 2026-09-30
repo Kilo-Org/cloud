@@ -81,6 +81,7 @@ function createActions(
     completePlayPurchase: vi.fn().mockResolvedValue({ alreadyProcessed: false }),
     finishTransaction: vi.fn().mockResolvedValue(undefined),
     invalidateAfterCompletion: vi.fn(),
+    isAccountCurrent: () => true,
     requestPurchase: vi.fn().mockResolvedValue(null),
     showError: () => undefined,
     ...overrides,
@@ -150,6 +151,44 @@ describe('createStoreCreditPurchaseActions.purchase', () => {
 
     expect(await actions.purchase(creditPack)).toBe(false);
     expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('recovers the outstanding transaction when the store says the pack is already owned', async () => {
+    const recoverOwnedPurchase = vi.fn().mockResolvedValue(true);
+    const showError = vi.fn();
+    const actions = createActions({
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'already-owned',
+        message: 'Item already owned',
+      }),
+      recoverOwnedPurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.purchase(creditPack)).toBe(false);
+    expect(recoverOwnedPurchase).toHaveBeenCalledTimes(1);
+    // The recovery completed the purchase, so no failure is reported — and never
+    // the different-account copy for a purchase the same user already made.
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('reports a generic failure when the already-owned recovery finds nothing', async () => {
+    const showError = vi.fn();
+    const actions = createActions({
+      requestPurchase: vi.fn().mockRejectedValue({
+        code: 'already-owned',
+        message: 'Item already owned',
+      }),
+      recoverOwnedPurchase: vi.fn().mockResolvedValue(false),
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.purchase(creditPack)).toBe(false);
+    expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
   });
 });
 
@@ -324,6 +363,160 @@ describe('createStoreCreditPurchaseActions completion', () => {
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
   });
 
+  it('does not let another account join an unresolved completion', async () => {
+    const purchase = createPurchase();
+    const backendCompletionGate = Promise.withResolvers<undefined>();
+    const completeForAccountA = vi.fn().mockImplementation(async () => {
+      await backendCompletionGate.promise;
+      return { alreadyProcessed: false };
+    });
+    // Account A is mid-completion when the account changes; the new account's
+    // recovery finds the same transaction. It must submit its own request under
+    // its own account token, not join A's and inherit its result.
+    const completeForAccountB = vi
+      .fn()
+      .mockRejectedValue(new Error(STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE));
+    const showErrorForAccountB = vi.fn();
+    const actionsForAccountA = createActions({
+      appAccountToken: 'account-a-token',
+      completeAppStorePurchase: completeForAccountA,
+    });
+    const actionsForAccountB = createActions({
+      appAccountToken: 'account-b-token',
+      completeAppStorePurchase: completeForAccountB,
+      showError: message => {
+        showErrorForAccountB(message);
+      },
+    });
+
+    const accountACompletion = actionsForAccountA.handlePurchaseSuccess(purchase);
+    const accountBCompletion = actionsForAccountB.handlePurchaseSuccess(purchase);
+    backendCompletionGate.resolve(undefined);
+
+    await expect(accountACompletion).resolves.toBe(true);
+    await expect(accountBCompletion).resolves.toBe(false);
+
+    expect(completeForAccountA).toHaveBeenCalledTimes(1);
+    expect(completeForAccountB).toHaveBeenCalledTimes(1);
+    // B's own refusal is the explicit backend ownership refusal, so it is the
+    // one that earns the different-account copy.
+    expect(showErrorForAccountB).toHaveBeenCalledWith(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY);
+  });
+
+  it('shares a completion within one account', async () => {
+    const purchase = createPurchase();
+    const backendCompletionGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendCompletionGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const actions = createActions({ appAccountToken: 'account-a-token', completeAppStorePurchase });
+
+    const first = actions.handlePurchaseSuccess(purchase);
+    const second = actions.handlePurchaseSuccess(purchase);
+    backendCompletionGate.resolve(undefined);
+
+    await expect(first).resolves.toBe(true);
+    await expect(second).resolves.toBe(true);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('announces a recovery the user triggered, unlike the background pass', async () => {
+    const purchase = createPurchase();
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    await actions.recoverPurchases([purchase], { notifyCompletion: true });
+
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a receipt whose account is already gone', async () => {
+    const completeAppStorePurchase = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => false,
+      completeAppStorePurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(false);
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('does not post a second receipt after the account changed under the first', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      appAccountToken: 'account-a-token',
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      invalidateAfterCompletion,
+    });
+
+    const firstPass = actions.recoverPurchases([createPurchase({ transactionId: 'tx-1' })]);
+    // The account changes while the first receipt's backend call is in flight.
+    signedInAccount = 'account-b';
+
+    // The second receipt is recovered by the same, now old, session: it must not
+    // be posted under the new one.
+    await expect(
+      actions.recoverPurchases([createPurchase({ transactionId: 'tx-2' })])
+    ).resolves.toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+
+    // The first receipt's grant belongs to the old session: it is not reported
+    // as recovered and does not refresh the new account's balance.
+    backendGate.resolve(undefined);
+    await expect(firstPass).resolves.toEqual([]);
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+  });
+
+  it('does not announce or refresh when the account changes while the backend answers', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = Promise.withResolvers<undefined>();
+    const completeAppStorePurchase = vi.fn().mockImplementation(async () => {
+      await backendGate.promise;
+      return { alreadyProcessed: false };
+    });
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const completion = actions.handlePurchaseSuccess(createPurchase());
+    signedInAccount = 'account-b';
+    backendGate.resolve(undefined);
+
+    await expect(completion).resolves.toBe(true);
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+    // The store transaction is still finished: the store holds it for this
+    // device whatever Kilo account is signed in, and leaving it queued would
+    // only re-deliver it.
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+  });
+
   it('reports a missing signed transaction without completing', async () => {
     const completeAppStorePurchase = vi.fn();
     const finishTransaction = vi.fn();
@@ -383,19 +576,22 @@ describe('getStoreCreditPurchaseErrorMessageKey', () => {
     ).toBe(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY);
   });
 
-  it('maps a store AlreadyOwned error to the storefront account key', () => {
+  it('does not map a store AlreadyOwned error to the different-account key', () => {
+    // A consumable the store still owns is usually this same user's unfinished
+    // charge, so the different-account copy is reserved for the backend's own
+    // ownership refusal (below).
     expect(
       getStoreCreditPurchaseErrorMessageKey(
         { code: 'already-owned', message: 'Item already owned' },
         'play'
       )
-    ).toBe(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_PLAY_KEY);
+    ).toBe(CREDIT_PURCHASE_FAILED_KEY);
     expect(
       getStoreCreditPurchaseErrorMessageKey(
         { code: 'already-owned', message: 'Item already owned' },
         'app_store'
       )
-    ).toBe(CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY);
+    ).toBe(CREDIT_PURCHASE_FAILED_KEY);
   });
 
   it('maps an unknown failure to the generic purchase-failed key', () => {

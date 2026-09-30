@@ -8,6 +8,7 @@ import {
 } from 'expo-iap';
 
 import { useAuth } from '@/lib/auth/auth-context';
+import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { createStoreCreditPurchaseActions } from '@/lib/credits/use-store-credit-purchase';
@@ -88,6 +89,10 @@ export function StorePurchaseRecoveryMount(): null {
   // The store this device has. Read from the one helper that owns that fork, so
   // this pass completes against the same store the purchase screens sell from.
   const storefront = getCreditStorefront();
+  // The auth epoch this mount belongs to. The `(app)` layout unmounts it on
+  // sign-out, but a pass already in flight keeps running; the epoch fences it so
+  // the next account's session never posts the old account's receipts.
+  const authEpochRef = useRef(currentAuthEpoch());
 
   const creditsCatalog = useQuery({
     ...trpc.credits.getMobileStoreProducts.queryOptions(),
@@ -153,6 +158,7 @@ export function StorePurchaseRecoveryMount(): null {
         completePlayPurchase: completePlayCredit.mutateAsync,
         finishTransaction: finishStoreTransaction,
         invalidateAfterCompletion: invalidateAfterCreditCompletion,
+        isAccountCurrent: () => isCurrentAuthEpoch(authEpochRef.current),
         showError: logRecoveryError,
       }),
     [
@@ -185,6 +191,7 @@ export function StorePurchaseRecoveryMount(): null {
         enabledAppleProductIds: kiloPassAppleProductIds,
         enabledGoogleProductIds: kiloPassGoogleProductIds,
         invalidateAfterCompletion: invalidateAfterKiloPassCompletion,
+        isAccountCurrent: () => isCurrentAuthEpoch(authEpochRef.current),
         showError: logRecoveryError,
       }),
     [
@@ -223,6 +230,13 @@ export function StorePurchaseRecoveryMount(): null {
         'the pending purchase lookup'
       );
       if (pendingPurchases.length === 0) {
+        return;
+      }
+      // A pass belongs to the account that started it. Sign-out or a new sign-in
+      // bumps the epoch (and unmounts this mount), but the pass is already
+      // running, so it must not submit its completions under the new account.
+      // The credit actions re-check this same predicate before every submission.
+      if (!isCurrentAuthEpoch(authEpochRef.current)) {
         return;
       }
       // Each flow completes only the purchases it sells and ignores the rest, so

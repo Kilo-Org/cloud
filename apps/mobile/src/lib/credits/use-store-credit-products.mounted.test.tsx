@@ -1,8 +1,9 @@
 import { createElement, useState } from 'react';
+import { onlineManager } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act } from '@/test/renderer';
-import { createTestQueryClient, renderWithProviders } from '@/test/render-with-providers';
+import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 import { type StoreCreditProductListing } from './store-products';
 import { useStoreCreditProducts } from './use-store-credit-products';
@@ -15,32 +16,34 @@ vi.mock('@/lib/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => ({ userId: 'user-1' }),
 }));
 
-vi.mock('@/lib/trpc', () => {
-  const backendCatalog = vi.fn().mockResolvedValue({
-    appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-    products: [
-      {
-        amountUsd: 10,
-        appleProductId: 'credits.usd10.v1',
-        googleProductId: 'credits_usd10',
+const mockedBackend = vi.hoisted(() => ({ query: vi.fn() }));
+
+vi.mock('@/lib/trpc', () => ({
+  useTRPC: () => ({
+    credits: {
+      getMobileStoreProducts: {
+        queryOptions: () => ({
+          queryKey: ['mobile-credit-products'],
+          queryFn: mockedBackend.query,
+        }),
       },
-    ],
-  });
-  return {
-    useTRPC: () => ({
-      credits: {
-        getMobileStoreProducts: {
-          queryOptions: () => ({
-            queryKey: ['mobile-credit-products'],
-            queryFn: backendCatalog,
-          }),
-        },
-      },
-    }),
-  };
-});
+    },
+  }),
+}));
+
+const BACKEND_CATALOG = {
+  appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+  products: [
+    {
+      amountUsd: 10,
+      appleProductId: 'credits.usd10.v1',
+      googleProductId: 'credits_usd10',
+    },
+  ],
+};
 
 const fetchStoreProducts = vi.fn();
+const reconnectStore = vi.fn().mockResolvedValue(true);
 
 const pricedListing: StoreCreditProductListing = {
   id: 'credits.usd10.v1',
@@ -57,7 +60,7 @@ type Probe = {
 function Harness({ probe }: { probe: Probe }) {
   const [connected, setConnected] = useState(false);
   probe.setConnected = setConnected;
-  probe.current = useStoreCreditProducts({ connected, fetchStoreProducts });
+  probe.current = useStoreCreditProducts({ connected, fetchStoreProducts, reconnectStore });
   return null;
 }
 
@@ -79,6 +82,15 @@ async function mountHook() {
   };
 }
 
+beforeEach(() => {
+  mockedPlatform.OS = 'ios';
+  mockedBackend.query.mockReset();
+  mockedBackend.query.mockResolvedValue(BACKEND_CATALOG);
+  fetchStoreProducts.mockReset();
+  reconnectStore.mockReset();
+  reconnectStore.mockResolvedValue(true);
+});
+
 /**
  * A manual retry re-arms the bounded store-connection wait. When the retry
  * answers while the connection flag is still false, the pending timer must not
@@ -86,11 +98,6 @@ async function mountHook() {
  * store had just priced and the screen had left enabled.
  */
 describe('useStoreCreditProducts store-connection timeout', () => {
-  beforeEach(() => {
-    mockedPlatform.OS = 'ios';
-    fetchStoreProducts.mockReset();
-  });
-
   it('does not re-raise the store-unavailable banner after a successful retry', async () => {
     vi.useFakeTimers();
     fetchStoreProducts.mockRejectedValue(new Error('store offline'));
@@ -143,6 +150,99 @@ describe('useStoreCreditProducts store-connection timeout', () => {
       expect(api().storeUnavailable).toBe(true);
     } finally {
       vi.useRealTimers();
+      unmount();
+    }
+  });
+});
+
+describe('useStoreCreditProducts retry reconnect', () => {
+  it('reconnects the IAP owner before refetching the store products', async () => {
+    const calls: string[] = [];
+    reconnectStore.mockImplementation(() => {
+      calls.push('reconnect');
+      return true;
+    });
+    fetchStoreProducts.mockImplementation(() => {
+      calls.push('fetch');
+      return [pricedListing];
+    });
+
+    const { api, unmount } = await mountHook();
+    try {
+      await act(async () => {
+        await api().refetch();
+      });
+
+      // expo-iap drops its purchase-update listeners when initialization fails,
+      // so the retry must restore them before it can enable a priced row.
+      expect(calls).toEqual(['reconnect', 'fetch']);
+    } finally {
+      unmount();
+    }
+  });
+
+  it('still refetches when the reconnect itself fails', async () => {
+    reconnectStore.mockRejectedValue(new Error('NotPrepared'));
+    fetchStoreProducts.mockResolvedValue([pricedListing]);
+
+    const { api, unmount } = await mountHook();
+    try {
+      await act(async () => {
+        await api().refetch();
+      });
+
+      expect(fetchStoreProducts).toHaveBeenCalledTimes(1);
+      expect(api().products.some(product => product.storeProductId !== null)).toBe(true);
+    } finally {
+      unmount();
+    }
+  });
+});
+
+describe('useStoreCreditProducts paused store query', () => {
+  it('keeps the known packs while the store query is paused offline', async () => {
+    const { api, queryClient, setConnected, unmount } = await mountHook();
+    try {
+      // The backend catalog is cached while the store is still disconnected.
+      await waitFor(() => queryClient.getQueryData(['mobile-credit-products']) !== undefined);
+
+      // Going offline pauses the store query: it is `pending` without fetching,
+      // so TanStack reports `isLoading: false` and there is no error. Before the
+      // fix that read as an empty catalog and hid the pack the backend named.
+      onlineManager.setOnline(false);
+      setConnected(true);
+      await waitFor(() => !api().isLoading);
+
+      expect(api().catalogEmpty).toBe(false);
+      expect(api().isError).toBe(false);
+      expect(api().storeUnavailable).toBe(false);
+      expect(api().products).toHaveLength(1);
+      expect(api().products[0]?.backend.amountUsd).toBe(10);
+      expect(api().products[0]?.storeProductId).toBeNull();
+    } finally {
+      onlineManager.setOnline(true);
+      unmount();
+    }
+  });
+
+  it('reports an empty catalog only when the backend answers with no packs', async () => {
+    mockedBackend.query.mockResolvedValue({
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [],
+    });
+    const { api, queryClient, setConnected, unmount } = await mountHook();
+    try {
+      await waitFor(() => queryClient.getQueryData(['mobile-credit-products']) !== undefined);
+
+      onlineManager.setOnline(false);
+      setConnected(true);
+      await waitFor(() => api().catalogEmpty);
+
+      expect(api().isLoading).toBe(false);
+      expect(api().products).toHaveLength(0);
+      expect(api().storeUnavailable).toBe(false);
+    } finally {
+      onlineManager.setOnline(true);
       unmount();
     }
   });

@@ -28,6 +28,15 @@ export type StoreCreditProductsOptions = {
   connected: boolean;
   /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreCreditProductListing[]>;
+  /**
+   * Restores the IAP owner's store connection.
+   *
+   * expo-iap removes its purchase-update listeners when initialization fails,
+   * and only the hook's `reconnect()` brings those listeners and the connected
+   * state back. A retry that only refetched products could therefore price packs
+   * the owner had no callback to complete.
+   */
+  reconnectStore: () => Promise<boolean>;
 };
 
 /**
@@ -41,9 +50,6 @@ type SettledStoreCreditProductsView = {
   storeUnavailable: boolean;
   errorMessageKey: string | null;
 };
-
-/** One shared empty catalog, so an empty settled view keeps a stable reference. */
-const EMPTY_STORE_PRODUCTS: StoreCreditProduct[] = [];
 
 function sameSettledView(
   left: SettledStoreCreditProductsView,
@@ -129,13 +135,23 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   });
 
   const { refetch: refetchProducts } = productsQuery;
+  const { reconnectStore } = options;
   const refetch = useCallback(async () => {
     // Keep `storeErrorMessage` until the retry answers: clearing it here drops
     // the banner while the store is still unreachable. The success effect below
     // clears it once the retry succeeds.
     setConnectionAttempt(attempt => attempt + 1);
+    // Restore the connection before asking for prices. A failed initialization
+    // leaves the owner without purchase-update listeners, so pricing a pack
+    // without reconnecting would enable a row that can never complete; the
+    // screen also keeps every row disabled until the owner reports connected.
+    try {
+      await reconnectStore();
+    } catch {
+      // Still unreachable: the bounded store-connection wait keeps the banner up.
+    }
     await refetchProducts();
-  }, [refetchProducts]);
+  }, [reconnectStore, refetchProducts]);
 
   const queryErrorMessage = getAuthoredProductsErrorMessageKey(productsQuery.error);
 
@@ -192,12 +208,14 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     [backendProductsQuery.data]
   );
   let products = productsState.products;
-  if (products.length === 0) {
-    // A store failure must not blank the rows: fall back to the backend packs
-    // with no store price, so the amounts stay on screen and each row shows the
-    // price-unavailable note. An empty result keeps one shared reference, so the
-    // settled-view comparison below is not restarted on every render.
-    products = storeUnavailable ? unpricedBackendProducts : EMPTY_STORE_PRODUCTS;
+  if (products.length === 0 && !catalogEmpty) {
+    // The store query has not priced the packs: it is pending, paused while
+    // offline, or failed. A pending query has no data and is neither loading
+    // (`isLoading` is `isPending && isFetching`, so a paused query is false) nor
+    // an error, so reporting its empty result would hide the packs the backend
+    // catalog already named. Keep those rows without a price: only a successful
+    // catalog with nothing to sell is an empty catalog.
+    products = unpricedBackendProducts;
   }
 
   const liveView = useMemo<SettledStoreCreditProductsView>(
@@ -236,6 +254,10 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
   }, [settled, liveView]);
 
   const view = !settled && settledView !== null ? settledView : liveView;
+  // Deliberately `isLoading`, not `isPending`: a paused store query is pending
+  // without fetching, and the packs the backend catalog already named render
+  // from the fallback above instead of hiding behind placeholders. Only a first
+  // load with nothing known yet shows the placeholders.
   const isLoading =
     settledView === null &&
     storeErrorMessage === null &&
@@ -251,6 +273,9 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     isError: view.isError,
     errorMessageKey: view.errorMessageKey,
     storeUnavailable: view.storeUnavailable,
+    // The backend catalog answered with nothing to sell — the one state that is
+    // an empty catalog. A pending, paused or failed store query is not.
+    catalogEmpty,
     refetch,
   };
 }

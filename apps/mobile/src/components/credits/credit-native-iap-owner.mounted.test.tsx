@@ -1,8 +1,11 @@
+/* eslint-disable max-lines -- The owner's request-generation, delivery and already-owned recovery tests share one IAP-owner harness; splitting them would duplicate its mocks and mount scaffolding. */
+
 import { createElement } from 'react';
 import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { act, TestRenderer } from '@/test/renderer';
 import {
   type CreditNativeIapContextValue,
@@ -22,6 +25,7 @@ const mockedIap = vi.hoisted(() => ({
     onPurchaseError: (error: unknown) => void;
     onPurchaseSuccess: (purchase: Purchase) => void;
   } | null,
+  reconnect: vi.fn(),
   requestPurchase: vi.fn(),
   useIAP: vi.fn(),
 }));
@@ -56,6 +60,7 @@ vi.mock('expo-iap', () => ({
     return {
       connected: mockedIap.connected,
       finishTransaction: mockedIap.finishTransaction,
+      reconnect: mockedIap.reconnect,
       requestPurchase: mockedIap.requestPurchase,
     };
   },
@@ -114,6 +119,18 @@ const creditPack: StoreCreditProduct = {
   displayPrice: '$10.99',
 };
 
+const CREDIT_PACK_50 = 'credits.usd50.v1';
+
+const creditPack50: StoreCreditProduct = {
+  backend: {
+    amountUsd: 50,
+    appleProductId: CREDIT_PACK_50,
+    googleProductId: 'credits_usd50',
+  },
+  storeProductId: CREDIT_PACK_50,
+  displayPrice: '$54.99',
+};
+
 function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
   return {
     id: 'purchase-1',
@@ -164,6 +181,7 @@ beforeEach(() => {
   mockedIap.finishTransaction.mockResolvedValue(undefined);
   mockedIap.getAvailablePurchases.mockResolvedValue([]);
   mockedIap.handlers = null;
+  mockedIap.reconnect.mockResolvedValue(true);
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedQuery.completePurchase.mockResolvedValue({ alreadyProcessed: false });
   mockedQuery.invalidateQueries.mockResolvedValue(undefined);
@@ -184,6 +202,7 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value).not.toBeNull();
     expect(typeof handle.value?.purchase).toBe('function');
     expect(typeof handle.value?.fetchStoreProducts).toBe('function');
+    expect(typeof handle.value?.reconnectStore).toBe('function');
     expect(handle.value?.completingProductId).toBeNull();
     expect(handle.value?.errorMessageKey).toBeNull();
   });
@@ -358,6 +377,165 @@ describe('CreditNativeIapOwner', () => {
     await flushPromises();
 
     expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+    expect(handle.value?.completingProductId).toBeNull();
+  });
+
+  it('does not release the in-flight request when the store replays another product', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack50)).toBe(true);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
+
+    // The store re-delivers an unfinished transaction for another product while
+    // the $50 request is still in flight. Completing the replay must not release
+    // the request the user is waiting on.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+    });
+    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
+
+    // The request's own transaction still completes and releases it.
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        productId: CREDIT_PACK_50,
+        purchaseToken: 'jws-50',
+        transactionId: 'tx-50',
+      })
+    );
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.completedPurchaseCount).toBe(2);
+  });
+
+  it('does not clear a newer request when a stale completion resolves', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [
+        { appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' },
+        { appleProductId: CREDIT_PACK_50, googleProductId: 'credits_usd50' },
+      ],
+    };
+    const staleCompletion = Promise.withResolvers<{ alreadyProcessed: boolean }>();
+    mockedQuery.completePurchase.mockReturnValueOnce(staleCompletion.promise);
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+
+    // The $10 request's transaction arrives and its backend completion starts.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+    // A store error releases that request while its completion is still in
+    // flight, and the user starts a different pack.
+    mockedIap.handlers?.onPurchaseError({
+      code: 'billing-unavailable',
+      message: 'Play Store service is not connected',
+    });
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBeNull();
+
+    expect(await handle.value?.purchase(creditPack50)).toBe(true);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
+
+    // The stale completion resolves: its finalizer owns the released request and
+    // must not clear the newer one.
+    staleCompletion.resolve({ alreadyProcessed: false });
+    await flushPromises();
+
+    expect(handle.value?.completingProductId).toBe(CREDIT_PACK_50);
+  });
+
+  it('recovers the outstanding purchase when the store reports it as already owned', async () => {
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+
+    mockedIap.handlers?.onPurchaseError({ code: 'already-owned', message: 'Item already owned' });
+    await flushPromises();
+
+    // "Already owned" is not proof of another account: the outstanding
+    // consumable is completed, so no account-mismatch message is shown.
+    expect(mockedQuery.completePurchase).toHaveBeenCalledWith({
+      signedTransactionJws: 'signed-jws',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ productId: APPLE_PRODUCT_ID }),
+      isConsumable: true,
+    });
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+  });
+
+  it('does not submit a recovery pass that outlived an account change', async () => {
+    const pendingLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.getAvailablePurchases.mockReturnValueOnce(pendingLookup.promise);
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+    await flushPromises();
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+
+    // Sign-out (and the next sign-in) advance the auth epoch while the store is
+    // still answering this pass.
+    bumpAuthEpoch();
+    pendingLookup.resolve([createPurchase()]);
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    expect(handle.value?.completedPurchaseCount).toBe(0);
+  });
+
+  it('does not announce a completion that outlived an account change', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const backendGate = Promise.withResolvers<{ alreadyProcessed: boolean }>();
+    mockedQuery.completePurchase.mockReturnValueOnce(backendGate.promise);
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    // The account changes while the backend answers the request's completion.
+    bumpAuthEpoch();
+    backendGate.resolve({ alreadyProcessed: false });
+    await flushPromises();
+
+    // The grant belongs to the old session: the new one is neither announced nor
+    // refreshed, and the store transaction is still finished for this device.
+    expect(handle.value?.completedPurchaseCount).toBe(0);
+    expect(mockedQuery.invalidateQueries).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ productId: APPLE_PRODUCT_ID }),
+      isConsumable: true,
+    });
     expect(handle.value?.completingProductId).toBeNull();
   });
 });

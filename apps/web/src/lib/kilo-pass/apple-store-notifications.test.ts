@@ -74,6 +74,39 @@ const mockReverseStoreCreditPurchase = jest.mocked(getStoreRefundMock().reverseS
 let processAppStoreKiloPassNotification: typeof AppleStoreNotifications.processAppStoreKiloPassNotification;
 
 const APP_STORE_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
+// The store's own chronology, which orders deliveries that arrive out of order.
+const REFUND_SIGNED_AT_MS = APP_STORE_NOTIFICATION_TEST_NOW_MS;
+const REFUND_REVERSED_SIGNED_AT_MS = APP_STORE_NOTIFICATION_TEST_NOW_MS + 60_000;
+
+/** A granted credit pack, exactly as `completeStoreCreditPurchase` writes it. */
+async function insertGrantedCreditPack(params: {
+  userId: string;
+  transactionId: string;
+  amountMicrodollars: number;
+}): Promise<void> {
+  await db.insert(credit_transactions).values({
+    kilo_user_id: params.userId,
+    amount_microdollars: params.amountMicrodollars,
+    is_free: false,
+    description: 'Credit purchase via App Store',
+    stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.AppStore, params.transactionId),
+  });
+  await db
+    .update(kilocode_users)
+    .set({ total_microdollars_acquired: params.amountMicrodollars })
+    .where(eq(kilocode_users.id, params.userId));
+}
+
+function creditRowsForCategory(creditCategory: string) {
+  return db
+    .select({
+      id: credit_transactions.id,
+      amountMicrodollars: credit_transactions.amount_microdollars,
+      creditCategory: credit_transactions.credit_category,
+    })
+    .from(credit_transactions)
+    .where(eq(credit_transactions.credit_category, creditCategory));
+}
 
 // The mobile clients match this exact backend string, so it is pinned here
 // rather than imported from the constant the completion throws it from.
@@ -1500,6 +1533,273 @@ describe('processAppStoreKiloPassNotification', () => {
       notificationUUID: 'credit-pack-refund',
       providerTransactionId: transactionId,
       storeCreditReversal: { reversed: true, amountMicrodollars },
+    });
+  });
+
+  describe('reversed refunds', () => {
+    async function refund(params: {
+      transactionId: string;
+      signedDate: number;
+      notificationUUID: string;
+    }) {
+      return processAppStoreKiloPassNotification({
+        signedPayload: params.notificationUUID,
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: params.notificationUUID,
+            notificationType: NotificationTypeV2.REFUND,
+            signedDate: params.signedDate,
+            signedTransactionInfo: `${params.notificationUUID}-transaction`,
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            transactionId: params.transactionId,
+            productId: 'credits.usd10.v1',
+            revocationDate: params.signedDate,
+            revocationType: RevocationType.REFUND_FULL,
+            revocationPercentage: 100_000,
+          }),
+      });
+    }
+
+    async function refundReversed(params: {
+      transactionId: string;
+      signedDate: number;
+      notificationUUID: string;
+    }) {
+      return processAppStoreKiloPassNotification({
+        signedPayload: params.notificationUUID,
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: params.notificationUUID,
+            notificationType: NotificationTypeV2.REFUND_REVERSED,
+            signedDate: params.signedDate,
+            signedTransactionInfo: `${params.notificationUUID}-transaction`,
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            transactionId: params.transactionId,
+            productId: 'credits.usd10.v1',
+            revocationDate: params.signedDate,
+          }),
+      });
+    }
+
+    async function acquiredMicrodollars(userId: string): Promise<number> {
+      const user = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, userId),
+      });
+      return user?.total_microdollars_acquired ?? 0;
+    }
+
+    it('restores the credits a refund clawed back exactly once', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+      const amountMicrodollars = toMicrodollars(10);
+      await insertGrantedCreditPack({ userId: user.id, transactionId, amountMicrodollars });
+
+      await expect(
+        refund({
+          transactionId,
+          signedDate: REFUND_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-reversed-refund',
+        })
+      ).resolves.toEqual({ processed: true });
+      expect(await acquiredMicrodollars(user.id)).toBe(0);
+
+      await expect(
+        refundReversed({
+          transactionId,
+          signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-refund-reversed',
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(amountMicrodollars);
+      const restorations = await creditRowsForCategory(
+        `store-credit-refund-reversal:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+      );
+      expect(restorations).toEqual([
+        {
+          id: expect.any(String),
+          amountMicrodollars,
+          creditCategory: `store-credit-refund-reversal:${KiloPassPaymentProvider.AppStore}:${transactionId}`,
+        },
+      ]);
+
+      // Apple redelivers the reversal with a fresh notification id: the restore
+      // is keyed by the purchase, so it cannot credit the pack twice.
+      await expect(
+        refundReversed({
+          transactionId,
+          signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-refund-reversed-again',
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(amountMicrodollars);
+      expect(
+        await creditRowsForCategory(
+          `store-credit-refund-reversal:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+        )
+      ).toHaveLength(1);
+    });
+
+    it('leaves the pack credited when a reversal arrives before the older refund it reverses', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+      const amountMicrodollars = toMicrodollars(10);
+      await insertGrantedCreditPack({ userId: user.id, transactionId, amountMicrodollars });
+
+      // The reversal reaches Kilo first, and the refund it reverses was signed
+      // before it: the refund is superseded and must not claw the pack back.
+      await expect(
+        refundReversed({
+          transactionId,
+          signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-reversal-before-refund',
+        })
+      ).resolves.toEqual({ processed: true });
+      await expect(
+        refund({
+          transactionId,
+          signedDate: REFUND_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-stale-refund',
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(amountMicrodollars);
+      expect(
+        await creditRowsForCategory(
+          `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+        )
+      ).toEqual([]);
+      const staleAudit = await db.query.kilo_pass_audit_log.findFirst({
+        where: sql`${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'credit-pack-stale-refund'`,
+      });
+      expect(staleAudit?.payload_json).toMatchObject({
+        supersededByStoreReversal: true,
+        storeCreditReversal: null,
+      });
+    });
+
+    it('claws the pack back when the refund is signed after the reversal Kilo processed', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+      const amountMicrodollars = toMicrodollars(10);
+      await insertGrantedCreditPack({ userId: user.id, transactionId, amountMicrodollars });
+
+      // The store reversed an earlier refund, and then refunded the pack again.
+      await expect(
+        refundReversed({
+          transactionId,
+          signedDate: REFUND_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-earlier-reversal',
+        })
+      ).resolves.toEqual({ processed: true });
+      await expect(
+        refund({
+          transactionId,
+          signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-later-refund',
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(0);
+      expect(
+        await creditRowsForCategory(
+          `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+        )
+      ).toEqual([
+        {
+          id: expect.any(String),
+          amountMicrodollars: -amountMicrodollars,
+          creditCategory: `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`,
+        },
+      ]);
+    });
+
+    it('claws the pack back again when the store refunds it after a reversal', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+      const amountMicrodollars = toMicrodollars(10);
+      await insertGrantedCreditPack({ userId: user.id, transactionId, amountMicrodollars });
+
+      await refund({
+        transactionId,
+        signedDate: REFUND_SIGNED_AT_MS,
+        notificationUUID: 'credit-pack-first-refund',
+      });
+      await refundReversed({
+        transactionId,
+        signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+        notificationUUID: 'credit-pack-first-reversal',
+      });
+      expect(await acquiredMicrodollars(user.id)).toBe(amountMicrodollars);
+
+      // The store refunds the same pack again, signed after the reversal: the
+      // settled first cycle must not leave the credits granted.
+      await refund({
+        transactionId,
+        signedDate: REFUND_REVERSED_SIGNED_AT_MS + 60_000,
+        notificationUUID: 'credit-pack-second-refund',
+      });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(0);
+      expect(
+        await creditRowsForCategory(
+          `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+        )
+      ).toHaveLength(1);
+      expect(
+        await creditRowsForCategory(
+          `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}:2`
+        )
+      ).toEqual([
+        {
+          id: expect.any(String),
+          amountMicrodollars: -amountMicrodollars,
+          creditCategory: `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}:2`,
+        },
+      ]);
+    });
+
+    it('credits a reversed refund of a pack Kilo never granted without blocking the grant', async () => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const transactionId = `tx-${crypto.randomUUID()}`;
+
+      await refund({
+        transactionId,
+        signedDate: REFUND_SIGNED_AT_MS,
+        notificationUUID: 'credit-pack-refund-before-reversal-grant',
+      });
+      await expect(
+        refundReversed({
+          transactionId,
+          signedDate: REFUND_REVERSED_SIGNED_AT_MS,
+          notificationUUID: 'credit-pack-refund-before-reversal',
+        })
+      ).resolves.toEqual({ processed: true });
+
+      expect(await acquiredMicrodollars(user.id)).toBe(0);
+      const completion = await completeStoreCreditPurchase({
+        user,
+        purchase: {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          productId: 'credits.usd10.v1',
+          providerTransactionId: transactionId,
+          appAccountToken: user.app_store_account_token,
+          quantity: 1,
+          amountUsd: 10,
+          amountMicrodollars: toMicrodollars(10),
+          purchasedAtIso: '2026-05-15T00:00:00.000Z',
+          environment: 'Sandbox',
+          rawPayload: {},
+        },
+      });
+
+      expect(completion.alreadyProcessed).toBe(false);
+      expect(await acquiredMicrodollars(user.id)).toBe(toMicrodollars(10));
     });
   });
 

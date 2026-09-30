@@ -35,6 +35,8 @@ import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
+import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import {
   lockStoreCreditPurchase,
   reverseStoreCreditPurchase,
@@ -719,18 +721,20 @@ export async function processGooglePlayKiloPassNotification(params: {
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
     await db.transaction(async tx => {
       // Serialize with a completion of the same purchase, in either order. The
-      // completion keys the grant by the order id or by the purchase token, so
-      // both ids are locked here; the reversal itself still tries the order id
-      // first and falls back to the token.
+      // completion keys the grant by the order id, or by a digest of the
+      // purchase token when Play reported none, so both ids are locked here;
+      // the reversal itself still tries the order id first and falls back to
+      // the digest. The raw token is never a lock key or a ledger key.
+      const tokenKey = googlePlayCreditProviderTransactionId({ purchaseToken });
       await lockStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
-        providerTransactionIds: [orderId, purchaseToken],
+        providerTransactionIds: [orderId, tokenKey],
       });
 
       // The grant is keyed by the order id when Play reported one and by the
-      // purchase token otherwise, while a voided notification always carries an
-      // order id. Try the order id first and fall back to the purchase token so
-      // a grant keyed by the token is still clawed back exactly.
+      // token digest otherwise, while a voided notification always carries an
+      // order id. Try the order id first and fall back to the digest so a
+      // grant keyed by the token is still clawed back exactly.
       let reversal = await reverseStoreCreditPurchase(tx, {
         paymentProvider: KiloPassPaymentProvider.GooglePlay,
         providerTransactionId: orderId,
@@ -739,7 +743,7 @@ export async function processGooglePlayKiloPassNotification(params: {
       if (reversal.creditTransactionId === null) {
         reversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.GooglePlay,
-          providerTransactionId: purchaseToken,
+          providerTransactionId: tokenKey,
           refundedMilliunits: STORE_FULL_MILLIUNITS,
         });
       }
@@ -1022,7 +1026,9 @@ export async function processGooglePlayKiloPassNotification(params: {
       try {
         reversal = await reverseGooglePlayRefundCredits(tx, purchaseToken, decoded.latestOrderId);
       } catch (error) {
-        captureException(error, {
+        // The purchase token is a bearer credential and a failed query quotes
+        // its own parameters, so the report carries a sanitized copy.
+        captureException(sanitizeErrorForTelemetry(error, [purchaseToken]), {
           tags: { area: 'kilo-pass', operation: 'reverse-google-play-refund-credits' },
           extra: {
             latestOrderId: decoded.latestOrderId,

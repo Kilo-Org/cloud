@@ -12,8 +12,10 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import type * as StoreCompletion from './store-completion';
 import type { ValidatedStoreCreditPurchase } from './store-verifier';
 import { storeCreditPaymentId } from './store-products';
+import { googlePlayCreditProviderTransactionId } from './store-verifier';
 import {
   lockStoreCreditPurchase,
+  restoreStoreCreditPurchase,
   reverseStoreCreditPurchase,
   STORE_FULL_MILLIUNITS,
   STORE_PURCHASE_REFUNDED_MESSAGE,
@@ -81,15 +83,17 @@ function playPurchase(
 
 /**
  * The event row a notification handler writes when it claims a refund, in the
- * shape both claim helpers store: the decoded notification type in
- * `payload_json`, the store ids in their own columns.
+ * shape both claim helpers store: the decoded notification type and the store's
+ * signed date in `payload_json`, the store ids in their own columns.
  */
 async function insertRefundEvent(params: {
   paymentProvider: KiloPassPaymentProvider;
   notificationType: string;
   providerTransactionId: string;
   providerSubscriptionId?: string;
+  signedDate?: number | null;
   processed: boolean;
+  processedAt?: string;
 }): Promise<string> {
   const eventId = `event-${crypto.randomUUID()}`;
   await db.insert(kilo_pass_store_events).values({
@@ -99,9 +103,12 @@ async function insertRefundEvent(params: {
     provider_subscription_id: params.providerSubscriptionId ?? null,
     product_id: 'credits.usd10.v1',
     environment: 'Sandbox',
-    payload_json: { notificationType: params.notificationType },
+    payload_json: {
+      notificationType: params.notificationType,
+      signedDate: params.signedDate ?? null,
+    },
     processing_started_at: new Date().toISOString(),
-    processed_at: params.processed ? new Date().toISOString() : null,
+    processed_at: params.processed ? (params.processedAt ?? new Date().toISOString()) : null,
   });
   return eventId;
 }
@@ -245,6 +252,157 @@ describe('completeStoreCreditPurchase', () => {
     }
   );
 
+  it('grants a credit pack whose refund the store reversed before the grant', async () => {
+    const user = await insertTestUser();
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND,
+      providerTransactionId,
+      signedDate: 1_777_700_000_000,
+      processed: true,
+    });
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND_REVERSED,
+      providerTransactionId,
+      signedDate: 1_777_700_060_000,
+      processed: true,
+    });
+
+    const result = await completeStoreCreditPurchase({
+      user,
+      purchase: purchase({ providerTransactionId }),
+    });
+
+    // The refund was reinstated, so the saved receipt is worth crediting.
+    expect(result.alreadyProcessed).toBe(false);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+  });
+
+  it('grants a credit pack when the reversal is delivered before the older refund it reverses', async () => {
+    const user = await insertTestUser();
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    // The store signed the refund first and the reversal after it, but the
+    // reversal reached Kilo first: the refund is the superseded delivery.
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND_REVERSED,
+      providerTransactionId,
+      signedDate: 1_777_700_060_000,
+      processed: true,
+      processedAt: '2026-06-01T09:00:00.000Z',
+    });
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND,
+      providerTransactionId,
+      signedDate: 1_777_700_000_000,
+      processed: true,
+      processedAt: '2026-06-01T09:00:01.000Z',
+    });
+
+    const result = await completeStoreCreditPurchase({
+      user,
+      purchase: purchase({ providerTransactionId }),
+    });
+
+    expect(result.alreadyProcessed).toBe(false);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+  });
+
+  it('refuses a credit pack whose refund the store signed after the reversal', async () => {
+    const user = await insertTestUser();
+    const providerTransactionId = `tx-${crypto.randomUUID()}`;
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND_REVERSED,
+      providerTransactionId,
+      signedDate: 1_777_700_000_000,
+      processed: true,
+    });
+    await insertRefundEvent({
+      paymentProvider: KiloPassPaymentProvider.AppStore,
+      notificationType: NotificationTypeV2.REFUND,
+      providerTransactionId,
+      signedDate: 1_777_700_060_000,
+      processed: true,
+    });
+
+    await expect(
+      completeStoreCreditPurchase({ user, purchase: purchase({ providerTransactionId }) })
+    ).rejects.toThrow(STORE_PURCHASE_REFUNDED_MESSAGE);
+    expect(await balanceOf(user.id)).toBe(0);
+  });
+
+  it('keeps a refunded then reinstated pack credited when the receipt is replayed', async () => {
+    const user = await insertTestUser();
+    const storePurchase = purchase();
+    const granted = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    const paymentId = storeCreditPaymentId(
+      storePurchase.paymentProvider,
+      storePurchase.providerTransactionId
+    );
+    const storeTransaction = {
+      paymentProvider: storePurchase.paymentProvider,
+      providerTransactionIds: [storePurchase.providerTransactionId],
+    };
+
+    // The store refunds the granted pack, then reverses its own refund, exactly
+    // as the App Store handler runs both notifications under the purchase lock.
+    const refundEventId = await insertRefundEvent({
+      paymentProvider: storePurchase.paymentProvider,
+      notificationType: NotificationTypeV2.REFUND,
+      providerTransactionId: storePurchase.providerTransactionId,
+      signedDate: 1_777_700_000_000,
+      processed: false,
+    });
+    await db.transaction(async tx => {
+      await lockStoreCreditPurchase(tx, storeTransaction);
+      await reverseStoreCreditPurchase(tx, {
+        ...storeTransaction,
+        providerTransactionId: storePurchase.providerTransactionId,
+        refundedMilliunits: STORE_FULL_MILLIUNITS,
+      });
+      await tx
+        .update(kilo_pass_store_events)
+        .set({ processed_at: '2026-06-01T09:00:00.000Z' })
+        .where(eq(kilo_pass_store_events.event_id, refundEventId));
+    });
+    expect(await balanceOf(user.id)).toBe(0);
+
+    const reversalEventId = await insertRefundEvent({
+      paymentProvider: storePurchase.paymentProvider,
+      notificationType: NotificationTypeV2.REFUND_REVERSED,
+      providerTransactionId: storePurchase.providerTransactionId,
+      signedDate: 1_777_700_060_000,
+      processed: false,
+    });
+    await db.transaction(async tx => {
+      await lockStoreCreditPurchase(tx, storeTransaction);
+      await restoreStoreCreditPurchase(tx, {
+        paymentProvider: storePurchase.paymentProvider,
+        providerTransactionId: storePurchase.providerTransactionId,
+      });
+      await tx
+        .update(kilo_pass_store_events)
+        .set({ processed_at: '2026-06-01T09:00:01.000Z' })
+        .where(eq(kilo_pass_store_events.event_id, reversalEventId));
+    });
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+
+    const replayed = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+
+    expect(replayed).toEqual({
+      alreadyProcessed: true,
+      amountUsd: 10,
+      amountMicrodollars: toMicrodollars(10),
+      creditTransactionId: granted.creditTransactionId,
+    });
+    expect(await creditRowsForPayment(paymentId)).toHaveLength(1);
+    expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+  });
+
   it('refuses to grant a Google Play credit pack refunded under the order id', async () => {
     const user = await insertTestUser();
     const orderId = `GPA.${crypto.randomUUID()}`;
@@ -276,10 +434,14 @@ describe('completeStoreCreditPurchase', () => {
     });
 
     // Play returned no order id when the client completed the purchase, so the
-    // grant is keyed by the token while the refund notification names the order.
-    await expect(
-      completeStoreCreditPurchase({ user, purchase: playPurchase(purchaseToken) })
-    ).rejects.toThrow(STORE_PURCHASE_REFUNDED_MESSAGE);
+    // grant is keyed by the token digest while the refund notification names the
+    // order id; the raw token carried on the purchase still finds the refund.
+    const digestKeyed = playPurchase(googlePlayCreditProviderTransactionId({ purchaseToken }), {
+      googlePlayPurchaseToken: purchaseToken,
+    });
+    await expect(completeStoreCreditPurchase({ user, purchase: digestKeyed })).rejects.toThrow(
+      STORE_PURCHASE_REFUNDED_MESSAGE
+    );
     expect(await balanceOf(user.id)).toBe(0);
   });
 

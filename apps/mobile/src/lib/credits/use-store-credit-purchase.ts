@@ -90,11 +90,34 @@ export type StoreCreditPurchaseActionsDeps = {
   onPurchaseCompleted?: () => void;
   /** Receives a catalog key, never translated copy; the screen translates it. */
   showError: (errorMessageKey: string) => void;
+  /**
+   * Whether the account this action set belongs to is still the signed-in one.
+   *
+   * A store delivery or a recovery pass outlives a sign-out/sign-in: its awaits
+   * keep running after the session changed. Posting a receipt under the new
+   * session would bind the wrong account, and refreshing or announcing under it
+   * would credit the new account's UI for the old account's grant. The caller
+   * captures the auth epoch when it builds these actions and this predicate
+   * reports whether that epoch is still current; it is checked before every
+   * backend submission and after every await.
+   */
+  isAccountCurrent: () => boolean;
+  /**
+   * Completes the store transaction the store reported as already owned.
+   *
+   * Only consulted for a store-side `AlreadyOwned` refusal. For a consumable
+   * credit pack that code is not proof of another Kilo account: a charge whose
+   * backend completion failed leaves the purchase owned but unconsumed, so
+   * retrying the same pack returns it for the same user. The owner looks the
+   * outstanding transaction up and completes it; a genuine ownership refusal
+   * comes back from that completion, which is where the account copy belongs.
+   */
+  recoverOwnedPurchase?: () => Promise<boolean>;
 };
 
 type PurchaseCompletionResult =
-  | { completed: true; errorMessageKey?: never }
-  | { completed: false; errorMessageKey: string | null };
+  | { completed: true; stale?: boolean; errorMessageKey?: never }
+  | { completed: false; stale?: boolean; errorMessageKey: string | null };
 
 type PurchaseCompletionOutcome = {
   completed: boolean;
@@ -106,6 +129,12 @@ type PurchaseCompletionOutcome = {
    * wants it, so a granted credit is announced exactly once.
    */
   shouldNotifyCompletion: boolean;
+  /**
+   * True when the account changed while this completion was in flight. The
+   * backend call already started, so its receipt is not submitted again and the
+   * new account's UI is neither announced nor refreshed for it.
+   */
+  stale: boolean;
 };
 
 type PurchaseCompletionOptions = {
@@ -117,7 +146,7 @@ type PurchaseSuccessOptions = PurchaseCompletionOptions & {
   notifyCompletion?: boolean;
 };
 
-type RecoverPurchasesOptions = PurchaseCompletionOptions & {
+type RecoverPurchasesOptions = PurchaseSuccessOptions & {
   creditPackAppleProductIds?: readonly string[];
   creditPackGoogleProductIds?: readonly string[];
 };
@@ -133,6 +162,11 @@ type SharedPurchaseCompletion = {
 };
 
 const sharedPurchaseCompletions = new Map<string, SharedPurchaseCompletion>();
+
+// Scope for a completion whose account is not known yet (the catalog has not
+// answered, so no account token exists). Each gets its own key: sharing an
+// in-flight completion is only safe when the account scope is known.
+let unknownAccountCompletionSequence = 0;
 
 /**
  * Refusals that make this exact receipt permanently unacceptable. Matched by
@@ -214,6 +248,19 @@ function missingTokenKey(purchase: Purchase): string {
 }
 
 /**
+ * The store reports the SKU as already owned.
+ *
+ * Not by itself proof that another Kilo account owns it: a consumable purchase
+ * whose backend completion failed stays owned but unconsumed, so retrying the
+ * same pack returns this code for the same user. Callers recover the
+ * outstanding transaction first; only the backend's explicit ownership refusal
+ * earns the different-account copy.
+ */
+export function isStoreAlreadyOwnedError(error: unknown): boolean {
+  return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
+}
+
+/**
  * Maps a store or backend error to the catalog key the screen translates.
  * A store-side `UserCancelled` is not a failure: it maps to `null` (no toast,
  * no copy), mirroring `getKiloPassPurchaseErrorMessage`.
@@ -230,10 +277,6 @@ export function getStoreCreditPurchaseErrorMessageKey(
     storefront === 'play'
       ? CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_PLAY_KEY
       : CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_KEY;
-
-  if (alreadyOwnedPurchaseErrorSchema.safeParse(error).success) {
-    return ownedByAnotherAccountKey;
-  }
 
   const message = errorMessageSchema.safeParse(error).data?.message ?? '';
   if (
@@ -284,6 +327,14 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       return { completed: false, errorMessageKey: missingTokenKey(purchase) };
     }
 
+    // The account can change between this completion being queued and reaching
+    // the backend (a recovery pass started under the old session, or a delivery
+    // that waited behind another await). Never post the receipt under the new
+    // session, and never report the old account's outcome onto it.
+    if (!deps.isAccountCurrent()) {
+      return { completed: false, stale: true, errorMessageKey: null };
+    }
+
     try {
       await (purchase.store === 'google'
         ? deps.completePlayPurchase({
@@ -305,6 +356,13 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       };
     }
 
+    // The account can also change while the backend answers. The grant is the
+    // old session's, so the new account's UI must not be told about it: no
+    // announcement, no balance refresh. The store transaction is still finished,
+    // because the store holds it for this device whatever Kilo account is signed
+    // in and leaving it queued would only re-deliver it.
+    const stale = !deps.isAccountCurrent();
+
     // The backend granted the credits, so the purchase succeeded. Finishing the
     // store transaction and refreshing the balance are best-effort follow-ups:
     // if either fails, the store keeps re-delivering the transaction and the
@@ -315,21 +373,26 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     } catch {
       // The store still holds the unfinished transaction; recovery retries it.
     }
-    if (options.invalidateAfterCompletion ?? true) {
+    if (!stale && (options.invalidateAfterCompletion ?? true)) {
       try {
         await deps.invalidateAfterCompletion();
       } catch {
         // The balance refresh is cosmetic; the screen refetches on focus.
       }
     }
-    return { completed: true };
+    return { completed: true, stale };
   }
 
   function reportPurchaseCompletionErrorIfNeeded(
     result: PurchaseCompletionResult,
     options: PurchaseCompletionOptions
   ) {
-    if (!result.completed && result.errorMessageKey && (options.notifyErrors ?? true)) {
+    if (
+      !result.completed &&
+      result.errorMessageKey &&
+      (options.notifyErrors ?? true) &&
+      deps.isAccountCurrent()
+    ) {
       deps.showError(result.errorMessageKey);
     }
   }
@@ -338,7 +401,19 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     purchase: Purchase,
     options: PurchaseSuccessOptions = {}
   ): Promise<PurchaseCompletionOutcome> {
-    const purchaseId = getPurchaseCompletionId(purchase);
+    // Keyed by the account submitting it as well as the transaction. A
+    // completion is posted under `deps.appAccountToken`, the backend's per-user
+    // `app_store_account_token`, so an unresolved request may only be joined by
+    // that same account: keyed by transaction id alone, a logout/login that
+    // replaced the recovery mount let the new account join the old account's
+    // in-flight request and inherit its ownership refusal instead of submitting
+    // its own. With no token yet (the catalog has not answered) the entry is
+    // unique rather than shared, so it can never be joined across accounts.
+    const accountScope =
+      deps.appAccountToken === ''
+        ? `unknown-account-${(unknownAccountCompletionSequence += 1)}`
+        : deps.appAccountToken;
+    const purchaseId = `${accountScope}\u0000${getPurchaseCompletionId(purchase)}`;
     const notifyCompletion = options.notifyCompletion ?? true;
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
     if (existingCompletion) {
@@ -349,7 +424,13 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       existingCompletion.hasNotifier = existingCompletion.hasNotifier || notifyCompletion;
       const result = await existingCompletion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return { completed: result.completed, shouldNotifyCompletion };
+      return {
+        completed: result.completed,
+        // Re-checked after the await: the account may have changed while this
+        // caller waited on the shared completion.
+        shouldNotifyCompletion: shouldNotifyCompletion && deps.isAccountCurrent(),
+        stale: result.stale ?? false,
+      };
     }
 
     const completion: SharedPurchaseCompletion = {
@@ -360,16 +441,20 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     try {
       const result = await completion.promise;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return { completed: result.completed, shouldNotifyCompletion: notifyCompletion };
+      return {
+        completed: result.completed,
+        shouldNotifyCompletion: notifyCompletion && deps.isAccountCurrent(),
+        stale: result.stale ?? false,
+      };
     } finally {
       sharedPurchaseCompletions.delete(purchaseId);
     }
   }
 
-  async function handlePurchaseSuccess(
+  async function completeAndAnnounce(
     purchase: Purchase,
     options: PurchaseSuccessOptions = {}
-  ): Promise<boolean> {
+  ): Promise<PurchaseCompletionOutcome> {
     const outcome = await completePurchaseOnce(purchase, options);
     // One announcement per granted completion: a re-delivery that joins a
     // notifying caller stays silent, and a live delivery that coalesces with the
@@ -377,6 +462,14 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     if (outcome.shouldNotifyCompletion && outcome.completed) {
       deps.onPurchaseCompleted?.();
     }
+    return outcome;
+  }
+
+  async function handlePurchaseSuccess(
+    purchase: Purchase,
+    options: PurchaseSuccessOptions = {}
+  ): Promise<boolean> {
+    const outcome = await completeAndAnnounce(purchase, options);
     return outcome.completed;
   }
 
@@ -415,16 +508,22 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
 
     const recoveryResults = await Promise.all(
       eligiblePurchases.map(async purchase => ({
-        completed: await handlePurchaseSuccess(purchase, {
+        outcome: await completeAndAnnounce(purchase, {
           invalidateAfterCompletion: false,
-          notifyCompletion: false,
+          // The silent background pass announces nothing; a recovery the user
+          // triggered (the store reported the pack as already owned) still
+          // announces the credits it completes.
+          notifyCompletion: options.notifyCompletion ?? false,
           notifyErrors: options.notifyErrors ?? false,
         }),
         purchase,
       }))
     );
+    // A completion that outlived its account is not reported and does not
+    // refresh the new account's balance: the grant, if any, is the old
+    // session's, and its own UI is gone.
     const completedPurchases = recoveryResults
-      .filter(result => result.completed)
+      .filter(result => result.outcome.completed && !result.outcome.stale)
       .map(result => result.purchase);
     if (completedPurchases.length > 0) {
       await deps.invalidateAfterCompletion();
@@ -456,6 +555,17 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
         await deps.requestPurchase({ request, type: 'in-app' });
         return true;
       } catch (error) {
+        if (
+          isStoreAlreadyOwnedError(error) &&
+          deps.recoverOwnedPurchase &&
+          (await deps.recoverOwnedPurchase())
+        ) {
+          // The store says the pack is already owned. Recover the outstanding
+          // transaction before saying anything: for a consumable it is usually
+          // a charge whose backend completion failed, owned by this same user.
+          // A real cross-account refusal surfaces from that completion.
+          return false;
+        }
         const errorMessageKey = getStoreCreditPurchaseErrorMessageKey(error, deps.storefront);
         if (errorMessageKey) {
           deps.showError(errorMessageKey);

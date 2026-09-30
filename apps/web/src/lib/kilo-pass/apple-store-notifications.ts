@@ -45,11 +45,15 @@ import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
 import {
   getStoreCreditConsumptionMilliunits,
+  isStoreRefundDeliverySuperseded,
   lockStoreCreditPurchase,
+  restoreStoreCreditPurchase,
   reverseStoreCreditPurchase,
   STORE_FULL_MILLIUNITS,
+  type StoreCreditRestorationResult,
   type StoreCreditReversalResult,
 } from '@/lib/credits/store-refund';
+import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
 import { dayjs } from './dayjs';
 
 type DbOrTx = DrizzleTransaction | typeof db;
@@ -59,6 +63,12 @@ export type AppleStoreDecodedNotification = {
   notificationType: string;
   subtype?: string;
   environment: AppleStoreEnvironment;
+  /**
+   * The UNIX time, in milliseconds, that the App Store signed the notification.
+   * It is the store's own chronology, so deliveries that arrive out of order
+   * are still ordered by it.
+   */
+  signedDate?: number;
   signedTransactionInfo?: string;
 };
 
@@ -101,6 +111,7 @@ const AppleStoreNotificationPayloadSchema = z
     notificationUUID: z.string().min(1),
     notificationType: z.string().min(1),
     subtype: z.string().optional(),
+    signedDate: z.number().optional(),
     data: z
       .object({
         environment: z.string().optional(),
@@ -166,6 +177,7 @@ export async function decodeAppleStoreNotificationJws(
     notificationType: payload.notificationType,
     subtype: payload.subtype,
     environment: normalizeEnvironment(payload.data?.environment),
+    signedDate: payload.signedDate,
     signedTransactionInfo: payload.data?.signedTransactionInfo,
   };
 }
@@ -263,6 +275,7 @@ function getStoreEventPayload(params: {
   return redactStoreAccountLinkedJson({
     notificationType: params.notification.notificationType,
     subtype: params.notification.subtype ?? null,
+    signedDate: params.notification.signedDate ?? null,
     transaction: params.purchase
       ? {
           productId: params.purchase.productId,
@@ -864,19 +877,31 @@ export async function processAppStoreKiloPassNotification(params: {
         providerTransactionIds: [transaction.transactionId],
       });
 
+      // A refund the store has already reinstated is superseded: the store
+      // signed a reversal after it, so its credits must stay where the reversal
+      // put them. A refund the store signs *after* a reversal is not superseded
+      // and claws the pack back again.
+      const superseded = await isStoreRefundDeliverySuperseded(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionIds: [transaction.transactionId],
+        signedDateMs: notification.signedDate ?? null,
+      });
+
       let reversal: CreditReversalResult | null = null;
-      try {
-        reversal = await reverseAppStoreRefundCredits(tx, transaction);
-      } catch (error) {
-        captureException(error, {
-          tags: { area: 'kilo-pass', operation: 'reverse-app-store-refund-credits' },
-          extra: {
-            notificationUuid: notification.notificationUUID,
-            originalTransactionId: transaction.originalTransactionId,
-            transactionId: transaction.transactionId,
-            currency: transaction.currency ?? null,
-          },
-        });
+      if (!superseded) {
+        try {
+          reversal = await reverseAppStoreRefundCredits(tx, transaction);
+        } catch (error) {
+          captureException(sanitizeErrorForTelemetry(error), {
+            tags: { area: 'kilo-pass', operation: 'reverse-app-store-refund-credits' },
+            extra: {
+              notificationUuid: notification.notificationUUID,
+              originalTransactionId: transaction.originalTransactionId,
+              transactionId: transaction.transactionId,
+              currency: transaction.currency ?? null,
+            },
+          });
+        }
       }
       // A refunded credit pack is not a Kilo Pass purchase, so it is reversed
       // separately, keyed by its store transaction id. A failure here must
@@ -888,7 +913,7 @@ export async function processAppStoreKiloPassNotification(params: {
       // refunded share; a full refund, a family revoke, or a missing share
       // reverses the whole pack.
       let storeCreditReversal: StoreCreditReversalResult | null = null;
-      if (getStoreCreditProductByAppleProductId(transaction.productId)) {
+      if (!superseded && getStoreCreditProductByAppleProductId(transaction.productId)) {
         storeCreditReversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.AppStore,
           providerTransactionId: transaction.transactionId,
@@ -907,11 +932,68 @@ export async function processAppStoreKiloPassNotification(params: {
           notificationUUID: notification.notificationUUID,
           providerSubscriptionId: transaction.originalTransactionId,
           providerTransactionId: transaction.transactionId,
+          supersededByStoreReversal: superseded,
           storePurchaseFound: reversal?.storePurchaseFound ?? false,
           creditTransactionIds: reversal?.creditTransactionIds ?? [],
           totalReversalMicrodollars: reversal?.totalReversalMicrodollars ?? 0,
           reversedItemKinds: reversal?.reversedItemKinds ?? [],
           storeCreditReversal,
+        },
+      });
+      await tx
+        .update(kilo_pass_store_events)
+        .set({ processed_at: new Date().toISOString() })
+        .where(
+          and(
+            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+            eq(kilo_pass_store_events.event_id, notification.notificationUUID)
+          )
+        );
+    });
+    return { processed: true };
+  }
+
+  if (transaction && notification.notificationType === NotificationTypeV2.REFUND_REVERSED) {
+    await db.transaction(async tx => {
+      // Serialize with the grant and the refund of the same purchase, in either
+      // order: a reversal that runs beside the refund it reverses must read the
+      // clawback the refund writes, not the absence of one.
+      await lockStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionIds: [transaction.transactionId],
+      });
+
+      // Apple reinstated a refund it reversed, so the pack's clawback is owed
+      // back. The restore reads the clawback row itself: a purchase Kilo never
+      // granted has nothing to restore, a prorated refund restores exactly its
+      // own share, and a redelivered reversal is a no-op. A reversal the store
+      // signed before a refund it already processed reinstates nothing, because
+      // that refund is the one in force. A failure propagates so the event stays
+      // unprocessed and the App Store redelivers it, the same contract as the
+      // clawback above.
+      const superseded = await isStoreRefundDeliverySuperseded(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionIds: [transaction.transactionId],
+        signedDateMs: notification.signedDate ?? null,
+      });
+      let storeCreditRestoration: StoreCreditRestorationResult | null = null;
+      if (!superseded && getStoreCreditProductByAppleProductId(transaction.productId)) {
+        storeCreditRestoration = await restoreStoreCreditPurchase(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId: transaction.transactionId,
+        });
+      }
+
+      await appendKiloPassAuditLog(tx, {
+        action: KiloPassAuditLogAction.StoreNotificationReceived,
+        result: KiloPassAuditLogResult.Success,
+        payload: {
+          notificationUUID: notification.notificationUUID,
+          notificationType: notification.notificationType,
+          providerSubscriptionId: transaction.originalTransactionId,
+          providerTransactionId: transaction.transactionId,
+          supersededByStoreRefund: superseded,
+          storeCreditRestoration,
         },
       });
       await tx

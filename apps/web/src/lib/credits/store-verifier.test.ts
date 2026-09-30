@@ -1,9 +1,12 @@
+import { createHash } from 'node:crypto';
+
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
 import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { StoreVerificationError } from './store-purchase-errors';
 import type * as StoreVerifier from './store-verifier';
 
 const mockGetGooglePlayProductPurchase =
@@ -84,6 +87,7 @@ describe('mapAppleCreditTransaction', () => {
       productId: 'credits.usd10.v1',
       providerTransactionId: 'tx-1',
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      googlePlayPurchaseToken: null,
       quantity: 1,
       amountUsd: 10,
       amountMicrodollars: 10_000_000,
@@ -213,6 +217,9 @@ describe('verifyGooglePlayCreditPurchase', () => {
       productId: 'credits_usd10',
       providerTransactionId: 'GPA.1234',
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      // The refund-event lookup needs the token, and the Play response does not
+      // echo it, so it is carried on the purchase explicitly.
+      googlePlayPurchaseToken: 'purchase-token',
       quantity: 1,
       amountUsd: 10,
       amountMicrodollars: 10_000_000,
@@ -277,16 +284,19 @@ describe('verifyGooglePlayCreditPurchase', () => {
     ).rejects.toThrow('Google Play purchase product is not a credit pack');
   });
 
-  it('honours the purchased quantity', async () => {
+  it('rejects a multi-unit purchase before it can be granted', async () => {
     const { verifyGooglePlayCreditPurchase } = loadVerifier();
     mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ quantity: 3 }));
 
-    const result = await verifyGooglePlayCreditPurchase({
+    // The refund handler refuses a quantity-based refund of a multi-quantity
+    // order, so granting a three-pack would leave two permanently unrefundable.
+    const rejection = verifyGooglePlayCreditPurchase({
       productId: 'credits_usd10',
       purchaseToken: 'purchase-token',
     });
 
-    expect(result).toMatchObject({ quantity: 3, amountMicrodollars: 30_000_000 });
+    await expect(rejection).rejects.toBeInstanceOf(StoreVerificationError);
+    await expect(rejection).rejects.toThrow('Google Play credit packs are sold one unit at a time');
   });
 
   it.each([0, 1.5, 101])('rejects the out-of-range quantity %s', async quantity => {
@@ -298,10 +308,12 @@ describe('verifyGooglePlayCreditPurchase', () => {
         productId: 'credits_usd10',
         purchaseToken: 'purchase-token',
       })
-    ).rejects.toThrow('Google Play purchase quantity is out of range');
+    ).rejects.toThrow('Google Play credit packs are sold one unit at a time');
   });
 
-  it('falls back to the purchase token when the order id is absent', async () => {
+  // The purchase token is a bearer credential, so it may never be the ledger or
+  // lock identity; the digest is the only trace of it the purchase keeps.
+  it('falls back to a non-reversible digest of the purchase token when the order id is absent', async () => {
     const { verifyGooglePlayCreditPurchase } = loadVerifier();
     mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ orderId: null }));
 
@@ -310,7 +322,13 @@ describe('verifyGooglePlayCreditPurchase', () => {
       purchaseToken: 'purchase-token',
     });
 
-    expect(result.providerTransactionId).toBe('purchase-token');
+    expect(result.providerTransactionId).toBe(
+      `token-sha256:${createHash('sha256').update('purchase-token').digest('hex')}`
+    );
+    expect(result.providerTransactionId).not.toContain('purchase-token');
+    // The digest key is the ledger identity; the raw token stays available for
+    // the refund-event lookup only.
+    expect(result.googlePlayPurchaseToken).toBe('purchase-token');
   });
 
   it('marks a test purchase as Sandbox', async () => {
@@ -323,6 +341,59 @@ describe('verifyGooglePlayCreditPurchase', () => {
     });
 
     expect(result.environment).toBe('Sandbox');
+  });
+});
+
+describe('storeCreditRefundLookupProviderTransactionIds', () => {
+  function googlePlayPurchase(
+    overrides: Partial<StoreVerifier.ValidatedStoreCreditPurchase> = {}
+  ): StoreVerifier.ValidatedStoreCreditPurchase {
+    return {
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      productId: 'credits_usd10',
+      providerTransactionId: 'GPA.1234',
+      appAccountToken: null,
+      googlePlayPurchaseToken: null,
+      quantity: 1,
+      amountUsd: 10,
+      amountMicrodollars: 10_000_000,
+      purchasedAtIso: '2026-06-01T09:00:00.000Z',
+      environment: 'Production',
+      rawPayload: {},
+      ...overrides,
+    };
+  }
+
+  // The credit ledger and the advisory lock only ever see the digest, so the
+  // raw token is handed to the refund-event lookup, which matches the token the
+  // store-event table stores. The purchase response cannot be relied on to echo
+  // the token, so it rides on the purchase explicitly.
+  it('adds the raw purchase token for a digest-keyed grant', () => {
+    const { storeCreditRefundLookupProviderTransactionIds } = loadVerifier();
+    const digest = `token-sha256:${createHash('sha256').update('purchase-token').digest('hex')}`;
+
+    expect(
+      storeCreditRefundLookupProviderTransactionIds(
+        googlePlayPurchase({
+          providerTransactionId: digest,
+          googlePlayPurchaseToken: 'purchase-token',
+        })
+      )
+    ).toEqual([digest, 'purchase-token']);
+  });
+
+  it('keeps the ledger identity alone when no token is carried', () => {
+    const { storeCreditRefundLookupProviderTransactionIds } = loadVerifier();
+
+    expect(
+      storeCreditRefundLookupProviderTransactionIds(
+        googlePlayPurchase({
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionId: 'tx-1',
+          googlePlayPurchaseToken: null,
+        })
+      )
+    ).toEqual(['tx-1']);
   });
 });
 

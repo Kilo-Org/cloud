@@ -339,6 +339,7 @@ function createActions(
     finishTransaction: vi.fn(),
     getAvailablePurchases: vi.fn().mockResolvedValue([]),
     invalidateAfterCompletion: vi.fn(),
+    isAccountCurrent: () => true,
     requestPurchase: vi.fn(),
     restorePurchases: vi.fn(),
     showError: () => undefined,
@@ -845,6 +846,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       finishTransaction: finishFromRecovery,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
+      isAccountCurrent: () => true,
       requestPurchase: vi.fn(),
       restorePurchases: vi.fn(),
       showError: () => undefined,
@@ -858,6 +860,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       finishTransaction: finishFromSheet,
       getAvailablePurchases: vi.fn().mockResolvedValue([]),
       invalidateAfterCompletion: vi.fn(),
+      isAccountCurrent: () => true,
       onPurchaseCompleted: () => {
         onPurchaseCompleted();
       },
@@ -876,6 +879,79 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(finishFromRecovery).toHaveBeenCalledTimes(1);
     expect(finishFromSheet).not.toHaveBeenCalled();
     expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a receipt whose account is already gone', async () => {
+    const completeAppStorePurchase = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => false,
+      completeAppStorePurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(createPurchase())).toBe(false);
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+  });
+
+  it('does not post a second pending Pass receipt after the account changed under the first', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredPromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      invalidateAfterCompletion,
+    });
+
+    const firstPass = actions.recoverPurchases([createPurchase({ transactionId: 'tx-1' })]);
+    // The account changes while the first receipt's backend call is in flight.
+    signedInAccount = 'account-b';
+
+    // The second receipt is recovered by the same, now old, session: it must not
+    // be posted under the new one.
+    await expect(
+      actions.recoverPurchases([createPurchase({ transactionId: 'tx-2' })])
+    ).resolves.toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+
+    // The first receipt's grant belongs to the old session: it is not reported
+    // as recovered and does not refresh the new account's balance.
+    backendGate.resolve({ alreadyProcessed: false });
+    await expect(firstPass).resolves.toEqual([]);
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+  });
+
+  it('does not announce or refresh when the account changes while the backend answers', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredPromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+    });
+
+    const completion = actions.handlePurchaseSuccess(createPurchase());
+    signedInAccount = 'account-b';
+    backendGate.resolve({ alreadyProcessed: false });
+
+    await expect(completion).resolves.toBe(true);
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(invalidateAfterCompletion).not.toHaveBeenCalled();
+    // The store transaction is still finished for this device.
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('explicitly restores active Kilo Pass purchases through StoreKit and backend completion', async () => {

@@ -87,6 +87,18 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
   setPendingPurchaseCompletedCallback?: (callback: (() => void) | null) => void;
+  /**
+   * Whether the account this action set belongs to is still the signed-in one.
+   *
+   * A recovery pass or a store delivery outlives a sign-out/sign-in: its awaits
+   * keep running after the session changed. Posting a receipt under the new
+   * session would bind the wrong account, and refreshing or announcing under it
+   * would credit the new account's UI for the old account's grant. The caller
+   * captures the auth epoch when it builds these actions and this predicate
+   * reports whether that epoch is still current; it is checked before every
+   * backend submission and after every await.
+   */
+  isAccountCurrent: () => boolean;
   showError: (message: string) => void;
 };
 
@@ -98,8 +110,18 @@ export type StoreKiloPassPurchaseOptions = {
 export type StoreKiloPassRestorePurchasesResult = 'restored' | 'empty' | 'failed';
 
 type PurchaseCompletionResult =
-  | { completed: true; errorMessage?: never }
-  | { completed: false; errorMessage: string | null };
+  | { completed: true; stale?: boolean; errorMessage?: never }
+  | { completed: false; stale?: boolean; errorMessage: string | null };
+
+type PurchaseCompletionOutcome = {
+  completed: boolean;
+  /**
+   * True when the account changed while this completion was in flight. The
+   * backend call already started, so its receipt is not submitted again and the
+   * new account's UI is neither announced nor refreshed for it.
+   */
+  stale: boolean;
+};
 
 const sharedPurchaseCompletions = new Map<string, Promise<PurchaseCompletionResult>>();
 
@@ -296,6 +318,13 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
   ): Promise<PurchaseCompletionResult> {
+    // The account can change between this completion being queued and reaching
+    // the backend (a recovery pass started under the old session, or a delivery
+    // that waited behind another await). Never post the receipt under the new
+    // session, and never report the old account's outcome onto it.
+    if (!deps.isAccountCurrent()) {
+      return { completed: false, stale: true, errorMessage: null };
+    }
     try {
       const token = getPurchaseToken(purchase);
       await (purchase.store === 'google'
@@ -311,11 +340,14 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
             storefront: 'app_store',
             product: 'kilo_pass',
           }));
+      // The account can also change while the backend answers. The grant is the
+      // old session's, so the new account's UI must not be refreshed for it.
+      const stale = !deps.isAccountCurrent();
       await deps.finishTransaction({ purchase, isConsumable: false });
-      if (options.invalidateAfterCompletion ?? true) {
+      if (!stale && (options.invalidateAfterCompletion ?? true)) {
         await deps.invalidateAfterCompletion();
       }
-      return { completed: true };
+      return { completed: true, stale };
     } catch (error) {
       // Only a message that names a defect in this payload is worth remembering:
       // an account or session refusal is payable after the user acts, so it stays
@@ -337,7 +369,12 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     result: PurchaseCompletionResult,
     options: PurchaseCompletionOptions
   ) {
-    if (!result.completed && result.errorMessage && (options.notifyErrors ?? true)) {
+    if (
+      !result.completed &&
+      result.errorMessage &&
+      (options.notifyErrors ?? true) &&
+      deps.isAccountCurrent()
+    ) {
       deps.showError(result.errorMessage);
     }
   }
@@ -345,13 +382,13 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
   async function completePurchaseOnce(
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
-  ): Promise<boolean> {
+  ): Promise<PurchaseCompletionOutcome> {
     const purchaseId = getPurchaseCompletionId(purchase);
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
     if (existingCompletion) {
       const result = await existingCompletion;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return result.completed;
+      return { completed: result.completed, stale: result.stale ?? false };
     }
 
     const completion = completePurchase(purchase, options);
@@ -359,20 +396,32 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     try {
       const result = await completion;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return result.completed;
+      return { completed: result.completed, stale: result.stale ?? false };
     } finally {
       sharedPurchaseCompletions.delete(purchaseId);
     }
   }
 
-  async function handlePurchaseSuccess(purchase: Purchase, options: PurchaseSuccessOptions = {}) {
-    const completed = await completePurchaseOnce(purchase, options);
-    if (completed && (options.notifyCompletion ?? true)) {
-      deps.onPurchaseCompleted?.();
-    } else if (!completed && (options.notifyCompletion ?? true)) {
-      deps.setPendingPurchaseCompletedCallback?.(null);
+  async function completeAndAnnounce(
+    purchase: Purchase,
+    options: PurchaseSuccessOptions = {}
+  ): Promise<PurchaseCompletionOutcome> {
+    const outcome = await completePurchaseOnce(purchase, options);
+    // A completion that outlived its account announces nothing and clears no
+    // pending callback: both belong to the session that started the purchase.
+    if (!outcome.stale && (options.notifyCompletion ?? true)) {
+      if (outcome.completed) {
+        deps.onPurchaseCompleted?.();
+      } else {
+        deps.setPendingPurchaseCompletedCallback?.(null);
+      }
     }
-    return completed;
+    return outcome;
+  }
+
+  async function handlePurchaseSuccess(purchase: Purchase, options: PurchaseSuccessOptions = {}) {
+    const outcome = await completeAndAnnounce(purchase, options);
+    return outcome.completed;
   }
 
   async function getEnabledAppleProductIdsForRestore() {
@@ -409,16 +458,19 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
             !terminallyRejectedPurchaseIds.has(getPurchaseCompletionId(purchase))
         )
         .map(async purchase => {
-          const completed = await handlePurchaseSuccess(purchase, {
+          const outcome = await completeAndAnnounce(purchase, {
             invalidateAfterCompletion: false,
             notifyCompletion: false,
             notifyErrors: options.notifyErrors ?? false,
           });
-          return { completed, purchase };
+          return { outcome, purchase };
         })
     );
+    // A completion that outlived its account is not reported and does not
+    // refresh the new account's balance: the grant, if any, is the old
+    // session's, and its own UI is gone.
     const completedPurchases = recoveryResults
-      .filter(result => result.completed)
+      .filter(result => result.outcome.completed && !result.outcome.stale)
       .map(result => result.purchase);
     if (completedPurchases.length > 0) {
       await deps.invalidateAfterCompletion();

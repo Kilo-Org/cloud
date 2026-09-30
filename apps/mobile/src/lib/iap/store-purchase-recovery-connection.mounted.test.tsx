@@ -1,6 +1,8 @@
 import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
+
 import {
   completionsNamed,
   createPurchase,
@@ -103,6 +105,26 @@ describe('StorePurchaseRecoveryMount connection lifecycle', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('does not submit a pass whose account changed while the store answered', async () => {
+    const pendingLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.getPendingTransactionsIOS.mockReturnValueOnce(pendingLookup.promise);
+
+    const renderer = await mountRecovery();
+    await flushPromises();
+    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
+
+    // Sign-out and the next sign-in advance the auth epoch while the store is
+    // still answering. This pass belongs to the old session, so it must not
+    // submit its completions under the new account.
+    bumpAuthEpoch();
+    pendingLookup.resolve([createPurchase()]);
+    await flushPromises();
+
+    expect(mockedQuery.completions).toHaveLength(0);
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(renderer).toBeDefined();
   });
 
   it('recovers a Play purchase after a purchase screen closes the global connection', async () => {

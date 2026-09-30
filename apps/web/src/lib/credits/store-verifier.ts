@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
@@ -13,6 +15,7 @@ import {
   getGooglePlayProductPurchase,
 } from '@/lib/kilo-pass/google-play-sdk';
 
+import { StoreVerificationError } from './store-purchase-errors';
 import {
   getStoreCreditProductByAppleProductId,
   getStoreCreditProductByGoogleProductId,
@@ -23,6 +26,19 @@ export type ValidatedStoreCreditPurchase = {
   productId: string;
   providerTransactionId: string;
   appAccountToken: string | null;
+  /**
+   * The raw Google Play purchase token this verification was handed, or null
+   * for an App Store purchase.
+   *
+   * It exists only so a processed refund event can be matched in either arrival
+   * order: the store-event table keys a Play purchase by the order id the
+   * notification carries and by the raw token, while the credit ledger and the
+   * advisory lock only ever see `providerTransactionId` (the order id, or a
+   * digest of this token when Play reported none). It is never a lock key, a
+   * ledger value, or part of a reported error. Optional so a hand-built
+   * purchase can omit it; the verifier always sets it.
+   */
+  googlePlayPurchaseToken?: string | null;
   quantity: number;
   amountUsd: number;
   amountMicrodollars: number;
@@ -38,9 +54,53 @@ function assertCreditQuantity(quantity: unknown, providerLabel: string): number 
     quantity < 1 ||
     quantity > 100
   ) {
-    throw new Error(`${providerLabel} quantity is out of range`);
+    throw new StoreVerificationError(`${providerLabel} quantity is out of range`);
   }
   return quantity;
+}
+
+/**
+ * Play names a one-time product purchase by its order id, which the purchase
+ * API is documented to return only "if it exists". The purchase token is then
+ * the only other id Play answers with, but a token is a bearer credential: it
+ * may never be written into a credit row, a lock key, or an error report, so
+ * the fallback identity is a digest. The refund handler derives the same one
+ * from the token its notification carries.
+ */
+export function googlePlayCreditProviderTransactionId(params: {
+  orderId?: string | null;
+  purchaseToken: string;
+}): string {
+  const orderId = params.orderId?.trim() ?? '';
+  if (orderId.length > 0) return orderId;
+  return `token-sha256:${createHash('sha256').update(params.purchaseToken).digest('hex')}`;
+}
+
+/**
+ * The ids a refund notification may name a purchase by, for matching
+ * `kilo_pass_store_events` rows only.
+ *
+ * The completion locks the purchase and keys the grant by
+ * `providerTransactionId`, which is the order id when Play reported one and the
+ * token digest otherwise. A voided notification always carries an order id, so
+ * the raw token `googlePlayPurchaseToken` holds is what finds a digest-keyed
+ * grant — and only that lookup may see it, because the store event table stores
+ * the token by design while the value never reaches a lock, the ledger, or
+ * telemetry.
+ */
+export function storeCreditRefundLookupProviderTransactionIds(
+  purchase: ValidatedStoreCreditPurchase
+): string[] {
+  const ids = [purchase.providerTransactionId];
+  const purchaseToken = purchase.googlePlayPurchaseToken;
+  if (
+    typeof purchaseToken === 'string' &&
+    purchaseToken.length > 0 &&
+    !ids.includes(purchaseToken)
+  ) {
+    ids.push(purchaseToken);
+  }
+  return ids;
 }
 
 /**
@@ -57,23 +117,23 @@ export function mapAppleCreditTransaction(
   decoded: AppleStoreDecodedTransaction
 ): ValidatedStoreCreditPurchase {
   if (!decoded.transactionId || !decoded.bundleId || !decoded.productId) {
-    throw new Error('Apple transaction is missing identifiers');
+    throw new StoreVerificationError('Apple transaction is missing identifiers');
   }
   if (decoded.bundleId !== APPLE_STORE_BUNDLE_ID) {
-    throw new Error('Apple transaction bundle mismatch');
+    throw new StoreVerificationError('Apple transaction bundle mismatch');
   }
   if (decoded.revocationDate != null) {
-    throw new Error('Apple transaction has been revoked');
+    throw new StoreVerificationError('Apple transaction has been revoked');
   }
   // Credit packs are consumables: a transaction that expires is a subscription
   // or a non-consumable, never a credit purchase.
   if (decoded.expiresDate != null) {
-    throw new Error('Apple credit purchase is not a consumable');
+    throw new StoreVerificationError('Apple credit purchase is not a consumable');
   }
 
   const product = getStoreCreditProductByAppleProductId(decoded.productId);
   if (!product) {
-    throw new Error('Apple transaction product is not a credit pack');
+    throw new StoreVerificationError('Apple transaction product is not a credit pack');
   }
 
   const quantity = assertCreditQuantity(readAppleQuantity(decoded), 'Apple transaction');
@@ -83,6 +143,7 @@ export function mapAppleCreditTransaction(
     productId: decoded.productId,
     providerTransactionId: decoded.transactionId,
     appAccountToken: decoded.appAccountToken ?? null,
+    googlePlayPurchaseToken: null,
     quantity,
     amountUsd: product.amountUsd,
     amountMicrodollars: product.amountMicrodollars * quantity,
@@ -116,27 +177,39 @@ export async function verifyGooglePlayCreditPurchase(params: {
   // a product id is still checked against the request.
   const responseProductId = apiData.productId ?? params.productId;
   if (responseProductId !== params.productId) {
-    throw new Error('Google Play purchase product is not a credit pack');
+    throw new StoreVerificationError('Google Play purchase product is not a credit pack');
   }
   const product = getStoreCreditProductByGoogleProductId(responseProductId);
   if (!product) {
-    throw new Error('Google Play purchase product is not a credit pack');
+    throw new StoreVerificationError('Google Play purchase product is not a credit pack');
   }
   // ProductPurchase.purchaseState: 0 purchased, 1 canceled, 2 pending.
   if (apiData.purchaseState !== 0) {
-    throw new Error('Google Play purchase is not in a purchased state');
+    throw new StoreVerificationError('Google Play purchase is not in a purchased state');
   }
 
-  const quantity = assertCreditQuantity(apiData.quantity ?? 1, 'Google Play purchase');
-
-  const orderId = apiData.orderId;
-  const providerTransactionId = orderId && orderId.length > 0 ? orderId : params.purchaseToken;
+  // A credit pack is sold one unit at a time, and the voided-purchase handler
+  // refuses a quantity-based refund of a multi-quantity order because the
+  // notification does not carry the refunded quantity. Until that
+  // reconciliation exists, a multi-unit purchase must be refused *before* it is
+  // granted: Play's later single-unit refund would remove one unit while the
+  // grant kept all of them, and the notification would retry a permanently
+  // rejected refund forever.
+  const quantity = apiData.quantity ?? 1;
+  if (quantity !== 1) {
+    throw new StoreVerificationError('Google Play credit packs are sold one unit at a time');
+  }
+  const providerTransactionId = googlePlayCreditProviderTransactionId({
+    orderId: apiData.orderId,
+    purchaseToken: params.purchaseToken,
+  });
 
   return {
     paymentProvider: KiloPassPaymentProvider.GooglePlay,
     productId: responseProductId,
     providerTransactionId,
     appAccountToken: apiData.obfuscatedExternalAccountId ?? null,
+    googlePlayPurchaseToken: params.purchaseToken,
     quantity,
     amountUsd: product.amountUsd,
     amountMicrodollars: product.amountMicrodollars * quantity,

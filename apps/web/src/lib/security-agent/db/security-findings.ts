@@ -95,7 +95,6 @@ export async function createSecurityFinding(params: CreateFindingParams): Promis
         dependabot_html_url: params.dependabot_html_url,
         raw_data: params.raw_data,
         first_detected_at: params.first_detected_at,
-        // Additional metadata
         cwe_ids: params.cwe_ids,
         cvss_score: params.cvss_score?.toString() || null,
         dependency_scope: params.dependency_scope,
@@ -545,7 +544,6 @@ export async function listSecurityFindings(
 
     const whereClause = and(...conditions);
 
-    // Sort order
     const severityOrder = sql`CASE ${security_findings.severity}
       WHEN 'critical' THEN 1
       WHEN 'high' THEN 2
@@ -575,7 +573,6 @@ export async function listSecurityFindings(
       orderByClause = [severityOrder, desc(security_findings.created_at)];
     }
 
-    // Run paginated query and count query in parallel
     const [findings, countResult] = await Promise.all([
       db
         .select()
@@ -609,14 +606,12 @@ export async function countSecurityFindings(params: {
 
     const conditions: Array<SQL | undefined> = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
       conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
     }
 
-    // Optional filters
     if (status) {
       if (status === 'closed') {
         conditions.push(
@@ -899,7 +894,6 @@ export async function getOrphanedRepositoriesWithFindingCounts(params: {
 
     const conditions: SQL[] = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
@@ -940,14 +934,12 @@ export async function deleteFindingsByRepository(params: {
 
     const conditions: SQL[] = [];
 
-    // Owner condition
     if (ownerConverted.type === 'org') {
       conditions.push(eq(security_findings.owned_by_organization_id, ownerConverted.id));
     } else {
       conditions.push(eq(security_findings.owned_by_user_id, ownerConverted.id));
     }
 
-    // Repository condition
     conditions.push(eq(security_findings.repo_full_name, repoFullName));
 
     const ownerForAudit = toSecurityFindingAuditOwner(ownerConverted);

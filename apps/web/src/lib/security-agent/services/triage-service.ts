@@ -21,7 +21,6 @@ import { emitApiMetrics } from './api-metrics.server';
 const log = sentryLogger('security-agent:triage', 'info');
 const logError = sentryLogger('security-agent:triage', 'error');
 
-// Version string for API requests
 const TRIAGE_SERVICE_VERSION = '5.0.0';
 const TRIAGE_SERVICE_USER_AGENT = `Kilo-Security-Triage/${TRIAGE_SERVICE_VERSION}`;
 
@@ -145,7 +144,6 @@ function parseTriageResult(args: string): SecurityFindingTriage | null {
   try {
     const parsed = JSON.parse(args);
 
-    // Validate required fields
     if (typeof parsed.needsSandboxAnalysis !== 'boolean') {
       logError('Invalid needsSandboxAnalysis', { value: parsed.needsSandboxAnalysis });
       return null;
@@ -331,14 +329,12 @@ export async function triageSecurityFinding(options: {
           return createFallbackTriage(`API error: ${result.status}`);
         }
 
-        // Set token usage on span
         const usage = result.data.usage;
         if (usage) {
           span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
         }
 
-        // Emit API metrics (only if o11y client secret is configured)
         if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
           const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
           const toolsUsed = responseToolCalls

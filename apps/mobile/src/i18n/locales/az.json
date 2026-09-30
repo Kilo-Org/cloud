@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Sessiya adı",
       "transcriptAccessibility": "Sessiyanın yazışma tarixçəsi",
       "readOnly": "Bu sessiyaya yalnız baxmaq olar.",
+      "continueInNewSession": "Yeni sessiyada davam et",
       "emptyDescription": "Başlamaq üçün aşağıdakı sahədən mesaj göndər.",
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex sessiya transkriptini idxal et",
       "reviewDescription": "dəyişiklikləri nəzərdən keçir [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} əmrindən istifadə et",
+      "useSkillCommand": "/{{command}} bacarığından istifadə et",
+      "skillBadge": "Bacarıq",
+      "catalogFull": "Əmr kataloqu doludur, buna görə bəzi əmrlər gizlədilir.",
+      "catalogOverLimit": "Bacarıq kataloqu ölçü həddini aşır, buna görə hər bacarıq göstərilir.",
       "insert": "Daxil et",
       "upgradeRequiredFallback": "Bu əmrdən istifadə etmək üçün CLI-ni yenilə.",
       "exitCapabilityUnavailable": "Sessiyadan çıxmaq üçün CLI-ni yenilə.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Etibarlı sayt yoxdur",
     "emptyDescription": "Sayta etibar etdikdə onun keçidləri bir daha təsdiq istəmədən açılır.",
     "revoke": "{{host}} üçün etibarı ləğv et",
+    "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
     "backToPreferences": "Parametrlərə qayıt"
   },
   "quickChat": {

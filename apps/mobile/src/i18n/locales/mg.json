@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Anaran'ny fotoam-piasana",
       "transcriptAccessibility": "Rakitsoratry ny fotoam-piasana",
       "readOnly": "Azo vakina ihany ity fotoam-piasana ity.",
+      "continueInNewSession": "Tohizo ao amin'ny fotoam-piasana vaovao",
       "emptyDescription": "Mandefasa hafatra etsy ambany mba hanombohana.",
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "hampiditra ny dikan-tenin'ny sesiona OpenAI Codex",
       "reviewDescription": "hijery ny fiovana [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Ampiasao /{{command}}",
+      "useSkillCommand": "Ampiasao ny fahaiza-manao /{{command}}",
+      "skillBadge": "Fahaiza-manao",
+      "catalogFull": "Feno ny lisitry ny baiko, ka misy baiko afenina.",
+      "catalogOverLimit": "Mihoatra ny fetra ny lisitry ny fahaiza-manao, ka aseho avokoa ny fahaiza-manao rehetra.",
       "insert": "Ampidiro",
       "upgradeRequiredFallback": "Havaozy ny CLI mba hampiasana ity baiko ity.",
       "exitCapabilityUnavailable": "Havaozy ny CLI mba hivoahana amin'ny fotoam-piasana.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Tsy misy mpampiantrano atokisana",
     "emptyDescription": "Rehefa atokisanao ny mpampiantrano ny rohy iray, dia sokafana tsy mila fanamafisana intsony ny rohy mankany aminy.",
     "revoke": "Foano ny fitokisana ny {{host}}",
+    "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
     "backToPreferences": "Miverena amin'ny safidy"
   },
   "quickChat": {

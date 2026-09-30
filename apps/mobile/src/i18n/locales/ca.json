@@ -2113,6 +2113,7 @@
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",
       "readOnly": "Aquesta sessió és només de lectura.",
+      "continueInNewSession": "Continua en una sessió nova",
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
@@ -2636,6 +2637,10 @@
       "resumeCodexDescription": "importa una transcripció de sessió d'OpenAI Codex",
       "reviewDescription": "revisa els canvis [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Utilitza /{{command}}",
+      "useSkillCommand": "Utilitza l'habilitat /{{command}}",
+      "skillBadge": "Habilitat",
+      "catalogFull": "El catàleg d'ordres és ple, així que algunes ordres queden ocultes.",
+      "catalogOverLimit": "El catàleg d'habilitats supera el límit de mida, així que es mostren totes les habilitats.",
       "insert": "Insereix",
       "upgradeRequiredFallback": "Actualitza el CLI per utilitzar aquesta ordre.",
       "exitCapabilityUnavailable": "Actualitza el CLI per finalitzar la sessió.",
@@ -3205,6 +3210,7 @@
     "emptyTitle": "No hi ha servidors de confiança",
     "emptyDescription": "Quan confies en el servidor d'un enllaç, els seus enllaços s'obren sense tornar a demanar confirmació.",
     "revoke": "Deixa de confiar en {{host}}",
+    "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
     "backToPreferences": "Torna a les preferències"
   },
   "quickChat": {

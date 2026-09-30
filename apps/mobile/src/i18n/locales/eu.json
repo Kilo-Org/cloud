@@ -712,7 +712,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editatu bidaltzeko dagoen iruzkin zaharkitua: {{location}}",
       "editA11y": "Editatu bidaltzeko dagoen iruzkina: {{location}}",
-      "staleHint": "pRa aldatu da hau idatzi zenuenetik.",
+      "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
       "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",
@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Saioaren izena",
       "transcriptAccessibility": "Saioaren transkripzioa",
       "readOnly": "Saio hau irakurtzeko soilik da.",
+      "continueInNewSession": "Jarraitu saio berri batean",
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "inportatu OpenAI Codex saio baten transkripzioa",
       "reviewDescription": "berrikusi aldaketak [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Erabili /{{command}}",
+      "useSkillCommand": "Erabili trebetasuna /{{command}}",
+      "skillBadge": "Trebetasuna",
+      "catalogFull": "Komandoen katalogoa beteta dago, beraz komando batzuk ezkutatuta daude.",
+      "catalogOverLimit": "Trebetasunen katalogoa tamainaren muga gainditzen du, beraz trebetasun guztiak zerrendatzen dira.",
       "insert": "Txertatu",
       "upgradeRequiredFallback": "Eguneratu zure CLI komando hau erabiltzeko.",
       "exitCapabilityUnavailable": "Eguneratu zure CLI saiotik irteteko.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Ez dago konfiantzako ostalaririk",
     "emptyDescription": "Esteka baten ostalariari konfiantza ematen badiozu, haren estekak berriro galdetu gabe irekiko dira.",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
+    "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {

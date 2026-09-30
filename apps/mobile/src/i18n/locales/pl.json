@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozytoria",
     "securityAgent": "Agent bezpieczeństwa",
     "unknown": "Brak danych",
@@ -1564,7 +1564,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -1605,6 +1605,7 @@
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
+      "continueInNewSession": "Kontynuuj w nowej sesji",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
@@ -2138,6 +2139,10 @@
       "resumeCodexDescription": "importuj transkrypcję sesji OpenAI Codex",
       "reviewDescription": "przejrzyj zmiany [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Użyj /{{command}}",
+      "useSkillCommand": "Użyj umiejętności /{{command}}",
+      "skillBadge": "Umiejętność",
+      "catalogFull": "Katalog poleceń jest pełny, więc niektóre polecenia są ukryte.",
+      "catalogOverLimit": "Katalog umiejętności przekracza limit rozmiaru, więc wyświetlane są wszystkie umiejętności.",
       "insert": "Wstaw",
       "upgradeRequiredFallback": "Zaktualizuj swoje CLI, aby użyć tego polecenia.",
       "exitCapabilityUnavailable": "Zaktualizuj swoje CLI, aby zakończyć sesję.",
@@ -2941,7 +2946,7 @@
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "staleHint": "pR zmienił się od czasu napisania tego komentarza.",
+      "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
       "summaryPlaceholder": "Opcjonalne podsumowanie przeglądu"
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
     "revoke": "Cofnij zaufanie do {{host}}",
+    "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {

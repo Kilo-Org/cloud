@@ -75,7 +75,9 @@ export function SessionContextMetrics({
   // for the 44pt minimum touch target; height is identical in every pill state.
   // `shrink min-w-0` lets the pill compress inside the header's capped trailing
   // slot: RN's default flexShrink is 0, so without them the pill keeps its
-  // natural width and paints past the row's right edge, off-screen.
+  // natural width and paints past the row's right edge, off-screen. The cost is
+  // the only unbounded text in the pill, so both text slots truncate to one
+  // line instead of painting past the pill.
   const pillClassName =
     'h-[44px] shrink min-w-0 flex-row items-center gap-2 rounded-full border border-border bg-secondary px-3';
 

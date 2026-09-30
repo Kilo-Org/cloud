@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "సెషన్ పేరు",
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",
       "readOnly": "ఈ సెషన్‌ను చదవడం మాత్రమే సాధ్యం.",
+      "continueInNewSession": "కొత్త సెషన్‌లో కొనసాగించండి",
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex సెషన్ ట్రాన్స్క్రిప్ట్ను దిగుమతి చేయండి",
       "reviewDescription": "మార్పులను సమీక్షించండి [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ఉపయోగించండి",
+      "useSkillCommand": "/{{command}} నైపుణ్యాన్ని ఉపయోగించండి",
+      "skillBadge": "నైపుణ్యం",
+      "catalogFull": "కమాండ్ జాబితా నిండింది, కాబట్టి కొన్ని కమాండ్‌లు దాచబడ్డాయి.",
+      "catalogOverLimit": "నైపుణ్యాల జాబితా పరిమాణ పరిమితిని మించింది, కాబట్టి అన్ని నైపుణ్యాలు చూపబడతాయి.",
       "insert": "చేర్చండి",
       "upgradeRequiredFallback": "ఈ కమాండ్‌ను ఉపయోగించడానికి మీ CLIను నవీకరించండి.",
       "exitCapabilityUnavailable": "సెషన్ నుండి నిష్క్రమించడానికి మీ CLIని నవీకరించండి.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "విశ్వసించిన హోస్ట్‌లు లేవు",
     "emptyDescription": "లింక్ హోస్ట్‌ను విశ్వసిస్తే, ఆ హోస్ట్ లింక్‌లు మళ్లీ అనుమతి అడగకుండా తెరుచుకుంటాయి.",
     "revoke": "{{host}}పై నమ్మకాన్ని ఉపసంహరించండి",
+    "revokeMessage": "ఈ హోస్ట్‌కు ఉన్న లింక్‌లు మళ్లీ నిర్ధారణ అడుగుతాయి.",
     "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
   },
   "quickChat": {

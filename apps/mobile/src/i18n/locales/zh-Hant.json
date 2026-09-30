@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
       "readOnly": "這是唯讀工作階段。",
+      "continueInNewSession": "在新工作階段中繼續",
       "emptyDescription": "在下方傳送訊息，即可開始。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "匯入 OpenAI Codex 工作階段記錄",
       "reviewDescription": "檢閱變更 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
+      "useSkillCommand": "使用技能 /{{command}}",
+      "skillBadge": "技能",
+      "catalogFull": "指令目錄已滿，因此部分指令被隱藏。",
+      "catalogOverLimit": "技能目錄超出大小限制，因此仍會列出全部技能。",
       "insert": "插入",
       "upgradeRequiredFallback": "請升級 CLI，才能使用此指令。",
       "exitCapabilityUnavailable": "請更新 CLI，才能結束工作階段。",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "沒有信任的主機",
     "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
     "revoke": "撤銷對 {{host}} 的信任",
+    "revokeMessage": "前往此主機的連結將再次要求確認。",
     "backToPreferences": "返回偏好設定"
   },
   "quickChat": {

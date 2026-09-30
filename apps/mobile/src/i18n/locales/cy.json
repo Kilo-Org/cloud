@@ -2197,6 +2197,7 @@
       "renamePlaceholder": "Enw sesiwn",
       "transcriptAccessibility": "Trawsgrifiad sesiwn",
       "readOnly": "Sesiwn ddarllen yn unig yw hon.",
+      "continueInNewSession": "Parhau mewn sesiwn newydd",
       "emptyDescription": "Anfonwch neges isod i ddechrau.",
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
@@ -2750,6 +2751,10 @@
       "resumeCodexDescription": "mewnforio trawsgrifiad sesiwn OpenAI Codex",
       "reviewDescription": "adolyga'r newidiadau [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Defnyddio /{{command}}",
+      "useSkillCommand": "Defnyddio sgil /{{command}}",
+      "skillBadge": "Sgil",
+      "catalogFull": "Mae'r catalog gorchmynion yn llawn, felly mae rhai gorchmynion wedi'u cuddio.",
+      "catalogOverLimit": "Mae'r catalog sgiliau dros ei derfyn maint, felly rhestrir pob sgil.",
       "insert": "Mewnosod",
       "upgradeRequiredFallback": "Uwchraddiwch eich CLI i ddefnyddio'r gorchymyn hwn.",
       "exitCapabilityUnavailable": "Diweddarwch eich CLI i adael y sesiwn.",
@@ -3334,6 +3339,7 @@
     "emptyTitle": "Dim gwesteiwyr dibynadwy",
     "emptyDescription": "Pan fyddwch yn ymddiried yng ngwesteiwr dolen, bydd y ddolen yn agor heb ofyn eto.",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
+    "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
   "quickChat": {

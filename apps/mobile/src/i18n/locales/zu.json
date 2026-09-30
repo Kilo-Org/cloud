@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Igama leseshini",
       "transcriptAccessibility": "Umbhalo weseshini",
       "readOnly": "Le seshini ingafundwa kuphela.",
+      "continueInNewSession": "Qhubeka kuseshini entsha",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "ngenisa umbhalo weseshini ye-OpenAI Codex",
       "reviewDescription": "buyekeza izinguquko [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sebenzisa /{{command}}",
+      "useSkillCommand": "Sebenzisa ikhono /{{command}}",
+      "skillBadge": "Ikhono",
+      "catalogFull": "Uhlu lwemiyalo lugcwele, ngakho eminye imiyalo ifihliwe.",
+      "catalogOverLimit": "Uhlu lamakhono ludlula umkhawulo wosayizi, ngakho wonke amakhono ayaboniswa.",
       "insert": "Faka",
       "upgradeRequiredFallback": "Sicela ubuyekeze i-CLI yakho ukuze usebenzise lo myalo.",
       "exitCapabilityUnavailable": "Buyekeza i-CLI yakho ukuze uphume eseshini.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Abekho abasingathi abathenjwayo",
     "emptyDescription": "Uma uthemba umsingathi wesixhumanisi, isixhumanisi sivuleka ngaphandle kokucela imvume futhi.",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
+    "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
   "quickChat": {

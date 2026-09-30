@@ -17,8 +17,9 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import type { FraudDetectionHeaders } from '@/lib/utils';
-import { EmptyFraudDetectionHeaders, toNonNullish } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toNonNullish } from '@/lib/utils';
 import { logExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import {

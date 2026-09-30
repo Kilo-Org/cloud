@@ -35,9 +35,10 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from '../user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
-import { getFraudDetectionHeaders, toMicrodollars } from '../utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toMicrodollars } from '@/lib/microdollars';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 

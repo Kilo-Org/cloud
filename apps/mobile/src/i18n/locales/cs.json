@@ -2141,6 +2141,7 @@
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
       "readOnly": "Tato relace je pouze pro čtení.",
+      "continueInNewSession": "Pokračovat v nové relaci",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
       "scrollToBottom": "Posunout na konec",
       "emptyTitle": "Zatím žádné zprávy",
@@ -2674,6 +2675,10 @@
       "resumeCodexDescription": "importuj transkript relace OpenAI Codex",
       "reviewDescription": "zkontroluj změny [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Použít /{{command}}",
+      "useSkillCommand": "Použít dovednost /{{command}}",
+      "skillBadge": "Dovednost",
+      "catalogFull": "Katalog příkazů je plný, takže některé příkazy jsou skryté.",
+      "catalogOverLimit": "Katalog dovedností překračuje limit velikosti, takže se zobrazují všechny dovednosti.",
       "insert": "Vložit",
       "upgradeRequiredFallback": "Pro použití tohoto příkazu aktualizujte své CLI.",
       "exitCapabilityUnavailable": "Aktualizujte své CLI, abyste mohli ukončit relaci.",
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Žádné důvěryhodné domény",
     "emptyDescription": "Odkazy na důvěryhodné domény se otevírají bez dalšího potvrzení.",
     "revoke": "Odebrat důvěru doméně {{host}}",
+    "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
     "backToPreferences": "Zpět na předvolby"
   },
   "quickChat": {

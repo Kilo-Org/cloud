@@ -7,7 +7,7 @@
       "instanceLifecycle": "Jūsų egzempliorius turi atnaujinimą",
       "scheduledAction": "Suplanuotas veiksmas turi atnaujinimą",
       "lowBalance": "Jūsų balansui reikia dėmesio",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Jūsų išlaidoms reikia dėmesio",
       "securityFinding": "Saugumo radiniui reikia dėmesio",
       "activeAgentsGlanceable": "Aktyvūs agentai turi atnaujinimą"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} balansas nukrito žemiau ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Išlaidų pranešimas",
+      "body": "{{scopeName}} išlaidos viršijo ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Naujas saugumo radinys ({{severity}})",

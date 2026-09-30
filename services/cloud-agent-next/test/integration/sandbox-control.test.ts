@@ -11599,6 +11599,16 @@ describe('SandboxSession control-plane regressions', () => {
       await waitForWrapperReady(fixture);
       await runInDurableObject(session, instance => instance.alarm());
       await waitForAccepted(session, 'msg_model_less');
+      // The queue drains one message per alarm pass, so the second admission is
+      // dispatched by a later pass and can still be queued here. Drive passes
+      // until it is accepted rather than racing the dispatch that promotes it.
+      await waitFor(async () => {
+        await runInDurableObject(session, instance => instance.alarm());
+        await expect(session.getMessageResult('msg_selected')).resolves.toMatchObject({
+          type: 'found',
+          result: { status: 'running' },
+        });
+      });
       const delivered = await admissionState(session);
       expect(delivered.messages[0]).toMatchObject({
         messageId: 'msg_invalid_model',
@@ -16768,7 +16778,7 @@ describe('SandboxControl event batch forwarding', () => {
     }
   });
 
-  it('keeps one pump per session and stops queued forwards at dispatch after the connection is replaced', async () => {
+  it('keeps one pump per session and retains queued forwards when the connection is replaced', async () => {
     const fixture = await worktreeFixture({ eventReceipts: true });
     const diagnostics = await captureControlDiagnostics(fixture.control);
     const receiver = await gateEventBatchReceiver(fixture.session);
@@ -16799,36 +16809,51 @@ describe('SandboxControl event batch forwarding', () => {
         )
       ).toBe(true);
 
-      // Replacing the connection before the held run drains must stop both
-      // queued forwards at the dispatch authority check.
+      // Replacing the connection before the held run drains stops both queued
+      // forwards at their dispatch authority check.
       await fixture.rotateSocket();
       receiver.release();
 
       const drops = () =>
         diagnostics.emissions.filter(emission => emission.event === 'forward_dropped');
+      // The held head had already passed the dispatch authority check when the
+      // connection changed, so it settles as a delivery-owned stale outcome.
       await vi.waitFor(() =>
         expect(
-          drops().filter(emission => emission.fields.reason === 'stale_before_enqueue')
-        ).toHaveLength(2)
+          drops().filter(emission => emission.fields.reason === 'stale_after_send')
+        ).toHaveLength(1)
       );
-
+      // The queued batch bails at its stale-before-enqueue guard; the queued
+      // single frame is fenced by the replaced connection.
       const staleBeforeDispatch = drops().filter(
         emission => emission.fields.reason === 'stale_before_enqueue'
       );
-      expect(
-        staleBeforeDispatch.map(emission => emission.fields.frameItems as number).sort()
-      ).toEqual([1, 2]);
-      for (const emission of staleBeforeDispatch) {
-        expect(emission.fields.sessionId).toBe(fixture.sessionId);
-        expect(emission.fields.forwardSequence).toEqual(expect.any(Number));
-      }
-      // The held head had already passed the dispatch authority check when the
-      // connection changed, so it settles as a delivery-owned stale outcome.
-      expect(
-        drops().filter(emission => emission.fields.reason === 'stale_after_send')
-      ).toHaveLength(1);
-      // Only the head reached the receiver; neither queued forward was dispatched.
-      expect(receiver.invocations()).toBe(1);
+      expect(staleBeforeDispatch).toHaveLength(1);
+      expect(staleBeforeDispatch[0]?.fields).toMatchObject({
+        sessionId: fixture.sessionId,
+        frameItems: 2,
+        forwardSequence: expect.any(Number),
+      });
+      const fencedDispatch = drops().filter(
+        emission => emission.fields.reason === 'forwarding_frame_rejected'
+      );
+      expect(fencedDispatch).toHaveLength(1);
+      expect(fencedDispatch[0]?.fields).toMatchObject({
+        sessionId: fixture.sessionId,
+        frameItems: 1,
+      });
+
+      // A fence change no longer discards the queued forwards: both are retained
+      // and replayed exactly once over the connection that is current when their
+      // replay runs.
+      await vi.waitFor(() => expect(receiver.invocations()).toBe(2));
+      await vi.waitFor(() =>
+        expect(
+          diagnostics.emissions.filter(
+            emission => emission.event === 'forward_recovered' && emission.fields.recovered === 3
+          )
+        ).not.toEqual([])
+      );
       await vi.waitFor(async () => {
         expect(
           await runInDurableObject(
@@ -16839,14 +16864,17 @@ describe('SandboxControl event batch forwarding', () => {
       });
 
       await runInDurableObject(fixture.session, (_instance, state) => {
-        expect(persistedKilocodeMarkers(state)).toEqual(['serialize_head']);
+        expect(persistedKilocodeMarkers(state)).toEqual([
+          'serialize_head',
+          'serialize_batch_a',
+          'serialize_batch_b',
+          'serialize_frame',
+        ]);
       });
 
       const skippedRuns = diagnostics.emissions.filter(
         emission => emission.event === 'forward_run' && emission.fields.result === 'skipped'
       );
-      expect(skippedRuns).toHaveLength(3);
-
       const batchSkipped = skippedRuns.filter(
         emission => emission.fields.operation === 'receiveSandboxControlEventBatch'
       );
@@ -16873,23 +16901,6 @@ describe('SandboxControl event batch forwarding', () => {
         rejectedCount: 0,
         unknownCount: 0,
         unattemptedCount: 2,
-      });
-
-      // The queued single frame never dispatched either, and is recorded as its
-      // own skipped run rather than silently dropped.
-      const singleSkipped = skippedRuns.filter(
-        emission => emission.fields.operation === 'receiveSandboxControlEvent'
-      );
-      expect(singleSkipped).toHaveLength(1);
-      expect(singleSkipped[0]?.fields).toMatchObject({
-        runMembers: 1,
-        sentItems: 1,
-        attempts: 0,
-        rpcWaitMs: 0,
-        appliedCount: 0,
-        rejectedCount: 0,
-        unknownCount: 0,
-        unattemptedCount: 1,
       });
     } finally {
       receiver.restore();

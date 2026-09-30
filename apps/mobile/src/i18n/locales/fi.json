@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Istunnon nimi",
       "transcriptAccessibility": "Istunnon viestihistoria",
       "readOnly": "Tätä istuntoa voi vain lukea.",
+      "continueInNewSession": "Jatka uudessa istunnossa",
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
       "scrollToBottom": "Vieritä alareunaan",
       "emptyTitle": "Ei vielä viestejä",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "tuo OpenAI Codex -istunnon litterointi",
       "reviewDescription": "tarkista muutokset [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Käytä /{{command}}",
+      "useSkillCommand": "Käytä taitoa /{{command}}",
+      "skillBadge": "Taito",
+      "catalogFull": "Komentoluettelo on täynnä, joten osa komennoista on piilotettu.",
+      "catalogOverLimit": "Taitoluettelo ylittää kokorajan, joten kaikki taidot näytetään.",
       "insert": "Lisää",
       "upgradeRequiredFallback": "Päivitä CLI, jotta voit käyttää tätä komentoa.",
       "exitCapabilityUnavailable": "Päivitä CLI, jotta voit poistua istunnosta.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Ei luotettuja verkkotunnuksia",
     "emptyDescription": "Kun luotat verkkotunnukseen, sen linkit avataan ilman uutta vahvistusta.",
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
+    "revokeMessage": "Tämän verkkotunnuksen linkit kysyvät jatkossa vahvistusta uudelleen.",
     "backToPreferences": "Takaisin asetuksiin"
   },
   "quickChat": {

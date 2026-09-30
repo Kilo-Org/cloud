@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
       "readOnly": "វគ្គនេះអាចបានត្រឹមតែអានប៉ុណ្ណោះ។",
+      "continueInNewSession": "បន្តនៅក្នុងវគ្គថ្មី",
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "នាំចូលប្រតិចារិកវគ្គ OpenAI Codex",
       "reviewDescription": "ពិនិត្យការផ្លាស់ប្តូរ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ប្រើ /{{command}}",
+      "useSkillCommand": "ប្រើជំនាញ /{{command}}",
+      "skillBadge": "ជំនាញ",
+      "catalogFull": "បញ្ជីពាក្យបញ្ជាពេញហើយ ដូច្នេះពាក្យបញ្ជាមួយចំនួនត្រូវបានលាក់។",
+      "catalogOverLimit": "បញ្ជីជំនាញលើសដែនកំណត់ទំហំ ដូច្នេះជំនាញទាំងអស់ត្រូវបានបង្ហាញ។",
       "insert": "បញ្ចូល",
       "upgradeRequiredFallback": "សូមធ្វើបច្ចុប្បន្នភាព CLI របស់អ្នកដើម្បីប្រើពាក្យបញ្ជានេះ។",
       "exitCapabilityUnavailable": "ធ្វើបច្ចុប្បន្នភាព CLI របស់អ្នក ដើម្បីចាកចេញពីវគ្គ។",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "គ្មានដែនគេហទំព័រដែលជឿទុកចិត្តទេ",
     "emptyDescription": "ពេលអ្នកជឿទុកចិត្តដែនគេហទំព័រមួយ តំណទៅដែននោះនឹងបើកដោយមិនសួរម្តងទៀត។",
     "revoke": "ដកហូតការជឿទុកចិត្តលើ {{host}}",
+    "revokeMessage": "តំណទៅដែននេះនឹងស្នើសុំការបញ្ជាក់ម្តងទៀត។",
     "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   },
   "quickChat": {

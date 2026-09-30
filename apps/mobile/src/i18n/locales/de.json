@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
+      "continueInNewSession": "In einer neuen Sitzung fortsetzen",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "Transkript einer OpenAI Codex-Sitzung importieren",
       "reviewDescription": "Änderungen prüfen [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} verwenden",
+      "useSkillCommand": "Skill /{{command}} verwenden",
+      "skillBadge": "Skill",
+      "catalogFull": "Der Befehlskatalog ist voll, daher sind einige Befehle ausgeblendet.",
+      "catalogOverLimit": "Der Skill-Katalog überschreitet sein Größenlimit, daher werden alle Skills aufgelistet.",
       "insert": "Einfügen",
       "upgradeRequiredFallback": "Bitte aktualisiere deine CLI, um diesen Befehl zu verwenden.",
       "exitCapabilityUnavailable": "Aktualisiere deine CLI, um die Sitzung zu beenden.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
     "revoke": "Vertrauen in {{host}} widerrufen",
+    "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {

@@ -2113,6 +2113,7 @@
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é apenas de leitura.",
+      "continueInNewSession": "Continuar numa nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
@@ -2636,6 +2637,10 @@
       "resumeCodexDescription": "importar uma transcrição de sessão do OpenAI Codex",
       "reviewDescription": "rever as alterações [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
+      "useSkillCommand": "Usar competência /{{command}}",
+      "skillBadge": "Competência",
+      "catalogFull": "O catálogo de comandos está cheio, por isso alguns comandos ficam ocultos.",
+      "catalogOverLimit": "O catálogo de competências excede o limite de tamanho, por isso são apresentadas todas as competências.",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Atualize a sua CLI para usar este comando.",
       "exitCapabilityUnavailable": "Atualize a sua CLI para sair da sessão.",
@@ -3205,6 +3210,7 @@
     "emptyTitle": "Sem servidores de confiança",
     "emptyDescription": "Ao confiar no servidor de uma ligação, pode abrir as ligações desse servidor sem nova confirmação.",
     "revoke": "Deixar de confiar em {{host}}",
+    "revokeMessage": "As ligações para este servidor voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {

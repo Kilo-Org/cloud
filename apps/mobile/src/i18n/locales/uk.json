@@ -1605,6 +1605,7 @@
       "renamePlaceholder": "Назва сеансу",
       "transcriptAccessibility": "Історія повідомлень сеансу",
       "readOnly": "Цей сеанс доступний лише для читання.",
+      "continueInNewSession": "Продовжити в новому сеансі",
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",
@@ -2138,6 +2139,10 @@
       "resumeCodexDescription": "імпортувати транскрипт сеансу OpenAI Codex",
       "reviewDescription": "переглянути зміни [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Використати /{{command}}",
+      "useSkillCommand": "Використати навичку /{{command}}",
+      "skillBadge": "Навичка",
+      "catalogFull": "Каталог команд заповнено, тому частину команд приховано.",
+      "catalogOverLimit": "Каталог навичок перевищує ліміт розміру, тому показано всі навички.",
       "insert": "Вставити",
       "upgradeRequiredFallback": "Оновіть CLI, щоб скористатися цією командою.",
       "exitCapabilityUnavailable": "Оновіть CLI, щоб завершити сеанс.",
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Немає довірених хостів",
     "emptyDescription": "Посилання на довірений хост відкриваються без повторного підтвердження.",
     "revoke": "Скасувати довіру до {{host}}",
+    "revokeMessage": "Посилання на цей хост знову запитуватимуть підтвердження.",
     "backToPreferences": "Назад до налаштувань"
   },
   "quickChat": {

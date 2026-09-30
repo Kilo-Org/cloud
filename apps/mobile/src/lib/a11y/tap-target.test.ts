@@ -9,6 +9,9 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import {
   COMPACT_CONTROL_BOX_CLASS,
   COMPACT_CONTROL_HIT_SLOP_DP,
+  COMPACT_H11_FRAME_DP,
+  COMPACT_H11_HIT_SLOP_DP,
+  compactControlTargetDp,
   INLINE_LINK_BOX_CLASS,
   INLINE_LINK_CONNECTOR_CLASS,
   INLINE_LINK_FACING_HIT_SLOP_DP,
@@ -81,6 +84,17 @@ describe('shared tap-target geometry', () => {
     expect(tapTargetReachDp(32, COMPACT_CONTROL_HIT_SLOP_DP)).toBeGreaterThanOrEqual(
       TOUCH_TARGET_DP
     );
+  });
+
+  it('keeps the measured h-11 frame at or above the audit floor and reaches the design target', () => {
+    // The regression this guards: a control sized to its glyph (or to a
+    // rem-scaled `h-7`, which measures 24.5dp) is reported as too small to tap.
+    expect(COMPACT_H11_FRAME_DP).toBeGreaterThanOrEqual(MIN_TAP_TARGET_DP);
+    expect(COMPACT_H11_HIT_SLOP_DP).toBeGreaterThan(0);
+    expect(compactControlTargetDp()).toBe(
+      tapTargetReachDp(COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP)
+    );
+    expect(compactControlTargetDp()).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('carries an inline link from the audit floor to the design target with its slop', () => {

@@ -18,7 +18,7 @@ import type {
 import { fetchGeneration } from './providers/upstream-request';
 import { OPENROUTER } from './providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from './providers/definitions/vercel';
-import { toMicrodollars } from '../utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { captureException, captureMessage, startSpan, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import PostHogClient from '@/lib/posthog';

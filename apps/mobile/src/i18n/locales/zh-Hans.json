@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "会话名称",
       "transcriptAccessibility": "会话记录",
       "readOnly": "此会话为只读模式。",
+      "continueInNewSession": "在新会话中继续",
       "emptyDescription": "在下方发送消息，开始对话。",
       "scrollToBottom": "滚动到底部",
       "emptyTitle": "暂无消息",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "导入 OpenAI Codex 会话记录",
       "reviewDescription": "查看更改 [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "使用 /{{command}}",
+      "useSkillCommand": "使用技能 /{{command}}",
+      "skillBadge": "技能",
+      "catalogFull": "命令目录已满，因此部分命令被隐藏。",
+      "catalogOverLimit": "技能目录超出大小限制，因此仍会列出全部技能。",
       "insert": "插入",
       "upgradeRequiredFallback": "请升级 CLI 后再使用此命令。",
       "exitCapabilityUnavailable": "请更新 CLI 后再退出会话。",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "暂无受信任的网站",
     "emptyDescription": "信任某个网站后，打开该网站的链接时将不再询问。",
     "revoke": "撤销对 {{host}} 的信任",
+    "revokeMessage": "指向此网站的链接将再次请求确认。",
     "backToPreferences": "返回偏好设置"
   },
   "quickChat": {

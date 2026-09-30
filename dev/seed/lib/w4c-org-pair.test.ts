@@ -35,8 +35,8 @@ function membership(
   return { id, organization_id, kilo_user_id, organizationName, organizationSettings };
 }
 
-function pair(ownerEmail = OWNER_EMAIL, organizationIds: string[] = []): FixturePair {
-  return { ownerEmail, organizationIds: new Set(organizationIds) };
+function pair(ownerEmail = OWNER_EMAIL): FixturePair {
+  return { ownerEmail };
 }
 
 // The mobile account sheet renders an organization's name verbatim, so the
@@ -65,15 +65,6 @@ void test('isPairOrganization recognizes the rows this owner created', () => {
     ),
     true
   );
-  // Rows created after #6332 but before the fixture marked anything are named
-  // `Acme Corp` and carry no other trace than the pair's membership.
-  assert.equal(
-    isPairOrganization(
-      organization('org-name', SEEDED_ORGANIZATION_NAME, CREATED_AT),
-      pair(OWNER_EMAIL, ['org-name'])
-    ),
-    true
-  );
 });
 
 void test('isPairOrganization rejects an organization this pair does not belong to', () => {
@@ -94,8 +85,7 @@ void test('isPairOrganization rejects an organization this pair does not belong 
     isPairOrganization(organization('org-similar', 'Acme Corp Ltd', CREATED_AT), pair()),
     false
   );
-  // A plain `true` flag names no owner; without the pair's membership it is
-  // not this pair's row either.
+  // A plain `true` flag names no owner, so it is not this pair's row either.
   assert.equal(
     isPairOrganization(
       organization('org-flag', SEEDED_ORGANIZATION_NAME, CREATED_AT, {
@@ -104,6 +94,36 @@ void test('isPairOrganization rejects an organization this pair does not belong 
       pair()
     ),
     false
+  );
+});
+
+void test('an app-created Acme Corp the pair belongs to is preserved, not claimed', () => {
+  // The owner created this organization through the app and the pair is a
+  // member of it. The generic name plus the membership is not fixture
+  // evidence, so a rerun must leave the organization, its name, its settings
+  // and its memberships alone instead of deleting or relabeling them.
+  assert.equal(
+    isPairOrganization(
+      organization('org-app-created', SEEDED_ORGANIZATION_NAME, CREATED_AT),
+      pair()
+    ),
+    false
+  );
+  assert.equal(
+    selectSeededOrganization(
+      [organization('org-app-created', SEEDED_ORGANIZATION_NAME, CREATED_AT)],
+      pair()
+    ),
+    undefined
+  );
+  assert.deepEqual(
+    membershipsToPrune(
+      [membership('m1', 'org-app-created', 'user-owner', SEEDED_ORGANIZATION_NAME)],
+      'org-keep',
+      ['user-owner'],
+      pair()
+    ),
+    []
   );
 });
 
@@ -164,29 +184,26 @@ void test('selectSeededOrganization keeps the oldest of the owner\u2019s duplica
   assert.equal(selectSeededOrganization(rows, pair())?.id, 'org-oldest');
 });
 
-void test('selectSeededOrganization keeps the oldest row that only the membership identifies', () => {
+void test('selectSeededOrganization does not adopt an organization the pair merely belongs to', () => {
   const rows = [
-    organization('org-newest', SEEDED_ORGANIZATION_NAME, '2026-03-03T00:00:00.000Z'),
-    organization('org-middle', SEEDED_ORGANIZATION_NAME, '2026-03-02T00:00:00.000Z'),
+    organization('org-app-created', SEEDED_ORGANIZATION_NAME, '2026-03-02T00:00:00.000Z'),
   ];
-  const ownerPair = pair(OWNER_EMAIL, ['org-newest', 'org-middle']);
-  assert.equal(selectSeededOrganization(rows, ownerPair)?.id, 'org-middle');
+  // No row carries the fixture's evidence, so the fixture inserts its own
+  // marked organization instead of adopting the owner's.
+  assert.equal(selectSeededOrganization(rows, pair()), undefined);
 });
 
 void test('selectSeededOrganization prefers the owner\u2019s row over an older unrelated one', () => {
   const rows = [
     // Older and same-named, and the pair is a member of it, but the fixture
-    // never named this owner in it: a database-wide first match would force
-    // the pair into it and relabel it.
+    // never named this owner in it: adopting it would force the pair into the
+    // owner's real organization and relabel it.
     organization('org-unrelated', SEEDED_ORGANIZATION_NAME, '2026-02-01T00:00:00.000Z'),
     organization('org-owned', SEEDED_ORGANIZATION_NAME, CREATED_AT, {
       [FIXTURE_SETTINGS_KEY]: OWNER_EMAIL,
     }),
   ];
-  assert.equal(
-    selectSeededOrganization(rows, pair(OWNER_EMAIL, ['org-unrelated', 'org-owned']))?.id,
-    'org-owned'
-  );
+  assert.equal(selectSeededOrganization(rows, pair())?.id, 'org-owned');
 });
 
 void test('selectSeededOrganization does not fall back to another owner\u2019s marked row', () => {
@@ -196,7 +213,7 @@ void test('selectSeededOrganization does not fall back to another owner\u2019s m
     }),
   ];
   // The two runs share a member, who is in the other owner's organization.
-  assert.equal(selectSeededOrganization(rows, pair(OWNER_EMAIL, ['org-other'])), undefined);
+  assert.equal(selectSeededOrganization(rows, pair()), undefined);
 });
 
 void test('selectSeededOrganization breaks a created_at tie by id', () => {
@@ -206,7 +223,7 @@ void test('selectSeededOrganization breaks a created_at tie by id', () => {
       [FIXTURE_SETTINGS_KEY]: OWNER_EMAIL,
     }),
   ];
-  assert.equal(selectSeededOrganization(rows, pair(OWNER_EMAIL, ['org-a']))?.id, 'org-a');
+  assert.equal(selectSeededOrganization(rows, pair(OWNER_EMAIL))?.id, 'org-a');
 });
 
 void test('selectSeededOrganization gives each owner its own organization', () => {
@@ -218,8 +235,8 @@ void test('selectSeededOrganization gives each owner its own organization', () =
       [FIXTURE_SETTINGS_KEY]: OWNER_EMAIL,
     }),
   ];
-  assert.equal(selectSeededOrganization(rows, pair(OWNER_EMAIL, ['org-a']))?.id, 'org-a');
-  assert.equal(selectSeededOrganization(rows, pair(OTHER_OWNER_EMAIL, ['org-b']))?.id, 'org-b');
+  assert.equal(selectSeededOrganization(rows, pair())?.id, 'org-a');
+  assert.equal(selectSeededOrganization(rows, pair(OTHER_OWNER_EMAIL))?.id, 'org-b');
 });
 
 void test('selectSeededOrganization returns undefined without an organization for this pair', () => {
@@ -247,7 +264,12 @@ void test('membershipsToPrune prunes only this pair\u2019s memberships outside t
   const rows = [
     membership('m1', keepOrganizationId, ownerUserId, SEEDED_ORGANIZATION_NAME),
     membership('m2', keepOrganizationId, memberUserId, SEEDED_ORGANIZATION_NAME),
-    membership('m3', 'org-duplicate', ownerUserId, SEEDED_ORGANIZATION_NAME),
+    membership(
+      'm3',
+      'org-duplicate',
+      ownerUserId,
+      `${LEGACY_ORGANIZATION_NAME_PREFIX}${OWNER_EMAIL}`
+    ),
     membership(
       'm4',
       'org-duplicate',
@@ -265,9 +287,14 @@ void test('membershipsToPrune prunes only this pair\u2019s memberships outside t
     membership('m9', 'org-other-pair', ownerUserId, SEEDED_ORGANIZATION_NAME, {
       [FIXTURE_SETTINGS_KEY]: OTHER_OWNER_EMAIL,
     }),
+    // The pair belongs to an `Acme Corp` the owner created through the app.
+    // The name and the membership are not fixture evidence, so neither
+    // membership is pruned.
+    membership('m10', 'org-app-created', ownerUserId, SEEDED_ORGANIZATION_NAME),
+    membership('m11', 'org-app-created', memberUserId, SEEDED_ORGANIZATION_NAME),
   ];
 
-  const ownerPair = pair(OWNER_EMAIL, [keepOrganizationId, 'org-duplicate', 'org-marked']);
+  const ownerPair = pair(OWNER_EMAIL);
   const pruned = membershipsToPrune(
     rows,
     keepOrganizationId,
@@ -286,12 +313,7 @@ void test('membershipsToPrune returns nothing when the pair only belongs to the 
     membership('m2', 'org-keep', 'user-member', SEEDED_ORGANIZATION_NAME),
   ];
   assert.deepEqual(
-    membershipsToPrune(
-      rows,
-      'org-keep',
-      ['user-owner', 'user-member'],
-      pair(OWNER_EMAIL, ['org-keep'])
-    ),
+    membershipsToPrune(rows, 'org-keep', ['user-owner', 'user-member'], pair(OWNER_EMAIL)),
     []
   );
 });

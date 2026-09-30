@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Emri i seancës",
       "transcriptAccessibility": "Transkripti i seancës",
       "readOnly": "Kjo seancë është vetëm për lexim.",
+      "continueInNewSession": "Vazhdo në një seancë të re",
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
       "scrollToBottom": "Shko në fund",
       "emptyTitle": "Ende nuk ka mesazhe",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "importo transkriptin e një sesioni OpenAI Codex",
       "reviewDescription": "shqyrto ndryshimet [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Përdor /{{command}}",
+      "useSkillCommand": "Përdor aftësinë /{{command}}",
+      "skillBadge": "Aftësi",
+      "catalogFull": "Katalogu i komandave është plot, prandaj disa komanda fshihen.",
+      "catalogOverLimit": "Katalogu i aftësive tejkalon kufirin e madhësisë, prandaj listohen të gjitha aftësitë.",
       "insert": "Fut",
       "upgradeRequiredFallback": "Përditëso CLI për të përdorur këtë komandë.",
       "exitCapabilityUnavailable": "Përditëso CLI për të mbyllur seancën.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Nuk ka serverë të besuar",
     "emptyDescription": "Kur i beson serverit të një lidhjeje, lidhja hapet pa kërkuar përsëri konfirmim.",
     "revoke": "Hiq besimin për {{host}}",
+    "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
     "backToPreferences": "Kthehu te preferencat"
   },
   "quickChat": {

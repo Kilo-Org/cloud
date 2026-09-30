@@ -37,6 +37,32 @@ export const COMPACT_CONTROL_BOX_CLASS = 'h-[32px] w-[32px] items-center justify
 export const COMPACT_CONTROL_HIT_SLOP_DP = 8;
 
 /**
+ * The frame a compact `h-11` control renders, in pt. NativeWind's rem is 14pt
+ * here, so `h-11` (2.75rem) measures 38.5pt on device: above the
+ * {@link MIN_TAP_TARGET_DP} floor a control-size audit accepts, and
+ * {@link COMPACT_H11_HIT_SLOP_DP} per side carries it to
+ * {@link TOUCH_TARGET_DP}. This is the second compact geometry beside
+ * {@link COMPACT_CONTROL_BOX_CLASS}: an `h-11` frame is set by its
+ * surroundings' layout (`discussion-thread.tsx`, `comment-row.tsx`), not by the
+ * icon-button box that 32pt defines. The frames stay literal class strings in
+ * the components (NativeWind reads them at build time); these numbers keep the
+ * arithmetic and its checks in one place. `comment-trailing-controls.ts` holds
+ * the one control whose neighbour bounds its tap area.
+ */
+export const COMPACT_H11_FRAME_DP = 38.5;
+
+/**
+ * Per-side `hitSlop` that lifts {@link COMPACT_H11_FRAME_DP} to
+ * `DESIGN.md:364`'s 44pt minimum: 38.5 + 3 + 3 = 44.5pt.
+ */
+export const COMPACT_H11_HIT_SLOP_DP = 3;
+
+/** Width and height of an `h-11` compact control's tap area, in pt. */
+export function compactControlTargetDp(): number {
+  return tapTargetReachDp(COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP);
+}
+
+/**
  * The box an inline text link renders. The sign-in legal links sit inside a
  * sentence, so their box is the control-size audit's {@link MIN_TAP_TARGET_DP}
  * floor and the slop carries the reach; a larger box would reflow the prose

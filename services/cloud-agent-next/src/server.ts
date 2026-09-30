@@ -1092,7 +1092,11 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
-export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
+// Cloudflare has been observed to keep firing a previously configured `*/3` trigger after a
+// deploy changed it to `*/5`. Accept both so a stale trigger cannot silently disable collection;
+// the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
+export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -1122,9 +1126,9 @@ export default {
       await removeExpiredCloudAgentReportData(env);
       return;
     }
-    if (controller.cron === OUTCOME_AGGREGATE_CRON) {
+    if (OUTCOME_AGGREGATE_CRONS.has(controller.cron)) {
       try {
-        await runCloudAgentOutcomeCollection(env);
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
       } finally {
         await runCloudAgentOpenStockCollection(env);
       }

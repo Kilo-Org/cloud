@@ -2113,6 +2113,7 @@
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ova je sesija dostupna samo za čitanje.",
+      "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Za početak pošalji poruku u nastavku.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
@@ -2636,6 +2637,10 @@
       "resumeCodexDescription": "uvezi transkript sesije OpenAI Codex",
       "reviewDescription": "pregledaj promjene [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Koristi /{{command}}",
+      "useSkillCommand": "Koristi vještinu /{{command}}",
+      "skillBadge": "Vještina",
+      "catalogFull": "Katalog naredbi je pun, pa su neke naredbe skrivene.",
+      "catalogOverLimit": "Katalog vještina premašuje ograničenje veličine, pa se prikazuju sve vještine.",
       "insert": "Umetni",
       "upgradeRequiredFallback": "Ažuriraj CLI da možeš koristiti ovu naredbu.",
       "exitCapabilityUnavailable": "Ažuriraj CLI da možeš zatvoriti sesiju.",
@@ -3205,6 +3210,7 @@
     "emptyTitle": "Nema pouzdanih poslužitelja",
     "emptyDescription": "Kad označiš poslužitelj pouzdanim, njegove se poveznice otvaraju bez ponovne potvrde.",
     "revoke": "Opozovi povjerenje za {{host}}",
+    "revokeMessage": "Poveznice na ovaj poslužitelj ponovno će tražiti potvrdu.",
     "backToPreferences": "Natrag na postavke"
   },
   "quickChat": {

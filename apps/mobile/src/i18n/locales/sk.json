@@ -2141,6 +2141,7 @@
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",
       "readOnly": "Táto relácia je iba na čítanie.",
+      "continueInNewSession": "Pokračovať v novej relácii",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
@@ -2674,6 +2675,10 @@
       "resumeCodexDescription": "importuj prepis relácie OpenAI Codex",
       "reviewDescription": "skontroluj zmeny [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Použiť /{{command}}",
+      "useSkillCommand": "Použiť zručnosť /{{command}}",
+      "skillBadge": "Zručnosť",
+      "catalogFull": "Katalóg príkazov je plný, takže niektoré príkazy sú skryté.",
+      "catalogOverLimit": "Katalóg zručností prekračuje limit veľkosti, takže sa zobrazujú všetky zručnosti.",
       "insert": "Vložiť",
       "upgradeRequiredFallback": "Ak chceš použiť tento príkaz, aktualizuj CLI.",
       "exitCapabilityUnavailable": "Ak chceš ukončiť reláciu, aktualizuj CLI.",
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
     "revoke": "Zrušiť dôveru serveru {{host}}",
+    "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {

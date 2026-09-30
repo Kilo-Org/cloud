@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "ຊື່ເຊດຊັນ",
       "transcriptAccessibility": "ບັນທຶກການສົນທະນາໃນເຊດຊັນ",
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
+      "continueInNewSession": "ສືບຕໍ່ໃນເຊດຊັນໃໝ່",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "ນຳເຂົ້າບົດບັນທຶກເຊສຊັນ OpenAI Codex",
       "reviewDescription": "ກວດສອບການປ່ຽນແປງ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ໃຊ້ /{{command}}",
+      "useSkillCommand": "ໃຊ້ທັກສະ /{{command}}",
+      "skillBadge": "ທັກສະ",
+      "catalogFull": "ລາຍການຄຳສັ່ງເຕັມແລ້ວ ດັ່ງນັ້ນບາງຄຳສັ່ງຖືກເຊື່ອງໄວ້.",
+      "catalogOverLimit": "ລາຍການທັກສະເກີນຂີດຈຳກັດຂະໜາດ ດັ່ງນັ້ນທັກສະທັງໝົດຖືກສະແດງ.",
       "insert": "ແຊກ",
       "upgradeRequiredFallback": "ອັບເກຣດ CLI ເພື່ອໃຊ້ຄຳສັ່ງນີ້.",
       "exitCapabilityUnavailable": "ອັບເດດ CLI ເພື່ອອອກຈາກເຊສຊັນ.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "ຍັງບໍ່ມີໂຮສທີ່ໄວ້ໃຈໄດ້",
     "emptyDescription": "ເມື່ອທ່ານເລືອກໄວ້ໃຈໂຮສຂອງລິ້ງ ລິ້ງຈາກໂຮສນັ້ນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
+    "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   },
   "quickChat": {

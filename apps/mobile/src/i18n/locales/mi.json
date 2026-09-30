@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Te ingoa o te wātū",
       "transcriptAccessibility": "Te tuhinga kōrero o te wātū",
       "readOnly": "Ka taea tēnei wātū te pānui anake.",
+      "continueInNewSession": "Haere tonu i tētahi wātū hou",
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "kawemai i tētahi tuhinga wātū OpenAI Codex",
       "reviewDescription": "arotake i ngā huringa [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Whakamahia /{{command}}",
+      "useSkillCommand": "Whakamahia te pūkenga /{{command}}",
+      "skillBadge": "Pūkenga",
+      "catalogFull": "Kua kī te rārangi whakahau, nō reira ka hunahia ētahi whakahau.",
+      "catalogOverLimit": "Kua hipa te rārangi pūkenga i te tepe rahi, nō reira ka whakaaturia ngā pūkenga katoa.",
       "insert": "Whakaurua",
       "upgradeRequiredFallback": "Whakahoutia tō CLI kia taea ai te whakamahi i tēnei whakahau.",
       "exitCapabilityUnavailable": "Whakahoutia tō CLI kia taea ai te puta i te wātū.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Kāore he paetukutuku whirinaki",
     "emptyDescription": "Ina whakawhirinaki koe ki te paetukutuku o tētahi hononga, ka tuwhera taua hononga me te kore pātai anō.",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
+    "revokeMessage": "Ka pātai anō ngā hononga ki tēnei paetukutuku mō te whakaaetanga.",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
   "quickChat": {

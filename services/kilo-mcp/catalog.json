@@ -9894,6 +9894,53 @@
     ],
     "searchBlob": "dolthub.verifyUpstream Verify that a DoltHub upstream repository (owner/repo) exists and is accessible. dolthub verifyupstream organizationid upstream organizationId upstream"
   },
+  "feedback.submit": {
+    "path": "feedback.submit",
+    "kind": "mutation",
+    "summary": "Submit feedback, a bug report, or a feature request about the Kilo platform to the Kilo team. Batch everything into one submission; the endpoint accepts one submission per user per minute.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "feedback_text": {
+          "default": "",
+          "type": "string"
+        },
+        "feedback_for": {
+          "default": "unknown",
+          "type": "string",
+          "minLength": 1
+        },
+        "feedback_batch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "default": "web",
+          "type": "string",
+          "minLength": 1
+        },
+        "context_json": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      }
+    },
+    "tags": [
+      "feedback",
+      "submit",
+      "feedback_text",
+      "feedback_for",
+      "feedback_batch",
+      "source",
+      "context_json"
+    ],
+    "searchBlob": "feedback.submit Submit feedback, a bug report, or a feature request about the Kilo platform to the Kilo team. Batch everything into one submission; the endpoint accepts one submission per user per minute. feedback submit feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
+  },
   "githubApps.beginConnection": {
     "path": "githubApps.beginConnection",
     "kind": "mutation",

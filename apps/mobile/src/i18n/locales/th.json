@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "ชื่อเซสชัน",
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
+      "continueInNewSession": "ดำเนินการต่อในเซสชันใหม่",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "นำเข้าบันทึกเซสชัน OpenAI Codex",
       "reviewDescription": "ตรวจสอบการเปลี่ยนแปลง [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ใช้ /{{command}}",
+      "useSkillCommand": "ใช้ทักษะ /{{command}}",
+      "skillBadge": "ทักษะ",
+      "catalogFull": "รายการคำสั่งเต็มแล้ว จึงมีบางคำสั่งถูกซ่อนไว้",
+      "catalogOverLimit": "รายการทักษะเกินขีดจำกัดขนาด จึงแสดงทักษะทั้งหมด",
       "insert": "แทรก",
       "upgradeRequiredFallback": "กรุณาอัปเดต CLI เพื่อใช้คำสั่งนี้",
       "exitCapabilityUnavailable": "อัปเดต CLI ของคุณเพื่อออกจากเซสชัน",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "ไม่มีโฮสต์ที่เชื่อถือ",
     "emptyDescription": "เมื่อคุณเชื่อถือโฮสต์ของลิงก์ แอปจะเปิดลิงก์จากโฮสต์นั้นโดยไม่ถามอีก",
     "revoke": "เลิกเชื่อถือ {{host}}",
+    "revokeMessage": "ลิงก์ไปยังโฮสต์นี้จะขอการยืนยันอีกครั้ง",
     "backToPreferences": "กลับไปที่การตั้งค่า"
   },
   "quickChat": {

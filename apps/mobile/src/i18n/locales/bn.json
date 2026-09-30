@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "সেশনের নাম",
       "transcriptAccessibility": "সেশনের কথোপকথন",
       "readOnly": "এই সেশনের বার্তাগুলো শুধু পড়া যায়।",
+      "continueInNewSession": "নতুন সেশনে চালিয়ে যান",
       "emptyDescription": "শুরু করতে নিচে একটি বার্তা পাঠান।",
       "scrollToBottom": "একেবারে নিচে স্ক্রল করুন",
       "emptyTitle": "এখনো কোনো বার্তা নেই",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex সেশনের ট্রান্সক্রিপ্ট আমদানি করুন",
       "reviewDescription": "পরিবর্তনগুলি পর্যালোচনা করুন [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ব্যবহার করুন",
+      "useSkillCommand": "/{{command}} স্কিল ব্যবহার করুন",
+      "skillBadge": "স্কিল",
+      "catalogFull": "কমান্ড তালিকা পূর্ণ, তাই কিছু কমান্ড লুকানো আছে।",
+      "catalogOverLimit": "স্কিল তালিকা আকার সীমা ছাড়িয়ে গেছে, তাই সব স্কিল দেখানো হয়েছে।",
       "insert": "যোগ করুন",
       "upgradeRequiredFallback": "এই কমান্ডটি ব্যবহার করতে আপনার CLI আপগ্রেড করুন।",
       "exitCapabilityUnavailable": "সেশন শেষ করতে আপনার CLI আপডেট করুন।",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "কোনো বিশ্বস্ত হোস্ট নেই",
     "emptyDescription": "কোনো লিঙ্কের হোস্টকে বিশ্বস্ত হিসেবে রাখলে সেই হোস্টের লিঙ্ক খুলতে আর অনুমতি চাওয়া হবে না।",
     "revoke": "বিশ্বস্ত হোস্টের তালিকা থেকে {{host}} সরান",
+    "revokeMessage": "এই হোস্টের লিঙ্কগুলি আবার নিশ্চিতকরণ চাইবে।",
     "backToPreferences": "পছন্দসমূহে ফিরুন"
   },
   "quickChat": {

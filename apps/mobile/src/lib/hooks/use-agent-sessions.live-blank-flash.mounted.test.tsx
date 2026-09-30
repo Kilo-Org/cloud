@@ -25,6 +25,7 @@ const readyContext: LiveSessionContext = {
   isReady: true,
   isResolving: false,
   isError: false,
+  isOffline: false,
   label: undefined,
   // The context is only read by `liveSessionContent`; the refetch is never
   // invoked here, so a no-op stub is enough to satisfy the exact query type.
@@ -43,6 +44,9 @@ const state = vi.hoisted(() => ({
   // The notification-preference row the mount subscribes to at app start.
   preferencesRequest: vi.fn<() => Promise<{ agentAttention: boolean }>>(),
   pathname: '/(app)/(tabs)/(2_agents)',
+  // The floor poll is scoped to the visible live-agents route, so the mount
+  // reads the same segments a focused Agents tab reports.
+  segments: ['(app)', '(tabs)', '(2_agents)'] as string[],
   scheduleNotificationAsync: vi.fn<(request: { identifier: string }) => Promise<void>>(),
   dismissNotificationAsync: vi.fn<(identifier: string) => Promise<void>>(),
 }));
@@ -81,6 +85,12 @@ vi.mock('@/lib/trpc', () => {
 vi.mock('@/lib/hooks/use-user-web-connection-state', () => ({
   useUserWebConnectionState: () => false,
 }));
+// The screen's admission context reads committed connectivity, whose real
+// module pulls NetInfo and the event service; the live-set behavior under test
+// does not depend on it, so pin it online.
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/components/agents/user-web-connection-provider', () => ({
   useUserWebConnection: () => connection,
 }));
@@ -93,7 +103,10 @@ vi.mock('react-native', () => ({
 // The mount also derives the app-owned needs-input plan from the route and
 // posts through expo-notifications; both are native-backed, so this test stubs
 // them (their behavior is covered by needs-input-notification.test.ts).
-vi.mock('expo-router', () => ({ usePathname: () => state.pathname }));
+vi.mock('expo-router', () => ({
+  usePathname: () => state.pathname,
+  useSegments: () => state.segments,
+}));
 vi.mock('expo-notifications', () => ({
   scheduleNotificationAsync: state.scheduleNotificationAsync,
   dismissNotificationAsync: state.dismissNotificationAsync,

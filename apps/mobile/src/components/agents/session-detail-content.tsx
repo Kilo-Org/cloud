@@ -347,6 +347,7 @@ export function SessionDetailContent({
   const remoteModelOverride = useAtomValue(manager.atoms.remoteModelOverride);
   const cloudAgentModelOverride = useAtomValue(manager.atoms.cloudAgentModelOverride);
   const availableCommands = useAtomValue(manager.atoms.availableCommands);
+  const availableCommandsCatalogStatus = useAtomValue(manager.atoms.availableCommandsCatalogStatus);
   const sessionInfo = useAtomValue(manager.atoms.sessionInfo);
   const sessionGoal = selectVisibleGoal(sessionInfo, isReadOnly);
   const remoteCommandState = useAtomValue(manager.atoms.remoteCommandState);
@@ -903,6 +904,32 @@ export function SessionDetailContent({
   const [droppedQueuedIds, setDroppedQueuedIds] = useState<ReadonlySet<string>>(EMPTY_IDS);
   const [canceledQueuedMessages, setCanceledQueuedMessages] =
     useState<ReadonlyMap<string, StoredMessage>>(EMPTY_CANCELED);
+  // Ids whose failed submission a retry accepted, plus the ids a re-send
+  // superseded while it is still in flight. The re-send is a new submission with
+  // its own row, so the original row must stop rendering even when it is
+  // server-confirmed (the SDK can only delete the client-materialised ghost).
+  // The row's preparation attempts go with it, or the filtered row's preparation
+  // would be re-emitted at the end of the transcript.
+  //
+  // Both records live in the manager, keyed by the session that owns the row:
+  // the re-send is awaited, so the user can switch sessions while it is in
+  // flight, and the row must stay hidden when the transcript is opened again —
+  // by another screen instance, or after a relaunch.
+  const resolvedDeliveryFailures = useAtomValue(manager.atoms.resolvedDeliveryFailures);
+  const supersededInFlightMessageIds = useAtomValue(manager.atoms.supersededInFlightMessageIds);
+  const supersededMessageIds = useMemo(() => {
+    if (supersededInFlightMessageIds.size === 0) {
+      return resolvedDeliveryFailures;
+    }
+    if (resolvedDeliveryFailures.size === 0) {
+      return supersededInFlightMessageIds;
+    }
+    const merged = new Set(supersededInFlightMessageIds);
+    for (const id of resolvedDeliveryFailures) {
+      merged.add(id);
+    }
+    return merged;
+  }, [supersededInFlightMessageIds, resolvedDeliveryFailures]);
   const [cancelQueuedStatus, setCancelQueuedStatus] = useState<CancelQueuedStatus | null>(null);
   const [cancelQueuedSheetStatus, setCancelQueuedSheetStatus] = useState<CancelQueuedStatus | null>(
     null
@@ -977,9 +1004,11 @@ export function SessionDetailContent({
 
   const visibleMessages = useMemo(() => {
     const base =
-      droppedQueuedIds.size === 0
+      droppedQueuedIds.size === 0 && supersededMessageIds.size === 0
         ? messages
-        : messages.filter(m => !droppedQueuedIds.has(m.info.id));
+        : messages.filter(
+            m => !droppedQueuedIds.has(m.info.id) && !supersededMessageIds.has(m.info.id)
+          );
     if (canceledQueuedMessages.size === 0) {
       return base;
     }
@@ -1001,7 +1030,7 @@ export function SessionDetailContent({
       }
       return 0;
     });
-  }, [messages, droppedQueuedIds, canceledQueuedMessages]);
+  }, [messages, droppedQueuedIds, supersededMessageIds, canceledQueuedMessages]);
 
   // Visibility-only strip for the "Hide thinking details" option. Applied once
   // here so the transcript, the message-details sheet, and the subagent views
@@ -1025,7 +1054,12 @@ export function SessionDetailContent({
     [getChildMessages, hideReasoningRows]
   );
 
-  const detailsMessage = displayedMessages.find(message => message.info.id === detailsMessageId);
+  // The details lookup runs on every render (including each composer
+  // keystroke), so memoize it against the two inputs that can change it.
+  const detailsMessage = useMemo(
+    () => displayedMessages.find(message => message.info.id === detailsMessageId),
+    [displayedMessages, detailsMessageId]
+  );
   const detailsDelivery =
     detailsMessageId === null ? undefined : pendingMessages.get(detailsMessageId);
   const detailsBusy = detailsMessageId !== null && cancelingQueuedIds.has(detailsMessageId);
@@ -1037,10 +1071,18 @@ export function SessionDetailContent({
   const isCancelingSelected =
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
-  const baseTranscript = useMemo(
-    () => mergeSessionTranscript(displayedMessages, preparationAttempts, pendingMessages),
-    [displayedMessages, preparationAttempts, pendingMessages]
-  );
+  const baseTranscript = useMemo(() => {
+    // A superseded submission's preparation goes with its row: dropping only
+    // the row would leave `mergeSessionTranscript` re-emitting the attempt at
+    // the end (its trigger id is no longer in the message list).
+    const attempts =
+      supersededMessageIds.size === 0
+        ? preparationAttempts
+        : preparationAttempts.filter(
+            attempt => !supersededMessageIds.has(attempt.triggerMessageId)
+          );
+    return mergeSessionTranscript(displayedMessages, attempts, pendingMessages);
+  }, [displayedMessages, preparationAttempts, pendingMessages, supersededMessageIds]);
   // Condensing is opt-in: with the preference off the derived transcript is the
   // same array identity, so nothing below re-renders differently.
   //
@@ -1100,6 +1142,9 @@ export function SessionDetailContent({
     setPrevSessionId(sessionId);
     setHeldQueuedIds(EMPTY_IDS);
     setDroppedQueuedIds(EMPTY_IDS);
+    // The superseded ids are not cleared here: the manager keys them by the
+    // session that owns the row, so switching back before an in-flight re-send
+    // settles must still hide the row it superseded.
     setCanceledQueuedMessages(EMPTY_CANCELED);
     setCancelQueuedStatus(null);
     setCancelQueuedSheetStatus(null);
@@ -1224,6 +1269,12 @@ export function SessionDetailContent({
       if (prompt === null) {
         return;
       }
+      // Only a user row may be superseded: `retryFailedMessage` never clears an
+      // assistant failure, so an assistant row added here would be hidden
+      // permanently (its preparation attempts are tied to a user
+      // `triggerMessageId`, but the row itself is not).
+      const messageId = message.info.id;
+      const isUser = message.info.role === 'user';
       // Same guard handleSend opens with: when no model resolves, run the send
       // anyway (the user gets the existing toast) and keep the failed row.
       if (requiresModel && !(pinned.model ?? currentModel)) {
@@ -1237,13 +1288,43 @@ export function SessionDetailContent({
       // outlive it: switching sessions while the re-send is in flight must not
       // record this resolution under the session the user switched to.
       const ownerSessionId = sessionId;
+      // The manager records the supersede against the session that owns the
+      // row. The re-send is awaited, so the user can switch sessions while it
+      // is in flight; a write under the switched-to session would put another
+      // transcript's id in its set, and a screen-local record would be lost
+      // with the screen that hosted the retry.
       void retryFailedMessage({
         message,
         send: async () => {
-          await handleSend(prompt);
+          try {
+            // Hide the original row in the same tap as the retry. The re-send
+            // inserts its own optimistic row before the transport round-trip
+            // (and fires this hook right after), so waiting for the send to
+            // settle would render the prompt twice for the whole round-trip.
+            await handleSend(prompt, {
+              onOptimisticSend: () => {
+                if (isUser) {
+                  manager.markMessageSuperseded(messageId, ownerSessionId);
+                }
+              },
+            });
+          } catch (retryError) {
+            // A rejected re-send restored nothing: bring the original failed row
+            // and its Retry control back. `retryFailedMessage` swallows the
+            // rejection, so its contract is unchanged.
+            if (isUser) {
+              manager.unmarkMessageSuperseded(messageId, ownerSessionId);
+            }
+            throw retryError;
+          }
         },
-        clearFailedMessage: messageId => {
-          manager.clearFailedMessage(messageId, ownerSessionId);
+        clearFailedMessage: clearedMessageId => {
+          // The manager records the resolution for the owning session and
+          // republishes it on `atoms.resolvedDeliveryFailures`, which already
+          // feeds the transcript filter. An accepted re-send therefore needs no
+          // local write, and the accepted id stays hidden across a switch-back
+          // and a relaunch.
+          manager.clearFailedMessage(clearedMessageId, ownerSessionId);
         },
       });
     },
@@ -1756,14 +1837,16 @@ export function SessionDetailContent({
       clearTimeout(handle);
     };
   }, [blockingInteraction]);
-  // One condition for the composer and for the bottom BlurBar that reserves
-  // its space: if the bar claimed the space on a condition the composer does
-  // not share, the composer pops in and the layout jumps on every open.
-  // The strip is a pure full-bleed background/spacer: it hosts no controls,
-  // so it deliberately carries no horizontal safe-area padding — the
-  // composer's own content clears the landscape sensor insets.
-  const isComposerMounted = !isReadOnly || messages.length === 0;
-  const isComposerVisible = isComposerMounted && !hasBlockingInteraction;
+  // The composer stays mounted for every session. A read-only session keeps it
+  // on screen but disabled, with the reason stated above it, so the reader has
+  // a stable input slot and the continue affordance names its destination.
+  // The bottom BlurBar reserves the composer's space and shares its visibility
+  // condition, so a blocking card that hides the composer never leaves the bar
+  // claiming space the composer does not fill. The strip is a pure full-bleed
+  // background/spacer: it hosts no controls, so it deliberately carries no
+  // horizontal safe-area padding — the composer's own content clears the
+  // landscape sensor insets.
+  const isComposerVisible = !hasBlockingInteraction;
   // Structural locks only. The live send capability is passed separately so a
   // failed turn (or a session that has not resolved yet) keeps the input
   // editable beside the error's Retry instead of locking the composer.
@@ -2091,6 +2174,7 @@ export function SessionDetailContent({
             titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
             backFallback={'/(app)/(tabs)/(2_agents)' as Href}
             headerRight={headerRight}
+            headerRightShrinks
             className="pb-1"
             {...(rename.isTitleInteractive
               ? {
@@ -2367,80 +2451,79 @@ export function SessionDetailContent({
             <Button
               variant="outline"
               size="sm"
-              accessibilityLabel={t('common.continue')}
+              accessibilityLabel={t('agentChat.session.continueInNewSession')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('common.continue')}</Text>
+              <Text>{t('agentChat.session.continueInNewSession')}</Text>
             </Button>
           </View>
         ) : null}
 
-        {isComposerMounted ? (
-          <View
-            className={cn(hasBlockingInteraction && 'hidden')}
-            accessibilityElementsHidden={hasBlockingInteraction}
-            importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
-          >
-            {exitFailure ? (
-              <Animated.View
-                entering={FadeIn.duration(200)}
-                exiting={FadeOut.duration(150)}
-                layout={LinearTransition.duration(150)}
-              >
-                <RemoteSessionExitFailure
-                  message={exitFailure.message}
-                  onRetry={handleRetryExit}
-                  isRetrying={isRetryingExit}
-                />
-              </Animated.View>
-            ) : null}
-            <ModelPickerSelectionScopeProvider
-              selectionScope={modelPickerSelectionScope}
-              isSelectionCurrent={isModelPickerSelectionCurrent}
+        <View
+          className={cn(hasBlockingInteraction && 'hidden')}
+          accessibilityElementsHidden={hasBlockingInteraction}
+          importantForAccessibility={hasBlockingInteraction ? 'no-hide-descendants' : 'auto'}
+        >
+          {exitFailure ? (
+            <Animated.View
+              entering={FadeIn.duration(200)}
+              exiting={FadeOut.duration(150)}
+              layout={LinearTransition.duration(150)}
             >
-              <ChatComposer
-                key={`${composerAccount.epoch}:${sessionId}`}
-                onSend={handleSend}
-                onSendCommand={handleSendCommand}
-                onCreateSession={handleCreateSession}
-                onRestartSession={handleRestartSession}
-                onExitSession={handleExitSession}
-                onStop={handleStop}
-                disabled={isComposerDisabled}
-                sendDisabled={!canSend}
-                isStreaming={isStreaming}
-                placeholder={composerPlaceholder}
-                mode={currentMode}
-                onModeChange={handleModeChange}
-                model={displayModel}
-                variant={displayVariant}
-                modelOptions={modelOptionsForToolbar}
-                customOptions={customOptions}
-                modelLocked={modelLocked}
-                modelLockLabel={pinned.agentName}
-                onModelSelect={handleModelSelect}
-                organizationId={organizationId}
-                attachmentsEnabled={supportsAttachments}
-                activeSessionType={activeSessionType}
-                commands={availableCommands}
-                commandState={remoteCommandState}
-                shareId={shareId}
-                autoSend={autoSend}
-                draftKey={userId ? sessionComposerDraftKey : undefined}
-                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
-                sessionId={sessionId}
-                suggestion={activeSuggestion}
-                onAcceptSuggestion={async (requestId, index) => {
-                  await manager.acceptSuggestion(requestId, index);
-                }}
-                onDismissSuggestion={async requestId => {
-                  await manager.dismissSuggestion(requestId);
-                }}
-                controlRef={composerControlRef}
+              <RemoteSessionExitFailure
+                message={exitFailure.message}
+                onRetry={handleRetryExit}
+                isRetrying={isRetryingExit}
               />
-            </ModelPickerSelectionScopeProvider>
-          </View>
-        ) : null}
+            </Animated.View>
+          ) : null}
+          <ModelPickerSelectionScopeProvider
+            selectionScope={modelPickerSelectionScope}
+            isSelectionCurrent={isModelPickerSelectionCurrent}
+          >
+            <ChatComposer
+              key={`${composerAccount.epoch}:${sessionId}`}
+              onSend={handleSend}
+              onSendCommand={handleSendCommand}
+              onCreateSession={handleCreateSession}
+              onRestartSession={handleRestartSession}
+              onExitSession={handleExitSession}
+              onStop={handleStop}
+              disabled={isComposerDisabled}
+              sendDisabled={!canSend}
+              isStreaming={isStreaming}
+              placeholder={composerPlaceholder}
+              mode={currentMode}
+              onModeChange={handleModeChange}
+              model={displayModel}
+              variant={displayVariant}
+              modelOptions={modelOptionsForToolbar}
+              customOptions={customOptions}
+              modelLocked={modelLocked}
+              modelLockLabel={pinned.agentName}
+              onModelSelect={handleModelSelect}
+              organizationId={organizationId}
+              attachmentsEnabled={supportsAttachments}
+              activeSessionType={activeSessionType}
+              commands={availableCommands}
+              commandCatalogStatus={availableCommandsCatalogStatus}
+              commandState={remoteCommandState}
+              shareId={shareId}
+              autoSend={autoSend}
+              draftKey={userId ? sessionComposerDraftKey : undefined}
+              initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
+              sessionId={sessionId}
+              suggestion={activeSuggestion}
+              onAcceptSuggestion={async (requestId, index) => {
+                await manager.acceptSuggestion(requestId, index);
+              }}
+              onDismissSuggestion={async requestId => {
+                await manager.dismissSuggestion(requestId);
+              }}
+              controlRef={composerControlRef}
+            />
+          </ModelPickerSelectionScopeProvider>
+        </View>
       </>
     );
   }

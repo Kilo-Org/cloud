@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "ಸೆಶನ್ ಹೆಸರು",
       "transcriptAccessibility": "ಸೆಶನ್‌ನ ಸಂಭಾಷಣೆಯ ಪಠ್ಯ",
       "readOnly": "ಈ ಸೆಶನ್ ಅನ್ನು ಓದಲು ಮಾತ್ರ ಸಾಧ್ಯ.",
+      "continueInNewSession": "ಹೊಸ ಸೆಶನ್ನಲ್ಲಿ ಮುಂದುವರಿಸಿ",
       "emptyDescription": "ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗೆ ಸಂದೇಶ ಕಳುಹಿಸಿ.",
       "scrollToBottom": "ಕೊನೆಯವರೆಗೆ ಸ್ಕ್ರಾಲ್ ಮಾಡಿ",
       "emptyTitle": "ಇನ್ನೂ ಯಾವುದೇ ಸಂದೇಶಗಳಿಲ್ಲ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex ಸೆಷನ್‌ನ ಪ್ರತಿಯನ್ನು ಆಮದು ಮಾಡಿ",
       "reviewDescription": "ಬದಲಾವಣೆಗಳನ್ನು ಪರಿಶೀಲಿಸಿ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ಬಳಸಿ",
+      "useSkillCommand": "/{{command}} ಕೌಶಲ್ಯ ಬಳಸಿ",
+      "skillBadge": "ಕೌಶಲ್ಯ",
+      "catalogFull": "ಆಜ್ಞೆಗಳ ಪಟ್ಟಿ ತುಂಬಿದೆ, ಆದ್ದರಿಂದ ಕೆಲವು ಆಜ್ಞೆಗಳು ಮರೆಯಾಗಿವೆ.",
+      "catalogOverLimit": "ಕೌಶಲ್ಯಗಳ ಪಟ್ಟಿ ಗಾತ್ರ ಮಿತಿ ಮೀರಿದೆ, ಆದ್ದರಿಂದ ಎಲ್ಲ ಕೌಶಲ್ಯಗಳನ್ನು ತೋರಿಸಲಾಗಿದೆ.",
       "insert": "ಸೇರಿಸಿ",
       "upgradeRequiredFallback": "ಈ ಆಜ್ಞೆಯನ್ನು ಬಳಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
       "exitCapabilityUnavailable": "ಸೆಶನ್‌ನಿಂದ ನಿರ್ಗಮಿಸಲು ನಿಮ್ಮ CLI ಅನ್ನು ನವೀಕರಿಸಿ.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "ವಿಶ್ವಾಸಾರ್ಹ ಹೋಸ್ಟ್‌ಗಳಿಲ್ಲ",
     "emptyDescription": "ಲಿಂಕ್‌ನ ಹೋಸ್ಟ್ ಅನ್ನು ವಿಶ್ವಾಸಾರ್ಹವೆಂದು ಗುರುತಿಸಿದರೆ ಅದರ ಲಿಂಕ್‌ಗಳು ಮತ್ತೆ ಅನುಮತಿ ಕೇಳದೆ ತೆರೆಯುತ್ತವೆ.",
     "revoke": "{{host}} ಗೆ ನೀಡಿದ ಅನುಮತಿಯನ್ನು ಹಿಂಪಡೆಯಿರಿ",
+    "revokeMessage": "ಈ ಹೋಸ್ಟ್‌ನ ಲಿಂಕ್‌ಗಳು ಮತ್ತೆ ಅನುಮತಿ ಕೇಳುತ್ತವೆ.",
     "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
   },
   "quickChat": {

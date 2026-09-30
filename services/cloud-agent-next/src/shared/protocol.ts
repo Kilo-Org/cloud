@@ -1,4 +1,4 @@
-import type { SlashCommandInfo } from './slash-commands.js';
+import type { SlashCommandCatalogStatus, SlashCommandInfo } from './slash-commands.js';
 
 /**
  * Event types that flow through the streaming system.
@@ -256,6 +256,12 @@ export type ConnectedEventData = {
  */
 export type CommandsAvailableData = {
   commands: SlashCommandInfo[];
+  /**
+   * Present when the wrapper bounded the catalog to the shared limits. The
+   * client renders a notice for it, so a catalog that is missing rows is never
+   * silent. Absent means the commands are the whole catalog.
+   */
+  catalogStatus?: SlashCommandCatalogStatus;
 };
 
 /**

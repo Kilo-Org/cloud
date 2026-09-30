@@ -1605,6 +1605,7 @@
       "renamePlaceholder": "Название сеанса",
       "transcriptAccessibility": "Переписка в сеансе",
       "readOnly": "Этот сеанс доступен только для чтения.",
+      "continueInNewSession": "Продолжить в новом сеансе",
       "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
@@ -2138,6 +2139,10 @@
       "resumeCodexDescription": "импортировать расшифровку сеанса OpenAI Codex",
       "reviewDescription": "просмотреть изменения [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Использовать /{{command}}",
+      "useSkillCommand": "Использовать навык /{{command}}",
+      "skillBadge": "Навык",
+      "catalogFull": "Каталог команд заполнен, поэтому часть команд скрыта.",
+      "catalogOverLimit": "Каталог навыков превышает предел размера, поэтому показаны все навыки.",
       "insert": "Вставить",
       "upgradeRequiredFallback": "Обновите CLI, чтобы использовать эту команду.",
       "exitCapabilityUnavailable": "Обновите CLI, чтобы выйти из сеанса.",
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Нет доверенных сайтов",
     "emptyDescription": "Ссылки на доверенные сайты открываются без повторного подтверждения.",
     "revoke": "Перестать доверять сайту {{host}}",
+    "revokeMessage": "Ссылки на этот хост снова будут запрашивать подтверждение.",
     "backToPreferences": "К настройкам"
   },
   "quickChat": {

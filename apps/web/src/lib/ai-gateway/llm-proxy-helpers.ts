@@ -24,7 +24,8 @@ import type {
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toMicrodollars } from '@/lib/microdollars';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';

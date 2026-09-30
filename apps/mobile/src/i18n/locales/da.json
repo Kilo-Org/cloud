@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
       "readOnly": "Denne session er skrivebeskyttet.",
+      "continueInNewSession": "Fortsæt i en ny session",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "importér et OpenAI Codex-sessionstranskript",
       "reviewDescription": "gennemgå ændringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Brug /{{command}}",
+      "useSkillCommand": "Brug færdigheden /{{command}}",
+      "skillBadge": "Færdighed",
+      "catalogFull": "Kommandokataloget er fyldt, så nogle kommandoer er skjult.",
+      "catalogOverLimit": "Færdighedskataloget overskrider sin størrelsesgrænse, så alle færdigheder vises.",
       "insert": "Indsæt",
       "upgradeRequiredFallback": "Opdatér din CLI for at bruge denne kommando.",
       "exitCapabilityUnavailable": "Opdatér din CLI for at afslutte sessionen.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
     "revoke": "Fjern tillid til {{host}}",
+    "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {

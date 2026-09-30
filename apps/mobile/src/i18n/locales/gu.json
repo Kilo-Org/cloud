@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "સત્રનું નામ",
       "transcriptAccessibility": "સત્રની લેખિત વાતચીત",
       "readOnly": "આ સત્ર માત્ર વાંચી શકાય છે.",
+      "continueInNewSession": "નવા સત્રમાં ચાલુ રાખો",
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex સત્રની ટ્રાન્સક્રિપ્ટ આયાત કરો",
       "reviewDescription": "ફેરફારો સમીક્ષા કરો [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} વાપરો",
+      "useSkillCommand": "/{{command}} સ્કિલ વાપરો",
+      "skillBadge": "સ્કિલ",
+      "catalogFull": "કમાન્ડ સૂચિ ભરાઈ ગઈ છે, તેથી કેટલાક કમાન્ડ છુપાયેલા છે.",
+      "catalogOverLimit": "સ્કિલ સૂચિ કદ મર્યાદા વટાવે છે, તેથી દરેક સ્કિલ બતાવાય છે.",
       "insert": "દાખલ કરો",
       "upgradeRequiredFallback": "આ કમાન્ડ વાપરવા માટે તમારું CLI અપગ્રેડ કરો.",
       "exitCapabilityUnavailable": "સત્રમાંથી બહાર નીકળવા માટે તમારું CLI અપડેટ કરો.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "કોઈ વિશ્વસનીય હોસ્ટ નથી",
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
+    "revokeMessage": "આ હોસ્ટની લિંક ફરીથી પુષ્ટિ માગશે.",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
   },
   "quickChat": {

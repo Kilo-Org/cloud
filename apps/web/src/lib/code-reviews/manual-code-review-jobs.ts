@@ -10,6 +10,7 @@ import {
   type ManualCodeReviewConfig,
 } from '@kilocode/db/schema-types';
 import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { isUniqueViolation } from '@/lib/db-errors';
 import {
   CodeReviewAgentConfigSchema,
   type CodeReviewAgentConfig,
@@ -285,11 +286,7 @@ export async function createManualCodeReviewJob(params: {
     await tryDispatchPendingReviews(params.owner);
     return { reviewId, outputMode };
   } catch (error) {
-    if (
-      getDatabaseErrorCode(error) === '23505' &&
-      outputMode === 'provider' &&
-      source.integrationId
-    ) {
+    if (isUniqueViolation(error) && outputMode === 'provider' && source.integrationId) {
       const activePublisher = await findActiveProviderPublishingReview({
         platformIntegrationId: source.integrationId,
         repoFullName: source.repoFullName,
@@ -776,12 +773,6 @@ function getGitLabRepositoryIdFromIntegration(
   const repositories = integration.repositories;
   const repository = repositories?.find(candidate => candidate.full_name === projectPath);
   return typeof repository?.id === 'number' ? repository.id : undefined;
-}
-
-function getDatabaseErrorCode(error: unknown): string | null {
-  if (typeof error !== 'object' || error === null || !('code' in error)) return null;
-  const code = Reflect.get(error, 'code');
-  return typeof code === 'string' ? code : null;
 }
 
 class ProviderFetchError extends Error {

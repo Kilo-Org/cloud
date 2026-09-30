@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "सत्राचे नाव",
       "transcriptAccessibility": "सत्रातील संभाषणाची नोंद",
       "readOnly": "हे सत्र फक्त वाचता येते.",
+      "continueInNewSession": "नवीन सत्रात सुरू ठेवा",
       "emptyDescription": "सुरुवात करण्यासाठी खाली संदेश पाठवा.",
       "scrollToBottom": "शेवटपर्यंत स्क्रोल करा",
       "emptyTitle": "अजून संदेश नाहीत",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex सत्राचे ट्रान्स्क्रिप्ट आयात करा",
       "reviewDescription": "बदलांचे पुनरावलोकन करा [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} वापरा",
+      "useSkillCommand": "/{{command}} कौशल्य वापरा",
+      "skillBadge": "कौशल्य",
+      "catalogFull": "कमांड सूची भरली आहे, म्हणून काही कमांड लपलेले आहेत.",
+      "catalogOverLimit": "कौशल्य सूची आकार मर्यादेपेक्षा मोठी आहे, म्हणून प्रत्येक कौशल्य दाखवले आहे.",
       "insert": "घाला",
       "upgradeRequiredFallback": "ही कमांड वापरण्यासाठी कृपया तुमचे CLI अद्ययावत करा.",
       "exitCapabilityUnavailable": "सत्रातून बाहेर पडण्यासाठी तुमचे CLI अद्ययावत करा.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "विश्वासार्ह होस्ट नाहीत",
     "emptyDescription": "जेव्हा तुम्ही लिंकच्या होस्टवर विश्वास ठेवता, तेव्हा ती पुन्हा न विचारता उघडते.",
     "revoke": "{{host}} वरील विश्वास रद्द करा",
+    "revokeMessage": "या होस्टच्या लिंक पुन्हा पुष्टी मागतील.",
     "backToPreferences": "प्राधान्यांवर परत जा"
   },
   "quickChat": {

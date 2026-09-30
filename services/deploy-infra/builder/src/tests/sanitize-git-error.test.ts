@@ -1,10 +1,3 @@
-/**
- * Tests for sanitizeGitError function.
- *
- * Ensures access tokens are properly redacted from error messages,
- * including tokens that contain regex special characters.
- */
-
 import { sanitizeGitError } from '../sanitize-git-error';
 
 describe('sanitizeGitError', () => {
@@ -61,7 +54,6 @@ describe('sanitizeGitError', () => {
   });
 
   it('should handle tokens with regex special characters safely', () => {
-    // Token containing regex special characters: . * + ? ^ $ { } [ ] \ | ( )
     const accessToken = 'token.with*special+chars?and^more$chars';
     const error = new Error(`Failed with token: ${accessToken}`);
 

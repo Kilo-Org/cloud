@@ -39,7 +39,7 @@
     "mergeRequest": "මර්ජ ඉල්ලීම",
     "notConnected": "සම්බන්ධ නැත",
     "notifications": "දැනුම්දීම්",
-    "pullRequest": "pR",
+    "pullRequest": "පුල් ඉල්ලීම",
     "repositories": "කේත ගබඩා",
     "securityAgent": "ආරක්ෂක නියෝජිතයා",
     "unknown": "නොදන්නා",
@@ -773,7 +773,7 @@
       }
     },
     "terms": {
-      "pullRequest": "PR",
+      "pullRequest": "පුල් ඉල්ලීම",
       "mergeRequest": "මර්ජ ඉල්ලීම",
       "mergeRequestNumber": "!{{number}}",
       "shareMergeRequest": "මර්ජ ඉල්ලීම බෙදාගන්න",
@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "සැසියේ නම",
       "transcriptAccessibility": "සැසියේ සංවාද පිටපත",
       "readOnly": "මෙම සැසිය කියවීමට පමණි.",
+      "continueInNewSession": "නව සැසියක ඉදිරියට යන්න",
       "emptyDescription": "ආරම්භ කිරීමට පහත කොටුවෙන් පණිවිඩයක් යවන්න.",
       "scrollToBottom": "අවසානය දක්වා පහළට අනුචලනය කරන්න",
       "emptyTitle": "තවම පණිවිඩ නැත",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex සැසියේ පිටපත ආයාත කරන්න",
       "reviewDescription": "වෙනස්කම් සමාලෝචනය කරන්න [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} භාවිත කරන්න",
+      "useSkillCommand": "/{{command}} කුසලතාව භාවිත කරන්න",
+      "skillBadge": "කුසලතාව",
+      "catalogFull": "විධාන ලැයිස්තුව පිරී ඇත, එබැවින් සමහර විධාන සඟවා ඇත.",
+      "catalogOverLimit": "කුසලතා ලැයිස්තුව ප්‍රමාණ සීමාව ඉක්මවයි, එබැවින් සියලු කුසලතා පෙන්වයි.",
       "insert": "ඇතුළත් කරන්න",
       "upgradeRequiredFallback": "මෙම විධානය භාවිත කිරීමට ඔබේ CLI යාවත්කාලීන කරන්න.",
       "exitCapabilityUnavailable": "සැසියෙන් ඉවත් වීමට ඔබේ CLI යාවත්කාලීන කරන්න.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "විශ්වාස කළ ධාරක නැත",
     "emptyDescription": "ඔබ සබැඳියක ධාරකය විශ්වාස කළ විට එහි සබැඳි නැවත තහවුරු කිරීමකින් තොරව විවෘත වේ.",
     "revoke": "{{host}} වෙත දුන් විශ්වාසය ඉවත් කරන්න",
+    "revokeMessage": "මෙම ධාරකයට ඇති සබැඳි නැවත තහවුරු කිරීම ඉල්ලා සිටී.",
     "backToPreferences": "මනාප වෙත ආපසු යන්න"
   },
   "quickChat": {

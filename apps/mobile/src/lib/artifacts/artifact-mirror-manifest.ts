@@ -157,6 +157,65 @@ export function safeArtifactSessionName({
 }
 
 /**
+ * Make every display name unique within one session.
+ *
+ * Two artifacts can share an agent-supplied filename, and the file browser
+ * paints `name` verbatim, so duplicates appear as indistinguishable rows in
+ * the session folder. The first occurrence keeps its name; a later duplicate
+ * gets a short ` (n)` suffix before the extension, with the stem truncated so
+ * the suffix and the extension both stay inside the byte bound. The input is
+ * never mutated.
+ */
+export function uniqueArtifactDisplayNames(files: ArtifactMirrorFile[]): ArtifactMirrorFile[] {
+  const used = new Set<string>();
+  return files.map(file => {
+    const name = uniqueArtifactDisplayName(file, used);
+    used.add(name);
+    return name === file.name ? file : { ...file, name };
+  });
+}
+
+/**
+ * A display name that is not in `used` yet. A collision takes a counter suffix
+ * before its extension; the suffix is guaranteed to survive truncation because
+ * the stem is bounded against the same byte budget, and the extension is capped
+ * so the counter never runs out of room. One candidate per taken name is tried,
+ * so a free one always exists.
+ */
+function uniqueArtifactDisplayName(file: ArtifactMirrorFile, used: ReadonlySet<string>): string {
+  if (!used.has(file.name)) {
+    return file.name;
+  }
+  const { stem, extension } = splitArtifactExtension(file.name);
+  const boundedExtension = truncateUtf8(extension, MAX_ARTIFACT_DISPLAY_NAME_BYTES / 2);
+  for (let index = 2; index <= used.size + 2; index += 1) {
+    const suffix = ` (${index})`;
+    const stemBudget =
+      MAX_ARTIFACT_DISPLAY_NAME_BYTES - utf8ByteLength(boundedExtension) - utf8ByteLength(suffix);
+    const candidate = `${truncateUtf8(stem, stemBudget)}${suffix}${boundedExtension}`;
+    if (!used.has(candidate)) {
+      return candidate;
+    }
+  }
+  return safeArtifactDisplayName({ id: file.id, name: '', mime: file.mime });
+}
+
+/** The stem and extension (with the dot) of a sanitized display name. */
+type ArtifactDisplayNameParts = {
+  extension: string;
+  stem: string;
+};
+
+/** Split a sanitized display name into its stem and extension (with the dot). */
+function splitArtifactExtension(name: string): ArtifactDisplayNameParts {
+  const extensionStart = name.lastIndexOf('.');
+  if (extensionStart > 0 && extensionStart < name.length - 1) {
+    return { extension: name.slice(extensionStart), stem: name.slice(0, extensionStart) };
+  }
+  return { extension: '', stem: name };
+}
+
+/**
  * Drop whole sessions, oldest `updatedAt` first, until the summed file sizes
  * fit `maxBytes`. The session entries stay — only their files leave — so an
  * evicted session shows up as an empty folder instead of disappearing from the

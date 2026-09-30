@@ -1562,6 +1562,7 @@
       "renamePlaceholder": "Nome della sessione",
       "transcriptAccessibility": "Trascrizione della sessione",
       "readOnly": "Questa sessione è di sola lettura.",
+      "continueInNewSession": "Continua in una nuova sessione",
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
@@ -2085,6 +2086,10 @@
       "resumeCodexDescription": "importa la trascrizione di una sessione OpenAI Codex",
       "reviewDescription": "rivedi le modifiche [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usa /{{command}}",
+      "useSkillCommand": "Usa la competenza /{{command}}",
+      "skillBadge": "Competenza",
+      "catalogFull": "Il catalogo dei comandi è pieno, quindi alcuni comandi sono nascosti.",
+      "catalogOverLimit": "Il catalogo delle competenze supera il limite di dimensione, quindi vengono elencate tutte le competenze.",
       "insert": "Inserisci",
       "upgradeRequiredFallback": "Aggiorna la tua CLI per usare questo comando.",
       "exitCapabilityUnavailable": "Aggiorna la tua CLI per uscire dalla sessione.",
@@ -2131,7 +2136,7 @@
       "open": "apri la PR",
       "closed": "pull request chiusa",
       "merged": "pull request integrata",
-      "draft": "pR in bozza",
+      "draft": "PR in bozza",
       "updating": "Aggiornamento in corso, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3205,6 +3210,7 @@
     "emptyTitle": "Nessun sito attendibile",
     "emptyDescription": "Quando consideri attendibile un sito, i suoi link si aprono senza chiedere di nuovo conferma.",
     "revoke": "Revoca l'attendibilità di {{host}}",
+    "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
     "backToPreferences": "Torna alle preferenze"
   },
   "quickChat": {

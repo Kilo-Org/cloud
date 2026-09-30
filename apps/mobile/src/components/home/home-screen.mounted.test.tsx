@@ -343,7 +343,7 @@ describe('HomeScreen composition', () => {
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: loaded });
     expect(nodes('RemoteSessionRow')).toHaveLength(loaded ? 1 : 0);
     expect(nodes('NewTaskButton')).toHaveLength(loaded ? 1 : 0);
-    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 1);
+    expect(nodes('Skeleton')).toHaveLength(loaded ? 0 : 3);
   });
 
   it.each([false, true])(
@@ -411,9 +411,21 @@ describe('Home live presentation', () => {
   ])('keeps valid actions and truthful content during $name', async test => {
     Object.assign(state.live, test.patch);
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 1 : 0);
+    expect(nodes('Skeleton')).toHaveLength(test.skeleton ? 3 : 0);
     if (test.skeleton) {
-      expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+      // The placeholder keeps the row frame: a reserved min-height card, and
+      // no full-width skeleton block standing in for the whole surface.
+      expect(
+        nodes('View').some(view => {
+          const className = String(view.props.className ?? '');
+          return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+        })
+      ).toBe(true);
+      expect(
+        nodes('Skeleton').some(skeleton =>
+          String(skeleton.props.className ?? '').includes('w-full')
+        )
+      ).toBe(false);
     }
     expect(text().includes('Nothing running right now')).toBe(Boolean(test.empty));
     expect(text().includes("Couldn't load active sessions")).toBe(Boolean(test.error));
@@ -461,7 +473,7 @@ describe('Home live presentation', () => {
     state.connection.isConnected = false;
     state.live.isPaused = true;
     await renderHome();
-    expect(nodes('Skeleton')).toHaveLength(1);
+    expect(nodes('Skeleton')).toHaveLength(3);
     expect(text()).not.toContain('Nothing running right now');
     expect(text()).not.toContain('Connecting…');
     expect(text()).not.toContain('No internet connection');
@@ -653,7 +665,12 @@ describe('Home live presentation', () => {
     // indicator while the live content is pending, so the platform pull
     // control must not also hold the scroll inset open for a second one.
     expect(refresh().props.refreshing).toBe(false);
-    expect(nodes('Skeleton')[0]?.props.className).toContain('min-h-[72px]');
+    expect(
+      nodes('View').some(view => {
+        const className = String(view.props.className ?? '');
+        return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
+      })
+    ).toBe(true);
     await act(async () => {
       pending.resolve(true);
       await pending.promise;
@@ -790,7 +807,7 @@ describe('Home admission', () => {
       expect(text()).not.toContain('Engineering');
     }
     if (mode === 'membership paused') {
-      expect(nodes('Skeleton')).toHaveLength(1);
+      expect(nodes('Skeleton')).toHaveLength(3);
       expect(text()).not.toContain('Organization unavailable');
     }
     if (

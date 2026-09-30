@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
       "readOnly": "این نشست فقط خواندنی است.",
+      "continueInNewSession": "ادامه در یک نشست جدید",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "رونوشت نشست OpenAI Codex را درونریزی کن",
       "reviewDescription": "تغییرات را بازبینی کن [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "استفاده از /{{command}}",
+      "useSkillCommand": "استفاده از مهارت /{{command}}",
+      "skillBadge": "مهارت",
+      "catalogFull": "فهرست فرمان‌ها پر است، بنابراین برخی فرمان‌ها پنهان شده‌اند.",
+      "catalogOverLimit": "فهرست مهارت‌ها از حد اندازه فراتر رفته است، بنابراین همه مهارت‌ها نمایش داده می‌شوند.",
       "insert": "درج",
       "upgradeRequiredFallback": "برای استفاده از این دستور، CLI خود را ارتقا دهید.",
       "exitCapabilityUnavailable": "برای خروج از نشست، CLI خود را به‌روزرسانی کنید.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "میزبان مورد اعتمادی نیست",
     "emptyDescription": "اگر به میزبان یک پیوند اعتماد کنید، پیوندهای آن بدون درخواست تأیید دوباره باز می‌شوند.",
     "revoke": "لغو اعتماد به {{host}}",
+    "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
     "backToPreferences": "بازگشت به تنظیمات"
   },
   "quickChat": {

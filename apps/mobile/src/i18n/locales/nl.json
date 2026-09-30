@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
+      "continueInNewSession": "Doorgaan in een nieuwe sessie",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "een OpenAI Codex-sessietranscript importeren",
       "reviewDescription": "wijzigingen bekijken [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} gebruiken",
+      "useSkillCommand": "Vaardigheid /{{command}} gebruiken",
+      "skillBadge": "Vaardigheid",
+      "catalogFull": "De opdrachtcatalogus is vol, dus sommige opdrachten zijn verborgen.",
+      "catalogOverLimit": "De vaardighedencatalogus overschrijdt de groottelimiet, dus elke vaardigheid wordt weergegeven.",
       "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
       "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
     "revoke": "Vertrouwen in {{host}} intrekken",
+    "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {

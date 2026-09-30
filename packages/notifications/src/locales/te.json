@@ -7,7 +7,7 @@
       "instanceLifecycle": "మీ ఇన్స్టాన్స్కు నవీకరణ ఉంది",
       "scheduledAction": "షెడ్యూల్ చేసిన చర్యకు నవీకరణ ఉంది",
       "lowBalance": "మీ బ్యాలెన్స్కు శ్రద్ధ అవసరం",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "మీ ఖర్చుకు శ్రద్ధ అవసరం",
       "securityFinding": "భద్రతా ఫైండింగ్కు శ్రద్ధ అవసరం",
       "activeAgentsGlanceable": "చురుకైన ఏజెంట్లకు నవీకరణ ఉంది"
     }
@@ -44,8 +44,8 @@
       "body": "{{organizationName}} బ్యాలెన్స్ ${{minimumBalanceUsd}} కంటే తక్కువకు పడిపోయింది"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "ఖర్చు హెచ్చరిక",
+      "body": "{{scopeName}} ఖర్చు ${{amountUsd}} మించిపోయింది"
     },
     "securityFindingNew": {
       "title": "కొత్త భద్రతా ఫైండింగ్ ({{severity}})",

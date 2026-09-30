@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini untuk bacaan sahaja.",
+      "continueInNewSession": "Teruskan dalam sesi baharu",
       "emptyDescription": "Hantar mesej di bawah untuk bermula.",
       "scrollToBottom": "Tatal ke bawah",
       "emptyTitle": "Belum ada mesej",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "import transkrip sesi OpenAI Codex",
       "reviewDescription": "semak perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
+      "useSkillCommand": "Gunakan kemahiran /{{command}}",
+      "skillBadge": "Kemahiran",
+      "catalogFull": "Katalog perintah penuh, jadi sesetengah perintah disembunyikan.",
+      "catalogOverLimit": "Katalog kemahiran melebihi had saiz, jadi semua kemahiran disenaraikan.",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Sila naik taraf CLI anda untuk menggunakan arahan ini.",
       "exitCapabilityUnavailable": "Kemas kini CLI anda untuk keluar daripada sesi.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Tiada hos yang dipercayai",
     "emptyDescription": "Jika anda mempercayai hos sesuatu pautan, pautan ke hos itu akan dibuka tanpa meminta pengesahan lagi.",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
+    "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
     "backToPreferences": "Kembali ke keutamaan"
   },
   "quickChat": {

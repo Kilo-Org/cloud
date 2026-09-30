@@ -73,10 +73,6 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/cron/minimax-token-health",
-      "schedule": "0 13 * * *"
-    },
-    {
       "path": "/api/cron/usage-daily-rollup-repairs",
       "schedule": "5 * * * *"
     },

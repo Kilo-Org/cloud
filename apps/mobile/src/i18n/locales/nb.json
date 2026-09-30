@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Øktnavn",
       "transcriptAccessibility": "Samtalelogg for økten",
       "readOnly": "Denne økten er skrivebeskyttet.",
+      "continueInNewSession": "Fortsett i en ny økt",
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "importer en OpenAI Codex-øktutskrift",
       "reviewDescription": "gjennomgå endringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Bruk /{{command}}",
+      "useSkillCommand": "Bruk ferdigheten /{{command}}",
+      "skillBadge": "Ferdighet",
+      "catalogFull": "Kommandokatalogen er full, så noen kommandoer er skjult.",
+      "catalogOverLimit": "Ferdighetskatalogen overskrider størrelsesgrensen, så alle ferdigheter vises.",
       "insert": "Sett inn",
       "upgradeRequiredFallback": "Oppgrader CLI-en din for å bruke denne kommandoen.",
       "exitCapabilityUnavailable": "Oppdater CLI-en din for å avslutte økten.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Ingen godkjente verter",
     "emptyDescription": "Når du godkjenner verten til en lenke, åpnes lenker til denne verten uten ny bekreftelse.",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
+    "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
     "backToPreferences": "Tilbake til innstillinger"
   },
   "quickChat": {

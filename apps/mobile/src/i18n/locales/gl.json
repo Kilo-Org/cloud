@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Nome da sesión",
       "transcriptAccessibility": "Transcrición da sesión",
       "readOnly": "Esta sesión é de só lectura.",
+      "continueInNewSession": "Continuar nunha sesión nova",
       "emptyDescription": "Envía unha mensaxe a continuación para comezar.",
       "scrollToBottom": "Desprazarse ata o final",
       "emptyTitle": "Aínda non hai mensaxes",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "importa unha transcrición de sesión de OpenAI Codex",
       "reviewDescription": "revisa os cambios [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
+      "useSkillCommand": "Usar a habilidade /{{command}}",
+      "skillBadge": "Habilidade",
+      "catalogFull": "O catálogo de ordes está cheo, así que algunhas ordes están ocultas.",
+      "catalogOverLimit": "O catálogo de habilidades supera o seu límite de tamaño, así que se mostran todas as habilidades.",
       "insert": "Inserir",
       "upgradeRequiredFallback": "Actualiza o teu CLI para usar este comando.",
       "exitCapabilityUnavailable": "Actualiza o teu CLI para saír da sesión.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Non hai dominios de confianza",
     "emptyDescription": "Se confías no dominio dunha ligazón, as súas ligazóns abriranse sen pedir confirmación.",
     "revoke": "Revogar a confianza en {{host}}",
+    "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
     "backToPreferences": "Volver ás preferencias"
   },
   "quickChat": {

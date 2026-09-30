@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
       "readOnly": "اس سیشن کو صرف پڑھا جا سکتا ہے۔",
+      "continueInNewSession": "نئے سیشن میں جاری رکھیں",
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex سیشن کی نقل درآمد کریں",
       "reviewDescription": "تبدیلیوں کا جائزہ لیں [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} استعمال کریں",
+      "useSkillCommand": "/{{command}} مہارت استعمال کریں",
+      "skillBadge": "مہارت",
+      "catalogFull": "کمانڈ کی فہرست بھر گئی ہے، اس لیے کچھ کمانڈز چھپے ہوئے ہیں۔",
+      "catalogOverLimit": "مہارت کی فہرست سائز کی حد سے بڑھ گئی ہے، اس لیے ہر مہارت دکھائی جاتی ہے۔",
       "insert": "داخل کریں",
       "upgradeRequiredFallback": "براہ کرم یہ کمانڈ استعمال کرنے کے لیے اپنا CLI اپ گریڈ کریں۔",
       "exitCapabilityUnavailable": "سیشن سے باہر نکلنے کے لیے اپنا CLI اپ ڈیٹ کریں۔",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "کوئی قابل اعتماد ہوسٹ نہیں",
     "emptyDescription": "کسی لنک کے ہوسٹ پر بھروسہ کرنے کے بعد اس کے لنکس دوبارہ اجازت لیے بغیر کھلتے ہیں۔",
     "revoke": "{{host}} پر اعتماد ختم کریں",
+    "revokeMessage": "اس ہوسٹ کے لنکس دوبارہ تصدیق طلب کریں گے۔",
     "backToPreferences": "ترجیحات پر واپس جائیں"
   },
   "quickChat": {

@@ -2113,6 +2113,7 @@
       "renamePlaceholder": "Sesijas nosaukums",
       "transcriptAccessibility": "Sesijas sarakste",
       "readOnly": "Šī sesija ir pieejama tikai lasīšanai.",
+      "continueInNewSession": "Turpināt jaunā sesijā",
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
@@ -2636,6 +2637,10 @@
       "resumeCodexDescription": "importē OpenAI Codex sesijas transkriptu",
       "reviewDescription": "pārskati izmaiņas [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Izmantot /{{command}}",
+      "useSkillCommand": "Izmantot prasmi /{{command}}",
+      "skillBadge": "Prasme",
+      "catalogFull": "Komandu katalogs ir pilns, tāpēc dažas komandas ir paslēptas.",
+      "catalogOverLimit": "Prasmju katalogs pārsniedz izmēra ierobežojumu, tāpēc tiek rādītas visas prasmes.",
       "insert": "Ievietot",
       "upgradeRequiredFallback": "Lūdzu, atjaunini savu CLI, lai izmantotu šo komandu.",
       "exitCapabilityUnavailable": "Atjaunini savu CLI, lai izietu no sesijas.",
@@ -3205,6 +3210,7 @@
     "emptyTitle": "Nav uzticamu resursdatoru",
     "emptyDescription": "Ja uzticies saites resursdatoram, tā saites turpmāk atveras bez atkārtota apstiprinājuma.",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
+    "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
   "quickChat": {

@@ -4,7 +4,9 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { GET } from './route';
 
-jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
+jest.mock('@/lib/organizations/organization-settings-route-handler', () => ({
+  handleTRPCRequest: jest.fn(),
+}));
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
   getCachedRoutingTable: jest.fn(),
 }));

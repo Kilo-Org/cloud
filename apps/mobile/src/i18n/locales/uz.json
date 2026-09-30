@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Sessiya nomi",
       "transcriptAccessibility": "Sessiya yozishmalari",
       "readOnly": "Bu sessiyani faqat o'qish mumkin.",
+      "continueInNewSession": "Yangi sessiyada davom etish",
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex seansi transkriptini import qilish",
       "reviewDescription": "o'zgarishlarni ko'rib chiqish [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} buyrug'idan foydalanish",
+      "useSkillCommand": "/{{command}} ko'nikmasidan foydalanish",
+      "skillBadge": "Ko'nikma",
+      "catalogFull": "Buyruqlar katalogi to'ldi, shuning uchun ba'zi buyruqlar yashirilgan.",
+      "catalogOverLimit": "Ko'nikmalar katalogi o'lcham chegarasidan oshdi, shuning uchun barcha ko'nikmalar ko'rsatiladi.",
       "insert": "Qo'yish",
       "upgradeRequiredFallback": "Bu buyruqdan foydalanish uchun CLI dasturini yangilang.",
       "exitCapabilityUnavailable": "Sessiyadan chiqish uchun CLI dasturini yangilang.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Ishonchli saytlar yo'q",
     "emptyDescription": "Saytni ishonchli deb belgilasangiz, uning havolalari qayta tasdiq so'ramasdan ochiladi.",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
+    "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {

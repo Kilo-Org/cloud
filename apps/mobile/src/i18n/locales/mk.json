@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Име на сесијата",
       "transcriptAccessibility": "Транскрипт на сесијата",
       "readOnly": "Оваа сесија е само за читање.",
+      "continueInNewSession": "Продолжи во нова сесија",
       "emptyDescription": "Испрати порака подолу за да започнеш.",
       "scrollToBottom": "Движи се до крајот",
       "emptyTitle": "Сè уште нема пораки",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "увези транскрипт од сесија на OpenAI Codex",
       "reviewDescription": "прегледај ги промените [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Користи /{{command}}",
+      "useSkillCommand": "Користи вештина /{{command}}",
+      "skillBadge": "Вештина",
+      "catalogFull": "Каталогот со команди е полн, затоа некои команди се скриени.",
+      "catalogOverLimit": "Каталогот со вештини го надминува ограничувањето за големина, затоа се прикажуваат сите вештини.",
       "insert": "Вметни",
       "upgradeRequiredFallback": "Ажурирај го CLI за да ја користиш оваа команда.",
       "exitCapabilityUnavailable": "Ажурирај го CLI за да излезеш од сесијата.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Нема доверливи хостови",
     "emptyDescription": "Кога ќе додадеш хост во доверливи, линковите до него ќе се отвораат без повторна потврда.",
     "revoke": "Отстрани го {{host}} од доверливите хостови",
+    "revokeMessage": "Линковите до овој хост повторно ќе бараат потврда.",
     "backToPreferences": "Назад на поставките"
   },
   "quickChat": {

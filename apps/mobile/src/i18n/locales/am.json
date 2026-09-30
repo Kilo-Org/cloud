@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "የክፍለ ጊዜ ስም",
       "transcriptAccessibility": "የክፍለ ጊዜው የውይይት ግልባጭ",
       "readOnly": "ይህን ክፍለ ጊዜ ማንበብ ብቻ ይቻላል።",
+      "continueInNewSession": "በአዲስ ክፍለ ጊዜ ይቀጥሉ",
       "emptyDescription": "ለመጀመር ከታች መልእክት ይላኩ።",
       "scrollToBottom": "ወደ ታች ይሸብልሉ",
       "emptyTitle": "እስካሁን ምንም መልእክቶች የሉም",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "የOpenAI Codex ክፍለ ጊዜ ግልባጭ አስገባ",
       "reviewDescription": "ለውጦችን ገምግም [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}}ን ይጠቀሙ",
+      "useSkillCommand": "/{{command}} ክህሎትን ይጠቀሙ",
+      "skillBadge": "ክህሎት",
+      "catalogFull": "የትዕዛዝ ካታሎጉ ሞልቷል፣ ስለዚህ አንዳንድ ትዕዛዞች ተደብቀዋል።",
+      "catalogOverLimit": "የክህሎት ካታሎጉ ከመጠን ገደቡ አልፏል፣ ስለዚህ ሁሉም ክህሎት ተዘርዝሯል።",
       "insert": "ያስገቡ",
       "upgradeRequiredFallback": "ይህን ትዕዛዝ ለመጠቀም እባክዎ CLIዎን ያዘምኑ።",
       "exitCapabilityUnavailable": "ከክፍለ ጊዜው ለመውጣት CLIዎን ያዘምኑ።",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
     "emptyDescription": "የአገናኝ አስተናጋጅን እንደታመነ ካደረጉት፣ አገናኞቹ እንደገና ሳይጠይቁዎት ይከፈታሉ።",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
+    "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
   "quickChat": {

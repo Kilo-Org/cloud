@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
+import { FeedbackPromptProvider } from '@/components/use-feedback-prompt';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -90,38 +91,43 @@ export default function ProviderPrReviewLayout() {
   const draftEntityKey = `${pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}@${providerPrRefKey(ref)}`;
 
   return (
-    <ProviderPrScopeProvider value={scope}>
-      <PendingReviewProvider
-        key={`${draftEntityKey}:${userId ?? ''}`}
-        userId={userId}
-        draftEntityKey={draftEntityKey}
-      >
-        {/* The provider-aware connect gate (s7): a disconnected reader can
-            never reach the authenticated queries and mutations below, and a
-            Bitbucket personal scope gets the terminal org-only explanation
-            instead of a retry that could not succeed. */}
-        <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
-          <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
-            {/* Register the overview first, exactly like the GitHub layout:
-                unregistered routes sort after registered siblings, so without
-                this the initial screen is the comment-composer formSheet
-                instead of the PR/MR overview. */}
-            <Stack.Screen name="index" />
-            {/* The write sheets (s6) are siblings of the GitHub route's
-                sheets: they mount inside this layout, so they see the provider
-                scope and this PR's single `PendingReviewProvider` queue. The
-                conversation-comment sheet (PR 6023 parity) is the Discussion
-                tab's bottom CTA; without it that CTA pushes the GitHub-only
-                sibling and leaves the provider scope. Its GitHub twin is
-                `[owner]/[repo]/[number]/conversation-comment`. */}
-            <Stack.Screen name="comment-composer" options={sheetOptions} />
-            <Stack.Screen name="conversation-comment" options={sheetOptions} />
-            <Stack.Screen name="review-submit" options={sheetOptions} />
-            <Stack.Screen name="merge" options={sheetOptions} />
-            <Stack.Screen name="file-navigator" options={sheetOptions} />
-          </Stack>
-        </PrReviewConnectGate>
-      </PendingReviewProvider>
-    </ProviderPrScopeProvider>
+    // The prompt provider sits outside the gate: the review-submit sheet
+    // requests the one-time post-submit prompt through it, and the host must
+    // stay mounted across that sheet's dismissal (see `FeedbackPromptProvider`).
+    <FeedbackPromptProvider>
+      <ProviderPrScopeProvider value={scope}>
+        <PendingReviewProvider
+          key={`${draftEntityKey}:${userId ?? ''}`}
+          userId={userId}
+          draftEntityKey={draftEntityKey}
+        >
+          {/* The provider-aware connect gate (s7): a disconnected reader can
+              never reach the authenticated queries and mutations below, and a
+              Bitbucket personal scope gets the terminal org-only explanation
+              instead of a retry that could not succeed. */}
+          <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
+            <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+              {/* Register the overview first, exactly like the GitHub layout:
+                  unregistered routes sort after registered siblings, so without
+                  this the initial screen is the comment-composer formSheet
+                  instead of the PR/MR overview. */}
+              <Stack.Screen name="index" />
+              {/* The write sheets (s6) are siblings of the GitHub route's
+                  sheets: they mount inside this layout, so they see the provider
+                  scope and this PR's single `PendingReviewProvider` queue. The
+                  conversation-comment sheet (PR 6023 parity) is the Discussion
+                  tab's bottom CTA; without it that CTA pushes the GitHub-only
+                  sibling and leaves the provider scope. Its GitHub twin is
+                  `[owner]/[repo]/[number]/conversation-comment`. */}
+              <Stack.Screen name="comment-composer" options={sheetOptions} />
+              <Stack.Screen name="conversation-comment" options={sheetOptions} />
+              <Stack.Screen name="review-submit" options={sheetOptions} />
+              <Stack.Screen name="merge" options={sheetOptions} />
+              <Stack.Screen name="file-navigator" options={sheetOptions} />
+            </Stack>
+          </PrReviewConnectGate>
+        </PendingReviewProvider>
+      </ProviderPrScopeProvider>
+    </FeedbackPromptProvider>
   );
 }

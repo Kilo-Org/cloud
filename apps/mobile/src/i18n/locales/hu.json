@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Munkamenet neve",
       "transcriptAccessibility": "A munkamenet átirata",
       "readOnly": "Ez a munkamenet csak olvasható.",
+      "continueInNewSession": "Folytatás új munkamenetben",
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "importálj egy OpenAI Codex munkamenet-átiratot",
       "reviewDescription": "tekintsd át a változásokat [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} használata",
+      "useSkillCommand": "/{{command}} készség használata",
+      "skillBadge": "Készség",
+      "catalogFull": "A parancskatalógus megtelt, ezért néhány parancs rejtve van.",
+      "catalogOverLimit": "A készségkatalógus túllépi a méretkorlátot, ezért minden készség megjelenik.",
       "insert": "Beszúrás",
       "upgradeRequiredFallback": "A parancs használatához frissítsd a CLI-t.",
       "exitCapabilityUnavailable": "A munkamenetből való kilépéshez frissítsd a CLI-t.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Nincsenek megbízható webhelyek",
     "emptyDescription": "Ha egy webhelyet megbízhatónak jelölsz, a hivatkozásai többé nem kérnek jóváhagyást megnyitáskor.",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
+    "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
     "backToPreferences": "Vissza a beállításokhoz"
   },
   "quickChat": {

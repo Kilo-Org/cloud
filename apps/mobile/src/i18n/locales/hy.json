@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Նիստի անուն",
       "transcriptAccessibility": "Նիստի սղագրություն",
       "readOnly": "Այս նիստը հասանելի է միայն կարդալու համար։",
+      "continueInNewSession": "Շարունակել նոր նիստում",
       "emptyDescription": "Սկսելու համար ներքևում հաղորդագրություն ուղարկեք։",
       "scrollToBottom": "Ոլորել մինչև վերջ",
       "emptyTitle": "Դեռևս հաղորդագրություններ չկան",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "ներմուծիր OpenAI Codex աշխատաշրջանի արտագրությունը",
       "reviewDescription": "վերանայիր փոփոխությունները [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Օգտագործել /{{command}}",
+      "useSkillCommand": "Օգտագործել հմտությունը /{{command}}",
+      "skillBadge": "Հմտություն",
+      "catalogFull": "Հրամանների ցանկը լցված է, ուստի որոշ հրամաններ թաքցված են։",
+      "catalogOverLimit": "Հմտությունների ցանկը գերազանցում է չափի սահմանը, ուստի բոլոր հմտությունները ցուցադրվում են։",
       "insert": "Տեղադրել",
       "upgradeRequiredFallback": "Այս հրամանն օգտագործելու համար թարմացրեք ձեր CLI-ն։",
       "exitCapabilityUnavailable": "Թարմացրեք ձեր CLI-ն՝ նիստից դուրս գալու համար։",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Վստահելի կայքեր չկան",
     "emptyDescription": "Երբ վստահում եք հղման կայքին, այդ կայքի հղումները բացվում են առանց կրկին հաստատում խնդրելու։",
     "revoke": "Չեղարկել վստահությունը {{host}} կայքի նկատմամբ",
+    "revokeMessage": "Այս կայքի հղումները կրկին հաստատում կպահանջեն։",
     "backToPreferences": "Վերադառնալ կարգավորումներին"
   },
   "quickChat": {

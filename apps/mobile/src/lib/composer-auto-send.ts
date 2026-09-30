@@ -6,10 +6,11 @@
  * `shareDelivered` is the ordering gate: text lands before files, so a rule
  * built on `hasText` alone would send the text and drop the files.
  *
- * `attachmentsEnabled` keeps the one-shot latch unspent while a freshly
- * spawned remote session has not yet advertised `capabilities.attachments`.
- * Sending early would hit the composer's "can't receive files" refusal and
- * burn the latch for a session that becomes capable a moment later.
+ * `attachmentsEnabled` keeps the one-shot latch unspent when the destination
+ * has explicitly reported it cannot receive files
+ * (`capabilities.attachments === false`). Sending early would hit the
+ * composer's "can't receive files" refusal and burn the latch for a session
+ * the CLI may later report as capable.
  */
 export function shouldAutoSendPrefilledShare(input: {
   autoSend: boolean;

@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini hanya dapat dibaca.",
+      "continueInNewSession": "Lanjutkan di sesi baru",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "impor transkrip sesi OpenAI Codex",
       "reviewDescription": "tinjau perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
+      "useSkillCommand": "Gunakan keterampilan /{{command}}",
+      "skillBadge": "Keterampilan",
+      "catalogFull": "Katalog perintah sudah penuh, jadi sebagian perintah disembunyikan.",
+      "catalogOverLimit": "Katalog keterampilan melebihi batas ukuran, jadi semua keterampilan ditampilkan.",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Perbarui CLI untuk menggunakan perintah ini.",
       "exitCapabilityUnavailable": "Perbarui CLI untuk keluar dari sesi.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Tidak ada host tepercaya",
     "emptyDescription": "Tautan dari host yang kamu percayai akan terbuka tanpa meminta konfirmasi lagi.",
     "revoke": "Cabut kepercayaan untuk {{host}}",
+    "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
     "backToPreferences": "Kembali ke preferensi"
   },
   "quickChat": {

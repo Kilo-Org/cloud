@@ -4,7 +4,9 @@ import type { OpenRouterModel } from '@/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@/lib/trpc-route-handler';
 import { POST } from './route';
 
-jest.mock('@/lib/trpc-route-handler', () => ({ handleTRPCRequest: jest.fn() }));
+jest.mock('@/lib/organizations/organization-settings-route-handler', () => ({
+  handleTRPCRequest: jest.fn(),
+}));
 
 const mockedHandleTRPCRequest = jest.mocked(handleTRPCRequest);
 const listAvailableModels = jest.fn();

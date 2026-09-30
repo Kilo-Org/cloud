@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Orúkọ ìgbà iṣẹ́",
       "transcriptAccessibility": "Àkọsílẹ̀ ìgbà iṣẹ́",
       "readOnly": "Kíkà nìkan ni o lè ṣe nínú ìgbà iṣẹ́ yìí.",
+      "continueInNewSession": "Tẹ̀síwájú nínú ìgbà iṣẹ́ tuntun",
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "kó àkọsílẹ̀ ìgbà iṣẹ́ OpenAI Codex wọlé",
       "reviewDescription": "ṣàyẹ̀wò àwọn ìyípadà [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Lo /{{command}}",
+      "useSkillCommand": "Lo ọgbọ́n /{{command}}",
+      "skillBadge": "Ọgbọ́n",
+      "catalogFull": "Àkójọ àwọn àṣẹ ti kún, nítorí náà àwọn àṣẹ kan pamọ́.",
+      "catalogOverLimit": "Àkójọ ọgbọ́n ti kọjá ààlà ìwọ̀n, nítorí náà gbogbo ọgbọ́n ni a fi hàn.",
       "insert": "Fi sí i",
       "upgradeRequiredFallback": "Jọ̀wọ́ ṣe ìgbésókè CLI rẹ láti lo àṣẹ yìí.",
       "exitCapabilityUnavailable": "Ṣe ìmúdójúìwọ̀n CLI rẹ láti jáde kúrò nínú ìgbà iṣẹ́.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Kò sí ojúlé tí a gbẹ́kẹ̀ lé",
     "emptyDescription": "Tí o bá gbẹ́kẹ̀ lé ojúlé ọ̀nà àsopọ̀ kan, ó máa ṣí láìbéèrè lọ́wọ́ rẹ mọ́.",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
+    "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
   "quickChat": {

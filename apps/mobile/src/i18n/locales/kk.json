@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "Сессия атауы",
       "transcriptAccessibility": "Сессия жазбасы",
       "readOnly": "Бұл сессия тек оқуға арналған.",
+      "continueInNewSession": "Жаңа сессияда жалғастыру",
       "emptyDescription": "Бастау үшін төмендегі өрістен хабарлама жіберіңіз.",
       "scrollToBottom": "Ең төменге айналдыру",
       "emptyTitle": "Әзірге хабарламалар жоқ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex сессиясының транскриптін импортта",
       "reviewDescription": "өзгерістерді шолу [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} пәрменін қолдану",
+      "useSkillCommand": "/{{command}} дағдысын қолдану",
+      "skillBadge": "Дағды",
+      "catalogFull": "Пәрмендер каталогы толы, сондықтан кейбір пәрмендер жасырылған.",
+      "catalogOverLimit": "Дағдылар каталогы өлшем шегінен асады, сондықтан барлық дағды көрсетіледі.",
       "insert": "Кірістіру",
       "upgradeRequiredFallback": "Бұл пәрменді қолдану үшін CLI құралын жаңартыңыз.",
       "exitCapabilityUnavailable": "Сессиядан шығу үшін CLI құралын жаңартыңыз.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Сенімді хосттар жоқ",
     "emptyDescription": "Хостты сенімді деп белгілесеңіз, оның сілтемелері қайта растаусыз ашылады.",
     "revoke": "Хостқа берілген сенімді қайтарып алу: {{host}}",
+    "revokeMessage": "Бұл хостқа сілтемелер қайтадан растауды сұрайды.",
     "backToPreferences": "Баптауларға оралу"
   },
   "quickChat": {

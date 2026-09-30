@@ -13,6 +13,10 @@ import { MessageErrorBoundary as V1MessageErrorBoundary } from '@/components/clo
 import { convertToCloudMessages } from '@/components/cloud-agent/store/db-session-atoms';
 import { MessageBubble as V2MessageBubble } from '@/components/cloud-agent-next/MessageBubble';
 import { MessageErrorBoundary as V2MessageErrorBoundary } from '@/components/cloud-agent-next/MessageErrorBoundary';
+import {
+  formatSessionCost,
+  isRenderableSessionCost,
+} from '@/components/cloud-agent-next/session-cost-breakdown';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import {
   useAdminSessionTrace,
@@ -31,6 +35,7 @@ import {
   Download,
   Server,
   Tag,
+  DollarSign,
 } from 'lucide-react';
 import type { CloudMessage, Message } from '@/components/cloud-agent/types';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
@@ -403,6 +408,18 @@ export function SessionTraceViewer() {
                   </span>
                 </div>
               )}
+              {sessionQuery.data.total_cost_microdollars != null &&
+                isRenderableSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000) && (
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="text-muted-foreground h-4 w-4" />
+                    <span className="text-sm">
+                      Cost:{' '}
+                      <span className="font-mono tabular-nums">
+                        {formatSessionCost(sessionQuery.data.total_cost_microdollars / 1_000_000)}
+                      </span>
+                    </span>
+                  </div>
+                )}
               {latestContainerInterval?.cloudflareInstanceId && (
                 <div className="flex min-w-0 items-center gap-2">
                   <Server className="text-muted-foreground h-4 w-4 shrink-0" />

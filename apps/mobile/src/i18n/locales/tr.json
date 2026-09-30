@@ -1581,6 +1581,7 @@
       "renamePlaceholder": "Oturum adı",
       "transcriptAccessibility": "Oturum dökümü",
       "readOnly": "Bu oturum salt okunur.",
+      "continueInNewSession": "Yeni oturumda devam et",
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
@@ -2094,6 +2095,10 @@
       "resumeCodexDescription": "bir OpenAI Codex oturum dökümünü içe aktar",
       "reviewDescription": "değişiklikleri incele [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} komutunu kullan",
+      "useSkillCommand": "/{{command}} becerisini kullan",
+      "skillBadge": "Beceri",
+      "catalogFull": "Komut kataloğu dolu, bu yüzden bazı komutlar gizli.",
+      "catalogOverLimit": "Beceri kataloğu boyut sınırını aşıyor, bu yüzden tüm beceriler listeleniyor.",
       "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için CLI'yı güncelle.",
       "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'yı güncelle.",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "Güvenilen sunucu yok",
     "emptyDescription": "Bir bağlantının sunucusunu güvenilir olarak işaretlediğinde o sunucunun bağlantıları tekrar onay istemeden açılır.",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
+    "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
     "backToPreferences": "Tercihlere dön"
   },
   "quickChat": {

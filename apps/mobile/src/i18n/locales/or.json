@@ -2085,6 +2085,7 @@
       "renamePlaceholder": "ସେସନ୍ ନାମ",
       "transcriptAccessibility": "ସେସନର ବାର୍ତ୍ତାଳାପ ବିବରଣୀ",
       "readOnly": "ଏହି ସେସନ୍ କେବଳ ପଢ଼ିପାରିବେ।",
+      "continueInNewSession": "ନୂଆ ସେସନରେ ଜାରି ରଖନ୍ତୁ",
       "emptyDescription": "ଆରମ୍ଭ କରିବାକୁ ନିମ୍ନରେ ଏକ ବାର୍ତ୍ତା ପଠାନ୍ତୁ।",
       "scrollToBottom": "ସବୁଠାରୁ ତଳକୁ ସ୍କ୍ରୋଲ୍ କରନ୍ତୁ",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ବାର୍ତ୍ତା ନାହିଁ",
@@ -2598,6 +2599,10 @@
       "resumeCodexDescription": "OpenAI Codex ସେସନ୍‌ର ଟ୍ରାନ୍ସକ୍ରିପ୍ଟ ଆମଦାନି କରନ୍ତୁ",
       "reviewDescription": "ପରିବର୍ତ୍ତନଗୁଡ଼ିକ ସମୀକ୍ଷା କରନ୍ତୁ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ବ୍ୟବହାର କରନ୍ତୁ",
+      "useSkillCommand": "/{{command}} ସ୍କିଲ୍ ବ୍ୟବହାର କରନ୍ତୁ",
+      "skillBadge": "ସ୍କିଲ୍",
+      "catalogFull": "କମାଣ୍ଡ ସୂଚୀ ପୂର୍ଣ୍ଣ ହୋଇଛି, ତେଣୁ କିଛି କମାଣ୍ଡ ଲୁଚା ଯାଇଛି।",
+      "catalogOverLimit": "ସ୍କିଲ୍ ସୂଚୀ ଆକାର ସୀମା ଅତିକ୍ରମ କରିଛି, ତେଣୁ ସମସ୍ତ ସ୍କିଲ୍ ଦେଖାଯାଉଛି।",
       "insert": "ଯୋଡ଼ନ୍ତୁ",
       "upgradeRequiredFallback": "ଏହି କମାଣ୍ଡ ବ୍ୟବହାର କରିବାକୁ ଆପଣଙ୍କ CLI ଅପଗ୍ରେଡ୍ କରନ୍ତୁ।",
       "exitCapabilityUnavailable": "ସେସନରୁ ବାହାରିବାକୁ ଆପଣଙ୍କ CLI ଅଦ୍ୟତନ କରନ୍ତୁ।",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "କୌଣସି ବିଶ୍ୱସ୍ତ ହୋଷ୍ଟ ନାହିଁ",
     "emptyDescription": "ଆପଣ ଏକ ଲିଙ୍କର ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କଲେ ସେହି ହୋଷ୍ଟର ଲିଙ୍କ ପୁଣି ଅନୁମତି ନମାଗି ଖୋଲିବ।",
     "revoke": "{{host}} ପ୍ରତି ବିଶ୍ୱାସ ପ୍ରତ୍ୟାହାର କରନ୍ତୁ",
+    "revokeMessage": "ଏହି ହୋଷ୍ଟର ଲିଙ୍କଗୁଡ଼ିକ ପୁଣି ଥରେ ଅନୁମତି ମାଗିବ।",
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
   },
   "quickChat": {

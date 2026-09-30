@@ -2141,6 +2141,7 @@
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
       "readOnly": "Šią sesiją galima tik skaityti.",
+      "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
@@ -2674,6 +2675,10 @@
       "resumeCodexDescription": "importuok OpenAI Codex sesijos transkriptą",
       "reviewDescription": "peržiūrėk pakeitimus [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Naudoti /{{command}}",
+      "useSkillCommand": "Naudoti įgūdį /{{command}}",
+      "skillBadge": "Įgūdis",
+      "catalogFull": "Komandų katalogas pilnas, todėl kai kurios komandos paslėptos.",
+      "catalogOverLimit": "Įgūdžių katalogas viršija dydžio limitą, todėl rodomi visi įgūdžiai.",
       "insert": "Įterpti",
       "upgradeRequiredFallback": "Norėdami naudoti šią komandą, atnaujinkite CLI.",
       "exitCapabilityUnavailable": "Norėdami baigti sesiją, atnaujinkite CLI.",
@@ -3248,6 +3253,7 @@
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
+    "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {

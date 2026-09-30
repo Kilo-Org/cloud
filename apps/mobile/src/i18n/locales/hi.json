@@ -1579,6 +1579,7 @@
       "committed": "कमिट हो गया",
       "commitFailed": "कमिट विफल रहा",
       "readOnly": "इस सत्र को केवल पढ़ा जा सकता है।",
+      "continueInNewSession": "नए सत्र में जारी रखें",
       "renamePlaceholder": "सत्र का नाम",
       "renameSession": "सत्र का नाम बदलें",
       "scrollToBottom": "सबसे नीचे स्क्रॉल करें",
@@ -2065,7 +2066,11 @@
       "clearCapabilityUnavailable": "सत्र फिर से शुरू करने के लिए अपना CLI अपडेट करें।",
       "argumentError": "{{command}} आर्ग्युमेंट नहीं लेता।",
       "insert": "डालें",
-      "useCommand": "/{{command}} का उपयोग करें"
+      "useCommand": "/{{command}} का उपयोग करें",
+      "useSkillCommand": "/{{command}} स्किल का उपयोग करें",
+      "skillBadge": "स्किल",
+      "catalogFull": "कमांड सूची भर गई है, इसलिए कुछ कमांड छिपे हैं।",
+      "catalogOverLimit": "स्किल सूची आकार सीमा से बड़ी है, इसलिए हर स्किल दिखाया गया है।"
     },
     "contextUsage": {
       "windowUnavailable": "संदर्भ विंडो का आकार उपलब्ध नहीं",
@@ -3162,6 +3167,7 @@
     "emptyTitle": "कोई विश्वसनीय होस्ट नहीं",
     "emptyDescription": "किसी लिंक के होस्ट पर भरोसा करने के बाद उसके लिंक दोबारा पूछे बिना खुलते हैं।",
     "revoke": "{{host}} को विश्वसनीय होस्ट से हटाएँ",
+    "revokeMessage": "इस होस्ट के लिंक दोबारा पुष्टि माँगेंगे।",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
   },
   "quickChat": {

@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import {
   USER_DELETION_ANONYMIZE_MIN_STATEMENT_TIMEOUT_MS,
   USER_DELETION_ANONYMIZE_PAGE_TIMEOUT_MS,
@@ -22,19 +23,6 @@ import {
   OWNED_BY_USER_DELETE_TABLES,
   type OwnedByUserDeleteTable,
 } from '@/lib/user/owned-by-user-batch-delete';
-
-function postgresErrorCode(error: unknown): string | null {
-  let current: unknown = error;
-  for (let depth = 0; depth < 5; depth += 1) {
-    if (typeof current !== 'object' || current === null) return null;
-    const candidate = current as { code?: unknown; cause?: unknown };
-    if (typeof candidate.code === 'string' && /^[0-9A-Z]{5}$/.test(candidate.code)) {
-      return candidate.code;
-    }
-    current = candidate.cause;
-  }
-  return null;
-}
 
 type DrainResult =
   | { kind: 'drained'; progress: UserDeletionTaskProgress | undefined }
@@ -65,7 +53,7 @@ async function drainOwnedTable(params: {
         );
       });
     } catch (error) {
-      const code = postgresErrorCode(error);
+      const code = getPostgresErrorCode(error);
       if (code === '57014') {
         return {
           kind: 'retry',

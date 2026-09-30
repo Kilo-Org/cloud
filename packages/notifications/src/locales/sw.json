@@ -80,8 +80,8 @@
       "body": "Imepangwa kuanzishwa upya saa {{when}}."
     },
     "restartCancelled": {
-      "title": "Kuanzishwa upya kwa {{instanceName}} kumegairiwa",
-      "body": "Kuanzishwa upya kuliopangwa hapo awali kumegairiwa."
+      "title": "Kuanzishwa upya kwa {{instanceName}} kumeghairiwa",
+      "body": "Kuanzishwa upya kuliopangwa hapo awali kumeghairiwa."
     },
     "versionChangeNotice": {
       "title": "{{instanceName}} itasasishwa hivi karibuni",

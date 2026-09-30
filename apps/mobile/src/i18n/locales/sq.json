@@ -2827,7 +2827,7 @@
     "cliCantReceiveFilesMessage": "Kilo CLI që ekzekuton këtë seancë nuk mund të marrë skedarë. Përditëso CLI-në në atë kompjuter ose ndaje përmbajtjen në një seancë të re.",
     "contentlessMessage": "Nuk ka asgjë për të ndarë. Nuk u përfshi asnjë tekst ose skedar.",
     "couldNotReadContent": "Nuk u lexua përmbajtja e ndarë.",
-    "onlyFirstFilesAttached_one": "Vetëm {{displayCount}} skedar e parë do të bashkëngjiten.",
+    "onlyFirstFilesAttached_one": "Vetëm {{displayCount}} skedar i parë do të bashkëngjitet.",
     "onlyFirstFilesAttached_other": "Vetëm {{displayCount}} skedarët e parë do të bashkëngjiten."
   },
   "kiloPass": {

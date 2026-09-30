@@ -7,7 +7,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatFileSize, formatNumber } from '@/lib/format';
-import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type SharePayload } from '@/lib/share-payload';
@@ -128,8 +127,8 @@ export function SharePayloadPreview({ payload, validation }: Readonly<SharePaylo
         <Text className="text-xs text-muted-foreground">
           {/* i18n-dup-ok: 'share.onlyFirstFilesAttached_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
           {t('share.onlyFirstFilesAttached', {
-            count: AGENT_ATTACHMENT_MAX_FILES,
-            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+            count: validation.accepted.length,
+            displayCount: formatNumber(validation.accepted.length, i18n.language),
           })}
         </Text>
       ) : null}

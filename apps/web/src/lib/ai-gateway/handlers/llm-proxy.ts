@@ -194,19 +194,12 @@ async function resolveRateLimit(
   };
 }
 
-/**
- * Bouncer's `decide` budget. The call runs alongside the rest of the
- * pre-upstream work, so awaiting it costs nothing when the worker answers in
- * time and at most this when it does not.
- */
-const BOUNCER_DECIDE_TIMEOUT_MS = 50;
+/** Report-only decide runs in `after()` and never holds up the upstream request. */
+const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;
 
 /**
  * Starts bouncer's report-only `decide` call as soon as the account is known.
- *
- * The promise never rejects and its verdict is never read: bouncer is advisory,
- * so a slow, failed, or blocked verdict must not change the response. `await`
- * it with `awaitBouncerDecide` just before the upstream call.
+ * The promise never rejects and its verdict is never read.
  */
 function startBouncerDecide(params: {
   requestId: string;
@@ -240,22 +233,6 @@ function startBouncerDecide(params: {
     () => undefined,
     () => undefined
   );
-}
-
-/**
- * Waits for `startBouncerDecide`, but never past the decide budget: a hanging
- * worker must not hold the request open for a verdict nobody reads.
- */
-async function awaitBouncerDecide(verdict: Promise<void>): Promise<void> {
-  const { promise: budget, resolve } = Promise.withResolvers<void>();
-  const timer = setTimeout(resolve, BOUNCER_DECIDE_TIMEOUT_MS);
-  try {
-    await Promise.race([verdict, budget]);
-  } catch {
-    // Report-only: bouncer never changes the response.
-  } finally {
-    clearTimeout(timer);
-  }
 }
 
 export async function handleLlmProxyRequest(
@@ -637,18 +614,18 @@ export async function handleLlmProxyRequest(
     user = maybeUser;
   }
 
-  // Bouncer's report-only verdict. Start it here so it overlaps the balance,
-  // organization-policy, and provider work below, and await it just before the
-  // upstream call. Its verdict is never read: it must not change the response,
-  // and the same request id is reused for the usage event.
+  // Start the report-only verdict alongside balance and provider work. Register
+  // it with after() now so early returns do not end its lifetime.
   const bouncerRequestId = vercelRequestId ?? randomUUID();
-  const bouncerDecide = startBouncerDecide({
-    requestId: bouncerRequestId,
-    user,
-    organizationId,
-    ip: ipAddress,
-    balanceAndSettingsPromise,
-  });
+  after(
+    startBouncerDecide({
+      requestId: bouncerRequestId,
+      user,
+      organizationId,
+      ip: ipAddress,
+      balanceAndSettingsPromise,
+    })
+  );
 
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream
@@ -994,9 +971,6 @@ export async function handleLlmProxyRequest(
     signal: request.signal,
     vercelRequestId,
   };
-  // The verdict has had the whole pre-upstream path to arrive; wait out the
-  // rest of its budget here and never longer.
-  await awaitBouncerDecide(bouncerDecide);
 
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,

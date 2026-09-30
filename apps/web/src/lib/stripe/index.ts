@@ -1,7 +1,7 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@/lib/stripe-client';
+import { client, skipStripeApi } from '@/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
 import { db, auto_deleted_at } from '@/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
@@ -912,6 +912,13 @@ export async function getStripeInvoices(
   stripeCustomerId: string,
   dateThreshold?: Date | null
 ): Promise<UnifiedInvoice[]> {
+  // Local development runs with the Stripe API skipped and a non-account key,
+  // so any call would fail with "Invalid API Key". Treat the skip as an
+  // organization with no invoices so the UI reaches its empty state.
+  if (skipStripeApi) {
+    return [];
+  }
+
   const listParams: Stripe.InvoiceListParams = {
     customer: stripeCustomerId,
     limit: 100,
@@ -970,6 +977,13 @@ export async function getStripeInvoicesPage(
   dateThreshold?: Date | null,
   startingAfter?: string | null
 ): Promise<StripeInvoicesPage> {
+  // Local development runs with the Stripe API skipped and a non-account key,
+  // so any call would fail with "Invalid API Key". Treat the skip as an
+  // organization with no invoices so the UI reaches its empty state.
+  if (skipStripeApi) {
+    return { entries: [], hasMore: false, nextCursor: null };
+  }
+
   const listParams: Stripe.InvoiceListParams = {
     customer: stripeCustomerId,
     limit: 25,

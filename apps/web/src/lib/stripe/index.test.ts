@@ -4288,6 +4288,38 @@ describe('getStripeInvoicesPage', () => {
       jest.resetModules();
     }
   });
+
+  // Local development and the mobile explorer run with SKIP_STRIPE_API=on and
+  // a key that Stripe rejects, so the reader must not reach the API at all.
+  // Regression: a fresh organization then showed a permanent "Something went
+  // wrong" instead of the empty-invoices state.
+  test('returns an empty page without calling Stripe when the API is skipped', async () => {
+    const previous = process.env.SKIP_STRIPE_API;
+    process.env.SKIP_STRIPE_API = 'true';
+    try {
+      jest.resetModules();
+      await jest.isolateModulesAsync(async () => {
+        const stripe = await import('@/lib/stripe');
+        const { client } = await import('@/lib/stripe-client');
+
+        const listSpy = jest.spyOn(client.invoices, 'list');
+
+        const result = await stripe.getStripeInvoicesPage('cus_page_test');
+
+        expect(listSpy).not.toHaveBeenCalled();
+        expect(result).toEqual({ entries: [], hasMore: false, nextCursor: null });
+
+        listSpy.mockRestore();
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.SKIP_STRIPE_API;
+      } else {
+        process.env.SKIP_STRIPE_API = previous;
+      }
+      jest.resetModules();
+    }
+  });
 });
 
 function createMemoryAssessmentStore(): ServiceFeeAssessmentStore {

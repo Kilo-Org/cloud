@@ -7,7 +7,7 @@ const stripeSecretKey = getEnvVariable('STRIPE_SECRET_KEY');
 if (!stripeSecretKey) {
   throw new Error('STRIPE_SECRET_KEY environment variable is not set');
 }
-const skipStripeApi =
+export const skipStripeApi =
   process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
 export const client: Stripe = new Stripe(stripeSecretKey, {

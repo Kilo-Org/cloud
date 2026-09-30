@@ -27,8 +27,7 @@ import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
-const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
-  .SANDBOX_CONTROL;
+const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_b10_status';
@@ -61,7 +60,11 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-    workspace: { branchName: 'kilo/b10', sandboxId: input.sandboxId, sandboxProvider: 'cloudflare' },
+    workspace: {
+      branchName: 'kilo/b10',
+      sandboxId: input.sandboxId,
+      sandboxProvider: 'cloudflare',
+    },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }

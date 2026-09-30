@@ -24,8 +24,7 @@ import { FakeSandboxPeer } from './helpers/fake-sandbox-peer.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
-const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
-  .SANDBOX_CONTROL;
+const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
@@ -197,9 +196,7 @@ async function readRegistration(stub: DurableObjectStub<SandboxSessionV2>): Prom
     }
   | undefined
 > {
-  return runInDurableObject(stub, (_instance, state) =>
-    state.storage.get('control_plane_session')
-  );
+  return runInDurableObject(stub, (_instance, state) => state.storage.get('control_plane_session'));
 }
 
 afterEach(async () => {
@@ -253,7 +250,9 @@ describe('SandboxSessionV2 worker RPC surface', () => {
       allocationName: 'alloc_test',
     });
     // Low: the raw Kilo token never reaches the route spec.
-    expect((registration?.spec.env as Record<string, string> | undefined)?.KILOCODE_TOKEN).toBeUndefined();
+    expect(
+      (registration?.spec.env as Record<string, string> | undefined)?.KILOCODE_TOKEN
+    ).toBeUndefined();
 
     // The session is prepared.
     await expect(sessionStub.getSession()).resolves.toMatchObject({
@@ -352,12 +351,12 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
     // The first register stores the seal; the repeat must replay success before
     // touching the seal (a naive unseal would fail "already installed").
-    await expect(sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))).resolves.toEqual(
-      { success: true }
-    );
-    await expect(sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))).resolves.toEqual(
-      { success: true }
-    );
+    await expect(
+      sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))
+    ).resolves.toEqual({ success: true });
+    await expect(
+      sessionStub.registerSessionFromMetadata(input(sessionId, sandboxId))
+    ).resolves.toEqual({ success: true });
 
     // A changed sandbox id is a different intent.
     await expect(
@@ -507,7 +506,9 @@ describe('SandboxSessionV2 worker RPC surface', () => {
 
     // R1 mints on the Sandbox DO at the connected `session.prepare`; resolution
     // of an unknown handle is still null.
-    await expect(sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')).resolves.toBeNull();
+    await expect(
+      sessionStub.resolveRuntimeCredentialProxyGrant('not-a-handle')
+    ).resolves.toBeNull();
   });
 
   it('reads the latest assistant message for the session Kilo session', async () => {

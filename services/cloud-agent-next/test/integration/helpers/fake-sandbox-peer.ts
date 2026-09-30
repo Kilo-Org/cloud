@@ -82,9 +82,6 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   }
 }
 
-function injectAttempt(
-  view: ControlPlaneRouteView,
-  attemptId: string
-): ControlPlaneRouteView {
+function injectAttempt(view: ControlPlaneRouteView, attemptId: string): ControlPlaneRouteView {
   return view.state === 'unknown' ? view : { ...view, attemptId };
 }

@@ -9,10 +9,7 @@ import {
   type SessionGitSummaryResult,
   type WorktreeSnapshotCapture,
 } from '../../../src/shared/worktree-changes-wire.js';
-import {
-  collectWorktreeChanges,
-  collectWorktreeSnapshot,
-} from '../control/worktree-changes.js';
+import { collectWorktreeChanges, collectWorktreeSnapshot } from '../control/worktree-changes.js';
 import { runDirectoryOperation } from '../control/worktree-operations.js';
 
 /**
@@ -43,9 +40,9 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-export function createControlPlaneWorktreeChanges(
-  deps: ControlPlaneWorktreeChangesDeps
-): { handle(frame: ControlPlaneWorktreeRequestFrame): Promise<void> } {
+export function createControlPlaneWorktreeChanges(deps: ControlPlaneWorktreeChangesDeps): {
+  handle(frame: ControlPlaneWorktreeRequestFrame): Promise<void>;
+} {
   const captureSnapshot = deps.captureSnapshot ?? collectWorktreeSnapshot;
   const captureChanges = deps.captureChanges ?? collectWorktreeChanges;
 
@@ -92,9 +89,7 @@ export function createControlPlaneWorktreeChanges(
         return;
       }
       deps.log?.(`worktree capture failed: ${messageOf(error)}`);
-      deps.emit(
-        fail(requestId, 'capture_failed', messageOf(error).slice(0, 4096), true)
-      );
+      deps.emit(fail(requestId, 'capture_failed', messageOf(error).slice(0, 4096), true));
     }
   }
 

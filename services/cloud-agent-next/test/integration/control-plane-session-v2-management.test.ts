@@ -599,9 +599,8 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
 
     let suppressCalls = 0;
     await runInDurableObject(stub, instance => {
-      const wrapper = (
-        instance as unknown as { worktreeChanges: { suppress: () => void } }
-      ).worktreeChanges;
+      const wrapper = (instance as unknown as { worktreeChanges: { suppress: () => void } })
+        .worktreeChanges;
       const original = wrapper.suppress.bind(wrapper);
       wrapper.suppress = () => {
         suppressCalls += 1;

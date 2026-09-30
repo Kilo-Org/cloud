@@ -62,12 +62,12 @@ describe('isControlWrapperArgv', () => {
   });
 
   it('matches the new-plane wrapper only under the control-plane basename', () => {
-    expect(
-      isControlWrapperArgv(controlPlaneargv, basenameOf, CONTROL_PLANE_WRAPPER_BASENAME)
-    ).toBe(true);
-    expect(isControlWrapperArgv(controlPlaneargv, basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)).toBe(
-      false
+    expect(isControlWrapperArgv(controlPlaneargv, basenameOf, CONTROL_PLANE_WRAPPER_BASENAME)).toBe(
+      true
     );
+    expect(
+      isControlWrapperArgv(controlPlaneargv, basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)
+    ).toBe(false);
   });
 
   it('requires a Bun argv element', () => {
@@ -78,9 +78,9 @@ describe('isControlWrapperArgv', () => {
   });
 
   it('does not match the Kilo server or the supervisor', () => {
-    expect(isControlWrapperArgv(['kilo', 'serve'], basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)).toBe(
-      false
-    );
+    expect(
+      isControlWrapperArgv(['kilo', 'serve'], basenameOf, LEGACY_CONTROL_WRAPPER_BASENAME)
+    ).toBe(false);
     expect(
       isControlWrapperArgv(
         ['sh', '/usr/local/bin/kilocode-control-plane-supervisor.sh'],

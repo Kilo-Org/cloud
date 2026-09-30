@@ -645,15 +645,17 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const credentialsFrame = await wrapper.next();
     expect(credentialsFrame?.type).toBe('session.credentials');
-    expect(credentialsFrame && 'kilo' in credentialsFrame ? credentialsFrame.kilo.token : null).toBe(
-      refreshed.kilo.alias
-    );
+    expect(
+      credentialsFrame && 'kilo' in credentialsFrame ? credentialsFrame.kilo.token : null
+    ).toBe(refreshed.kilo.alias);
     // R1: the runtime-proxy handle and facade targets travel in the
     // `session.credentials` payload too, not the route spec.
-    expect(credentialsFrame && 'proxy' in credentialsFrame ? credentialsFrame.proxy : null).toEqual({
-      handle: 'handle_1',
-      targets: expect.objectContaining({ backendBaseUrl: VERCEL_TARGET }),
-    });
+    expect(credentialsFrame && 'proxy' in credentialsFrame ? credentialsFrame.proxy : null).toEqual(
+      {
+        handle: 'handle_1',
+        targets: expect.objectContaining({ backendBaseUrl: VERCEL_TARGET }),
+      }
+    );
     // credentials + the one prompt.
     expect(wrapper.receivedFrames()).toBe(framesBeforeDeliver + 2);
   });

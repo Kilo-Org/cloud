@@ -294,10 +294,7 @@ async function runControlPlaneCallbacks(
  * Kilo history summary count to increase: a completed turn alone does not prove
  * the session was summarised.
  */
-async function runCommand(
-  args: LifecycleArgs,
-  env: ScenarioEnvironment
-): Promise<LifecycleResult> {
+async function runCommand(args: LifecycleArgs, env: ScenarioEnvironment): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const { conversation } = args;
   const scenarioName = 'command';
@@ -636,12 +633,7 @@ export const CONTROL_PLANE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'contained-credentials': {
     name: 'contained-credentials',
-    requires: [
-      'sessionSandbox',
-      'controlPlaneRuntime',
-      'controlPlaneV2',
-      'credentialContainment',
-    ],
+    requires: ['sessionSandbox', 'controlPlaneRuntime', 'controlPlaneV2', 'credentialContainment'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: CONTROL_PLANE_TIMEOUT_MS,

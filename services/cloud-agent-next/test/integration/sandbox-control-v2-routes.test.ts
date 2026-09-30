@@ -313,9 +313,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const { wrapper } = await connectAndHello(provider);
     await wrapper.next();
 
-    expect(
-      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })
-    ).toBe('not_ready');
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
 
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
@@ -619,7 +619,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await new Promise(resolve => setTimeout(resolve, 50));
     expect((await readRouteRow(stub, SESSION))?.state).toBe('preparing');
-    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(0);
+    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(
+      0
+    );
 
     await releaseGate(stub, () => provider.stopGates[0]('terminal'));
   });
@@ -682,7 +684,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await new Promise(resolve => setTimeout(resolve, 50));
     expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
-    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(0);
+    expect(peer.routeUpdatesFor(SESSION).filter(update => update.state === 'ready')).toHaveLength(
+      0
+    );
   });
 
   it('forwards wrapper events and outcomes to the session peer', async () => {
@@ -824,9 +828,9 @@ describe('SandboxControlV2 routes and forwarding', () => {
       });
     });
 
-    expect(
-      await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })
-    ).toBe('not_ready');
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'not_ready'
+    );
     // A plain write failure keeps the route `ready`: the next send or `onRoute`
     // retries delivery. Only a credential-policy failure with no due grant left
     // fails the route.
@@ -858,9 +862,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const reprepared = await readRouteRow(stub, SESSION);
     expect(reprepared?.state).toBe('preparing');
     expect(reprepared?.attempt_id).not.toBe(failed?.attempt_id);
-    expect(reprepared?.attempt_deadline_at ?? 0).toBeGreaterThan(
-      failed?.attempt_deadline_at ?? 0
-    );
+    expect(reprepared?.attempt_deadline_at ?? 0).toBeGreaterThan(failed?.attempt_deadline_at ?? 0);
     expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
   });
 

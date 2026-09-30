@@ -26,10 +26,7 @@ const SNAPSHOT = { summary: SUMMARY, files: [] } as unknown as WorktreeSnapshotC
 
 function harness(
   overrides: Partial<
-    Pick<
-      ControlPlaneWorktreeChangesDeps,
-      'captureSnapshot' | 'captureChanges' | 'isPrepared'
-    >
+    Pick<ControlPlaneWorktreeChangesDeps, 'captureSnapshot' | 'captureChanges' | 'isPrepared'>
   > = {}
 ) {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -65,7 +62,11 @@ describe('control-plane wrapper worktree changes', () => {
         type: 'worktree.result',
         requestId: 'req-guard',
         ok: false,
-        error: { code: 'not_ready', message: 'Session directory is not attached', retryable: false },
+        error: {
+          code: 'not_ready',
+          message: 'Session directory is not attached',
+          retryable: false,
+        },
       },
     ]);
   });

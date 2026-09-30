@@ -26,8 +26,7 @@ import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 type SessionNamespace = DurableObjectNamespace<SandboxSessionV2>;
-const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
-  .SANDBOX_CONTROL;
+const sandboxes = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace }).SANDBOX_CONTROL;
 const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDBOX_SESSION;
 
 const USER_ID = 'user_b10';
@@ -36,7 +35,11 @@ const ORG_ID = 'org_b10';
 /** A minimal but schema-valid full snapshot capture (baseRef filled per reply). */
 const SNAPSHOT_SUMMARY = {
   revision: 1,
-  comparison: { baseRef: 'refs/remotes/origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
+  comparison: {
+    baseRef: 'refs/remotes/origin/main',
+    mergeBase: 'a'.repeat(40),
+    head: 'b'.repeat(40),
+  },
   files: [],
   truncated: false,
 };
@@ -68,7 +71,11 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
     auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
-    workspace: { branchName: 'kilo/b10', sandboxId: input.sandboxId, sandboxProvider: 'cloudflare' },
+    workspace: {
+      branchName: 'kilo/b10',
+      sandboxId: input.sandboxId,
+      sandboxProvider: 'cloudflare',
+    },
     lifecycle: { version: 1, timestamp: 1 },
   });
 }
@@ -214,7 +221,11 @@ async function markRouteReady(
 function snapshotReply(revision: number, baseRef: string) {
   return {
     ...SNAPSHOT,
-    summary: { ...SNAPSHOT_SUMMARY, revision, comparison: { ...SNAPSHOT_SUMMARY.comparison, baseRef } },
+    summary: {
+      ...SNAPSHOT_SUMMARY,
+      revision,
+      comparison: { ...SNAPSHOT_SUMMARY.comparison, baseRef },
+    },
   };
 }
 
@@ -314,9 +325,9 @@ describe('control-plane worktree changes (B10)', () => {
     });
     await awaitFrame(wrapper, 'worktree.snapshot');
     await expect(stub.getAllocationState()).resolves.toMatchObject({ kind: 'connected' });
-    await expect(
-      stub.status({ sessionId: 'workspace_x' })
-    ).resolves.toMatchObject({ sessionId: 'workspace_x' });
+    await expect(stub.status({ sessionId: 'workspace_x' })).resolves.toMatchObject({
+      sessionId: 'workspace_x',
+    });
     wrapper.close();
     await expect(pending).resolves.toMatchObject({ ok: false });
   });
@@ -423,7 +434,9 @@ describe('control-plane worktree changes (B10)', () => {
     await drain(wrapper);
     const baseline = wrapper.receivedFrames();
 
-    await expect(sessionStub.refreshWorktreeChanges()).resolves.toMatchObject({ status: 'offline' });
+    await expect(sessionStub.refreshWorktreeChanges()).resolves.toMatchObject({
+      status: 'offline',
+    });
     await new Promise(resolve => setTimeout(resolve, 150));
     expect(wrapper.receivedFrames()).toBe(baseline);
 

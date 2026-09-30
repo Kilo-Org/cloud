@@ -19,7 +19,7 @@
     },
     "failed": {
       "title": "{{sessionTitle}}",
-      "body": "Fallejt: {{detail}}"
+      "body": "Falla: {{detail}}"
     },
     "interrupted": {
       "title": "{{sessionTitle}}",
@@ -70,8 +70,8 @@
       "body": "Tektek biex tibda tħaddet."
     },
     "startFailed": {
-      "title": "{{instanceName}} fallejt jibda",
-      "body": "Il-bidu fallejt."
+      "title": "{{instanceName}} falla jibda",
+      "body": "Il-bidu falla."
     }
   },
   "scheduledAction": {

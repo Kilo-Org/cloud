@@ -714,6 +714,38 @@ describe('createStoreCreditPurchaseActions.recoverPurchases', () => {
     }
   );
 
+  it('reports a remembered terminal refusal on explicit recovery without reposting it', async () => {
+    const purchase = createPurchase();
+    const completeAppStorePurchase = vi.fn().mockRejectedValue({
+      data: { code: 'BAD_REQUEST', message: STORE_PURCHASE_VERIFICATION_FAILED_MESSAGE },
+    });
+    const showError = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    // The first automatic pass posts the receipt once and learns it is terminal.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    // Background recovery stays silent.
+    expect(showError).not.toHaveBeenCalled();
+
+    // The next automatic pass skips the remembered refusal silently.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(showError).not.toHaveBeenCalled();
+
+    // An explicit recovery surfaces the remembered refusal — never a silent
+    // no-op — and still does not post the refused receipt again.
+    expect(await actions.recoverPurchases([purchase], { notifyErrors: true })).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledTimes(1);
+    expect(showError).toHaveBeenCalledWith(CREDIT_PURCHASE_FAILED_KEY);
+  });
+
   it('retries after a session error, which is not about the receipt', async () => {
     const purchase = createPurchase();
     const completeAppStorePurchase = vi

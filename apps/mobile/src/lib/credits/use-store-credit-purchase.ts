@@ -193,17 +193,22 @@ const TERMINAL_PURCHASE_MESSAGES = {
 };
 
 /**
- * Purchases the backend terminally refused in this process. The store keeps an
- * unfinished transaction until the app finishes it, so without this memory every
- * later recovery pass posts a payload the backend already rejected. Deliberately
- * in-memory: the next app launch retries once, so a server-side change is never
- * ignored forever.
+ * Purchases the backend terminally refused in this process, with the catalog key
+ * their refusal maps to. The store keeps an unfinished transaction until the app
+ * finishes it, so without this memory every later recovery pass posts a payload
+ * the backend already rejected. Deliberately in-memory: the next app launch
+ * retries once, so a server-side change is never ignored forever.
+ *
+ * The key is kept, not just the id, because the silent background pass must skip
+ * a remembered refusal without a word, while an explicit recovery (the store
+ * reported the pack as already owned) must still surface why it can never
+ * succeed — without posting the refused receipt again.
  */
-const terminallyRejectedPurchaseIds = new Set<string>();
+const terminallyRejectedPurchases = new Map<string, string>();
 
 /** Test seam: forget the recorded rejections, so a test starts the process over. */
 export function resetTerminalPurchaseRejections(): void {
-  terminallyRejectedPurchaseIds.clear();
+  terminallyRejectedPurchases.clear();
 }
 
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
@@ -353,13 +358,13 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       // remembering: an account or session refusal is payable after the user acts,
       // so it stays in the store queue and is posted again.
       const refusalMessage = readTrpcErrorField(error, 'message') ?? '';
-      if (Object.hasOwn(TERMINAL_PURCHASE_MESSAGES, refusalMessage)) {
-        terminallyRejectedPurchaseIds.add(getPurchaseCompletionId(purchase));
+      const errorMessageKey = getStoreCreditPurchaseErrorMessageKey(error, deps.storefront);
+      if (Object.hasOwn(TERMINAL_PURCHASE_MESSAGES, refusalMessage) && errorMessageKey) {
+        // Remember the key the refusal maps to, so a later explicit recovery can
+        // show it without posting this receipt again.
+        terminallyRejectedPurchases.set(getPurchaseCompletionId(purchase), errorMessageKey);
       }
-      return {
-        completed: false,
-        errorMessageKey: getStoreCreditPurchaseErrorMessageKey(error, deps.storefront),
-      };
+      return { completed: false, errorMessageKey };
     }
 
     // The account can also change while the backend answers. The grant is the
@@ -489,28 +494,47 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
       options.creditPackGoogleProductIds ?? deps.creditPackGoogleProductIds;
     // One completion per store transaction: a store that lists the same
     // transaction twice must not be completed twice. A payload the backend named
-    // as defective is skipped too: posting it again can never succeed, and the
+    // as defective is never posted again: posting it can never succeed, and the
     // store keeps re-delivering it. The next app launch retries it once.
     const seenCompletionIds = new Set<string>();
-    const eligiblePurchases = purchases
-      .filter(purchase => !terminallyRejectedPurchaseIds.has(getPurchaseCompletionId(purchase)))
-      .filter(purchase => {
-        if (
-          !isRecoverableCreditPurchase(
-            purchase,
-            creditPackAppleProductIds,
-            creditPackGoogleProductIds
-          )
-        ) {
-          return false;
+    const rememberedRejections: string[] = [];
+    const eligiblePurchases = purchases.filter(purchase => {
+      const id = getPurchaseCompletionId(purchase);
+      const rememberedErrorMessageKey = terminallyRejectedPurchases.get(id);
+      if (rememberedErrorMessageKey !== undefined) {
+        // The silent background pass skips a remembered refusal without a word.
+        // An explicit recovery must still say why this purchase can never
+        // complete, once per pass, without posting the refused receipt again.
+        if ((options.notifyErrors ?? false) && !seenCompletionIds.has(id)) {
+          seenCompletionIds.add(id);
+          rememberedRejections.push(rememberedErrorMessageKey);
         }
-        const id = getPurchaseCompletionId(purchase);
-        if (seenCompletionIds.has(id)) {
-          return false;
-        }
-        seenCompletionIds.add(id);
-        return true;
-      });
+        return false;
+      }
+      if (
+        !isRecoverableCreditPurchase(
+          purchase,
+          creditPackAppleProductIds,
+          creditPackGoogleProductIds
+        )
+      ) {
+        return false;
+      }
+      if (seenCompletionIds.has(id)) {
+        return false;
+      }
+      seenCompletionIds.add(id);
+      return true;
+    });
+
+    // A remembered refusal belongs to the account that asked for it: a session
+    // change while this pass ran must not report the old account's refusal onto
+    // the new one.
+    if (deps.isAccountCurrent()) {
+      for (const errorMessageKey of rememberedRejections) {
+        deps.showError(errorMessageKey);
+      }
+    }
 
     const recoveryResults = await Promise.all(
       eligiblePurchases.map(async purchase => ({

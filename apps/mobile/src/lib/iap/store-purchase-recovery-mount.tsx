@@ -13,6 +13,7 @@ import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { createStoreCreditPurchaseActions } from '@/lib/credits/use-store-credit-purchase';
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
+import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import { createAppStoreKiloPassPurchaseActions } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
 
@@ -25,30 +26,6 @@ function logRecoveryError(message: string | null): void {
   if (message) {
     // eslint-disable-next-line no-console -- a purchase that never credits must be diagnosable
     console.warn(`[iap-recovery] ${message}`);
-  }
-}
-
-/**
- * A store call must answer inside this window or the pass gives up.
- *
- * StoreKit and Play Billing both answer slowly on a cold connection, and a call
- * that never answers is worse than one that fails: the pass holds its in-flight
- * guard, so recovery is dead for the rest of the process and silent about it.
- * Measured on a simulator on 2026-09-29: the pass entered with 14 known product
- * ids, then `initConnection` never settled — no result, no failure, no further
- * recovery for the life of that app process.
- */
-const STORE_CALL_DEADLINE_MS = 15_000;
-
-async function withStoreDeadline<T>(work: Promise<T>, label: string): Promise<T> {
-  const { promise: deadline, reject: failDeadline } = Promise.withResolvers<never>();
-  const timer = setTimeout(() => {
-    failDeadline(new Error(`${label} did not answer within ${STORE_CALL_DEADLINE_MS} ms`));
-  }, STORE_CALL_DEADLINE_MS);
-  try {
-    return await Promise.race([work, deadline]);
-  } finally {
-    clearTimeout(timer);
   }
 }
 

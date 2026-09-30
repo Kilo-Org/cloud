@@ -544,6 +544,60 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.errorMessageKey).toBeNull();
   });
 
+  it('gives up on a lookup that never answers and retries the next already-owned attempt', async () => {
+    // The store accepts the first `AlreadyOwned` lookup and never answers it.
+    // The pass must time out, release its single-flight slot, and let the next
+    // attempt run a fresh lookup instead of pinning recovery for the life of
+    // the mount.
+    const hungLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.getAvailablePurchases.mockReturnValueOnce(hungLookup.promise);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const alreadyOwned = { code: 'already-owned', message: 'Item already owned' };
+    mockedIap.requestPurchase.mockRejectedValue(alreadyOwned);
+
+    // Only the deadline is faked: the mount helpers await real microtasks.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { handle } = await mountOwner();
+
+      const firstAttempt = handle.value?.purchase(creditPack);
+      await flushPromises();
+      expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(16_000);
+      await flushPromises();
+
+      // The deadline gives up on the hung lookup: the attempt falls back to the
+      // existing purchase-failure copy and completes nothing.
+      expect(await firstAttempt).toBe(false);
+      expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+      expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+
+      // The slot is free, so the next attempt runs a fresh lookup, which answers.
+      mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
+      const secondAttempt = handle.value?.purchase(creditPack);
+      await flushPromises();
+
+      expect(await secondAttempt).toBe(false);
+      expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(2);
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+      expect(handle.value?.errorMessageKey).toBeNull();
+
+      // The timed-out lookup answers late: a settled pass must ignore it, so no
+      // completion lands for the transaction it carried.
+      hungLookup.resolve([createPurchase({ transactionId: 'tx-late' })]);
+      await flushPromises();
+      expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completedPurchaseCount).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the backend ownership refusal when both triggers recover one already-owned failure', async () => {
     mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
     mockedQuery.serverProductsData = {

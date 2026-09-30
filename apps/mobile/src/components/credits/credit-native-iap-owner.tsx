@@ -27,6 +27,7 @@ import {
 } from '@/lib/credits/store-products';
 import { getCreditStorefront } from '@/lib/credits/storefront';
 import { fetchPendingStorePurchases } from '@/lib/iap/pending-store-purchases';
+import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
 import {
   createStoreCreditPurchaseActions,
   getPurchaseCompletionId,
@@ -366,7 +367,13 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
         // changes while the store answers, the new account's own pass recovers.
         let pendingPurchases: Purchase[] = [];
         try {
-          pendingPurchases = await fetchPendingStorePurchases(storefront);
+          // Bounded: a store that never answers must not hold this epoch's
+          // single-flight slot open. The pass gives up, releases the slot, and
+          // the next `AlreadyOwned` attempt retries the lookup.
+          pendingPurchases = await withStoreDeadline(
+            fetchPendingStorePurchases(storefront),
+            'the pending purchase lookup'
+          );
         } catch {
           // The store cannot answer; the retry re-runs this.
           return false;

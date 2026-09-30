@@ -241,6 +241,7 @@
     "addPasskey": "Tambah kunci sandi",
     "passkeyDefaultName": "Kunci sandi",
     "passkeyAddedOn": "Ditambahkan {{date}}",
+    "passkeyLastUsedOn": "Terakhir digunakan {{date}}",
     "passkeyAdded": "Kunci sandi ditambahkan.",
     "passkeyAddFailed": "Tidak dapat menambahkan kunci sandi. Coba lagi.",
     "passkeyAddUnsupported": "Perangkat ini tidak dapat membuat kunci sandi.",

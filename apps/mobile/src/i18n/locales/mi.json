@@ -241,6 +241,7 @@
     "addPasskey": "Tāpiri he kī whakauru",
     "passkeyDefaultName": "Kī whakauru",
     "passkeyAddedOn": "I tāpirihia {{date}}",
+    "passkeyLastUsedOn": "I whakamahia whakamutunga {{date}}",
     "passkeyAdded": "Kua tāpirihia te kī whakauru.",
     "passkeyAddFailed": "Kāore i taea te tāpiri he kī whakauru. Whakamātau anō.",
     "passkeyAddUnsupported": "Kāore e taea e tēnei pūrere ngā kī whakauru te hanga.",

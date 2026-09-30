@@ -241,6 +241,7 @@
     "addPasskey": "Ƙara maɓallin shiga",
     "passkeyDefaultName": "Maɓallin shiga",
     "passkeyAddedOn": "An ƙara {{date}}",
+    "passkeyLastUsedOn": "An yi amfani da shi na ƙarshe {{date}}",
     "passkeyAdded": "An ƙara maɓallin shiga.",
     "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
     "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",

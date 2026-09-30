@@ -241,6 +241,7 @@
     "addPasskey": "Voeg ’n passkey by",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Bygevoeg {{date}}",
+    "passkeyLastUsedOn": "Laas gebruik {{date}}",
     "passkeyAdded": "Passkey bygevoeg.",
     "passkeyAddFailed": "Kon nie ’n passkey byvoeg nie. Probeer weer.",
     "passkeyAddUnsupported": "Hierdie toestel kan nie passkeys skep nie.",

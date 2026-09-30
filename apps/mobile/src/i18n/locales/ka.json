@@ -241,6 +241,7 @@
     "addPasskey": "წვდომის გასაღების დამატება",
     "passkeyDefaultName": "წვდომის გასაღები",
     "passkeyAddedOn": "დამატებულია {{date}}",
+    "passkeyLastUsedOn": "ბოლო გამოყენება {{date}}",
     "passkeyAdded": "წვდომის გასაღები დაემატა.",
     "passkeyAddFailed": "წვდომის გასაღების დამატება ვერ მოხერხდა. სცადეთ ხელახლა.",
     "passkeyAddUnsupported": "ეს მოწყობილობა ვერ ქმნის წვდომის გასაღებებს.",

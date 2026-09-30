@@ -241,6 +241,7 @@
     "addPasskey": "Bæta við aðgangslykli",
     "passkeyDefaultName": "Aðgangslykill",
     "passkeyAddedOn": "Bætt við {{date}}",
+    "passkeyLastUsedOn": "Síðast notað {{date}}",
     "passkeyAdded": "Aðgangslykli bætt við.",
     "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
     "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",

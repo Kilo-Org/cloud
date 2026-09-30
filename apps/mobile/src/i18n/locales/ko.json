@@ -241,6 +241,7 @@
     "addPasskey": "패스키 추가",
     "passkeyDefaultName": "패스키",
     "passkeyAddedOn": "{{date}}에 추가됨",
+    "passkeyLastUsedOn": "{{date}}에 마지막 사용",
     "passkeyAdded": "패스키가 추가되었습니다.",
     "passkeyAddFailed": "패스키를 추가하지 못했습니다. 다시 시도하세요.",
     "passkeyAddUnsupported": "이 기기에서는 패스키를 만들 수 없습니다.",

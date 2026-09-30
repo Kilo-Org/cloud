@@ -72,17 +72,7 @@ import {
   type WorkspaceFolderDropTarget,
 } from './workspace-folders';
 import { filterLiveSidebarSessions } from './live-sidebar-sessions';
-
-type ActiveSession = {
-  id: string;
-  status: string;
-  title: string;
-  connectionId: string;
-  gitUrl?: string;
-  gitBranch?: string;
-  /** Stored origin from `cli_sessions_v2`, absent until the session is ingested. */
-  createdOnPlatform?: string;
-};
+import type { ActiveSession } from './hooks/useActiveSessions';
 
 type ChatSidebarProps = {
   sessions: StoredSession[];
@@ -765,19 +755,19 @@ export function ChatSidebar({
 
   // Live sessions the stored list does not carry. The live rows bypass the
   // server-side filter the stored list gets, so they have to honor the same
-  // scope and selections here or the sidebar shows rows the filters exclude.
+  // selections here or the sidebar shows rows the filters exclude.
   const liveOnlySessions = useMemo(
     () =>
       filterLiveSidebarSessions(
         activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
         {
-          organizationId: organizationId ?? null,
           platformFilter: platformFilter ?? [],
           projectFilter: projectFilter ?? [],
           searchQuery,
         }
       ),
-    [activeSessions, sessions, organizationId, platformFilter, projectFilter, searchQuery]
+    [activeSessions, sessions, platformFilter, projectFilter, searchQuery]
+  );
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 

@@ -10,31 +10,18 @@ const liveSessions = [
     title: 'Remote CLI session',
     gitUrl: 'https://github.com/acme/Widgets.git',
     createdOnPlatform: 'cli',
-    organizationId: null,
   },
   {
     id: 'ses_web',
     title: 'Cloud web session',
     gitUrl: 'https://github.com/acme/widgets',
     createdOnPlatform: 'cloud-agent-web',
-    organizationId: null,
-  },
-  {
-    id: 'ses_org',
-    title: 'Org CLI session',
-    createdOnPlatform: 'cli',
-    organizationId: 'org_1',
   },
   { id: 'ses_other', title: 'Custom client session', createdOnPlatform: 'my-tool' },
   { id: 'ses_unattributed', title: 'Legacy CLI session' },
 ];
 
-const noQuery = {
-  organizationId: null,
-  platformFilter: [],
-  projectFilter: [],
-  searchQuery: '',
-};
+const noQuery = { platformFilter: [], projectFilter: [], searchQuery: '' };
 
 describe('platformFilterValues', () => {
   it('expands a filter value to every stored platform it covers', () => {
@@ -52,14 +39,14 @@ describe('matchesLivePlatformFilter', () => {
   });
 
   it('claims an origin outside the platform catalogue by the other bucket', () => {
-    expect(matchesLivePlatformFilter(liveSessions[3], ['other'])).toBe(true);
-    expect(matchesLivePlatformFilter(liveSessions[3], ['cli'])).toBe(false);
+    expect(matchesLivePlatformFilter(liveSessions[2], ['other'])).toBe(true);
+    expect(matchesLivePlatformFilter(liveSessions[2], ['cli'])).toBe(false);
   });
 
   it('claims a row with no reported origin by no selection', () => {
-    expect(matchesLivePlatformFilter(liveSessions[4], ['cloud-agent'])).toBe(false);
-    expect(matchesLivePlatformFilter(liveSessions[4], ['other'])).toBe(false);
-    expect(matchesLivePlatformFilter(liveSessions[4], [])).toBe(true);
+    expect(matchesLivePlatformFilter(liveSessions[3], ['cloud-agent'])).toBe(false);
+    expect(matchesLivePlatformFilter(liveSessions[3], ['other'])).toBe(false);
+    expect(matchesLivePlatformFilter(liveSessions[3], [])).toBe(true);
   });
 
   it('never claims a row by the client the connection runs in', () => {
@@ -71,21 +58,8 @@ describe('matchesLivePlatformFilter', () => {
 });
 
 describe('filterLiveSidebarSessions', () => {
-  it('returns every row in scope when nothing is selected', () => {
-    expect(filterLiveSidebarSessions(liveSessions, noQuery).map(row => row.id)).toEqual([
-      'ses_remote',
-      'ses_web',
-      'ses_other',
-      'ses_unattributed',
-    ]);
-  });
-
-  it('keeps a row another scope owns out of the sidebar', () => {
-    expect(
-      filterLiveSidebarSessions(liveSessions, { ...noQuery, organizationId: 'org_1' }).map(
-        row => row.id
-      )
-    ).toEqual(['ses_org']);
+  it('returns every row when nothing is selected', () => {
+    expect(filterLiveSidebarSessions(liveSessions, noQuery)).toEqual(liveSessions);
   });
 
   it('hides remote rows while only cloud is selected', () => {
@@ -106,7 +80,7 @@ describe('filterLiveSidebarSessions', () => {
     expect(rows.map(row => row.id)).toEqual(['ses_remote']);
   });
 
-  it('combines scope, origin, repository, and text with AND', () => {
+  it('combines origin, repository, and text with AND', () => {
     expect(
       filterLiveSidebarSessions(liveSessions, {
         ...noQuery,

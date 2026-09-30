@@ -1,5 +1,9 @@
 import type { ChatEvent, ServiceEvent } from './normalizer';
-import { createCliLiveTransport } from './cli-live-transport';
+import {
+  createCliLiveTransport,
+  REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS,
+  REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS,
+} from './cli-live-transport';
 import type { SlashCommandInfo } from './schemas';
 import type {
   RemoteModelCatalogV1,
@@ -85,6 +89,34 @@ const WIRE_CATALOG = {
     variant: 'high',
   },
   defaultModel: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+  truncated: false,
+} satisfies RemoteModelCatalogWireV1;
+const EMPTY_WIRE_CATALOG = {
+  all: [],
+  default: {},
+  connected: [],
+  failed: [],
+  protocolVersion: 1,
+  truncated: false,
+} satisfies RemoteModelCatalogWireV1;
+// A schema-valid catalog with a connected provider whose `models` record is
+// empty. It projects to zero picker options, so it must self-heal exactly like
+// the fully-empty catalog rather than publish as an `idle` success.
+const ZERO_MODEL_WIRE_CATALOG = {
+  all: [
+    {
+      id: 'anthropic',
+      name: 'Anthropic',
+      source: 'env' as const,
+      env: [],
+      options: {},
+      models: {},
+    },
+  ],
+  default: {},
+  connected: ['anthropic'],
+  failed: [],
+  protocolVersion: 1,
   truncated: false,
 } satisfies RemoteModelCatalogWireV1;
 const REMOTE_CATALOG = {
@@ -396,6 +428,297 @@ describe('CliLiveTransport unified user web connection', () => {
     expect(states).not.toContainEqual(expect.objectContaining({ protocol: 'legacy' }));
     expect(transport.canSend?.()).toBe(true);
     transport.destroy();
+  });
+
+  it('self-heals an empty v1 catalog instead of publishing a successful idle load', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      let modelRequest = 0;
+      jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+        if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+        modelRequest += 1;
+        return Promise.resolve(modelRequest === 1 ? EMPTY_WIRE_CATALOG : WIRE_CATALOG);
+      });
+      const states: RemoteModelState[] = [];
+      const { transport } = createTransportWithSinks({
+        connection,
+        onRemoteModelStateChange: state => states.push(state),
+      });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // The empty catalog must not be published as an idle success.
+      expect(states).not.toContainEqual(
+        expect.objectContaining({ protocol: 'v1', refresh: 'idle' })
+      );
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+
+      await jest.advanceTimersByTimeAsync(REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'idle',
+      });
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(([, command]) => command === 'list_models')
+      ).toHaveLength(2);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('self-heals a zero-model v1 catalog with a connected provider', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      let modelRequest = 0;
+      jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+        if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+        modelRequest += 1;
+        return Promise.resolve(modelRequest === 1 ? ZERO_MODEL_WIRE_CATALOG : WIRE_CATALOG);
+      });
+      const states: RemoteModelState[] = [];
+      const { transport } = createTransportWithSinks({
+        connection,
+        onRemoteModelStateChange: state => states.push(state),
+      });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // A connected provider with no models projects to zero options and must
+      // not be published as an idle success that would stick.
+      expect(states).not.toContainEqual(
+        expect.objectContaining({ protocol: 'v1', refresh: 'idle' })
+      );
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        refresh: 'error',
+        error: 'Remote model catalog is empty',
+      });
+
+      await jest.advanceTimersByTimeAsync(REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'idle',
+      });
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('retries a transient catalog failure and stops once a non-empty catalog loads', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      let modelRequest = 0;
+      jest.mocked(connection.sendCommand).mockImplementation((_sessionId, command) => {
+        if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+        modelRequest += 1;
+        return modelRequest === 1
+          ? Promise.reject(new Error('catalog timed out'))
+          : Promise.resolve(WIRE_CATALOG);
+      });
+      const states: RemoteModelState[] = [];
+      const { transport } = createTransportWithSinks({
+        connection,
+        onRemoteModelStateChange: state => states.push(state),
+      });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'unknown',
+        refresh: 'error',
+        error: 'catalog timed out',
+      });
+
+      await jest.advanceTimersByTimeAsync(REMOTE_MODEL_DISCOVERY_RETRY_BASE_DELAY_MS);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'idle',
+      });
+
+      const callsAfterRecovery = jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(([, command]) => command === 'list_models').length;
+      expect(callsAfterRecovery).toBe(2);
+
+      // A published non-empty catalog stops the retry loop.
+      await jest.advanceTimersByTimeAsync(60_000);
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(([, command]) => command === 'list_models')
+      ).toHaveLength(2);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('does not schedule retries after a non-empty catalog succeeds', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      jest
+        .mocked(connection.sendCommand)
+        .mockImplementation((_sessionId, command) =>
+          Promise.resolve(command === 'list_models' ? WIRE_CATALOG : COMMAND_WIRE_CATALOG)
+        );
+      const { transport } = createTransportWithSinks({ connection });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await jest.advanceTimersByTimeAsync(60_000);
+
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(([, command]) => command === 'list_models')
+      ).toHaveLength(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('resets the discovery budget when the owner changes', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      jest
+        .mocked(connection.sendCommand)
+        .mockImplementation((_sessionId, command, _data, owner) => {
+          if (command === 'list_commands') return Promise.resolve(COMMAND_WIRE_CATALOG);
+          if (owner === 'owner-a') return Promise.reject(new Error('owner-a catalog unavailable'));
+          return Promise.resolve(WIRE_CATALOG);
+        });
+      const states: RemoteModelState[] = [];
+      const { transport } = createTransportWithSinks({
+        connection,
+        onRemoteModelStateChange: state => states.push(state),
+      });
+
+      transport.connect();
+      emitOwner(connection, 'owner-a');
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Drain the entire budget for the stuck first owner.
+      await jest.advanceTimersByTimeAsync(60_000);
+      const ownerAAttempts = jest
+        .mocked(connection.sendCommand)
+        .mock.calls.filter(
+          ([, command, , owner]) => command === 'list_models' && owner === 'owner-a'
+        ).length;
+      expect(ownerAAttempts).toBe(REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS);
+
+      // A new owner gets a fresh budget and converges immediately.
+      emitOwner(connection, 'owner-b');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(states.at(-1)).toEqual({
+        ownerConnectionId: 'owner-b',
+        protocol: 'v1',
+        catalog: REMOTE_CATALOG,
+        refresh: 'idle',
+      });
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(
+            ([, command, , owner]) => command === 'list_models' && owner === 'owner-b'
+          )
+      ).toHaveLength(1);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('caps discovery attempts for a stuck owner so a heartbeat cannot add a list_models per beat', async () => {
+    jest.useFakeTimers();
+    try {
+      const connection = createConnection();
+      jest
+        .mocked(connection.sendCommand)
+        .mockImplementation((_sessionId, command) =>
+          command === 'list_commands'
+            ? Promise.resolve(COMMAND_WIRE_CATALOG)
+            : Promise.reject(new Error('catalog unavailable'))
+        );
+      const { transport } = createTransportWithSinks({ connection });
+
+      transport.connect();
+      emitOwner(connection);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      await jest.advanceTimersByTimeAsync(60_000);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(([, command]) => command === 'list_models')
+      ).toHaveLength(REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS);
+
+      // Same-owner heartbeats must not call discoverModels, and the exhausted
+      // budget blocks any further backoff retry even as time advances.
+      for (let i = 0; i < 5; i++) {
+        emitHeartbeat(connection, [{ id: KILO_SESSION_ID, status: 'active', title: 'Tracked' }]);
+      }
+      await jest.advanceTimersByTimeAsync(60_000);
+      await Promise.resolve();
+
+      expect(
+        jest
+          .mocked(connection.sendCommand)
+          .mock.calls.filter(([, command]) => command === 'list_models')
+      ).toHaveLength(REMOTE_MODEL_DISCOVERY_MAX_ATTEMPTS);
+      transport.destroy();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('ignores a late catalog response from a replaced owner', async () => {

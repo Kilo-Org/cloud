@@ -38,7 +38,7 @@ export function DestinationOptionRow({
       disabled={disabled}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, busy }}
       className={`flex-row items-center gap-3 border-b border-border px-4 py-3.5 ${
         disabled ? 'opacity-50' : 'active:opacity-70'
       }`}

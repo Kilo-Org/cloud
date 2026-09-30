@@ -158,6 +158,29 @@ describe('safeArtifactDisplayName', () => {
     ).toBe('abcde.txt');
   });
 
+  it('drops bidi formatting characters, so a name cannot spoof its extension', () => {
+    expect(
+      safeArtifactDisplayName({
+        id: fallbackId,
+        name: 'evil\u202Egnp.exe',
+        mime: 'application/octet-stream',
+      })
+    ).toBe('evilgnp.exe');
+    expect(
+      safeArtifactDisplayName({
+        id: fallbackId,
+        name: '\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069report.pdf',
+        mime: 'application/pdf',
+      })
+    ).toBe('report.pdf');
+  });
+
+  it('falls back when a name is only bidi formatting characters', () => {
+    expect(safeArtifactDisplayName({ id: fallbackId, name: '\u202E\u2069', mime: png })).toBe(
+      'part-1.png'
+    );
+  });
+
   it('collapses whitespace runs and trims the ends', () => {
     expect(
       safeArtifactDisplayName({ id: fallbackId, name: '  a   b.txt  ', mime: 'text/plain' })

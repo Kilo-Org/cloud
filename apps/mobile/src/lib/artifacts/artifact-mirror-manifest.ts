@@ -35,6 +35,19 @@ const DELETE_CODE_POINT = 127;
 const C1_CONTROL_CODE_POINT_MIN = 128;
 const C1_CONTROL_CODE_POINT_MAX = 159;
 
+// Bidi formatting characters: the directional marks plus the embedding,
+// override, and isolate controls. A file browser paints the display name
+// verbatim, so a U+202E or another override in an agent-supplied name would
+// reorder the visible characters and let the name spoof its extension.
+// Written in decimal for the same reason as the control code points above.
+const ARABIC_LETTER_MARK_CODE_POINT = 1564;
+const LEFT_TO_RIGHT_MARK_CODE_POINT = 8206;
+const RIGHT_TO_LEFT_MARK_CODE_POINT = 8207;
+const BIDI_EMBEDDING_CODE_POINT_MIN = 8234;
+const BIDI_EMBEDDING_CODE_POINT_MAX = 8238;
+const BIDI_ISOLATE_CODE_POINT_MIN = 8294;
+const BIDI_ISOLATE_CODE_POINT_MAX = 8297;
+
 const artifactMirrorFileSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -104,9 +117,9 @@ export function serializeArtifactMirrorManifest(manifest: ArtifactMirrorManifest
  * Turn an agent-supplied name into a display name a file browser can show.
  *
  * Only the manifest ever holds this string (the on-disk name is the opaque file
- * id), but it still must not carry a path, a control character, or an unbounded
- * run of bytes. The extension is kept when the name has to be truncated, so the
- * browser can still map the file to an app.
+ * id), but it still must not carry a path, a control or bidi formatting
+ * character, or an unbounded run of bytes. The extension is kept when the name
+ * has to be truncated, so the browser can still map the file to an app.
  */
 export function safeArtifactDisplayName({
   id,
@@ -280,7 +293,7 @@ function sanitizeArtifactName(raw: string): string {
   let withoutControls = '';
   for (const character of basename) {
     const codePoint = character.codePointAt(0) ?? 0;
-    if (!isControlCodePoint(codePoint)) {
+    if (!isUnsafeDisplayCodePoint(codePoint)) {
       withoutControls += character;
     }
   }
@@ -292,11 +305,25 @@ function sanitizeArtifactName(raw: string): string {
   return boundArtifactDisplayName(collapsed);
 }
 
+function isUnsafeDisplayCodePoint(codePoint: number): boolean {
+  return isControlCodePoint(codePoint) || isBidiControlCodePoint(codePoint);
+}
+
 function isControlCodePoint(codePoint: number): boolean {
   return (
     codePoint <= C0_CONTROL_CODE_POINT_MAX ||
     codePoint === DELETE_CODE_POINT ||
     (codePoint >= C1_CONTROL_CODE_POINT_MIN && codePoint <= C1_CONTROL_CODE_POINT_MAX)
+  );
+}
+
+function isBidiControlCodePoint(codePoint: number): boolean {
+  return (
+    codePoint === ARABIC_LETTER_MARK_CODE_POINT ||
+    codePoint === LEFT_TO_RIGHT_MARK_CODE_POINT ||
+    codePoint === RIGHT_TO_LEFT_MARK_CODE_POINT ||
+    (codePoint >= BIDI_EMBEDDING_CODE_POINT_MIN && codePoint <= BIDI_EMBEDDING_CODE_POINT_MAX) ||
+    (codePoint >= BIDI_ISOLATE_CODE_POINT_MIN && codePoint <= BIDI_ISOLATE_CODE_POINT_MAX)
   );
 }
 

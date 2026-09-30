@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Сессийн нэр",
       "transcriptAccessibility": "Сессийн ярианы бичвэр",
       "readOnly": "Энэ сессийг зөвхөн унших боломжтой.",
+      "continueInNewSession": "Шинэ сессэд үргэлжлүүлэх",
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",

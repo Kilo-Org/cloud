@@ -5,7 +5,7 @@ import { randomInt, randomUUID, createHmac } from 'crypto';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/email-address';
 
 /**
  * Step-up codes that authorize a single data-export download URL.

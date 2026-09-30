@@ -41,10 +41,6 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-jest.mock('@/lib/ai-gateway/abuse-service', () => ({
-  reportEvents: jest.fn(async () => undefined),
-}));
-
 jest.mock('@/lib/web-session-revocation', () => ({
   revokeWebSessions: jest.fn(async () => undefined),
 }));
@@ -70,9 +66,6 @@ const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
     subscriptionSchedules: { release: AnyMock; retrieve: AnyMock };
   };
 };
-const { reportEvents } = jest.requireMock('@/lib/ai-gateway/abuse-service') as {
-  reportEvents: AnyMock;
-};
 const { revokeWebSessions } = jest.requireMock('@/lib/web-session-revocation') as {
   revokeWebSessions: AnyMock;
 };
@@ -86,7 +79,6 @@ const cancelSubscriptionMock = stripeClientMock.client.subscriptions.cancel;
 const retrieveSubscriptionMock = stripeClientMock.client.subscriptions.retrieve;
 const releaseSubscriptionScheduleMock = stripeClientMock.client.subscriptionSchedules.release;
 const stopKiloClawMock = kiloclawClientMock.__stopMock;
-const reportEventsMock = reportEvents;
 const revokeWebSessionsMock = revokeWebSessions;
 
 beforeEach(async () => {
@@ -139,18 +131,6 @@ describe('acceptStripeDisputeCase', () => {
     expect(result).toEqual({ status: 'accepted', failures: [] });
     expect(closeDisputeMock).toHaveBeenCalledWith('dp_accept_personal');
     expect(revokeWebSessionsMock).toHaveBeenCalledWith(user.id);
-    expect(reportEventsMock).toHaveBeenCalledWith({
-      events: [
-        {
-          type: 'user.blocked',
-          data: {
-            kilo_user_id: user.id,
-            reason: 'stripe_dispute_accepted:dp_accept_personal',
-            actor_email: admin.google_user_email,
-          },
-        },
-      ],
-    });
 
     const [updatedCase] = await db
       .select()

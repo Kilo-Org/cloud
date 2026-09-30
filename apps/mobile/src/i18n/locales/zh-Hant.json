@@ -1584,6 +1584,7 @@
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
       "readOnly": "這是唯讀工作階段。",
+      "continueInNewSession": "在新工作階段中繼續",
       "emptyDescription": "在下方傳送訊息，即可開始。",
       "scrollToBottom": "捲動到底部",
       "emptyTitle": "尚無訊息",

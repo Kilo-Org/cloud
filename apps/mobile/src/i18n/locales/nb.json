@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Øktnavn",
       "transcriptAccessibility": "Samtalelogg for økten",
       "readOnly": "Denne økten er skrivebeskyttet.",
+      "continueInNewSession": "Fortsett i en ny økt",
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",

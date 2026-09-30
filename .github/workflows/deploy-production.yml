@@ -1,14 +1,14 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'apps/mobile/**'
+  schedule:
+    - cron: '7,27,47 * * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
   actions: read
+  deployments: read
 
 concurrency:
   group: deploy-production
@@ -19,7 +19,14 @@ env:
   VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
 
 jobs:
+  check-changes:
+    uses: ./.github/workflows/check-deployment-changes.yml
+    with:
+      workflow_file: deploy-production.yml
+
   check-production-db-startup:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -33,6 +40,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -50,6 +58,8 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -63,6 +73,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -80,18 +91,24 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   stage-app:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   stage-global-app:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
@@ -113,39 +130,12 @@ jobs:
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
-  resolve-worker-base:
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    outputs:
-      base_sha: ${{ steps.base.outputs.sha }}
-
-    steps:
-      - name: Resolve last successful production SHA
-        id: base
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          sha=$(gh run list \
-            --repo "$GITHUB_REPOSITORY" \
-            --workflow deploy-production.yml \
-            --branch main \
-            --status success \
-            --json headSha \
-            --limit 1 \
-            --jq '.[0].headSha')
-
-          if [ -z "$sha" ] || [ "$sha" = "null" ]; then
-            sha="${{ github.event.before }}"
-          fi
-
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
-
   deploy-workers:
     needs:
       [
         check-production-db-startup,
         run-migrations,
-        resolve-worker-base,
+        check-changes,
         stage-app,
         stage-global-app,
         promote-app,
@@ -154,9 +144,9 @@ jobs:
     if: >-
       ${{
         !cancelled() &&
+        needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
-        needs.resolve-worker-base.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.promote-app.result) &&
@@ -164,11 +154,13 @@ jobs:
       }}
     uses: ./.github/workflows/deploy-workers.yml
     with:
-      base_sha: ${{ needs.resolve-worker-base.outputs.base_sha }}
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
 
   detect-gastown-wasteland-changes:
-    needs: resolve-worker-base
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -180,15 +172,12 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           fetch-depth: 0
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Detect Gastown and Wasteland changes
         id: detect
         run: |
-          BASE_SHA="${{ needs.resolve-worker-base.outputs.base_sha }}"
-
-          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "null" ]; then
-            BASE_SHA="${{ github.event.before }}"
-          fi
+          BASE_SHA="${{ needs.check-changes.outputs.base_sha }}"
 
           changed_any() {
             git diff --name-only "$BASE_SHA" HEAD -- "$@" | grep -q .
@@ -235,7 +224,7 @@ jobs:
       [
         check-production-db-startup,
         run-migrations,
-        resolve-worker-base,
+        check-changes,
         detect-gastown-wasteland-changes,
         stage-app,
         stage-global-app,
@@ -245,9 +234,9 @@ jobs:
     if: >-
       ${{
         !cancelled() &&
+        needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
         needs.run-migrations.result == 'success' &&
-        needs.resolve-worker-base.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.stage-app.result) &&
         contains(fromJSON('["success","skipped"]'), needs.stage-global-app.result) &&
@@ -268,6 +257,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+        with:
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -300,7 +291,8 @@ jobs:
         run: pnpm --filter cloudflare-gastown sentry:sourcemaps
 
   deploy-kiloclaw:
-    needs: [check-production-db-startup, run-migrations]
+    needs: [check-changes, check-production-db-startup, run-migrations]
+    if: needs.check-changes.outputs.deploy_kiloclaw == 'true'
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller). The reusable workflow restricts further per job — only
     # its isolated attest-sbom job actually uses id-token/attestations.
@@ -310,4 +302,54 @@ jobs:
       id-token: write
       attestations: write
     uses: ./.github/workflows/deploy-kiloclaw.yml
+    with:
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
+
+  record-deployment:
+    needs:
+      [
+        check-changes,
+        check-production-db-startup,
+        run-migrations,
+        stage-app,
+        stage-global-app,
+        promote-app,
+        promote-global-app,
+        deploy-workers,
+        detect-gastown-wasteland-changes,
+        deploy-gastown-wasteland,
+        deploy-kiloclaw,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.check-production-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        needs.stage-app.result == 'success' &&
+        needs.stage-global-app.result == 'success' &&
+        needs.promote-app.result == 'success' &&
+        needs.promote-global-app.result == 'success' &&
+        needs.deploy-workers.result == 'success' &&
+        needs.detect-gastown-wasteland-changes.result == 'success' &&
+        contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result) &&
+        contains(fromJSON('["success","skipped"]'), needs.deploy-kiloclaw.result)
+      }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      deployments: write
+    steps:
+      - name: Record fully deployed production SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.check-changes.outputs.target_sha }}
+        run: |
+          deployment_id=$(jq -n \
+            --arg ref "$SOURCE_SHA" \
+            '{ref:$ref, environment:"scheduled-deploy-production", auto_merge:false, required_contexts:[], production_environment:true}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq '.id')
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+            -f state=success > /dev/null
+          echo "Production release completed: \`$SOURCE_SHA\`." >> "$GITHUB_STEP_SUMMARY"

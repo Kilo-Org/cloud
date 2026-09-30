@@ -74,7 +74,10 @@ import {
 import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { SuggestionCard } from '@/components/agents/suggestion-card';
-import { useTextHeight } from '@/components/agents/use-text-height';
+import {
+  ChatComposerMeasure,
+  type ChatComposerMeasureHandle,
+} from '@/components/agents/chat-composer-measure';
 import { resolveChatComposerControlState } from '@/components/agents/chat-composer-input-state';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
@@ -303,7 +306,6 @@ export function ChatComposer({
   const restoreFocusOnActiveRef = useRef(false);
   const restoreFocusTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [hasText, setHasText] = useState(false);
-  const [characterCount, setCharacterCount] = useState(0);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [slashCommandInput, setSlashCommandInput] = useState<string | null>(null);
   // Inline validation feedback for a rejected slash-command submission. A
@@ -435,40 +437,68 @@ export function ChatComposer({
   // lays out at from it, so the capped height it publishes lands on a whole
   // rendered line.
   const [inputContentHeight, setInputContentHeight] = useState<number | null>(null);
-  const measure = useTextHeight({
-    minHeight: inputMinHeight,
-    maxHeight: rawInputMaxHeight,
-    verticalPadding: TEXT_INPUT_VERTICAL_PADDING,
-    textContentWidth: resolveComposerTextContentWidth(inputWidth),
-    fontSize: TEXT_INPUT_FONT_SIZE,
-    lineHeight: TEXT_INPUT_LINE_HEIGHT,
-    fontScale,
-    nativeContentHeight: inputContentHeight,
-  });
-  // The cap snapped to the input's own rendered line pitch (see
-  // `useTextHeight`). A capped multiline input must be a whole number of that
-  // pitch: Android's `TextInput` scrolls to the caret by a partial line
-  // otherwise, which cuts the first visible line against the input's top edge.
-  const inputMaxHeight = measure.maxHeight;
-  // useTextHeight() returns a new object every render.  Hold the latest
-  // measure in a ref so the draft-restore effect only runs after an
-  // inputEpoch bump (remount), never on a stray measure identity change.
-  const measureRef = useRef(measure);
-  measureRef.current = measure;
+  // The mirror measurement lives in `ChatComposerMeasure`, a leaf that owns the
+  // per-keystroke text state. It publishes the height and the line-snapped cap
+  // back through `handleMeasureChange`, so this component re-renders only when
+  // one of them changes — at most once per rendered line, never per keystroke.
+  // Both seed at the one-line floor and the raw remaining-space cap until the
+  // leaf's first measurement lands.
+  const [measureHeight, setMeasureHeight] = useState(inputMinHeight);
+  const [inputMaxHeight, setInputMaxHeight] = useState(rawInputMaxHeight);
+  const handleMeasureChange = useCallback((height: number, maxHeight: number) => {
+    setMeasureHeight(height);
+    setInputMaxHeight(maxHeight);
+  }, []);
+  const measureHandleRef = useRef<ChatComposerMeasureHandle | null>(null);
+  // Derived values the composer renders, kept as guard refs so a keystroke that
+  // does not change one publishes nothing. The raw character count is never
+  // held here: only the counter's near-limit value (or null while hidden) and
+  // the empty flag cross the leaf boundary, and each only when it flips.
+  const [inputEmpty, setInputEmpty] = useState(true);
+  const [counterRemaining, setCounterRemaining] = useState<number | null>(null);
+  const publishedHasTextRef = useRef(false);
+  const publishedSlashCommandRef = useRef<string | null>(null);
+  const publishedInputEmptyRef = useRef(true);
+  const publishedCounterRef = useRef<number | null>(null);
 
-  // Coalesce the three derived setters (measure node, hasText, slash command)
-  // to at most one publication per animation frame. Typing can fire many
-  // onChangeText calls in a single frame; publishing derived state once per
-  // frame keeps the send button and slash suggestions from re-rendering on
-  // every keystroke. The publish closure reads `measureRef` at call time and
-  // uses the stable `setHasText`/`setSlashCommandInput` setters, so it stays
-  // valid for the lifetime of the component.
+  // Single publication point for the values the composer derives from the
+  // draft. Every writer (the per-frame coalescer and the restore/apply/clear
+  // paths) goes through it, and each setter fires only when the value the
+  // composer renders actually changed.
+  const publishDerivedState = useCallback((value: string, slashCandidate: string | null) => {
+    const nextHasText = value.trim().length > 0;
+    if (nextHasText !== publishedHasTextRef.current) {
+      publishedHasTextRef.current = nextHasText;
+      setHasText(nextHasText);
+    }
+    const nextInputEmpty = value.length === 0;
+    if (nextInputEmpty !== publishedInputEmptyRef.current) {
+      publishedInputEmptyRef.current = nextInputEmpty;
+      setInputEmpty(nextInputEmpty);
+    }
+    const remaining = CLOUD_AGENT_PROMPT_MAX_LENGTH - value.length;
+    const nextCounter = remaining <= COMPOSER_COUNTER_VISIBLE_REMAINING ? remaining : null;
+    if (nextCounter !== publishedCounterRef.current) {
+      publishedCounterRef.current = nextCounter;
+      setCounterRemaining(nextCounter);
+    }
+    if (slashCandidate !== publishedSlashCommandRef.current) {
+      publishedSlashCommandRef.current = slashCandidate;
+      setSlashCommandInput(slashCandidate);
+    }
+  }, []);
+
+  // Coalesce the mirror text and the derived publications to at most one per
+  // animation frame. Typing can fire many `onChangeText` calls in a single
+  // frame. The text goes to the measure leaf (which alone re-renders); the
+  // derived values publish only when they changed, so a keystroke mid-line
+  // commits neither this component nor the mirror's layout host. The publish
+  // closure reads the stable setters and refs, so it stays valid for the
+  // lifetime of the component.
   const composerFrameCoalescerRef = useRef<FrameCoalescer<string> | null>(null);
   composerFrameCoalescerRef.current ??= createFrameCoalescer<string>(value => {
-    measureRef.current.setText(value);
-    setHasText(value.trim().length > 0);
-    setCharacterCount(value.length);
-    setSlashCommandInput(getSlashCommandCandidate(value));
+    measureHandleRef.current?.setText(value);
+    publishDerivedState(value, getSlashCommandCandidate(value));
   });
   const composerFrameCoalescer = composerFrameCoalescerRef.current;
 
@@ -491,24 +521,25 @@ export function ChatComposer({
   // the Stop remount and the host-loaded draft both go through it, so both set
   // text, selection, hasText, slash-command state, and the measure node the
   // same way.
-  const restoreTextIntoInput = useCallback((draft: string) => {
-    // Sync the live submit-time ref with the restored text: `handleSend`
-    // reads `textRef.current`, so an immediate send (before any keystroke)
-    // must see the restored draft, not the mount-time empty string.
-    textRef.current = draft;
-    inputRef.current?.setNativeProps({
-      text: draft,
-      selection: { start: draft.length, end: draft.length },
-    });
-    selectionRef.current = { start: draft.length, end: draft.length };
-    setHasText(draft.trim().length > 0);
-    setCharacterCount(draft.length);
-    setSlashCommandInput(getSlashCommandCandidate(draft));
-    if (!isGoalCommandDraft(draft)) {
-      setGoalComposeActive(false);
-    }
-    measureRef.current.setText(draft);
-  }, []);
+  const restoreTextIntoInput = useCallback(
+    (draft: string) => {
+      // Sync the live submit-time ref with the restored text: `handleSend`
+      // reads `textRef.current`, so an immediate send (before any keystroke)
+      // must see the restored draft, not the mount-time empty string.
+      textRef.current = draft;
+      inputRef.current?.setNativeProps({
+        text: draft,
+        selection: { start: draft.length, end: draft.length },
+      });
+      selectionRef.current = { start: draft.length, end: draft.length };
+      publishDerivedState(draft, getSlashCommandCandidate(draft));
+      if (!isGoalCommandDraft(draft)) {
+        setGoalComposeActive(false);
+      }
+      measureHandleRef.current?.setText(draft);
+    },
+    [publishDerivedState]
+  );
 
   useEffect(() => {
     if (!pendingDraftRestoreRef.current) {
@@ -578,10 +609,8 @@ export function ChatComposer({
     // copied prompt in one commit.
     composerFrameCoalescer.flush();
     textRef.current = value;
-    measure.setText(value);
-    setHasText(value.trim().length > 0);
-    setCharacterCount(value.length);
-    setSlashCommandInput(null);
+    measureHandleRef.current?.setText(value);
+    publishDerivedState(value, null);
     if (!isGoalCommandDraft(value)) {
       setGoalComposeActive(false);
     }
@@ -822,7 +851,7 @@ export function ChatComposer({
     };
   }, []);
 
-  const inputScrollable = shouldEnableComposerInputScroll(measure.height, inputMaxHeight);
+  const inputScrollable = shouldEnableComposerInputScroll(measureHeight, inputMaxHeight);
   const dismissKeyboardPan = useMemo(
     () =>
       // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
@@ -924,11 +953,9 @@ export function ChatComposer({
     // below then override the published value in the same batched commit.
     composerFrameCoalescer.flush();
     textRef.current = '';
-    setHasText(false);
-    setCharacterCount(0);
-    setSlashCommandInput(null);
+    publishDerivedState('', null);
     setGoalComposeActive(false);
-    measure.reset();
+    measureHandleRef.current?.reset();
     inputRef.current?.clear();
     // Clear the persisted draft only on successful send / explicit clear,
     // never on navigation-away, process kill, or sign-out.
@@ -1209,7 +1236,7 @@ export function ChatComposer({
     fontSize,
     includeFontPadding: false,
     lineHeight,
-    height: measure.height,
+    height: measureHeight,
     paddingHorizontal: COMPOSER_INPUT_PADDING_HORIZONTAL,
     paddingVertical: 12,
     textAlignVertical: 'top',
@@ -1244,7 +1271,18 @@ export function ChatComposer({
   return (
     <BlurBar>
       <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
-        {measure.measureElement}
+        <ChatComposerMeasure
+          handleRef={measureHandleRef}
+          fontSize={TEXT_INPUT_FONT_SIZE}
+          fontScale={fontScale}
+          lineHeight={TEXT_INPUT_LINE_HEIGHT}
+          maxHeight={rawInputMaxHeight}
+          minHeight={inputMinHeight}
+          nativeContentHeight={inputContentHeight}
+          onMeasureChange={handleMeasureChange}
+          textContentWidth={resolveComposerTextContentWidth(inputWidth)}
+          verticalPadding={TEXT_INPUT_VERTICAL_PADDING}
+        />
 
         {suggestionRow}
 
@@ -1333,16 +1371,16 @@ export function ChatComposer({
           />
         ) : null}
 
-        {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
+        {counterRemaining !== null ? (
           <View className="flex-row justify-end px-4 pb-1">
             {/* i18n-dup-ok: 'agentChat.composer.charactersRemaining_other' is this counted message's plural other category — the bare key carries that copy by i18next convention, and every catalog inflects the family by its own count rules. */}
             <Text
               className="text-xs font-normal text-muted-foreground"
               accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
-                count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
+                count: counterRemaining,
               })}
             >
-              {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
+              {counterRemaining}
             </Text>
           </View>
         ) : null}
@@ -1359,12 +1397,12 @@ export function ChatComposer({
               hasSendableContent={control.hasSendableContent}
               inputAccessibilityDisabled={control.inputAccessibilityDisabled}
               inputEditable={control.inputEditable}
-              inputEmpty={characterCount === 0}
+              inputEmpty={inputEmpty}
               inputRef={inputRef}
               isSending={isSending}
               isStreaming={isStreaming}
               maxInputHeight={inputMaxHeight}
-              measureHeight={measure.height}
+              measureHeight={measureHeight}
               onAddAttachment={() => {
                 void handleAddAttachment();
               }}

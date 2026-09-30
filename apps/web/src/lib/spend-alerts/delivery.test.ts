@@ -3,11 +3,8 @@ import type { InternalDispatchSpendAlertRequest } from '@kilocode/notifications'
 import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { organizations, spend_alert_deliveries } from '@kilocode/db/schema';
-import {
-  addUserToOrganization,
-  createOrganization,
-  removeUserFromOrganization,
-} from '@/lib/organizations/organizations';
+import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
+import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { drainPendingSpendAlertDeliveries, type SpendAlertDeliveryDeps } from './delivery';
 import { organizationScopeKey } from './settings';

@@ -2,7 +2,7 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getBalanceForUser } from '@/lib/user/balance';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 
 export async function POST(
   _request: NextRequest,

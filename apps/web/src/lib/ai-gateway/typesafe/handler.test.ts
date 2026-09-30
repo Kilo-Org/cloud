@@ -25,7 +25,7 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
-import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({

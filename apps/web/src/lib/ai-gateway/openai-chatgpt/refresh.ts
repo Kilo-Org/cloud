@@ -52,14 +52,16 @@ export const OPENAI_CHATGPT_RECONNECT_MESSAGE =
  * OAuth error codes that mean the stored refresh token can never work again.
  * The credential is dead: `markOpenAiChatGptConnectionErrored` clears the stored OpenAI
  * token set, disables the connection, and the user is told to reconnect.
+ * OpenAI's "Errors and recovery" reference names this set for token sharing.
  */
-const TERMINAL_REFRESH_ERROR_CODES = new Set([
-  'invalid_grant',
-  'invalid_refresh_token',
-  'refresh_token_expired',
-  'refresh_token_invalidated',
-  'refresh_token_reused',
-]);
+const TERMINAL_REFRESH_ERROR_CODES: Record<string, true> = {
+  invalid_grant: true,
+  invalid_refresh_token: true,
+  token_expired: true,
+  refresh_token_expired: true,
+  refresh_token_invalidated: true,
+  refresh_token_reused: true,
+};
 
 /** A conflict is a lost race against a sibling refresh; retrying can win. */
 const RETRYABLE_REFRESH_ERROR_CODE = 'refresh_token_conflict';
@@ -296,7 +298,7 @@ async function attemptRefresh(
   const errorCode = readOAuthErrorCode(body) ?? `http_${response.status}`;
   logRefreshFailure(owner, errorCode);
 
-  if (TERMINAL_REFRESH_ERROR_CODES.has(errorCode)) {
+  if (TERMINAL_REFRESH_ERROR_CODES[errorCode] === true) {
     return { kind: 'terminal' };
   }
 

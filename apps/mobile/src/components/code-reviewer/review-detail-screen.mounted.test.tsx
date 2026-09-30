@@ -113,7 +113,16 @@ vi.mock('@kilocode/app-shared/utils', () => ({
 }));
 vi.mock('@/components/code-reviewer/review-list-screen', () => ({
   statusMeta: (status: string) => ({
-    label: status === 'completed' ? 'Completed' : status,
+    label:
+      {
+        pending: 'Pending',
+        queued: 'Queued',
+        running: 'Running',
+        completed: 'Completed',
+        failed: 'Failed',
+        cancelled: 'Cancelled',
+        interrupted: 'Interrupted',
+      }[status] ?? status,
     className: 'text-good',
   }),
 }));
@@ -443,6 +452,41 @@ describe('ReviewDetailScreen details metadata', () => {
     // placement check without proving the row sits inside the Details list.
     expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
     expect(completionRowIndex).toBeGreaterThan(detailsHeaderIndex);
+  });
+
+  it('labels the finish-time row with the review status, not the fixed Completed label', () => {
+    // `completed_at` is set for every terminal status, not only `completed`.
+    // A cancelled review must label its finish time "Cancelled", matching the
+    // conclusion and gate above it, instead of the hard-coded "Completed".
+    detail.data = {
+      success: true,
+      review: makeReview({
+        status: 'cancelled',
+        started_at: null,
+        completed_at: '2024-01-01T00:05:00.000Z',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const finishLabel = i18n.t('common.cancelled');
+
+    const finishRows = renderer.root.findAll(
+      node => node.type === MetaRow && node.props.label === finishLabel
+    );
+    expect(finishRows).toHaveLength(1);
+    // The Details card draws the status label beside the finish timestamp.
+    expect(collectText(finishRows[0]?.children ?? [])).toEqual([finishLabel, 'now']);
+
+    const texts = collectText(renderer.toJSON());
+    const detailsHeaderIndex = texts.indexOf('Details');
+    const finishRowIndex = texts.findIndex(
+      (text, index) => text === finishLabel && texts[index + 1] === 'now'
+    );
+    expect(detailsHeaderIndex).toBeGreaterThanOrEqual(0);
+    expect(finishRowIndex).toBeGreaterThan(detailsHeaderIndex);
+    // The screen must not contradict itself with a stray "Completed".
+    expect(texts).not.toContain(i18n.t('codeReviewer.status.completed'));
   });
 
   it('omits the completion row when the review was never completed', () => {

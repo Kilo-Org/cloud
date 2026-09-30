@@ -234,10 +234,12 @@ export function ReviewDetailScreen({
               />
             ) : null}
             {review.completed_at ? (
-              <MetaRow
-                label={t('codeReviewer.status.completed')}
-                value={timeAgo(parseTimestamp(review.completed_at))}
-              />
+              // `completed_at` marks the end of every terminal status, not just
+              // `completed` (see the terminal-status check in the code-reviews
+              // schema), so label the finish time with the review's own status.
+              // A cancelled review must not read "Completed" here while the
+              // conclusion above it reads "Cancelled".
+              <MetaRow label={meta.label} value={timeAgo(parseTimestamp(review.completed_at))} />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow

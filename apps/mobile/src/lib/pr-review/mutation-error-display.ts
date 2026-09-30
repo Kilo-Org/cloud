@@ -11,7 +11,7 @@
 // generic retryable copy.
 
 import { i18n } from '@/i18n';
-import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
+import { type classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import {
   isPrOperationAmbiguous,
   isPrOperationPersistenceFailed,

@@ -154,7 +154,8 @@ export async function getRecentPrs(): Promise<RecentPr[]> {
  * indexed recents entry.
  */
 export async function getRecentPrsForIndex(): Promise<RecentPr[] | undefined> {
-  return readRecentsForUpdate();
+  const recents = await readRecentsForUpdate();
+  return recents;
 }
 
 /**

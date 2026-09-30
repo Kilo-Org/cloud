@@ -27,7 +27,7 @@ export type AutoFreeModel = {
 export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {
     model: 'stealth/space-bunny-alpha',
-    weight: 1,
+    weight: 7,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
   {
@@ -42,11 +42,6 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   } satisfies AutoFreeModel,
   {
     model: 'dots-studio/dots-3-note-preview:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'nex-agi/nex-n2.5-pro:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,

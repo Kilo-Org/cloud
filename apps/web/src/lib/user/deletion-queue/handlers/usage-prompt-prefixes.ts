@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
 import { UserDeletionStepStatus, type UserDeletionTaskProgress } from '@kilocode/db/schema-types';
 import { db } from '@/lib/drizzle';
+import { getPostgresErrorCode } from '@/lib/db-errors';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
@@ -69,19 +70,6 @@ function parseUsagePrefixProgress(
 
 function encodeCursor(cursor: UsagePromptPrefixCursor): string {
   return `${cursor.createdAt}\t${cursor.id}`;
-}
-
-function postgresErrorCode(error: unknown): string | null {
-  let current: unknown = error;
-  for (let depth = 0; depth < 5; depth += 1) {
-    if (typeof current !== 'object' || current === null) return null;
-    const candidate = current as { code?: unknown; cause?: unknown };
-    if (typeof candidate.code === 'string' && /^[0-9A-Z]{5}$/.test(candidate.code)) {
-      return candidate.code;
-    }
-    current = candidate.cause;
-  }
-  return null;
 }
 
 class UsagePrefixClaimLostError extends Error {
@@ -181,7 +169,7 @@ export const handleUsagePromptPrefixes: DeletionHandler = async ({ request, step
       if (error instanceof UsagePrefixClaimLostError) {
         return { kind: 'retry', errorCode: 'claim_lost', httpStatusClass: 'error' };
       }
-      const code = postgresErrorCode(error);
+      const code = getPostgresErrorCode(error);
       if (code === '57014') {
         return {
           kind: 'retry',

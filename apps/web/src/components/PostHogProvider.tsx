@@ -115,6 +115,8 @@ function IdentifyUser() {
   const posthog = usePostHog();
   const { data: session, status } = useSession();
   const previousStatusRef = useRef<string | undefined>(undefined);
+  const email = session?.user?.email;
+  const name = session?.user?.name;
 
   useEffect(() => {
     // Check if posthog is loaded before using it
@@ -122,23 +124,9 @@ function IdentifyUser() {
 
     const previousStatus = previousStatusRef.current;
 
-    if (status === 'authenticated' && session?.user?.email) {
-      const currentAnonymousId = posthog.get_distinct_id();
-      posthog.identify(session.user.email, {
-        email: session.user.email,
-        name: session.user.name,
-      });
-      // Alias the new user ID (session.user.email) to the previous anonymous ID.
-      // This links pre-login events to the identified user.
-      // Important: Only call alias if currentAnonymousId is different from session.user.email
-      // to avoid aliasing an ID to itself.
-      if (currentAnonymousId && currentAnonymousId !== session.user.email) {
-        posthog.alias(session.user.email, currentAnonymousId);
-      }
-      // Re-fetch feature flags now that the user is identified.
-      // Without this, flags evaluated for the anonymous ID remain cached,
-      // so user-targeted flags would stay false until the next natural reload.
-      posthog.reloadFeatureFlags();
+    if (status === 'authenticated' && email) {
+      // identify links the anonymous ID and reloads flags when the identity changes.
+      posthog.identify(email, { email, name });
     } else if (status === 'unauthenticated' && previousStatus === 'authenticated') {
       // Reset PostHog identification only when transitioning from authenticated to unauthenticated (logout)
       posthog.reset();
@@ -146,7 +134,7 @@ function IdentifyUser() {
 
     // Update the previous status for the next render
     previousStatusRef.current = status;
-  }, [session, status, posthog]); // Rerun effect if session, status, or posthog instance changes
+  }, [email, name, status, posthog]);
 
   return null; // This component doesn't render anything
 }

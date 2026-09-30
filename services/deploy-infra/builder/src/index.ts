@@ -9,14 +9,12 @@ import { CloudflareAPI } from './cloudflare-api';
 import { validateWorkerName } from './utils';
 import * as Sentry from '@sentry/cloudflare';
 
-// Import base Durable Objects
 import { DeploymentOrchestrator as DeploymentOrchestratorBase } from './deployment-orchestrator';
 import { EventsManager as EventsManagerBase } from './events-manager';
 import { htmlDeployHandler } from './html-deploy/handler';
 import { runEphemeralDeploymentCleanup } from './html-deploy/ephemeral-cleanup';
 export { Sandbox } from '@cloudflare/sandbox';
 
-// Export Sentry-instrumented Durable Objects
 export const DeploymentOrchestrator = Sentry.instrumentDurableObjectWithSentry(
   (env: Env) => ({
     dsn: env.SENTRY_DSN,
@@ -50,13 +48,11 @@ app.post('/deploy-html', htmlDeployHandler);
 
 // ── Backend-authenticated routes ───────────────────────────────────────────
 
-// Authentication middleware
 app.use(
   '*',
   backendAuthMiddleware<HonoEnv>(c => c.env.BACKEND_AUTH_TOKEN)
 );
 
-// Route: POST /deploy
 app.post('/deploy', async (c: Context<HonoEnv>) => {
   let body: DeployRequest;
 
@@ -66,7 +62,6 @@ app.post('/deploy', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'Invalid JSON body' }, 400);
   }
 
-  // Handle build cancellations if provided
   if (body.cancelBuildIds && body.cancelBuildIds.length > 0) {
     await Promise.allSettled(
       body.cancelBuildIds.map(async buildId => {
@@ -83,26 +78,21 @@ app.post('/deploy', async (c: Context<HonoEnv>) => {
     );
   }
 
-  // Validate required fields
   if (!body.slug || !body.provider || !body.repoSource) {
     return c.json({ error: 'Missing required fields: slug, provider, repoSource' }, 400);
   }
 
-  // Validate slug format
   try {
     validateWorkerName(body.slug);
   } catch (_error) {
     return c.json({ error: 'Invalid worker slug' }, 400);
   }
 
-  // Generate unique job ID
   const buildId = createDurableObjectBuilderID();
 
-  // Get Durable Object stub
   const id = c.env.DeploymentOrchestrator.idFromName(buildId);
   const stub = c.env.DeploymentOrchestrator.get(id);
 
-  // Start the job via RPC
   const result = await stub.start({
     buildId,
     slug: body.slug,
@@ -116,7 +106,6 @@ app.post('/deploy', async (c: Context<HonoEnv>) => {
     envVars: body.envVars,
   });
 
-  // Return 202 Accepted with job details
   const response: DeployResponse = {
     buildId,
     slug: body.slug,
@@ -126,7 +115,6 @@ app.post('/deploy', async (c: Context<HonoEnv>) => {
   return c.json(response, 202);
 });
 
-// Route: POST /deploy-archive - Deploy from uploaded tar.gz archive
 app.post('/deploy-archive', async (c: Context<HonoEnv>) => {
   const slug = c.req.header('X-Slug');
 
@@ -134,14 +122,12 @@ app.post('/deploy-archive', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'Missing X-Slug header' }, 400);
   }
 
-  // Validate slug format
   try {
     validateWorkerName(slug);
   } catch (_error) {
     return c.json({ error: 'Invalid worker slug' }, 400);
   }
 
-  // Parse optional env vars from header
   const envVarsHeader = c.req.header('X-Env-Vars');
   let envVars: DeployRequest['envVars'] | undefined;
   if (envVarsHeader) {
@@ -159,14 +145,11 @@ app.post('/deploy-archive', async (c: Context<HonoEnv>) => {
     return c.json({ error: 'Empty archive body' }, 400);
   }
 
-  // Generate unique job ID
   const buildId = createDurableObjectBuilderID();
 
-  // Get Durable Object stub
   const id = c.env.DeploymentOrchestrator.idFromName(buildId);
   const stub = c.env.DeploymentOrchestrator.get(id);
 
-  // Start the job via RPC with archive source
   const result = await stub.startFromArchive({
     buildId,
     slug,
@@ -174,7 +157,6 @@ app.post('/deploy-archive', async (c: Context<HonoEnv>) => {
     envVars,
   });
 
-  // Return 202 Accepted with job details
   const response: DeployResponse = {
     buildId,
     slug,
@@ -189,12 +171,10 @@ app.get('/deploy/:buildId/status', async (c: Context<HonoEnv>) => {
   const buildId = c.req.param('buildId');
   if (!buildId) return c.json({ error: 'Missing buildId' }, 400);
 
-  // Get Durable Object stub
   const id = c.env.DeploymentOrchestrator.idFromName(buildId);
   const stub = c.env.DeploymentOrchestrator.get(id);
 
   try {
-    // Fetch status from Durable Object via RPC
     const status: StatusResponse = await stub.status();
     return c.json(status, 200);
   } catch (error) {
@@ -211,12 +191,10 @@ app.get('/deploy/:buildId/events', async (c: Context<HonoEnv>) => {
   const buildId = c.req.param('buildId');
   if (!buildId) return c.json({ error: 'Missing buildId' }, 400);
 
-  // Get Durable Object stub
   const id = c.env.DeploymentOrchestrator.idFromName(buildId);
   const stub = c.env.DeploymentOrchestrator.get(id);
 
   try {
-    // Fetch events from Durable Object via RPC
     const events = await stub.events();
     return c.json(events, 200);
   } catch (error) {
@@ -233,7 +211,6 @@ app.delete('/deploy/:buildId', async (c: Context<HonoEnv>) => {
   const buildId = c.req.param('buildId');
   if (!buildId) return c.json({ error: 'Missing buildId' }, 400);
 
-  // Get Durable Object stub
   const id = c.env.DeploymentOrchestrator.idFromName(buildId);
   const stub = c.env.DeploymentOrchestrator.get(id);
 
@@ -251,21 +228,19 @@ app.delete('/deploy/:buildId', async (c: Context<HonoEnv>) => {
 });
 
 /**
- * Delete a worker from the dispatch namespace
  * Note: Assets are automatically cleaned up when the script is deleted
  */
 app.delete('/worker/:slug', async (c: Context<HonoEnv>) => {
   const slug = c.req.param('slug');
   if (!slug) return c.json({ error: 'Missing slug' }, 400);
 
-  // Validate slug format
   try {
     validateWorkerName(slug);
   } catch (_error) {
     return c.json({ error: 'Invalid worker slug' }, 400);
   }
 
-  const dispatchNamespace = 'kilo-deploy'; // Hardcoded for now
+  const dispatchNamespace = 'kilo-deploy';
 
   try {
     const cloudflareApi = new CloudflareAPI(
@@ -284,7 +259,6 @@ app.delete('/worker/:slug', async (c: Context<HonoEnv>) => {
   }
 });
 
-// Global error handler
 const errorHandler = createErrorHandler(console, { includeMessage: false });
 app.onError((err, c) => {
   Sentry.captureException(err, {
@@ -314,7 +288,6 @@ export default Sentry.withSentry(
   {
     fetch: app.fetch,
 
-    // ── Scheduled handler: minute-scale ephemeral cleanup ───────────────────
     async scheduled(
       _controller: ScheduledController,
       env: Env,

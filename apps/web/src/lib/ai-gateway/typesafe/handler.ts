@@ -26,10 +26,11 @@ import {
   TYPESAFE_MODEL,
 } from '@/lib/ai-gateway/typesafe/schemas';
 import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { errorExceptInTest } from '@/lib/utils.server';
 import type { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
@@ -90,9 +91,11 @@ export async function handleSystemOneRequest(request: NextRequest) {
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
-      const only = providerConfig?.only
-        ? providerConfig.only.filter(route => decision.eligibleProviderRoutes?.has(route))
-        : [...decision.eligibleProviderRoutes];
+      const only = withoutVirtualProvider(
+        providerConfig?.only
+          ? providerConfig.only.filter(route => decision.eligibleProviderRoutes?.has(route))
+          : [...decision.eligibleProviderRoutes]
+      );
       if (only.length === 0) return modelNotAllowedResponse();
       providerPolicy = { ...providerPolicy, only };
     }

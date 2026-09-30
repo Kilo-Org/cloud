@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gå tilbage",
     "idle": "Inaktiv",
+    "scheduled": "Planlagt",
     "keepEditing": "Fortsæt med at redigere",
     "keepRunning": "Lad køre",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "slettet bruger",
       "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}.",
       "moreLinesAbove_one": "… der er flere linjer ovenfor: {{displayCount}}.",
-      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}."
+      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}.",
+      "deleteComment": "Slet kommentar",
+      "deleteCommentTitle": "Slet kommentaren?",
+      "deleteCommentMessage": "Denne kommentar bliver slettet fra pull requesten.",
+      "commentEditFailed": "Kunne ikke gemme din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentEditUnavailable": "Denne kommentar kan ikke redigeres. Den er muligvis slettet.",
+      "commentDeleteFailed": "Kunne ikke slette din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentDeleteUnavailable": "Denne kommentar kan ikke slettes."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
+      "commentUpdated": "Kommentar opdateret",
+      "commentDeleted": "Kommentar slettet",
       "reviewSubmitted": "Gennemgang sendt",
       "autoMergeEnabled": "Automatisk fletning aktiveret"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
       "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
+      "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "tryAdjustFilters": "Prøv at justere eller fjerne dine filtre.",
       "couldNotSearch": "Der kunne ikke søges i sessionerne.",
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
+      "pastSessions": "Tidligere sessioner",
       "live": "I REALTID",
       "updating": "Opdaterer"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
       "readOnly": "Denne session er skrivebeskyttet.",
+      "continueInNewSession": "Fortsæt i en ny session",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "importér et OpenAI Codex-sessionstranskript",
       "reviewDescription": "gennemgå ændringer [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Brug /{{command}}",
+      "useSkillCommand": "Brug færdigheden /{{command}}",
+      "skillBadge": "Færdighed",
+      "catalogFull": "Kommandokataloget er fyldt, så nogle kommandoer er skjult.",
+      "catalogOverLimit": "Færdighedskataloget overskrider sin størrelsesgrænse, så alle færdigheder vises.",
       "insert": "Indsæt",
       "upgradeRequiredFallback": "Opdatér din CLI for at bruge denne kommando.",
       "exitCapabilityUnavailable": "Opdatér din CLI for at afslutte sessionen.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "Gå tilbage til den forrige skærm og åbn valgmulighederne igen."
   },
   "sessionRow": {
-    "needsInput": "AFVENTER SVAR"
+    "needsInput": "AFVENTER SVAR",
+    "scheduled": "PLANLAGT"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
     "revoke": "Fjern tillid til {{host}}",
+    "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "newestResult": "Nyeste resultat"
+    "newestResult": "Nyeste resultat",
+    "scheduledWakes": "vågner {{time}}"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",

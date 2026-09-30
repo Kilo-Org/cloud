@@ -225,7 +225,7 @@ describe('sandbox status presentation', () => {
     }
   );
 
-  it.each(['Cloudflare', 'Vercel', 'Unknown'] as const)(
+  it.each(['Cloudflare', 'Cloudflare Containers', 'Vercel', 'Unknown'] as const)(
     'uses the bounded %s provider',
     provider => {
       expect(
@@ -508,7 +508,7 @@ describe('sandbox status presentation', () => {
     });
     expect(view).toMatchObject({
       provider: 'Cloudflare',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       kiloCliVersion: '7.4.20',
       wrapperVersion: '2.4.0',
       startedAt: now - 600_000,
@@ -573,7 +573,7 @@ describe('sandbox status presentation', () => {
     ).toMatchObject({
       ...versions,
       status: 'active',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       startedAt: now - 600_000,
       stoppedAt: null,
     });
@@ -594,7 +594,7 @@ describe('sandbox status presentation', () => {
     ).toMatchObject({
       status: 'unknown',
       provider: 'Cloudflare',
-      sandboxType: 'Standard',
+      sandboxType: 'Large',
       kiloCliVersion: '7.4.20',
       wrapperVersion: '2.4.0',
       startedAt: now - 600_000,
@@ -662,6 +662,8 @@ describe('sandboxTypeCapacity', () => {
     ['isolated-small', '2 vCPU / 6 GiB'],
     ['code-review', '1 vCPU / 4 GiB'],
     ['devcontainer', '2 vCPU / 6 GiB'],
+    ['containers-standard-3', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', '4 vCPU / 12 GiB'],
   ] as const)('reports the container capacity behind %s', (sandboxType, capacity) => {
     expect(sandboxTypeCapacity(sandboxType)).toBe(capacity);
   });
@@ -686,6 +688,12 @@ describe('sandboxTypeCapacity', () => {
         instanceType: 'devcontainer',
       })
     );
+    expect(sandboxTypeCapacity('containers-standard-3')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-3'))
+    );
+    expect(sandboxTypeCapacity('containers-standard-4')).toBe(
+      formatSandboxCapacity(getSandboxAllocationRequest('cloudflare-containers-standard-4'))
+    );
   });
 });
 
@@ -698,6 +706,29 @@ describe('sandbox status capacity', () => {
       }).capacity
     ).toBe('2 vCPU / 6 GiB');
   });
+
+  it.each([
+    ['containers-standard-3', 'Medium', '2 vCPU / 8 GiB'],
+    ['containers-standard-4', 'Large', '4 vCPU / 12 GiB'],
+  ] as const)(
+    'presents the containers instance %s as its type and capacity',
+    (sandboxType, typeLabel, capacity) => {
+      expect(
+        sandboxStatusPresentation({
+          ...observation,
+          data: {
+            ...snapshot,
+            provider: 'Cloudflare Containers',
+            runtime: { ...runtime, sandboxType },
+          },
+        })
+      ).toMatchObject({
+        provider: 'Cloudflare Containers',
+        sandboxType: typeLabel,
+        capacity,
+      });
+    }
+  );
 
   it('keeps the capacity of a sleeping sandbox, which still names its container', () => {
     expect(

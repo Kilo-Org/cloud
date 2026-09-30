@@ -58,6 +58,15 @@ function destination(root: TestRenderer.ReactTestInstance, email = reportedEmail
   );
 }
 
+function label(root: TestRenderer.ReactTestInstance, copy: string) {
+  return root.find(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      node.props.children === copy
+  );
+}
+
 const { compile } = createRequire(import.meta.url)(
   'react-native-css/compiler'
 ) as typeof NativeCSSCompiler;
@@ -150,9 +159,25 @@ describe('EmailOtpForm destination layout', () => {
       });
 
       expect(destination(mounted.root).props.children).toBe(initialDescription);
-      expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
       for (const button of mounted.root.findAllByType('Button')) {
         expect(button.props.disabled).toBe(true);
+      }
+
+      const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
+      const resend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
+      if (busy === 'otp-verify') {
+        // Verify owns the busy state: the spinner lives inside Button
+        // (`loading`), so the form renders no child indicator of its own.
+        expect(verify.props.loading).toBe(true);
+        expect(verify.findAllByType('ActivityIndicator')).toHaveLength(0);
+        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(0);
+        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+      } else {
+        // Resend keeps its inline spinner; Verify is disabled but not busy, so
+        // it must keep the muted disabled fill, not the brand-filled busy treatment.
+        expect(verify.props.loading).not.toBe(true);
+        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(1);
+        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
       }
 
       act(() => {
@@ -161,14 +186,38 @@ describe('EmailOtpForm destination layout', () => {
 
       expect(destination(mounted.root).props.children).toBe(initialDescription);
       expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
-      const resend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
-      expect(resend.props.disabled).toBe(false);
+      const idleResend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
+      expect(idleResend.props.disabled).toBe(false);
       act(() => {
-        (resend.props.onPress as () => void)();
+        (idleResend.props.onPress as () => void)();
       });
       expect(props.onResend).toHaveBeenCalledOnce();
     }
   );
+});
+
+describe('EmailOtpForm button labels', () => {
+  // The reported capture: the Arabic secondary label ("إعادة إرسال الرمز")
+  // wrapped onto two lines inside a full-width button, so the copy did not fit
+  // its control. Pin the label to one line — the remedy the segmented control
+  // takes — and keep the full text as the control's accessible name.
+  it.each(['en', 'ar'])('keeps the resend label on one line in %s', async language => {
+    await i18n.changeLanguage(language);
+    const { mounted } = mount();
+
+    const resend = label(mounted.root, i18n.t('login.resendCode'));
+    expect(resend.props.numberOfLines).toBe(1);
+    expect(resend.props.adjustsFontSizeToFit).toBe(true);
+    // The full label stays the control's accessible name.
+    expect(
+      mounted.root.findByProps({ accessibilityLabel: i18n.t('login.resendCode') })
+    ).toBeTruthy();
+  });
+
+  it('keeps the verify label on one line', () => {
+    const { mounted } = mount();
+    expect(label(mounted.root, 'Verify code').props.numberOfLines).toBe(1);
+  });
 });
 
 describe('EmailOtpForm controls', () => {
@@ -177,6 +226,9 @@ describe('EmailOtpForm controls', () => {
 
     const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
     expect(verify.props.disabled).toBe(true);
+    // Disabled but not busy: no loading flag, so Button keeps the muted
+    // disabled fill instead of the brand-filled busy treatment.
+    expect(verify.props.loading).not.toBe(true);
     act(() => {
       (verify.props.onPress as () => void)();
     });

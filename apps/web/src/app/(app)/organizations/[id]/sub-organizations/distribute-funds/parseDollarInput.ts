@@ -1,4 +1,4 @@
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 
 export type ParsedDollarInput = { microdollars: number; error: string | null };
 

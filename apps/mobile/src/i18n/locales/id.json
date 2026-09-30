@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kembali",
     "idle": "Siaga",
+    "scheduled": "Terjadwal",
     "keepEditing": "Lanjutkan menyunting",
     "keepRunning": "Biarkan berjalan",
     "kiloclaw": "KiloClaw",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif.",
       "couldNotRefresh": "Tidak dapat memuat ulang",
       "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu. Sesimu akan muncul di sini.",
+      "viewHistory": "Riwayat sesi",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba kata kunci lain.",
       "tryAdjustFilters": "Coba ubah atau hapus filtermu.",
       "couldNotSearch": "Tidak dapat mencari sesi.",
       "completedWillAppear": "Sesi yang selesai akan muncul di sini.",
       "noPastSessions": "Tidak ada sesi sebelumnya",
+      "pastSessions": "Sesi sebelumnya",
       "live": "LANGSUNG",
       "updating": "Memperbarui"
     },
@@ -1581,6 +1584,7 @@
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini hanya dapat dibaca.",
+      "continueInNewSession": "Lanjutkan di sesi baru",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
@@ -2094,6 +2098,10 @@
       "resumeCodexDescription": "impor transkrip sesi OpenAI Codex",
       "reviewDescription": "tinjau perubahan [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Gunakan /{{command}}",
+      "useSkillCommand": "Gunakan keterampilan /{{command}}",
+      "skillBadge": "Keterampilan",
+      "catalogFull": "Katalog perintah sudah penuh, jadi sebagian perintah disembunyikan.",
+      "catalogOverLimit": "Katalog keterampilan melebihi batas ukuran, jadi semua keterampilan ditampilkan.",
       "insert": "Sisipkan",
       "upgradeRequiredFallback": "Perbarui CLI untuk menggunakan perintah ini.",
       "exitCapabilityUnavailable": "Perbarui CLI untuk keluar dari sesi.",
@@ -2252,7 +2260,8 @@
     "optionsExpiredDescription": "Kembali dan buka ulang pemilih ini dari layar sebelumnya."
   },
   "sessionRow": {
-    "needsInput": "PERLU MASUKAN"
+    "needsInput": "PERLU MASUKAN",
+    "scheduled": "TERJADWAL"
   },
   "voiceInput": {
     "listening": "Mendengarkan...",
@@ -2616,7 +2625,14 @@
       "deletedUser": "pengguna yang dihapus",
       "replyForbiddenTerm": "Kamu tidak memiliki izin untuk membalas {{term}} ini.",
       "moreLinesAbove_one": "… {{displayCount}} baris lagi di atas",
-      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas"
+      "moreLinesAbove_other": "… {{displayCount}} baris lagi di atas",
+      "deleteComment": "Hapus komentar",
+      "deleteCommentTitle": "Hapus komentar?",
+      "deleteCommentMessage": "Komentar ini akan dihapus dari PR.",
+      "commentEditFailed": "Tidak dapat menyimpan komentarmu. Periksa koneksimu dan coba lagi.",
+      "commentEditUnavailable": "Komentar ini tidak dapat diedit. Mungkin sudah dihapus.",
+      "commentDeleteFailed": "Tidak dapat menghapus komentarmu. Periksa koneksimu dan coba lagi.",
+      "commentDeleteUnavailable": "Komentar ini tidak dapat dihapus."
     },
     "entry": {
       "eyebrow": "Buka PR atau merge request melalui URL",
@@ -2929,6 +2945,8 @@
     "linkPasteNotAPullRequest": "Ini bukan tautan PR atau merge request",
     "announce": {
       "commentPosted": "Komentar terkirim",
+      "commentUpdated": "Komentar diperbarui",
+      "commentDeleted": "Komentar dihapus",
       "reviewSubmitted": "Tinjauan terkirim",
       "autoMergeEnabled": "Penggabungan otomatis diaktifkan"
     },
@@ -3162,6 +3180,7 @@
     "emptyTitle": "Tidak ada host tepercaya",
     "emptyDescription": "Tautan dari host yang kamu percayai akan terbuka tanpa meminta konfirmasi lagi.",
     "revoke": "Cabut kepercayaan untuk {{host}}",
+    "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
     "backToPreferences": "Kembali ke preferensi"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci.",
     "openSession": "Buka",
     "approveFailed": "Tidak dapat menyetujui. Ketuk $t(common.approve) untuk mencoba lagi.",
-    "newestResult": "Hasil terbaru"
+    "newestResult": "Hasil terbaru",
+    "scheduledWakes": "bangun {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkripsi",

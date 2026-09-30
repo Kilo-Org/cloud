@@ -70,12 +70,26 @@ export const glanceableAgentsSnapshotSchema = z.object({
   /** Sessions connected but doing nothing. */
   idle: z.number().int().min(0),
   /**
+   * Sessions scheduled to wake later and doing nothing now. Optional on input
+   * with a zero default: a version-1 snapshot persisted by the release before
+   * this count carried no such key, and every reader treats absent as 0.
+   * Remove the default when every producer sends it.
+   */
+  scheduled: z.number().int().min(0).default(0),
+  /**
    * ISO 8601 timestamp or null: when the longest-waiting needs-input session
    * entered that state. Null when nothing needs input, or when no row carried
    * a status timestamp. Only needs-input carries a duration, because a wait is
    * the one interval the user can act on — see `oldestNeedsInputSince`.
    */
   needsInputSince: z.string().nullable(),
+  /**
+   * ISO 8601 timestamp or null: the soonest wake among scheduled sessions.
+   * Null when nothing is scheduled, or when no scheduled row carried a usable
+   * `scheduledAt`. A `scheduled` count with no wake time is representable.
+   * Optional on input with a null default for the same reason as `scheduled`.
+   */
+  scheduledAt: z.string().nullable().default(null),
   /**
    * The kind of the most recent agent state change, in the one vocabulary every
    * surface shows. Null when no row carried a usable status timestamp. A
@@ -88,7 +102,7 @@ export const glanceableAgentsSnapshotSchema = z.object({
    * absent as null. Remove the optional and the default when every producer
    * sends it.
    */
-  newestResultKind: z.enum(['needsInput', 'running', 'idle']).nullable().default(null),
+  newestResultKind: z.enum(['needsInput', 'running', 'idle', 'scheduled']).nullable().default(null),
   /**
    * ISO 8601 timestamp or null: when that newest change happened. Null exactly
    * when `newestResultKind` is null. Optional on input with a null default for
@@ -103,6 +117,7 @@ export type GlanceableCounts = {
   running: number;
   needsInput: number;
   idle: number;
+  scheduled: number;
 };
 
 /** One session row, as both producers read it from the active-sessions list. */
@@ -110,36 +125,47 @@ export type GlanceableSessionRow = {
   status: string;
   /** ISO 8601; when this session's status last changed. Absent on old rows. */
   statusUpdatedAt?: string;
+  /**
+   * ISO 8601 wake time. Only a `scheduled` row carries one, and even then the
+   * CLI may omit it — `scheduled` with no time is representable.
+   */
+  scheduledAt?: string;
 };
 
 /** Statuses that mean the agent waits on the user and cannot go on alone. */
 const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 
 /** What a session's status means to a user: the one vocabulary every surface reads. */
-export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle';
+export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle' | 'scheduled';
 
 /**
  * Map one session status to the kind the glanceable surfaces and the session
  * lists both show. Total on strings: needs-input statuses → `needsInput`,
- * `idle` → `idle`, everything else → `running` (starting, empty, unknown
- * included). A session is idle only when the agent is not working and not
- * waiting on the user, so a working session can never render idle and a row
- * can never disagree with the widget beside it. Callers pass null only when
- * a row has no status at all.
+ * `idle` → `idle`, the literal `scheduled` → `scheduled`, everything else →
+ * `running` (starting, empty, unknown included). A session is idle only when
+ * the agent says so, so a working or unrecognized session can never render
+ * idle and a row can never disagree with the widget beside it. Callers pass
+ * null only when a row has no status at all.
  */
 export function glanceableStatusKind(status: string): GlanceableStatusKind {
   if (NEEDS_INPUT_STATUSES.has(status)) {
     return 'needsInput';
   }
-  return status === 'idle' ? 'idle' : 'running';
+  if (status === 'idle') {
+    return 'idle';
+  }
+  if (status === 'scheduled') {
+    return 'scheduled';
+  }
+  return 'running';
 }
 
 /**
- * Map session rows to the three glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any other
- * status (starting, empty, unknown, completed) counts as running: a session
- * is idle only when the agent says so, and no row is dropped from the count
- * its list row shows.
+ * Map session rows to the glanceable counts. `busy` → running,
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, the literal
+ * `scheduled` → scheduled, and any other status (starting, empty, unknown,
+ * completed) counts as running: a session is idle only when the agent says
+ * so, and no row is dropped from the count its list row shows.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
@@ -149,7 +175,7 @@ export function glanceableStatusKind(status: string): GlanceableStatusKind {
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
 ): GlanceableCounts {
-  const counts = { running: 0, needsInput: 0, idle: 0 };
+  const counts = { running: 0, needsInput: 0, idle: 0, scheduled: 0 };
   for (const session of sessions) {
     counts[glanceableStatusKind(session.status)] += 1;
   }
@@ -199,6 +225,32 @@ export function oldestNeedsInputSince(sessions: readonly GlanceableSessionRow[])
     oldestIso = session.statusUpdatedAt;
   }
   return oldestIso;
+}
+
+/**
+ * The earliest parseable `scheduledAt` among scheduled sessions, or null when
+ * none is scheduled or none carried a usable wake time.
+ *
+ * A row with a missing or unparseable timestamp is skipped rather than treated
+ * as waking now, which would understate how soon the soonest wake is. A
+ * scheduled row with no wake time still counts as scheduled — only the
+ * timestamp is absent.
+ */
+export function soonestScheduledAt(sessions: readonly GlanceableSessionRow[]): string | null {
+  let soonest: number | null = null;
+  let soonestIso: string | null = null;
+  for (const session of sessions) {
+    if (session.status !== 'scheduled' || session.scheduledAt === undefined) {
+      continue;
+    }
+    const at = Date.parse(session.scheduledAt);
+    if (Number.isNaN(at) || (soonest !== null && at >= soonest)) {
+      continue;
+    }
+    soonest = at;
+    soonestIso = session.scheduledAt;
+  }
+  return soonestIso;
 }
 
 /**
@@ -283,9 +335,9 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  // Idle counts: a connected agent doing nothing is still something the user
-  // wants on the Lock Screen, and the Dynamic Island ranks it last.
-  const eligible = counts.running + counts.needsInput + counts.idle > 0;
+  // Idle and scheduled counts: a connected agent doing nothing, or one that
+  // will wake later, is still something the user wants on the Lock Screen.
+  const eligible = counts.running + counts.needsInput + counts.idle + counts.scheduled > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
   const newest = newestGlanceableResult(input.sessions);
@@ -303,25 +355,30 @@ export function buildGlanceableSnapshot(
     needsInput: counts.needsInput,
     needsApproval: countGlanceableApprovals(input.sessions),
     idle: counts.idle,
+    scheduled: counts.scheduled,
     needsInputSince: oldestNeedsInputSince(input.sessions),
+    scheduledAt: soonestScheduledAt(input.sessions),
     newestResultKind: newest?.kind ?? null,
     newestResultAt: newest?.at ?? null,
   };
 }
 
-/** True when any agent is connected, whether working, waiting, or idle. */
+/** True when any agent is connected, whether working, waiting, idle, or scheduled. */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+  return snapshot.running + snapshot.needsInput + snapshot.idle + snapshot.scheduled > 0;
 }
 
 /**
- * True when an agent is working or waiting on the user. Only this may raise a
- * Live Activity: idle work is worth keeping one alive, never worth interrupting
- * the Lock Screen for. The client sink and the APNs push-to-start share the
- * rule, so neither can resurrect a surface the other retired.
+ * True when an agent is working, waiting on the user, or scheduled to wake.
+ * Only this may raise a Live Activity: idle work is worth keeping one alive,
+ * never worth interrupting the Lock Screen for. A scheduled session is worth
+ * a card and must not be treated as idle-only, or the widget would offer
+ * `New agent` and the iOS Live Activity would not raise. The client sink and
+ * the APNs push-to-start share the rule, so neither can resurrect a surface
+ * the other retired.
  */
 export function isStartableGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput > 0;
+  return snapshot.running + snapshot.needsInput + snapshot.scheduled > 0;
 }
 
 /** True when every connected agent is idle: eligible work, but nothing happening. */

@@ -76,9 +76,10 @@ describe('SectionHeader mounted layout', () => {
     expect(label.props.maxFontSizeMultiplier).toBeUndefined();
     expect(label.props.adjustsFontSizeToFit).not.toBe(true);
     expect(label.children).toEqual(['Live now']);
-    // The tracked class stays for the Latin design; the RTL letter-spacing
-    // reset applies to RTL-script copy only, so this Latin label keeps its
-    // tracking (see lib/rtl-text.ts and text.rtl-labels.mounted.test.tsx).
+    // The tracked class stays for the Latin design; the reset lands on a joined
+    // script in either direction and on RTL-script copy inside an RTL
+    // interface, so this Latin label keeps its tracking (see lib/rtl-text.ts and
+    // text.rtl-labels.mounted.test.tsx).
     if (isRTL) {
       expect(label.props.style).toContainEqual({ writingDirection: 'rtl' });
       expect(label.props.style).not.toContainEqual({ letterSpacing: 0 });
@@ -116,10 +117,12 @@ describe('SectionHeader mounted layout', () => {
     expect(text.children).toEqual(['See all']);
   });
 
-  // The letter-spacing reset belongs to an RTL interface: in this LTR screen
-  // the eyebrow label and the action keep `tracking-[1.5px]`, and no inline
-  // style overrides the class (the RTL case below pins the reset).
-  it('keeps the tracked letter-spacing on the Arabic label and action in LTR', () => {
+  // The letter-spacing reset belongs to the script: a joined script takes it in
+  // either direction, so this LTR screen keeps the tracked class on the element
+  // and the inline reset draws it inert. The mono family goes with it, because
+  // JetBrains Mono ships no Arabic glyph (the RTL case below pins the same
+  // treatment).
+  it('keeps the tracked class and resets the joined-script label and action in LTR', () => {
     const root = mount(
       createElement(SectionHeader, {
         label: 'الجلسات الجارية الآن',
@@ -134,8 +137,9 @@ describe('SectionHeader mounted layout', () => {
     const actionText = action.find(node => Object.is(node.type, 'Text'));
 
     expect((label.props.className as string).split(' ')).toContain('tracking-[1.5px]');
-    expect(label.props.style).toBeUndefined();
-    expect(actionText.props.style).toBeUndefined();
+    expect(label.props.style).toContainEqual({ letterSpacing: 0 });
+    expect(actionText.props.style).toContainEqual({ letterSpacing: 0 });
+    expect((actionText.props.className as string).split(' ')).not.toContain('font-mono-medium');
   });
 
   it('renders Arabic labels without the mono family or letter spacing in RTL', () => {

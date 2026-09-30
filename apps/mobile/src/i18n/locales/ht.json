@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Tounen",
     "idle": "San aktivite",
+    "scheduled": "Pwograme",
     "keepEditing": "Kontinye modifye",
     "keepRunning": "Kite l kontinye fonksyone",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "itilizatè ki efase",
       "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a.",
       "moreLinesAbove_one": "Gen {{displayCount}} liy anplis pi wo a.",
-      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a."
+      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a.",
+      "deleteComment": "Efase kòmantè a",
+      "deleteCommentTitle": "Efase kòmantè a?",
+      "deleteCommentMessage": "Kòmantè sa a ap efase nan demann fizyon an.",
+      "commentEditFailed": "Nou pa t ka anrejistre kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentEditUnavailable": "Kòmantè sa a pa ka modifye. Petèt li te efase.",
+      "commentDeleteFailed": "Nou pa t ka efase kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentDeleteUnavailable": "Kòmantè sa a pa ka efase."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
     "announce": {
       "commentPosted": "Kòmantè pibliye",
+      "commentUpdated": "Kòmantè mete ajou",
+      "commentDeleted": "Kòmantè efase",
       "reviewSubmitted": "Revizyon soumèt",
       "autoMergeEnabled": "Fizyon otomatik aktive"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
       "couldNotRefresh": "Pa t ka rafrechi",
       "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
+      "viewHistory": "Istwa sesyon yo",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",
       "tryAdjustFilters": "Eseye ajiste oswa retire filtè ou yo.",
       "couldNotSearch": "Pa t ka chèche sesyon yo.",
       "completedWillAppear": "Sesyon ki fini yo pral parèt isit la.",
       "noPastSessions": "Pa gen ansyen sesyon",
+      "pastSessions": "Ansyen sesyon",
       "live": "AN DIRÈK",
       "updating": "Ap mete ajou"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "Non sesyon",
       "transcriptAccessibility": "Transkripsyon sesyon an",
       "readOnly": "Ou ka li sesyon sa a sèlman.",
+      "continueInNewSession": "Kontinye nan yon nouvo sesyon",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "enpòte yon transkripsyon sesyon OpenAI Codex",
       "reviewDescription": "revize chanjman yo [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Sèvi ak /{{command}}",
+      "useSkillCommand": "Sèvi ak konpetans /{{command}}",
+      "skillBadge": "Konpetans",
+      "catalogFull": "Katalòg kòmand yo plen, kidonk kèk kòmand kache.",
+      "catalogOverLimit": "Katalòg konpetans yo depase limit gwosè li, kidonk tout konpetans parèt.",
       "insert": "Antre",
       "upgradeRequiredFallback": "Tanpri mete CLI ou a ajou pou sèvi ak kòmandman sa a.",
       "exitCapabilityUnavailable": "Mete CLI ou a ajou pou soti nan sesyon an.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "Tounen nan ekran anvan an epi relouvri selektè sa a."
   },
   "sessionRow": {
-    "needsInput": "BEZWEN REPONS"
+    "needsInput": "BEZWEN REPONS",
+    "scheduled": "PWOGRAME"
   },
   "voiceInput": {
     "listening": "Ap koute...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "Pa gen domèn ou fè konfyans",
     "emptyDescription": "Lè ou fè domèn yon lyen konfyans, lyen an louvri san li pa mande konfimasyon ankò.",
     "revoke": "Retire {{host}}",
+    "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
     "backToPreferences": "Tounen nan preferans yo"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
-    "newestResult": "Dènye rezilta"
+    "newestResult": "Dènye rezilta",
+    "scheduledWakes": "leve {{time}}"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",
@@ -3269,7 +3289,7 @@
     },
     "nameLabel": "Non pwofil la",
     "namePlaceholder": "pa egzanp Backend debogaj",
-    "descriptionLabel": "Deskripsyon Profile",
+    "descriptionLabel": "Deskripsyon pwofil",
     "descriptionPlaceholder": "Si ou vle deskripsyon",
     "ownerLabel": "Pwopriyetè pwofil",
     "nameRequired": "Antre yon non pwofil",
@@ -3324,7 +3344,7 @@
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
     "mcp": {
-      "title": "MCP serveurs",
+      "title": "Sèvè MCP",
       "add": "Ajoute sèvè MCP",
       "empty": "Pa gen sèvè MCP ankò",
       "name": "Non sèvè",
@@ -3403,9 +3423,9 @@
       "nameConflict": "Non sa a rezève pa yon kòmandman entegre"
     },
     "repoBindings": {
-      "title": "Default Profiles pou Repos",
+      "title": "Pwofil pa defo pou depo yo",
       "add": "Ajoute default",
-      "empty": "Pa gen par défaut configuré",
+      "empty": "Pa gen okenn default konfigire",
       "emptyDescription": "Ajoute yon default pou aplike otomatikman yon pwofil lè w kòmanse sesyon yo pou yon repo.",
       "repo": "Chwazi depo...",
       "profile": "Chwazi pwofil",

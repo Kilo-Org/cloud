@@ -118,10 +118,9 @@ export type TimedRestRouteHandler<Ctx> = (request: Request, ctx?: Ctx) => Promis
 
 /**
  * The pattern with its dynamic segments removed: everything from the first
- * `[...path]`/`[param]` segment onwards is dropped. A catch-all that re-exports
- * an already wrapped handler (the gateway re-exports the openrouter handler)
- * then has a pathname outside the inner pattern's prefix, so it does not emit a
- * second line.
+ * `[...path]`/`[param]` segment onwards is dropped. An alias route that
+ * re-exports an already wrapped handler then has a pathname outside the inner
+ * pattern's prefix, so it does not emit a second line.
  */
 function staticPrefix(pattern: string): string {
   const staticSegments: string[] = [];

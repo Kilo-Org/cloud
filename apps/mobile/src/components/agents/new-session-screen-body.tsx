@@ -12,6 +12,10 @@ import { NewSessionConfigureForm } from '@/components/agents/new-session-configu
 import { resetSelectedBranchOverrides } from '@/components/agents/new-session-repository-state';
 import { resolveNewSessionModelView } from '@/components/agents/new-session-model-view';
 import {
+  type NewSessionPromptSeed,
+  resolveNewSessionPromptSeedDecision,
+} from '@/components/agents/new-session-prompt-seed';
+import {
   type CloudCreateFailure,
   useNewSessionCreator,
 } from '@/components/agents/use-new-session-creator';
@@ -462,34 +466,40 @@ export function NewSessionScreenBody() {
   // the uncontrolled input, which only a remount can do. Only `restore`
   // changes the form key, so the settled path never remounts and never
   // destroys typing.
-  const [promptSeed, setPromptSeed] = useState<'pending' | 'settled' | 'restore'>('pending');
+  const [promptSeed, setPromptSeed] = useState<NewSessionPromptSeed>('pending');
+  // A prompt the user edited before the identity (and its draft load) resolved,
+  // including one they cleared back to empty. The input is uncontrolled, so
+  // this edit is already its visible text; the seed decision below and the
+  // identity-arrival persist both honor it over any stored draft.
+  const promptEditedRef = useRef(false);
   useEffect(() => {
-    if (!draftState.settled) {
-      if (promptSeed !== 'pending') {
-        // The identity or entity changed, so the input remounts empty: clear
-        // the route-owned prompt state with it, or Start would submit text the
-        // user can no longer see.
-        promptRef.current = '';
-        setHasPrompt(false);
-        setPromptSeed('pending');
-      }
+    const decision = resolveNewSessionPromptSeedDecision({
+      draftSettled: draftState.settled,
+      seed: promptSeed,
+      prompt: promptRef.current,
+      initialPrompt,
+      sharePrefillText,
+      userEdited: promptEditedRef.current,
+    });
+    if (decision.type === 'keep') {
       return;
     }
-    if (promptSeed !== 'pending') {
+    if (decision.type === 'reset') {
+      promptRef.current = '';
+      setHasPrompt(false);
+      setPromptSeed('pending');
       return;
     }
-    if (promptRef.current !== '' || !initialPrompt) {
+    if (decision.type === 'settle') {
       setPromptSeed('settled');
       return;
     }
     // `hasPrompt` is exactly what `resolveNewSessionPromptForCreate` re-derives
     // on submit, so seeding both from one value keeps the Start gate and the
     // submitted text in agreement.
-    promptRef.current = initialPrompt;
-    setHasPrompt(initialPrompt.trim().length > 0);
-    // A share prefill already seeded the first render; only a stored draft
-    // needs the remount.
-    setPromptSeed(initialPrompt === sharePrefillText ? 'settled' : 'restore');
+    promptRef.current = decision.prompt;
+    setHasPrompt(decision.hasPrompt);
+    setPromptSeed(decision.seed);
   }, [draftState.settled, initialPrompt, promptRef, promptSeed, sharePrefillText]);
 
   const { remoteSpawn, handleRunOnInstanceChange } = useNewSessionShareRemote({
@@ -555,6 +565,7 @@ export function NewSessionScreenBody() {
   );
 
   function handlePromptChange(text: string) {
+    promptEditedRef.current = true;
     promptRef.current = text;
     const nextHasPrompt = text.trim().length > 0;
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
@@ -562,6 +573,23 @@ export function NewSessionScreenBody() {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
     }
   }
+
+  // The composer mounts before `user.getMe` resolves, so a prompt typed in that
+  // window has no account to write under and `handlePromptChange` skips the
+  // save. Persist the current prompt once the identity arrives (and if it
+  // changes), so text typed before the query settled survives a background or
+  // kill rather than waiting for the next keystroke. An explicit edit is
+  // persisted even when it left the prompt empty, so a pre-identity clear
+  // replaces the stored draft instead of letting it resurface later.
+  useEffect(() => {
+    if (isCloneEntry || !userId) {
+      return;
+    }
+    const text = promptRef.current;
+    if (text.trim().length > 0 || promptEditedRef.current) {
+      saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);
+    }
+  }, [userId, isCloneEntry, promptRef]);
 
   // Discard confirm: leaving with a non-empty prompt or unsent uploads asks
   // first. Discard clears the stored draft and the route-owned prompt ref, then
@@ -582,7 +610,7 @@ export function NewSessionScreenBody() {
     attachments.releaseUnclaimedUploads();
   }, [userId, promptRef, attachments]);
 
-  useNewSessionDiscardGuard({
+  const { discardConfirm } = useNewSessionDiscardGuard({
     dirty: (isCloneEntry ? false : hasPrompt) || attachments.hasUnclaimedAttachments,
     hasUnclaimedAttachments: attachments.hasUnclaimedAttachments,
     onDiscard: handleDiscardDraft,
@@ -650,10 +678,15 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null;
-  const instanceHasSessionClone = runOnInstance?.capabilities?.sessionClone === true;
-  // Clone entry: an incapable CLI shows the inline "cannot continue" reason
-  // immediately; a delivered clone/import failure overrides it after a Start
-  // attempt. Both clear when Run-on changes (see handleRunOnChange).
+  // Optimistic CLI-capability gate: an instance that has not advertised
+  // `sessionClone` is treated as capable; only an explicit
+  // `sessionClone: false` marks it incapable.
+  const instanceHasSessionClone =
+    runOnInstance !== null && runOnInstance.capabilities?.sessionClone !== false;
+  // Clone entry: a CLI the picker reported as incapable shows the inline
+  // "cannot continue" reason immediately; a delivered clone/import failure
+  // overrides it after a Start attempt. Both clear when Run-on changes (see
+  // handleRunOnChange).
   const incapableCliSelected = isCloneEntry && runOnInstance !== null && !instanceHasSessionClone;
   let runOnInlineNote: string | null = null;
   if (incapableCliSelected) {
@@ -707,8 +740,9 @@ export function NewSessionScreenBody() {
   const handleStartSession = useCallback(() => {
     if (isCloneEntry) {
       if (runOnInstance !== null) {
-        // Live CLI import: the dispatch carries the clone source id only when
-        // the instance advertises `sessionClone` (fail-closed otherwise).
+        // Live CLI import: the dispatch carries the clone source id unless the
+        // instance explicitly reported `sessionClone: false` (unknown is
+        // treated as capable).
         remoteSpawn.onStart();
         return;
       }
@@ -841,6 +875,9 @@ export function NewSessionScreenBody() {
         cloudCreateError={cloudCreateError}
         onRetryCloudCreate={handleStartSession}
       />
+      {/* The discard confirm: a Modal overlay, so the composer behind it keeps
+          its layout while the destructive choice keeps its red fill. */}
+      {discardConfirm}
     </View>
   );
 }

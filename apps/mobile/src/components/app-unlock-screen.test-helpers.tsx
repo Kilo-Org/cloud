@@ -209,6 +209,17 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
+// The PR-review layouts host the one-time feedback prompt through
+// `FeedbackPromptProvider`, whose real `@/lib/feedback` module loads
+// expo-application and expo-store-review — root imports that need `__DEV__`
+// and a native binding, like the expo surfaces mocked above.
+vi.mock('@/lib/feedback', () => ({
+  // eslint-disable-next-line require-await, typescript-eslint/require-await -- the settled mock mirrors the async claim's shape; it has no await to run
+  maybeAskAfterSuccessfulOutcome: vi.fn(async (): Promise<void> => undefined),
+  requestAppRating: vi.fn(),
+  sendAppFeedback: vi.fn(),
+  showFeedbackPrompt: vi.fn(),
+}));
 vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
 vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
 // The second OS-surface publisher in the (app) layout. It renders nothing and

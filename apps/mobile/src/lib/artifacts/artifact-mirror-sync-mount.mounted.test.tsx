@@ -1,7 +1,10 @@
 import { createElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ArtifactMirrorSyncMount } from '@/lib/artifacts/artifact-mirror-sync-mount';
+import {
+  ArtifactMirrorSyncMount,
+  MIRROR_BURST_SETTLE_MS,
+} from '@/lib/artifacts/artifact-mirror-sync-mount';
 import { act, TestRenderer } from '@/test/renderer';
 
 // The mount reads three process-wide inputs: the auth session, the resolved
@@ -82,6 +85,13 @@ async function mount(): Promise<void> {
     ref.current = TestRenderer.create(createElement(ArtifactMirrorSyncMount));
     await Promise.resolve();
   });
+  // The mount's first run waits for the launch burst to settle
+  // (`MIRROR_BURST_SETTLE_MS`); advancing the clock past that edge is what
+  // a launch does once the tree is up and its own requests have gone out.
+  await act(async () => {
+    vi.advanceTimersByTime(MIRROR_BURST_SETTLE_MS);
+    await Promise.resolve();
+  });
   const renderer = ref.current;
   if (!renderer) {
     throw new Error('ArtifactMirrorSyncMount did not mount');
@@ -97,6 +107,7 @@ function unmountAll(): void {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
   clock.now = MOUNT_TIME;
   vi.spyOn(Date, 'now').mockImplementation(() => clock.now);
   appState.reset();
@@ -108,6 +119,7 @@ afterEach(() => {
   unmountAll();
   appState.reset();
   vi.restoreAllMocks();
+  vi.useRealTimers();
 });
 
 describe('ArtifactMirrorSyncMount', () => {
@@ -137,7 +149,7 @@ describe('ArtifactMirrorSyncMount', () => {
     expect(mocks.registerArtifactsProviderDomain).not.toHaveBeenCalled();
   });
 
-  it('re-runs on a foreground regain only after the interval', async () => {
+  it('re-runs on a foreground regain only after the interval, past the burst', async () => {
     await mount();
 
     appState.emit('background');
@@ -150,9 +162,35 @@ describe('ArtifactMirrorSyncMount', () => {
 
     clock.now = MOUNT_TIME + mocks.MIRROR_SYNC_MIN_INTERVAL_MS;
     appState.emit('active');
+    // The transition is accepted, but the run waits out the transition's own
+    // request burst so the mirror's session-list read does not join the app's
+    // foreground refresh (device check p2).
+    expect(mocks.syncArtifactMirror).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.advanceTimersByTime(MIRROR_BURST_SETTLE_MS);
+      await Promise.resolve();
+    });
     expect(mocks.syncArtifactMirror).toHaveBeenCalledTimes(2);
     // Not forced: the engine's persisted `lastRunAt` stays the authority.
     expect(mocks.syncArtifactMirror).toHaveBeenLastCalledWith();
+  });
+
+  it('drops a scheduled foreground run when the app leaves the foreground', async () => {
+    await mount();
+
+    clock.now = MOUNT_TIME + mocks.MIRROR_SYNC_MIN_INTERVAL_MS;
+    appState.emit('active');
+    appState.emit('background');
+
+    await act(async () => {
+      vi.advanceTimersByTime(MIRROR_BURST_SETTLE_MS);
+      await Promise.resolve();
+    });
+
+    // The trigger is foreground-only: a run scheduled by a regain that ended
+    // before the burst settled never starts.
+    expect(mocks.syncArtifactMirror).toHaveBeenCalledTimes(1);
   });
 
   it('stops listening on unmount', async () => {

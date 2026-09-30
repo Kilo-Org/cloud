@@ -15,18 +15,19 @@ type EffectiveProfileCustomModes = {
 };
 
 /**
- * Read the effective default profile's visible custom agents for the new-session
- * mode picker and model lock. Personal context uses the first `list` row with
- * `isDefault`; org context uses `listCombined.effectiveDefaultId`. A failed or
- * missing profile degrades to empty custom options (built-ins only), matching
- * web.
+ * Read the visible custom agents of `profileId` for the new-session mode picker
+ * and model lock. The caller resolves the id — the Environment picker's explicit
+ * selection, else the effective default — so the picker and a selected agent's
+ * pinned model follow the same profile the Environment row and the create body
+ * use. A missing or failed profile degrades to empty custom options (built-ins
+ * only), matching web.
  */
 export function useEffectiveProfileCustomModes(
-  organizationId?: string
+  organizationId?: string,
+  profileId?: string | null
 ): EffectiveProfileCustomModes {
   const trpc = useTRPC();
 
-  const list = useQuery(trpc.agentProfiles.list.queryOptions({}, { enabled: !organizationId }));
   const listCombined = useQuery(
     trpc.agentProfiles.listCombined.queryOptions(
       { organizationId: organizationId ?? '' },
@@ -34,9 +35,7 @@ export function useEffectiveProfileCustomModes(
     )
   );
 
-  const effectiveId = organizationId
-    ? (listCombined.data?.effectiveDefaultId ?? null)
-    : (list.data?.find(profile => profile.isDefault)?.id ?? null);
+  const effectiveId = profileId ?? null;
 
   const isOrgProfile =
     Boolean(effectiveId) &&

@@ -233,10 +233,25 @@ export function NewSessionScreenBody() {
   } = usePersistedRunOnDestination();
   const attachments = useAgentAttachmentUpload({ organizationId });
 
-  // Custom modes and the pinned model come from the effective default profile.
+  const {
+    profile,
+    profileId,
+    effectiveDefaultId,
+    isLoading: isProfileLoading,
+    isError: isProfileError,
+    overrideNeedsAttention: profileOverrideNeedsAttention,
+    refetch: refetchProfile,
+  } = useEffectiveAgentProfile(organizationId, overrideProfileId);
+
+  // Custom modes and a custom agent's pinned model resolve from the same profile
+  // the Environment row and the create body use: the user's explicit pick wins,
+  // else the effective default — web's `selectedProfileId ?? effectiveDefault`.
   // The lock applies only to the Cloud Agent target; a remote target keeps the
   // unlocked model view and never sends a gateway pin.
-  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(organizationId);
+  const { customOptions, profileAgents } = useEffectiveProfileCustomModes(
+    organizationId,
+    profileId ?? effectiveDefaultId
+  );
   // Clone entry keeps the source prefill model and an unlocked toolbar: no
   // pinned-agent lock, no gateway pin override.
   const pinned = isCloneEntry ? {} : resolvePinnedAgentModel({ slug: mode, profileAgents });
@@ -289,15 +304,6 @@ export function NewSessionScreenBody() {
       ) ?? null
     );
   }, [repositories, selectedRepo]);
-
-  const {
-    profile,
-    profileId,
-    isLoading: isProfileLoading,
-    isError: isProfileError,
-    overrideNeedsAttention: profileOverrideNeedsAttention,
-    refetch: refetchProfile,
-  } = useEffectiveAgentProfile(organizationId, overrideProfileId);
 
   // The picker opens as the app's standard native formSheet. The bridge carries
   // the current pick; the sheet reports the new one back through `onSelect`.

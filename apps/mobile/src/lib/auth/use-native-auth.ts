@@ -3,7 +3,6 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { CryptoDigestAlgorithm, digestStringAsync, getRandomBytesAsync } from 'expo-crypto';
 import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
-import { toast } from 'sonner-native';
 
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 
@@ -118,7 +117,7 @@ export function useNativeAuth(): NativeAuthResult {
       });
 
       if (!credential.identityToken) {
-        toast.error(defaultErrorMessage());
+        announcingToast.error(defaultErrorMessage());
         return;
       }
 
@@ -146,7 +145,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          announcingToast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -160,13 +159,13 @@ export function useNativeAuth(): NativeAuthResult {
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(credential.email ?? '', result.ssoOrganizationId);
       } else {
-        toast.error(mapError(result.errorCode));
+        announcingToast.error(mapError(result.errorCode));
       }
     } catch (error) {
       if (hasStringCode(error) && error.code === 'ERR_REQUEST_CANCELED') {
         return;
       }
-      toast.error(defaultErrorMessage());
+      announcingToast.error(defaultErrorMessage());
     } finally {
       finishAction('apple');
     }
@@ -190,7 +189,7 @@ export function useNativeAuth(): NativeAuthResult {
       const idToken = response.data.idToken;
 
       if (!serverAuthCode && !idToken) {
-        toast.error(defaultErrorMessage());
+        announcingToast.error(defaultErrorMessage());
         return;
       }
 
@@ -213,7 +212,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (result.ok) {
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          announcingToast.error(defaultErrorMessage());
           return;
         }
         await signIn(
@@ -227,10 +226,10 @@ export function useNativeAuth(): NativeAuthResult {
       } else if (result.errorCode === 'SSO_ERROR') {
         handleSsoError(response.data.user.email, result.ssoOrganizationId);
       } else {
-        toast.error(mapError(result.errorCode));
+        announcingToast.error(mapError(result.errorCode));
       }
     } catch {
-      toast.error(defaultErrorMessage());
+      announcingToast.error(defaultErrorMessage());
     } finally {
       finishAction('google');
     }
@@ -262,13 +261,13 @@ export function useNativeAuth(): NativeAuthResult {
         handleSsoError('', result.ssoOrganizationId);
         return;
       }
-      toast.error(
+      announcingToast.error(
         result.errorCode ? mapError(result.errorCode) : i18n.t(passkeyFailureKey(result.failure))
       );
     } catch (error) {
       // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
       console.error('[native-auth] signInWithPasskey failed:', error);
-      toast.error(defaultErrorMessage());
+      announcingToast.error(defaultErrorMessage());
     } finally {
       finishAction('passkey');
     }
@@ -285,7 +284,7 @@ export function useNativeAuth(): NativeAuthResult {
       if (!startAction('otp-send')) {
         // Refused because another auth action is in flight. Tell the user why
         // instead of returning a silent false that leaves the button dead.
-        toast.error(i18n.t('login.couldNotCompleteSignIn'));
+        announcingToast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -299,13 +298,13 @@ export function useNativeAuth(): NativeAuthResult {
           ) {
             setEmailError(mapError(result.errorCode));
           } else {
-            toast.error(mapError(result.errorCode));
+            announcingToast.error(mapError(result.errorCode));
           }
           return false;
         }
         const parsed = parseEmailCodeResponse(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          announcingToast.error(defaultErrorMessage());
           return false;
         }
         // Hold the challenge for the current email so verifyEmailCode can
@@ -325,7 +324,7 @@ export function useNativeAuth(): NativeAuthResult {
     async (rawEmail: string, code: string) => {
       const email = rawEmail.trim().toLowerCase();
       if (!startAction('otp-verify')) {
-        toast.error(i18n.t('login.couldNotCompleteSignIn'));
+        announcingToast.error(i18n.t('login.couldNotCompleteSignIn'));
         return false;
       }
       try {
@@ -352,13 +351,13 @@ export function useNativeAuth(): NativeAuthResult {
           if (result.errorCode === 'SSO_ERROR') {
             handleSsoError(email, result.ssoOrganizationId);
           } else {
-            toast.error(mapError(result.errorCode));
+            announcingToast.error(mapError(result.errorCode));
           }
           return false;
         }
         const parsed = parseTokenPair(result.data);
         if (!parsed) {
-          toast.error(defaultErrorMessage());
+          announcingToast.error(defaultErrorMessage());
           return false;
         }
         await signIn(
@@ -373,7 +372,7 @@ export function useNativeAuth(): NativeAuthResult {
       } catch (error) {
         // eslint-disable-next-line no-console -- surface swallowed auth errors to Sentry
         console.error('[native-auth] verifyEmailCode signIn failed:', error);
-        toast.error(defaultErrorMessage());
+        announcingToast.error(defaultErrorMessage());
         return false;
       } finally {
         finishAction('otp-verify');

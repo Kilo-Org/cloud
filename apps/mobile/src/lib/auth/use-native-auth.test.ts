@@ -124,7 +124,6 @@ const { defaultErrorMessage, mapError, retryableAdmissionError } =
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
-const { toast } = await import('sonner-native');
 const { announcingToast } = await import('@/lib/a11y/announcing-toast');
 
 const mockGetAdmission = vi.mocked(getAdmission);
@@ -293,14 +292,14 @@ describe('resolveAdmission', () => {
     mockGetAdmission.mockRejectedValue(new Error('Network error'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
+    expect(announcingToast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 
   it('shows retryable toast and throws on JSON parse failure', async () => {
     mockGetAdmission.mockRejectedValue(new SyntaxError('Unexpected token'));
 
     await expect(resolveAdmission()).rejects.toThrow('admission_challenge_failed');
-    expect(toast.error).toHaveBeenCalledWith(retryableAdmissionError());
+    expect(announcingToast.error).toHaveBeenCalledWith(retryableAdmissionError());
   });
 });
 
@@ -418,7 +417,7 @@ describe('useNativeAuth email validation feedback', () => {
         await resultRef.current?.requestEmailCode('http://localhost:3000/device-auth?code=test');
       });
 
-      expect(toast.error).not.toHaveBeenCalled();
+      expect(announcingToast.error).not.toHaveBeenCalled();
       expect(resultRef.current?.emailError).toBe(mapError(errorCode));
       expect(resultRef.current?.busy).toBeUndefined();
     }
@@ -430,7 +429,7 @@ describe('useNativeAuth email validation feedback', () => {
       await resultRef.current?.requestEmailCode('   ');
     });
 
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.error).not.toHaveBeenCalled();
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(resultRef.current?.emailError).toBe('Please enter your email address.');
   });
@@ -453,7 +452,7 @@ describe('useNativeAuth email validation feedback', () => {
       email: 'user@example.com',
     });
     expect(resultRef.current?.emailError).toBeUndefined();
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.error).not.toHaveBeenCalled();
   });
 
   it('clears old validation while a request is pending and preserves retryable delivery feedback', async () => {
@@ -476,7 +475,7 @@ describe('useNativeAuth email validation feedback', () => {
       finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
       await Promise.resolve();
     });
-    expect(toast.error).toHaveBeenCalledWith(mapError('EMAIL_DELIVERY_FAILED'));
+    expect(announcingToast.error).toHaveBeenCalledWith(mapError('EMAIL_DELIVERY_FAILED'));
     expect(resultRef.current?.busy).toBeUndefined();
 
     mockPostAuth.mockResolvedValueOnce({ ok: true, data: { success: true } });
@@ -522,7 +521,9 @@ describe('useNativeAuth in-flight refusal', () => {
 
     expect(secondResult).toBe(false);
     expect(mockPostAuth).toHaveBeenCalledTimes(1);
-    expect(toast.error).toHaveBeenCalledWith('Could not complete sign in. Please try again.');
+    expect(announcingToast.error).toHaveBeenCalledWith(
+      'Could not complete sign in. Please try again.'
+    );
 
     await act(async () => {
       resolvePost?.({ ok: true, data: { success: true } });
@@ -624,7 +625,7 @@ describe('useNativeAuth passkey sign-in', () => {
     });
 
     expect(authMock.signIn).toHaveBeenCalledWith('at', 'rt', 3600);
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.error).not.toHaveBeenCalled();
     expect(announcingToast.success).not.toHaveBeenCalled();
   });
 
@@ -653,7 +654,9 @@ describe('useNativeAuth passkey sign-in', () => {
       await resultRef.current?.signInWithPasskey();
     });
 
-    expect(toast.error).toHaveBeenCalledWith('Passkey sign-in was cancelled. Please try again.');
+    expect(announcingToast.error).toHaveBeenCalledWith(
+      'Passkey sign-in was cancelled. Please try again.'
+    );
     expect(authMock.signIn).not.toHaveBeenCalled();
   });
 
@@ -665,7 +668,7 @@ describe('useNativeAuth passkey sign-in', () => {
       await resultRef.current?.signInWithPasskey();
     });
 
-    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    const message = vi.mocked(announcingToast.error).mock.calls[0]?.[0];
     expect(message).toBe(
       'No passkey is saved for this device. Sign in with Apple, Google, or your email instead.'
     );
@@ -682,7 +685,7 @@ describe('useNativeAuth passkey sign-in', () => {
 
     // The server knew the passkey and the assertion did not verify, so the same
     // button fails identically. The toast names the way out instead of a retry.
-    const message = vi.mocked(toast.error).mock.calls[0]?.[0];
+    const message = vi.mocked(announcingToast.error).mock.calls[0]?.[0];
     expect(message).toBe(
       'That passkey could not sign you in. Sign in with Apple, Google, or your email instead.'
     );
@@ -701,7 +704,7 @@ describe('useNativeAuth passkey sign-in', () => {
       await resultRef.current?.signInWithPasskey();
     });
 
-    expect(toast.error).toHaveBeenCalledWith(
+    expect(announcingToast.error).toHaveBeenCalledWith(
       'This account has been blocked. Please contact support.'
     );
   });
@@ -722,7 +725,7 @@ describe('useNativeAuth passkey sign-in', () => {
     // The usernameless ceremony names no address, so the block is seeded with
     // the empty email Apple's credential omits on a later sign-in.
     expect(resultRef.current?.ssoRecovery).toEqual({ email: '', ssoOrganizationId: 'org_1' });
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.error).not.toHaveBeenCalled();
     expect(authMock.signIn).not.toHaveBeenCalled();
   });
 
@@ -738,7 +741,7 @@ describe('useNativeAuth passkey sign-in', () => {
       await resultRef.current?.signInWithPasskey();
     });
 
-    expect(toast.error).not.toHaveBeenCalled();
+    expect(announcingToast.error).not.toHaveBeenCalled();
   });
 
   it('ignores a second tap while a passkey ceremony is running', async () => {
@@ -782,6 +785,6 @@ describe('useNativeAuth passkey sign-in', () => {
       await resultRef.current?.signInWithPasskey();
     });
 
-    expect(toast.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
+    expect(announcingToast.error).toHaveBeenCalledWith('Something went wrong. Please try again.');
   });
 });

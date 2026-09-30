@@ -230,8 +230,8 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
     expect(field.props.error).toBe('Please enter your email address.');
     expect(mockPostAuth).not.toHaveBeenCalled();
     expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(0);
-    const { toast } = await import('sonner-native');
-    expect(toast.error).not.toHaveBeenCalled();
+    const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+    expect(announcingToast.error).not.toHaveBeenCalled();
 
     // Typing clears the message so the control is not left in an error state.
     act(() => {
@@ -268,8 +268,8 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    const { toast } = await import('sonner-native');
-    expect(toast.error).toHaveBeenCalled();
+    const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+    expect(announcingToast.error).toHaveBeenCalled();
     expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(0);
 
     act(() => {
@@ -301,8 +301,8 @@ describe('IdleAuth email sign-in flow (real useNativeAuth)', () => {
       await Promise.resolve();
     });
 
-    const { toast } = await import('sonner-native');
-    expect(toast.error).toHaveBeenCalledWith('Sign-in timed out. Please try again.');
+    const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+    expect(announcingToast.error).toHaveBeenCalledWith('Sign-in timed out. Please try again.');
     expect(findAll(renderer.root, 'EmailOtpForm')).toHaveLength(0);
     // The landing is intact with the Continue control back in its slot.
     expect(findAll(renderer.root, 'FormField')).toHaveLength(1);

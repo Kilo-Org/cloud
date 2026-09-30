@@ -1,5 +1,4 @@
-import { toast } from 'sonner-native';
-
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 import {
   ADMISSION_CHALLENGE_FAILED,
   type AdmissionPayload,
@@ -20,7 +19,7 @@ export async function resolveAdmission(): Promise<
     // Normalize every challenge/provider failure to the retryable message.
     // Network errors, JSON parse failures, and !response.ok all abort sign-in;
     // every path must show the retryable toast and throw a consistent sentinel.
-    toast.error(retryableAdmissionError());
+    announcingToast.error(retryableAdmissionError());
     throw new Error(ADMISSION_CHALLENGE_FAILED);
   }
 }

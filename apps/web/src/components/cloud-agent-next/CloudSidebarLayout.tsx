@@ -84,6 +84,7 @@ import {
   type PendingWorktreeChat,
 } from './worktree-chat-pending';
 import { PendingFirstChatProvider } from './pending-first-chat';
+import { platformFilterValues } from './live-sidebar-sessions';
 
 // Context for children to toggle the mobile sidebar sheet
 type WorktreeChatTabs = {
@@ -251,21 +252,10 @@ export function CloudSidebarLayout({
   const [pendingWorktreeChat, setPendingWorktreeChat] = useState<PendingWorktreeChat | null>(null);
   const repoUpdatedSince = useMemo(() => startOfDay(subDays(new Date(), 30)).toISOString(), []);
 
-  const createdOnPlatform = useMemo(() => {
-    if (platformFilter.length === 0) return undefined;
-    return platformFilter.flatMap(p => {
-      switch (p) {
-        // 'cloud-agent-web' is a variant of the cloud agent
-        case 'cloud-agent':
-          return ['cloud-agent', 'cloud-agent-web'];
-        // Extension sessions are created from VS Code or agent-manager
-        case 'extension':
-          return ['vscode', 'agent-manager'];
-        default:
-          return [p];
-      }
-    });
-  }, [platformFilter]);
+  const createdOnPlatform = useMemo(
+    () => (platformFilter.length === 0 ? undefined : platformFilterValues(platformFilter)),
+    [platformFilter]
+  );
 
   const folderWorktreeIds = useMemo(
     () => workspaceFolders.folders.flatMap(folder => folder.worktreeIds),

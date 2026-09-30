@@ -98,4 +98,11 @@ describe('glanceable live activity accessibility scoping', () => {
     expect(combined.body).not.toContain('<Button');
     expect(small.slice(combined.after)).toContain(APPROVE_TARGET);
   });
+
+  it('drops zero counts from the combined VoiceOver label', () => {
+    // The count rows draw zeros to hold the grid still, but the spoken label
+    // must keep only the real counts: "0 Working" is noise to a screen reader.
+    // The widgets and `glanceableSpokenLabel` filter zeros the same way.
+    expect(source).toContain('countLines.filter(line => line.count > 0)');
+  });
 });

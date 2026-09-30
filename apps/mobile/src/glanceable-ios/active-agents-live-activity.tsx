@@ -161,10 +161,13 @@ const layout: LiveActivityComponent<ContentState> = props => {
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
-  // spoken label even though no line draws it.
+  // spoken label even though no line draws it. Zero rows draw to hold the grid
+  // still, but "0 Working" is only noise to a screen reader, so the spoken
+  // label keeps the real counts, exactly as the widgets and the shared
+  // presentation helper do.
   const spokenParts = [
     ...(statusLine !== null ? [statusLine] : []),
-    ...countLines.map(line => `${line.count} ${line.label}`),
+    ...countLines.filter(line => line.count > 0).map(line => `${line.count} ${line.label}`),
     COPY.openAgents,
   ];
   const accessibility = spokenParts.join(', ');

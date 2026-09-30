@@ -65,9 +65,13 @@ export function LanguagePickerSheet({
     onClose();
   }, [onClose]);
 
-  // While an apply is in flight — busy, restarting, or the reload has failed
-  // and Retry is up — a swipe-dismiss or back would close the sheet mid-change.
-  usePreventRemove(busy || restarting || reloadFailed, ({ data }) => {
+  // While an apply is in flight — busy or restarting — a swipe-dismiss or back
+  // would close the sheet mid-change. A failed reload is terminal, not in
+  // flight: the preference is already saved, so the Retry sheet must let
+  // back/swipe through. Keeping the guard on here trapped the user with only
+  // the Retry control and no way back to the previous task when Retry kept
+  // failing.
+  usePreventRemove(busy || restarting, ({ data }) => {
     if (skipNextGuardRef.current) {
       skipNextGuardRef.current = false;
       navigation.dispatch(data.action);
@@ -174,6 +178,7 @@ export function LanguagePickerSheet({
         onDone={() => {
           void retryReload();
         }}
+        onCancel={closePicker}
         doneLabel={t('common.retry')}
         disabled={busy}
         scrollable={false}

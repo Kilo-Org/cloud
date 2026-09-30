@@ -457,7 +457,7 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('keeps Retry as the only action when the reload fails', async () => {
+  it('offers Cancel to leave the sheet when the reload keeps failing', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');
@@ -466,7 +466,15 @@ describe('LanguagePickerSheet apply', () => {
     if (!failedSheet) {
       throw new Error('PickerSheet not found');
     }
-    expect(failedSheet.props.onCancel).toBeUndefined();
+    // A failed reload is terminal but the sheet still has to be dismissible:
+    // Retry may keep failing, so Cancel is the user's way back to the previous
+    // task.
+    expect(failedSheet.props.onCancel).toBeTypeOf('function');
+
+    act(() => {
+      (failedSheet.props.onCancel as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });

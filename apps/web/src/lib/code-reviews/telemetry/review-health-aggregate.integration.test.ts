@@ -11,6 +11,7 @@ import {
   REVIEW_COLLECTION_METRIC,
   REVIEW_OPEN_METRIC,
   REVIEW_OUTCOME_METRIC,
+  REVIEW_PUBLICATION_METRIC,
   REVIEW_REASON_METRIC,
   REVIEW_START_METRIC,
   collectCodeReviewOpenStock,
@@ -86,6 +87,20 @@ describe('review health aggregate against the database', () => {
       .returning({ id: cloud_agent_code_reviews.id });
     createdReviewIds.push(row.id);
     return row.id;
+  }
+
+  async function insertAttempt(input: {
+    reviewId: string;
+    attemptNumber: number;
+    publicationStatus?: string | null;
+    status?: string;
+  }): Promise<void> {
+    await db.insert(cloud_agent_code_review_attempts).values({
+      code_review_id: input.reviewId,
+      attempt_number: input.attemptNumber,
+      status: input.status ?? 'completed',
+      publication_status: input.publicationStatus ?? null,
+    });
   }
 
   function loggedRecords(): Record<string, unknown>[] {
@@ -253,6 +268,95 @@ describe('review health aggregate against the database', () => {
     ]);
   });
 
+  it('reports one missing and three unknown publications across the latest attempt of each completed review', async () => {
+    const completedAt = '2096-05-01T00:06:00.000Z';
+    const reviewBase = { status: 'completed', createdAt: '2096-05-01T00:00:00.000Z', completedAt };
+
+    const bothMissing = await insertReview(reviewBase);
+    await insertAttempt({ reviewId: bothMissing, attemptNumber: 1, publicationStatus: 'missing' });
+    await insertAttempt({ reviewId: bothMissing, attemptNumber: 2, publicationStatus: 'missing' });
+
+    await insertReview(reviewBase);
+
+    const latestNullEarlierMissing = await insertReview(reviewBase);
+    await insertAttempt({
+      reviewId: latestNullEarlierMissing,
+      attemptNumber: 1,
+      publicationStatus: 'missing',
+    });
+    await insertAttempt({
+      reviewId: latestNullEarlierMissing,
+      attemptNumber: 2,
+      publicationStatus: null,
+    });
+
+    const unknownStatus = await insertReview(reviewBase);
+    await insertAttempt({
+      reviewId: unknownStatus,
+      attemptNumber: 1,
+      publicationStatus: 'unknown',
+    });
+
+    const latestPublished = await insertReview(reviewBase);
+    await insertAttempt({
+      reviewId: latestPublished,
+      attemptNumber: 1,
+      publicationStatus: 'missing',
+    });
+    await insertAttempt({
+      reviewId: latestPublished,
+      attemptNumber: 2,
+      publicationStatus: 'published',
+    });
+
+    for (const publicationStatus of ['unchanged', 'not_applicable', 'published']) {
+      const reviewId = await insertReview(reviewBase);
+      await insertAttempt({ reviewId, attemptNumber: 1, publicationStatus });
+    }
+
+    const failed = await insertReview({ ...reviewBase, status: 'failed' });
+    await insertAttempt({ reviewId: failed, attemptNumber: 1, publicationStatus: 'missing' });
+
+    const outside = await insertReview({
+      status: 'completed',
+      createdAt: '2096-04-30T23:50:00.000Z',
+      completedAt: '2096-05-01T00:03:00.000Z',
+    });
+    await insertAttempt({ reviewId: outside, attemptNumber: 1, publicationStatus: 'missing' });
+
+    await collectCodeReviewOutcome(new Date('2096-05-01T00:12:00.000Z'));
+
+    const publication = loggedRecords().find(
+      record =>
+        record.metric === REVIEW_PUBLICATION_METRIC &&
+        record.observedAt === '2096-05-01T00:12:00.000Z'
+    );
+    expect(publication).toEqual({
+      metric: REVIEW_PUBLICATION_METRIC,
+      environment: process.env.VERCEL_ENV ?? null,
+      observedAt: '2096-05-01T00:12:00.000Z',
+      windowStart: '2096-05-01T00:05:00.000Z',
+      windowEnd: '2096-05-01T00:10:00.000Z',
+      missingPublication: 1,
+      coverageUnknown: 3,
+    });
+
+    const serialized = logSpy.mock.calls.map(([line]) => line).join('\n');
+    expect(serialized).not.toContain(bothMissing);
+    expect(serialized).not.toContain(PII_MARKER);
+  });
+
+  it('emits zero publication findings for a window with no completed reviews', async () => {
+    await collectCodeReviewOutcome(new Date('2096-05-02T00:12:00.000Z'));
+
+    const publication = loggedRecords().find(
+      record =>
+        record.metric === REVIEW_PUBLICATION_METRIC &&
+        record.observedAt === '2096-05-02T00:12:00.000Z'
+    );
+    expect(publication).toMatchObject({ missingPublication: 0, coverageUnknown: 0 });
+  });
+
   it('keeps a null completed_at out of the outcome window and increments missingCompletedAt', async () => {
     const collectionTimestamp = new Date('2096-04-06T00:10:00.000Z');
 
@@ -288,7 +392,7 @@ describe('review health aggregate against the database', () => {
     };
     await collectCodeReviewOutcome(new Date('2096-04-07T00:10:00.000Z'), failingDb as never);
 
-    expect(errorSpy).toHaveBeenCalledTimes(2);
+    expect(errorSpy).toHaveBeenCalledTimes(3);
     const records = errorSpy.mock.calls.map(([line]) => JSON.parse(line as string));
     expect(records).toEqual([
       expect.objectContaining({
@@ -296,6 +400,10 @@ describe('review health aggregate against the database', () => {
         collector: REVIEW_OUTCOME_METRIC,
       }),
       expect.objectContaining({ metric: REVIEW_COLLECTION_METRIC, collector: REVIEW_START_METRIC }),
+      expect.objectContaining({
+        metric: REVIEW_COLLECTION_METRIC,
+        collector: REVIEW_PUBLICATION_METRIC,
+      }),
     ]);
     expect(logSpy).not.toHaveBeenCalled();
   });

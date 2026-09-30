@@ -166,7 +166,7 @@
     "signInWithGoogle": "ورود با Google",
     "signInWithPasskey": "ورود با کلید عبور",
     "emailAddress": "نشانی ایمیل",
-    "emailPlaceholder": "you@example.com",
+    "emailPlaceholder": "shoma@example.com",
     "continueWithEmail": "ادامه با ایمیل",
     "enterCodeSentTo": "کد ارسال‌شده به {{email}} را وارد کنید.",
     "codeArrivalHint": "اگر این نشانی واجد شرایط باشد، کد ظرف یک دقیقه می‌رسد.",

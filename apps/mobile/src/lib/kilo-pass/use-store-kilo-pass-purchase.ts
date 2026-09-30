@@ -6,6 +6,7 @@ import { toast } from 'sonner-native';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { type AppStoreKiloPassProduct } from './store-products';
 
 const userCancelledPurchaseErrorSchema = z.object({
@@ -101,6 +102,34 @@ type PurchaseCompletionResult =
   | { completed: false; errorMessage: string | null };
 
 const sharedPurchaseCompletions = new Map<string, Promise<PurchaseCompletionResult>>();
+
+/**
+ * Purchases the backend terminally refused in this process. The store keeps an
+ * unfinished transaction until the app finishes it, so without this memory every
+ * later pass posts a payload the backend already rejected, and logs an error each
+ * time. Deliberately in-memory: the next app launch retries once, so a server-side
+ * change is never ignored forever.
+ */
+const terminallyRejectedPurchaseIds = new Set<string>();
+
+/** Test seam: forget the recorded rejections, so a test starts the process over. */
+export function resetTerminalPurchaseRejections(): void {
+  terminallyRejectedPurchaseIds.clear();
+}
+
+/**
+ * Codes that make this exact payload permanently unacceptable. A positive list on
+ * purpose. `isTerminalTrpcCode` also holds `FORBIDDEN`, which is the account
+ * mismatch this screen tells the user to fix and retry, and `UNAUTHORIZED`, which
+ * describes the session rather than the payload. A purchase refused for either
+ * reason is genuinely payable after the user acts, so it must stay in the queue.
+ */
+const PAYLOAD_TERMINAL_TRPC_CODES = new Set(['BAD_REQUEST', 'UNPROCESSABLE_CONTENT']);
+
+function isPayloadTerminalTrpcCode(code: string | undefined): boolean {
+  return code !== undefined && PAYLOAD_TERMINAL_TRPC_CODES.has(code);
+}
+
 let lastPurchaseErrorToast: { message: string; shownAt: number } | null = null;
 
 export function resetPurchaseErrorToastDedup() {
@@ -138,7 +167,23 @@ type PurchaseSuccessOptions = PurchaseCompletionOptions & {
 type RecoverPurchasesOptions = PurchaseCompletionOptions & {
   enabledAppleProductIds?: readonly string[];
   enabledGoogleProductIds?: readonly string[];
+  /**
+   * An explicit user action. Post even a purchase the backend already refused, so a
+   * restore is never silently empty.
+   */
+  ignoreRejectionMemory?: boolean;
 };
+
+/**
+ * True only when the store gave an expiration date and it has passed. A purchase
+ * with no date is kept: only a known expiry is a reason to skip it.
+ */
+function isExpiredAppleSubscription(purchase: Purchase): boolean {
+  // Only the iOS purchase carries an expiration date, and the union does not
+  // discriminate on `store`, so narrow with `in`.
+  const expiresAt = 'expirationDateIOS' in purchase ? purchase.expirationDateIOS : null;
+  return expiresAt != null && expiresAt <= Date.now();
+}
 
 export function isRecoverableKiloPassPurchase(
   purchase: Purchase,
@@ -149,6 +194,13 @@ export function isRecoverableKiloPassPurchase(
     return false;
   }
   if (purchase.store === 'apple') {
+    // The tRPC completion path rejects an expired transaction on purpose, and only
+    // the notification handler may grant one. Posting it again can never succeed, and
+    // the store keeps the transaction until the app finishes it, so a pass without
+    // this check would repeat the same rejected request forever.
+    if (isExpiredAppleSubscription(purchase)) {
+      return false;
+    }
     return enabledAppleProductIds.includes(purchase.productId);
   }
   if (purchase.store === 'google') {
@@ -268,6 +320,9 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       }
       return { completed: true };
     } catch (error) {
+      if (isPayloadTerminalTrpcCode(readTrpcErrorField(error, 'code'))) {
+        terminallyRejectedPurchaseIds.add(getPurchaseCompletionId(purchase));
+      }
       const message = getKiloPassPurchaseErrorMessage(
         error,
         i18n.t('kiloPass.purchaseFailed'),
@@ -343,6 +398,14 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       purchases
         .filter(purchase =>
           isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
+        )
+        // The background pass honours the rejection memory. An explicit restore
+        // passes `ignoreRejectionMemory`, so a user action always reaches the
+        // backend.
+        .filter(
+          purchase =>
+            options.ignoreRejectionMemory === true ||
+            !terminallyRejectedPurchaseIds.has(getPurchaseCompletionId(purchase))
         )
         .map(async purchase => {
           const completed = await handlePurchaseSuccess(purchase, {
@@ -455,6 +518,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         const completedPurchases = await recoverPurchases(kiloPassPurchases, {
           enabledAppleProductIds,
           enabledGoogleProductIds,
+          ignoreRejectionMemory: true,
           notifyErrors: true,
         });
         return completedPurchases.length > 0 ? 'restored' : 'failed';

@@ -12,8 +12,10 @@ import { i18n } from '@/i18n';
 import {
   createAppStoreKiloPassPurchaseActions,
   getKiloPassPurchaseErrorMessage,
+  isRecoverableKiloPassPurchase,
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
+  resetTerminalPurchaseRejections,
   useInlinePurchaseErrorOwnership,
 } from './use-store-kilo-pass-purchase';
 import { type AppStoreKiloPassProduct } from './store-products';
@@ -380,6 +382,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   resetPurchaseErrorToastDedup();
   resetInlinePurchaseErrorOwnership();
+  resetTerminalPurchaseRejections();
   mockedPlatform.OS = 'ios';
   mockedAuth.authEpoch = 0;
   mockedCurrentUserId.userId = 'user-1';
@@ -655,6 +658,80 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(onPurchaseCompleted).not.toHaveBeenCalled();
   });
 
+  it('skips an App Store transaction that the completion path rejects as expired', async () => {
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+
+    const expired = createPurchase({
+      expirationDateIOS: Date.now() - 60_000,
+      transactionId: 'tx-expired',
+    });
+    expect(isRecoverableKiloPassPurchase(expired, [product.appleProductId])).toBe(false);
+    expect(await actions.recoverPurchases([expired])).toEqual([]);
+    expect(completeAppStorePurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+
+    const live = createPurchase({
+      expirationDateIOS: Date.now() + 60_000,
+      transactionId: 'tx-live',
+    });
+    expect(await actions.recoverPurchases([live])).toEqual([live]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a purchase with no expiration date recoverable', async () => {
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not post a purchase the backend terminally rejected a second time', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValue({
+        data: { code: 'BAD_REQUEST', message: 'Apple subscription transaction has expired' },
+      });
+    const actions = createActions({ completeAppStorePurchase });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries after a session error, which is not about the payload', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({ data: { code: 'UNAUTHORIZED', message: 'Not signed in' } })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+  });
+
+  it('retries after the account mismatch, which the user can fix', async () => {
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({ data: { code: 'FORBIDDEN', message: 'Account mismatch' } })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({ completeAppStorePurchase, finishTransaction });
+    const purchase = createPurchase();
+
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
+  });
+
   it('invalidates Kilo Pass state once after recovering multiple purchases', async () => {
     const finishTransaction = vi.fn();
     const invalidateAfterCompletion = vi.fn();
@@ -779,6 +856,34 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries a remembered rejection when the user asks for a restore', async () => {
+    const purchase = createPurchase();
+    const restorePurchases = vi.fn().mockResolvedValue(undefined);
+    const getAvailablePurchases = vi.fn().mockResolvedValue([purchase]);
+    const completeAppStorePurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: { code: 'BAD_REQUEST', message: 'Apple subscription transaction has expired' },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const actions = createActions({
+      completeAppStorePurchase,
+      finishTransaction,
+      getAvailablePurchases,
+      restorePurchases,
+    });
+
+    // The background pass remembers the refusal, and does not post again.
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+
+    // A restore is an explicit action, so it posts a second time.
+    expect(await actions.restorePurchases()).toBe('restored');
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(2);
   });
 
   it('loads product IDs before deciding an explicit restore is empty', async () => {

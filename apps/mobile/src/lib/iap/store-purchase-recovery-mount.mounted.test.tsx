@@ -80,6 +80,51 @@ describe('StorePurchaseRecoveryMount', () => {
     });
   });
 
+  it('never posts an expired Pass transaction, and leaves it unfinished', async () => {
+    mockedIap.getPendingTransactionsIOS.mockResolvedValue([
+      createPurchase({
+        productId: KILO_PASS_PRODUCT_ID,
+        transactionId: 'tx-expired',
+        expirationDateIOS: Date.now() - 60_000,
+      }),
+    ]);
+
+    await mountRecovery();
+    await flushPromises();
+
+    // The completion path rejects an expired transaction on purpose, so the pass must
+    // not ask: the store keeps the transaction, and the next pass would ask again.
+    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
+    expect(completionsNamed('credits.completeAppStorePurchase')).toHaveLength(0);
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+  });
+
+  it('skips only the expired Pass transaction, and still grants the fresh credit pack', async () => {
+    mockedIap.getPendingTransactionsIOS.mockResolvedValue([
+      createPurchase({
+        productId: KILO_PASS_PRODUCT_ID,
+        transactionId: 'tx-expired',
+        expirationDateIOS: Date.now() - 60_000,
+      }),
+      createPurchase({ transactionId: 'tx-credit' }),
+    ]);
+
+    await mountRecovery();
+    await flushPromises();
+
+    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
+    expect(completionsNamed('credits.completeAppStorePurchase')).toEqual([
+      {
+        procedure: 'credits.completeAppStorePurchase',
+        input: { signedTransactionJws: 'signed-jws' },
+      },
+    ]);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ productId: CREDIT_PRODUCT_ID }),
+      isConsumable: true,
+    });
+  });
+
   it('recovers a Pass purchase when its catalog loads after the credit catalog', async () => {
     const passPurchase = createPurchase({
       productId: KILO_PASS_PRODUCT_ID,

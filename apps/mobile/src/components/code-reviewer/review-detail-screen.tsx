@@ -1,7 +1,6 @@
 /* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
 
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -28,8 +27,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
-import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
@@ -68,9 +65,7 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const router = useRouter();
   const { t } = useTranslation();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
@@ -262,14 +257,11 @@ export function ReviewDetailScreen({
           <Button
             variant="secondary"
             onPress={() => {
-              const destination = resolveCodeReviewerOpenPrDestination(
-                review.pr_url,
-                prReviewEnabled
-              );
-              if (destination.kind === 'in-app') {
-                router.push(destination.href);
-                return;
-              }
+              // A code review's PR was reviewed by the Kilo GitHub/GitLab/
+              // Bitbucket App, not by the user's own PR-review connection, so
+              // the button opens the PR itself. Routing into the in-app
+              // PR-review tree would land a disconnected user on the Connect
+              // gate instead of the pull request named by the button.
               void openExternalUrl(review.pr_url, {
                 label: t('common.pullRequest'),
               });

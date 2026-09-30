@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { type TextInputProps } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Input, INPUT_BOX_CLASS } from './input';
+import { Input } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
@@ -56,10 +56,6 @@ function flattenStyle(style: unknown): Record<string, unknown> {
 }
 
 describe('Input single-line box', () => {
-  it('keeps the shared box free of vertical padding and a fixed height', () => {
-    expect(INPUT_BOX_CLASS).toBe('min-h-[44px] px-3 leading-[normal]');
-  });
-
   it('renders the shared box, centered vertical alignment, and the themed placeholder', () => {
     const input = mountInput();
 

@@ -13,9 +13,6 @@ import { cn } from '@/lib/utils';
 const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] px-3';
 const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 
-/** The one single-line box. Every single-line field renders this. */
-export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT_CLASS}`;
-
 /**
  * The shared single-line box: `min-h-[44px] px-3 leading-[normal]`.
  *

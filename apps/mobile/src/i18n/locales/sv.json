@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",
       "readOnly": "Den här sessionen är skrivskyddad.",
+      "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",

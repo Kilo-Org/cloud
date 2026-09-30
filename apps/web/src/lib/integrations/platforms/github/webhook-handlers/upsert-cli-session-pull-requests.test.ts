@@ -648,7 +648,6 @@ describe('upsertCliSessionPullRequestsFromWebhook', () => {
     const branch = 'feature/missed-reopen-then-sync';
     await seedSession({ branch, owner: testOwner });
 
-    // PR gets closed.
     await upsertCliSessionPullRequestsFromWebhook(
       makePayload({
         action: 'closed',

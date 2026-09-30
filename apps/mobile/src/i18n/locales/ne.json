@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "सत्रको नाम",
       "transcriptAccessibility": "सत्रको कुराकानीको अभिलेख",
       "readOnly": "यो सत्र पढ्न मात्र मिल्छ।",
+      "continueInNewSession": "नयाँ सत्रमा जारी राख्नुहोस्",
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
       "emptyTitle": "अहिलेसम्म कुनै सन्देश छैन",

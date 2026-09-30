@@ -9,6 +9,7 @@ nearer `AGENTS.md` and follow its scoped invariants.
 | Path | Description |
 |---|---|
 | `apps/web/` | Next.js web application deployed to Vercel |
+| `apps/ai-gateway/` | Next.js app for the AI gateway API routes; not deployed yet |
 | `apps/mobile/` | React Native mobile application |
 | `apps/extension/` | WXT browser extension |
 | `services/` | Cloudflare Worker and supporting services |

@@ -75,6 +75,19 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
   const [enabled, setEnabled] = useState(initial.enabled);
   const [error, setError] = useState<McpFormError | null>(null);
 
+  /**
+   * Switch the server type and clear the field the other type owned. The
+   * command and URL fields share one slot in the tree, so React would reuse the
+   * same uncontrolled `FormField` (and its native input would keep the other
+   * type's text) unless each branch carries its own key. Resetting the refs
+   * keeps the saved payload equal to what the field shows.
+   */
+  const changeType = (next: McpFormType) => {
+    commandRef.current = initial.command;
+    urlRef.current = initial.url;
+    setType(next);
+  };
+
   const submit = () => {
     const state = {
       name: nameRef.current,
@@ -122,7 +135,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
             <SegmentedControl
               options={typeOptions}
               value={type}
-              onChange={setType}
+              onChange={changeType}
               accessibilityLabel={t('profiles.mcp.type')}
             />
           </View>
@@ -145,6 +158,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
 
         {type === 'local' ? (
           <FormField
+            key="command"
             label={t('profiles.mcp.command')}
             defaultValue={initial.command}
             error={errorKeyFor(t, error, ['command-required', 'command-too-long'])}
@@ -160,6 +174,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           />
         ) : (
           <FormField
+            key="url"
             label={t('profiles.mcp.url')}
             defaultValue={initial.url}
             error={errorKeyFor(t, error, ['url-required', 'url-invalid', 'url-too-long'])}

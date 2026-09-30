@@ -2119,6 +2119,7 @@
       "provider": "プロバイダー",
       "totalCost": "合計コスト",
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
+      "usageUnavailable": "コンテキスト使用状況を利用できません",
       "tokenUsage": "トークン使用量",
       "cacheRate": "キャッシュ率",
       "modelsCount": "モデル（{{displayCount}}）",

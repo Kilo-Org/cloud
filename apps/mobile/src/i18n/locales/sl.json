@@ -2708,6 +2708,7 @@
       "provider": "Ponudnik",
       "totalCost": "Skupni strošek",
       "usageReflectsLatest": "Prikazana poraba velja za zadnji dokončani odgovor asistenta.",
+      "usageUnavailable": "Uporaba konteksta ni na voljo",
       "tokenUsage": "Poraba žetonov",
       "cacheRate": "Delež iz predpomnilnika",
       "modelsCount": "Modeli ({{displayCount}})",

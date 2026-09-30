@@ -2119,6 +2119,7 @@
       "provider": "Sağlayıcı",
       "totalCost": "Toplam maliyet",
       "usageReflectsLatest": "Kullanım bilgileri, asistanın tamamlanan son yanıtına dayanır.",
+      "usageUnavailable": "Bağlam kullanımı kullanılamıyor",
       "tokenUsage": "Token kullanımı",
       "cacheRate": "Önbellek oranı",
       "modelsCount": "Modeller ({{displayCount}})",

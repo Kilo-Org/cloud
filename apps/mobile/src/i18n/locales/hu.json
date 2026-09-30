@@ -2632,6 +2632,7 @@
       "provider": "Szolgáltató",
       "totalCost": "Teljes költség",
       "usageReflectsLatest": "A használati adatok az asszisztens legutóbbi befejezett válaszát tükrözik.",
+      "usageUnavailable": "A környezethasználat nem érhető el",
       "tokenUsage": "Tokenhasználat",
       "cacheRate": "Gyorsítótár találati aránya",
       "modelsCount": "Modellek ({{displayCount}})",

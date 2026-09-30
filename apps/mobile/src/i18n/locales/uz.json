@@ -2632,6 +2632,7 @@
       "provider": "Provayder",
       "totalCost": "Umumiy xarajat",
       "usageReflectsLatest": "Foydalanish ko'rsatkichlari yordamchining oxirgi tugallangan javobiga tegishli.",
+      "usageUnavailable": "Kontekstdan foydalanish mavjud emas",
       "tokenUsage": "Tokenlardan foydalanish",
       "cacheRate": "Keshdan foydalanish ulushi",
       "modelsCount": "Modellar ({{displayCount}})",

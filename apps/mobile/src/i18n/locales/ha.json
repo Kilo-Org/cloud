@@ -2632,6 +2632,7 @@
       "provider": "Mai ba da sabis",
       "totalCost": "Jimlar kuɗi",
       "usageReflectsLatest": "Wannan adadin amfani ya shafi amsar mataimaki ta ƙarshe da aka kammala.",
+      "usageUnavailable": "Amfani da mahallin ba ya samuwa",
       "tokenUsage": "Yawan guntayen rubutun da aka yi amfani da su",
       "cacheRate": "Ƙimar amfani da ma'ajiyar wucin gadi",
       "modelsCount": "Samfura ({{displayCount}})",

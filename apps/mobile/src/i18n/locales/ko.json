@@ -2119,6 +2119,7 @@
       "provider": "제공업체",
       "totalCost": "총 비용",
       "usageReflectsLatest": "사용량은 가장 최근에 생성이 완료된 어시스턴트 응답을 기준으로 합니다.",
+      "usageUnavailable": "컨텍스트 사용량을 사용할 수 없습니다",
       "tokenUsage": "토큰 사용량",
       "cacheRate": "캐시 비율",
       "modelsCount": "모델 ({{displayCount}})",

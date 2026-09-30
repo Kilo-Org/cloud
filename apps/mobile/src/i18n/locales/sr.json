@@ -2670,6 +2670,7 @@
       "provider": "Provajder",
       "totalCost": "Ukupan trošak",
       "usageReflectsLatest": "Prikazana potrošnja odgovara poslednjem dovršenom odgovoru asistenta.",
+      "usageUnavailable": "Korišćenje konteksta nije dostupno",
       "tokenUsage": "Potrošnja tokena",
       "cacheRate": "Udeo tokena iz keša",
       "modelsCount": "Modeli ({{displayCount}})",

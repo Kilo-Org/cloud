@@ -2632,6 +2632,7 @@
       "provider": "Verskaffer",
       "totalCost": "Totale koste",
       "usageReflectsLatest": "Die gebruik weerspieël die assistent se jongste voltooide antwoord.",
+      "usageUnavailable": "Konteksgebruik is nie beskikbaar nie",
       "tokenUsage": "Tekengebruik",
       "cacheRate": "Kasgeheutrefferkoers",
       "modelsCount": "Modelle ({{displayCount}})",

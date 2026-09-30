@@ -2632,6 +2632,7 @@
       "provider": "Провайдер",
       "totalCost": "Жалпы құны",
       "usageReflectsLatest": "Қолданыс деректері көмекшінің соңғы аяқталған жауабына негізделген.",
+      "usageUnavailable": "Контекстті пайдалану қолжетімсіз",
       "tokenUsage": "Токен қолданысы",
       "cacheRate": "Кэш үлесі",
       "modelsCount": "Модельдер ({{displayCount}})",

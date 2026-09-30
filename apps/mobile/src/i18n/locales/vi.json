@@ -2119,6 +2119,7 @@
       "provider": "Nhà cung cấp",
       "totalCost": "Tổng chi phí",
       "usageReflectsLatest": "Mức sử dụng được tính theo phản hồi gần nhất mà trợ lý đã hoàn tất.",
+      "usageUnavailable": "Mức sử dụng ngữ cảnh không khả dụng",
       "tokenUsage": "Mức sử dụng token",
       "cacheRate": "Tỷ lệ dùng bộ nhớ đệm",
       "modelsCount": "Mô hình ({{displayCount}})",

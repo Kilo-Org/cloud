@@ -2632,6 +2632,7 @@
       "provider": "සැපයුම්කරු",
       "totalCost": "මුළු පිරිවැය",
       "usageReflectsLatest": "මෙහි දැක්වෙන භාවිතය අවසන් වරට සම්පූර්ණ වූ සහායක ප්‍රතිචාරයට අදාළයි.",
+      "usageUnavailable": "සන්දර්භ භාවිතය ලබාගත නොහැක",
       "tokenUsage": "ටෝකන භාවිතය",
       "cacheRate": "හැඹිලි අනුපාතය",
       "modelsCount": "මාදිලි ({{displayCount}})",

@@ -2632,6 +2632,7 @@
       "provider": "Hornitzailea",
       "totalCost": "Kostu osoa",
       "usageReflectsLatest": "Erabilera-datuak laguntzaileak amaitu duen azken erantzunari dagozkio.",
+      "usageUnavailable": "Testuinguruaren erabilera ez dago erabilgarri",
       "tokenUsage": "Tokenen erabilera",
       "cacheRate": "Cache-tasa",
       "modelsCount": "Modeloak ({{displayCount}})",

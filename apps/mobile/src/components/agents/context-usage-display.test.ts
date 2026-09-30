@@ -34,11 +34,13 @@ function pill(args: {
   info?: SessionContextInfo;
   totalCostMicrodollars: number | null;
   hasMessages: boolean;
+  loading?: boolean;
 }): HeaderPillContent {
   return getHeaderPillContent({
     info: args.info,
     totalCostMicrodollars: args.totalCostMicrodollars,
     hasMessages: args.hasMessages,
+    loading: args.loading,
   });
 }
 
@@ -49,6 +51,18 @@ const trackOnly: HeaderPillContent = {
   tone: 'neutral',
   arcFraction: 0,
   interactive: false,
+  usageUnavailable: false,
+};
+
+/** No info after loading has stopped: the dash marks the slot instead. */
+const unknownUsage: HeaderPillContent = {
+  primary: '—',
+  secondary: null,
+  hasCost: false,
+  tone: 'neutral',
+  arcFraction: 0,
+  interactive: false,
+  usageUnavailable: true,
 };
 
 describe('formatCompactTokens', () => {
@@ -142,10 +156,19 @@ describe('formatRemainingTokens', () => {
 
 describe('getHeaderPillContent', () => {
   // Migrated getHeaderSummary cases (info-present) + new no-info branches.
-  it('is track-only and non-interactive with no info and no transcript', () => {
-    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(trackOnly);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(trackOnly);
-    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(trackOnly);
+  it('marks unknown usage with the dash, non-interactive, with no info and no transcript', () => {
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: null, hasMessages: false })).toEqual(unknownUsage);
+  });
+
+  it('keeps the loading placeholder label-free before the session resolves', () => {
+    expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false, loading: true })).toEqual(
+      trackOnly
+    );
+    expect(pill({ totalCostMicrodollars: null, hasMessages: false, loading: true })).toEqual(
+      trackOnly
+    );
   });
 
   it('shows percentage as primary and cost as secondary when capacity is known', () => {
@@ -158,6 +181,7 @@ describe('getHeaderPillContent', () => {
       tone: 'primary',
       arcFraction: 0.42,
       interactive: true,
+      usageUnavailable: false,
     });
   });
 
@@ -169,6 +193,7 @@ describe('getHeaderPillContent', () => {
       tone: 'primary' as const,
       arcFraction: 0.1,
       interactive: true,
+      usageUnavailable: false,
     };
     expect(
       pill({ info: info({ percentage: 10 }), totalCostMicrodollars: 0, hasMessages: true })
@@ -217,6 +242,7 @@ describe('getHeaderPillContent', () => {
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
+      usageUnavailable: false,
     });
   });
 
@@ -234,6 +260,7 @@ describe('getHeaderPillContent', () => {
       tone: 'neutral',
       arcFraction: undefined,
       interactive: true,
+      usageUnavailable: false,
     });
   });
 
@@ -245,16 +272,20 @@ describe('getHeaderPillContent', () => {
       tone: 'neutral',
       arcFraction: 0,
       interactive: false,
+      usageUnavailable: true,
     });
   });
 
-  it('shows no text when transcript exists without context or cost', () => {
-    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(trackOnly);
-    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(trackOnly);
+  it('marks unknown usage with the dash when a transcript exists without cost', () => {
+    expect(pill({ totalCostMicrodollars: null, hasMessages: true })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: 0, hasMessages: true })).toEqual(unknownUsage);
+    expect(pill({ totalCostMicrodollars: null, hasMessages: true, loading: true })).toEqual(
+      trackOnly
+    );
   });
 
   it('never surfaces a bare cost before a transcript exists', () => {
-    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(trackOnly);
+    expect(pill({ totalCostMicrodollars: 700, hasMessages: false })).toEqual(unknownUsage);
   });
 });
 
@@ -376,31 +407,68 @@ describe('getMetricsAccessibilityLabel', () => {
     expect(label).not.toContain('100%');
   });
 
-  it('drops tap intent when not pressable and reads cost', () => {
+  it('names usage unavailable with the spoken cost once loading has stopped', () => {
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
         totalCostMicrodollars: 80_000,
         interactive: false,
       })
-    ).toBe('cost 8 cents');
+    ).toBe('Context usage unavailable, cost 8 cents.');
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
         totalCostMicrodollars: 120_000,
         interactive: false,
       })
-    ).toBe('cost 12 cents');
+    ).toBe('Context usage unavailable, cost 12 cents.');
   });
 
-  it('reads empty when there is no info or cost', () => {
+  it('keeps the bare spoken cost while the session is still loading', () => {
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: 80_000,
+        interactive: false,
+        loading: true,
+      })
+    ).toBe('cost 8 cents');
+  });
+
+  it('names usage unavailable when there is no info or cost', () => {
     expect(
       getMetricsAccessibilityLabel({
         info: undefined,
         totalCostMicrodollars: null,
         interactive: false,
       })
+    ).toBe('Context usage unavailable.');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: null,
+        interactive: false,
+        loading: true,
+      })
     ).toBe('');
+  });
+
+  it('pairs the unavailable copy with the tap intent on a live pill', () => {
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: null,
+        interactive: true,
+      })
+    ).toBe('Context usage unavailable. Tap to view context details.');
+    expect(
+      getMetricsAccessibilityLabel({
+        info: undefined,
+        totalCostMicrodollars: null,
+        interactive: true,
+        loading: true,
+      })
+    ).toBe('Tap to view context details.');
   });
 
   it('does not speak a platform when info and cost are present', () => {

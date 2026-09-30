@@ -2784,6 +2784,7 @@
       "provider": "Darparwr",
       "totalCost": "Cyfanswm y gost",
       "usageReflectsLatest": "Mae'r defnydd yn seiliedig ar ymateb diweddaraf y cynorthwyydd sydd wedi'i gwblhau.",
+      "usageUnavailable": "Nid yw defnyddio cyd-destun ar gael",
       "tokenUsage": "Defnydd tocynnau",
       "cacheRate": "Cyfradd y storfa dros dro",
       "modelsCount": "Modelau ({{displayCount}})",

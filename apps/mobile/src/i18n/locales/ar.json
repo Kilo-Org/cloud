@@ -2207,6 +2207,7 @@
       "provider": "المزود",
       "totalCost": "التكلفة الإجمالية",
       "usageReflectsLatest": "تعكس بيانات الاستخدام آخر رد مكتمل من المساعد.",
+      "usageUnavailable": "استخدام السياق غير متوفر",
       "tokenUsage": "استخدام الرموز",
       "cacheRate": "نسبة التخزين المؤقت",
       "modelsCount": "النماذج ({{displayCount}})",

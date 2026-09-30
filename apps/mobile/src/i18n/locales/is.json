@@ -2632,6 +2632,7 @@
       "provider": "Veitandi",
       "totalCost": "Heildarkostnaður",
       "usageReflectsLatest": "Notkunin miðast við síðasta fullgerða svar aðstoðarmannsins.",
+      "usageUnavailable": "Notkun samhengis er ekki tiltæk",
       "tokenUsage": "Tókanotkun",
       "cacheRate": "Skyndiminnishlutfall",
       "modelsCount": "Líkön ({{displayCount}})",

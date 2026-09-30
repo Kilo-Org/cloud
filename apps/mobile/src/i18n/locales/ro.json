@@ -2670,6 +2670,7 @@
       "provider": "Furnizor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "Datele de utilizare corespund celui mai recent răspuns finalizat al asistentului.",
+      "usageUnavailable": "Utilizarea contextului nu este disponibilă",
       "tokenUsage": "Utilizarea tokenurilor",
       "cacheRate": "Rată de utilizare a cache-ului",
       "modelsCount": "Modele ({{displayCount}})",

@@ -2708,6 +2708,7 @@
       "provider": "Poskytovateľ",
       "totalCost": "Celkové náklady",
       "usageReflectsLatest": "Údaje o využití zodpovedajú poslednej dokončenej odpovedi asistenta.",
+      "usageUnavailable": "Využitie kontextu nie je k dispozícii",
       "tokenUsage": "Využitie tokenov",
       "cacheRate": "Podiel využitia vyrovnávacej pamäte",
       "modelsCount": "Modely ({{displayCount}})",

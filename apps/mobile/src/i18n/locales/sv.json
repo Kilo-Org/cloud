@@ -2632,6 +2632,7 @@
       "provider": "Leverantör",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Användningen avser det senaste färdiga svaret från assistenten.",
+      "usageUnavailable": "Kontextanvändning är inte tillgänglig",
       "tokenUsage": "Tokenanvändning",
       "cacheRate": "Andel från cache",
       "modelsCount": "Modeller ({{displayCount}})",

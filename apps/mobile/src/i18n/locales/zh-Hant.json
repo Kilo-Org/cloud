@@ -2119,6 +2119,7 @@
       "provider": "供應商",
       "totalCost": "總費用",
       "usageReflectsLatest": "這是最近一次助理回覆完成後的用量。",
+      "usageUnavailable": "上下文用量無法取得",
       "tokenUsage": "詞元用量",
       "cacheRate": "快取命中率",
       "modelsCount": "模型（{{displayCount}}）",

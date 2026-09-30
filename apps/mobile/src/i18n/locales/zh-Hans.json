@@ -2119,6 +2119,7 @@
       "provider": "提供商",
       "totalCost": "总费用",
       "usageReflectsLatest": "此处显示的是助手最近一次完成回复时的用量。",
+      "usageUnavailable": "上下文用量不可用",
       "tokenUsage": "词元用量",
       "cacheRate": "缓存命中率",
       "modelsCount": "模型（{{displayCount}}）",

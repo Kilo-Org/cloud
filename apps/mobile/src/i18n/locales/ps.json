@@ -2632,6 +2632,7 @@
       "provider": "چمتو کوونکی",
       "totalCost": "ټول لګښت",
       "usageReflectsLatest": "د کارونې شمېرې د مرستیال د وروستي بشپړ شوي ځواب پر بنسټ دي.",
+      "usageUnavailable": "د شرایطو کارول نه شته",
       "tokenUsage": "د ټوکنونو کارونه",
       "cacheRate": "د کېش کچه",
       "modelsCount": "ماډلونه ({{displayCount}})",

@@ -2632,6 +2632,7 @@
       "provider": "Kaiwhakarato",
       "totalCost": "Te utu katoa",
       "usageReflectsLatest": "Ko te whakamahinga e whakaaturia ana nō te whakautu hou rawa a te kaiāwhina kua oti.",
+      "usageUnavailable": "Kāore te whakamahinga horopako e wātea ana",
       "tokenUsage": "Te whakamahinga tōkena",
       "cacheRate": "Te ōrau keteroki",
       "modelsCount": "Ngā tauira ({{displayCount}})",

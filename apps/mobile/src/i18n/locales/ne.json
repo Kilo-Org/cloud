@@ -2632,6 +2632,7 @@
       "provider": "प्रदायक",
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यो प्रयोग विवरण सहायकले पूरा गरेको पछिल्लो उत्तरमा आधारित छ।",
+      "usageUnavailable": "सन्दर्भ प्रयोग अनुपलब्ध छ",
       "tokenUsage": "टोकन प्रयोग",
       "cacheRate": "क्यास दर",
       "modelsCount": "मोडेलहरू ({{displayCount}})",

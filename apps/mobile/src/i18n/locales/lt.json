@@ -2708,6 +2708,7 @@
       "provider": "Teikėjas",
       "totalCost": "Bendra kaina",
       "usageReflectsLatest": "Naudojimo duomenys atitinka paskutinį baigtą asistento atsakymą.",
+      "usageUnavailable": "Konteksto naudojimas neprieinamas",
       "tokenUsage": "Žetonų naudojimas",
       "cacheRate": "Iš talpyklos gauta dalis",
       "modelsCount": "Modeliai ({{displayCount}})",

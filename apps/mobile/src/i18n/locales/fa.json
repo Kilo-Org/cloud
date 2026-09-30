@@ -2632,6 +2632,7 @@
       "provider": "ارائه‌دهنده",
       "totalCost": "هزینه کل",
       "usageReflectsLatest": "میزان استفاده بر اساس آخرین پاسخ تکمیل‌شدهٔ دستیار است.",
+      "usageUnavailable": "میزان استفاده از زمینه در دسترس نیست",
       "tokenUsage": "مصرف توکن",
       "cacheRate": "نرخ استفاده از کش",
       "modelsCount": "مدل‌ها ({{displayCount}})",

@@ -2632,6 +2632,7 @@
       "provider": "فراہم کنندہ",
       "totalCost": "کل لاگت",
       "usageReflectsLatest": "استعمال کے یہ اعداد معاون کے آخری مکمل جواب کے مطابق ہیں۔",
+      "usageUnavailable": "سیاق کا استعمال دستیاب نہیں ہے",
       "tokenUsage": "ٹوکن کا استعمال",
       "cacheRate": "کیش کی شرح",
       "modelsCount": "ماڈلز ({{displayCount}})",

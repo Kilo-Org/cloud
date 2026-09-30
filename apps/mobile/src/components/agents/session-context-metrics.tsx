@@ -52,7 +52,7 @@ export function SessionContextMetrics({
   onPress,
   loading = false,
 }: Readonly<SessionContextMetricsProps>) {
-  const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages });
+  const content = getHeaderPillContent({ info, totalCostMicrodollars, hasMessages, loading });
   // This pill is the only way into the session's context sheet, which owns the
   // session's permission settings (auto-approve). The parent provides `onPress`
   // whenever the sheet can open for this session, so pressability follows that
@@ -68,6 +68,7 @@ export function SessionContextMetrics({
     info,
     totalCostMicrodollars,
     interactive: pressable,
+    loading,
   });
 
   // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with

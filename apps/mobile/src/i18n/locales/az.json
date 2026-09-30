@@ -2632,6 +2632,7 @@
       "provider": "Təminatçı",
       "totalCost": "Ümumi xərc",
       "usageReflectsLatest": "İstifadə göstəriciləri köməkçinin son tamamlanmış cavabına aiddir.",
+      "usageUnavailable": "Kontekst istifadəsi əlçatmazdır",
       "tokenUsage": "Token istifadəsi",
       "cacheRate": "Keşdən istifadə faizi",
       "modelsCount": "Modellər ({{displayCount}})",

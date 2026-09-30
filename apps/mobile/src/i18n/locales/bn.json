@@ -2632,6 +2632,7 @@
       "provider": "প্রোভাইডার",
       "totalCost": "মোট খরচ",
       "usageReflectsLatest": "সহকারীর সর্বশেষ সম্পূর্ণ উত্তরের ভিত্তিতে ব্যবহারের হিসাব দেখানো হচ্ছে।",
+      "usageUnavailable": "প্রসঙ্গ ব্যবহারের তথ্য অনুপলব্ধ",
       "tokenUsage": "টোকেনের ব্যবহার",
       "cacheRate": "ক্যাশের হার",
       "modelsCount": "মডেল ({{displayCount}})",

@@ -71,10 +71,14 @@ export function KvRow({
         className
       )}
     >
-      <View className="shrink-0 flex-row items-center gap-2">
+      {/* The label yields before the value: a long localized label truncates
+          instead of stealing the width the value needs, so a single-line value
+          is never middle-ellipsized by a wide label. `min-w-8` keeps a floor so
+          a long value cannot collapse the label away entirely. */}
+      <View className="min-w-8 flex-1 flex-row items-center gap-2">
         {dotTone ? <View className={cn('size-2 rounded-full', DOT_TONE[dotTone])} /> : null}
         {Icon ? <Icon size={14} color={colors.mutedForeground} /> : null}
-        <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+        <Text className="min-w-0 shrink text-sm text-muted-foreground" numberOfLines={1}>
           {label}
         </Text>
       </View>

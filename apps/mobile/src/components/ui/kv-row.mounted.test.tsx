@@ -65,4 +65,30 @@ describe('KvRow mounted layout', () => {
     expect(text.props.numberOfLines).toBe(1);
     expect(text.props.ellipsizeMode).toBe('middle');
   });
+
+  // SPOT-DEFECT: the Spend alerts "Spend in the last 24 hours" row rendered
+  // "Još nema z…potrošnje" under the Croatian/Bosnian catalog. The label was
+  // `shrink-0`, so the long localized label kept its full width and the
+  // single-line value shrank into a middle ellipsis. The label is the flexible
+  // side now (same convention as `SessionRow`), so the value keeps its width.
+  it('lets a long label yield instead of shrinking the value', () => {
+    const root = renderRow({ value: 'No spend recorded yet' });
+    const label = root.find(
+      node => Object.is(node.type, 'Text') && node.children.includes('Repository')
+    );
+    expect((label.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-0', 'shrink'])
+    );
+    const labelWrapper = root.find(
+      node =>
+        typeof node.props.className === 'string' &&
+        node.props.className.split(' ').includes('flex-1')
+    );
+    expect((labelWrapper.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-8', 'flex-1'])
+    );
+    const value = valueText(root, 'No spend recorded yet');
+    expect((value.props.className as string).split(' ')).toContain('shrink');
+    expect((value.props.className as string).split(' ')).not.toContain('shrink-0');
+  });
 });

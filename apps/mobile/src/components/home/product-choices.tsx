@@ -1,5 +1,6 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
@@ -15,7 +16,13 @@ type ProductChoicesProps = {
   contextReady: boolean;
 };
 
-export function ProductChoices({ organizationId, contextReady }: Readonly<ProductChoicesProps>) {
+// Memoized because HomeScreen re-renders on every live-session socket write
+// while these props stay stable; without it the Explore section and its rows
+// re-render on each update.
+export const ProductChoices = memo(function ProductChoices({
+  organizationId,
+  contextReady,
+}: Readonly<ProductChoicesProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
@@ -69,4 +76,4 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
       </View>
     </View>
   );
-}
+});

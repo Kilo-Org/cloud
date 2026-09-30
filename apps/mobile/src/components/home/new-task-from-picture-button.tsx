@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { memo, useCallback } from 'react';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useActionSheet } from '@expo/react-native-action-sheet';
@@ -25,7 +25,7 @@ type NewTaskFromPictureButtonProps = {
  * composer with it attached, and cancel (or a failed launch) leaves the person
  * on Home with nothing staged.
  */
-export function NewTaskFromPictureButton({
+export const NewTaskFromPictureButton = memo(function NewTaskFromPictureButton({
   organizationId,
 }: Readonly<NewTaskFromPictureButtonProps>) {
   const router = useRouter();
@@ -94,4 +94,4 @@ export function NewTaskFromPictureButton({
       </Button>
     </View>
   );
-}
+});

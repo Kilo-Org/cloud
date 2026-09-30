@@ -1,6 +1,7 @@
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { INLINE_LINK_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
@@ -38,7 +39,11 @@ export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<Se
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
           // is RTL).
-          className="max-w-full shrink-0 flex-row active:opacity-70"
+          // The box is the app's shared inline-link box: a 28dp floor (the
+          // control-size audit's minimum measured on this node) plus the
+          // `hitSlop` below reaches the 44pt target, while the box's
+          // layout-neutral margins keep the header row on its own line height.
+          className={cn('max-w-full shrink-0 flex-row active:opacity-70', INLINE_LINK_BOX_CLASS)}
         >
           <Text
             className={cn(

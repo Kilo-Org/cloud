@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
+import { useLiveSessionContext } from '@/components/home/live-session-state';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
 import { BlurBar } from '@/components/ui/blur-bar';
@@ -17,7 +18,6 @@ import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useOrganization } from '@/lib/organization-context';
 import {
   isAttentionAcked,
   reconcileSessionAttention,
@@ -149,20 +149,26 @@ export default function TabsLayout() {
   });
   const tabBarHorizontalInset = getTabBarHorizontalInset({ left, right });
   const tabIconSize = getTabBarIconSize(fontScale);
-  const { organizationId, isLoaded: orgLoaded } = useOrganization();
+  // The organization-boundary admission Home and Agents share: the persisted
+  // organization is unconfirmed until the loaded membership list resolves it,
+  // so `isLoaded` alone is not enough. Enabling with `orgLoaded` fired an
+  // access-checked `activeSessions.list` for a persisted organization the user
+  // no longer belongs to — which the server rejects — and let the Agents badge
+  // and pending-action routing read that unconfirmed org's sessions.
+  const { organizationId, isReady: orgReady } = useLiveSessionContext();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({
     organizationId,
-    enabled: orgLoaded,
+    enabled: orgReady,
   });
   const attentionRevision = useSessionAttentionRevision();
   useEffect(() => {
-    if (!orgLoaded) {
+    if (!orgReady) {
       return;
     }
     for (const session of activeSessions) {
       reconcileSessionAttention(session.id, session.status, null);
     }
-  }, [activeSessions, orgLoaded, attentionRevision]);
+  }, [activeSessions, orgReady, attentionRevision]);
   const needsInputRows = activeSessions.map(session => ({
     id: session.id,
     status: session.status,
@@ -176,14 +182,14 @@ export default function TabsLayout() {
     })
   ).length;
   const needsInputBadge =
-    orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
+    orgReady && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
 
   // The in-app consumer for an action another surface asked for: the URL rails
   // park one (`action-url-handler.ts`), and a completed StartAgent parks the
   // session it created. The consumer lives in `usePendingAppAction` and is
   // mounted here because this layout owns both the router and the live session
   // list — the destination is decided here and nowhere else.
-  usePendingAppAction({ needsInputRows, orgLoaded, isLoading, isError });
+  usePendingAppAction({ needsInputRows, orgLoaded: orgReady, isLoading, isError });
 
   // If the flag flips off while the Chat tab is focused, its `href` becomes
   // null but the route is still mounted — move to Home instead.

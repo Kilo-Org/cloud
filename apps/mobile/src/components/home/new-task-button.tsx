@@ -1,4 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Plus } from '@/components/ui/icons';
 import { View } from 'react-native';
@@ -11,7 +12,11 @@ type NewTaskButtonProps = {
   organizationId: string | null;
 };
 
-export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) {
+// Memoized so a live-session update does not re-render the action section on
+// Home while `organizationId` stays stable.
+export const NewTaskButton = memo(function NewTaskButton({
+  organizationId,
+}: Readonly<NewTaskButtonProps>) {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -34,4 +39,4 @@ export function NewTaskButton({ organizationId }: Readonly<NewTaskButtonProps>) 
       </Button>
     </View>
   );
-}
+});

@@ -53,8 +53,8 @@ const ALLOWLIST: Readonly<Record<string, string>> = {
   'src/components/agents/chat-composer-input-row.tsx': 'multiline prompt composer',
   'src/components/agents/new-session-prompt.tsx':
     'multiline new-session prompt composer (multiline, leading-6, measured height)',
-  'src/components/code-reviewer/manual-review-screen.tsx':
-    'multiline `h-24` summary editor (its single-line URL field uses the shared box)',
+  'src/components/code-reviewer/manual-review-fields.tsx':
+    'multiline `h-24` instructions editor (its single-line URL field uses the shared box)',
   'src/components/kilo-chat/message-input-view.tsx': 'multiline chat composer',
   'src/components/kiloclaw/version-pin-row.tsx': 'multiline pin editor (:87-99)',
   'src/components/pr-review/discussion/reply-input.tsx': 'multiline reply composer',

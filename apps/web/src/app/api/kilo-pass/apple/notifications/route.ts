@@ -9,7 +9,10 @@ const AppStoreNotificationBodySchema = z.object({
 
 export async function POST(request: Request) {
   try {
-    const body = AppStoreNotificationBodySchema.safeParse(await request.json());
+    // A body that is not JSON is a bad request, not a server fault. A 5xx would
+    // make Apple retry a request that can never succeed.
+    const rawBody = await request.json().catch(() => undefined);
+    const body = AppStoreNotificationBodySchema.safeParse(rawBody);
     if (!body.success) {
       return Response.json({ error: 'Missing signedPayload' }, { status: 400 });
     }

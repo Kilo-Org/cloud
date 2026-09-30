@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -61,38 +62,48 @@ function InstructionsEditor({
 export default function InstructionsRoute() {
   const { scope, platform } = useLocalSearchParams<{ scope: string; platform: ReviewerPlatform }>();
   const router = useRouter();
-  const { data } = useReviewConfig(scope, platform);
+  const { data, isError, isFetching, refetch } = useReviewConfig(scope, platform);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
+
+  // A failed first load is the whole body. Render it outside the page scroller
+  // so QueryError's own centered ScrollView fills the screen; nested inside
+  // TabScreenScrollView its `flex-1` collapses to zero height in the scroll
+  // content's auto-height column, clipping the message and Retry (repos.tsx).
+  const configFailed = data == null && isError;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.instructions.title')} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="px-6 pt-4"
-        automaticallyAdjustKeyboardInsets
-        keyboardShouldPersistTaps="handled"
-      >
-        <Animated.View layout={LinearTransition} className="gap-4">
-          {data == null && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-10 w-full rounded-md" />
-            </Animated.View>
-          )}
+      {configFailed ? (
+        <QueryError variant="server" onRetry={() => void refetch()} isRetrying={isFetching} />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName="px-6 pt-4"
+          automaticallyAdjustKeyboardInsets
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View layout={LinearTransition} className="gap-4">
+            {data == null && (
+              <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
+                <Skeleton className="h-32 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </Animated.View>
+            )}
 
-          {data != null && (
-            <InstructionsEditor
-              initial={data.customInstructions ?? ''}
-              save={save}
-              onSaved={() => {
-                router.back();
-              }}
-            />
-          )}
-        </Animated.View>
-      </TabScreenScrollView>
+            {data != null && (
+              <InstructionsEditor
+                initial={data.customInstructions ?? ''}
+                save={save}
+                onSaved={() => {
+                  router.back();
+                }}
+              />
+            )}
+          </Animated.View>
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

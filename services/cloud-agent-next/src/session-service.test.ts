@@ -3504,6 +3504,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
       expect(kiloConfig.snapshot).toBe(false);
       expect(opencodeConfig).toEqual(kiloConfig);
+      expect(result.readyRequest.materialized.env.KILO_DISABLE_CODEBASE_INDEXING).toBe(
+        'vscode-no-workspace'
+      );
     }
   );
 

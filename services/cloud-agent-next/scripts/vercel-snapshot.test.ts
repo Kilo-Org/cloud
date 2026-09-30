@@ -73,7 +73,8 @@ describe('Vercel snapshot operator pure logic', () => {
   it('defaults wrapper path, wrapper version, and a dated build id', () => {
     const input = resolveSnapshotInputs({});
     expect(input.wrapperPath).toMatch(/wrapper\/dist\/wrapper\.js$/);
-    expect(input.controlWrapperPath).toMatch(/wrapper\/dist\/control-wrapper\.js$/);
+    expect(input.controlPlaneWrapperPath).toMatch(/wrapper\/dist\/control-plane-wrapper\.js$/);
+    expect(input.controlPlaneSupervisorPath).toMatch(/wrapper\/control-plane-supervisor\.sh$/);
     expect(input.wrapperVersion).toBe(WRAPPER_VERSION);
     expect(input.runtimeBuildId).toMatch(/^local-\d{8}-\d{6}$/);
     expect(defaultRuntimeBuildId(new Date('2026-08-19T12:34:56.000Z'))).toBe(

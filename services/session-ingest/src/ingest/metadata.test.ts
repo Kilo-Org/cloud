@@ -614,15 +614,41 @@ describe('applyMetadataChanges', () => {
   it.each([
     { parentCloudAgentScopeId: 'workspace_root' },
     { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
-  ])('does not let public parent metadata claim a Cloud Agent root: %j', identity => {
-    const db = createApplyMetadataDb({ parentExists: true, ...identity });
+  ])(
+    'records owned Cloud Agent parent lineage without claiming its scope or worktree: %j',
+    identity => {
+      const db = createApplyMetadataDb({ parentExists: true, ...identity });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['parentId', 'ses_parent']])
+      ).then(() => {
+        expect(db.updateSets).toEqual([{ parent_session_id: 'ses_parent' }]);
+        expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+          env,
+          'usr_1',
+          expect.objectContaining({
+            type: 'session.updated',
+            data: expect.objectContaining({
+              session: expect.objectContaining({ parentSessionId: 'ses_parent', worktreeId: null }),
+            }),
+          }),
+          undefined
+        );
+      });
+    }
+  );
+
+  it('refuses parent lineage when the authenticated user does not own the parent', async () => {
+    const db = createApplyMetadataDb({ parentExists: false });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    return applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']])).then(
-      () => {
-        expect(db.updateSets).toEqual([]);
-        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
-      }
-    );
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_other_owner']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   describe('glanceable aggregate refresh', () => {

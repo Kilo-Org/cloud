@@ -21,6 +21,8 @@ import type {
 } from '../src/notifications-binding.js';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
 import { getSandboxControlStub, isSandboxControlId } from '../src/sandbox-control/stub';
+import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
+import { SandboxSessionV2 } from '../src/control-plane/session/session-do';
 import { getSandboxSessionStub, resolveSessionStub } from '../src/sandbox-session/session-stub';
 import { SESSION_ID_RE } from '../src/shared/protocol.js';
 import { terminalPtyIdSchema } from '../src/shared/sandbox-control-protocol.js';
@@ -69,8 +71,9 @@ export class CloudAgentSession extends RealCloudAgentSession {
 }
 
 export { UserKiloFacade } from '../src/kilo-facade/user-kilo-facade.js';
-export { SandboxControl } from '../src/persistence/SandboxControl.js';
-export { SandboxSession } from '../src/sandbox-session/SandboxSession.js';
+// The test Worker binds the production `SANDBOX_CONTROL`/`SANDBOX_SESSION`
+// names to the control-plane V2 classes, matching production after the C1c flip.
+export { SandboxControlV2, SandboxSessionV2 };
 
 type TestEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
@@ -128,6 +131,18 @@ export default {
         return new Response('Invalid sandboxId', { status: 400 });
       }
       return getSandboxControlStub(env, sandboxId).fetch(request);
+    }
+
+    if (url.pathname.startsWith('/sandbox-control-v2/')) {
+      const upgradeHeader = request.headers.get('Upgrade');
+      if (upgradeHeader?.toLowerCase() !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control-v2/'.length));
+      if (!sandboxId || sandboxId.includes('/') || !isSandboxControlId(sandboxId)) {
+        return new Response('Invalid sandboxId', { status: 400 });
+      }
+      return env.SANDBOX_CONTROL.getByName(sandboxId).fetch(request);
     }
 
     if (url.pathname === '/terminal-test') {
@@ -188,6 +203,19 @@ export default {
       }
 
       return resolveSessionStub(env, userId, sessionId).fetch(request);
+    }
+
+    if (url.pathname === '/stream-v2') {
+      if (request.headers.get('Upgrade') !== 'websocket') {
+        return new Response('Expected WebSocket upgrade', { status: 426 });
+      }
+      const sessionId = url.searchParams.get('sessionId');
+      if (!sessionId) {
+        return new Response('Missing sessionId parameter', { status: 400 });
+      }
+      const streamUrl = new URL(request.url);
+      streamUrl.pathname = '/stream';
+      return env.SANDBOX_SESSION.getByName(sessionId).fetch(new Request(streamUrl, request));
     }
 
     if (url.pathname === '/test/notification-jobs/fail-next' && request.method === 'POST') {

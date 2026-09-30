@@ -28,9 +28,9 @@ await Bun.build({
 });
 
 await Bun.build({
-  entrypoints: ['./src/control/main.ts'],
+  entrypoints: ['./src/control-plane/main.ts'],
   outdir: './dist',
-  naming: 'control-wrapper.js',
+  naming: 'control-plane-wrapper.js',
   target: 'bun',
   minify: true,
 });
@@ -38,5 +38,5 @@ await Bun.build({
 await chmod('./dist/bb', 0o755);
 
 console.log(
-  'Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb, dist/control-wrapper.js'
+  'Build complete: dist/wrapper.js, dist/restore-session.js, dist/bb, dist/control-plane-wrapper.js'
 );

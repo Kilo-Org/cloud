@@ -1,0 +1,1218 @@
+import { describe, expect, it } from 'bun:test';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  CONTROL_PLANE_TIMERS,
+  type ControlPlaneTimers,
+} from '../../../src/shared/control-plane-timers.js';
+import type { KiloFeedEvent, KiloEventFeedSource } from './kilo-event-feed.js';
+import {
+  cleanupStaleKiloPidfiles,
+  createKiloRuntime,
+  createKiloRuntimes,
+  parseKiloPidfile,
+  type KiloFeedCallbacks,
+  type KiloProcess,
+  type KiloProcessSpawner,
+  type KiloRuntime,
+  type KiloRuntimeOptions,
+  type KiloRuntimeScheduler,
+} from './kilo-runtime.js';
+
+function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
+  return {
+    ...CONTROL_PLANE_TIMERS,
+    wrapper: { ...CONTROL_PLANE_TIMERS.wrapper, ...overrides },
+  };
+}
+
+async function waitFor(condition: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await Bun.sleep(1);
+  }
+  return;
+}
+
+type FakeScheduler = {
+  scheduler: KiloRuntimeScheduler;
+  advance(ms: number): void;
+  intervalCount(): number;
+  fire(): void;
+};
+
+function createScheduler(): FakeScheduler {
+  let current = 1_000_000;
+  const intervals = new Map<symbol, () => void>();
+  return {
+    scheduler: {
+      now: () => current,
+      setInterval: (handler: () => void) => {
+        const id = Symbol('interval');
+        intervals.set(id, handler);
+        return id;
+      },
+      clearInterval: handle => {
+        intervals.delete(handle as symbol);
+      },
+    },
+    advance(ms) {
+      current += ms;
+    },
+    intervalCount: () => intervals.size,
+    fire() {
+      for (const handler of [...intervals.values()]) handler();
+    },
+  };
+}
+
+type FakeProcessRecord = { pid: number; stopped: number; exit: () => void };
+
+function createSpawner(): {
+  spawn: KiloProcessSpawner;
+  processes: FakeProcessRecord[];
+  spawnCount(): number;
+} {
+  let nextPid = 1_000;
+  const processes: FakeProcessRecord[] = [];
+  const spawn: KiloProcessSpawner = async () => {
+    const pid = nextPid++;
+    const deferred = Promise.withResolvers<void>();
+    const record: FakeProcessRecord = { pid, stopped: 0, exit: () => deferred.resolve() };
+    processes.push(record);
+    const process: KiloProcess = {
+      pid,
+      url: `http://127.0.0.1:${pid}`,
+      exited: deferred.promise,
+      stop: async () => {
+        record.stopped += 1;
+        return true;
+      },
+    };
+    return process;
+  };
+  return { spawn, processes, spawnCount: () => processes.length };
+}
+
+type FakeFeedRecord = { callbacks: KiloFeedCallbacks; closed: number };
+
+function createFeedFactory(options: { failOpens?: number } = {}): {
+  openFeed: (
+    source: KiloEventFeedSource,
+    callbacks: KiloFeedCallbacks
+  ) => { open(): Promise<void>; close(): void };
+  feeds: FakeFeedRecord[];
+} {
+  const feeds: FakeFeedRecord[] = [];
+  let remainingFailures = options.failOpens ?? 0;
+  return {
+    feeds,
+    openFeed: (_source, callbacks) => {
+      const record: FakeFeedRecord = { callbacks, closed: 0 };
+      feeds.push(record);
+      return {
+        open: async () => {
+          if (remainingFailures > 0) {
+            remainingFailures -= 1;
+            throw new Error('feed failed to open');
+          }
+          // Behave like the real reader: deliver the first event before
+          // `open()` resolves so a successful attempt is visible immediately.
+          callbacks.onEvent({ type: 'server.connected', properties: {}, nativeRuntimeId: 'r' });
+        },
+        close: () => {
+          record.closed += 1;
+        },
+      };
+    },
+  };
+}
+
+function createProbe(answer: boolean | (() => Promise<boolean>)): {
+  probe: () => Promise<boolean>;
+  calls: { count: number };
+  set(answer: boolean | (() => Promise<boolean>)): void;
+} {
+  let current = answer;
+  const calls = { count: 0 };
+  return {
+    calls,
+    probe: async () => {
+      calls.count += 1;
+      return typeof current === 'function' ? current() : current;
+    },
+    set(value) {
+      current = value;
+    },
+  };
+}
+
+const TEST_TIMERS = timers({
+  sseSilenceMs: 100,
+  healthRequestMs: 1_000,
+  kiloRestartLimit: 3,
+  kiloRestartWindowMs: 60_000,
+});
+
+function createRuntime(options: {
+  spawner: ReturnType<typeof createSpawner>;
+  feed: ReturnType<typeof createFeedFactory>;
+  probe: ReturnType<typeof createProbe>;
+  scheduler: FakeScheduler;
+  restarts?: Array<{ reason: string }>;
+  unavailable?: number;
+  directory?: string;
+  env?: Record<string, string>;
+  isIdle?: () => boolean | Promise<boolean>;
+  prepareFilesystem?: (env: Record<string, string>, directory: string) => Promise<void>;
+  spawnKilo?: KiloProcessSpawner;
+  timers?: ControlPlaneTimers;
+  onRestart?: (info: { directory: string; reason: string }) => void;
+}) {
+  const restarts: Array<{ reason: string }> = options.restarts ?? [];
+  const restartingAtOnRestart: boolean[] = [];
+  const logs: string[] = [];
+  const runtimeRef: { current?: ReturnType<typeof createKiloRuntime> } = {};
+  let unavailable = options.unavailable ?? 0;
+  const runtime = createKiloRuntime({
+    directory: options.directory ?? '/tmp/kilo-runtime-test',
+    env: options.env ?? { HOME: '/old' },
+    timers: options.timers ?? TEST_TIMERS,
+    pidfileDirectory: '/tmp/kilo-runtime-test-pids',
+    spawnKilo: options.spawnKilo ?? options.spawner.spawn,
+    openFeed: options.feed.openFeed,
+    probeHealth: options.probe.probe,
+    scheduler: options.scheduler.scheduler,
+    readProcessStartTime: () => undefined,
+    log: message => logs.push(message),
+    ...(options.isIdle
+      ? {
+          isIdle: async () => options.isIdle!(),
+        }
+      : {}),
+    ...(options.prepareFilesystem ? { prepareFilesystem: options.prepareFilesystem } : {}),
+    onRestart: info => {
+      restarts.push({ reason: info.reason });
+      restartingAtOnRestart.push(runtimeRef.current?.isRestarting() ?? true);
+      options.onRestart?.(info);
+    },
+    onUnavailable: () => {
+      unavailable += 1;
+    },
+  });
+  runtimeRef.current = runtime;
+  return {
+    restarts,
+    restartingAtOnRestart,
+    logs,
+    unavailable: () => unavailable,
+    runtime,
+  };
+}
+
+describe('parseKiloPidfile', () => {
+  it('accepts a well-formed record and rejects anything else', () => {
+    expect(parseKiloPidfile('{"pid":12,"startTime":"345"}')).toEqual({ pid: 12, startTime: '345' });
+    expect(parseKiloPidfile('not json')).toBeUndefined();
+    expect(parseKiloPidfile('{"pid":0,"startTime":"1"}')).toBeUndefined();
+    expect(parseKiloPidfile('{"pid":12,"startTime":"abc"}')).toBeUndefined();
+    expect(parseKiloPidfile('{"pid":12}')).toBeUndefined();
+  });
+});
+
+describe('cleanupStaleKiloPidfiles', () => {
+  it('kills only the process group whose PID and start time still match, then clears every pidfile', async () => {
+    const directory = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-pidfile-test-'));
+    try {
+      await fsp.writeFile(
+        path.join(directory, '101.pid.json'),
+        JSON.stringify({ pid: 101, startTime: '500' })
+      );
+      await fsp.writeFile(
+        path.join(directory, '202.pid.json'),
+        JSON.stringify({ pid: 202, startTime: '999' })
+      );
+      await fsp.writeFile(path.join(directory, '303.pid.json'), 'not json');
+      const killed: Array<{ pid: number; signal: NodeJS.Signals }> = [];
+      const count = await cleanupStaleKiloPidfiles({
+        directory,
+        readProcessStartTime: pid => (pid === 101 ? '500' : '777'),
+        killProcessGroup: (pid, signal) => killed.push({ pid, signal }),
+        log: () => undefined,
+      });
+      expect(count).toBe(1);
+      expect(killed).toEqual([{ pid: 101, signal: 'SIGKILL' }]);
+      expect(await fsp.readdir(directory)).toEqual([]);
+    } finally {
+      await fsp.rm(directory, { recursive: true, force: true });
+    }
+  });
+
+  it('is a no-op for a missing directory', async () => {
+    const count = await cleanupStaleKiloPidfiles({
+      directory: '/tmp/kilo-pidfile-does-not-exist',
+      log: () => undefined,
+    });
+    expect(count).toBe(0);
+  });
+});
+
+describe('createKiloRuntime', () => {
+  it('restarts on an unexpected Kilo exit but not after a deliberate stop', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, logs } = createRuntime({ spawner, feed, probe, scheduler });
+    await runtime.ensure();
+    expect(spawner.spawnCount()).toBe(1);
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => spawner.spawnCount() === 2);
+    expect(
+      logs.some(message => message.includes('kilo restarting') && message.includes('reason=exit'))
+    ).toBe(true);
+
+    await runtime.shutdown();
+    spawner.processes[1]!.exit();
+    await Bun.sleep(5);
+    expect(spawner.spawnCount()).toBe(2);
+    expect(scheduler.intervalCount()).toBe(0);
+  });
+
+  it('runs onRestart only after the runtime reports it is no longer restarting', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, restarts, restartingAtOnRestart } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => restarts.length === 1);
+    expect(restartingAtOnRestart).toEqual([false]);
+    expect(runtime.isRestarting()).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it('swallows a throwing onRestart handler without stranding the runtime', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      onRestart: () => {
+        throw new Error('handler boom');
+      },
+    });
+    await runtime.ensure();
+
+    spawner.processes[0]!.exit();
+    await waitFor(() => restarts.length === 1);
+    expect(runtime.isRestarting()).toBe(false);
+    expect(runtime.isUnavailable()).toBe(false);
+    await runtime.ensure();
+    await runtime.shutdown();
+  });
+
+  it('cleans up a failed start so the next ensure spawns a fresh Kilo', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory({ failOpens: 1 });
+    const probe = createProbe(false);
+    const { runtime } = createRuntime({ spawner, feed, probe, scheduler });
+
+    let failure: unknown;
+    try {
+      await runtime.ensure();
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure instanceof Error ? failure.message : String(failure)).toContain(
+      'feed failed to open'
+    );
+    expect(spawner.processes[0]!.stopped).toBe(1);
+
+    const client = await runtime.ensure();
+    expect(spawner.spawnCount()).toBe(2);
+    expect(client).toBeDefined();
+  });
+
+  it('restarts at once when 30 s of silence gets no health answer', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, restarts, logs } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => spawner.spawnCount() === 2);
+
+    expect(probe.calls.count).toBe(1);
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(
+      logs.some(message => message.includes('kilo restarting') && message.includes('reason=hang'))
+    ).toBe(true);
+    expect(
+      logs.some(message => message.includes('kilo restarted') && message.includes('reason=hang'))
+    ).toBe(true);
+  });
+
+  it('keeps the suspect state during silence until the next event', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    // Hold the next health probe so the recovery loop does not replace the
+    // stream before the assertion; suspicion clears on a delivered event.
+    probe.set(() => new Promise(() => {}));
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtime.isSuspected());
+
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+
+    const event: KiloFeedEvent = { type: 'message.updated', properties: {}, nativeRuntimeId: 'r' };
+    feed.feeds[0]!.callbacks.onEvent(event);
+    expect(runtime.isSuspected()).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it('reconnects the stream and counts it when the health probe answers', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      timers: timers({
+        sseSilenceMs: 100,
+        healthRequestMs: 1_000,
+        sseReconnectLimit: 6,
+        sseReconnectWindowMs: 120_000,
+        kiloRestartLimit: 3,
+        kiloRestartWindowMs: 60_000,
+      }),
+    });
+
+    await runtime.ensure();
+    expect(feed.feeds.length).toBe(1);
+
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => feed.feeds.length === 2);
+
+    // The stalled feed was closed without restarting Kilo, and a fresh stream
+    // was attached for the same live process.
+    expect(feed.feeds[0]!.closed).toBe(1);
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it('restarts Kilo after sseReconnectLimit reconnects inside the window', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    // Production-shaped ratio: the window is four silence thresholds, so a
+    // connect frame that ended the episode would cap reconnects at four per
+    // window and the limit would never be reached.
+    const activeTimers = timers({
+      sseSilenceMs: 6_000,
+      healthRequestMs: 1_000,
+      sseReconnectLimit: 6,
+      sseReconnectWindowMs: 24_000,
+      kiloRestartLimit: 3,
+      kiloRestartWindowMs: 600_000,
+    });
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      timers: activeTimers,
+    });
+
+    await runtime.ensure();
+    // Drive the watchdog one tick at a time. The connect frame does not clear
+    // the episode, so every stream that stays silent past its proof window is
+    // replaced until the reconnect budget is spent.
+    let ticks = 0;
+    while (restarts.length === 0 && ticks < 60) {
+      scheduleTick(scheduler, activeTimers);
+      ticks += 1;
+      await Bun.sleep(1);
+    }
+
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    expect(spawner.spawnCount()).toBe(2);
+    // Six reconnects happened before the restart, not one "recovered" connect.
+    expect(feed.feeds.length).toBeGreaterThanOrEqual(7);
+    await runtime.shutdown();
+  });
+
+  describe('with production timings', () => {
+    const PRODUCTION_SILENCE = timers({
+      sseSilenceMs: 30_000,
+      healthRequestMs: 5_000,
+      sseReconnectLimit: 6,
+      sseReconnectWindowMs: 120_000,
+      kiloRestartLimit: 3,
+      kiloRestartWindowMs: 600_000,
+    });
+    const TICK_MS = 5_000;
+
+    async function tick(scheduler: FakeScheduler, count: number): Promise<void> {
+      for (let index = 0; index < count; index += 1) {
+        scheduleTick(scheduler, PRODUCTION_SILENCE);
+        await Bun.sleep(2);
+      }
+    }
+
+    async function silentStreamReconnectedOnce() {
+      const spawner = createSpawner();
+      const scheduler = createScheduler();
+      const feed = createFeedFactory();
+      const probe = createProbe(true);
+      const created = createRuntime({
+        spawner,
+        feed,
+        probe,
+        scheduler,
+        timers: PRODUCTION_SILENCE,
+      });
+      await created.runtime.ensure();
+      scheduleSilence(scheduler, PRODUCTION_SILENCE);
+      await waitFor(() => feed.feeds.length === 2);
+      return { ...created, spawner, scheduler, feed, probe };
+    }
+
+    it('lets a reconnected stream deliver its heartbeat before replacing it', async () => {
+      const { runtime, restarts, spawner, scheduler, feed, probe } =
+        await silentStreamReconnectedOnce();
+
+      // Kilo's first heartbeat arrives 10 s after connect, so the stream must
+      // survive two 5 s checks with nothing delivered.
+      await tick(scheduler, 2);
+      expect(feed.feeds.length).toBe(2);
+      expect(feed.feeds[1]!.closed).toBe(0);
+
+      const heartbeat: KiloFeedEvent = {
+        type: 'server.heartbeat',
+        properties: {},
+        nativeRuntimeId: 'r',
+      };
+      feed.feeds[1]!.callbacks.onEvent(heartbeat);
+      expect(runtime.isSuspected()).toBe(false);
+
+      await tick(scheduler, 4);
+      expect(feed.feeds.length).toBe(2);
+      expect(spawner.spawnCount()).toBe(1);
+      expect(restarts).toEqual([]);
+      expect(probe.calls.count).toBe(1);
+      await runtime.shutdown();
+    });
+
+    it('replaces a reconnected stream that stays silent after its proof window', async () => {
+      const { runtime, restarts, spawner, scheduler, feed } = await silentStreamReconnectedOnce();
+
+      await tick(scheduler, 2);
+      expect(feed.feeds.length).toBe(2);
+
+      await tick(scheduler, 1);
+      await waitFor(() => feed.feeds.length === 3);
+      expect(feed.feeds[1]!.closed).toBe(1);
+      expect(spawner.spawnCount()).toBe(1);
+      expect(restarts).toEqual([]);
+      await runtime.shutdown();
+    });
+
+    it('spends the six reconnects inside the two-minute window before restarting', async () => {
+      const { runtime, restarts, spawner, scheduler, feed } = await silentStreamReconnectedOnce();
+
+      let elapsed = 0;
+      while (restarts.length === 0 && elapsed < 120_000) {
+        await tick(scheduler, 1);
+        elapsed += TICK_MS;
+      }
+
+      expect(restarts).toEqual([{ reason: 'hang' }]);
+      expect(elapsed).toBeLessThan(120_000);
+      expect(feed.feeds.length).toBeGreaterThanOrEqual(7);
+      await waitFor(() => spawner.spawnCount() === 2);
+      await runtime.shutdown();
+    });
+  });
+
+  it('clears the reconnect budget for a new Kilo after a budget restart', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const activeTimers = timers({
+      sseSilenceMs: 6_000,
+      healthRequestMs: 1_000,
+      sseReconnectLimit: 6,
+      sseReconnectWindowMs: 24_000,
+      kiloRestartLimit: 3,
+      kiloRestartWindowMs: 600_000,
+    });
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      timers: activeTimers,
+    });
+
+    await runtime.ensure();
+    let ticks = 0;
+    while (restarts.length === 0 && ticks < 60) {
+      scheduleTick(scheduler, activeTimers);
+      ticks += 1;
+      await Bun.sleep(1);
+    }
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    await waitFor(() => spawner.spawnCount() === 2);
+    await Bun.sleep(10);
+
+    // An ordinary drop on the fresh Kilo must reconnect, not restart again.
+    const feedsAfterRestart = feed.feeds.length;
+    feed.feeds[feedsAfterRestart - 1]!.callbacks.onFailure();
+    await waitFor(() => feed.feeds.length === feedsAfterRestart + 1);
+    expect(spawner.spawnCount()).toBe(2);
+    expect(restarts).toEqual([{ reason: 'hang' }]);
+    await runtime.shutdown();
+  });
+
+  it('completes an attempt and reconnects when the stream ends', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    feed.feeds[0]!.callbacks.onFailure();
+    await waitFor(() => feed.feeds.length === 2);
+
+    // The stream end completed a recovery attempt and reconnected the same
+    // live process; it did not restart Kilo.
+    expect(feed.feeds[0]!.closed).toBe(1);
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it('does not restart Kilo immediately for a stream drop while it is healthy', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    feed.feeds[0]!.callbacks.onFailure();
+    await Bun.sleep(5);
+    expect(spawner.spawnCount()).toBe(1);
+    expect(restarts).toEqual([]);
+    await runtime.shutdown();
+  });
+
+  it('prunes reconnect attempts outside sseReconnectWindowMs', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      timers: timers({
+        sseSilenceMs: 100,
+        healthRequestMs: 1_000,
+        sseReconnectLimit: 2,
+        sseReconnectWindowMs: 100,
+        kiloRestartLimit: 3,
+        kiloRestartWindowMs: 60_000,
+      }),
+    });
+
+    await runtime.ensure();
+    feed.feeds[0]!.callbacks.onFailure();
+    await waitFor(() => feed.feeds.length === 2);
+    await Bun.sleep(5);
+
+    scheduler.advance(200);
+    feed.feeds[1]!.callbacks.onFailure();
+    await waitFor(() => feed.feeds.length === 3);
+    await Bun.sleep(5);
+
+    scheduler.advance(200);
+    feed.feeds[2]!.callbacks.onFailure();
+    await waitFor(() => feed.feeds.length === 4);
+
+    // Each attempt aged out of the window before the next, so the limit never
+    // accumulated and Kilo was never restarted.
+    expect(restarts).toEqual([]);
+    expect(spawner.spawnCount()).toBe(1);
+    await runtime.shutdown();
+  });
+
+  it('allows three restarts in the window and then reports the runtime unavailable', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, unavailable } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      scheduleSilence(scheduler, TEST_TIMERS);
+      await waitFor(() => spawner.spawnCount() === attempt + 2);
+    }
+    expect(runtime.isUnavailable()).toBe(false);
+
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtime.isUnavailable());
+    expect(unavailable()).toBe(1);
+    expect(spawner.spawnCount()).toBe(4);
+    expect(runtime.isSuspected()).toBe(true);
+  });
+
+  it('installs refreshed credentials by restarting without spending the crash budget', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      isIdle: () => true,
+    });
+
+    await runtime.ensure();
+    await runtime.installCredentials({ HOME: '/new' });
+    await waitFor(() => spawner.spawnCount() === 2);
+    expect(runtime.env.HOME).toBe('/new');
+    expect(restarts).toEqual([{ reason: 'credentials' }]);
+
+    // The credential restart must not consume the 3-in-10 crash budget.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      scheduleSilence(scheduler, TEST_TIMERS);
+      await waitFor(() => spawner.spawnCount() === attempt + 3);
+    }
+    expect(runtime.isUnavailable()).toBe(false);
+  });
+
+  it('defers the credential restart while a turn is busy but records the new env', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    let idle = false;
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      isIdle: () => idle,
+    });
+
+    await runtime.ensure();
+    await runtime.installCredentials({ HOME: '/new' });
+    expect(spawner.spawnCount()).toBe(1);
+    expect(runtime.env.HOME).toBe('/new');
+    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(restarts).toEqual([]);
+
+    idle = true;
+    expect(await runtime.applyPendingCredentials()).toBe(true);
+    await waitFor(() => spawner.spawnCount() === 2);
+    expect(restarts).toEqual([{ reason: 'credentials' }]);
+  });
+
+  it('does not restart when the idle probe fails or hangs', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      isIdle: () => Promise.reject(new Error('probe failed')),
+    });
+
+    await runtime.ensure();
+    await runtime.installCredentials({ HOME: '/new' });
+    expect(spawner.spawnCount()).toBe(1);
+    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(restarts).toEqual([]);
+  });
+
+  it('probes once per silence episode and reconnects without re-probing', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const { runtime } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => feed.feeds.length === 2);
+    expect(probe.calls.count).toBe(1);
+
+    // The connect frame did not end the episode, so the next silence reconnects
+    // without another health probe.
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => feed.feeds.length === 3);
+    await Bun.sleep(5);
+    expect(probe.calls.count).toBe(1);
+
+    // A real event ends the episode, so the next silence probes again.
+    const event: KiloFeedEvent = { type: 'message.updated', properties: {}, nativeRuntimeId: 'r' };
+    feed.feeds[2]!.callbacks.onEvent(event);
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => probe.calls.count === 2);
+    await runtime.shutdown();
+  });
+
+  it('aborts a hung Kilo startup at the start deadline', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const hang: KiloProcessSpawner = input =>
+      new Promise((_resolve, reject) => {
+        if (input.signal?.aborted) {
+          reject(new Error('Kilo server startup aborted'));
+          return;
+        }
+        input.signal?.addEventListener(
+          'abort',
+          () => reject(new Error('Kilo server startup aborted')),
+          { once: true }
+        );
+      });
+    const { runtime } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      spawnKilo: hang,
+      timers: timers({
+        sseSilenceMs: 100,
+        healthRequestMs: 1_000,
+        kiloRestartLimit: 3,
+        kiloRestartWindowMs: 60_000,
+        kiloRuntimeStartMs: 30,
+      }),
+    });
+
+    let failure: unknown;
+    try {
+      await runtime.ensure();
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure instanceof Error ? failure.message : String(failure)).toContain(
+      'startup aborted'
+    );
+  });
+
+  it('clears the dead client on stop so ensure re-spawns after a failed restart', async () => {
+    let calls = 0;
+    const processes: Array<{ pid: number; stopped: number; exit: () => void }> = [];
+    let nextPid = 5_000;
+    const spawner: KiloProcessSpawner = async () => {
+      calls += 1;
+      if (calls === 2) throw new Error('spawn failed');
+      const pid = nextPid++;
+      const deferred = Promise.withResolvers<void>();
+      const record = { pid, stopped: 0, exit: () => deferred.resolve() };
+      processes.push(record);
+      return {
+        pid,
+        url: `http://127.0.0.1:${pid}`,
+        exited: deferred.promise,
+        stop: async () => {
+          record.stopped += 1;
+          return true;
+        },
+      };
+    };
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const scheduler = createScheduler();
+    const { runtime } = createRuntime({
+      spawner: { spawn: spawner, processes, spawnCount: () => calls },
+      feed,
+      probe,
+      scheduler,
+    });
+
+    await runtime.ensure();
+    processes[0]!.exit();
+    await waitFor(() => calls === 2);
+    await Bun.sleep(5);
+    await runtime.ensure();
+    expect(calls).toBe(3);
+  });
+
+  it('keeps restarting toward the budget after a failed restart leaves no client', async () => {
+    let calls = 0;
+    const processes: FakeProcessRecord[] = [];
+    let nextPid = 7_000;
+    const spawner: KiloProcessSpawner = async () => {
+      calls += 1;
+      if (calls >= 2) throw new Error('spawn failed');
+      const pid = nextPid++;
+      const deferred = Promise.withResolvers<void>();
+      const record: FakeProcessRecord = { pid, stopped: 0, exit: () => deferred.resolve() };
+      processes.push(record);
+      return {
+        pid,
+        url: `http://127.0.0.1:${pid}`,
+        exited: deferred.promise,
+        stop: async () => {
+          record.stopped += 1;
+          return true;
+        },
+      };
+    };
+    const feed = createFeedFactory();
+    const probe = createProbe(true);
+    const scheduler = createScheduler();
+    const { runtime, unavailable } = createRuntime({
+      spawner: { spawn: spawner, processes, spawnCount: () => calls },
+      feed,
+      probe,
+      scheduler,
+    });
+
+    await runtime.ensure();
+    expect(calls).toBe(1);
+    // The restart fails, so `stopProcess` has cleared the client and the failed
+    // start leaves no exit hook; only the watchdog can restart it.
+    processes[0]!.exit();
+    await waitFor(() => calls === 2);
+    await waitFor(() => !runtime.isRestarting());
+
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => calls === 3);
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => calls === 4);
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtime.isUnavailable());
+    expect(unavailable()).toBe(1);
+  });
+
+  it('creates the Kilo home, auth file, runtime dir and worktree before spawn', async () => {
+    const root = await fsp.mkdtemp(path.join(os.tmpdir(), 'kilo-fs-'));
+    try {
+      const dataHome = path.join(root, 'data');
+      const runtimeDir = path.join(root, 'run');
+      const worktree = path.join(root, 'worktree');
+      const spawner = createSpawner();
+      const scheduler = createScheduler();
+      const feed = createFeedFactory();
+      const probe = createProbe(true);
+      const { runtime } = createRuntime({
+        spawner,
+        feed,
+        probe,
+        scheduler,
+        directory: worktree,
+        env: {
+          XDG_DATA_HOME: dataHome,
+          XDG_RUNTIME_DIR: runtimeDir,
+          KILO_AUTH_CONTENT: '{"token":"x"}',
+        },
+      });
+
+      await runtime.ensure();
+
+      const authDirectory = path.join(dataHome, 'kilo');
+      expect(await fsp.readFile(path.join(authDirectory, 'auth.json'), 'utf8')).toBe(
+        '{"token":"x"}'
+      );
+      expect((await fsp.stat(authDirectory)).mode & 0o777).toBe(0o700);
+      expect((await fsp.stat(path.join(authDirectory, 'auth.json'))).mode & 0o777).toBe(0o600);
+      expect((await fsp.stat(runtimeDir)).mode & 0o777).toBe(0o700);
+      await fsp.access(worktree);
+    } finally {
+      await fsp.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('kilo-runtime hang-rule ownership', () => {
+  it('does not import the legacy sandbox-control-runtime module', async () => {
+    const source = await fsp.readFile(path.join(import.meta.dir, 'kilo-runtime.ts'), 'utf8');
+    expect(source).not.toContain('sandbox-control-runtime');
+  });
+});
+
+describe('kilo runtime phase mapping', () => {
+  it('maps silence to suspected, not restarting or unavailable', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    // Hold the probe so the runtime stays in the silence episode while asserting.
+    probe.set(() => new Promise(() => {}));
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtime.isSuspected());
+
+    expect(runtime.isSuspected()).toBe(true);
+    expect(runtime.isRestarting()).toBe(false);
+    expect(runtime.isUnavailable()).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it('maps a restart to restarting while Kilo is replaced', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const duringRestart: Array<{ restarting: boolean; unavailable: boolean; suspected: boolean }> =
+      [];
+    let spawnCalls = 0;
+    const baseSpawn = spawner.spawn;
+    const runtimeRef: { current?: ReturnType<typeof createKiloRuntime> } = {};
+    const { runtime, restarts } = createRuntime({
+      spawner,
+      feed,
+      probe,
+      scheduler,
+      spawnKilo: input => {
+        spawnCalls += 1;
+        if (spawnCalls > 1) {
+          duringRestart.push({
+            restarting: runtimeRef.current!.isRestarting(),
+            unavailable: runtimeRef.current!.isUnavailable(),
+            suspected: runtimeRef.current!.isSuspected(),
+          });
+        }
+        return baseSpawn(input);
+      },
+    });
+    runtimeRef.current = runtime;
+
+    await runtime.ensure();
+    spawner.processes[0]!.exit();
+    await waitFor(() => restarts.length === 1);
+
+    expect(duringRestart).toEqual([{ restarting: true, unavailable: false, suspected: true }]);
+    expect(runtime.isRestarting()).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it('maps spending the crash budget to unavailable', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime, unavailable } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      scheduleSilence(scheduler, TEST_TIMERS);
+      await waitFor(() => spawner.spawnCount() === attempt + 2);
+    }
+    scheduleSilence(scheduler, TEST_TIMERS);
+    await waitFor(() => runtime.isUnavailable());
+
+    expect(runtime.isUnavailable()).toBe(true);
+    expect(runtime.isSuspected()).toBe(true);
+    expect(runtime.isRestarting()).toBe(false);
+    expect(unavailable()).toBe(1);
+    await runtime.shutdown();
+  });
+
+  it('maps a deliberate stop to stopped', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const { runtime } = createRuntime({ spawner, feed, probe, scheduler });
+
+    await runtime.ensure();
+    await runtime.shutdown();
+
+    let failure: unknown;
+    try {
+      await runtime.ensure();
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure instanceof Error ? failure.message : String(failure)).toContain('shutting down');
+    expect(runtime.isSuspected()).toBe(false);
+    expect(runtime.isRestarting()).toBe(false);
+    expect(runtime.isUnavailable()).toBe(false);
+    expect(spawner.spawnCount()).toBe(1);
+  });
+});
+
+describe('createKiloRuntimes', () => {
+  it('replaces an unavailable runtime on the next ensure so the budget is fresh', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-test-pids',
+      scheduler: scheduler.scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: feed.openFeed,
+      probeHealth: probe.probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+    });
+    await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    const first = runtimes.get('dir');
+    expect(first).toBeDefined();
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      spawner.processes[attempt]!.exit();
+      await waitFor(() => spawner.spawnCount() === attempt + 2);
+    }
+    spawner.processes[3]!.exit();
+    await waitFor(() => first!.isUnavailable());
+    expect(runtimes.unavailable()).toBe(true);
+
+    await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    expect(runtimes.get('dir')).not.toBe(first);
+    expect(runtimes.unavailable()).toBe(false);
+  });
+
+  it('carries the runtime key into onRestart and onUnavailable', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const feed = createFeedFactory();
+    const probe = createProbe(false);
+    const restarts: Array<{ directory: string; reason: string; key: string }> = [];
+    const unavailable: Array<{ directory: string; key: string }> = [];
+    let captured: KiloRuntimeOptions | undefined;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-key-test-pids',
+      scheduler: scheduler.scheduler,
+      spawnKilo: spawner.spawn,
+      openFeed: feed.openFeed,
+      probeHealth: probe.probe,
+      readProcessStartTime: () => undefined,
+      log: () => undefined,
+      onRestart: info => restarts.push(info),
+      onUnavailable: (directory, key) => unavailable.push({ directory, key }),
+      createRuntime: options => {
+        captured = options;
+        return createKiloRuntime(options);
+      },
+    });
+    await runtimes.ensure({ key: 'session-a', directory: '/tmp/dir', env: {} });
+    expect(captured).toBeDefined();
+
+    captured!.onRestart?.({ directory: '/tmp/dir', reason: 'hang' });
+    captured!.onUnavailable?.('/tmp/dir');
+    expect(restarts).toEqual([{ directory: '/tmp/dir', reason: 'hang', key: 'session-a' }]);
+    expect(unavailable).toEqual([{ directory: '/tmp/dir', key: 'session-a' }]);
+    await runtimes.shutdown();
+  });
+
+  it('removes an unavailable runtime from the map before its shutdown completes', async () => {
+    const shutdownStarted = Promise.withResolvers<void>();
+    const releaseShutdown = Promise.withResolvers<void>();
+    let unavailable = false;
+    let firstEnsureCalls = 0;
+    let created = 0;
+    const runtimes = createKiloRuntimes({
+      timers: TEST_TIMERS,
+      pidfileDirectory: '/tmp/kilo-runtimes-retire-test-pids',
+      createRuntime: () => {
+        created += 1;
+        const isFirst = created === 1;
+        return {
+          directory: '/tmp/dir',
+          env: {},
+          client: {},
+          ensure: async () => {
+            if (!isFirst) return {};
+            firstEnsureCalls += 1;
+            // The real runtime reports `stopped`, so `ensure` on the retired
+            // instance throws; a concurrent ensure must never reach it.
+            if (firstEnsureCalls > 1) throw new Error('Kilo runtime is shutting down');
+            return {};
+          },
+          installCredentials: async () => undefined,
+          applyPendingCredentials: async () => false,
+          isSuspected: () => false,
+          isRestarting: () => false,
+          isUnavailable: () => (isFirst ? unavailable : false),
+          shutdown: async () => {
+            if (!isFirst) return;
+            shutdownStarted.resolve();
+            await releaseShutdown.promise;
+          },
+        } as unknown as KiloRuntime;
+      },
+    });
+
+    await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    const first = runtimes.get('dir');
+    expect(first).toBeDefined();
+
+    // Retire the unavailable runtime, holding its shutdown open.
+    unavailable = true;
+    const retire = runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    await shutdownStarted.promise;
+
+    expect(runtimes.get('dir')).toBeUndefined();
+    const concurrent = await runtimes.ensure({ key: 'dir', directory: '/tmp/dir', env: {} });
+    expect(concurrent).toBeDefined();
+    expect(firstEnsureCalls).toBe(1);
+
+    releaseShutdown.resolve();
+    await retire;
+    expect(runtimes.get('dir')).not.toBe(first);
+  });
+});
+
+/** Advances the fake clock by one silence window, then runs the watchdog tick. */
+function scheduleSilence(scheduler: FakeScheduler, activeTimers: ControlPlaneTimers): void {
+  scheduler.advance(activeTimers.wrapper.sseSilenceMs);
+  scheduler.fire();
+}
+
+/** Advances one watchdog tick, matching the runtime's `sseSilenceMs / 6` cadence. */
+function scheduleTick(scheduler: FakeScheduler, activeTimers: ControlPlaneTimers): void {
+  scheduler.advance(Math.max(1, Math.floor(activeTimers.wrapper.sseSilenceMs / 6)));
+  scheduler.fire();
+}

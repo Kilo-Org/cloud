@@ -13,7 +13,7 @@ import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
-import { CONTROL_WRAPPER_LOG_PATH, CONTROL_WRAPPER_PATH } from './container-paths.js';
+import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -181,7 +181,7 @@ export function createVercelProviderAdapter(deps: {
       if (!parsed) throw new Error('Invalid Vercel sandbox allocation');
       await restClient.executeCommand(parsed.sessionId, {
         command: 'sh',
-        args: ['-lc', `exec bun run ${CONTROL_WRAPPER_PATH}`],
+        args: ['-lc', `exec ${CONTROL_SUPERVISOR_PATH}`],
         cwd: '/',
         env: {
           ...env,

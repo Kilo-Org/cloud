@@ -24,14 +24,18 @@ import {
   resolveManagedBitbucketToken,
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
-import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
+import type {
+  ControlPlaneCredentialRepository,
+  ControlPlaneCredentialSource,
+} from '../shared/control-plane-protocol.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { gitAuthorSchema } from '../shared/sandbox-control-protocol.js';
 import {
   agentSandboxProviderSchema,
   parseCanonicalBitbucketCloneUrl,
   sessionIdSchema,
+  type AgentSandboxProvider,
   type Env,
 } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
@@ -458,12 +462,12 @@ function isKnownScmCredential(token: string | undefined, scm: ScmGrant | undefin
   );
 }
 
-function repositoryFromMetadata(
-  metadata: SessionMetadata,
+function repositoryFromSource(
+  repository: ControlPlaneCredentialRepository | undefined,
   provider: SessionCredentialGrant['provider'],
-  existing: SessionCredentialGrant | undefined
+  existing: SessionCredentialGrant | undefined,
+  context: { containmentEnabled: boolean; orgId?: string; createdOnPlatform?: string }
 ): CredentialRepository | undefined {
-  const repository = metadata.repository;
   if (!repository) return undefined;
   if (repository.type === 'github') {
     if (
@@ -476,11 +480,7 @@ function repositoryFromMetadata(
     }
     const explicit =
       Boolean(repository.token) && !isKnownScmCredential(repository.token, existing?.scm);
-    if (
-      requiresContainmentSandbox(metadata) &&
-      providerUsesOutboundCredentialProxy(provider) &&
-      explicit
-    ) {
+    if (context.containmentEnabled && providerUsesOutboundCredentialProxy(provider) && explicit) {
       invalidCredentials();
     }
     return {
@@ -498,8 +498,7 @@ function repositoryFromMetadata(
         : {}),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
-        metadata.identity.createdOnPlatform === 'cloud-agent-web' ||
-        metadata.identity.createdOnPlatform === 'slack',
+        context.createdOnPlatform === 'cloud-agent-web' || context.createdOnPlatform === 'slack',
     };
   }
   const url = canonicalRepositoryUrl(repository.url, repository.type !== 'git');
@@ -507,7 +506,7 @@ function repositoryFromMetadata(
     if (repository.token) invalidCredentials();
     return { type: 'git', url, ...(repository.platform ? { platform: repository.platform } : {}) };
   }
-  if (requiresContainmentSandbox(metadata) && provider === 'vercel') invalidCredentials();
+  if (context.containmentEnabled && provider === 'vercel') invalidCredentials();
   if (repository.type === 'gitlab') {
     if (
       repository.token &&
@@ -519,12 +518,10 @@ function repositoryFromMetadata(
     return {
       type: 'gitlab',
       url,
-      ...(metadata.identity.createdOnPlatform
-        ? { createdOnPlatform: metadata.identity.createdOnPlatform }
-        : {}),
+      ...(context.createdOnPlatform ? { createdOnPlatform: context.createdOnPlatform } : {}),
     };
   }
-  if (!metadata.identity.orgId || !parseCanonicalBitbucketCloneUrl(url)) invalidCredentials();
+  if (!context.orgId || !parseCanonicalBitbucketCloneUrl(url)) invalidCredentials();
   return {
     type: 'bitbucket',
     url,
@@ -738,25 +735,30 @@ async function selectDirectKiloToken(
   }
 }
 
-function preparedPayload(
-  metadata: SessionMetadata,
-  payload: SessionAttachPayload,
-  grant: SessionCredentialGrant,
-  existing: SessionCredentialGrant | undefined
-): PreparedSessionAttachPayload {
+function preparedPayload(input: {
+  payload: SessionAttachPayload;
+  grant: SessionCredentialGrant;
+  existing: SessionCredentialGrant | undefined;
+  nativeKiloToken: string;
+  nativeRepositoryToken: string | undefined;
+  profileEnv: Record<string, string> | undefined;
+}): PreparedSessionAttachPayload {
+  const { payload, grant, existing } = input;
+  // Never let a `git` from the input payload pass through: it may carry a raw
+  // token. The emitted `git` comes only from the issued grant below (B3 review 2, N3).
+  const { git: _inputGit, ...payloadWithoutGit } = payload;
   const contained = isContainedSessionCredentialGrant(grant);
   const kiloToken = contained ? grant.kilo.alias : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   const replacements: Array<[string, string]> = [[grant.kilo.token, kiloToken]];
-  if (metadata.auth.kilocodeToken) replacements.push([metadata.auth.kilocodeToken, kiloToken]);
+  replacements.push([input.nativeKiloToken, kiloToken]);
   if (existing) replacements.push([existing.kilo.token, kiloToken]);
   for (const capability of Object.values(grant.kilo.capabilities)) {
     replacements.push([capability.credential, kiloToken]);
   }
   if (grant.scm) {
     if (!scmToken) invalidCredentials();
-    const repositoryToken =
-      metadata.repository && 'token' in metadata.repository ? metadata.repository.token : undefined;
+    const repositoryToken = input.nativeRepositoryToken;
     for (const token of [
       repositoryToken,
       grant.scm.nativeToken,
@@ -769,7 +771,7 @@ function preparedPayload(
   }
   const sanitize = (value: string) =>
     replacements.reduce((result, [token, alias]) => result.replaceAll(token, alias), value);
-  const profile = readProfileBundle(metadata);
+  const profile = { envVars: input.profileEnv };
   const env = Object.fromEntries(
     Object.entries({ ...profile.envVars, ...payload.env }).map(([key, value]) => [
       key,
@@ -806,7 +808,7 @@ function preparedPayload(
     env.KILO_BITBUCKET_REPOSITORY_UUID = `{${repository.repositoryUuid}}`;
   }
   return {
-    ...payload,
+    ...payloadWithoutGit,
     directory: grant.directory,
     env,
     ...(grant.scm
@@ -840,13 +842,13 @@ function preparedPayload(
 async function resolveDirectScmCredentials(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
-  payload: SessionAttachPayload
+  repositoryToken: string | undefined
 ): Promise<SessionCredentialGrant> {
   const repository = grant.repository;
   if (!repository || repository.type === 'git') return grant;
   const common = { userId: grant.userId, ...(grant.orgId ? { orgId: grant.orgId } : {}) };
   if (repository.type === 'github') {
-    let nativeToken = payload.git?.token;
+    let nativeToken = repositoryToken;
     let author: { name: string; email: string } | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
@@ -923,52 +925,96 @@ async function resolveDirectScmCredentials(
   };
 }
 
-export async function prepareSessionCredentials(input: {
+function repositoryTokenOf(
+  repository: ControlPlaneCredentialRepository | undefined
+): string | undefined {
+  return repository !== undefined && 'token' in repository ? repository.token : undefined;
+}
+
+/**
+ * B3 credentials: `hasModernRuntimeAuthorization` reads only the native Kilo
+ * token, so the V2 Sandbox DO derives the same flag from the credential source
+ * without needing session metadata.
+ */
+function kiloTokenHasRuntimeAuthorization(token: string): boolean {
+  const decoded = jwt.decode(token);
+  return (
+    typeof decoded === 'object' &&
+    decoded !== null &&
+    'runtimeAuthorization' in decoded &&
+    typeof decoded.runtimeAuthorization === 'object' &&
+    decoded.runtimeAuthorization !== null
+  );
+}
+
+/**
+ * The metadata-free grant core. Both the legacy `prepareSessionCredentials`
+ * (below) and the V2 Sandbox DO feed it the same minimal inputs, so issuance,
+ * renewal, containment and every ownership/authorization check stay in one
+ * place.
+ */
+export type CredentialGrantPreparation = {
   env: CredentialEnv;
-  metadata: SessionMetadata;
+  source: ControlPlaneCredentialSource;
+  sessionId: string;
   sandboxId: string;
+  provider: AgentSandboxProvider;
+  containmentEnabled: boolean;
+  directory: string;
+  scopeId: string;
+  payload: SessionAttachPayload;
+  profileEnv?: Record<string, string> | undefined;
   outboundContainerId?: string;
+  /** Grant duration; V2 passes the named `credentialGrantMs` timer. */
+  leaseMs?: number;
+  /**
+   * Runtime-proxy members to carry into a re-issued grant. Re-issue rotates the
+   * aliases, so the caller passes the prior grant's bound handles explicitly.
+   */
+  runtimeProxyMembers?: ReadonlyArray<{ sessionId: string; kiloSessionId: string; handle: string }>;
   existing?: SessionCredentialGrant;
   now?: number;
-}): Promise<{ grant: SessionCredentialGrant; payload: PreparedSessionAttachPayload }> {
-  const { env, metadata, sandboxId } = input;
+};
+
+export async function prepareCredentialGrant(
+  input: CredentialGrantPreparation
+): Promise<{ grant: SessionCredentialGrant; payload: PreparedSessionAttachPayload }> {
+  const { env, source, sandboxId } = input;
   const now = input.now ?? Date.now();
   if (!timestampSchema.safeParse(now).success) invalidCredentials();
-  if (
-    metadata.workspace?.sandboxId !== sandboxId ||
-    sandboxId.startsWith('dind-') ||
-    metadata.workspace?.devcontainerRequested ||
-    metadata.devcontainer
-  ) {
-    invalidCredentials();
-  }
+  if (!isValidSandboxId(sandboxId) || sandboxId.startsWith('dind-')) invalidCredentials();
   const member = memberSchema.safeParse({
-    sessionId: metadata.identity.sessionId,
-    kiloSessionId: metadata.auth.kiloSessionId,
+    sessionId: input.sessionId,
+    kiloSessionId: source.kiloSessionId,
   });
-  const token = realTokenSchema.safeParse(metadata.auth.kilocodeToken);
+  const token = realTokenSchema.safeParse(source.kiloToken);
   if (!member.success || !token.success) invalidCredentials();
-  const provider = getSandboxProvider(metadata);
-  const containmentEnabled = requiresContainmentSandbox(metadata);
+  const provider = input.provider;
+  const containmentEnabled = input.containmentEnabled;
   const targets = deriveKiloSandboxTargets(env, token.data, {
     requireHttps: provider === 'vercel',
   });
   if (!targets.success) invalidCredentials();
   const existing = input.existing === undefined ? undefined : validateGrant(input.existing);
-  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
-  const scopeId = scopeIdSchema.safeParse(
-    metadata.workspace?.worktreeId ?? metadata.identity.sessionId
-  );
-  if (!scopeId.success || !payload.directory) invalidCredentials();
-  const repository = repositoryFromMetadata(metadata, provider, existing);
+  const directory = input.directory;
+  if (!directory) invalidCredentials();
+  const scopeId = scopeIdSchema.safeParse(input.scopeId);
+  if (!scopeId.success) invalidCredentials();
+  const repository = repositoryFromSource(source.repository, provider, existing, {
+    containmentEnabled,
+    ...(source.orgId === undefined ? {} : { orgId: source.orgId }),
+    ...(source.createdOnPlatform === undefined
+      ? {}
+      : { createdOnPlatform: source.createdOnPlatform }),
+  });
   if (
     existing &&
     (isContainedSessionCredentialGrant(existing) !== containmentEnabled ||
       existing.scopeId !== scopeId.data ||
-      existing.directory !== payload.directory ||
+      existing.directory !== directory ||
       existing.sandboxId !== sandboxId ||
-      existing.userId !== metadata.identity.userId ||
-      existing.orgId !== metadata.identity.orgId ||
+      existing.userId !== source.userId ||
+      existing.orgId !== source.orgId ||
       existing.provider !== provider ||
       existing.outboundContainerId !== input.outboundContainerId ||
       existing.preparedAt > now ||
@@ -989,14 +1035,15 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
+  const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
   const modernRuntimeProxy =
-    provider === 'vercel' && containmentEnabled && hasModernRuntimeAuthorization(metadata)
+    provider === 'vercel' && containmentEnabled && modernRuntimeAuthorization
       ? runtimeProxyTargets(env)
       : null;
   if (
     provider === 'vercel' &&
     containmentEnabled &&
-    hasModernRuntimeAuthorization(metadata) &&
+    modernRuntimeAuthorization &&
     !modernRuntimeProxy
   ) {
     invalidCredentials();
@@ -1008,10 +1055,10 @@ export async function prepareSessionCredentials(input: {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
     scopeId: scopeId.data,
-    directory: payload.directory,
+    directory,
     sandboxId,
-    userId: metadata.identity.userId,
-    ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),
+    userId: source.userId,
+    ...(source.orgId === undefined ? {} : { orgId: source.orgId }),
     provider,
     ...(input.outboundContainerId ? { outboundContainerId: input.outboundContainerId } : {}),
     members: members.some(current => current.sessionId === member.data.sessionId)
@@ -1036,7 +1083,9 @@ export async function prepareSessionCredentials(input: {
         ? {
             runtimeProxy: {
               targets: modernRuntimeProxy,
-              members: existing?.kilo.runtimeProxy?.members ?? [],
+              members: existing?.kilo.runtimeProxy?.members ?? [
+                ...(input.runtimeProxyMembers ?? []),
+              ],
             },
           }
         : {}),
@@ -1044,17 +1093,20 @@ export async function prepareSessionCredentials(input: {
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
     preparedAt: now,
-    expiresAt: now + WORKTREE_LEASE_MS,
+    expiresAt: now + (input.leaseMs ?? WORKTREE_LEASE_MS),
   };
+  // The native repository token can arrive on the source or on the wrapper-safe
+  // git payload (legacy built it from metadata; V2 carries it in the spec).
+  const repositoryToken = repositoryTokenOf(source.repository) ?? input.payload.git?.token;
   if (!containmentEnabled) {
-    grant = await resolveDirectScmCredentials(env, grant, payload);
+    grant = await resolveDirectScmCredentials(env, grant, repositoryToken);
   } else if (providerUsesOutboundCredentialProxy(provider)) {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
     grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
     grant = await refreshScmCapability(env, grant, outboundContainerId, now);
   } else if (repository?.type === 'github') {
-    let nativeToken = payload.git?.token;
+    let nativeToken = repositoryToken;
     let author: { name: string; email: string } | undefined;
     if (repository.authentication === 'managed') {
       const resolved = await resolveCloudAgentGitHubAuthForRepo(env, {
@@ -1085,7 +1137,17 @@ export async function prepareSessionCredentials(input: {
   }
   grant = validateGrant(grant);
   if (!isContainedSessionCredentialGrant(grant)) {
-    return { grant, payload: preparedPayload(metadata, payload, grant, existing) };
+    return {
+      grant,
+      payload: preparedPayload({
+        payload: input.payload,
+        grant,
+        existing,
+        nativeKiloToken: source.kiloToken,
+        nativeRepositoryToken: repositoryToken,
+        profileEnv: input.profileEnv,
+      }),
+    };
   }
   if (provider === 'vercel') buildControlNetworkPolicy([grant]);
   else {
@@ -1100,7 +1162,181 @@ export async function prepareSessionCredentials(input: {
       { requireHttps: false }
     );
   }
-  return { grant, payload: preparedPayload(metadata, payload, grant, existing) };
+  return {
+    grant,
+    payload: preparedPayload({
+      payload: input.payload,
+      grant,
+      existing,
+      nativeKiloToken: source.kiloToken,
+      nativeRepositoryToken: repositoryToken,
+      profileEnv: input.profileEnv,
+    }),
+  };
+}
+
+/**
+ * Projects grouped metadata's repository into the DO-only credential source's
+ * strict shape. The grant core reads only these fields; extra metadata fields
+ * (for example `upstreamBranch`, `githubInstallationId`) are dropped so the
+ * source validates against `controlPlaneCredentialRepositorySchema` (the B4
+ * Session DO sends it through the Sandbox DO's strict `prepare` input).
+ */
+function credentialRepositoryFromMetadata(
+  repository: SessionMetadata['repository']
+): ControlPlaneCredentialRepository | undefined {
+  if (repository === undefined) return undefined;
+  switch (repository.type) {
+    case 'github':
+      return {
+        type: 'github',
+        repo: repository.repo,
+        ...(repository.token ? { token: repository.token } : {}),
+        ...(repository.githubIntegrationId
+          ? { githubIntegrationId: repository.githubIntegrationId }
+          : {}),
+        ...(repository.githubAccessPurpose
+          ? { githubAccessPurpose: repository.githubAccessPurpose }
+          : {}),
+      };
+    case 'gitlab':
+      return {
+        type: 'gitlab',
+        url: repository.url,
+        ...(repository.token ? { token: repository.token } : {}),
+        ...(repository.gitlabTokenManaged ? { gitlabTokenManaged: true } : {}),
+      };
+    case 'bitbucket':
+      return {
+        type: 'bitbucket',
+        url: repository.url,
+        workspaceUuid: repository.workspaceUuid,
+        repositoryUuid: repository.repositoryUuid,
+        ...(repository.bitbucketIntegrationId
+          ? { bitbucketIntegrationId: repository.bitbucketIntegrationId }
+          : {}),
+      };
+    case 'git':
+      return {
+        type: 'git',
+        url: repository.url,
+        ...(repository.token ? { token: repository.token } : {}),
+        ...(repository.platform ? { platform: repository.platform } : {}),
+      };
+  }
+}
+
+/**
+ * Legacy-plane boundary: adapts `SessionMetadata` to the credential source and
+ * the metadata-only guards, then delegates to the shared grant core. Behavior
+ * is unchanged for existing callers; the repository projection is the B4
+ * strict-schema cleanup described above.
+ */
+export function credentialSourceFromMetadata(
+  metadata: SessionMetadata
+): ControlPlaneCredentialSource {
+  const kiloToken = metadata.auth.kilocodeToken;
+  const kiloSessionId = metadata.auth.kiloSessionId;
+  const userId = metadata.identity.userId;
+  if (
+    typeof kiloToken !== 'string' ||
+    typeof kiloSessionId !== 'string' ||
+    typeof userId !== 'string'
+  ) {
+    invalidCredentials();
+  }
+  const repository = credentialRepositoryFromMetadata(metadata.repository);
+  return {
+    userId,
+    kiloSessionId,
+    kiloToken,
+    ...(metadata.identity.orgId === undefined ? {} : { orgId: metadata.identity.orgId }),
+    ...(metadata.identity.createdOnPlatform === undefined
+      ? {}
+      : { createdOnPlatform: metadata.identity.createdOnPlatform }),
+    ...(repository === undefined ? {} : { repository }),
+  };
+}
+
+export async function prepareSessionCredentials(input: {
+  env: CredentialEnv;
+  metadata: SessionMetadata;
+  sandboxId: string;
+  outboundContainerId?: string;
+  existing?: SessionCredentialGrant;
+  now?: number;
+}): Promise<{ grant: SessionCredentialGrant; payload: PreparedSessionAttachPayload }> {
+  const { env, metadata, sandboxId } = input;
+  const now = input.now ?? Date.now();
+  if (!timestampSchema.safeParse(now).success) invalidCredentials();
+  if (
+    metadata.workspace?.sandboxId !== sandboxId ||
+    sandboxId.startsWith('dind-') ||
+    metadata.workspace?.devcontainerRequested ||
+    metadata.devcontainer
+  ) {
+    invalidCredentials();
+  }
+  const payload = buildSessionAttachPayload(metadata);
+  return prepareCredentialGrant({
+    env,
+    source: credentialSourceFromMetadata(metadata),
+    sessionId: metadata.identity.sessionId,
+    sandboxId,
+    provider: getSandboxProvider(metadata),
+    containmentEnabled: requiresContainmentSandbox(metadata),
+    directory: payload.directory ?? '',
+    scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
+    payload,
+    profileEnv: readProfileBundle(metadata).envVars,
+    ...(input.outboundContainerId === undefined
+      ? {}
+      : { outboundContainerId: input.outboundContainerId }),
+    ...(input.existing === undefined ? {} : { existing: input.existing }),
+    now,
+  });
+}
+
+/**
+ * Wrapper-facing projection of a route grant: the resolved material the wrapper
+ * installs. Carries no issuer material (native tokens stay DO-side).
+ */
+export function sessionCredentialsPayloadFromGrant(
+  grant: SessionCredentialGrant,
+  sessionId: string
+): {
+  sessionId: string;
+  git?: { token: string; platform?: 'github' | 'gitlab' | 'bitbucket' };
+  kilo: { token: string };
+  proxy?: {
+    handle: string;
+    targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
+  };
+} {
+  const contained = isContainedSessionCredentialGrant(grant);
+  const kiloToken = contained ? grant.kilo.alias : grant.kilo.token;
+  const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
+  // The runtime credential proxy facade and the per-session handle (minted by
+  // the Session DO and bound to the route grant) are projected here, never into
+  // the route spec.
+  const proxyMember = grant.kilo.runtimeProxy?.members.find(
+    member => member.sessionId === sessionId
+  );
+  return {
+    sessionId,
+    ...(grant.scm && scmToken
+      ? {
+          git: {
+            token: scmToken,
+            ...(grant.scm.purpose ? { platform: grant.scm.purpose } : {}),
+          },
+        }
+      : {}),
+    kilo: { token: kiloToken },
+    ...(grant.kilo.runtimeProxy && proxyMember
+      ? { proxy: { handle: proxyMember.handle, targets: grant.kilo.runtimeProxy.targets } }
+      : {}),
+  };
 }
 
 export function removeSessionCredentialMembership(

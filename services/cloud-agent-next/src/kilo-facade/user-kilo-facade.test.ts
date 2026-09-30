@@ -35,7 +35,6 @@ vi.mock('@cloudflare/sandbox', () => ({
   Sandbox: class Sandbox {},
 }));
 
-import type { SessionMessageAdmissionResult } from '../execution/types';
 import type { KiloSdkStoredMessage } from '../session-ingest-binding';
 import type { Env } from '../types';
 import {
@@ -2469,35 +2468,32 @@ describe('handleKiloFacadeRequest', () => {
 
   it.each([
     {
-      admissionCode: 'BAD_REQUEST',
+      trpcCode: 'BAD_REQUEST',
       status: 400,
       publicCode: 'KILO_PROMPT_ADMISSION_REJECTED',
       message: 'Selected model is not available for this cloud agent session',
     },
     {
-      admissionCode: 'FORBIDDEN',
+      trpcCode: 'FORBIDDEN',
       status: 403,
       publicCode: 'KILO_PROMPT_ADMISSION_REJECTED',
       message: 'Model catalog access denied for this cloud agent session',
     },
     {
-      admissionCode: 'MODEL_VALIDATION_UNAVAILABLE',
+      trpcCode: 'SERVICE_UNAVAILABLE',
       status: 503,
       publicCode: 'MODEL_VALIDATION_UNAVAILABLE',
       message: 'Model availability could not be verified',
     },
   ] as const)(
-    'maps returned control $admissionCode to an SDK error at HTTP $status',
-    async ({ admissionCode, status, publicCode, message }) => {
+    'maps control-plane model preflight $trpcCode to an SDK error at HTTP $status',
+    async ({ trpcCode, status, publicCode, message }) => {
       const env = envStub();
-      const admission: SessionMessageAdmissionResult = {
-        success: false,
-        code: admissionCode,
-        error: message,
-      };
-      vi.spyOn(env.SANDBOX_SESSION, 'get').mockReturnValue({
-        admitSubmittedMessage: vi.fn().mockResolvedValue(admission),
-      } as never);
+      // A control-plane send runs the same model-policy preflight as the legacy
+      // plane; its TRPCError code is what the facade maps.
+      preflightExistingPromptModelMock.mockRejectedValueOnce(
+        new TRPCError({ code: trpcCode, message })
+      );
 
       const response = await handleKiloFacadeRequest({
         request: new Request(`http://worker.test/kilo/session/${kiloSessionId}/prompt_async`, {

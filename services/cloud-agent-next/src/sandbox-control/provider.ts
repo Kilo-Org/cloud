@@ -5,10 +5,25 @@ import {
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
-import type {
-  CredentialContainmentRequirements,
-  VercelAllocationConfig,
-} from '../sandbox-state/model/allocation.js';
+import type { CredentialContainmentRequirements } from './credential-containment.js';
+
+export const vercelAllocationConfigSchema = z
+  .object({
+    projectId: z.string().min(1).optional(),
+    snapshotId: z.string().min(1).optional(),
+    runtimeBuildId: z.string().min(1).optional(),
+    runtime: z.string().min(1).optional(),
+    resources: z
+      .object({
+        vcpus: z.number().int().positive(),
+        memory: z.number().int().positive(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+
+export type VercelAllocationConfig = z.infer<typeof vercelAllocationConfigSchema>;
 
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('cloudflare') }).strict(),

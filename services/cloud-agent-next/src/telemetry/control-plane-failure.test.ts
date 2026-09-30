@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { CloudAgentRunFailureClassifications } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { CONTROL_PLANE_FAILURE_REASON_VALUES } from '../shared/control-plane-protocol.js';
 import {
   classifyControlPlaneFailure,
+  classifyControlPlaneRunFailure,
   type ControlPlaneDispatchState,
 } from './control-plane-failure.js';
 
@@ -105,9 +107,75 @@ const cases: ReadonlyArray<
   ['missing_metadata', 'pre_dispatch', 'interrupted', 'interruption', 'system_interrupt'],
   ['preparation_timeout', 'accepted', 'interrupted', 'interruption', 'system_interrupt'],
   ['some_wrapper_reason', 'accepted', 'interrupted', 'interruption', 'system_interrupt'],
+  // The new plane's Stop/cancel reason maps to a user interruption.
+  ['interrupted', 'pre_dispatch', 'interrupted', 'interruption', 'user_interrupt'],
+  // The spec §10 reasons for the new plane (the mapping's one owner).
+  ['workspace_setup_failed', 'pre_dispatch', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
+  ['workspace_setup_failed', 'accepted', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
+  ['billing_blocked', 'pre_dispatch', 'failed', 'pre_dispatch', 'payment_required'],
+  ['billing_blocked', 'accepted', 'failed', 'pre_dispatch', 'payment_required'],
+  [
+    'billing_unavailable',
+    'pre_dispatch',
+    'failed',
+    'pre_dispatch',
+    'admission_billing_unavailable',
+  ],
+  ['billing_unavailable', 'accepted', 'failed', 'pre_dispatch', 'admission_billing_unavailable'],
+  ['agent_unavailable', 'pre_dispatch', 'failed', 'pre_dispatch', 'kilo_server_failed'],
+  ['agent_unavailable', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
+  ['connection_lost', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
+  [
+    'connection_lost',
+    'pre_dispatch',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_disconnected',
+  ],
+  ['sandbox_lost', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
+  ['agent_restarted', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_disconnected'],
+  ['no_progress', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
+  ['no_outcome', 'accepted', 'failed', 'post_dispatch_no_activity', 'wrapper_no_output'],
+  [
+    'prompt_failed',
+    'accepted',
+    'failed',
+    'post_dispatch_no_activity',
+    'wrapper_error_before_activity',
+  ],
+  ['sandbox_stopped', 'accepted', 'failed', 'interruption', 'system_interrupt'],
+  ['execution_limit', 'accepted', 'failed', 'interruption', 'system_interrupt'],
+  ['sandbox_stopped', 'accepted', 'interrupted', 'interruption', 'system_interrupt'],
+  ['execution_limit', 'accepted', 'interrupted', 'interruption', 'system_interrupt'],
 ];
 
 describe('classifyControlPlaneFailure', () => {
+  it('attributes Vercel billing credit denial to the user and admission outage to the platform', () => {
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'billing_blocked',
+        dispatchState: 'pre_dispatch',
+        status: 'failed',
+      })
+    ).toMatchObject({
+      stage: 'pre_dispatch',
+      code: 'payment_required',
+      responsibility: 'user',
+      failureReason: 'insufficient_credits',
+    });
+    expect(
+      classifyControlPlaneRunFailure({
+        reason: 'billing_unavailable',
+        dispatchState: 'pre_dispatch',
+        status: 'failed',
+      })
+    ).toMatchObject({
+      stage: 'pre_dispatch',
+      code: 'admission_billing_unavailable',
+      responsibility: 'platform',
+      failureReason: 'admission_billing_unavailable',
+    });
+  });
   it.each(cases)(
     'maps %s at %s for %s to %s/%s',
     (reason, dispatchState, status, failureStage, failureCode) => {
@@ -135,6 +203,17 @@ describe('classifyControlPlaneFailure', () => {
       expect(classifyControlPlaneFailure(reason, dispatchState, 'failed').stage).not.toBe(
         'interruption'
       );
+    }
+  });
+
+  it('maps every new-plane failure reason to an allowed classification', () => {
+    for (const reason of CONTROL_PLANE_FAILURE_REASON_VALUES) {
+      for (const dispatchState of ['pre_dispatch', 'accepted'] as const) {
+        for (const status of ['failed', 'interrupted'] as const) {
+          const classification = classifyControlPlaneFailure(reason, dispatchState, status);
+          expect(validPairs.has(`${classification.stage}:${classification.code}`)).toBe(true);
+        }
+      }
     }
   });
 });

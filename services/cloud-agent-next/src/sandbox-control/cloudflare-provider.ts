@@ -1,4 +1,6 @@
 import { z } from 'zod';
+import type { ExecResult } from '@cloudflare/sandbox';
+import { withTimeout } from '@kilocode/worker-utils';
 import {
   configureSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
@@ -16,7 +18,27 @@ import type {
   ProviderAllocationIntent,
   ProviderCreateIntent,
 } from './provider.js';
-import { CONTROL_WRAPPER_LOG_PATH, CONTROL_WRAPPER_PATH } from './container-paths.js';
+import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
+
+export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
+
+export type CloudflareWrapperProbeResult =
+  | { outcome: 'count'; count: number; incomplete: boolean }
+  | { outcome: 'unparsed' }
+  | { outcome: 'timeout' }
+  | { outcome: 'error' }
+  | { outcome: 'invalid_reference' };
+
+export type CloudflareProviderAdapter = ProviderAdapter & {
+  probeWrapperProcesses(ref: string): Promise<CloudflareWrapperProbeResult>;
+};
+
+export function isCloudflareProviderAdapter(
+  provider: ProviderAdapter
+): provider is CloudflareProviderAdapter {
+  return 'probeWrapperProcesses' in provider;
+}
 
 const providerRefSchema = z
   .object({
@@ -50,7 +72,7 @@ export function createCloudflareProviderAdapter(deps: {
   sandboxId: string;
   getSandbox: (id: string, options: SandboxOptions) => CloudflareSandboxHandle;
   destroy: (allocationId: string, options: SandboxOptions) => Promise<void>;
-}): ProviderAdapter {
+}): CloudflareProviderAdapter {
   const decodeOwnedProviderRef = (
     ref: string | null
   ): { sandboxId: string; containment: boolean } | null => {
@@ -102,6 +124,33 @@ export function createCloudflareProviderAdapter(deps: {
     persistentWorkspace: false,
     destroysOnStop: true,
     ensureBillingAdmission,
+    async probeWrapperProcesses(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (!parsed) return { outcome: 'invalid_reference' };
+      let timedOut = false;
+      const execPromise = (async () => {
+        const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
+        return sandbox.exec(WRAPPER_PROC_SCAN_COMMAND);
+      })();
+      execPromise.catch(() => undefined);
+      let result: ExecResult;
+      try {
+        result = await withTimeout(
+          execPromise,
+          WRAPPER_PROC_PROBE_TIMEOUT_MS,
+          'Wrapper process probe timed out',
+          () => {
+            timedOut = true;
+          }
+        );
+      } catch {
+        return { outcome: timedOut ? 'timeout' : 'error' };
+      }
+      const scan = parseWrapperProcScanOutput(result.stdout ?? '');
+      return scan.kind === 'count'
+        ? { outcome: 'count', count: scan.count, incomplete: scan.incomplete }
+        : { outcome: 'unparsed' };
+    },
     async create(intent: ProviderCreateIntent) {
       const providerRef = encodeCloudflareProviderRef({
         sandboxId: intent.allocationName ?? deps.sandboxId,
@@ -120,7 +169,7 @@ export function createCloudflareProviderAdapter(deps: {
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
-      await sandbox.startProcess(`bun run ${CONTROL_WRAPPER_PATH}`, {
+      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, {
         cwd: '/',
         env: {
           ...env,

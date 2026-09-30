@@ -8,6 +8,7 @@ jest.mock('@/lib/config.server', () => ({
 import {
   createWorkerTrigger,
   getWorkerTrigger,
+  getWorkerRequest,
   invokeWorkerScheduledTrigger,
   updateWorkerTrigger,
 } from './webhook-agent-client';
@@ -15,6 +16,39 @@ import {
 describe('webhook agent client variant forwarding', () => {
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it.each([
+    ['oauth/owner', undefined, '/user/'],
+    [undefined, 'org-id', '/org/org-id/'],
+  ])('fetches an individual request in the selected namespace', async (userId, orgId, path) => {
+    const data = { id: 'request-id', processStatus: 'success', cloudAgentSessionId: 'cloud-id' };
+    const fetchSpy = jest
+      .spyOn(global, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ data }), { status: 200 }));
+    expect(await getWorkerRequest(userId, orgId, 'trigger', 'request-id')).toMatchObject({
+      success: true,
+      data,
+    });
+    expect(fetchSpy.mock.calls[0]?.[0]).toEqual(expect.stringContaining(path));
+    expect(fetchSpy.mock.calls[0]?.[0]).toEqual(
+      expect.stringContaining('/trigger/requests/request-id')
+    );
+  });
+
+  it('rejects a mismatched worker request ID', async () => {
+    jest.spyOn(global, 'fetch').mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: { id: 'other', processStatus: 'success', cloudAgentSessionId: 'cloud-id' },
+        }),
+        { status: 200 }
+      )
+    );
+    expect(await getWorkerRequest('owner', undefined, 'trigger', 'request-id')).toMatchObject({
+      success: false,
+      status: 502,
+    });
   });
 
   it('omits variant from create requests when it is not configured', async () => {

@@ -11,17 +11,17 @@ Use the Kilo Code organization: `orgId: "kilo-code-nvjh"`, not `"kilo"`. Confirm
 
 Treat this map as a starting point; refresh `listDatasets` when a name/kind differs. Dataset **kind**, not name or description, determines APL versus MPL.
 
-| Dataset                       | Query | Start Here For                                                                       |
-| ----------------------------- | ----- | ------------------------------------------------------------------------------------ |
-| `vercel`                      | APL   | Web/function/request logs; Cloud Agent session creation and request IDs.             |
-| `cloudflare-logpush`          | APL   | Worker/DO logs and execution metadata; Cloud Agent allocation and message lifecycle. |
-| `cloudflare-user-data-export` | APL   | Cloudflare OTel spans: `trace_id`, `span_id`, `duration`, service/HTTP attributes.   |
-| `supabase-production`         | APL   | Production database logs.                                                            |
-| `supabase-snowflake-exports`  | APL   | Exported Supabase platform/database logs: `event_message`, `metadata.*`.             |
-| `kilocode-app`                | MPL   | Vercel app telemetry; discover the metric catalog first.                             |
-| `kilocode-app-dev`            | MPL   | Development app telemetry; discover the metric catalog first.                        |
-| `kilocode-app-metrics`        | MPL   | App metrics.                                                                         |
-| `traces`                      | MPL   | **Metrics despite the name**, not an APL traces dataset.                             |
+| Dataset | Query | Start Here For |
+|---|---|---|
+| `vercel` | APL | Web/function/request logs; Cloud Agent session creation and request IDs. |
+| `cloudflare-logpush` | APL | Worker/DO logs and execution metadata; Cloud Agent allocation and message lifecycle. |
+| `cloudflare-user-data-export` | APL | Cloudflare OTel spans: `trace_id`, `span_id`, `duration`, service/HTTP attributes. |
+| `supabase-production` | APL | Production database logs. |
+| `supabase-snowflake-exports` | APL | Exported Supabase platform/database logs: `event_message`, `metadata.*`. |
+| `kilocode-app` | MPL | Vercel app telemetry; discover the metric catalog first. |
+| `kilocode-app-dev` | MPL | Development app telemetry; discover the metric catalog first. |
+| `kilocode-app-metrics` | MPL | App metrics. |
+| `traces` | MPL | **Metrics despite the name**, not an APL traces dataset. |
 
 ## Fast Workflow
 

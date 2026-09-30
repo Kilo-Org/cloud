@@ -222,28 +222,11 @@ const rejectedCases = {
     (d.inlineComments = [{ user: { login: 'human' }, body: 'Concern' }]),
   'a human changes-requested review': d =>
     (d.reviews = [{ user: { login: 'human' }, state: 'CHANGES_REQUESTED' }]),
-  'a dismissed Kilo finding': d =>
-    (d.reviews = [{ user: bot, state: 'DISMISSED', body: 'Fix this' }]),
-  'adverse Kilo summary': d => (d.comments[1].body = '<!-- kilo-review -->\nIssues found'),
-  'missing Kilo summary': d => (d.comments = d.comments.slice(0, 1)),
-  'an old clean Kilo summary': d => {
-    d.comments[1].created_at = '2026-09-29T11:00:00Z';
-    d.comments[1].updated_at = '2026-09-29T11:00:00Z';
-  },
-  'an adverse current verdict with a clean historical verdict': d => {
-    d.comments[1].body = `${d.comments[1].body.replace('No Issues Found', 'Issues Found')}\n\n<!-- kilo-review-history -->\n${d.comments[1].body}\n<!-- /kilo-review-history -->`;
-  },
-  'a clean current verdict with historical findings': d => {
-    d.comments[1].body +=
-      '\n\n<!-- kilo-review-history -->\n**Status:** Issues Found | **Recommendation:** Fix\n<!-- /kilo-review-history -->';
-  },
-  'a clean verdict appearing only in quoted text': d => {
-    d.comments[1].body = `<!-- kilo-review -->\n## Code Review Summary\n\n> **Status:** No Issues Found | **Recommendation:** Merge`;
-  },
-  'a contradictory second current verdict': d => {
-    d.comments[1].body += '\n**Status:** Issues Found | **Recommendation:** Fix';
-  },
   'Kilo summary edited after the signal': d => (d.comments[1].updated_at = '2026-09-30T12:01:00Z'),
+  'a new Kilo comment after the signal': d =>
+    d.comments.push({ user: bot, updated_at: '2026-09-30T12:01:00Z' }),
+  'a new Kilo review after the signal': d =>
+    (d.reviews = [{ user: bot, state: 'COMMENTED', submitted_at: '2026-09-30T12:01:00Z' }]),
   'a new human comment after the signal': d =>
     d.comments.push({ user: { login: 'human' }, updated_at: '2026-09-30T12:01:00Z' }),
   'a new human comment-only review after the signal': d =>
@@ -289,15 +272,33 @@ test('does not duplicate an existing Actions approval for the same SHA', async (
   assert.equal((await run(data)).approvals.length, 0);
 });
 
-test('accepts a clean existing summary updated during the current review run', async () => {
+test('review-summary formatting is assessed by the meta-janitor, not the workflow', async () => {
   const data = fixture();
-  data.comments[1].created_at = '2026-09-29T11:00:00Z';
+  data.comments[1].body = 'An entirely different review format assessed by the meta-janitor';
+  data.reviews = [
+    {
+      user: bot,
+      state: 'COMMENTED',
+      body: 'Different review format',
+      submitted_at: '2026-09-30T11:04:00Z',
+    },
+  ];
+  assert.equal((await run(data)).approvals.length, 1);
+  assert.doesNotMatch(script, /cleanSummary|cleanReview|kilo-review|No Issues Found/);
+});
+
+test('does not require a Markdown summary when the current Kilo check passed', async () => {
+  const data = fixture();
+  data.comments = data.comments.slice(0, 1);
   assert.equal((await run(data)).approvals.length, 1);
 });
 
-test('accepts a clean current summary with clean historical verdicts', async () => {
+test('a Council Review block does not prevent the assessed commit being approved', async () => {
   const data = fixture();
-  data.comments[1].body += `\n\n<!-- kilo-review-history -->\n${data.comments[1].body}\n<!-- /kilo-review-history -->`;
+  data.comments[1].body = data.comments[1].body.replace(
+    '<!-- kilo-review -->',
+    '<!-- kilo-review -->\n\n<!-- kilo-council-verdict:start -->\n## Council Review\nA council verdict\n<!-- kilo-council-verdict:end -->\n'
+  );
   assert.equal((await run(data)).approvals.length, 1);
 });
 

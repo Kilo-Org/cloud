@@ -33,14 +33,6 @@ jobs:
           script: |
             const bot = 'kilo-code-bot[bot]';
             const signalPattern = /^Meta Janitor: Safety review passed; requesting approval\.\n\n<!-- meta-janitor-approve:v1 head=([0-9a-f]{40}) -->\n?$/;
-            const cleanSummary = '**Status:** No Issues Found | **Recommendation:** Merge';
-            const cleanReview = body => {
-              const lines = (body ?? '').split('\n');
-              const verdicts = lines.filter(line => line.startsWith('**Status:'));
-              return lines[0] === '<!-- kilo-review -->' && lines[1] === '## Code Review Summary' &&
-                lines[2] === '' && lines[3] === cleanSummary &&
-                verdicts.every(line => line === cleanSummary);
-            };
             const skip = reason => core.info(`Not approving: ${reason}`);
             const { owner, repo } = context.repo;
             const { issue, comment: eventComment } = context.payload;
@@ -115,20 +107,11 @@ jobs:
             });
             if (inlineComments.length > 0 || reviews.some(review =>
                 review.state === 'CHANGES_REQUESTED' ||
-                (review.user?.login === bot && review.body?.trim() && !cleanReview(review.body)) ||
-                (review.user?.login !== bot && review.user?.login !== 'github-actions[bot]' &&
-                  review.body?.trim() && review.submitted_at > signal.created_at))) {
-              return skip('inline feedback or an adverse/unclear review exists');
+                (review.user?.login !== 'github-actions[bot]' && review.submitted_at > signal.created_at))) {
+              return skip('inline feedback, requested changes, or a post-assessment review exists');
             }
-            const kiloSummaries = comments.filter(comment => comment.user?.login === bot &&
-              comment.user.type === 'Bot' && comment.body?.includes('<!-- kilo-review -->'));
-            if (kiloSummaries.some(comment => !cleanReview(comment.body)) ||
-                !kiloSummaries.some(comment => comment.updated_at >= kiloCheck.started_at &&
-                  comment.updated_at <= signal.created_at && cleanReview(comment.body))) {
-              return skip('Kilo feedback is adverse, unclear, or missing for the current review');
-            }
-            if (comments.some(comment => comment.user?.login !== bot &&
-                comment.user?.login !== 'github-actions[bot]' && comment.updated_at > signal.created_at)) {
+            if (comments.some(comment => comment.user?.login !== 'github-actions[bot]' &&
+                comment.updated_at > signal.created_at)) {
               return skip('new conversation feedback appeared after the safety assessment');
             }
             const actionsReviews = reviews.filter(review => review.user?.login === 'github-actions[bot]');

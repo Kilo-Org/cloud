@@ -424,6 +424,7 @@ export function AgentSessionListScreen() {
         getItemType={() => 'session'}
         style={rowsInsets.frame}
         contentContainerStyle={rowsInsets.content}
+        keyboardShouldPersistTaps="handled"
         refreshControl={rowsControl}
         maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
       />

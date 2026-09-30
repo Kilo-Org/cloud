@@ -434,6 +434,7 @@ export function AgentSessionListContent({
             ) : null
           }
           contentContainerStyle={tabBarOnlyClearanceStyle}
+          keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}

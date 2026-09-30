@@ -229,7 +229,15 @@ function repositoryPath(segments: readonly string[]): string | null {
   const cleaned = raw.map((segment, index) =>
     index === raw.length - 1 ? segment.replace(/\.git$/i, '') : segment
   );
-  if (cleaned.some(segment => segment.length === 0 || !REPOSITORY_SEGMENT_PATTERN.test(segment))) {
+  if (
+    cleaned.some(
+      segment =>
+        segment.length === 0 ||
+        segment === '.' ||
+        segment === '..' ||
+        !REPOSITORY_SEGMENT_PATTERN.test(segment)
+    )
+  ) {
     return null;
   }
   return cleaned.join('/');

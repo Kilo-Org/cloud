@@ -5,106 +5,26 @@ import {
   buildItems,
   buildPaginationItem,
 } from '@/lib/pr-review/diff/pr-diff-list-builder';
-import { type BuildItemsArgs, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
+import {
+  baseArgs,
+  diffLines,
+  gapLinesFor,
+  largeGapPatch,
+  makeFile,
+  paginationRow,
+  patchMissingItems,
+  separatorFor,
+  singleHunkPatch,
+  twoHunkPatch,
+} from '@/lib/pr-review/diff/pr-diff-list-builder-fixtures';
+import { type BuildItemsArgs } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { parsePatch } from '@/lib/pr-review/diff/parse-patch';
-import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 
 // Wraps the real parser in a spy so a test can count parse calls.
 vi.mock('@/lib/pr-review/diff/parse-patch', async importOriginal => {
   const actual = await importOriginal<{ parsePatch: typeof parsePatch }>();
   return { ...actual, parsePatch: vi.fn(actual.parsePatch) };
 });
-
-type FilePatchMissingItem = Extract<ListItem, { kind: 'file-patch-missing' }>;
-
-type SeparatorItem = Extract<ListItem, { kind: 'expand-separator' }>;
-type DiffLineListItem = Extract<ListItem, { kind: 'diff-line' }>;
-type PaginationItem = Extract<ListItem, { kind: 'pagination-row' }>;
-
-function patchMissingItems(items: ListItem[]): FilePatchMissingItem[] {
-  return items.filter((i): i is FilePatchMissingItem => i.kind === 'file-patch-missing');
-}
-
-function separators(items: ListItem[]): SeparatorItem[] {
-  return items.filter((i): i is SeparatorItem => i.kind === 'expand-separator');
-}
-function diffLines(items: ListItem[]): DiffLineListItem[] {
-  return items.filter((i): i is DiffLineListItem => i.kind === 'diff-line');
-}
-function paginationRow(items: ListItem[]): PaginationItem | undefined {
-  return items.find((i): i is PaginationItem => i.kind === 'pagination-row');
-}
-
-function makeFile(patch: string, path = 'a.ts'): PrReviewFile {
-  return {
-    path,
-    previousPath: null,
-    status: 'modified',
-    additions: 1,
-    deletions: 1,
-    patch,
-    patchMissing: false,
-  };
-}
-
-function baseArgs(overrides: Partial<BuildItemsArgs> = {}): BuildItemsArgs {
-  return {
-    files: [],
-    expanded: {},
-    expandedContext: {},
-    viewed: () => false,
-    headSha: 'abc',
-    owner: 'owner',
-    repo: 'repo',
-    number: 1,
-    changedFiles: 0,
-    isLoading: false,
-    isFetchingNextPage: false,
-    hasNextPage: false,
-    laterPageError: false,
-    fetchToCompletionRunning: false,
-    fetchToCompletionLoaded: 0,
-    totalFiles: null,
-    ...overrides,
-  };
-}
-
-const singleHunkPatch = [
-  'diff --git a/a.ts b/a.ts',
-  '@@ -5,3 +5,3 @@',
-  ' context line 5',
-  '-old line 6',
-  '+new line 6',
-  ' context line 7',
-].join('\n');
-
-const twoHunkPatch = [
-  'diff --git a/a.ts b/a.ts',
-  '@@ -5,3 +5,3 @@',
-  ' context line 5',
-  '-old line 6',
-  '+new line 6',
-  ' context line 7',
-  '@@ -15,3 +15,3 @@',
-  ' context line 15',
-  '-old line 16',
-  '+new line 16',
-  ' context line 17',
-].join('\n');
-
-const largeGapPatch = [
-  'diff --git a/a.ts b/a.ts',
-  '@@ -5,3 +5,3 @@',
-  ' context line 5',
-  '-old line 6',
-  '+new line 6',
-  ' context line 7',
-  '@@ -45,3 +45,3 @@',
-  ' context line 45',
-  '-old line 46',
-  '+new line 46',
-  ' context line 47',
-].join('\n');
 
 describe('buildItems later-page error', () => {
   it('emits an error pagination row when laterPageError + hasNextPage', () => {
@@ -122,15 +42,6 @@ describe('buildItems later-page error', () => {
     expect(paginationRow(items)?.state).not.toBe('error');
   });
 });
-
-function gapLinesFor(items: ListItem[], path: string, gapIndex: number): DiffLineListItem[] {
-  const prefix = `gap-line:${path}:${gapIndex}:`;
-  return diffLines(items).filter(l => l.lineKey.startsWith(prefix));
-}
-
-function separatorFor(items: ListItem[], gapIndex: number): SeparatorItem | undefined {
-  return separators(items).find(s => s.context.gapIndex === gapIndex);
-}
 
 describe('buildItems gap separators', () => {
   it('renders a leading separator when the first hunk starts after line 1', () => {
@@ -348,8 +259,7 @@ describe('buildFileItems parsed patch cache', () => {
     const spy = vi.mocked(parsePatch);
     spy.mockClear();
     const args = baseArgs({ files: [makeFile(singleHunkPatch)], expanded: { 'a.ts': true } });
-    const build = (next: BuildItemsArgs) =>
-      buildFileItems(next).find((i): i is DiffLineListItem => i.kind === 'diff-line');
+    const build = (next: BuildItemsArgs) => diffLines(buildFileItems(next))[0];
     expect(build(args)?.parsed).toBe(build({ ...args, viewed: () => true })?.parsed);
     expect(spy).toHaveBeenCalledTimes(1);
   });

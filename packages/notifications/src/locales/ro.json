@@ -7,7 +7,7 @@
       "instanceLifecycle": "Instanța ta are o actualizare",
       "scheduledAction": "O acțiune programată are o actualizare",
       "lowBalance": "Soldul tău necesită atenție",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Cheltuiala ta necesită atenție",
       "securityFinding": "O constatare de securitate necesită atenție",
       "activeAgentsGlanceable": "Agenții activi au o actualizare"
     }
@@ -44,8 +44,8 @@
       "body": "Soldul {{organizationName}} a scăzut sub ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Alertă de cheltuială",
+      "body": "Cheltuiala pentru {{scopeName}} a depășit ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "Constatare de securitate nouă ({{severity}})",

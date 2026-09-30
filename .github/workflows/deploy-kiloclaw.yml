@@ -3,6 +3,12 @@ name: Deploy KiloClaw
 on:
   workflow_dispatch:
   workflow_call:
+    inputs:
+      source_sha:
+        description: 'Exact tested commit to deploy (defaults to the caller SHA)'
+        required: false
+        default: ''
+        type: string
 
 # Least-privilege default for the whole workflow. Each job opts into only the
 # scopes it needs via its own `permissions:` block below.
@@ -38,6 +44,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           dissociate: true
+          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -161,9 +168,9 @@ jobs:
             registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}
             registry.fly.io/kiloclaw-machines:latest
             ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}
-            ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}
+            ghcr.io/kilo-org/kiloclaw:sha-${{ inputs.source_sha || github.sha }}
           build-args: |
-            CONTROLLER_COMMIT=${{ github.sha }}
+            CONTROLLER_COMMIT=${{ inputs.source_sha || github.sha }}
 
       # ── Ensure GHCR has the tag when the build was skipped ──────
       # When check-image finds the tag already in Fly registry, the build is
@@ -188,7 +195,7 @@ jobs:
         run: |
           FLY_IMAGE="registry.fly.io/kiloclaw-machines:${{ steps.image-hash.outputs.tag }}"
           GHCR_IMAGE="ghcr.io/kilo-org/kiloclaw:${{ steps.image-hash.outputs.tag }}"
-          GHCR_SHA_IMAGE="ghcr.io/kilo-org/kiloclaw:sha-${{ github.sha }}"
+          GHCR_SHA_IMAGE="ghcr.io/kilo-org/kiloclaw:sha-${{ inputs.source_sha || github.sha }}"
 
           echo "Pulling ${FLY_IMAGE}..."
           docker pull "${FLY_IMAGE}"

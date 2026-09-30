@@ -32,7 +32,7 @@ import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 import type * as StoreRefund from '@/lib/credits/store-refund';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id.

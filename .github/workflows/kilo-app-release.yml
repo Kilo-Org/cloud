@@ -624,7 +624,11 @@ jobs:
             gh pr edit "$PR" --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md"
             echo "Refreshed the version-bump PR #$PR for $BRANCH"
           else
+            # --head is required: this job checks out main, and without it gh
+            # resolves the head to the checked-out branch and the API refuses
+            # the PR with "No commits between main and main".
             gh pr create --base main \
+              --head "$BRANCH" \
               --title "chore(kilo-app): bump version to $NEW" \
               --body-file "$RUNNER_TEMP/kilo-app-bump-pr.md" \
               --assignee iscekic \

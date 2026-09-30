@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 import {

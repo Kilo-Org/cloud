@@ -11,6 +11,7 @@ import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
   clearOpenAiChatGptConnection,
+  clearOpenAiChatGptUsageLimit,
   getOpenAiChatGptStoredConnection,
   openAiChatGptSharedServicesOwner,
   readOpenAiChatGptUsageLimit,
@@ -149,6 +150,17 @@ describe('openai-chatgpt shared-services connection (real database)', () => {
       resetsAt: expect.any(String),
     });
     await expect(readOpenAiChatGptUsageLimit(memberOwner)).resolves.toBeNull();
+  });
+
+  it('clears a recorded limit once a request through that row succeeded', async () => {
+    const shared = openAiChatGptSharedServicesOwner(organization.id);
+
+    await recordOpenAiChatGptUsageLimit(shared, { resetsAt: Date.now() + 60 * 60 * 1000 });
+    await clearOpenAiChatGptUsageLimit(shared);
+    await expect(readOpenAiChatGptUsageLimit(shared)).resolves.toBeNull();
+
+    // A success on a row that never hit a limit writes nothing and must not throw.
+    await expect(clearOpenAiChatGptUsageLimit(shared)).resolves.toBeUndefined();
   });
 
   it('deletes the shared row and leaves the member row in place', async () => {

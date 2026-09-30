@@ -23,7 +23,7 @@ import {
   KiloPassPaymentProvider,
 } from './enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 
 const mockAcknowledge = jest

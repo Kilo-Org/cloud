@@ -3665,6 +3665,27 @@ describe('SandboxControl lifecycle boundaries', () => {
     }
   );
 
+  it.each([false, true])(
+    'normalizes invalid attach configuration with operation results %s',
+    async supportsOperationResults => {
+      const h = await harness();
+      h.socket.supportsOperationResults = () => supportsOperationResults;
+      await h.create();
+      await h.ready();
+      const schedule = await readSchedule(h.storage);
+
+      await expect(
+        h.control.request({
+          operation: 'session.attach',
+          session: ROUTE,
+          payload: { directory: 123, env: { SECRET_VALUE: 'private-environment-value' } },
+        })
+      ).rejects.toMatchObject({ name: 'Error', message: 'Invalid session.attach payload' });
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(await readSchedule(h.storage)).toEqual(schedule);
+    }
+  );
+
   describe('session.attach native runtime id capture', () => {
     const sentPayload = (h: Awaited<ReturnType<typeof harness>>): unknown => {
       const [request] = h.sendRequest.mock.calls[0] as [SandboxControlOutboundRequest];

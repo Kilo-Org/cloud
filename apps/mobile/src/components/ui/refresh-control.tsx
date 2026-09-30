@@ -6,12 +6,12 @@ import { darkColors } from '@/lib/hooks/theme-colors.generated';
 /**
  * Android draws its pull indicator with the platform accent — a saturated blue
  * that belongs to no screen in this app (device defect model-picker). Default it
- * to the muted foreground `RefreshProgress` already falls back to, so a screen
- * that picks no color still shows app chrome instead of system chrome.
+ * to the dark-theme muted foreground so a screen that picks no color still
+ * shows app chrome instead of system chrome.
  *
- * The generated palette is read directly, like `RefreshProgress`, to keep this
- * component free of the theme hook: it renders inside suites that stub
- * `react-native`, and `useThemeColors` would pull `expo-router` in behind them.
+ * The generated palette is read directly to keep this component free of the
+ * theme hook: it renders inside suites that stub `react-native`, and
+ * `useThemeColors` would pull `expo-router` in behind them.
  */
 export function RefreshControl({ refreshing, ...props }: Readonly<RefreshControlProps>) {
   const { reducedMotion } = useMotionPolicy();

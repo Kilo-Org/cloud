@@ -26,6 +26,9 @@ vi.mock('@/lib/a11y/motion-context', () => ({
     scrollAnimated: !policy.reducedMotion,
   }),
 }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#8A8680' }),
+}));
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 

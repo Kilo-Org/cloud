@@ -1,5 +1,5 @@
 import { type LucideIcon } from '@/components/ui/icons';
-import { Pressable, View } from 'react-native';
+import { Pressable } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Text } from '@/components/ui/text';
@@ -66,7 +66,6 @@ export function ActionButton({
         <Icon size={16} color={colors[TONE_ICON[tone]]} />
       )}
       <Text className={cn('text-[13px] font-semibold', TONE_TEXT[tone])}>{label}</Text>
-      <View />
     </Pressable>
   );
 }

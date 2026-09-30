@@ -32,6 +32,9 @@ const native = vi.hoisted(() => {
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
 vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedForeground: '#8A8680' }),
+}));
 vi.mock('react-native', () => ({
   PixelRatio: {
     roundToNearestPixel: (value: number) => Math.round(value * native.scale) / native.scale,

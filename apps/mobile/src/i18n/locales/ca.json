@@ -3384,7 +3384,7 @@
     "skillNameInvalid": "El nom de l'habilitat ha de començar amb una lletra o un dígit i utilitzar només lletres minúscules, dígits i guions",
     "skillContentRequired": "Es requereix contingut d'habilitat",
     "skillSaveFailed": "No s'ha pogut estalviar l'habilitat",
-    "skillsHint": "Enganxeu un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
+    "skillsHint": "Enganxa un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
     "skillEditTitle": "Edita l'habilitat",
     "mcp": {
       "title": "Servidors MCP",
@@ -3421,7 +3421,7 @@
       "add": "Afegeix un agent",
       "empty": "Encara no hi ha agents",
       "name": "Nom de l'agent",
-      "slug": "Agent llimac",
+      "slug": "Slug de l'agent",
       "description": "Descripció de l'agent",
       "model": "Anul·lació del model",
       "modelPlaceholder": "Utilitza la sessió predeterminada",
@@ -3442,9 +3442,9 @@
       "visibilityAll": "Tots, tots dos",
       "saveFailed": "No s'ha pogut desar l'agent",
       "nameRequired": "Introduïu un nom d'agent",
-      "slugRequired": "Introduïu un llimac d'agent",
+      "slugRequired": "Introduïu un slug d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra i utilitzar només lletres minúscules, dígits i guions",
-      "slugConflict": "Aquest llimac està reservat per un agent integrat",
+      "slugConflict": "Aquest slug està reservat per un agent integrat",
       "edit": "Edita l'agent"
     },
     "slashCommands": {

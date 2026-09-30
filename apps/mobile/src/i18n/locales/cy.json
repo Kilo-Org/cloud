@@ -3499,7 +3499,7 @@
     "commandsTitle": "Gosod gorchmynion",
     "addCommand": "Ychwanegu gorchymyn",
     "commandLabel": "Gorchymyn",
-    "commandPlaceholder": "e.g. pnpm install",
+    "commandPlaceholder": "e.e. pnpm install",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
     "moveUp": "Symud i fyny",

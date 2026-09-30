@@ -3355,7 +3355,7 @@
       "url": "URL",
       "environment": "አካባቢ (JSON)",
       "headers": "ራስጌዎች (JSON)",
-      "timeout": "ጊዜው አልቋል",
+      "timeout": "የጊዜ ገደብ",
       "secretCount": "ሚስጥራዊ ቆጠራ",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",

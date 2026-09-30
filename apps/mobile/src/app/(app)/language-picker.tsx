@@ -19,7 +19,7 @@ export default function AppLanguagePickerScreen() {
 
   return (
     <LanguagePickerSheet
-      returnTarget="preferences"
+      returnTarget="account"
       beforeReload={bridge?.beforeReload}
       onApplied={bridge?.onApplied}
       onClose={() => {

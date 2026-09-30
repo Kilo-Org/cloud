@@ -382,6 +382,13 @@ function RootLayoutNav({
         router.replace('/(auth)/login');
       } else if (returnTarget === 'profile') {
         router.replace('/(app)/(tabs)/(3_profile)' as Href);
+      } else if (returnTarget === 'account') {
+        // The app language picker is opened from Account settings, so an RTL
+        // relaunch reopens that screen. Two steps, not one `replace`: the
+        // relaunched stack has no entry below the reopened screen, so a lone
+        // `replace` leaves the header's back control with nothing to pop.
+        router.replace('/(app)/(tabs)/(3_profile)' as Href);
+        router.push('/(app)/(tabs)/(3_profile)/account' as Href);
       } else if (returnTarget === 'preferences') {
         // Two steps, not one `replace`: the relaunched stack has no entry
         // below the reopened screen, so a lone `replace` leaves the header's

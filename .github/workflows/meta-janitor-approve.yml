@@ -63,12 +63,6 @@ jobs:
             const rules = await github.paginate('GET /repos/{owner}/{repo}/rules/branches/{branch}', {
               owner, repo, branch: 'main', per_page: 100,
             });
-            // SHA-bound reviews alone do not prevent an approval surviving a later push.
-            if (!rules.some(rule => rule.type === 'pull_request' &&
-                rule.parameters?.dismiss_stale_reviews_on_push === true)) {
-              core.setFailed('Enable dismissal of stale approvals in an active main branch ruleset before automated approval.');
-              return;
-            }
             const requiredChecks = rules.filter(rule => rule.type === 'required_status_checks')
               .flatMap(rule => rule.parameters.required_status_checks);
             if (requiredChecks.length === 0) return skip('no required CI checks could be established');

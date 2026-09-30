@@ -17,10 +17,7 @@ import { RequestDeadlineError } from '@kilocode/event-service';
 import { fetchMobileSessionSnapshotPage } from '@/components/agents/mobile-session-page-adapter';
 import { type AgentMode } from '@/components/agents/mode-normalize';
 import { CLOUD_AGENT_WS_URL, WEB_BASE_URL } from '@/lib/config';
-import {
-  fetchCloudAgentStreamTicket,
-  StreamTicketResponseSchema,
-} from '@/lib/cloud-agent-stream-ticket';
+import { fetchCloudAgentStreamTicket } from '@/lib/cloud-agent-stream-ticket';
 import { SPAWNED_NOT_FOUND_MAX_ATTEMPTS } from '@/lib/spawned-not-found-retry';
 import { trpcClient } from '@/lib/trpc';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
@@ -34,8 +31,6 @@ import {
   readResolvedDeliveryFailures,
 } from '@/lib/persist/resolved-delivery-failures';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
-
-export { StreamTicketResponseSchema };
 
 type SessionWithRuntimeState =
   inferRouterOutputs<MobileRouter>['cliSessionsV2']['getWithRuntimeState'];

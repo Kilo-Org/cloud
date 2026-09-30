@@ -116,8 +116,8 @@ const {
   isCloudPrepareRetryableError,
   isStalledTransportError,
   readFetchSessionErrorCode,
-  StreamTicketResponseSchema,
 } = await import('@/components/agents/mobile-session-manager');
+const { StreamTicketResponseSchema } = await import('@/lib/cloud-agent-stream-ticket');
 
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
 

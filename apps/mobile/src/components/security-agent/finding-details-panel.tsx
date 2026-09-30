@@ -14,7 +14,7 @@ import {
   FINDING_TONE_TO_KV_ROW_TONE,
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
-import { getDeadlineCopy } from '@/lib/security-agent-copy';
+import { getDeadlineCopy, SEVERITY_KEYS } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
@@ -29,15 +29,9 @@ type FindingDetailsPanelProps = {
 };
 
 // Catalog keys for app-shared presentation codes. The mobile app maps a
-// stable code (severity, status, dismissal reason, source) to a key and
-// renders `t(key)` instead of app-shared's English labels.
-const SEVERITY_KEYS = {
-  critical: 'common.critical',
-  high: 'securityAgent.sla.high',
-  medium: 'securityAgent.sla.medium',
-  low: 'securityAgent.sla.low',
-} satisfies Record<string, string>;
-
+// stable code (status, dismissal reason, source) to a key and renders
+// `t(key)` instead of app-shared's English labels. Severity keys are shared
+// with the finding row in security-agent-copy.ts.
 const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.deadline.superseded',
   fixed: 'securityAgent.filter.fixed',

@@ -21,15 +21,8 @@ import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
-import { getDeadlineCopy, getSecurityAnalysisLabel } from '@/lib/security-agent-copy';
+import { getDeadlineCopy, getSecurityAnalysisLabel, SEVERITY_KEYS } from '@/lib/security-agent-copy';
 import { cn } from '@/lib/utils';
-
-const SEVERITY_KEYS = {
-  critical: 'common.critical',
-  high: 'securityAgent.sla.high',
-  medium: 'securityAgent.sla.medium',
-  low: 'securityAgent.sla.low',
-} satisfies Record<string, string>;
 
 const SEVERITY_TEXT_CLASS = {
   critical: 'text-destructive',

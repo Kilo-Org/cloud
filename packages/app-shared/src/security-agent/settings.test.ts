@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 
 import {
   canManageSecurityAgent,
-  getSecurityAgentAuditUrl,
   getSecurityRepositoriesInScope,
   getSettingsBackGuardOptions,
   getSettingsDirtyState,
@@ -12,15 +11,6 @@ import {
 } from './settings';
 
 describe('Security Agent helpers', () => {
-  it('builds owner-aware web audit URLs', () => {
-    expect(getSecurityAgentAuditUrl('https://app.kilo.ai/', 'personal')).toBe(
-      'https://app.kilo.ai/security-agent/audit-report'
-    );
-    expect(getSecurityAgentAuditUrl('https://app.kilo.ai', 'org_123')).toBe(
-      'https://app.kilo.ai/organizations/org_123/security-agent/audit-report'
-    );
-  });
-
   it('allows only personal, owner, admin, and billing manager policy changes', () => {
     expect(canManageSecurityAgent('personal', undefined)).toBe(true);
     expect(canManageSecurityAgent('org_123', 'owner')).toBe(true);

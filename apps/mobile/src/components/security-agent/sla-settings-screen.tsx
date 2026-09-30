@@ -91,7 +91,14 @@ function SlaDayRow({
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const rawRef = useRef(formatNumber(initialValue, i18n.language, { useGrouping: false }));
+  // Seed the uncontrolled input only from a valid value. A cleared field
+  // stores NaN; if the row remounts (SLA toggled off and back on) the input
+  // must show an empty field, not the literal "NaN" formatNumber(NaN) yields.
+  const rawRef = useRef(
+    isValidDayCount(initialValue)
+      ? formatNumber(initialValue, i18n.language, { useGrouping: false })
+      : ''
+  );
   const [days, setDays] = useState(initialValue);
 
   return (
@@ -156,8 +163,8 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits. Day-row inputs stay unmounted (see the `slaEnabled`
-  // read below) until this has run, so they never mount with the NaN
-  // placeholder as their initial value.
+  // read below) until this has run; SlaDayRow also seeds its input only from
+  // a valid value, so a remount never shows the NaN placeholder.
   useEffect(() => {
     if (hydratedRef.current || !config.data) {
       return;

@@ -7,6 +7,15 @@ import { i18n } from '@/i18n';
 import { formatDate } from '@/lib/format';
 import { firstNonEmpty } from '@/lib/utils';
 
+// Catalog keys for finding severity codes, shared by the finding list row and
+// the finding detail panel so a severity label change stays in one place.
+export const SEVERITY_KEYS = {
+  critical: 'common.critical',
+  high: 'securityAgent.sla.high',
+  medium: 'securityAgent.sla.medium',
+  low: 'securityAgent.sla.low',
+} satisfies Record<string, string>;
+
 // Analysis-state copy keys, translated at render time. English wording must
 // match packages/app-shared/src/security-agent/presentation.ts exactly.
 const LABEL_KEYS = {

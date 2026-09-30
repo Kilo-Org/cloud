@@ -10,13 +10,6 @@ export function canManageSecurityAgent(scope: string, role: OrganizationRole | u
   return isPersonalSecurityScope(scope) || canManageOrganizationBilling(role);
 }
 
-export function getSecurityAgentAuditUrl(webBaseUrl: string, scope: string): string {
-  const base = webBaseUrl.endsWith('/') ? webBaseUrl.slice(0, -1) : webBaseUrl;
-  return isPersonalSecurityScope(scope)
-    ? `${base}/security-agent/audit-report`
-    : `${base}/organizations/${encodeURIComponent(scope)}/security-agent/audit-report`;
-}
-
 // `T` stands in for the platform-specific security-agent config shape
 // (web's DB-backed config / mobile's tRPC-derived config) — both are plain
 // records of scalars and arrays, which is all this comparison needs.

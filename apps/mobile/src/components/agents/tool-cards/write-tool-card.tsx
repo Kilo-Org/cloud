@@ -21,9 +21,10 @@ const optionalStringSchema = z.string().optional();
 
 /**
  * Sheet body for a write tool part: markdown or highlighted code from
- * `input.content`, plus the error. Diff preview is gone. Renders only inside
- * the detail sheet — attachments and the pending/running status line live in
- * `ToolPartDetailBody`.
+ * `input.content`, plus the error. An empty body is shown only for a completed
+ * part, so a failed call never reads as a successfully emptied file. Diff
+ * preview is gone. Renders only inside the detail sheet — attachments and the
+ * pending/running status line live in `ToolPartDetailBody`.
  */
 export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const { t } = useTranslation();
@@ -31,12 +32,13 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const filePath = optionalStringSchema.safeParse(input.filePath).data ?? '';
   const content = optionalStringSchema.safeParse(input.content).data ?? '';
   const error = part.state.status === 'error' ? part.state.error : undefined;
-  const isFinal = part.state.status === 'completed' || part.state.status === 'error';
 
   let body: React.ReactNode = null;
-  if (content === '' && !isFinal) {
+  if (content === '' && part.state.status !== 'completed') {
     // Pending or running: the write has not finished, so the file is not yet
-    // known to be empty. `ToolPartDetailBody` already shows the status line.
+    // known to be empty. Error: the failed call never emptied the file, so an
+    // empty-content body would read as a successful result. The dispatcher's
+    // status line and the error line below already cover both.
   } else if (isMarkdownPath(filePath)) {
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
   } else if (content === '') {

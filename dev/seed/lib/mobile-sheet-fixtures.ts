@@ -11,15 +11,18 @@ export const ROOT_SESSION_ID = 'ses_000000000001RootFixture001';
 export const CHILD_SESSION_ID = 'ses_000000000002ChildFixture01';
 export const UNSUPPORTED_SESSION_ID = 'ses_000000000003Unsupported001';
 export const EMPTY_SESSION_ID = 'ses_000000000004EmptyFixture01';
+export const TOOL_ERROR_SESSION_ID = 'ses_000000000005ToolErrorFix01';
 
 export const ROOT_SESSION_TITLE = 'Mobile sheet fixtures';
 export const CHILD_SESSION_TITLE = 'Inspect child fixture';
 export const UNSUPPORTED_SESSION_TITLE = 'Unsupported repository fixture';
 export const EMPTY_SESSION_TITLE = 'Empty session fixture';
+export const TOOL_ERROR_SESSION_TITLE = 'Tool error fixture';
 export const ROOT_SESSION_SLUG = 'mobile-sheet-fixtures';
 export const CHILD_SESSION_SLUG = 'inspect-child-fixture';
 export const UNSUPPORTED_SESSION_SLUG = 'unsupported-repository-fixture';
 export const EMPTY_SESSION_SLUG = 'empty-session-fixture';
+export const TOOL_ERROR_SESSION_SLUG = 'tool-error-fixture';
 
 export const FIXTURE_PROJECT_ID = 'fixture';
 export const FIXTURE_DIRECTORY = '/workspace';
@@ -42,6 +45,12 @@ export const CHILD_BASH_PART_ID = 'prtChildBash0000001';
 
 export const UNSUPPORTED_USER_MESSAGE_ID = 'msgUnsupported00001';
 
+export const TOOL_ERROR_USER_MESSAGE_ID = 'msgToolErrorUser0001';
+export const TOOL_ERROR_ASSISTANT_MESSAGE_ID = 'msgToolErrorHelp0001';
+export const TOOL_ERROR_TODO_PART_ID = 'prtToolErrorTodo00001';
+export const TOOL_ERROR_WRITE_PART_ID = 'prtToolErrorWrite0001';
+export const TOOL_ERROR_WRITE_MARKDOWN_PART_ID = 'prtToolErrorWriteMd001';
+
 export const FIXTURE_TIME_CREATED = 1_700_000_000_000;
 export const FIXTURE_TIME_UPDATED = 1_700_000_300_000;
 
@@ -60,6 +69,16 @@ const CHILD_BASH_START = 1_700_000_051_000;
 const CHILD_BASH_END = 1_700_000_054_000;
 
 const UNSUPPORTED_USER_CREATED = 1_700_000_060_000;
+
+const TOOL_ERROR_USER_CREATED = 1_700_000_070_000;
+const TOOL_ERROR_ASSISTANT_CREATED = 1_700_000_080_000;
+const TOOL_ERROR_ASSISTANT_COMPLETED = 1_700_000_085_000;
+const TOOL_ERROR_TODO_START = 1_700_000_081_000;
+const TOOL_ERROR_TODO_END = 1_700_000_082_000;
+const TOOL_ERROR_WRITE_START = 1_700_000_082_500;
+const TOOL_ERROR_WRITE_END = 1_700_000_083_500;
+const TOOL_ERROR_WRITE_MARKDOWN_START = 1_700_000_083_600;
+const TOOL_ERROR_WRITE_MARKDOWN_END = 1_700_000_084_500;
 
 const ROOT_FILE_MIME = 'text/plain';
 const ROOT_FILE_NAME = 'fixture-notes.txt';
@@ -110,6 +129,7 @@ export function fixtureSessionIds(childPerformance = false): string[] {
     CHILD_SESSION_ID,
     UNSUPPORTED_SESSION_ID,
     EMPTY_SESSION_ID,
+    TOOL_ERROR_SESSION_ID,
     ...(childPerformance ? PERFORMANCE_SESSION_IDS : []),
   ];
 }
@@ -121,6 +141,9 @@ export function expectedPartIdsFor(sessionId: string): string[] {
   }
   if (sessionId === CHILD_SESSION_ID) {
     return [CHILD_BASH_PART_ID];
+  }
+  if (sessionId === TOOL_ERROR_SESSION_ID) {
+    return [TOOL_ERROR_TODO_PART_ID, TOOL_ERROR_WRITE_PART_ID, TOOL_ERROR_WRITE_MARKDOWN_PART_ID];
   }
   if (sessionId === UNSUPPORTED_SESSION_ID || sessionId === EMPTY_SESSION_ID) {
     return [];
@@ -394,6 +417,80 @@ export function buildEmptyIngestItems(): SessionIngestItem[] {
   ];
 }
 
+/**
+ * A read-only transcript whose assistant message holds the failed tool calls
+ * the mobile error cards guard: a `todowrite` with an empty `todos` input (and
+ * no `metadata.todos`, so it parses to an empty model) and `write` calls with
+ * empty and non-string `content`. Opening their detail sheets must show only
+ * the error line, never the success-looking `No tasks.` or
+ * `This file is empty.` empty states.
+ */
+export function buildToolErrorIngestItems(): SessionIngestItem[] {
+  return [
+    buildSessionItem({
+      sessionId: TOOL_ERROR_SESSION_ID,
+      slug: TOOL_ERROR_SESSION_SLUG,
+      title: TOOL_ERROR_SESSION_TITLE,
+    }),
+    buildUserMessageItem({
+      messageId: TOOL_ERROR_USER_MESSAGE_ID,
+      sessionId: TOOL_ERROR_SESSION_ID,
+      createdAt: TOOL_ERROR_USER_CREATED,
+    }),
+    buildAssistantMessageItem({
+      messageId: TOOL_ERROR_ASSISTANT_MESSAGE_ID,
+      sessionId: TOOL_ERROR_SESSION_ID,
+      parentId: TOOL_ERROR_USER_MESSAGE_ID,
+      createdAt: TOOL_ERROR_ASSISTANT_CREATED,
+      completedAt: TOOL_ERROR_ASSISTANT_COMPLETED,
+      cost: 0,
+      tokens: { total: 0, input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    }),
+    buildToolPartItem({
+      partId: TOOL_ERROR_TODO_PART_ID,
+      sessionId: TOOL_ERROR_SESSION_ID,
+      messageId: TOOL_ERROR_ASSISTANT_MESSAGE_ID,
+      callId: 'callToolErrorTodo00001',
+      tool: 'todowrite',
+      status: 'error',
+      input: { todos: [] },
+      output: 'todowrite failed: the task list was left unchanged.',
+      title: 'todowrite',
+      metadata: {},
+      start: TOOL_ERROR_TODO_START,
+      end: TOOL_ERROR_TODO_END,
+    }),
+    buildToolPartItem({
+      partId: TOOL_ERROR_WRITE_PART_ID,
+      sessionId: TOOL_ERROR_SESSION_ID,
+      messageId: TOOL_ERROR_ASSISTANT_MESSAGE_ID,
+      callId: 'callToolErrorWrite00001',
+      tool: 'write',
+      status: 'error',
+      input: { filePath: '/workspace/tool-error-fixture.ts', content: '' },
+      output: 'write failed: the empty body was left unchanged.',
+      title: 'write',
+      metadata: {},
+      start: TOOL_ERROR_WRITE_START,
+      end: TOOL_ERROR_WRITE_END,
+    }),
+    buildToolPartItem({
+      partId: TOOL_ERROR_WRITE_MARKDOWN_PART_ID,
+      sessionId: TOOL_ERROR_SESSION_ID,
+      messageId: TOOL_ERROR_ASSISTANT_MESSAGE_ID,
+      callId: 'callToolErrorWriteMd0001',
+      tool: 'write',
+      status: 'error',
+      input: { filePath: '/workspace/tool-error-fixture.md', content: 42 },
+      output: 'write failed: the non-string body was left unchanged.',
+      title: 'write',
+      metadata: {},
+      start: TOOL_ERROR_WRITE_MARKDOWN_START,
+      end: TOOL_ERROR_WRITE_MARKDOWN_END,
+    }),
+  ];
+}
+
 export const PERFORMANCE_ROOT_SESSION_ID = 'ses_000000000006ChildPerfRoot1';
 export const SELECTED_CHILD_SESSION_ID = 'ses_000000000007ChildPerf00001';
 export const EMPTY_CHILD_SESSION_ID = 'ses_000000000007ChildPerf00024';
@@ -425,6 +522,7 @@ export function fixtureCleanupSessionIds(childPerformance = false): string[] {
     ROOT_SESSION_ID,
     UNSUPPORTED_SESSION_ID,
     EMPTY_SESSION_ID,
+    TOOL_ERROR_SESSION_ID,
   ];
 }
 
@@ -445,6 +543,7 @@ export function buildMobileSheetFixtureResult(
     childSessionId: CHILD_SESSION_ID,
     unsupportedSessionId: UNSUPPORTED_SESSION_ID,
     emptySessionId: EMPTY_SESSION_ID,
+    toolErrorSessionId: TOOL_ERROR_SESSION_ID,
     usedRepository: context.usedRepository,
     sessionIngestPort: context.sessionIngestPort,
     sessionIngestUrl: context.sessionIngestUrl,

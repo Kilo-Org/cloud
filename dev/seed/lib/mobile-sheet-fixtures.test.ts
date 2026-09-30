@@ -14,6 +14,7 @@ import {
   buildEmptyIngestItems,
   buildMobileSheetFixtureResult,
   buildRootIngestItems,
+  buildToolErrorIngestItems,
   buildUnsupportedIngestItems,
   CHILD_ASSISTANT_MESSAGE_ID,
   CHILD_BASH_PART_ID,
@@ -38,6 +39,13 @@ import {
   ROOT_TASK_PART_ID,
   ROOT_USER_MESSAGE_ID,
   SELECTED_CHILD_SESSION_ID,
+  TOOL_ERROR_ASSISTANT_MESSAGE_ID,
+  TOOL_ERROR_SESSION_ID,
+  TOOL_ERROR_SESSION_TITLE,
+  TOOL_ERROR_TODO_PART_ID,
+  TOOL_ERROR_USER_MESSAGE_ID,
+  TOOL_ERROR_WRITE_MARKDOWN_PART_ID,
+  TOOL_ERROR_WRITE_PART_ID,
   UNSUPPORTED_SESSION_ID,
   UNSUPPORTED_SESSION_TITLE,
   UNSUPPORTED_USER_MESSAGE_ID,
@@ -79,12 +87,13 @@ function parsePartData(data: SessionIngestItem['data']) {
   return parsed.data;
 }
 
-void test('cleanup scope is exactly the four fixture session IDs', () => {
+void test('cleanup scope is exactly the five fixture session IDs', () => {
   assert.deepEqual(fixtureSessionIds(), [
     ROOT_SESSION_ID,
     CHILD_SESSION_ID,
     UNSUPPORTED_SESSION_ID,
     EMPTY_SESSION_ID,
+    TOOL_ERROR_SESSION_ID,
   ]);
   for (const id of fixtureSessionIds()) {
     assert.match(id, /^ses_/);
@@ -289,6 +298,69 @@ void test('empty fixture items match the session-ingest schemas', () => {
   assert.deepEqual(expectedPartIdsFor(EMPTY_SESSION_ID), []);
 });
 
+void test('tool-error fixture holds the two failed calls the detail sheets guard', () => {
+  const items = buildToolErrorIngestItems();
+  assert.equal(items.length, 6);
+
+  const session = parseSessionData(singleItemOfType(items, 'session').data);
+  assert.equal(session.id, TOOL_ERROR_SESSION_ID);
+  assert.equal(session.slug, 'tool-error-fixture');
+  assert.equal(session.title, TOOL_ERROR_SESSION_TITLE);
+  assert.equal(session.parentID, undefined);
+
+  const messages = itemsOfType(items, 'message').map(item => parseMessageData(item.data));
+  assert.equal(messages.length, 2);
+  const assistant = messages.find(message => message.role === 'assistant');
+  assert.ok(assistant);
+  assert.equal(assistant.id, TOOL_ERROR_ASSISTANT_MESSAGE_ID);
+  assert.equal(assistant.parentID, TOOL_ERROR_USER_MESSAGE_ID);
+
+  const parts = itemsOfType(items, 'part').map(item => parsePartData(item.data));
+  assert.equal(parts.length, 3);
+
+  const todoPart = parts.find(part => part.id === TOOL_ERROR_TODO_PART_ID);
+  assert.ok(todoPart);
+  assert.equal(todoPart.type, 'tool');
+  if (todoPart.type === 'tool') {
+    assert.equal(todoPart.tool, 'todowrite');
+    assert.equal(todoPart.state.status, 'error');
+    assert.deepEqual(todoPart.state.input, { todos: [] });
+    assert.equal(todoPart.state.metadata?.todos, undefined);
+    assert.equal(todoPart.state.error, 'todowrite failed: the task list was left unchanged.');
+  }
+
+  const writePart = parts.find(part => part.id === TOOL_ERROR_WRITE_PART_ID);
+  assert.ok(writePart);
+  assert.equal(writePart.type, 'tool');
+  if (writePart.type === 'tool') {
+    assert.equal(writePart.tool, 'write');
+    assert.equal(writePart.state.status, 'error');
+    assert.deepEqual(writePart.state.input, {
+      filePath: '/workspace/tool-error-fixture.ts',
+      content: '',
+    });
+    assert.equal(writePart.state.error, 'write failed: the empty body was left unchanged.');
+  }
+
+  const markdownPart = parts.find(part => part.id === TOOL_ERROR_WRITE_MARKDOWN_PART_ID);
+  assert.ok(markdownPart);
+  assert.equal(markdownPart.type, 'tool');
+  if (markdownPart.type === 'tool') {
+    assert.equal(markdownPart.tool, 'write');
+    assert.equal(markdownPart.state.status, 'error');
+    assert.deepEqual(markdownPart.state.input, {
+      filePath: '/workspace/tool-error-fixture.md',
+      content: 42,
+    });
+  }
+
+  assert.deepEqual(expectedPartIdsFor(TOOL_ERROR_SESSION_ID), [
+    TOOL_ERROR_TODO_PART_ID,
+    TOOL_ERROR_WRITE_PART_ID,
+    TOOL_ERROR_WRITE_MARKDOWN_PART_ID,
+  ]);
+});
+
 void test('status JSON parsing extracts the session-ingest service', () => {
   const up = parseSessionIngestServiceStatus(
     JSON.stringify({
@@ -455,11 +527,12 @@ void test('cleanup owns exactly the selected fixtures and deletes descendants fi
     ROOT_SESSION_ID,
     UNSUPPORTED_SESSION_ID,
     EMPTY_SESSION_ID,
+    TOOL_ERROR_SESSION_ID,
   ]);
   const fixtures = buildChildPerformanceFixtures();
   const cleanup = fixtureCleanupSessionIds(true);
-  assert.equal(cleanup.length, 30);
-  assert.equal(new Set(cleanup).size, 30);
+  assert.equal(cleanup.length, 31);
+  assert.equal(new Set(cleanup).size, 31);
   assert.deepEqual(
     new Set(cleanup),
     new Set([...fixtureSessionIds(), ...fixtures.map(fixture => fixture.sessionId)])
@@ -488,6 +561,7 @@ void test('default JSON stays unchanged and opt-in JSON preserves every existing
     childSessionId: 'ses_000000000002ChildFixture01',
     unsupportedSessionId: 'ses_000000000003Unsupported001',
     emptySessionId: 'ses_000000000004EmptyFixture01',
+    toolErrorSessionId: 'ses_000000000005ToolErrorFix01',
     usedRepository: 'fixture-owner/fixture-repo',
     sessionIngestPort: 12345,
     sessionIngestUrl: 'http://localhost:12345',
@@ -496,7 +570,7 @@ void test('default JSON stays unchanged and opt-in JSON preserves every existing
   assert.deepEqual(buildMobileSheetFixtureResult(context, false), expected);
   const result = buildMobileSheetFixtureResult(context, true);
   for (const [key, value] of Object.entries(expected)) assert.equal(result[key], value);
-  assert.equal(Object.keys(result).length, 17);
+  assert.equal(Object.keys(result).length, 18);
   assert.equal(typeof result.performanceChildSessionIds, 'string');
   if (typeof result.performanceChildSessionIds !== 'string') assert.fail('missing child IDs');
   const fixtures = buildChildPerformanceFixtures();

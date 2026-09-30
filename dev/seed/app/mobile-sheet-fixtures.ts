@@ -18,6 +18,7 @@ import {
   buildEmptyIngestItems,
   buildMobileSheetFixtureResult,
   buildRootIngestItems,
+  buildToolErrorIngestItems,
   buildUnsupportedIngestItems,
   CHILD_SESSION_ID,
   CHILD_SESSION_TITLE,
@@ -30,6 +31,8 @@ import {
   pollForChildPerformanceFixture,
   ROOT_SESSION_ID,
   ROOT_SESSION_TITLE,
+  TOOL_ERROR_SESSION_ID,
+  TOOL_ERROR_SESSION_TITLE,
   UNSUPPORTED_SESSION_ID,
   UNSUPPORTED_SESSION_TITLE,
   type SessionIngestItem,
@@ -45,7 +48,7 @@ function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-sheet-fixtures ${usage}`);
   console.log('');
   console.log('Seeds deterministic mobile transcripts for sheet hit-area E2E.');
-  console.log('Resets only the four fixture session IDs, then ingests history');
+  console.log('Resets only the five fixture session IDs, then ingests history');
   console.log('through the local cloudflare-session-ingest worker.');
   console.log('Use --child-performance to also reset and seed a separate tree');
   console.log('with 24 direct children, paged history, and one nested child.');
@@ -291,6 +294,12 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
       title: EMPTY_SESSION_TITLE,
       created_on_platform: 'cli',
     },
+    {
+      session_id: TOOL_ERROR_SESSION_ID,
+      kilo_user_id: user.userId,
+      title: TOOL_ERROR_SESSION_TITLE,
+      created_on_platform: 'cli',
+    },
     ...performanceFixtures.map(fixture => ({
       session_id: fixture.sessionId,
       kilo_user_id: user.userId,
@@ -312,18 +321,20 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     buildUnsupportedIngestItems()
   );
   await ingestSession(sessionIngestUrl, EMPTY_SESSION_ID, token, buildEmptyIngestItems());
+  await ingestSession(sessionIngestUrl, TOOL_ERROR_SESSION_ID, token, buildToolErrorIngestItems());
   for (const fixture of performanceFixtures) {
     await ingestSession(sessionIngestUrl, fixture.sessionId, token, fixture.items);
   }
 
   await pollForParts(sessionIngestUrl, ROOT_SESSION_ID, token);
   await pollForParts(sessionIngestUrl, CHILD_SESSION_ID, token);
+  await pollForParts(sessionIngestUrl, TOOL_ERROR_SESSION_ID, token);
   for (const fixture of performanceFixtures) {
     await pollForChildPerformanceFixture(sessionIngestUrl, token, fixture);
   }
 
   console.log('');
-  console.log('Seeded four mobile transcripts for sheet hit-area E2E.');
+  console.log('Seeded five mobile transcripts for sheet hit-area E2E.');
   if (childPerformance) {
     console.log('Also seeded a performance tree with 24 direct children and one nested child.');
   }

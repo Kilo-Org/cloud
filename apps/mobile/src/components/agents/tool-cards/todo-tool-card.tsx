@@ -16,8 +16,10 @@ import { TodoTaskRows } from './todo-task-rows';
  * Sheet body for a todoread/todowrite tool part: one row per task with its
  * state icon (cancelled tasks are muted and struck through), a muted
  * `No tasks.` line for an empty parsed list, the raw-output block fallback
- * when nothing parses, plus the error. Renders only inside the detail sheet —
- * attachments and the pending/running status line live in `ToolPartDetailBody`.
+ * when nothing parses, plus the error. A failed part suppresses the empty
+ * line — a failed call never reads as a successful empty result. Renders only
+ * inside the detail sheet — attachments and the pending/running status line
+ * live in `ToolPartDetailBody`.
  */
 export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
   const { t } = useTranslation();
@@ -30,7 +32,7 @@ export function TodoToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
       {todoModel && todoModel.tasks.length > 0 ? (
         <TodoTaskRows tasks={todoModel.tasks} truncated={todoModel.truncated} />
       ) : null}
-      {todoModel && todoModel.tasks.length === 0 ? (
+      {todoModel && todoModel.tasks.length === 0 && part.state.status !== 'error' ? (
         <SelectableText className="text-sm text-muted-foreground">
           {t('agentChat.toolCard.noTasks')}
         </SelectableText>

@@ -29,6 +29,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: true,
         subscription: undefined,
+        stateHasData: false,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -40,6 +41,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: undefined,
+        stateHasData: false,
         stateIsError: false,
         stateIsPending: true,
         platformOS: 'ios',
@@ -54,6 +56,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: true,
         presentationIsPending: false,
         subscription: undefined,
+        stateHasData: false,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -73,11 +76,58 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: undefined,
+        stateHasData: false,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
       })
     ).toEqual({ kind: 'loading' });
+  });
+
+  it('keeps cached content after a refetch failure with data present', () => {
+    // A failed refetch keeps `data` while setting `isError`. The route renders
+    // its cached presentation for that failure, so the card must too instead of
+    // blanking the active subscription with the error surface.
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: true,
+        presentationIsPending: false,
+        subscription: activeAppStoreSubscription,
+        stateHasData: true,
+        stateIsError: true,
+        stateIsPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      kind: 'card',
+      state: {
+        action: 'open-store-management',
+        actionLabel: 'Manage',
+        description: '$19 monthly credits · Managed in App Store',
+        title: 'Kilo Pass active',
+      },
+    });
+  });
+
+  it('keeps the error surface only when a failed query has no cached data', () => {
+    expect(
+      getKiloPassSubscriptionCardContentState({
+        presentation: { kind: 'native_iap', statusClass: 'healthy' },
+        presentationIsError: false,
+        presentationIsPending: false,
+        subscription: undefined,
+        stateHasData: false,
+        stateIsError: true,
+        stateIsPending: false,
+        platformOS: 'ios',
+      })
+    ).toEqual({
+      actionLabel: 'Retry',
+      description: 'Try again from Profile.',
+      kind: 'error',
+      title: 'Kilo Pass unavailable',
+    });
   });
 
   it('renders the unavailable surface without a purchase CTA', () => {
@@ -87,6 +137,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: null,
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'android',
@@ -109,6 +160,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: null,
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'android',
@@ -131,6 +183,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: null,
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -153,6 +206,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: activeAppStoreSubscription,
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -175,6 +229,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: { ...activeAppStoreSubscription, cancelAtPeriodEnd: true },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -203,6 +258,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
           refillAt: '2026-06-08T15:21:05.000Z',
           status: 'active',
         },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'android',
@@ -231,6 +287,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
           refillAt: '2026-06-08T15:21:05.000Z',
           status: 'active',
         },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'android',
@@ -259,6 +316,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
           refillAt: '2026-06-08T15:21:05.000Z',
           status: 'active',
         },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -287,6 +345,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
           refillAt: '2026-06-08T15:21:05.000Z',
           status: 'active',
         },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',
@@ -309,6 +368,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
         presentationIsError: false,
         presentationIsPending: false,
         subscription: activeAppStoreSubscription,
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'android',
@@ -337,6 +397,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
           refillAt: '2026-06-08T15:21:05.000Z',
           status: 'active',
         },
+        stateHasData: true,
         stateIsError: false,
         stateIsPending: false,
         platformOS: 'ios',

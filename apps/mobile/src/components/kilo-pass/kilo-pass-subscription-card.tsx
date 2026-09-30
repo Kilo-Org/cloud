@@ -64,6 +64,7 @@ export function KiloPassSubscriptionCard({
     presentationIsError: presentationQuery.isError,
     presentationIsPending: presentationQuery.isPending,
     subscription,
+    stateHasData: stateQuery.data !== undefined,
     stateIsError: stateQuery.isError,
     stateIsPending: stateQuery.isPending,
     platformOS: Platform.OS,

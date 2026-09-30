@@ -136,6 +136,12 @@ export function getKiloPassSubscriptionCardContentState(params: {
   presentationIsError: boolean;
   presentationIsPending: boolean;
   subscription: KiloPassSubscriptionCardSubscription | null | undefined;
+  /**
+   * Whether the state query has cached data. A refetch failure keeps `data`
+   * while reporting `isError`, so an error is only fatal when that query has
+   * nothing cached to fall back to.
+   */
+  stateHasData: boolean;
   stateIsError: boolean;
   stateIsPending: boolean;
   platformOS: string;
@@ -144,7 +150,15 @@ export function getKiloPassSubscriptionCardContentState(params: {
     return { kind: 'loading' };
   }
 
-  if (params.presentationIsError || params.stateIsError) {
+  // React Query keeps `data` and reports `isError` after a failed refetch with
+  // cached data. The Kilo Pass route renders its cached presentation for that
+  // same failure, so surface the error card only when a query has nothing
+  // cached to show — otherwise a transient offline focus refresh would replace
+  // the active-subscription card with "Kilo Pass unavailable".
+  if (
+    (params.presentationIsError && !params.presentation) ||
+    (params.stateIsError && !params.stateHasData)
+  ) {
     return {
       actionLabel: i18n.t('common.retry'),
       description: i18n.t('kiloPass.tryAgainFromProfile'),

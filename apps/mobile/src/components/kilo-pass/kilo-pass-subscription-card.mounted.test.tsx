@@ -262,6 +262,22 @@ describe('KiloPassSubscriptionCard mounted', () => {
     expect(queryState.presentation).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps cached card content after a refetch error', async () => {
+    // A failed refetch keeps `data` and sets `isError`; the cached card must
+    // survive instead of blanking to the retry surface.
+    queryState.presentationData = { kind: 'unavailable' };
+    queryState.presentationIsError = true;
+    queryState.stateData = { subscription: null };
+    queryState.stateIsError = true;
+
+    const renderer = await renderCard();
+
+    expect(renderer.root.findAllByProps({ testID: 'kilo-pass-unavailable-card' })).toHaveLength(1);
+    expect(
+      renderer.root.findAllByProps({ accessibilityHint: 'kiloPass.retryHint' })
+    ).toHaveLength(0);
+  });
+
   it('renders the card presentation state', async () => {
     queryState.presentationData = { kind: 'unavailable' };
     queryState.stateData = { subscription: null };

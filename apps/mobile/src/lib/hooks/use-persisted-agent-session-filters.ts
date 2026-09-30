@@ -1,9 +1,9 @@
-import * as SecureStore from '@/lib/auth/secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { setAccountMetadata } from '@/lib/auth/account-metadata-write';
+import { readStoredValueForUpdate } from '@/lib/auth/secure-store-value';
 import {
   type AgentSessionFilters,
   countActiveSessionFilters,
@@ -13,9 +13,18 @@ import {
 
 type StringArrayUpdater = string[] | ((prev: string[]) => string[]);
 
-async function loadStoredFilters(storageKey: string): Promise<AgentSessionFilters> {
-  const raw = await SecureStore.getItemAsync(storageKey);
-  return parseStoredAgentSessionFilters(raw) ?? createDefaultAgentSessionFilters();
+/**
+ * The stored filters, or `null` when the read failed. `null` is not "nothing
+ * stored": `readStoredValueForUpdate` keeps a failed read apart from an absent
+ * one so the caller never persists the fallback defaults over the record a
+ * transient keychain failure prevented it from reading.
+ */
+async function loadStoredFilters(storageKey: string): Promise<AgentSessionFilters | null> {
+  const read = await readStoredValueForUpdate(storageKey);
+  if (read.status === 'unreadable') {
+    return null;
+  }
+  return parseStoredAgentSessionFilters(read.value) ?? createDefaultAgentSessionFilters();
 }
 
 /**
@@ -28,25 +37,25 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     createDefaultAgentSessionFilters()
   );
   const [hasLoaded, setHasLoaded] = useState(false);
+  // Whether the in-memory filters may be written back. A stored record we
+  // actually read (or confirmed absent) is authoritative, and so is a value the
+  // person just set. The fallback defaults after an unreadable read are neither:
+  // persisting them would overwrite the stored filters the read never saw.
+  const [canPersist, setCanPersist] = useState(false);
 
   useEffect(() => {
     let isActive = true;
 
     const loadFilters = async () => {
-      try {
-        const loadedFilters = await loadStoredFilters(storageKey);
-        if (isActive) {
-          setFiltersState(loadedFilters);
-        }
-      } catch {
-        if (isActive) {
-          setFiltersState(createDefaultAgentSessionFilters());
-        }
-      } finally {
-        if (isActive) {
-          setHasLoaded(true);
-        }
+      const loadedFilters = await loadStoredFilters(storageKey);
+      if (!isActive) {
+        return;
       }
+      if (loadedFilters !== null) {
+        setFiltersState(loadedFilters);
+        setCanPersist(true);
+      }
+      setHasLoaded(true);
     };
 
     void loadFilters();
@@ -57,7 +66,7 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
   }, [storageKey]);
 
   useEffect(() => {
-    if (!hasLoaded) {
+    if (!hasLoaded || !canPersist) {
       return;
     }
 
@@ -73,17 +82,20 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
     };
 
     void saveFilters();
-  }, [filters, hasLoaded, storageKey]);
+  }, [filters, hasLoaded, canPersist, storageKey]);
 
   const setFilters = useCallback((next: AgentSessionFilters) => {
+    setCanPersist(true);
     setFiltersState(next);
   }, []);
 
   const clearFilters = useCallback(() => {
+    setCanPersist(true);
     setFiltersState(createDefaultAgentSessionFilters());
   }, []);
 
   const setPlatformFilter = useCallback((updater: StringArrayUpdater) => {
+    setCanPersist(true);
     setFiltersState(prev => ({
       ...prev,
       platformFilter: Array.isArray(updater) ? updater : updater(prev.platformFilter),
@@ -91,6 +103,7 @@ export function usePersistedAgentSessionFilters(storageKey: string) {
   }, []);
 
   const setProjectFilter = useCallback((updater: StringArrayUpdater) => {
+    setCanPersist(true);
     setFiltersState(prev => ({
       ...prev,
       projectFilter: Array.isArray(updater) ? updater : updater(prev.projectFilter),

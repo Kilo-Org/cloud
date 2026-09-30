@@ -4,7 +4,6 @@ import { describe, expect, it } from 'vitest';
 import { i18n } from '@/i18n';
 
 import {
-  displaySessionTitle,
   getSessionDetailRenameState,
   initialRenameState,
   titleFromSessionUpdatedEvent,
@@ -292,7 +291,7 @@ describe('getSessionDetailRenameState', () => {
 
   it('falls back to the untitled copy for a loaded session whose server title normalized away', () => {
     // A `New session - <ISO>` placeholder is normalized to undefined by
-    // displaySessionTitle at the data boundary; the header then shows the
+    // sessionDisplayTitle at the data boundary; the header then shows the
     // short fallback in full instead of an ellipsized timestamp.
     expect(
       getSessionDetailRenameState({
@@ -371,23 +370,6 @@ describe('getSessionDetailRenameState', () => {
         renameState: initialRenameState(),
       }).title
     ).toBe('Original');
-  });
-});
-
-describe('displaySessionTitle', () => {
-  it('hides the auto-title placeholder so the header shows its fallback', () => {
-    expect(displaySessionTitle('New session - 2026-01-01T00:00:00.000Z')).toBeUndefined();
-    expect(displaySessionTitle('Child session - 2026-01-01T00:00:00.000Z')).toBeUndefined();
-  });
-
-  it('keeps a real title untouched', () => {
-    expect(displaySessionTitle('Mobile layout refinement')).toBe('Mobile layout refinement');
-  });
-
-  it('treats null, undefined and blank titles as untitled', () => {
-    expect(displaySessionTitle(null)).toBeUndefined();
-    expect(displaySessionTitle(undefined)).toBeUndefined();
-    expect(displaySessionTitle('   ')).toBeUndefined();
   });
 });
 

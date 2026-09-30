@@ -74,22 +74,6 @@ type SessionDetailRenameState = {
 export const SESSION_TITLE_MAX_LENGTH = 200;
 
 /**
- * The title as it may be shown on screen, or undefined when the session has
- * no real title yet. A freshly created session carries a
- * `New session - <ISO timestamp>` placeholder until auto-titling replaces it;
- * the placeholder is an internal marker (the web router normalizes it to
- * null the same way), and rendering it in the header truncates to
- * "New session - 2026-…" instead of showing the title in full. Treat it as
- * untitled so the header keeps its short fallback copy.
- *
- * Shared with every other title surface through `sessionDisplayTitle`
- * (`@/lib/session-display-title`), so the placeholder rule has one owner.
- */
-export function displaySessionTitle(title: string | null | undefined): string | undefined {
-  return sessionDisplayTitle(title);
-}
-
-/**
  * Titles the user set through the app's rename flow, keyed by session id.
  *
  * `sessionDisplayTitle` judges the stored text alone: it can prove only that a

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import {
   clearSecretCacheForTest,
   signKiloToken,
@@ -153,7 +153,7 @@ async function signModernInternalToken(audience: string): Promise<string> {
   return token;
 }
 
-async function signCloudAgentRuntimeToken(): Promise<string> {
+async function signCloudAgentRuntimeToken(options: { now?: Date } = {}): Promise<string> {
   const { token } = await signModernKiloToken({
     userId: 'usr_123',
     pepper: 'pepper-current',
@@ -162,6 +162,7 @@ async function signCloudAgentRuntimeToken(): Promise<string> {
     audience: SESSION_INGEST_AUDIENCE,
     tokenPurpose: 'delegated-workload',
     credentialExchange: false,
+    ...(options.now ? { now: options.now } : {}),
     extra: {
       runtimeAuthorization: {
         id: '11111111-1111-4111-8111-111111111111',
@@ -845,5 +846,308 @@ describe('kiloJwtAuthMiddleware', () => {
     expect(
       (await request(deletion, { path: '/api/session/ses_abc', method: 'DELETE' }).response).status
     ).toBe(401);
+  });
+
+  describe('401 reason logging', () => {
+    let warnSpy: MockInstance;
+
+    beforeEach(() => {
+      clearSecretCacheForTest();
+      userRowByUserId.clear();
+      dbState.fails = false;
+      dbState.queries = 0;
+      dbState.downstreamCalls = 0;
+      getWorkerDbMock.mockClear();
+      warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      warnSpy.mockRestore();
+    });
+
+    // Asserts the whole `console.warn` call: exactly one call, exactly two
+    // arguments, the constant prefix and the allowlisted fields object. An extra
+    // argument, a different prefix or an extra warning all fail here.
+    function onlyRejectionFields(): Record<string, unknown> {
+      expect(warnSpy.mock.calls).toHaveLength(1);
+      const call = warnSpy.mock.calls[0]!;
+      expect(call).toHaveLength(2);
+      expect(call[0]).toBe('Kilo JWT auth rejected');
+      return call[1] as Record<string, unknown>;
+    }
+
+    function expectNoWarning(): void {
+      expect(warnSpy.mock.calls).toStrictEqual([]);
+    }
+
+    const BASE_KEYS = [
+      'event',
+      'reason',
+      'hasBearer',
+      'hasRuntimeAuthorizationClaim',
+      'hasAttestationHeader',
+    ];
+
+    const TICKET_PATH_KEYS = ['event', 'reason', 'hasAttestationHeader'];
+
+    it('logs missing_ticket without reading the bearer or ?token= on the ticket path', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signUserToken('pepper-current');
+      const res = await request(token, {
+        path: '/api/user/web',
+        websocket: true,
+        query: `?token=${token}`,
+      }).response;
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: 'Missing or invalid ticket',
+      });
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'missing_ticket',
+        hasAttestationHeader: false,
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(TICKET_PATH_KEYS);
+    });
+
+    it('logs invalid_ticket for an unknown ticket', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const tickets = makeTicketStore();
+      const res = await request(await signUserToken('pepper-current'), {
+        path: '/api/user/web',
+        websocket: true,
+        query: '?ticket=invalid',
+        ticketStore: tickets,
+      }).response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_ticket',
+        hasAttestationHeader: false,
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(TICKET_PATH_KEYS);
+    });
+
+    it('logs missing_bearer with hasBearer false for an empty websocket ?token=', async () => {
+      const res = await request(null, {
+        path: '/api/user/cli',
+        websocket: true,
+        query: '?token=',
+      }).response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'missing_bearer',
+        hasBearer: false,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(BASE_KEYS);
+    });
+
+    it('logs invalid_token with the generic pepper reason exactly once when the deletion attempt also fails', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signUserToken('pepper-stale');
+      const res = await request(token).response;
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: 'Invalid or expired token',
+      });
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'pepper_mismatch',
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual([
+        ...BASE_KEYS,
+        'tokenRejectionReason',
+      ]);
+    });
+
+    it('logs the expired generic verification failure and its keys', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const now = Math.floor(Date.now() / 1000);
+      const token = await new SignJWT({
+        version: 3,
+        kiloUserId: 'usr_123',
+        apiTokenPepper: 'pepper-current',
+        env: 'production',
+      })
+        .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+        .setIssuedAt(now - 120)
+        .setExpirationTime(now - 60)
+        .setAudience(SESSION_INGEST_AUDIENCE)
+        .sign(new TextEncoder().encode(TEST_JWT_SECRET));
+
+      const res = await request(token).response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'token_verification_failed',
+        tokenVerificationFailure: 'expired',
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual([
+        ...BASE_KEYS,
+        'tokenRejectionReason',
+        'tokenVerificationFailure',
+      ]);
+    });
+
+    it('logs a claim-bearing expired token with hasRuntimeAuthorizationClaim true', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signCloudAgentRuntimeToken({ now: new Date(Date.now() - 7_200_000) });
+
+      const res = await request(token).response;
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: 'Invalid or expired token',
+      });
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: true,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'token_verification_failed',
+        tokenVerificationFailure: 'expired',
+      });
+    });
+
+    it('logs a claim-bearing wrong-signature token with hasRuntimeAuthorizationClaim true', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signCloudAgentRuntimeToken();
+
+      const res = await request(`${token}x`).response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: true,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'token_verification_failed',
+        tokenVerificationFailure: 'signature',
+      });
+    });
+
+    it('does not report a runtime authorization claim for a malformed bearer', async () => {
+      const res = await request('not-a-jwt').response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'token_verification_failed',
+        tokenVerificationFailure: 'malformed',
+      });
+    });
+
+    it('logs invalid_runtime_attestation as the discriminator for a claim-bearing bearer', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signCloudAgentRuntimeToken();
+
+      const res = await request(token).response;
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: 'Invalid runtime proxy attestation',
+      });
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_runtime_attestation',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: true,
+        hasAttestationHeader: false,
+      });
+      expect(Object.keys(onlyRejectionFields())).toStrictEqual(BASE_KEYS);
+    });
+
+    it('records a present but invalid attestation header', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const token = await signCloudAgentRuntimeToken();
+
+      const res = await request(token, { runtimeProxyAttestation: 'not-an-attestation' }).response;
+
+      expect(res.status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_runtime_attestation',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: true,
+        hasAttestationHeader: true,
+      });
+    });
+
+    it('does not log on success, even after an earlier rejection in the same test', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: null });
+      const stale = await signUserToken('pepper-stale');
+      const valid = await signUserToken('pepper-current');
+
+      expect((await request(stale).response).status).toBe(401);
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'invalid_token',
+        hasBearer: true,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+        tokenRejectionReason: 'pepper_mismatch',
+      });
+
+      warnSpy.mockClear();
+      expect((await request(valid).response).status).toBe(200);
+      expectNoWarning();
+    });
+
+    it('does not log on the 403 deletion-token branch', async () => {
+      userRowByUserId.set('usr_123', { pepper: 'pepper-current', blockedReason: 'deleted' });
+      const deletion = await signModernInternalToken(SESSION_INGEST_USER_DELETION_AUDIENCE);
+
+      const res = await request(deletion, { path: '/api/me' }).response;
+
+      expect(res.status).toBe(403);
+      expectNoWarning();
+    });
+
+    it('keeps the 401 status and body when console.warn throws', async () => {
+      warnSpy.mockImplementation(() => {
+        throw new Error('logging failed');
+      });
+
+      const res = await request(null).response;
+
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toEqual({
+        success: false,
+        error: 'Missing or malformed Authorization header',
+      });
+      expect(onlyRejectionFields()).toStrictEqual({
+        event: 'kilo_jwt_auth_rejected',
+        reason: 'missing_bearer',
+        hasBearer: false,
+        hasRuntimeAuthorizationClaim: false,
+        hasAttestationHeader: false,
+      });
+    });
   });
 });

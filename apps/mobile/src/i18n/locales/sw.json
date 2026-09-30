@@ -241,6 +241,7 @@
     "addPasskey": "Ongeza ufunguo wa kuingia",
     "passkeyDefaultName": "Ufunguo wa kuingia",
     "passkeyAddedOn": "Umeongezwa {{date}}",
+    "passkeyLastUsedOn": "Ilitumika mara ya mwisho {{date}}",
     "passkeyAdded": "Ufunguo wa kuingia umeongezwa.",
     "passkeyAddFailed": "Imeshindikana kuongeza ufunguo wa kuingia. Jaribu tena.",
     "passkeyAddUnsupported": "Kifaa hiki hakiwezi kuunda vifunguo vya kuingia.",

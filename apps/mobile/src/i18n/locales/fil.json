@@ -241,6 +241,7 @@
     "addPasskey": "Magdagdag ng passkey",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Idinagdag {{date}}",
+    "passkeyLastUsedOn": "Huling ginamit {{date}}",
     "passkeyAdded": "Naidagdag ang passkey.",
     "passkeyAddFailed": "Hindi maidagdag ang passkey. Subukan muli.",
     "passkeyAddUnsupported": "Hindi makakagawa ng mga passkey ang device na ito.",

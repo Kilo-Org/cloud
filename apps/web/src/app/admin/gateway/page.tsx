@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
+import { AutoFreeContent } from '@/app/admin/gateway/AutoFreeContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -15,9 +16,10 @@ const VALID_TABS: readonly string[] = [
   'sync-providers',
   'custom-llms',
   'routing',
+  'auto-free',
   'api-request-log',
 ];
-type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'api-request-log';
+type Tab = 'sync-providers' | 'custom-llms' | 'routing' | 'auto-free' | 'api-request-log';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -67,6 +69,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="routing" className={tabTriggerClass}>
               Routing
             </TabsTrigger>
+            <TabsTrigger value="auto-free" className={tabTriggerClass}>
+              Auto Free
+            </TabsTrigger>
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
@@ -79,6 +84,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="routing" className="mt-4">
             <RoutingContent />
+          </TabsContent>
+          <TabsContent value="auto-free" className="mt-4">
+            <AutoFreeContent />
           </TabsContent>
           <TabsContent
             value="api-request-log"

@@ -241,6 +241,7 @@
     "addPasskey": "Додај клуч за пристап",
     "passkeyDefaultName": "Клуч за пристап",
     "passkeyAddedOn": "Додаден {{date}}",
+    "passkeyLastUsedOn": "Последно користено {{date}}",
     "passkeyAdded": "Клучот за пристап е додаден.",
     "passkeyAddFailed": "Не успеа додавањето на клуч за пристап. Обиди се повторно.",
     "passkeyAddUnsupported": "Овој уред не може да создава клучеви за пристап.",

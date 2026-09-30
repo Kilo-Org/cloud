@@ -241,6 +241,7 @@
     "addPasskey": "Добавить ключ доступа",
     "passkeyDefaultName": "Ключ доступа",
     "passkeyAddedOn": "Добавлен {{date}}",
+    "passkeyLastUsedOn": "Последнее использование {{date}}",
     "passkeyAdded": "Ключ доступа добавлен.",
     "passkeyAddFailed": "Не удалось добавить ключ доступа. Попробуйте ещё раз.",
     "passkeyAddUnsupported": "Это устройство не может создавать ключи доступа.",

@@ -241,6 +241,7 @@
     "addPasskey": "Geçiş anahtarı ekle",
     "passkeyDefaultName": "Geçiş anahtarı",
     "passkeyAddedOn": "{{date}} tarihinde eklendi",
+    "passkeyLastUsedOn": "Son kullanım {{date}}",
     "passkeyAdded": "Geçiş anahtarı eklendi.",
     "passkeyAddFailed": "Geçiş anahtarı eklenemedi. Tekrar deneyin.",
     "passkeyAddUnsupported": "Bu cihaz geçiş anahtarı oluşturamaz.",

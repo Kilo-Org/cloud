@@ -241,6 +241,7 @@
     "addPasskey": "د ننوتلو کیلي اضافه کړئ",
     "passkeyDefaultName": "د ننوتلو کیلي",
     "passkeyAddedOn": "{{date}} اضافه شوه",
+    "passkeyLastUsedOn": "وروستی کارول {{date}}",
     "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
     "passkeyAddFailed": "د ننوتلو کیلي اضافه نشو. بیا هڅه وکړئ.",
     "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",

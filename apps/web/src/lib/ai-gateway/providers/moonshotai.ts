@@ -12,5 +12,3 @@ export function applyMoonshotModelSettings(requestToMutate: GatewayRequest) {
 }
 
 export const KIMI_CURRENT_MODEL_ID = 'moonshotai/kimi-k3';
-
-export const KIMI_CURRENT_VERCEL_MODEL_ID = KIMI_CURRENT_MODEL_ID;

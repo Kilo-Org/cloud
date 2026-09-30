@@ -10,7 +10,3 @@ export function isGptOssModel(requestedModel: string) {
 }
 
 export const GPT_SOL_CURRENT_MODEL_ID = 'openai/gpt-6.1-sol';
-
-export const GPT_MINI_CURRENT_MODEL_ID = 'openai/gpt-5.4-mini';
-
-export const GPT_MINI_CURRENT_VERCEL_MODEL_ID = GPT_MINI_CURRENT_MODEL_ID;

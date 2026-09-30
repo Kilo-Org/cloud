@@ -212,6 +212,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', () => ({
       activeIsError: false,
       storedIsError: listState.isError,
       storedIsPending: listState.storedIsPending,
+      storedIsPaused: false,
       storedIsFetching: listState.storedIsFetching,
       storedFetchedSinceMount: true,
       storedLoadedPageCount: 1,

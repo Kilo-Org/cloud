@@ -9,6 +9,7 @@ function loading(overrides: Partial<Parameters<typeof selectSessionListIsLoading
     isSearching: false,
     searchIsPending: false,
     storedIsPending: false,
+    storedIsPaused: false,
     ...overrides,
   });
 }
@@ -41,6 +42,32 @@ describe('selectSessionListIsLoading', () => {
       expect(loading({ isSearching: false, searchIsPending: false, storedIsPending: false })).toBe(
         false
       );
+    });
+
+    it('stops loading when the stored query is paused with no cached page', () => {
+      // Offline with no cached page: React Query reports isPending true and
+      // isPaused true forever, so keying loading off isPending alone pins the
+      // skeleton rows with no error or retry. A paused query is unresolved but
+      // not loading, so the retryable error surface can show.
+      expect(
+        loading({
+          isSearching: false,
+          searchIsPending: false,
+          storedIsPending: true,
+          storedIsPaused: true,
+        })
+      ).toBe(false);
+      // Still loading when it is pending for another reason (the first render
+      // before the fetch starts), so the offline paused state does not hide the
+      // cold-open skeletons.
+      expect(
+        loading({
+          isSearching: false,
+          searchIsPending: false,
+          storedIsPending: true,
+          storedIsPaused: false,
+        })
+      ).toBe(true);
     });
 
     it('stops loading when a search settles with no matches', () => {

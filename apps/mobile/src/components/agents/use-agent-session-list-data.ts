@@ -42,6 +42,7 @@ export function useAgentSessionListData(options: {
     activeIsError,
     storedIsError,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
@@ -72,7 +73,13 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
   });
-  const contentIsError = isSearching ? search.isError : storedIsError;
+  // A paused stored query (offline) with no cached rows will not settle until
+  // the network returns, so it must surface the retryable error instead of a
+  // skeleton that never resolves. Rows already rendered (restored from the read
+  // cache, or held through a reconcile) keep the list and are not an error.
+  const contentIsError = isSearching
+    ? search.isError
+    : storedIsError || (storedIsPaused && storedSessions.length === 0);
   const handleRetry = useCallback(() => {
     if (!isSearching) {
       void refetch();
@@ -158,6 +165,7 @@ export function useAgentSessionListData(options: {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     paging,
     refetch,

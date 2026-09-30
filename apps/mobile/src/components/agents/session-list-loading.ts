@@ -21,9 +21,20 @@ export function selectSessionListIsLoading(input: {
   searchIsPending: boolean;
   /** `stored.isPending` — no stored page cached yet. */
   storedIsPending: boolean;
+  /**
+   * `stored.isPaused` — the stored query has no cached page and the device is
+   * offline, so it will not settle until the network returns. A paused query is
+   * not loading: gating the body on it pins the skeleton rows forever with no
+   * error or retry (the stored-history offline cold start). Treat it as
+   * resolved so the retryable error surface shows instead.
+   */
+  storedIsPaused: boolean;
 }): boolean {
   if (!input.ready) {
     return true;
   }
-  return input.isSearching ? input.searchIsPending : input.storedIsPending;
+  if (input.isSearching) {
+    return input.searchIsPending;
+  }
+  return input.storedIsPending && !input.storedIsPaused;
 }

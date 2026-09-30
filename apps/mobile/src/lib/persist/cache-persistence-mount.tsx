@@ -80,13 +80,13 @@ export function CachePersistenceMount() {
     // resubscribing while the old user id is still cached.
     const epoch = authEpoch;
 
-    // Authoritative identity takes over from the cold-start hint: a still-
-    // pending restore is abandoned, and a completed restore reports the scope
-    // it hydrated. A scope from another account is cleared together with the
-    // query client, so restored data can never render under the wrong user.
-    // The hint only survives an interrupted teardown, and authoritative
-    // identity wins.
-    const restoredScope = takeOverColdStartRestore();
+    // Authoritative identity takes over from the cold-start hint. A scope from
+    // another account is cleared together with the query client, so restored
+    // data can never render under the wrong user; a still-pending restore for
+    // this same user may still hydrate (the mount's user is the fence), while a
+    // different account is fenced. The hint only survives an interrupted
+    // teardown, and authoritative identity wins.
+    const restoredScope = takeOverColdStartRestore(userId);
     if (restoredScope !== null && restoredScope !== readCacheScope(userId)) {
       queryClient.clear();
       void (async () => {
@@ -115,8 +115,9 @@ export function CachePersistenceMount() {
 
     const persister = createReadCachePersister({ queryClient, userId, epoch });
     // Subscribe-only persistence: the root layout already performed the single
-    // cold-start restore via `restorePersistedCacheOnColdStart`, so the mount
-    // must not restore again (a second restore would re-hydrate and rescope).
+    // cold-start restore via `restorePersistedCacheOnColdStart` (which may still
+    // hydrate for this same user after the takeover above), so the mount must
+    // not run a second restore.
     // No `buster`: the scope segment carries the schema version, so a blob from
     // an older schema lives in another scope and is never read.
     const unsubscribe = persistQueryClientSubscribe({

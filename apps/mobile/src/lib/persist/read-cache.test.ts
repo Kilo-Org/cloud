@@ -64,6 +64,8 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 /* eslint-disable import/first */
+import { buildAgentSessionListInput } from '@/lib/agent-session-input';
+import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import {
   clearCacheScopeForSignOut,
   createReadCachePersister,
@@ -133,7 +135,8 @@ describe('allowlist filter', () => {
   it('allows the default personal-context list input with an omitted organization', () => {
     // A caller that omits the organization option still builds the personal
     // default: `organizationId` is then `undefined`, which is not an
-    // organization-scoped variant.
+    // organization-scoped variant. The stored-history list pages order by
+    // creation time (`SESSION_LIST_SORT`), so that is the persisted `orderBy`.
     expect(
       isReadCacheAllowedKey([
         ['cliSessionsV2', 'list'],
@@ -141,7 +144,7 @@ describe('allowlist filter', () => {
           type: 'query',
           input: {
             limit: 30,
-            orderBy: 'updated_at',
+            orderBy: 'created_at',
             includeChildren: false,
             createdOnPlatform: undefined,
             gitUrl: undefined,
@@ -182,13 +185,14 @@ describe('allowlist filter', () => {
     // `useStoredSessions` builds exactly this key via
     // `trpc.cliSessionsV2.list.infiniteQueryOptions(buildAgentSessionListInput(...))`:
     // the library stores the input without a cursor and marks the meta segment
-    // `type: 'infinite'`.
+    // `type: 'infinite'`. The stored-history list pages pass `SESSION_LIST_SORT`
+    // (`created_at`), so the persisted snapshot carries that `orderBy`.
     const realFirstPageKey: readonly unknown[] = [
       ['cliSessionsV2', 'list'],
       {
         input: {
           limit: 30,
-          orderBy: 'updated_at',
+          orderBy: 'created_at',
           includeChildren: false,
           createdOnPlatform: undefined,
           gitUrl: undefined,
@@ -198,6 +202,26 @@ describe('allowlist filter', () => {
       },
     ];
     expect(isReadCacheAllowedKey(realFirstPageKey)).toBe(true);
+  });
+
+  it('allows the exact personal stored-history input the app builds via the shared builders', () => {
+    // The stored-history screen builds its personal query through
+    // `buildAgentSessionListInput({ organizationId: null, sortBy: SESSION_LIST_SORT })`.
+    // Deriving the expected key from the same builders ties the allowlist to the
+    // real caller: a future sort change moves both together instead of silently
+    // dropping the offline snapshot the history restore depends on.
+    const input = buildAgentSessionListInput({ organizationId: null, sortBy: SESSION_LIST_SORT });
+    expect(isReadCacheAllowedKey([['cliSessionsV2', 'list'], { input, type: 'infinite' }])).toBe(
+      true
+    );
+    // The generic builder default (`updated_at`) is Home/Share's order, not the
+    // stored-history query, so it does not persist.
+    expect(
+      isReadCacheAllowedKey([
+        ['cliSessionsV2', 'list'],
+        { input: buildAgentSessionListInput({ organizationId: null }), type: 'infinite' },
+      ])
+    ).toBe(false);
   });
 
   it('allows the real recentRepositories key the app builds', () => {
@@ -217,7 +241,7 @@ describe('allowlist filter', () => {
   it('denies organization, repo, platform, sort, extra-field, and cursor list variants', () => {
     const defaultInput = {
       limit: 30,
-      orderBy: 'updated_at',
+      orderBy: 'created_at',
       includeChildren: false,
       createdOnPlatform: undefined,
       gitUrl: undefined,
@@ -241,10 +265,12 @@ describe('allowlist filter', () => {
         { type: 'query', input: { ...defaultInput, createdOnPlatform: 'cli' } },
       ])
     ).toBe(false);
+    // `updated_at` is Home/Share's order; the persisted stored-history snapshot
+    // must carry the list pages' own `SESSION_LIST_SORT`.
     expect(
       isReadCacheAllowedKey([
         ['cliSessionsV2', 'list'],
-        { type: 'query', input: { ...defaultInput, orderBy: 'created_at' } },
+        { type: 'query', input: { ...defaultInput, orderBy: 'updated_at' } },
       ])
     ).toBe(false);
     expect(
@@ -331,7 +357,7 @@ describe('dehydration filter', () => {
       {
         input: {
           limit: 30,
-          orderBy: 'updated_at',
+          orderBy: 'created_at',
           includeChildren: false,
           createdOnPlatform: undefined,
           gitUrl: undefined,
@@ -663,6 +689,69 @@ describe('cold-start restore and takeover', () => {
     // The mount takes over while the KV read is still in flight: the restore
     // must not hydrate after the authoritative identity has taken over.
     expect(takeOverColdStartRestore()).toBeNull();
+    restoreRead.resolve?.(JSON.stringify(makePersistedClient({ id: 'u1' })));
+    await restorePromise;
+
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toBeUndefined();
+    expect(takeOverColdStartRestore()).toBeNull();
+  });
+
+  it('hydrates the same account when the mount takes over while the restore read is in flight', async () => {
+    const { kv, scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    scopes.set(
+      'cache:u1:1',
+      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
+    );
+    const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
+    kv.getItem.mockImplementationOnce(
+      async () =>
+        new Promise<string | null>(resolve => {
+          restoreRead.resolve = resolve;
+        })
+    );
+    const queryClient = new QueryClient();
+
+    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(kv.getItem).toHaveBeenCalled();
+    });
+    // The mount takes over with the same account as the stored hint while the
+    // KV read is still in flight: the restore still hydrates, or a cold start
+    // whose faster network identity resolves first would always lose its cache.
+    expect(takeOverColdStartRestore('u1')).toBeNull();
+    restoreRead.resolve?.(JSON.stringify(makePersistedClient({ id: 'u1' })));
+    await restorePromise;
+
+    expect(queryClient.getQueryData(GET_ME_QUERY_KEY)).toEqual({ id: 'u1' });
+    // The scope was already reported to the mount on takeover; the late restore
+    // must not claim it a second time.
+    expect(takeOverColdStartRestore()).toBeNull();
+  });
+
+  it('never hydrates a different account when the mount takes over while the restore read is in flight', async () => {
+    const { kv, scopes } = createFakeKv();
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    scopes.set(
+      'cache:u1:1',
+      new Map([['read-cache', JSON.stringify(makePersistedClient({ id: 'u1' }))]])
+    );
+    const restoreRead: { resolve: ((value: string | null) => void) | null } = { resolve: null };
+    kv.getItem.mockImplementationOnce(
+      async () =>
+        new Promise<string | null>(resolve => {
+          restoreRead.resolve = resolve;
+        })
+    );
+    const queryClient = new QueryClient();
+
+    const restorePromise = restorePersistedCacheOnColdStart(queryClient);
+    await vi.waitFor(() => {
+      expect(kv.getItem).toHaveBeenCalled();
+    });
+    // The mount takes over as a different account while the KV read is still in
+    // flight: the hint account must never hydrate under the new identity.
+    expect(takeOverColdStartRestore('u2')).toBeNull();
     restoreRead.resolve?.(JSON.stringify(makePersistedClient({ id: 'u1' })));
     await restorePromise;
 

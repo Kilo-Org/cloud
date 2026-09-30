@@ -81,6 +81,7 @@ export function SessionHistoryScreen() {
     storedSessions,
     activeSessionIds,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     paging,
     handleRetry,
@@ -172,6 +173,7 @@ export function SessionHistoryScreen() {
     isSearching,
     searchIsPending: search.isPending,
     storedIsPending,
+    storedIsPaused,
   });
 
   // Reserve the search header through the initial load too: the cold-open

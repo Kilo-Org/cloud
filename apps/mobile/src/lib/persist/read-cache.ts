@@ -8,6 +8,7 @@ import {
 import { z } from 'zod';
 
 import { buildAgentSessionListInput } from '@/lib/agent-session-input';
+import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
@@ -47,6 +48,7 @@ export function readCacheScope(userId: string): string {
 export function resetReadCacheForTests(): void {
   coldStartGeneration = 0;
   coldStartRestoredScope = null;
+  coldStartTakenOverUserId = null;
   setSignOutActive(false);
 }
 
@@ -89,11 +91,16 @@ type AllowedProcedure = {
 
 /**
  * The exact default first-page input the app builds for the personal session
- * list (`buildAgentSessionListInput({ organizationId: null })`). The app's
- * list callers always pass the organization context, and personal context is
- * `null`, so the persisted snapshot must match this shape field for field.
+ * list (`buildAgentSessionListInput({ organizationId: null, sortBy: SESSION_LIST_SORT })`).
+ * The stored-history list pages order by creation time (`SESSION_LIST_SORT`),
+ * so the persisted snapshot must carry that `orderBy`; the generic builder
+ * default (`updated_at`) is Home/Share's order and is not the history query
+ * this cache restores offline.
  */
-const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({ organizationId: null });
+const DEFAULT_SESSION_LIST_INPUT = buildAgentSessionListInput({
+  organizationId: null,
+  sortBy: SESSION_LIST_SORT,
+});
 const DEFAULT_SESSION_LIST_KEY_COUNT = Object.keys(DEFAULT_SESSION_LIST_INPUT).length;
 
 // Initial allowlist. Verified against the mobile tRPC router
@@ -123,11 +130,12 @@ const ALLOWED_PROCEDURES: readonly AllowedProcedure[] = [
     path: 'cliSessionsV2.list',
     // Only the exact default first-page input persists: `null` and an omitted
     // organization are both personal context, and every other field must match
-    // the default builder output. An organization, repository (`gitUrl`),
-    // platform (`createdOnPlatform`), sort (`orderBy`), extra-field, or cursor
-    // variant is denied, so the read cache holds at most one session-list
-    // snapshot. The tRPC adapter strips `cursor`/`direction` from infinite
-    // keys, so a later page shares this key — the loaded page count is
+    // the stored-history list's own builder output (including its
+    // `SESSION_LIST_SORT` order). An organization, repository (`gitUrl`),
+    // platform (`createdOnPlatform`), other sort (`orderBy`), extra-field, or
+    // cursor variant is denied, so the read cache holds at most one
+    // session-list snapshot. The tRPC adapter strips `cursor`/`direction` from
+    // infinite keys, so a later page shares this key — the loaded page count is
     // enforced separately in {@link shouldPersistReadCacheQuery}.
     isAllowedInput: meta => {
       const input = metaInput(meta);
@@ -257,14 +265,32 @@ export function createReadCachePersister(options: ReadCachePersisterOptions): Pe
 
 let coldStartGeneration = 0;
 let coldStartRestoredScope: string | null = null;
+// The authoritative user id the authenticated mount took over with, or null
+// when it has not taken over (or took over without a known identity).
+let coldStartTakenOverUserId: string | null = null;
+
+/**
+ * True when the in-flight cold-start restore may still apply. The restore owns
+ * the identity while its generation is current; once the authenticated mount
+ * takes over, the restore may only finish if the authoritative user matches the
+ * stored identity hint. A takeover by a different account (or without a known
+ * identity) fences hydration, so a late restore can never render one account's
+ * cached data under another.
+ */
+function coldStartRestoreApplies(generation: number, hintUserId: string): boolean {
+  return generation === coldStartGeneration || coldStartTakenOverUserId === hintUserId;
+}
 
 /**
  * Best-effort cold-start restore for the identity hint stored in
- * `ACTIVE_USER_ID_KEY`. Never blocks startup. A generation flag abandons the
- * restore once the authenticated mount takes over: a late restore no-ops —
+ * `ACTIVE_USER_ID_KEY`. Never blocks startup. A generation flag fences the
+ * restore against a takeover by a different identity: once the authenticated
+ * mount takes over with another account (or without one) the restore no-ops —
  * including one whose KV read was still in flight at takeover, which never
- * hydrates — and never claims a scope, and the scope of a completed restore
- * is reported to the mount via {@link takeOverColdStartRestore}.
+ * hydrates — and never claims a scope. When the mount takes over with the same
+ * account as the hint, the restore may finish and hydrate (the cold start
+ * otherwise loses its cache to the faster network identity resolution); the
+ * scope it hydrated was already reported, so it does not claim one again.
  */
 export async function restorePersistedCacheOnColdStart(queryClient: QueryClient): Promise<void> {
   // The generation bump is synchronous so the authenticated mount can abandon
@@ -282,7 +308,11 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
     // identity is never hydrated and the first foreground refetch has nothing
     // to render.
     const hintUserId = await readStoredValueWithRetry(ACTIVE_USER_ID_KEY);
-    if (generation !== coldStartGeneration || !hintUserId || !isCurrentAuthEpoch(epoch)) {
+    if (
+      !hintUserId ||
+      !coldStartRestoreApplies(generation, hintUserId) ||
+      !isCurrentAuthEpoch(epoch)
+    ) {
       return;
     }
     const persister = createReadCachePersister({
@@ -290,21 +320,21 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
       userId: hintUserId,
       epoch,
     });
-    if (generation !== coldStartGeneration || !isCurrentAuthEpoch(epoch)) {
+    if (!coldStartRestoreApplies(generation, hintUserId) || !isCurrentAuthEpoch(epoch)) {
       return;
     }
     // The mount bumps the generation when it takes over, and
     // `persistQueryClientRestore` hydrates internally without a hook, so the
     // fence lives in a wrapped `restoreClient`: it reports no blob (and the
-    // library therefore does nothing) whenever the generation moved or the
+    // library therefore does nothing) whenever the restore is fenced or the
     // auth epoch changed while the KV read was in flight. A late restore can
-    // never hydrate after the authoritative identity has taken over or a
+    // never hydrate after an identity other than the hint has taken over or a
     // sign-in/sign-out has moved the epoch.
     const fencedPersister: Persister = {
       ...persister,
       restoreClient: async () => {
         const restored = await persister.restoreClient();
-        return generation === coldStartGeneration && isCurrentAuthEpoch(epoch)
+        return coldStartRestoreApplies(generation, hintUserId) && isCurrentAuthEpoch(epoch)
           ? restored
           : undefined;
       },
@@ -328,12 +358,15 @@ export async function restorePersistedCacheOnColdStart(queryClient: QueryClient)
 }
 
 /**
- * Marks the authenticated mount as the cache owner: any still-pending cold-
- * start restore is abandoned, and the scope a completed restore hydrated is
- * returned (and cleared from the module) for identity comparison.
+ * Marks the authenticated mount as the cache owner with its authoritative
+ * `userId`. A still-pending restore is fenced unless the mount's user matches
+ * the stored identity hint, in which case the restore may still hydrate for
+ * that same account. The scope a completed restore hydrated is returned (and
+ * cleared from the module) for identity comparison.
  */
-export function takeOverColdStartRestore(): string | null {
+export function takeOverColdStartRestore(userId?: string | null): string | null {
   coldStartGeneration += 1;
+  coldStartTakenOverUserId = userId ?? null;
   const scope = coldStartRestoredScope;
   coldStartRestoredScope = null;
   return scope;

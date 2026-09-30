@@ -9,7 +9,7 @@ import {
   type GitAuthorConfig,
   type ManagedGitHubFallbackReason,
 } from './types.js';
-import { generateSandboxId, getOutboundContainerId, isSharedSandboxId } from './sandbox-id.js';
+import { generateSandboxId, getOutboundContainerId } from './sandbox-id.js';
 import { mintWrapperDispatchTicket, resolveSecret } from './auth.js';
 import {
   isLocalFakeDeterministicModel,
@@ -587,25 +587,6 @@ export function resolveCommandGuardBashPermission(
     if (matchesKiloPermissionPattern(command, pattern)) result = action;
   }
   return result;
-}
-
-/**
- * Shared sandboxes co-locate sessions of one org/user, with each checkout under
- * `<tenantRoot>/{sessions,worktrees}/<id>`. Allow the container by default and
- * deny every sibling checkout; the session's own workspace is re-allowed last,
- * since the CLI resolves overlapping patterns in favor of the final match.
- */
-export function buildSharedExternalDirectoryPermission(
-  workspacePath: string
-): Record<string, 'allow' | 'deny'> {
-  const tenantRoot = dirname(dirname(workspacePath));
-  return {
-    '*': 'allow',
-    [`${tenantRoot}/sessions/*`]: 'deny',
-    [`${tenantRoot}/worktrees/*`]: 'deny',
-    [workspacePath]: 'allow',
-    [`${workspacePath}/**`]: 'allow',
-  };
 }
 
 class SessionSnapshotRestoreError extends Error {
@@ -1200,7 +1181,6 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
-      sandboxId: context.sandboxId,
       env: opts.env,
       kiloCapability: opts.kiloCapability,
       kiloBackendBaseUrl: opts.kiloBackendBaseUrl,
@@ -1230,7 +1210,6 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
-      sandboxId,
       env,
       kiloCapability,
       kiloBackendBaseUrl,
@@ -1352,14 +1331,8 @@ export class SessionService {
       });
     }
 
-    // Everything is reachable by default. Only shared sandboxes narrow this,
-    // and only to hide sibling sessions' checkouts (see the helper).
-    const externalDirectoryPermission = isSharedSandboxId(sandboxId ?? '')
-      ? buildSharedExternalDirectoryPermission(workspacePath)
-      : 'allow';
-
     const permission: Record<string, unknown> = {
-      external_directory: externalDirectoryPermission,
+      external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
@@ -2092,7 +2065,6 @@ export class SessionService {
       sessionHome,
       sessionId,
       workspacePath,
-      sandboxId,
       env,
       kiloCapability,
       kiloBackendBaseUrl,
@@ -3047,7 +3019,6 @@ type GetSaferEnvVarsOptions = {
   sessionHome: string;
   sessionId: string;
   workspacePath: string;
-  sandboxId?: string;
   env: PersistenceEnv;
   kiloCapability: string;
   kiloBackendBaseUrl?: string;

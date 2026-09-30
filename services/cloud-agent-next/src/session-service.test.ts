@@ -3460,31 +3460,8 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('blocks sibling checkouts but allows the container by default on a shared sandbox', async () => {
-    const metadata = createMetadata();
-    const result = await buildPromptWrapperRequests({
-      ...metadata,
-      workspace: { ...metadata.workspace, sandboxId: `usr-${'a'.repeat(48)}` },
-    });
-    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
-      permission: { external_directory: Record<string, string> };
-    };
-
-    expect(config.permission.external_directory).toEqual({
-      '*': 'allow',
-      '/workspace/user/sessions/*': 'deny',
-      '/workspace/user/worktrees/*': 'deny',
-      '/workspace/user/sessions/agent_test': 'allow',
-      '/workspace/user/sessions/agent_test/**': 'allow',
-    });
-  });
-
-  it('allows every external directory for an isolated sandbox', async () => {
-    const metadata = createMetadata();
-    const result = await buildPromptWrapperRequests({
-      ...metadata,
-      workspace: { ...metadata.workspace, sandboxId: `ses-${'a'.repeat(48)}` },
-    });
+  it('allows every external directory', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
     const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
 
     expect(config).toMatchObject({ permission: { external_directory: 'allow' } });

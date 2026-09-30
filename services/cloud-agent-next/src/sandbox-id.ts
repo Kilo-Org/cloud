@@ -119,11 +119,6 @@ export function isGeneratedSharedSandboxId(sandboxId: string): sandboxId is Sand
   return /^(org|usr|bot|ubt)-[0-9a-f]{48}$/.test(sandboxId);
 }
 
-export function isSharedSandboxId(sandboxId: string): boolean {
-  const classification = classifySandboxId(sandboxId);
-  return classification === 'shared' || classification === 'legacy-shared';
-}
-
 function getSharedSandboxPrefix(sandboxId: SandboxId): SharedSandboxPrefix {
   if (sandboxId.startsWith('org-')) return 'org';
   if (sandboxId.startsWith('usr-')) return 'usr';

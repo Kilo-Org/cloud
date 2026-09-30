@@ -49,15 +49,15 @@
     },
     "securityFindingNew": {
       "title": "Tátal slándála nua ({{severity}})",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityFindingSlaWarning": {
       "title": "Rabhadh SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityFindingSlaBreach": {
       "title": "Sárú SLA",
-      "body": "{{findingTitle}} in {{repoFullName}}"
+      "body": "{{findingTitle}} i {{repoFullName}}"
     },
     "securityLifecycle": {
       "title": "Kilo",

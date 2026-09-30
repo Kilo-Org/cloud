@@ -8,6 +8,7 @@ import { clearClipboardImages } from '@/lib/agent-attachments/clipboard-image';
 import { clearArtifactMirror } from '@/lib/artifacts/artifact-mirror';
 import { resetArtifactMirrorSyncState } from '@/lib/artifacts/artifact-mirror-sync';
 import { notifyArtifactsChanged } from '@/lib/artifacts/artifact-provider-native';
+import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
@@ -105,6 +106,12 @@ export function clearSessionScopedState(): void {
   runClear(clearFilePartCache);
   runClear(clearClipboardImages);
   runClear(clearSessionAutoApprove);
+  // The code-reviewer repo-selection sender map is keyed by scope+platform,
+  // and the personal key (`personal:<platform>`) is device-global with no
+  // account namespace. A pending personal-scope toggle or its server baseline
+  // left by the previous account would otherwise be re-applied and sent under
+  // the next account's credentials, rewriting its selected repositories.
+  runClear(clearRepoSelectionSenders);
   runClear(clearUserSessionTitles);
   runClear(clearSessionGoalCollapseState);
   // Wiping the mirror is what makes "signed out shows nothing to browse" true;

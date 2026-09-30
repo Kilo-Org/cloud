@@ -4,6 +4,12 @@ import { hashKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { i18n } from '@/i18n';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { type ReviewConfigData, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import {
+  clearRepoSelectionSenders,
+  getRepoSelectionSender,
+  type RepoSelectionSaveVars,
+  type RepoSelectionSender,
+} from '@/lib/hooks/repo-selection-senders';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { trpcClient } from '@/lib/trpc';
 
@@ -17,41 +23,6 @@ import {
 } from './use-code-reviewer';
 
 export const REPO_SELECTION_DEBOUNCE_MS = 500;
-
-type RepoSelectionDelta = {
-  add: (number | string)[];
-  remove: (number | string)[];
-};
-
-type RepoSelectionSaveVars = RepoSelectionDelta & {
-  optimisticSelection: (number | string)[];
-};
-
-type RepoSelectionSender = {
-  timer: ReturnType<typeof setTimeout> | null;
-  // The latest user-intended selection. Null means no toggle is pending.
-  pendingSelection: (number | string)[] | null;
-  // The last server-confirmed selection. Null means the server state is not
-  // yet known (no toggle and no refetch have synced it).
-  serverSelection: (number | string)[] | null;
-  // The mutation trigger of the hook instance that currently owns this key.
-  mutate: ((vars: RepoSelectionSaveVars) => void) | null;
-};
-
-// One pending debounced send per scope+platform. The timer closes over the
-// sender state, so a remount never retargets an older timer. `serverSelection`
-// is the last server-confirmed selection; `pendingSelection` is the latest
-// user-intended selection and is null while nothing is pending.
-const repoSelectionSenders = new Map<string, RepoSelectionSender>();
-
-function getRepoSelectionSender(key: string): RepoSelectionSender {
-  let sender = repoSelectionSenders.get(key);
-  if (!sender) {
-    sender = { timer: null, pendingSelection: null, serverSelection: null, mutate: null };
-    repoSelectionSenders.set(key, sender);
-  }
-  return sender;
-}
 
 function sameSelection(a: (number | string)[] | null, b: (number | string)[] | null): boolean {
   if (a === null || b === null) {
@@ -248,10 +219,5 @@ export function useRepoSelectionToggle(scope: string, platform: ReviewerPlatform
 // state so a test never leaks a fire into a later case (same pattern as
 // resetDraftTimersForTests in drafts.ts).
 export function resetRepoSelectionSendersForTests(): void {
-  for (const sender of repoSelectionSenders.values()) {
-    if (sender.timer) {
-      clearTimeout(sender.timer);
-    }
-  }
-  repoSelectionSenders.clear();
+  clearRepoSelectionSenders();
 }

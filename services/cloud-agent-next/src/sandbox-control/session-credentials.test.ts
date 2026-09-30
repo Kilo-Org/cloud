@@ -1850,6 +1850,47 @@ describe('credential failure safety', () => {
     expect(await resolve(env, invalidGrant)).toBeNull();
     expectSecretSafeLogs();
   });
+
+  it('fails encrypted MCP materialization immediately without exposing the encrypted value', async () => {
+    const encryptedHeader = `malformed-${BROKER_ERROR_SECRET}`;
+    const { broker } = createBroker();
+    const env = { ...environment(broker), AGENT_ENV_VARS_PRIVATE_KEY: 'not-a-private-key' };
+    const data = metadata({
+      profile: {
+        mcpServers: {
+          remote: {
+            type: 'remote',
+            url: 'https://mcp.example.com',
+            headers: {
+              Authorization: {
+                encryptedData: encryptedHeader,
+                encryptedDEK: encryptedHeader,
+                algorithm: 'rsa-aes-256-gcm',
+                version: 1,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    await expect(prepare(env, data)).rejects.toMatchObject({
+      name: 'McpConfigurationError',
+      message: 'MCP server "remote" headers contains an invalid encrypted value',
+      retryable: false,
+    });
+    expect(broker.issueKiloSessionCapability).not.toHaveBeenCalled();
+    const mockedLogger = vi.mocked(logger);
+    expect(
+      JSON.stringify([
+        mockedLogger.info.mock.calls,
+        mockedLogger.warn.mock.calls,
+        mockedLogger.error.mock.calls,
+        mockedLogger.withFields.mock.calls,
+      ])
+    ).not.toContain(encryptedHeader);
+    expectSecretSafeLogs();
+  });
 });
 
 describe('credential resolution boundaries', () => {

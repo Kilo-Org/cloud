@@ -241,6 +241,7 @@
     "addPasskey": "Gehitu sarbide-gako bat",
     "passkeyDefaultName": "Sarbide-gakoa",
     "passkeyAddedOn": "Gehitua {{date}}",
+    "passkeyLastUsedOn": "Azken erabilera {{date}}",
     "passkeyAdded": "Sarbide-gakoa gehituta.",
     "passkeyAddFailed": "Ezin izan da sarbide-gako bat gehitu. Saiatu berriro.",
     "passkeyAddUnsupported": "Gailu honek ezin ditu sarbide-gakoak sortu.",

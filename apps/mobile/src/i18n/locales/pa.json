@@ -241,6 +241,7 @@
     "addPasskey": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਕਰੋ",
     "passkeyDefaultName": "ਪਾਸਕੀ",
     "passkeyAddedOn": "{{date}} ਨੂੰ ਸ਼ਾਮਲ ਕੀਤੀ",
+    "passkeyLastUsedOn": "ਆਖਰੀ ਵਾਰ ਵਰਤਿਆ {{date}}",
     "passkeyAdded": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਕੀਤੀ ਗਈ।",
     "passkeyAddFailed": "ਪਾਸਕੀ ਸ਼ਾਮਲ ਨਹੀਂ ਹੋ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "passkeyAddUnsupported": "ਇਹ ਡਿਵਾਈਸ ਪਾਸਕੀ ਨਹੀਂ ਬਣਾ ਸਕਦੀ।",

@@ -241,6 +241,7 @@
     "addPasskey": "Giriş açarı əlavə et",
     "passkeyDefaultName": "Giriş açarı",
     "passkeyAddedOn": "{{date}} tarixində əlavə edildi",
+    "passkeyLastUsedOn": "Son istifadə {{date}}",
     "passkeyAdded": "Giriş açarı əlavə edildi.",
     "passkeyAddFailed": "Giriş açarı əlavə etmək mümkün olmadı. Yenidən cəhd edin.",
     "passkeyAddUnsupported": "Bu cihaz giriş açarı yarada bilmir.",

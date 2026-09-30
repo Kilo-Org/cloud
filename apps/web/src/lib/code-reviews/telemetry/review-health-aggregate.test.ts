@@ -5,6 +5,7 @@ import {
   REVIEW_COLLECTION_METRIC,
   REVIEW_OPEN_METRIC,
   REVIEW_OUTCOME_METRIC,
+  REVIEW_PUBLICATION_METRIC,
   REVIEW_REASON_METRIC,
   REVIEW_START_METRIC,
   assembleReviewOutcome,
@@ -13,6 +14,7 @@ import {
   collectCodeReviewOutcome,
   reviewOpenCountsQuery,
   reviewOutcomeStatusQuery,
+  reviewPublicationQuery,
   reviewStartedLatencyQuery,
   reviewTerminalMissingOutcomeTimeQuery,
   reviewWindow,
@@ -43,11 +45,14 @@ const zeroOpenCounts = {
   runningOverNinetyMinutes: 0,
 };
 
+const zeroPublicationCounts = { missingPublication: 0, coverageUnknown: 0 };
+
 const usageDb = () => getWorkerDb('postgres://unused:unused@localhost:0/unused');
 
 type FakeResults = {
   statusRows?: unknown[] | Error;
   latencyRow?: unknown;
+  publicationRow?: unknown;
   openCounts?: unknown;
   terminalMissing?: number;
 };
@@ -57,10 +62,12 @@ function fakeDatabase(results: FakeResults) {
     select(selection: Record<string, unknown>) {
       const isTerminalMissing = 'terminalMissingOutcomeTime' in selection;
       const isLatency = 'startedSampleCount' in selection;
+      const isPublication = 'missingPublication' in selection;
       const chain: {
         hasGroup: boolean;
         from: () => unknown;
         where: () => unknown;
+        leftJoin: () => unknown;
         groupBy: () => unknown;
         then: (
           resolve: (value: unknown[]) => unknown,
@@ -70,6 +77,7 @@ function fakeDatabase(results: FakeResults) {
         hasGroup: false,
         from: () => chain,
         where: () => chain,
+        leftJoin: () => chain,
         groupBy: () => {
           chain.hasGroup = true;
           return chain;
@@ -82,7 +90,11 @@ function fakeDatabase(results: FakeResults) {
           if (isTerminalMissing) {
             return resolve([{ terminalMissingOutcomeTime: results.terminalMissing ?? 0 }]);
           }
-          const value = isLatency ? results.latencyRow : results.openCounts;
+          const value = isLatency
+            ? results.latencyRow
+            : isPublication
+              ? (results.publicationRow ?? zeroPublicationCounts)
+              : results.openCounts;
           if (value instanceof Error) return reject(value);
           return resolve([value]);
         },
@@ -218,6 +230,20 @@ describe('review SQL allowlist', () => {
     expect(query.sql).toMatch(/"completed_at" is null/);
   });
 
+  it('joins only the latest attempt for completed reviews in the publication window', () => {
+    const query = reviewPublicationQuery(usageDb() as never, window).toSQL();
+
+    expect(query.sql).toContain('left join "cloud_agent_code_review_attempts"');
+    expect(query.sql).toContain(
+      '"cloud_agent_code_review_attempts"."attempt_number" = (select max(latest_attempt.attempt_number) from cloud_agent_code_review_attempts latest_attempt where latest_attempt.code_review_id = "cloud_agent_code_reviews"."id")'
+    );
+    expect(query.sql).toContain('"status" = $');
+    expect(query.sql).toContain('"completed_at" >=');
+    expect(query.sql).toContain('"completed_at" <');
+    expect(query.sql).toContain('"publication_status" = \'missing\'');
+    expect(query.sql).toContain('"publication_status" = \'unknown\'');
+  });
+
   it('aggregates only nonnegative completed review runtimes excluding queue wait', () => {
     const query = reviewOutcomeStatusQuery(usageDb() as never, window).toSQL();
     expect(query.sql).toContain('"completed_at" - "started_at"');
@@ -250,7 +276,7 @@ describe('review collection wiring', () => {
     return logSpy.mock.calls.map(([line]) => JSON.parse(line as string));
   }
 
-  it('logs one outcome and one start for the closed bucket and no reason rows', async () => {
+  it('logs one outcome, one start and one publication for the closed bucket and no reason rows', async () => {
     const database = fakeDatabase({ statusRows: [], latencyRow: zeroLatency });
 
     const status = await collectCodeReviewOutcome(
@@ -259,11 +285,12 @@ describe('review collection wiring', () => {
     );
 
     expect(status).toBe('complete');
-    expect(logSpy).toHaveBeenCalledTimes(2);
+    expect(logSpy).toHaveBeenCalledTimes(3);
     const records = loggedRecords();
     expect(records.map(record => record.metric)).toEqual([
       REVIEW_OUTCOME_METRIC,
       REVIEW_START_METRIC,
+      REVIEW_PUBLICATION_METRIC,
     ]);
     for (const record of records) {
       expect(record.observedAt).toBe('2026-02-01T00:12:00.000Z');
@@ -284,7 +311,30 @@ describe('review collection wiring', () => {
     expect(outcome).not.toHaveProperty('windowMinutes');
     const start = records[1];
     expect(start).toMatchObject({ started: 0, startedWithinFiveMinutes: 0, p95WaitMs: null });
+    expect(records[2]).toMatchObject({ missingPublication: 0, coverageUnknown: 0 });
+    expect(records[2]).not.toHaveProperty('completed');
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it('emits explicit publication counts when the window has missing and unknown reviews', async () => {
+    const database = fakeDatabase({
+      statusRows: [],
+      latencyRow: zeroLatency,
+      publicationRow: { missingPublication: 1, coverageUnknown: 3 },
+    });
+
+    const status = await collectCodeReviewOutcome(
+      new Date('2026-02-01T00:12:00.000Z'),
+      database as never
+    );
+
+    expect(status).toBe('complete');
+    const records = loggedRecords();
+    expect(records[records.length - 1]).toMatchObject({
+      metric: REVIEW_PUBLICATION_METRIC,
+      missingPublication: 1,
+      coverageUnknown: 3,
+    });
   });
 
   it('logs the outcome row and only a review_reason breakdown when reasons are present', async () => {
@@ -308,6 +358,7 @@ describe('review collection wiring', () => {
       REVIEW_REASON_METRIC,
       REVIEW_REASON_METRIC,
       REVIEW_START_METRIC,
+      REVIEW_PUBLICATION_METRIC,
     ]);
     const outcome = records[0];
     expect(outcome).toMatchObject({ failed: 2, cancelled: 1, completed: 0, interrupted: 0 });
@@ -353,7 +404,10 @@ describe('review collection wiring', () => {
 
     expect(status).toBe('failed');
     const records = loggedRecords();
-    expect(records.map(record => record.metric)).toEqual([REVIEW_START_METRIC]);
+    expect(records.map(record => record.metric)).toEqual([
+      REVIEW_START_METRIC,
+      REVIEW_PUBLICATION_METRIC,
+    ]);
     expect(errorSpy).toHaveBeenCalledTimes(1);
     const error = JSON.parse(errorSpy.mock.calls[0]?.[0] as string);
     expect(error).toEqual({
@@ -375,12 +429,44 @@ describe('review collection wiring', () => {
 
     expect(status).toBe('failed');
     const records = loggedRecords();
-    expect(records.map(record => record.metric)).toEqual([REVIEW_OUTCOME_METRIC]);
+    expect(records.map(record => record.metric)).toEqual([
+      REVIEW_OUTCOME_METRIC,
+      REVIEW_PUBLICATION_METRIC,
+    ]);
     expect(errorSpy).toHaveBeenCalledTimes(1);
     const error = JSON.parse(errorSpy.mock.calls[0]?.[0] as string);
     expect(error).toEqual({
       metric: REVIEW_COLLECTION_METRIC,
       collector: REVIEW_START_METRIC,
+      environment: expectedEnvironment,
+      observedAt: '2026-02-01T00:10:00.000Z',
+      status: 'failed',
+    });
+  });
+
+  it('reports a failed publication collection without suppressing the sibling outcome and start rows', async () => {
+    const database = fakeDatabase({
+      statusRows: [],
+      latencyRow: zeroLatency,
+      publicationRow: new Error('boom'),
+    });
+
+    const status = await collectCodeReviewOutcome(
+      new Date('2026-02-01T00:10:00.000Z'),
+      database as never
+    );
+
+    expect(status).toBe('failed');
+    const records = loggedRecords();
+    expect(records.map(record => record.metric)).toEqual([
+      REVIEW_OUTCOME_METRIC,
+      REVIEW_START_METRIC,
+    ]);
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    const error = JSON.parse(errorSpy.mock.calls[0]?.[0] as string);
+    expect(error).toEqual({
+      metric: REVIEW_COLLECTION_METRIC,
+      collector: REVIEW_PUBLICATION_METRIC,
       environment: expectedEnvironment,
       observedAt: '2026-02-01T00:10:00.000Z',
       status: 'failed',

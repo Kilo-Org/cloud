@@ -241,6 +241,7 @@
     "addPasskey": "Нэвтрэх түлхүүр нэмэх",
     "passkeyDefaultName": "Нэвтрэх түлхүүр",
     "passkeyAddedOn": "{{date}}-нд нэмсэн",
+    "passkeyLastUsedOn": "Сүүлд ашигласан {{date}}",
     "passkeyAdded": "Нэвтрэх түлхүүр нэмэгдлээ.",
     "passkeyAddFailed": "Нэвтрэх түлхүүр нэмж чадсангүй. Дахин оролдоно уу.",
     "passkeyAddUnsupported": "Энэ төхөөрөмж нэвтрэх түлхүүр үүсгэж чадахгүй.",

@@ -241,6 +241,7 @@
     "addPasskey": "Engeza ukhiye wokungena",
     "passkeyDefaultName": "Ukhiye wokungena",
     "passkeyAddedOn": "Kungezwe {{date}}",
+    "passkeyLastUsedOn": "Kusetshenziswe okokugcina {{date}}",
     "passkeyAdded": "Ukhiye wokungena kungeziwe.",
     "passkeyAddFailed": "Ukhiye wokungena awukwazanga ukungezwa. Zama futhi.",
     "passkeyAddUnsupported": "Le divayisi ayikwazi ukudala amakhiye okungena.",

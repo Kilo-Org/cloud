@@ -241,6 +241,7 @@
     "addPasskey": "Pridėti priėjimo raktą",
     "passkeyDefaultName": "Priėjimo raktas",
     "passkeyAddedOn": "Pridėta {{date}}",
+    "passkeyLastUsedOn": "Paskutinį kartą naudota {{date}}",
     "passkeyAdded": "Priėjimo raktas pridėtas.",
     "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
     "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",

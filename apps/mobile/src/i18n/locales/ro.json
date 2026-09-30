@@ -241,6 +241,7 @@
     "addPasskey": "Adaugă o cheie de acces",
     "passkeyDefaultName": "Cheie de acces",
     "passkeyAddedOn": "Adăugată {{date}}",
+    "passkeyLastUsedOn": "Ultima utilizare {{date}}",
     "passkeyAdded": "Cheie de acces adăugată.",
     "passkeyAddFailed": "Nu s-a putut adăuga o cheie de acces. Încearcă din nou.",
     "passkeyAddUnsupported": "Acest dispozitiv nu poate crea chei de acces.",

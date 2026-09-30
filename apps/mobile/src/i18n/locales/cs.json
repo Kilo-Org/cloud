@@ -241,6 +241,7 @@
     "addPasskey": "Přidat přístupový klíč",
     "passkeyDefaultName": "Přístupový klíč",
     "passkeyAddedOn": "Přidán {{date}}",
+    "passkeyLastUsedOn": "Naposledy použito {{date}}",
     "passkeyAdded": "Přístupový klíč přidán.",
     "passkeyAddFailed": "Přístupový klíč se nepodařilo přidat. Zkuste to znovu.",
     "passkeyAddUnsupported": "Toto zařízení nemůže vytvářet přístupové klíče.",

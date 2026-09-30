@@ -241,6 +241,7 @@
     "addPasskey": "Lägg till en passnyckel",
     "passkeyDefaultName": "Passnyckel",
     "passkeyAddedOn": "Tillagd {{date}}",
+    "passkeyLastUsedOn": "Senast använd {{date}}",
     "passkeyAdded": "Passnyckel tillagd.",
     "passkeyAddFailed": "Det gick inte att lägga till en passnyckel. Försök igen.",
     "passkeyAddUnsupported": "Den här enheten kan inte skapa passnycklar.",

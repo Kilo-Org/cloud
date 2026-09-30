@@ -58,7 +58,10 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
-import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  inferRuntimeCredentialProxyRoute,
+  type RuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -473,7 +476,7 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const requestPath = new URL(c.req.url).pathname;
   if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
-  if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
     return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 }
@@ -482,7 +485,7 @@ async function forwardRuntimeCredentialProxy(
   c: Context<HonoContext>,
   handle: string,
   claims: RuntimeProxyHandleClaims,
-  route: 'backend' | 'provider' | 'ingest',
+  route: RuntimeCredentialProxyRoute,
   path: string
 ): Promise<Response> {
   if (!claims) return c.text('Unauthorized', 401);
@@ -523,7 +526,7 @@ async function forwardRuntimeCredentialProxy(
   try {
     // The route allowlist is resolved above before a proof is issued.
     const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'provider' ? 'kilo-gateway' : 'session-ingest';
+      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');

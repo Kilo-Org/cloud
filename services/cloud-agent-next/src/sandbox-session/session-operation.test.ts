@@ -21,6 +21,7 @@ import {
 import {
   commitSessionOperationResult,
   dispatchSessionOperation,
+  operationDispatchError,
   reconcileSessionOperation,
   type SessionOperationEffects,
 } from './session-operation.js';
@@ -270,6 +271,113 @@ describe('dispatchSessionOperation', () => {
       )
     ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+  });
+
+  it.each([
+    { description: 'empty command', reason: /command/i, local: { type: 'local', command: [] } },
+    {
+      description: 'fractional timeout',
+      reason: /timeout/i,
+      local: { type: 'local', command: ['node'], timeout: 500.5 },
+    },
+    {
+      description: 'oversized configuration',
+      reason: /80 KiB/,
+      local: {
+        type: 'local',
+        command: ['node'],
+        environment: Object.fromEntries(
+          Array.from({ length: 12 }, (_, index) => [`VALUE_${index}`, 'x'.repeat(8192)])
+        ),
+      },
+    },
+  ])(
+    'rejects $description before dispatching it as transport uncertainty',
+    async ({ local, reason }) => {
+      const attachAuthorization = {
+        ...authorization,
+        operation: 'session.attach' as const,
+        operationId: 'attempt_invalid_attach_1',
+        dispatchDeadlineAt: Date.now() + 60_000,
+      };
+      let stored = messages();
+      const request = vi.fn();
+
+      const result = await dispatchSessionOperation(
+        {
+          authorization: attachAuthorization,
+          payload: {
+            mcp: {
+              local,
+            },
+          },
+        },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      );
+      expect(result).toMatchObject({
+        state: 'rejected',
+        error: {
+          code: 'protocol_error',
+          retryable: false,
+        },
+        rejectionReceived: true,
+      });
+      if (result.state !== 'rejected') throw new Error('Expected local configuration rejection');
+      expect(result.error.message).toMatch(/^Invalid session.attach payload:/);
+      expect(result.error.message).toMatch(reason);
+      expect(operationDispatchError(result)).toMatchObject({
+        message: result.error.message,
+        rejectionReceived: true,
+        retryable: false,
+      });
+      expect(request).not.toHaveBeenCalled();
+      expect(stored[0]?.proofs?.attach).toBeUndefined();
+    }
+  );
+
+  it('does not classify an unexpected parser fault as a configuration rejection', async () => {
+    const fault = new TypeError('Unexpected payload getter failure');
+    const invalidPayload = Object.defineProperty({}, 'mcp', {
+      enumerable: true,
+      get() {
+        throw fault;
+      },
+    });
+    const request = vi.fn();
+    const commit = vi.fn(() => true);
+
+    await expect(
+      dispatchSessionOperation(
+        {
+          authorization: {
+            ...authorization,
+            operation: 'session.attach',
+            operationId: 'attempt_parser_fault',
+            dispatchDeadlineAt: Date.now() + 60_000,
+          },
+          payload: invalidPayload,
+        },
+        { read: messages, commit },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toEqual({ state: 'uncertain', reason: 'transport', error: fault });
+    expect(request).not.toHaveBeenCalled();
+    expect(commit).not.toHaveBeenCalled();
   });
 
   it('retires a dispatched attach the runtime has no record of and dispatches a fresh attach', async () => {

@@ -241,6 +241,7 @@
     "addPasskey": "新增通行密鑰",
     "passkeyDefaultName": "通行密鑰",
     "passkeyAddedOn": "新增於 {{date}}",
+    "passkeyLastUsedOn": "最後使用於 {{date}}",
     "passkeyAdded": "已新增通行密鑰。",
     "passkeyAddFailed": "無法新增通行密鑰。請重試。",
     "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",

@@ -13,16 +13,12 @@ import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { AutoFreeModelConfig } from '@kilocode/db/schema-types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
 export const PRIMARY_DEFAULT_MODEL = GLM_FLASH_CURRENT_MODEL_ID;
 
-export type AutoFreeModel = {
-  model: string;
-  weight: number;
-  reasoning: OpenRouterReasoningConfig;
-};
+export type AutoFreeModel = AutoFreeModelConfig;
 
 export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   {

@@ -241,6 +241,7 @@
     "addPasskey": "Een passkey toevoegen",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Toegevoegd op {{date}}",
+    "passkeyLastUsedOn": "Laatst gebruikt {{date}}",
     "passkeyAdded": "Passkey toegevoegd.",
     "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
     "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",

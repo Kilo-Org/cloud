@@ -38,6 +38,16 @@ import {
 const rpId = new URL(NEXTAUTH_URL).hostname;
 const rpOrigin = new URL(NEXTAUTH_URL).origin;
 
+// `android:apk-key-hash` origins the native app presents. The release hashes
+// are the unpadded base64url SHA-256 of the fingerprints published in
+// `apps/web/public/.well-known/assetlinks.json`; the debug hash is the CI dev
+// client's debug certificate, accepted only outside production.
+const ANDROID_UPLOAD_ORIGIN = 'android:apk-key-hash:OYcNOQ5FiE-4sC2lDOSXm-xnss9fadmohHleZf24hec';
+const ANDROID_PLAY_SIGNING_ORIGIN =
+  'android:apk-key-hash:iY7SytoBDXbRzrSYoUAN5FFC0-BHBwzOtg7L53M4nWs';
+const ANDROID_DEBUG_ORIGIN = 'android:apk-key-hash:-sYXRdwJA3hvue3mKpYrOZ9zSPC7b4mbgzJmdZEDO5w';
+const ANDROID_ORIGINS = [ANDROID_UPLOAD_ORIGIN, ANDROID_PLAY_SIGNING_ORIGIN, ANDROID_DEBUG_ORIGIN];
+
 const userId = 'oauth/passkey-test-user';
 const otherUserId = 'oauth/passkey-test-other-user';
 const userEmail = 'passkey-test@example.com';
@@ -226,6 +236,29 @@ async function insertCredential(
     public_key: isoBase64URL.fromBuffer(authenticator.cosePublicKey),
     sign_count: opts.signCount ?? 0,
   });
+}
+
+/**
+ * Run `operation` with a temporary `NODE_ENV`. The module reads the value per
+ * ceremony, so this is how the production-only gating of the debug Android
+ * origin is exercised without a second process.
+ */
+async function withNodeEnv(nodeEnv: string, operation: () => Promise<void>): Promise<void> {
+  const original = process.env.NODE_ENV;
+  Object.defineProperty(process.env, 'NODE_ENV', {
+    value: nodeEnv,
+    writable: true,
+    configurable: true,
+  });
+  try {
+    await operation();
+  } finally {
+    Object.defineProperty(process.env, 'NODE_ENV', {
+      value: original,
+      writable: true,
+      configurable: true,
+    });
+  }
 }
 
 describe('passkey', () => {
@@ -621,6 +654,93 @@ describe('passkey', () => {
         ),
         'VERIFICATION_FAILED'
       );
+    });
+  });
+
+  describe('Android app origins', () => {
+    it.each(ANDROID_ORIGINS)('accepts a registration response with origin %s', async origin => {
+      const authenticator = createTestAuthenticator();
+      const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+
+      const credential = await verifyRegistration(
+        userId,
+        challengeId,
+        buildRegistrationResponse(authenticator, { challenge: options.challenge, origin })
+      );
+
+      expect(credential.credential_id).toBe(authenticator.credentialId);
+      expect(credential.kilo_user_id).toBe(userId);
+    });
+
+    it.each(ANDROID_ORIGINS)('accepts an authentication response with origin %s', async origin => {
+      const authenticator = createTestAuthenticator();
+      await insertCredential(authenticator, { signCount: 1 });
+
+      const { challengeId, options } = await createAuthenticationOptions();
+      const { ticket } = await verifyAuthentication(
+        challengeId,
+        buildAuthenticationResponse(authenticator, {
+          challenge: options.challenge,
+          counter: 2,
+          origin,
+        })
+      );
+
+      expect(ticket).toHaveLength(64);
+    });
+
+    it('refuses an Android origin that is not an accepted certificate', async () => {
+      const authenticator = createTestAuthenticator();
+      const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+
+      await expectRefusal(
+        verifyRegistration(
+          userId,
+          challengeId,
+          buildRegistrationResponse(authenticator, {
+            challenge: options.challenge,
+            origin: 'android:apk-key-hash:not-a-registered-certificate',
+          })
+        ),
+        'VERIFICATION_FAILED'
+      );
+    });
+
+    it('refuses the Android debug origin in production', async () => {
+      await withNodeEnv('production', async () => {
+        const authenticator = createTestAuthenticator();
+        const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+
+        await expectRefusal(
+          verifyRegistration(
+            userId,
+            challengeId,
+            buildRegistrationResponse(authenticator, {
+              challenge: options.challenge,
+              origin: ANDROID_DEBUG_ORIGIN,
+            })
+          ),
+          'VERIFICATION_FAILED'
+        );
+      });
+    });
+
+    it('still accepts a release origin in production', async () => {
+      await withNodeEnv('production', async () => {
+        const authenticator = createTestAuthenticator();
+        const { challengeId, options } = await createRegistrationOptions(userId, userEmail);
+
+        const credential = await verifyRegistration(
+          userId,
+          challengeId,
+          buildRegistrationResponse(authenticator, {
+            challenge: options.challenge,
+            origin: ANDROID_UPLOAD_ORIGIN,
+          })
+        );
+
+        expect(credential.credential_id).toBe(authenticator.credentialId);
+      });
     });
   });
 

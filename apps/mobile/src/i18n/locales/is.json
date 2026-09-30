@@ -720,7 +720,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri athugasemd í bið við {{location}}",
       "editA11y": "Breyta athugasemd í bið við {{location}}",
-      "staleHint": "pR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
+      "staleHint": "PR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
       "deleteA11y": "Eyða athugasemd í bið við {{location}}",
       "deletedAnnouncement": "Athugasemd í bið eytt",
       "noCommentsQueued": "Engar athugasemdir eru í bið. Yfirferðin verður send með þeirri tegund sem valin er hér að ofan, án athugasemda.",

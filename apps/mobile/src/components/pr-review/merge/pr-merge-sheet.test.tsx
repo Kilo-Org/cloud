@@ -217,7 +217,6 @@ const baseProps = {
   mode: 'merge' as const,
   sheetTitle: 'Merge pull request',
   eyebrow: 'octocat/hello#1',
-  onRefetch: vi.fn().mockResolvedValue(undefined),
   onDismiss: vi.fn(),
 };
 
@@ -302,8 +301,7 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
 
   it('partial success (merged:true + branchDeleteError) writes the banner, fires haptic, and dismisses', async () => {
     const onDismiss = vi.fn();
-    const onRefetch = vi.fn().mockResolvedValue(undefined);
-    const props = { ...baseProps, onDismiss, onRefetch };
+    const props = { ...baseProps, onDismiss };
 
     mergeMutationMocks.mutateAsync.mockResolvedValueOnce({
       merged: true,
@@ -319,15 +317,13 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
     expect(Haptics.notificationAsync).toHaveBeenCalledWith(
       Haptics.NotificationFeedbackType.Success
     );
-    expect(onRefetch).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
   });
 
   it('clean success (merged:true + branchDeleted:true) fires haptic and dismisses without writing a banner', async () => {
     const onDismiss = vi.fn();
-    const onRefetch = vi.fn().mockResolvedValue(undefined);
-    const props = { ...baseProps, onDismiss, onRefetch };
+    const props = { ...baseProps, onDismiss };
 
     mergeMutationMocks.mutateAsync.mockResolvedValueOnce({
       merged: true,
@@ -342,15 +338,13 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
     expect(Haptics.notificationAsync).toHaveBeenCalledWith(
       Haptics.NotificationFeedbackType.Success
     );
-    expect(onRefetch).toHaveBeenCalledTimes(1);
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-merge:octocat/hello#1');
   });
 
-  it('rejected mutation (merged:false) does not fire haptic, refetch, dismiss, or write a banner', async () => {
+  it('rejected mutation (merged:false) does not fire haptic, dismiss, or write a banner', async () => {
     const onDismiss = vi.fn();
-    const onRefetch = vi.fn().mockResolvedValue(undefined);
-    const props = { ...baseProps, onDismiss, onRefetch };
+    const props = { ...baseProps, onDismiss };
 
     mergeMutationMocks.mutateAsync.mockRejectedValueOnce(new MergeNotCompletedError({ sha: 's1' }));
 
@@ -359,7 +353,6 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
 
     expect(consumeMergePartialSuccess(REF)).toBeNull();
     expect(Haptics.notificationAsync).not.toHaveBeenCalled();
-    expect(onRefetch).not.toHaveBeenCalled();
     expect(onDismiss).not.toHaveBeenCalled();
     expect(clearDraft).not.toHaveBeenCalled();
   });
@@ -386,8 +379,7 @@ describe('PrMergeSheet performSubmit wiring (P0-B-08)', () => {
 
   it('auto-merge enable success clears the draft and dismisses', async () => {
     const onDismiss = vi.fn();
-    const onRefetch = vi.fn().mockResolvedValue(undefined);
-    const props = { ...baseProps, mode: 'enable-auto-merge' as const, onDismiss, onRefetch };
+    const props = { ...baseProps, mode: 'enable-auto-merge' as const, onDismiss };
 
     autoMergeMutationMocks.mutateAsync.mockResolvedValueOnce({});
 

@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
     "notifications": "Notifiche",
-    "pullRequest": "pR",
+    "pullRequest": "pull request",
     "repositories": "Repository",
     "securityAgent": "Agente di sicurezza",
     "unknown": "Sconosciuto",
@@ -3015,7 +3015,7 @@
       }
     },
     "terms": {
-      "pullRequest": "PR",
+      "pullRequest": "Pull request",
       "mergeRequest": "Merge request",
       "mergeRequestNumber": "!{{number}}",
       "shareMergeRequest": "Condividi il merge request",

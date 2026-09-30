@@ -114,8 +114,6 @@ type PrMergeSheetProps = Readonly<{
    * (Bitbucket) renders the explicit capability banner instead of the form.
    */
   autoMergeCapability?: ProviderReviewCapability;
-  /** Called after a successful merge / auto-merge enable so the orchestrator can refetch. */
-  onRefetch: () => Promise<void>;
   /** Called when the user cancels or after a successful submit. */
   onDismiss: () => void;
 }>;
@@ -204,7 +202,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     prRef,
     mergeState,
     autoMergeCapability,
-    onRefetch,
     onDismiss,
   } = props;
 
@@ -454,7 +451,6 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       }
       if (celebrate) {
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        await onRefetch();
         // The merge consumed the draft; clear it before dismissing so it never
         // reappears on the next visit.
         if (userId) {

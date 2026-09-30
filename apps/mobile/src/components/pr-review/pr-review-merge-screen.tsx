@@ -178,9 +178,6 @@ export function PrReviewMergeScreen() {
         autoMergeCapability={
           needsAutoMergeCapability && capabilitiesData ? capabilitiesData.autoMerge : undefined
         }
-        onRefetch={async () => {
-          await pr.refetch();
-        }}
         onDismiss={dismiss}
       />
     );

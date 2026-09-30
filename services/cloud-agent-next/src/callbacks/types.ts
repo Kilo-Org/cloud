@@ -29,6 +29,11 @@ export type ExecutionCallbackPayload = {
   /** Present when errorMessage was shortened to fit the callback queue. */
   errorMessageTruncation?: CallbackTextTruncation;
   lastSeenBranch?: string;
+  /**
+   * `owner/repo` the branch in `lastSeenBranch` was pushed to, when it differs from the receiver's
+   * base repository. Absent for non-GitHub sessions and for sessions with no repository.
+   */
+  headRepoFullName?: string;
   kiloSessionId?: string;
   /** Gate result reported by the agent when gate_threshold is active */
   gateResult?: 'pass' | 'fail';

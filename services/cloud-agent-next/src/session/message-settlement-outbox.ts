@@ -1,4 +1,5 @@
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
+import { callbackHeadRepoFullName } from '../callbacks/head-repository.js';
 import type { CallbackJob } from '../callbacks/types.js';
 import { logger } from '../logger.js';
 import type {
@@ -469,6 +470,7 @@ export function createMessageSettlementOutbox(
             }),
           }),
       lastSeenBranch: metadata?.repository?.upstreamBranch ?? metadata?.workspace?.branchName,
+      headRepoFullName: callbackHeadRepoFullName(metadata),
       kiloSessionId: metadata?.auth.kiloSessionId,
       gateResult: state.gateResult,
       lastAssistantMessageText,

@@ -1311,7 +1311,7 @@ describe('ChatSidebar worktree controls', () => {
     const html = renderChatSidebar(
       {
         sessions: [deleting, available],
-        deletingWorktreeId: deleting.worktreeId ?? undefined,
+        deletingWorktreeIds: deleting.worktreeId ? [deleting.worktreeId] : [],
         onCreateWorktreeChat: async () => true,
         onRenameWorktree: async () => undefined,
         onDeleteWorktree: () => undefined,

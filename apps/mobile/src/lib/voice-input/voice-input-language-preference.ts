@@ -37,8 +37,3 @@ export function useVoiceInputLanguage(): string | null {
 export function useVoiceInputLanguageLoaded(): boolean {
   return useSyncExternalStore(languageStore.subscribe, languageStore.getHasLoaded);
 }
-
-/** Await the persisted language read. For callers with no React tree. */
-export async function whenVoiceInputLanguageLoaded(): Promise<void> {
-  await languageStore.whenLoaded();
-}

@@ -174,13 +174,15 @@ type NewSessionStartBlockedReasonInput = {
  * rendering.
  *
  * A reason is only ever emitted when re-evaluating the entry's own gate with a
- * synthetic selected/resolved repository STILL leaves Start disabled: any
- * other precondition (empty prompt, uploading/failed attachment, loading
- * profile, creating/submitting, empty or unavailable model) then owns the
- * blocker, and the repository is not it. Provider connect state and repository
- * count stay separate, exactly like the extension's `submitBlockedReason`
- * separates `integrationInstalled` from `repoCount`: a `connected-empty`,
- * `error`, or `repos` group never reads as "connect a provider".
+ * synthetic selected/resolved repository makes Start ENABLED — i.e. the missing
+ * repository is the blocker. If the gate is still disabled with that synthetic
+ * selection, some other precondition (empty prompt, uploading/failed
+ * attachment, loading profile, creating/submitting, empty or unavailable
+ * model) owns the blocker, and the repository is not it. Provider connect state
+ * and repository count stay separate, exactly like the extension's
+ * `submitBlockedReason` separates `integrationInstalled` from `repoCount`: a
+ * `connected-empty`, `error`, or `repos` group never reads as "connect a
+ * provider".
  */
 export function resolveNewSessionStartBlockedReason(
   input: NewSessionStartBlockedReasonInput
@@ -190,12 +192,16 @@ export function resolveNewSessionStartBlockedReason(
   if (input.isRemoteTargetSelected) {
     return null;
   }
-  // A selected repository means the picker was completed; a still-loading list
-  // means naming a blocker now would name the wrong one.
+  // A selected repository means the picker was completed: the missing
+  // repository is not the blocker.
   if (input.selectedRepo !== '') {
     return null;
   }
-  if (input.isLoadingRepositories) {
+  // A still-loading list only defers the decision while it could change it: when
+  // no rows exist yet, naming a blocker now could name the wrong one. Once rows
+  // already exist, `select-repository` is unambiguous and must not be hidden
+  // behind an unrelated group that is still loading.
+  if (!input.hasRepositories && input.isLoadingRepositories) {
     return null;
   }
 

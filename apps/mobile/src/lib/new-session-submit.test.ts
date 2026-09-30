@@ -420,10 +420,20 @@ describe('resolveNewSessionStartBlockedReason', () => {
     ).toBeNull();
   });
 
-  it('returns null while the repository list is still loading', () => {
+  it('returns null while the repository list is still loading and no rows exist yet', () => {
     expect(
-      resolveNewSessionStartBlockedReason(newSessionReasonInput({ isLoadingRepositories: true }))
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: false, isLoadingRepositories: true })
+      )
     ).toBeNull();
+  });
+
+  it('names select-repository while a list is loading once rows already exist', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: true, isLoadingRepositories: true })
+      )
+    ).toBe('select-repository');
   });
 
   it('returns null when another precondition blocks Start', () => {

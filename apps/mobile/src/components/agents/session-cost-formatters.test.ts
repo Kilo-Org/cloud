@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { formatSpokenCost } from './session-row-accessibility-label';
 import {
   composeStoredSessionSpokenMeta,
@@ -199,9 +200,19 @@ describe('selectSessionCostInputs', () => {
  * spoken formatter (`formatSpokenCost` → "12 cents").
  */
 describe('composeStoredSessionSpokenMeta (spoken wiring)', () => {
+  afterEach(async () => {
+    await i18n.changeLanguage('en');
+  });
+
   it('composes a humanized cost phrase with the spoken time', () => {
     const result = composeStoredSessionSpokenMeta(formatSpokenCost(120_000), '5 minutes ago');
     expect(result).toBe('cost 12 cents, 5 minutes ago');
+  });
+
+  it('localizes the cost template with the active language (Arabic)', async () => {
+    await i18n.changeLanguage('ar');
+    const result = composeStoredSessionSpokenMeta('3 سنتات', 'قبل 5 دقائق');
+    expect(result).toBe('التكلفة 3 سنتات، قبل 5 دقائق');
   });
 
   it('composes a fractional-cent cost with the spoken time', () => {

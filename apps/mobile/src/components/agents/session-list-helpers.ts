@@ -222,11 +222,14 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
 /**
  * Compose the spoken `meta` string for a stored session row's accessibility
  * label. When `cost === null`, the spoken meta is just the time phrase.
- * Otherwise cost is spoken first ("cost 12 cents, 5 minutes ago"), matching
- * the visible "$0.12 · 5M AGO" order.
+ * Otherwise cost is spoken first (`agents.sessionRow.costSpokenWithTime`,
+ * e.g. "cost 12 cents, 5 minutes ago"), matching the visible "$0.12 · 5M AGO"
+ * order and localized like the active-session path.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+  return cost
+    ? i18n.t('agents.sessionRow.costSpokenWithTime', { cost, time: timeSpoken })
+    : timeSpoken;
 }
 
 /**

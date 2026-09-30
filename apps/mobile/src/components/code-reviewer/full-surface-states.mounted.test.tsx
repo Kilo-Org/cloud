@@ -72,10 +72,8 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: 'ScrollView',
-  useTabBarBottomPadding: () => 0,
-}));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
+vi.mock('@/lib/tab-bar-clearance', () => ({ useEffectiveTabBarHeight: () => 0 }));
 vi.mock('@/components/repo-toggle-row', () => ({ RepoToggleRow: 'RepoToggleRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));

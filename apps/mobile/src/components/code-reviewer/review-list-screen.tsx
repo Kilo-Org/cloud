@@ -2,14 +2,14 @@ import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -18,6 +18,7 @@ import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer'
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
+import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 // Tone classes stay mobile-local; the label is the translated catalog key
@@ -46,6 +47,8 @@ type Review = Extract<
   NonNullable<ReturnType<typeof useReviewList>['data']>['pages'][number],
   { success: true }
 >['reviews'][number];
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export function statusMeta(status: string) {
   if (!isCodeReviewStatus(status)) {
@@ -85,7 +88,7 @@ function ReviewListFooter({
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const paddingBottom = useTabBarBottomPadding();
+  const tabBarHeight = useEffectiveTabBarHeight();
   const {
     data,
     isLoading,
@@ -174,6 +177,11 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
       <FlatList
         data={reviews}
         keyExtractor={review => review.id}
+        // The tab bar is an absolutely-positioned overlay, so the list viewport
+        // has to end at the bar's top edge: a row parked under the bar renders
+        // behind it and its tap lands on a tab instead of the row. The same
+        // frame inset `TabScreenScrollView` applies.
+        style={[listStyle, { marginBottom: tabBarHeight }]}
         renderItem={({ item: review, index }) => {
           const meta = statusMeta(review.status);
           return (
@@ -217,14 +225,11 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         }}
         onEndReachedThreshold={0.5}
         ListFooterComponent={
-          <>
-            <ReviewListFooter
-              loading={isFetchingNextPage}
-              error={isFetchNextPageError}
-              onRetry={() => void fetchNextPage()}
-            />
-            <View style={{ height: paddingBottom }} pointerEvents="none" />
-          </>
+          <ReviewListFooter
+            loading={isFetchingNextPage}
+            error={isFetchNextPageError}
+            onRetry={() => void fetchNextPage()}
+          />
         }
       />
     );

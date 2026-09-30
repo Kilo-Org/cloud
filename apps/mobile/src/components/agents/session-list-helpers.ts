@@ -4,6 +4,7 @@ import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
+import { containsJoinedScript, hasRtlScript } from '@/lib/rtl-text';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 /**
@@ -100,12 +101,29 @@ const HEADER_WIDE_ADVANCE_EM = 1;
 const HEADER_SECTION_LABEL_FONT_SIZE = 10;
 /** The history link overrides the variant to `text-[11px]`. */
 const HEADER_HISTORY_LABEL_FONT_SIZE = 11;
-/** The labels' `tracking-[1.5px]`; dropped under RTL (see `EYEBROW_LATIN_DISPLAY`). */
+/** The labels' `tracking-[1.5px]`. `Text` draws it for Latin copy in either
+ * direction and resets it for the scripts it cannot hold (see
+ * {@link headerLabelTracking}), so it is applied per label. */
 const HEADER_LABEL_TRACKING = 1.5;
 /** `SessionFilterButton`'s `h-[36px] w-[36px] shrink-0`. */
 const HEADER_FILTER_BUTTON_WIDTH = 36;
 /** The controls row's `gap-4`: NativeWind's rem is 14pt, not 16. */
 const HEADER_ACTIONS_GAP = 14;
+
+/**
+ * Letter spacing (dp per glyph) a label actually draws, matching
+ * `@/components/ui/text`'s reset rule rather than the interface direction
+ * alone: the reset lands on copy in a joined script in either direction
+ * (`containsJoinedScript`) and on any RTL-script copy inside an RTL interface
+ * (`isRTL && hasRtlScript`), while Latin copy keeps its tracking in either
+ * direction. Keying off `isRTL` alone dropped the tracking for a Latin label in
+ * an RTL interface, so the estimate fell short of the rendered cluster and the
+ * row could still squeeze the title — the opposite of the upper bound this
+ * module promises.
+ */
+function headerLabelTracking(label: string, isRTL: boolean): number {
+  return containsJoinedScript(label) || (isRTL && hasRtlScript(label)) ? 0 : HEADER_LABEL_TRACKING;
+}
 
 function headerLabelWidth(params: {
   label: string;
@@ -145,19 +163,18 @@ export function estimateSessionListHeaderActionsWidth(params: {
   isRTL?: boolean;
 }): number {
   const { sectionLabel, historyLabel, showFilter, fontScale = 1, isRTL = false } = params;
-  const tracking = isRTL ? 0 : HEADER_LABEL_TRACKING;
   const segments = [
     headerLabelWidth({
       label: sectionLabel,
       fontSize: HEADER_SECTION_LABEL_FONT_SIZE,
       fontScale,
-      tracking,
+      tracking: headerLabelTracking(sectionLabel, isRTL),
     }),
     headerLabelWidth({
       label: historyLabel,
       fontSize: HEADER_HISTORY_LABEL_FONT_SIZE,
       fontScale,
-      tracking,
+      tracking: headerLabelTracking(historyLabel, isRTL),
     }),
     ...(showFilter ? [HEADER_FILTER_BUTTON_WIDTH] : []),
   ];

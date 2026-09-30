@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- cohesive unit-test suite for session-list-helpers pure functions */
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
@@ -27,6 +27,12 @@ import {
   selectRemoteRowSpokenMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
+
+// `session-list-helpers` reaches `@/lib/rtl-text` for the header label's script
+// detection, which imports `I18nManager` from react-native. The pure project
+// runs under Node with no RN transform, so stub the one export the module reads
+// (the same stub `rtl-text.test.ts` uses).
+vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
 
 afterEach(async () => {
   await i18n.changeLanguage('en');
@@ -73,9 +79,29 @@ describe('estimateSessionListHeaderActionsWidth', () => {
     expect(withFilter - withoutFilter).toBe(50);
   });
 
-  it('drops the letterspacing the RTL display treatment drops', () => {
-    expect(estimateSessionListHeaderActionsWidth({ ...english, isRTL: true })).toBeLessThan(
+  it('drops the letterspacing the RTL display treatment drops, per label script', () => {
+    // `Text` resets tracking for RTL-script copy in an RTL interface, so a
+    // Hebrew section label narrows the estimate there; the Latin history label
+    // keeps its tracking in either direction (see the next case).
+    const hebrew = { sectionLabel: 'סוכנים', historyLabel: 'PAST SESSIONS', showFilter: true };
+    expect(estimateSessionListHeaderActionsWidth({ ...hebrew, isRTL: true })).toBeLessThan(
+      estimateSessionListHeaderActionsWidth(hebrew)
+    );
+  });
+
+  it('keeps a Latin label’s letterspacing in an RTL interface', () => {
+    // The reset follows the label's script, not the interface direction: Latin
+    // copy keeps `tracking-[1.5px]` in an RTL interface, so the estimate must
+    // stay an upper bound instead of shrinking under the rendered cluster.
+    expect(estimateSessionListHeaderActionsWidth({ ...english, isRTL: true })).toBe(
       estimateSessionListHeaderActionsWidth(english)
+    );
+  });
+
+  it('drops the letterspacing for a joined script in either direction', () => {
+    const joined = { sectionLabel: 'الجلسات', historyLabel: 'الجلسات', showFilter: true };
+    expect(estimateSessionListHeaderActionsWidth(joined)).toBe(
+      estimateSessionListHeaderActionsWidth({ ...joined, isRTL: true })
     );
   });
 });

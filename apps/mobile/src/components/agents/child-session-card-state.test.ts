@@ -582,7 +582,7 @@ describe('getChildSessionStreaming', () => {
     const topLevel = [makeAssistantMessage([parentTask])];
     const childTranscript = [makeAssistantMessage([grandchildTask])];
     const getChildMessages = (sessionId: string) =>
-      sessionId === subagentSessionId ? childTranscript : [];
+      (sessionId === subagentSessionId ? childTranscript : []);
     expect(getChildSessionStreaming(topLevel, grandchildSessionId, getChildMessages)).toBe(true);
   });
 

@@ -5,13 +5,22 @@ import { i18n } from '@/i18n';
 export type DeviceSession = inferRouterOutputs<MobileRouter>['user']['listDeviceSessions'][number];
 
 /**
+ * Product tokens of the platform HTTP client React Native puts on the wire
+ * when the app does not set its own `User-Agent`. They name the transport, not
+ * the device, so a header that leads with one identifies nothing to show.
+ */
+const TRANSPORT_ONLY_PRODUCT_TOKEN = /^okhttp$/i;
+
+/**
  * Derive a short, human-readable label from the raw `user_agent` HTTP header
  * stored on the session row.
  *
  * Browser requests always lead with the `Mozilla/5.0` compatibility token, so
- * those collapse to "Web browser". Everything else keeps its first product
- * token ("Kilo-Code/1.2.3" → "Kilo-Code", "axios/1.7.0" → "axios"), and a
- * missing or empty header falls back to "Unknown device".
+ * those collapse to "Web browser". A header that leads with a bare transport
+ * token ("okhttp/4.12.0") identifies no device, so it falls back to
+ * "Unknown device" like a missing header. Everything else keeps its first
+ * product token ("Kilo-Code/1.2.3" → "Kilo-Code", "axios/1.7.0" → "axios"),
+ * and a missing or empty header falls back to "Unknown device".
  */
 export function deviceSessionLabel(userAgent: string | null | undefined): string {
   const trimmed = userAgent?.trim() ?? '';
@@ -22,7 +31,11 @@ export function deviceSessionLabel(userAgent: string | null | undefined): string
     return i18n.t('deviceSessions.webBrowser');
   }
   // "Kilo-Code/1.2.3 (darwin; arm64)" → "Kilo-Code" (drop the version and the rest).
-  return trimmed.split(/[\s/]/)[0] ?? i18n.t('kiloclaw.devicePairing.unknownDevice');
+  const product = trimmed.split(/[\s/]/)[0] ?? '';
+  if (!product || TRANSPORT_ONLY_PRODUCT_TOKEN.test(product)) {
+    return i18n.t('kiloclaw.devicePairing.unknownDevice');
+  }
+  return product;
 }
 
 /**

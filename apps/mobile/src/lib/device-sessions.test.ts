@@ -33,6 +33,12 @@ describe('deviceSessionLabel', () => {
     ).toBe('Web browser');
   });
 
+  it('falls back to Unknown device for a bare native transport token', () => {
+    expect(deviceSessionLabel('okhttp')).toBe('Unknown device');
+    expect(deviceSessionLabel('okhttp/4.12.0')).toBe('Unknown device');
+    expect(deviceSessionLabel('OkHttp/5.0.0')).toBe('Unknown device');
+  });
+
   it('keeps the first product token for app and tool user agents', () => {
     expect(deviceSessionLabel('Kilo-Code/1.2.3 (darwin; arm64)')).toBe('Kilo-Code');
     expect(deviceSessionLabel('axios/1.7.0')).toBe('axios');

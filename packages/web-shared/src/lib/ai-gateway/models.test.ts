@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, preferredModels, selectAutoFreeCandidate } from './models';
+import { preferredModels, selectAutoFreeCandidate } from './models';
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
@@ -10,7 +10,6 @@ import {
 } from './kilo-exclusive-models';
 import { hasBestEffortGuessDataCollectionRequirement, isFreeModel } from './is-free-model';
 import { getInferenceProvider } from './providers/kilo-exclusive-model';
-import { getAiSdkProvider } from './providers/model-settings';
 import {
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
@@ -91,12 +90,11 @@ describe('isFreeModel', () => {
     });
 
     test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free', 'nex-agi/nex-n2.5-pro:free'])(
-      'removes %s from exclusive, Auto Free, and preferred models without restricting availability',
+      'removes %s from exclusive and preferred models without restricting availability',
       modelId => {
         expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
         expect(findKiloExclusiveModel(modelId)).toBeNull();
         expect(isUnavailableModel(modelId)).toBe(false);
-        expect(autoFreeModels.map(({ model }) => model)).not.toContain(modelId);
         expect(preferredModels).not.toContain(modelId);
       }
     );
@@ -112,9 +110,8 @@ describe('isFreeModel', () => {
       }
     );
 
-    test('keeps MiniMax free models outside Auto Free and preferred models', () => {
+    test('keeps MiniMax free models outside preferred models', () => {
       for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
-        expect(autoFreeModels.map(candidate => candidate.model)).not.toContain(model);
         expect(preferredModels).not.toContain(model);
       }
     });
@@ -143,46 +140,7 @@ describe('isFreeModel', () => {
       }
     });
 
-    test('all autoFreeModels should pass isFreeModel', async () => {
-      expect(autoFreeModels.length).toBeGreaterThan(0);
-      for (const { model } of autoFreeModels) {
-        expect(await isFreeModel(model)).toBe(true);
-      }
-    });
-
-    test('all autoFreeModels should have positive integer weights', () => {
-      for (const { weight } of autoFreeModels) {
-        expect(Number.isInteger(weight)).toBe(true);
-        expect(weight).toBeGreaterThan(0);
-      }
-    });
-
-    test('hardcodes high reasoning effort for every Auto Free model', () => {
-      expect(
-        Object.fromEntries(autoFreeModels.map(({ model, reasoning }) => [model, reasoning]))
-      ).toEqual({
-        'stealth/space-bunny-alpha': { enabled: true, effort: 'high' },
-        'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
-        'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
-        'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
-      });
-    });
-
-    test('routes 70% of Auto Free traffic to Space Bunny', () => {
-      const weights = Object.fromEntries(
-        autoFreeModels.map(({ model, weight }) => [model, weight])
-      );
-      expect(weights).toEqual({
-        'stealth/space-bunny-alpha': 7,
-        'poolside/laguna-s-2.1:free': 1,
-        'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
-        'dots-studio/dots-3-note-preview:free': 1,
-      });
-      const totalWeight = autoFreeModels.reduce((total, { weight }) => total + weight, 0);
-      expect(weights['stealth/space-bunny-alpha'] / totalWeight).toBe(0.7);
-    });
-
-    test('uses autoFreeModels weights when selecting a model', () => {
+    test('uses candidate weights when selecting an Auto Free model', () => {
       const candidates = [
         { model: 'preferred/model', weight: 3, reasoning: { enabled: true } },
         { model: 'other/model', weight: 1, reasoning: { enabled: true } },
@@ -195,12 +153,6 @@ describe('isFreeModel', () => {
 
       expect(getRandomNumber(randomSeed, 4)).toBe(1);
       expect(selectAutoFreeCandidate(candidates, randomSeed)).toBe(candidates[0]);
-    });
-
-    test('all autoFreeModels should use the same AI SDK provider', () => {
-      expect(autoFreeModels.length).toBeGreaterThan(0);
-      const providers = new Set(autoFreeModels.map(({ model }) => getAiSdkProvider(model, null)));
-      expect(providers.size).toBe(1);
     });
   });
 

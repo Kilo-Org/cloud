@@ -20,29 +20,6 @@ export const PRIMARY_DEFAULT_MODEL = GLM_FLASH_CURRENT_MODEL_ID;
 
 export type AutoFreeModel = AutoFreeModelConfig;
 
-export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
-  {
-    model: 'stealth/space-bunny-alpha',
-    weight: 7,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'poolside/laguna-s-2.1:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-  {
-    model: 'dots-studio/dots-3-note-preview:free',
-    weight: 1,
-    reasoning: { enabled: true, effort: 'high' },
-  } satisfies AutoFreeModel,
-];
-
 export function selectAutoFreeCandidate(
   candidates: ReadonlyArray<AutoFreeModel>,
   randomSeed: string
@@ -63,7 +40,10 @@ export const preferredModels = [
   KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
 
-  ...autoFreeModels.map(({ model }) => model),
+  'stealth/space-bunny-alpha',
+  'poolside/laguna-s-2.1:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'dots-studio/dots-3-note-preview:free',
 
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_SOL_CURRENT_MODEL_ID,

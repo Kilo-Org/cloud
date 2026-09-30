@@ -3355,7 +3355,7 @@
       "url": "URL",
       "environment": "පරිසරය (JSON)",
       "headers": "ශීර්ෂ (JSON)",
-      "timeout": "කාලය හමාරයි",
+      "timeout": "කල් ඉකුත්වීම",
       "secretCount": "රහස් ගණන",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",

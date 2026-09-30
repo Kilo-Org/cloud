@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, View } from 'react-native';
 
@@ -46,7 +46,10 @@ export function TrustedHostsScreen() {
             <Button
               variant="outline"
               onPress={() => {
-                router.back();
+                // This screen is reached from Account (Preferences > Account >
+                // Trusted hosts), so `back()` lands on Account and contradicts
+                // the label. Dismiss to the Preferences hub the label names.
+                router.dismissTo('/(app)/(tabs)/(3_profile)/preferences' as Href);
               }}
             >
               <Text>{t('trustedHosts.backToPreferences')}</Text>

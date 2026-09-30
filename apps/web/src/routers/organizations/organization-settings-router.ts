@@ -4,17 +4,14 @@ import {
   setOrganizationRecommendationsDigestEnabled,
   updateOrganizationSettings,
 } from '@/lib/organizations/organizations';
-import type {
-  OpenRouterModelsResponse,
-  OrganizationSettings,
-} from '@/lib/organizations/organization-types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
-  organizationMemberProcedure,
   organizationAdminMutationProcedure,
 } from '@/routers/organizations/utils';
+import { listAvailableModelsProcedure } from '@/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
@@ -314,28 +311,7 @@ const SettingsResponseSchema = z.object({
 });
 
 export const organizationsSettingsRouter = createTRPCRouter({
-  listAvailableModels: organizationMemberProcedure
-    .input(OrganizationIdInputSchema)
-    .output(z.custom<OpenRouterModelsResponse>())
-    .query(async ({ input, ctx }) => {
-      const { organizationId } = input;
-
-      const result = await getAvailableModelsForOrganization(organizationId, {
-        type: 'member',
-        kiloUserId: ctx.user.id,
-        // `ensureOrganizationAccess` also admits Kilo admins and parent-organization
-        // owners, who hold no membership row and belong to no group; they resolve
-        // against organization-level policy instead of being rejected.
-        allowNonMember: true,
-      });
-      if (!result) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-      return result;
-    }),
+  listAvailableModels: listAvailableModelsProcedure,
 
   updateAllowLists: organizationAdminMutationProcedure
     .input(UpdateAllowListsInputSchema)

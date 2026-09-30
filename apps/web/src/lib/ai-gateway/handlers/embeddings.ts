@@ -12,7 +12,7 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
-  checkOrganizationModelRestrictions,
+  getOrganizationProviderPrivacy,
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
   extractFraudAndProjectHeaders,
@@ -47,6 +47,7 @@ import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/pr
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -220,8 +221,10 @@ export async function handleEmbeddingsRequest(
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, plan, balanceLimitedByUserAllowance } =
-      await getBalanceAndOrgSettings(organizationId, user);
+    const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+      organizationId,
+      user
+    );
     organizationDataCollection = settings?.data_collection;
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
@@ -233,12 +236,7 @@ export async function handleEmbeddingsRequest(
       });
     }
 
-    const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-      modelId: requestedModelLowerCased,
-      settings,
-      organizationPlan: plan,
-    });
-    if (modelRestrictionError) return modelRestrictionError;
+    const providerConfig = getOrganizationProviderPrivacy(settings);
 
     if (organizationId) {
       const { decision } = await resolveOrganizationMemberModelDecision({
@@ -248,10 +246,7 @@ export async function handleEmbeddingsRequest(
       });
       if (!decision.allowed) return modelNotAllowedResponse();
       if (decision.eligibleProviderRoutes) {
-        const currentOnly = providerConfig?.only;
-        const only = currentOnly
-          ? currentOnly.filter(route => decision.eligibleProviderRoutes?.has(route))
-          : [...decision.eligibleProviderRoutes];
+        const only = withoutVirtualProvider([...decision.eligibleProviderRoutes]);
         if (only.length === 0) return modelNotAllowedResponse();
         requestBodyParsed.provider = { ...providerConfig, only };
       } else if (providerConfig) {

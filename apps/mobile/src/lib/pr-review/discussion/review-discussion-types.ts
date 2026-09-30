@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the pure DTO types, anchor/label selectors, and the discussion cache reducers share one Node-testable module */
 // Pure types, helpers, and reducers for the PR review Discussion tab.
 //
 // The discussion tab is built from three pure contracts:
@@ -335,6 +336,120 @@ export function applyReactionToggle(args: {
     return data;
   }
   return { ...data, pages: nextPages };
+}
+
+/**
+ * The two posted-comment kinds the CRUD reducers address. A review comment
+ * lives nested inside `page.threads[].comments`; a conversation (issue)
+ * comment lives in `page.conversation`.
+ */
+export type PrCommentKind = 'review' | 'conversation';
+
+/** Identify exactly one posted comment in the cached pages. */
+export type PrCommentTarget = {
+  readonly kind: PrCommentKind;
+  readonly commentId: number;
+};
+
+/**
+ * Replace one posted comment's `bodyMarkdown` in the cached
+ * `InfiniteData<ReviewThreadsPage>`. `kind === 'review'` walks every
+ * `page.threads[].comments`; `kind === 'conversation'` walks
+ * `page.conversation`. An unmatched `commentId` (or a body that already
+ * matches) returns the input reference unchanged — never a crash and never a
+ * blanked comment. Returns a new object so react-query sees the optimistic
+ * edit.
+ */
+export function applyCommentBodyUpdate(
+  data: ReviewThreadsInfiniteData | undefined,
+  args: PrCommentTarget & { readonly body: string }
+): ReviewThreadsInfiniteData | undefined {
+  const { kind, commentId, body } = args;
+  if (!data) {
+    return data;
+  }
+  const nextPages = data.pages.map(page => {
+    if (kind === 'conversation') {
+      const nextConversation = page.conversation.map(comment =>
+        comment.commentId === commentId && comment.bodyMarkdown !== body
+          ? { ...comment, bodyMarkdown: body }
+          : comment
+      );
+      const conversationChanged = nextConversation.some(
+        (comment, index) => comment !== page.conversation[index]
+      );
+      return conversationChanged ? { ...page, conversation: nextConversation } : page;
+    }
+    const nextThreads = page.threads.map(thread => {
+      const nextComments = thread.comments.map(comment =>
+        comment.commentId === commentId && comment.bodyMarkdown !== body
+          ? { ...comment, bodyMarkdown: body }
+          : comment
+      );
+      const commentsChanged = nextComments.some(
+        (comment, index) => comment !== thread.comments[index]
+      );
+      return commentsChanged ? { ...thread, comments: nextComments } : thread;
+    });
+    const threadsChanged = nextThreads.some((thread, index) => thread !== page.threads[index]);
+    return threadsChanged ? { ...page, threads: nextThreads } : page;
+  });
+  const changed = nextPages.some((page, index) => page !== data.pages[index]);
+  return changed ? { ...data, pages: nextPages } : data;
+}
+
+/**
+ * Remove one posted comment from the cached `InfiniteData<ReviewThreadsPage>`.
+ * `kind === 'conversation'` drops the row from `page.conversation`.
+ * `kind === 'review'` drops the comment from its thread, and when the comment
+ * is the thread's ROOT (first) comment the whole thread is dropped, because
+ * GitHub deletes a review thread with its root comment. An unmatched id
+ * returns the input reference unchanged. `nextCursor` and every untouched
+ * page are preserved by reference.
+ */
+export function applyCommentRemoval(
+  data: ReviewThreadsInfiniteData | undefined,
+  args: PrCommentTarget
+): ReviewThreadsInfiniteData | undefined {
+  const { kind, commentId } = args;
+  if (!data) {
+    return data;
+  }
+  const nextPages = data.pages.map(page => {
+    if (kind === 'conversation') {
+      const nextConversation = page.conversation.filter(comment => comment.commentId !== commentId);
+      return nextConversation.length === page.conversation.length
+        ? page
+        : { ...page, conversation: nextConversation };
+    }
+    const nextThreads = page.threads.flatMap(thread => {
+      const index = thread.comments.findIndex(comment => comment.commentId === commentId);
+      if (index === -1) {
+        return [thread];
+      }
+      // GitHub deletes the thread with its root comment: drop the whole thread
+      // rather than leaving a thread with no root.
+      if (index === 0) {
+        return [];
+      }
+      return [
+        {
+          ...thread,
+          comments: thread.comments.filter(comment => comment.commentId !== commentId),
+        },
+      ];
+    });
+    // Compare by length as well as by index: dropping the last thread (or the
+    // only one) shifts nothing at the indices that remain, so an index-only
+    // check would report the page unchanged and the removal would silently
+    // no-op until the settle refetch reconciled it.
+    const threadsChanged =
+      nextThreads.length !== page.threads.length ||
+      nextThreads.some((thread, index) => thread !== page.threads[index]);
+    return threadsChanged ? { ...page, threads: nextThreads } : page;
+  });
+  const changed = nextPages.some((page, index) => page !== data.pages[index]);
+  return changed ? { ...data, pages: nextPages } : data;
 }
 
 /**

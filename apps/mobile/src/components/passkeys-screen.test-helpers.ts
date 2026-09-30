@@ -29,6 +29,13 @@ function passkey(overrides: Partial<PasskeyFixture> & { id: string }): PasskeyFi
 
 export const MACBOOK = passkey({ id: 'pk-1', name: 'MacBook' });
 export const UNNAMED = passkey({ id: 'pk-2', name: null, created_at: '2026-02-03T04:05:06Z' });
+/** A passkey the server recorded a use for, so its row carries the last-used line. */
+export const USED = passkey({
+  id: 'pk-3',
+  name: 'Work laptop',
+  created_at: '2026-03-01T00:00:00Z',
+  last_used_at: '2026-03-04T05:06:07Z',
+});
 
 type PasskeysView = Awaited<ReturnType<typeof renderWithProviders>>;
 

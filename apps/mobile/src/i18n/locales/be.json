@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Чакае",
+    "scheduled": "Запланавана",
     "keepEditing": "Працягнуць рэдагаванне",
     "keepRunning": "Працягнуць працу",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Дадаць ключ доступу",
     "passkeyDefaultName": "Ключ доступу",
     "passkeyAddedOn": "Дададзены {{date}}",
+    "passkeyLastUsedOn": "Апошняе выкарыстанне {{date}}",
     "passkeyAdded": "Ключ доступу дададзены.",
     "passkeyAddFailed": "Не ўдалося дадаць ключ доступу. Паспрабуйце яшчэ раз.",
     "passkeyAddUnsupported": "Гэта прылада не можа ствараць ключы доступу.",
@@ -588,7 +590,14 @@
       "moreLinesAbove_one": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_other": "… дадатковыя радкі вышэй: {{displayCount}}",
       "moreLinesAbove_few": "… дадатковыя радкі вышэй: {{displayCount}}",
-      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}"
+      "moreLinesAbove_many": "… дадатковыя радкі вышэй: {{displayCount}}",
+      "deleteComment": "Выдаліць каментар",
+      "deleteCommentTitle": "Выдаліць каментар?",
+      "deleteCommentMessage": "Гэты каментар будзе выдалены з запыту на зліццё.",
+      "commentEditFailed": "Не атрымалася захаваць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
+      "commentEditUnavailable": "Гэты каментар нельга рэдагаваць. Магчыма, ён быў выдалены.",
+      "commentDeleteFailed": "Не атрымалася выдаліць твой каментар. Правер падключэнне і паспрабуй яшчэ раз.",
+      "commentDeleteUnavailable": "Гэты каментар нельга выдаліць."
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
@@ -779,6 +788,8 @@
     "linkPasteNotAPullRequest": "Гэта не спасылка на запыт на зліццё або merge-запыт",
     "announce": {
       "commentPosted": "Каментар апублікаваны",
+      "commentUpdated": "Каментар абноўлены",
+      "commentDeleted": "Каментар выдалены",
       "reviewSubmitted": "Праверка кода адпраўлена",
       "autoMergeEnabled": "Аўтазліццё ўключана"
     },
@@ -2067,12 +2078,14 @@
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы.",
       "couldNotRefresh": "Не атрымалася абнавіць",
       "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона. Твае сеансы з'явяцца тут.",
+      "viewHistory": "Гісторыя сеансаў",
       "noMatches": "Няма сеансаў паводле ўмоў пошуку",
       "tryDifferentSearch": "Паспрабуй іншы пошукавы запыт.",
       "tryAdjustFilters": "Паспрабуй змяніць або скінуць фільтры.",
       "couldNotSearch": "Не атрымалася выканаць пошук сеансаў.",
       "completedWillAppear": "Завершаныя сеансы з'явяцца тут.",
       "noPastSessions": "Няма завершаных сеансаў",
+      "pastSessions": "Завершаныя сеансы",
       "live": "НАЖЫВА",
       "updating": "Абнаўленне"
     },
@@ -2141,6 +2154,7 @@
       "renamePlaceholder": "Назва сеанса",
       "transcriptAccessibility": "Гісторыя паведамленняў сеанса",
       "readOnly": "Гэты сеанс даступны толькі для чытання.",
+      "continueInNewSession": "Працягнуць у новым сеансе",
       "emptyDescription": "Адпраўце паведамленне ніжэй, каб пачаць.",
       "scrollToBottom": "Пракруціць уніз",
       "emptyTitle": "Паведамленняў яшчэ няма",
@@ -2842,7 +2856,8 @@
     "optionsExpiredDescription": "Вярніцеся на папярэдні экран і зноў адкрыйце акно выбару."
   },
   "sessionRow": {
-    "needsInput": "ЧАКАЕ АДКАЗУ"
+    "needsInput": "ЧАКАЕ АДКАЗУ",
+    "scheduled": "ЗАПЛАНАВАНА"
   },
   "voiceInput": {
     "listening": "Слухаем…",
@@ -3252,6 +3267,7 @@
     "emptyTitle": "Няма давераных сайтаў",
     "emptyDescription": "Калі вы дадасце сайт у давераныя, спасылкі на яго будуць адкрывацца без паўторнага пацвярджэння.",
     "revoke": "Адклікаць давер да {{host}}",
+    "revokeMessage": "Спасылкі на гэты хост зноў будуць запытваць пацвярджэнне.",
     "backToPreferences": "Назад да налад"
   },
   "quickChat": {
@@ -3281,7 +3297,8 @@
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі.",
     "openSession": "Адкрыць",
     "approveFailed": "Не ўдалося ўхваліць. Націсніце $t(common.approve), каб паспрабаваць яшчэ раз.",
-    "newestResult": "Найноўшы вынік"
+    "newestResult": "Найноўшы вынік",
+    "scheduledWakes": "прачынаецца {{time}}"
   },
   "transcriptionModel": {
     "title": "Мадэль распазнавання маўлення",

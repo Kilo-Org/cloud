@@ -323,7 +323,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [...models, ...models] });
 
     expect((await GET(request())).status).toBe(200);
-    expect(ids).toHaveLength(70);
+    expect(ids).toHaveLength(89);
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
       [monitoredModel, ...models],
       [monitoredModel.id],

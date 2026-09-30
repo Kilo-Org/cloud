@@ -16,8 +16,6 @@ describe('TownDO', () => {
     town = getTownStub(townName);
   });
 
-  // ── Beads ──────────────────────────────────────────────────────────────
-
   describe('beads', () => {
     it('should create and retrieve a bead', async () => {
       const bead = await town.createBead({
@@ -84,8 +82,6 @@ describe('TownDO', () => {
       expect(bead.priority).toBe('medium');
     });
   });
-
-  // ── Agents ─────────────────────────────────────────────────────────────
 
   describe('agents', () => {
     it('should register and retrieve an agent', async () => {
@@ -178,8 +174,6 @@ describe('TownDO', () => {
     });
   });
 
-  // ── Hooks (GUPP) ──────────────────────────────────────────────────────
-
   describe('hooks', () => {
     it('should hook and unhook a bead', async () => {
       const agent = await town.registerAgent({
@@ -237,8 +231,6 @@ describe('TownDO', () => {
     });
   });
 
-  // ── Bead status updates ────────────────────────────────────────────────
-
   describe('bead status', () => {
     it('should update bead status', async () => {
       const agent = await town.registerAgent({
@@ -285,8 +277,6 @@ describe('TownDO', () => {
       expect(closedBeads[0].title).toBe('Closed bead');
     });
   });
-
-  // ── Mail ───────────────────────────────────────────────────────────────
 
   describe('mail', () => {
     it('should send and check mail', async () => {
@@ -353,8 +343,6 @@ describe('TownDO', () => {
     });
   });
 
-  // ── Review Queue ───────────────────────────────────────────────────────
-
   describe('review queue', () => {
     it('should submit to review queue and create an open merge_request bead', async () => {
       const agent = await town.registerAgent({
@@ -373,7 +361,6 @@ describe('TownDO', () => {
         summary: 'Fixed the widget',
       });
 
-      // submitToReviewQueue creates an open merge_request bead
       const mrBeads = await town.listBeads({ type: 'merge_request' });
       expect(mrBeads).toHaveLength(1);
       expect(mrBeads[0].status).toBe('open');
@@ -407,12 +394,10 @@ describe('TownDO', () => {
         commit_sha: 'abc123',
       });
 
-      // Bead should be closed
       const updatedBead = await town.getBeadAsync(bead.bead_id);
       expect(updatedBead?.status).toBe('closed');
       expect(updatedBead?.closed_at).toBeDefined();
 
-      // MR bead should be closed
       const updatedMr = await town.getBeadAsync(mrBeadId);
       expect(updatedMr?.status).toBe('closed');
     });
@@ -446,7 +431,6 @@ describe('TownDO', () => {
       const updatedBead = await town.getBeadAsync(bead.bead_id);
       expect(updatedBead?.status).not.toBe('closed');
 
-      // An escalation bead should have been created
       const escalations = await town.listBeads({ type: 'escalation' });
       expect(escalations).toHaveLength(1);
       expect(escalations[0].title).toBe('Merge conflict: feature/conflict-test');
@@ -458,13 +442,10 @@ describe('TownDO', () => {
         agent_id: agent.id,
       });
 
-      // MR bead should be marked as failed
       const updatedMr = await town.getBeadAsync(mrBeadId);
       expect(updatedMr?.status).toBe('failed');
     });
   });
-
-  // ── Prime ──────────────────────────────────────────────────────────────
 
   describe('prime', () => {
     it('should assemble prime context for an agent', async () => {
@@ -521,8 +502,6 @@ describe('TownDO', () => {
     });
   });
 
-  // ── Checkpoint ─────────────────────────────────────────────────────────
-
   describe('checkpoint', () => {
     it('should write and read checkpoint data', async () => {
       const agent = await town.registerAgent({
@@ -555,8 +534,6 @@ describe('TownDO', () => {
     });
   });
 
-  // ── Agent Done ─────────────────────────────────────────────────────────
-
   describe('agentDone', () => {
     it('should submit to review queue and unhook', async () => {
       const agent = await town.registerAgent({
@@ -576,22 +553,17 @@ describe('TownDO', () => {
         summary: 'Completed the work',
       });
 
-      // Drain the agent_done event
       await runDurableObjectAlarm(town);
 
-      // Agent should be unhooked
       const updatedAgent = await town.getAgentAsync(agent.id);
       expect(updatedAgent?.current_hook_bead_id).toBeNull();
       expect(updatedAgent?.status).toBe('idle');
 
-      // Review queue should have an entry (MR bead created by applyEvent)
       const mrBeads = await town.listBeads({ type: 'merge_request' });
       expect(mrBeads.length).toBeGreaterThan(0);
       expect(mrBeads[0].metadata?.source_bead_id).toBe(bead.bead_id);
     });
   });
-
-  // ── Witness Patrol ─────────────────────────────────────────────────────
 
   describe('witnessPatrol (via alarm)', () => {
     it('should detect dead agents by verifying agent status after alarm', async () => {
@@ -609,12 +581,9 @@ describe('TownDO', () => {
 
     it('should have no issues with a clean town', async () => {
       const agentList = await town.listAgents();
-      // No agents = nothing to patrol
       expect(agentList).toHaveLength(0);
     });
   });
-
-  // ── DO stubs ───────────────────────────────────────────────────────────
 
   describe('GastownUserDO stub', () => {
     it('should respond to ping', async () => {
@@ -624,8 +593,6 @@ describe('TownDO', () => {
       expect(result).toBe('pong');
     });
   });
-
-  // ── Bead Events ──────────────────────────────────────────────────────────
 
   describe('bead events', () => {
     it('should write events on createBead', async () => {

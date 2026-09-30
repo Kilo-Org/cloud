@@ -682,9 +682,103 @@ describe('worktree Kilo environments', () => {
     expect(inherited.KILOCODE_TOKEN).toBe('actual-managed-kilo-token');
     expect(environment.KILOCODE_TOKEN).toBe('actual-attachment-token');
   });
+
+  it('writes attached MCP servers into the per-worktree CLI configuration', () => {
+    const env = buildWorktreeKiloEnvironment(
+      '/workspace/a',
+      '/home/worktree-a',
+      auth,
+      {},
+      inherited,
+      {
+        local: {
+          type: 'local',
+          command: ['npx', 'local-mcp'],
+          environment: { API_TOKEN: 'local-secret' },
+        },
+        remote: {
+          type: 'remote',
+          url: 'https://mcp.example.test/connect',
+          headers: { Authorization: 'Bearer remote-secret' },
+        },
+      }
+    );
+
+    expect(JSON.parse(env.KILO_CONFIG_CONTENT).mcp).toEqual({
+      local: {
+        type: 'local',
+        command: ['npx', 'local-mcp'],
+        environment: { API_TOKEN: 'local-secret' },
+      },
+      remote: {
+        type: 'remote',
+        url: 'https://mcp.example.test/connect',
+        headers: { Authorization: 'Bearer remote-secret' },
+      },
+    });
+    expect(env.OPENCODE_CONFIG_CONTENT).toBe(env.KILO_CONFIG_CONTENT);
+    const configWithoutMcp = JSON.parse(
+      buildWorktreeKiloEnvironment('/workspace/a', '/home/worktree-a', auth).KILO_CONFIG_CONTENT
+    );
+    expect(configWithoutMcp).not.toHaveProperty('mcp');
+  });
+
+  it('rejects a UTF-8 MCP configuration before it reaches the environment size limit', () => {
+    const mcp = Object.fromEntries(
+      Array.from({ length: 6 }, (_, index) => [
+        `remote-${index}`,
+        {
+          type: 'remote' as const,
+          url: 'https://mcp.example.test/connect',
+          headers: { VALUE: '😀"\\'.repeat(4_000) },
+        },
+      ])
+    );
+
+    expect(() =>
+      buildWorktreeKiloEnvironment('/workspace/a', '/home/worktree-a', auth, {}, {}, mcp)
+    ).toThrow('Kilo configuration is too large');
+  });
 });
 
 describe('worktree Kilo runtime registry', () => {
+  it('isolates MCP-configured sessions from empty shared-directory siblings and rejects MCP drift', async () => {
+    const directory = path.join(tmpDir, 'mcp-isolation');
+    const configuredIdentity = rootIdentity(directory, 'mcp-configured');
+    const emptyIdentity = rootIdentity(directory, 'mcp-empty');
+    const { rawRegistry } = createSharedRegistry();
+    const mcp = {
+      remote: {
+        type: 'remote' as const,
+        url: 'https://mcp.example.test/connect',
+        headers: { VALUE: 'configured-secret' },
+      },
+    };
+
+    const configured = rawRegistry.attach(
+      configuredIdentity,
+      auth,
+      {},
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      mcp
+    );
+    const configuredRuntime = await configured.ready;
+    configured.commit();
+    const empty = rawRegistry.attach(emptyIdentity, auth);
+    const emptyRuntime = await empty.ready;
+    empty.commit();
+
+    expect(emptyRuntime.runtimeId).not.toBe(configuredRuntime.runtimeId);
+    expect(() =>
+      rawRegistry.attach(configuredIdentity, auth, {}, undefined, undefined, undefined, undefined, {
+        remote: { ...mcp.remote, headers: { VALUE: 'changed-secret' } },
+      })
+    ).toThrow('Kilo worktree MCP configuration mismatch');
+  });
+
   it('waits for exit, gates replacement, and preserves a recovery acknowledgement', async () => {
     const stopped = Promise.withResolvers<void>();
     const directory = path.join(tmpDir, 'recovery');

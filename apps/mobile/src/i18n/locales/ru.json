@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Назад",
     "idle": "Ожидание",
+    "scheduled": "Запланировано",
     "keepEditing": "Продолжить редактирование",
     "keepRunning": "Продолжить выполнение",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Добавить ключ доступа",
     "passkeyDefaultName": "Ключ доступа",
     "passkeyAddedOn": "Добавлен {{date}}",
+    "passkeyLastUsedOn": "Последнее использование {{date}}",
     "passkeyAdded": "Ключ доступа добавлен.",
     "passkeyAddFailed": "Не удалось добавить ключ доступа. Попробуйте ещё раз.",
     "passkeyAddUnsupported": "Это устройство не может создавать ключи доступа.",
@@ -1531,12 +1533,14 @@
       "couldNotLoadActive": "Не удалось загрузить активные сеансы.",
       "couldNotRefresh": "Не удалось обновить",
       "noSessionsYetDescription": "Запустите задачу по разработке с телефона. Ваши сеансы появятся здесь.",
+      "viewHistory": "История сеансов",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "tryAdjustFilters": "Попробуйте изменить или сбросить фильтры.",
       "couldNotSearch": "Не удалось выполнить поиск сеансов.",
       "completedWillAppear": "Завершённые сеансы появятся здесь.",
       "noPastSessions": "Нет завершённых сеансов",
+      "pastSessions": "Завершённые сеансы",
       "live": "В РЕАЛЬНОМ ВРЕМЕНИ",
       "updating": "Обновление"
     },
@@ -1605,6 +1609,7 @@
       "renamePlaceholder": "Название сеанса",
       "transcriptAccessibility": "Переписка в сеансе",
       "readOnly": "Этот сеанс доступен только для чтения.",
+      "continueInNewSession": "Продолжить в новом сеансе",
       "emptyDescription": "Отправьте сообщение ниже, чтобы начать.",
       "scrollToBottom": "Прокрутить вниз",
       "emptyTitle": "Сообщений пока нет",
@@ -2306,7 +2311,8 @@
     "optionsExpiredDescription": "Вернитесь на предыдущий экран и снова откройте список выбора."
   },
   "sessionRow": {
-    "needsInput": "ОЖИДАНИЕ ВВОДА"
+    "needsInput": "ОЖИДАНИЕ ВВОДА",
+    "scheduled": "ЗАПЛАНИРОВАНО"
   },
   "voiceInput": {
     "listening": "Говорите…",
@@ -2680,7 +2686,14 @@
       "moreLinesAbove_one": "… строк выше: {{displayCount}}",
       "moreLinesAbove_other": "… строк выше: {{displayCount}}",
       "moreLinesAbove_few": "… строк выше: {{displayCount}}",
-      "moreLinesAbove_many": "… строк выше: {{displayCount}}"
+      "moreLinesAbove_many": "… строк выше: {{displayCount}}",
+      "deleteComment": "Удалить комментарий",
+      "deleteCommentTitle": "Удалить комментарий?",
+      "deleteCommentMessage": "Этот комментарий будет удалён из запроса на слияние.",
+      "commentEditFailed": "Не удалось сохранить ваш комментарий. Проверьте подключение и попробуйте снова.",
+      "commentEditUnavailable": "Этот комментарий нельзя редактировать. Возможно, он был удалён.",
+      "commentDeleteFailed": "Не удалось удалить ваш комментарий. Проверьте подключение и попробуйте снова.",
+      "commentDeleteUnavailable": "Этот комментарий нельзя удалить."
     },
     "entry": {
       "eyebrow": "Откройте пул-реквест или запрос на слияние по URL",
@@ -3017,6 +3030,8 @@
     "linkPasteNotAPullRequest": "Это не ссылка на пул-реквест или запрос на слияние",
     "announce": {
       "commentPosted": "Комментарий опубликован",
+      "commentUpdated": "Комментарий обновлён",
+      "commentDeleted": "Комментарий удалён",
       "reviewSubmitted": "Ревью отправлено",
       "autoMergeEnabled": "Автослияние включено"
     },
@@ -3252,6 +3267,7 @@
     "emptyTitle": "Нет доверенных сайтов",
     "emptyDescription": "Ссылки на доверенные сайты открываются без повторного подтверждения.",
     "revoke": "Перестать доверять сайту {{host}}",
+    "revokeMessage": "Ссылки на этот хост снова будут запрашивать подтверждение.",
     "backToPreferences": "К настройкам"
   },
   "quickChat": {
@@ -3281,7 +3297,8 @@
     "activityKitDisabledBody": "Включите «Эфир активности» в настройках, чтобы видеть активных агентов на экране блокировки.",
     "openSession": "Открыть",
     "approveFailed": "Не удалось одобрить. Нажмите $t(common.approve), чтобы повторить.",
-    "newestResult": "Последний результат"
+    "newestResult": "Последний результат",
+    "scheduledWakes": "просыпается {{time}}"
   },
   "transcriptionModel": {
     "title": "Модель распознавания речи",

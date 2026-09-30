@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Koma baya",
     "idle": "A jiran aiki",
+    "scheduled": "An tsara",
     "keepEditing": "Ci gaba da gyarawa",
     "keepRunning": "Ci gaba da aikin",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Ƙara maɓallin shiga",
     "passkeyDefaultName": "Maɓallin shiga",
     "passkeyAddedOn": "An ƙara {{date}}",
+    "passkeyLastUsedOn": "An yi amfani da shi na ƙarshe {{date}}",
     "passkeyAdded": "An ƙara maɓallin shiga.",
     "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
     "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",
@@ -566,7 +568,14 @@
       "deletedUser": "mai amfani da aka share",
       "replyForbiddenTerm": "Ba ka da izinin amsa wannan {{term}}.",
       "moreLinesAbove_one": "… akwai ƙarin layuka {{displayCount}} a sama.",
-      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama."
+      "moreLinesAbove_other": "… akwai ƙarin layuka {{displayCount}} a sama.",
+      "deleteComment": "Share tsokaci",
+      "deleteCommentTitle": "A share tsokaci?",
+      "deleteCommentMessage": "Za a share wannan tsokaci daga buƙatar haɗawa.",
+      "commentEditFailed": "Ba a iya adana tsokacinka ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "commentEditUnavailable": "Ba a iya gyara wannan tsokacin ba. Wataƙila an share shi.",
+      "commentDeleteFailed": "Ba a iya share tsokacinka ba. Duba haɗinka na intanet ka sake gwadawa.",
+      "commentDeleteUnavailable": "Ba a iya share wannan tsokacin ba."
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Ba mahaɗin buƙatar haɗa canje-canje ko buƙatar haɗawa ba ne",
     "announce": {
       "commentPosted": "An wallafa tsokaci",
+      "commentUpdated": "An sabunta tsokaci",
+      "commentDeleted": "An share tsokaci",
       "reviewSubmitted": "An aika bita",
       "autoMergeEnabled": "An kunna haɗawa ta atomatik"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Ba a iya loda zaman da ke aiki ba.",
       "couldNotRefresh": "Ba a iya sabuntawa ba",
       "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka. Zaman aikinka za su bayyana a nan.",
+      "viewHistory": "Tarihin zaman",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wata kalmar bincike dabam.",
       "tryAdjustFilters": "Gwada gyara ko cire matatun da ka sa.",
       "couldNotSearch": "Ba a iya bincika zaman ba.",
       "completedWillAppear": "Zaman da aka kammala za su bayyana a nan.",
       "noPastSessions": "Babu zaman da suka gabata",
+      "pastSessions": "Zaman da suka gabata",
       "live": "KAI TSAYE",
       "updating": "Ana sabuntawa"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Sunan zaman",
       "transcriptAccessibility": "Tarihin tattaunawar zaman",
       "readOnly": "Ana iya karanta wannan zaman ne kawai.",
+      "continueInNewSession": "Ci gaba a sabon zaman",
       "emptyDescription": "Aika saƙo a ƙasa domin farawa.",
       "scrollToBottom": "Gungura zuwa ƙasa",
       "emptyTitle": "Babu saƙonni har yanzu",
@@ -2760,7 +2774,8 @@
     "optionsExpiredDescription": "Koma baya ka sake buɗe wurin zaɓin nan daga shafin da ya gabata."
   },
   "sessionRow": {
-    "needsInput": "ANA BUƘATAR BAYANI"
+    "needsInput": "ANA BUƘATAR BAYANI",
+    "scheduled": "AN TSARA"
   },
   "voiceInput": {
     "listening": "Ana sauraro...",
@@ -3166,6 +3181,7 @@
     "emptyTitle": "Babu rukunin yanar gizo da aka amince da shi",
     "emptyDescription": "Idan ka amince da rukunin yanar gizon mahaɗi, za a buɗe shi ba tare da sake tambaya ba.",
     "revoke": "Soke amincewa da {{host}}",
+    "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
   "quickChat": {
@@ -3195,7 +3211,8 @@
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle.",
     "openSession": "Buɗe",
     "approveFailed": "An kasa amincewa. Danna $t(common.approve) don sake gwadawa.",
-    "newestResult": "Sabon sakamako"
+    "newestResult": "Sabon sakamako",
+    "scheduledWakes": "zai farka {{time}}"
   },
   "transcriptionModel": {
     "title": "Samfurin mayar da magana zuwa rubutu",
@@ -3292,7 +3309,7 @@
     "deleteFailed": "An kasa share bayanan martaba",
     "deleteBlocked": "Ana amfani da wannan bayanin martaba ta hanyar faɗakarwa ta yanar gizo. Cire shi daga waɗancan abubuwan tunzura.",
     "deletedToast": "An goge bayanin martaba \"{{name}}\".",
-    "variablesTitle": "Matsalolin muhalli",
+    "variablesTitle": "Masu canjin yanayi",
     "addVariable": "Ƙara m",
     "keyLabel": "Maɓalli",
     "keyTooLong": "Maɓalli dole ya zama haruffa 256 ko ƙasa da haka",
@@ -3375,7 +3392,7 @@
       "topPPlaceholder": "misali 0.95",
       "slugPlaceholder": "my-agent",
       "namePlaceholder": "Wakilina",
-      "promptPlaceholder": "ka a...",
+      "promptPlaceholder": "Kai mataimaki ne...",
       "tools": "Kayan aiki",
       "visibility": "Ganuwa",
       "visibilityPrimary": "Na farko - wanda aka nuna a cikin mai ɗaukar hoto",

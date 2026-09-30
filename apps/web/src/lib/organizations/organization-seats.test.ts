@@ -12,7 +12,8 @@ import {
   addUserToOrganization,
   inviteUserToOrganization,
 } from './organizations';
-import { getMostRecentSeatPurchase, getOrganizationSeatUsage } from './organization-seats';
+import { getOrganizationSeatUsage } from './organization-seats';
+import { getMostRecentSeatPurchase } from './organization-seat-purchases';
 
 describe('getUserOrganizationsWithSeats', () => {
   afterEach(async () => {

@@ -1,8 +1,3 @@
-/**
- * DeploymentOrchestrator - Durable Object for managing deployment job lifecycle.
- * Handles cloning, building, deploying, and tracking job state and events.
- */
-
 import { DurableObject } from 'cloudflare:workers';
 import { type ExecEvent, getSandbox, parseSSEStream } from '@cloudflare/sandbox';
 import { stripVTControlCharacters } from 'node:util';
@@ -37,22 +32,13 @@ import {
 } from './errors';
 import { sanitizeGitError } from './sanitize-git-error';
 
-/**
- * DeploymentOrchestrator manages the complete lifecycle of a deployment job.
- * Persists job state and a bounded ring buffer of events in storage.
- */
 export class DeploymentOrchestrator extends DurableObject<Env> {
-  /** In-memory cache of current build state */
   private state!: Build;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
   }
 
-  /**
-   * Alarm handler for scheduled tasks.
-   * Handles job execution when a job is queued and ready to run.
-   */
   async alarm(): Promise<void> {
     await this.loadState();
 
@@ -61,9 +47,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Load state and events from durable storage.
-   */
   private async loadState(): Promise<void> {
     const storedState = await this.ctx.storage.get<Build>('state');
 
@@ -72,9 +55,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Save current state to durable storage.
-   */
   private async saveState(): Promise<void> {
     await this.ctx.storage.put('state', this.state);
   }
@@ -84,18 +64,11 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     return this.env.EventsManager.get(eventsManagerId);
   }
 
-  /**
-   * Add a log event via EventsManager DO.
-   * Updates local state timestamp and delegates event storage to EventsManager.
-   */
   private async addLogEvent(message: string): Promise<void> {
     const eventsManager = this.eventsManager();
     await eventsManager.addEvent({ type: 'log', payload: { message } });
   }
 
-  /**
-   * Add a status change event via EventsManager DO.
-   */
   private async addStatusChangeEvent(status: BuildStatus): Promise<void> {
     const eventsManager = this.eventsManager();
 
@@ -105,9 +78,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Log stdout and stderr from an ExecResult, splitting by line and skipping empty lines.
-   */
   private async logExecResult(result: { stdout: string; stderr: string }): Promise<void> {
     for (const output of [result.stderr, result.stdout]) {
       for (const line of output.split('\n')) {
@@ -118,9 +88,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Update build status
-   */
   private async updateStatus(status: BuildStatus): Promise<void> {
     if (this.state.status === status) {
       return;
@@ -128,7 +95,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
 
     this.state.status = status;
 
-    // Update timestamps based on status
     if (status === 'building' && !this.state.startedAt) {
       this.state.startedAt = new Date().toISOString();
     }
@@ -140,13 +106,9 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     this.state.updatedAt = new Date().toISOString();
     await this.saveState();
 
-    // Emit status change event
     await this.addStatusChangeEvent(status);
   }
 
-  /**
-   * RPC method: Start the job.
-   */
   async start(params: {
     buildId: string;
     slug: string;
@@ -163,22 +125,17 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     };
     await this.saveState();
 
-    // Setup events manager
     const eventsManager = this.eventsManager();
     await eventsManager.initialize(this.state.buildId);
 
     await this.addLogEvent('Build created and queued');
 
-    // Schedule alarm to run job asynchronously
     // Alarms are designed for long-running work that survives context timeouts
-    await this.ctx.storage.setAlarm(Date.now() + 50); // Run almost immediately
+    await this.ctx.storage.setAlarm(Date.now() + 50);
 
     return { status: this.state.status };
   }
 
-  /**
-   * RPC method: Start job from uploaded archive.
-   */
   async startFromArchive(params: ArchiveDeployParams): Promise<{ status: BuildStatus }> {
     this.state = {
       buildId: params.buildId,
@@ -193,21 +150,16 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     await this.ctx.storage.put('archiveBuffer', params.archiveBuffer);
     await this.saveState();
 
-    // Setup events manager
     const eventsManager = this.eventsManager();
     await eventsManager.initialize(this.state.buildId);
 
     await this.addLogEvent('Build created from archive');
 
-    // Schedule alarm to run job asynchronously
     await this.ctx.storage.setAlarm(Date.now() + 50);
 
     return { status: this.state.status };
   }
 
-  /**
-   * RPC method: Return current state.
-   */
   async status(): Promise<StatusResponse> {
     if (!this.state) {
       await this.loadState();
@@ -220,9 +172,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     return this.state;
   }
 
-  /**
-   * RPC method: Return events from EventsManager.
-   */
   async events(): Promise<Event[]> {
     if (!this.state) {
       await this.loadState();
@@ -232,18 +181,12 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       throw new Error('Build not found');
     }
 
-    // Get EventsManager DO stub and fetch events via RPC
     const eventsManagerId = this.env.EventsManager.idFromName(this.state.buildId);
     const eventsManager = this.env.EventsManager.get(eventsManagerId);
 
     return eventsManager.getEvents();
   }
 
-  /**
-   * RPC method: Cancel a running build.
-   * Destroys the sandbox and updates status to cancelled.
-   * Returns a detailed result indicating whether the build was cancelled and why.
-   */
   async cancel(reason?: string): Promise<CancelBuildResult> {
     await this.loadState();
 
@@ -254,7 +197,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       };
     }
 
-    // Only cancel if build is queued or building (NOT deploying)
     const cancellableStatuses: BuildStatus[] = ['queued', 'building'];
     if (!cancellableStatuses.includes(this.state.status)) {
       return {
@@ -288,26 +230,18 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     };
   }
 
-  /**
-   * Setup project from archive source.
-   * Extracts the archive buffer from storage into the sandbox.
-   */
   private async setupArchiveSource(sandbox: Awaited<ReturnType<typeof getSandbox>>): Promise<void> {
     const archiveBuffer = await this.ctx.storage.get<Uint8Array>('archiveBuffer');
     if (!archiveBuffer) {
       throw new Error('Archive buffer not found in storage');
     }
 
-    // Clear archive from storage (no longer needed)
     await this.ctx.storage.delete('archiveBuffer');
 
     await this.addLogEvent('Extracting archive...');
 
-    // Convert archive to base64 for transfer
     const base64Archive = Buffer.from(archiveBuffer).toString('base64');
 
-    // Write archive to sandbox using base64 decoding
-    // We need to write the base64 content to a file, then decode it
     await sandbox.writeFile('/tmp/project.tar.gz.b64', base64Archive);
     const decodeResult = await sandbox.exec(
       'base64 -d /tmp/project.tar.gz.b64 > /tmp/project.tar.gz && rm /tmp/project.tar.gz.b64'
@@ -320,7 +254,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       );
     }
 
-    // Create project directory and extract
     await sandbox.exec('mkdir -p /workspace/project');
     const extractResult = await sandbox.exec('tar -xzf /tmp/project.tar.gz -C /workspace/project');
 
@@ -331,16 +264,11 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       );
     }
 
-    // Clean up archive
     await sandbox.exec('rm /tmp/project.tar.gz');
 
     await this.addLogEvent('Archive extracted successfully');
   }
 
-  /**
-   * Setup project from git source.
-   * Clones the repository into the sandbox.
-   */
   private async setupGitSource(
     sandbox: Awaited<ReturnType<typeof getSandbox>>,
     source: GitSource,
@@ -378,7 +306,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       );
     }
 
-    // Check if Git LFS is needed by looking for .gitattributes with LFS patterns
     const lfsCheckResult = await sandbox.exec(
       'cd /workspace/project && [ -f .gitattributes ] && grep -q "filter=lfs" .gitattributes'
     );
@@ -407,7 +334,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       }
     }
 
-    // Get the commit hash
     const commitHashResult = await sandbox.exec('cd /workspace/project && git rev-parse HEAD');
     if (!commitHashResult.success) {
       console.log(commitHashResult.stderr);
@@ -417,9 +343,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     await this.addLogEvent(`Repository cloned successfully (commit: ${commitHash})`);
   }
 
-  /**
-   * Clear sensitive data from state and return the access token if present.
-   */
   private async popAccessTokenAndEnvData(): Promise<{
     accessToken?: string;
     envVars?: EncryptedEnvVar[];
@@ -446,15 +369,10 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     return { accessToken, envVars };
   }
 
-  /**
-   * Clear sensitive and unnecessary data from state and storage on failure.
-   * This ensures archive buffers, access tokens, and env vars don't persist after failures.
-   */
   private async clearSensitiveDataOnFailure(): Promise<void> {
     // Clear archive buffer from storage (may not have been extracted yet)
     await this.ctx.storage.delete('archiveBuffer');
 
-    // Clear sensitive data from state
     let needsSave = false;
 
     if (this.state.source?.type === 'git' && this.state.source.accessToken) {
@@ -496,10 +414,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     await this.addLogEvent('Database migrations completed');
   }
 
-  /**
-   * Main orchestration method.
-   * Clones repo, builds project, and deploys to Cloudflare.
-   */
   private async run(): Promise<void> {
     let sandbox: Awaited<ReturnType<typeof getSandbox>> | null = null;
 
@@ -509,23 +423,19 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
         throw new Error('No source configured for build');
       }
 
-      // Extract and clear sensitive data from state
       const { accessToken, envVars } = await this.popAccessTokenAndEnvData();
 
       await this.updateStatus('building');
 
-      // Get sandbox instance
       sandbox = getSandbox(this.env.Sandbox, this.state.buildId);
       await this.addLogEvent('Build environment ready');
 
-      // Setup source
       if (source.type === 'archive') {
         await this.setupArchiveSource(sandbox);
       } else {
         await this.setupGitSource(sandbox, source, accessToken);
       }
 
-      // Step 1: Detect project type
       await this.addLogEvent('Analyzing project...');
       const detectResult = await sandbox.exec(
         'cd /workspace/project && /workspace/detect-project.sh /workspace/project'
@@ -542,7 +452,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
 
       await this.addLogEvent(`Detected: ${detectedType}`);
 
-      // Validate detected type against supported project types
       const parseResult = supportedProjectTypeSchema.safeParse(detectedType);
 
       if (!parseResult.success) {
@@ -572,7 +481,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
       //   throw new Error('Failed to set up tool versions');
       // }
 
-      // Step 3: Build based on project type
       const buildPipelines: Record<
         ProjectType,
         Array<{ message: string; script: string; passEnvVars?: boolean }>
@@ -632,7 +540,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
         ],
       };
 
-      // Decrypt env vars
       const decryptedEnvVars = decryptEnvVars(
         envVars || [],
         Buffer.from(this.env.ENV_ENCRYPTION_PRIVATE_KEY, 'base64')
@@ -647,20 +554,17 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
         );
       }
 
-      // Store detected project type
       this.state.projectType = projectType;
       await this.saveState();
 
       await this.addLogEvent('Build completed successfully');
 
-      // Run migrations if needed
       if (await this.needsMigrations(sandbox)) {
         await this.runMigrations(sandbox, decryptedEnvVars);
       }
 
       await this.updateStatus('deploying');
 
-      // Read artifacts from sandbox based on detected project type
       const artifactReader = new SandboxArtifactReader();
       const artifacts = await artifactReader.readArtifactsByType(
         sandbox,
@@ -668,7 +572,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
         (message: string) => this.addLogEvent(message)
       );
 
-      // Deploy artifacts
       const api = new CloudflareAPI(this.env.CLOUDFLARE_ACCOUNT_ID, this.env.CLOUDFLARE_API_TOKEN);
       const deployer = new Deployer(api);
 
@@ -681,10 +584,8 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
 
       await this.updateStatus('deployed');
     } catch (error) {
-      // Update status
       await this.updateStatus('failed');
 
-      // Clear sensitive/unnecessary data from storage on failure
       await this.clearSensitiveDataOnFailure();
 
       Sentry.captureException(error, {
@@ -698,7 +599,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
         },
       });
     } finally {
-      // Always destroy sandbox
       if (sandbox) {
         try {
           await sandbox.destroy();
@@ -714,9 +614,6 @@ export class DeploymentOrchestrator extends DurableObject<Env> {
     }
   }
 
-  /**
-   * Helper method to run a script in the sandbox and stream its output to logs.
-   */
   private async runScript(
     sandbox: Awaited<ReturnType<typeof getSandbox>>,
     command: string,

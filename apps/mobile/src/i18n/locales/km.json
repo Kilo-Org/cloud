@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ត្រឡប់ក្រោយ",
     "idle": "ទំនេរ",
+    "scheduled": "បានកំណត់ពេល",
     "keepEditing": "បន្តកែសម្រួល",
     "keepRunning": "បន្តដំណើរការ",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "បន្ថែមកូនសោចូល",
     "passkeyDefaultName": "កូនសោចូល",
     "passkeyAddedOn": "បានបន្ថែម {{date}}",
+    "passkeyLastUsedOn": "ប្រើប្រាស់ចុងក្រោយ {{date}}",
     "passkeyAdded": "បានបន្ថែមកូនសោចូល។",
     "passkeyAddFailed": "មិនអាចបន្ថែមកូនសោចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "passkeyAddUnsupported": "ឧបករណ៍នេះមិនអាចបង្កើតកូនសោចូលបានទេ។",
@@ -566,7 +568,14 @@
       "deletedUser": "អ្នកប្រើប្រាស់ដែលបានលុបគណនី",
       "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
       "moreLinesAbove_one": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
-      "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។"
+      "moreLinesAbove_other": "… នៅមាន {{displayCount}} បន្ទាត់ទៀតខាងលើ។",
+      "deleteComment": "លុបមតិយោបល់",
+      "deleteCommentTitle": "លុបមតិយោបល់?",
+      "deleteCommentMessage": "មតិយោបល់នេះនឹងត្រូវលុបចេញពីសំណើបញ្ចូលកូដ។",
+      "commentEditFailed": "មិនអាចរក្សាទុកមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "commentEditUnavailable": "មតិយោបល់នេះមិនអាចកែសម្រួលបានទេ។ វាអាចត្រូវបានលុប។",
+      "commentDeleteFailed": "មិនអាចលុបមតិយោបល់របស់អ្នកបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
+      "commentDeleteUnavailable": "មតិយោបល់នេះមិនអាចលុបបានទេ។"
     },
     "couldNotOpenGitHubAppSettings": "មិនអាចបើកការកំណត់កម្មវិធី GitHub បានទេ។",
     "installKiloGitHubApp": "ដំឡើងកម្មវិធី Kilo សម្រាប់ GitHub",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "មិនមែនជាតំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលទេ",
     "announce": {
       "commentPosted": "បានបង្ហោះមតិយោបល់",
+      "commentUpdated": "មតិយោបល់ត្រូវបានធ្វើបច្ចុប្បន្នភាព",
+      "commentDeleted": "មតិយោបល់ត្រូវបានលុប",
       "reviewSubmitted": "បានដាក់ស្នើការពិនិត្យ",
       "autoMergeEnabled": "បានបើកការបញ្ចូលដោយស្វ័យប្រវត្តិ"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ។",
       "couldNotRefresh": "មិនអាចផ្ទុកឡើងវិញបានទេ",
       "noSessionsYetDescription": "ចាប់ផ្តើមកិច្ចការសរសេរកូដពីទូរស័ព្ទរបស់អ្នក។ វគ្គរបស់អ្នកនឹងបង្ហាញនៅទីនេះ។",
+      "viewHistory": "ប្រវត្តិវគ្គ",
       "noMatches": "គ្មានវគ្គដែលត្រូវគ្នា",
       "tryDifferentSearch": "សូមសាកល្បងពាក្យស្វែងរកផ្សេង។",
       "tryAdjustFilters": "សាកល្បងកែតម្រូវ ឬដកតម្រងរបស់អ្នកចេញ។",
       "couldNotSearch": "មិនអាចស្វែងរកវគ្គបានទេ។",
       "completedWillAppear": "វគ្គដែលបានបញ្ចប់នឹងបង្ហាញនៅទីនេះ។",
       "noPastSessions": "គ្មានវគ្គកន្លងមក",
+      "pastSessions": "វគ្គកន្លងមក",
       "live": "ផ្ទាល់",
       "updating": "កំពុងធ្វើបច្ចុប្បន្នភាព"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
       "readOnly": "វគ្គនេះអាចបានត្រឹមតែអានប៉ុណ្ណោះ។",
+      "continueInNewSession": "បន្តនៅក្នុងវគ្គថ្មី",
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
@@ -2760,7 +2774,8 @@
     "optionsExpiredDescription": "ត្រឡប់ទៅអេក្រង់មុន ហើយបើកផ្ទាំងជ្រើសរើសនេះម្តងទៀត។"
   },
   "sessionRow": {
-    "needsInput": "ត្រូវការការឆ្លើយតប"
+    "needsInput": "ត្រូវការការឆ្លើយតប",
+    "scheduled": "បានកំណត់ពេល"
   },
   "voiceInput": {
     "listening": "កំពុងស្តាប់...",
@@ -3166,6 +3181,7 @@
     "emptyTitle": "គ្មានដែនគេហទំព័រដែលជឿទុកចិត្តទេ",
     "emptyDescription": "ពេលអ្នកជឿទុកចិត្តដែនគេហទំព័រមួយ តំណទៅដែននោះនឹងបើកដោយមិនសួរម្តងទៀត។",
     "revoke": "ដកហូតការជឿទុកចិត្តលើ {{host}}",
+    "revokeMessage": "តំណទៅដែននេះនឹងស្នើសុំការបញ្ជាក់ម្តងទៀត។",
     "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   },
   "quickChat": {
@@ -3195,7 +3211,8 @@
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។",
     "openSession": "បើក",
     "approveFailed": "មិនអាចយល់ព្រមបានទេ។ ប៉ះ $t(common.approve) ដើម្បីព្យាយាមម្តងទៀត។",
-    "newestResult": "លទ្ធផលថ្មីបំផុត"
+    "newestResult": "លទ្ធផលថ្មីបំផុត",
+    "scheduledWakes": "ភ្ញាក់ {{time}}"
   },
   "transcriptionModel": {
     "title": "ម៉ូដែលបម្លែងសំឡេងជាអត្ថបទ",

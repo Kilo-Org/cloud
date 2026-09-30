@@ -15,19 +15,16 @@ import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';
 import { debugSaveProxyResponseStream } from '@/lib/debugUtils';
-import type {
-  OrganizationSettings,
-  OrganizationPlan,
-} from '@/lib/organizations/organization-types';
+import type { OrganizationSettings } from '@/lib/organizations/organization-types';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toMicrodollars } from '@/lib/microdollars';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
@@ -584,56 +581,18 @@ export async function captureProxyError(params: {
 // Shared Helper Functions
 // ============================================================================
 
-export type OrganizationRestrictionResult = {
-  error: NextResponse | null;
-  providerConfig?: OpenRouterProviderConfig;
-};
-
 /**
- * Checks organization-level restrictions for model and provider access.
- *
- * Provider allow list and model deny list restrictions only apply to Enterprise plans.
- * Data collection settings apply to all organization plans.
- *
- * @param params.modelId - The model ID being requested
- * @param params.settings - Organization settings (may be undefined for non-org users)
- * @param params.organizationPlan - The organization's plan type (undefined for non-org users)
- * @returns Object with error response (if blocked) and provider config to apply
+ * The organization's data collection setting as an upstream provider config.
+ * Enterprise model and provider restrictions are not applied here: the member
+ * model-access decision enforces them, including group grants that extend the
+ * organization baseline.
  */
-export function checkOrganizationModelRestrictions(params: {
-  modelId: string;
-  settings?: OrganizationSettings;
-  organizationPlan?: OrganizationPlan;
-}): OrganizationRestrictionResult {
-  if (!params.settings) return { error: null };
-
-  const normalizedModelId = normalizeModelId(params.modelId);
-
-  // Model/provider access restrictions only apply to Enterprise plans.
-  if (params.organizationPlan === 'enterprise') {
-    const modelDenyList = params.settings.model_deny_list;
-    if (modelDenyList?.some(entry => normalizeModelId(entry) === normalizedModelId)) {
-      return { error: modelNotAllowedResponse() };
-    }
-  }
-
-  const providerAllowList = params.settings.provider_allow_list;
-
-  const providerConfig: OpenRouterProviderConfig = getEffectiveProviderPrivacy(
-    undefined,
-    params.settings.data_collection
-  );
-
-  if (params.organizationPlan === 'enterprise') {
-    if (providerAllowList !== undefined) {
-      providerConfig.only = providerAllowList;
-    }
-  }
-
-  return {
-    error: null,
-    providerConfig: Object.keys(providerConfig).length > 0 ? providerConfig : undefined,
-  };
+export function getOrganizationProviderPrivacy(
+  settings: OrganizationSettings | undefined
+): OpenRouterProviderConfig | undefined {
+  if (!settings) return undefined;
+  const providerConfig = getEffectiveProviderPrivacy(undefined, settings.data_collection);
+  return Object.keys(providerConfig).length > 0 ? providerConfig : undefined;
 }
 
 export function extractHeaderAndLimitLength(request: NextRequest, name: string) {
@@ -662,6 +621,87 @@ export function extractFimPromptInfo(body: { prompt: string; suffix?: string | n
     system_prompt_length: (body.suffix || '').length + body.prompt.length,
     user_prompt_prefix: body.prompt.slice(0, 100), // prompt = user input
   };
+}
+
+/** An input item with a role, as both the chat and the responses APIs use. */
+function isRoleMessage(value: unknown): value is { role?: unknown; content?: unknown } {
+  return typeof value === 'object' && value !== null && 'role' in value;
+}
+
+/** Joins the text of a message content, which is a string or a list of content parts. */
+function textFromPromptContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  const parts: unknown[] = content;
+  const texts: string[] = [];
+  for (const part of parts) {
+    // The text payload field is always `text`; its part type differs per API
+    // (`text` for chat and messages, `input_text` for responses). Non-text
+    // parts (images, tool output) carry no `text` field.
+    if (part && typeof part === 'object' && 'text' in part && typeof part.text === 'string') {
+      texts.push(part.text);
+    }
+  }
+  return texts.join('\n');
+}
+
+/** The text of the last `user` turn, scanning from the end of the input list. */
+function lastUserTurnText(input: unknown): string | null {
+  if (typeof input === 'string') return input; // responses accepts a plain prompt string
+  if (!Array.isArray(input)) return null;
+  const messages: unknown[] = input;
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index];
+    if (isRoleMessage(message) && message.role === 'user') {
+      return textFromPromptContent(message.content);
+    }
+  }
+  return null;
+}
+
+/**
+ * The request shapes that carry a user prompt. The body is typed structurally
+ * because only the three gateway kinds pass through here, and FIM's `prompt`
+ * body is not part of `GatewayRequest`.
+ */
+type PromptBearingRequest = {
+  kind: GatewayChatApiKind | 'fim_completions';
+  body: { messages?: unknown; input?: unknown; prompt?: unknown };
+};
+
+/**
+ * The last user turn's text, which bouncer hashes into a prompt SimHash.
+ * Chat Completions and Messages carry it in `messages`, Responses in `input`
+ * (a prompt string or an input-item list), FIM in `prompt`. Null when the
+ * request carries no user text.
+ */
+export function lastUserPromptText(request: PromptBearingRequest): string | null {
+  if (request.kind === 'responses') return lastUserTurnText(request.body.input);
+  if (request.kind === 'fim_completions') {
+    return typeof request.body.prompt === 'string' ? request.body.prompt : null;
+  }
+  return lastUserTurnText(request.body.messages);
+}
+
+/**
+ * True when the request asked for token-level probabilities, which bouncer
+ * reads as a distillation signal. No gateway request type declares all three
+ * fields (Messages declares none), so read them structurally.
+ */
+export function requestedLogprobs(body: unknown): boolean {
+  if (typeof body !== 'object' || body === null) return false;
+  const logitBias = 'logit_bias' in body ? body.logit_bias : undefined;
+  return (
+    ('logprobs' in body && Boolean(body.logprobs)) ||
+    ('top_logprobs' in body && Boolean(body.top_logprobs)) ||
+    (typeof logitBias === 'object' && logitBias !== null && Object.keys(logitBias).length > 0)
+  );
+}
+
+/** The `n` sampling parameter, or null when the request did not set one. */
+export function requestedSamples(body: unknown): number | null {
+  if (typeof body !== 'object' || body === null || !('n' in body)) return null;
+  return typeof body.n === 'number' ? body.n : null;
 }
 
 // ============================================================================

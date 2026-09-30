@@ -10,8 +10,6 @@ import {
   emitAdminAccessEvent,
 } from '@/lib/admin/admin-access-log';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
-import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
 import {
   appUpdateRequiredError,
@@ -19,14 +17,17 @@ import {
   getMinimumVersions,
   isMobileClient,
 } from '@/lib/trpc/min-version';
-import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
 import {
   buildTimingLine,
   readClientDimensions,
   shouldLogTiming,
 } from '@/lib/observability/request-timing';
+import {
+  controlPlanePathFromInfo,
+  controlPlaneTypeFromInfo,
+  withControlPlaneBudget,
+  type ControlPlaneRequestInfo,
+} from '@/lib/trpc/control-plane-budget';
 
 export { UpstreamApiError } from '@/lib/trpc/transport';
 // Define the context type
@@ -48,14 +49,42 @@ export type TRPCContext = {
   trpcType?: string;
   // Populated by `createTRPCContext` and read by the min-version middleware.
   headersList?: Headers;
+  // `performance.now()` when the mobile control-plane budget started, set by
+  // `createTRPCContext` so the procedure middleware shares the same 10s window
+  // as the shared auth read. Absent for web/CLI callers and test constructors.
+  controlPlaneStartedAt?: number;
+};
+
+/**
+ * Optional fetch-adapter argument. tRPC's `createContext` passes `{ req, info }`;
+ * callers that invoke this with no args (SSR prefetch, REST wrappers) fall
+ * back to `next/headers()` and a generic path.
+ */
+export type CreateTRPCContextOpts = {
+  req?: Request;
+  info?: ControlPlaneRequestInfo;
 };
 
 /**
  * @see: https://trpc.io/docs/server/context
+ *
+ * The shared auth read (`getUserFromAuth` -> `findUserById(..., readDb)`) is
+ * the only upstream `user.getMe` awaits, and tRPC runs it *before* procedure
+ * middleware. Wrapping it here is what keeps a hanging replica read from
+ * becoming a gateway 504; the procedure middleware then consumes whatever
+ * budget remains.
  */
-export const createTRPCContext = async (): Promise<TRPCContext> => {
-  const headersList = await headers();
-  const { user, deviceSessionId, tokenSource } = await getUserFromAuth({ adminOnly: false });
+export const createTRPCContext = async (opts?: CreateTRPCContextOpts): Promise<TRPCContext> => {
+  const headersList = opts?.req?.headers ?? (await headers());
+  const startedAt = performance.now();
+  const { user, deviceSessionId, tokenSource } = await withControlPlaneBudget({
+    path: controlPlanePathFromInfo(opts?.info),
+    type: controlPlaneTypeFromInfo(opts?.info),
+    headersList,
+    next: () => getUserFromAuth({ adminOnly: false }),
+    startedAt,
+    surface: 'context',
+  });
   if (!user) {
     throw new TRPCError({
       code: 'UNAUTHORIZED',
@@ -74,6 +103,7 @@ export const createTRPCContext = async (): Promise<TRPCContext> => {
     tokenSource: tokenSource ?? null,
     ip: clientIpFromHeaders(headersList),
     headersList,
+    controlPlaneStartedAt: isMobileClient(headersList) ? startedAt : undefined,
   };
 };
 
@@ -145,6 +175,19 @@ export const timingMiddleware = async <TResult extends { ok: boolean }>({
   return result;
 };
 
+// Bounds a mobile query's procedure pipeline to whatever remains of the
+// control-plane budget started in `createTRPCContext`. Web/CLI callers and
+// mutations pass through untouched; see `control-plane-budget.ts`.
+const controlPlaneBudgetMiddleware = t.middleware(({ path, type, ctx, next }) =>
+  withControlPlaneBudget({
+    path,
+    type,
+    headersList: ctx.headersList,
+    next,
+    startedAt: ctx.controlPlaneStartedAt,
+  })
+);
+
 // Publishes the procedure path/type onto the context so audit emitters reachable
 // only from a resolver (see `recordKiloAdminElevation`) can name the procedure.
 // `next({ ctx })` merges into the existing context, so nothing is dropped.
@@ -169,12 +212,14 @@ export const createTRPCRouter = t.router;
 export const createCallerFactory = t.createCallerFactory;
 export const baseProcedure = t.procedure
   .use(timingMiddleware)
+  .use(controlPlaneBudgetMiddleware)
   .use(sentryMiddleware)
   .use(auditContextMiddleware)
   .use(minimumVersionMiddleware);
 
-// Admin-only procedure. creditManager/superadmin/sessionViewer chain on this,
-// so emitting here covers the whole admin.* tRPC surface with a single event.
+// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
+// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
+// admin.* tRPC surface with a single event.
 export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }) => {
   if (!ctx.user.is_admin) {
     throw new TRPCError({
@@ -194,48 +239,5 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }
     method: type,
     ip: ctx.ip ?? null,
   });
-  return next();
-});
-
-export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanManageCredits(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Credit management access required',
-    });
-  }
-
-  return next();
-});
-
-async function getCurrentUserFromPrimary(userId: string) {
-  return db.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
-
-export const superadminProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userIsSuperadmin(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Superadmin access required',
-    });
-  }
-
-  return next();
-});
-
-export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanViewSessions(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Session viewing access required',
-    });
-  }
-
   return next();
 });

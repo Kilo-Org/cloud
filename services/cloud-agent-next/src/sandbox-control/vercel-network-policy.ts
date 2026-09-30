@@ -4,6 +4,7 @@ import type {
   VercelSandboxNetworkPolicy,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { deriveKiloSandboxTargets, type KiloSandboxTargets } from '../kilo/kilo-targets.js';
+import { EXA_PROXY_PATHS } from '../kilo/runtime-credential-proxy-routes.js';
 import { runtimeCredentialProxyFacadeBaseUrl } from '../runtime-credential-proxy.js';
 
 export type VercelCredentialPolicyInput = {
@@ -303,6 +304,9 @@ function runtimeProxyInjectionRules(
         [...methods],
         authorization
       );
+    }
+    for (const path of EXA_PROXY_PATHS) {
+      add(backend, `${basePath(backend)}${path}`, ['POST'], authorization);
     }
   }
   return rules;

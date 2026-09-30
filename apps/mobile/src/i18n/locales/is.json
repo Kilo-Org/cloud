@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Fara til baka",
     "idle": "Í bið",
+    "scheduled": "Áætlað",
     "keepEditing": "Halda áfram að breyta",
     "keepRunning": "Halda keyrslu áfram",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Bæta við aðgangslykli",
     "passkeyDefaultName": "Aðgangslykill",
     "passkeyAddedOn": "Bætt við {{date}}",
+    "passkeyLastUsedOn": "Síðast notað {{date}}",
     "passkeyAdded": "Aðgangslykli bætt við.",
     "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
     "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",
@@ -566,7 +568,14 @@
       "deletedUser": "eyddur notandi",
       "replyForbiddenTerm": "Þú hefur ekki heimild til að svara við {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} lína til viðbótar fyrir ofan.",
-      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan."
+      "moreLinesAbove_other": "… {{displayCount}} línur til viðbótar fyrir ofan.",
+      "deleteComment": "Eyða athugasemd",
+      "deleteCommentTitle": "Eyða athugasemd?",
+      "deleteCommentMessage": "Þessari athugasemd verður eytt úr sameiningarbeiðninni.",
+      "commentEditFailed": "Ekki tókst að vista athugasemdina þína. Athugaðu tenginguna og reyndu aftur.",
+      "commentEditUnavailable": "Ekki er hægt að breyta þessari athugasemd. Hún gæti hafa verið eydd.",
+      "commentDeleteFailed": "Ekki tókst að eyða athugasemdinni þinni. Athugaðu tenginguna og reyndu aftur.",
+      "commentDeleteUnavailable": "Ekki er hægt að eyða þessari athugasemd."
     },
     "couldNotOpenGitHubAppSettings": "Tókst ekki að opna stillingar GitHub-forritsins.",
     "installKiloGitHubApp": "Setja upp Kilo-forritið fyrir GitHub",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Þetta er ekki tengill á samrunabeiðni eða merge request",
     "announce": {
       "commentPosted": "Athugasemd birt",
+      "commentUpdated": "Athugasemd uppfærð",
+      "commentDeleted": "Athugasemd eydd",
       "reviewSubmitted": "Yfirferð send",
       "autoMergeEnabled": "Sjálfvirk sameining virkjuð"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
       "couldNotRefresh": "Ekki tókst að endurnýja",
       "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
+      "viewHistory": "Lotuferill",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
       "tryAdjustFilters": "Reyndu að breyta eða hreinsa síurnar þínar.",
       "couldNotSearch": "Ekki tókst að leita í lotum.",
       "completedWillAppear": "Hér birtast lotur sem er lokið.",
       "noPastSessions": "Engar fyrri lotur",
+      "pastSessions": "Fyrri lotur",
       "live": "Í RAUNTÍMA",
       "updating": "Uppfæri"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Lotunafn",
       "transcriptAccessibility": "Samtalsferill lotunnar",
       "readOnly": "Þessi lota er skrifvarin.",
+      "continueInNewSession": "Halda áfram í nýrri lotu",
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
@@ -2760,7 +2774,8 @@
     "optionsExpiredDescription": "Farðu til baka á fyrri skjá og opnaðu valgluggann aftur."
   },
   "sessionRow": {
-    "needsInput": "BÍÐUR EFTIR SVARI"
+    "needsInput": "BÍÐUR EFTIR SVARI",
+    "scheduled": "ÁÆTLAÐ"
   },
   "voiceInput": {
     "listening": "Hlusta…",
@@ -3166,6 +3181,7 @@
     "emptyTitle": "Engir traustir vefþjónar",
     "emptyDescription": "Þegar þú treystir vefþjóni opnast tenglar á hann án þess að beðið sé um staðfestingu aftur.",
     "revoke": "Afturkalla traust á {{host}}",
+    "revokeMessage": "Tenglar á þennan vefþjón munu biðja um staðfestingu aftur.",
     "backToPreferences": "Til baka í stillingar"
   },
   "quickChat": {
@@ -3195,7 +3211,8 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum.",
     "openSession": "Opna",
     "approveFailed": "Ekki tókst að samþykkja. Ýttu á $t(common.approve) til að reyna aftur.",
-    "newestResult": "Nýjasta niðurstaðan"
+    "newestResult": "Nýjasta niðurstaðan",
+    "scheduledWakes": "vaknar {{time}}"
   },
   "transcriptionModel": {
     "title": "Umritunarlíkan",

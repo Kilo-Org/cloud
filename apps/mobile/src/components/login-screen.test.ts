@@ -259,10 +259,27 @@ describe('login-screen error mapping', () => {
 
 describe('login-screen keyboard bottom padding', () => {
   it.each(['android', 'ios'] as const)(
-    'reserves the bottom inset alone for the %s keyboard-down state',
+    'floors the %s keyboard-down inset at the platform bottom chrome',
     platform => {
+      // The reported inset is not a reliable floor for the chrome the platform
+      // draws over the app: Android reports navigationBars() only and reports 0
+      // when the window does not inset for the bar, so a bare inset let the
+      // form's last control sit under the home indicator (landscape gesture
+      // bar). 48 is the tallest bottom chrome either platform draws.
       expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28, platform })).toBe(
-        28
+        48
+      );
+      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0, platform })).toBe(
+        48
+      );
+    }
+  );
+
+  it.each(['android', 'ios'] as const)(
+    'keeps a %s reported inset larger than the floor',
+    platform => {
+      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63, platform })).toBe(
+        63
       );
     }
   );
@@ -282,7 +299,7 @@ describe('login-screen keyboard bottom padding', () => {
   it('ignores a negative reported height', () => {
     expect(
       resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28, platform: 'android' })
-    ).toBe(28);
+    ).toBe(48);
   });
 });
 
@@ -606,7 +623,7 @@ describe('login-screen bottom-bar clearance', () => {
       const renderer = await mountLoginScreen();
 
       expect(findByType(renderer.root, 'IdleAuth')[0]?.props.initialEmail).toBe(email);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
       // One padded wrapper for both platforms; the platform-gated
       // KeyboardAvoidingView is gone.
       expect(findByType(renderer.root, 'KeyboardAvoidingView')).toHaveLength(0);
@@ -621,7 +638,7 @@ describe('login-screen bottom-bar clearance', () => {
       deviceAuth.status = status;
       const renderer = await mountLoginScreen();
 
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       renderer.unmount();
     }
@@ -633,14 +650,14 @@ describe('login-screen bottom-bar clearance', () => {
     const renderer = await mountLoginScreen();
 
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(2);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
     await act(async () => {
       draft.resolve({ email: '', ssoRecovery: null });
       await draft.promise;
     });
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
     renderer.unmount();
   });
@@ -658,7 +675,7 @@ describe('login-screen bottom-bar clearance', () => {
         events.show,
         events.hide,
       ]);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       // Android's reported height excludes the navigation bar, so the reserved
       // inset is added on top; iOS reports the keyboard window frame, whose
@@ -670,10 +687,10 @@ describe('login-screen bottom-bar clearance', () => {
       });
 
       emitKeyboard(events.hide);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       emitKeyboard(events.show, 0);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       renderer.unmount();
     }
@@ -693,7 +710,7 @@ describe('login-screen bottom-bar clearance', () => {
       act(() => {
         subscription[1]('background');
       });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 28 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       renderer.unmount();
     }
@@ -725,15 +742,29 @@ describe('login-screen bottom-bar clearance', () => {
     renderer.unmount();
   });
 
-  it('tracks bottom inset changes, including devices without a bottom bar', async () => {
+  it('floors the reserved inset at the bottom chrome and keeps a larger reported inset', async () => {
     const renderer = await mountLoginScreen();
 
-    for (const bottom of [48, 0]) {
-      vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom, left: 0, right: 0 });
+    // 48 is the tallest bottom chrome either platform draws (Android's
+    // navigation bar / IME navigation row, iOS's home indicator): the reported
+    // inset is floored, never replaced. A window that reports 0 for the bar —
+    // landscape, where the gesture bar sits on the side — still keeps the last
+    // control clear of the home indicator.
+    for (const [reported, reserved] of [
+      [48, 48],
+      [0, 48],
+      [63, 63],
+    ] as const) {
+      vi.mocked(useSafeAreaInsets).mockReturnValue({
+        top: 24,
+        bottom: reported,
+        left: 0,
+        right: 0,
+      });
       act(() => {
         renderer.update(createElement(LoginScreen));
       });
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: bottom });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: reserved });
     }
 
     renderer.unmount();

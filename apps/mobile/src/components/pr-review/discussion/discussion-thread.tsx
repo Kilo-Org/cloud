@@ -29,19 +29,20 @@
 //     thread just routes the events and lets the cache flow.
 
 import * as Haptics from 'expo-haptics';
-import { Check, CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
+import { CheckCheck, ChevronDown, ChevronUp, type LucideIcon } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { CommentRow } from '@/components/pr-review/discussion/comment-row';
+import { ResolveToggle } from '@/components/pr-review/discussion/discussion-thread-resolve-toggle';
 import { ReplyInput } from '@/components/pr-review/discussion/reply-input';
 import { ThreadDiffSnippet } from '@/components/pr-review/discussion/thread-diff-snippet';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 import { formatNumber } from '@/lib/format';
 import {
+  type PrCommentKind,
   type ReviewComment,
   type ReviewReactionContent,
   type ReviewThread,
@@ -72,6 +73,13 @@ type DiscussionThreadProps = {
   readonly viewerLogin?: string | null;
   /** Invoked when the inline reply field gains focus (see useReplyFocusScroll). */
   readonly onReplyFocus?: () => void;
+  /**
+   * Own-comment actions (s4), bound per comment with `kind: 'review'` for
+   * every row this card renders. Absent on a read-only provider scope, where
+   * the rows keep today's affordances.
+   */
+  readonly onEditComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
+  readonly onDeleteComment?: (comment: ReviewComment, kind: PrCommentKind) => void;
 };
 
 export function DiscussionThread({
@@ -83,6 +91,8 @@ export function DiscussionThread({
   onToggleExpand,
   viewerLogin = null,
   onReplyFocus,
+  onEditComment,
+  onDeleteComment,
 }: Readonly<DiscussionThreadProps>) {
   // s6: the reply and resolve writes route through the `providerReview` seam
   // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
@@ -186,6 +196,20 @@ export function DiscussionThread({
                 readOnly={!isGithub}
                 reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
+                onEditComment={
+                  onEditComment
+                    ? () => {
+                        onEditComment(comment, 'review');
+                      }
+                    : undefined
+                }
+                onDeleteComment={
+                  onDeleteComment
+                    ? () => {
+                        onDeleteComment(comment, 'review');
+                      }
+                    : undefined
+                }
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
                 }}
@@ -309,7 +333,7 @@ function ThreadHeader({
 
 type BadgeProps = {
   readonly tone: 'good' | 'muted' | 'warn' | 'destructive';
-  readonly icon?: typeof Check;
+  readonly icon?: LucideIcon;
   readonly label: string;
 };
 
@@ -336,38 +360,5 @@ function Badge({ tone, icon: Icon, label }: Readonly<BadgeProps>) {
       {Icon ? <Icon size={10} color={iconColor[tone]} /> : null}
       <Text className="text-[10px] font-medium uppercase tracking-wide">{label}</Text>
     </View>
-  );
-}
-
-type ResolveToggleProps = {
-  readonly resolved: boolean;
-  readonly disabled: boolean;
-  readonly onPress: () => void;
-};
-
-function ResolveToggle({ resolved, disabled, onPress }: Readonly<ResolveToggleProps>) {
-  const colors = useThemeColors();
-  const { t } = useTranslation();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        resolved ? t('prReview.discussion.unresolveThread') : t('prReview.discussion.resolveThread')
-      }
-      onPress={onPress}
-      disabled={disabled}
-      // The frame is the tap target the size audit measures (38.5pt on
-      // device) and the header row grows to hold it, so the whole frame is
-      // hittable; the 3pt slop reaches the 44pt minimum.
-      hitSlop={COMPACT_H11_HIT_SLOP_DP}
-      className="h-11 w-11 items-center justify-center active:opacity-70"
-    >
-      {/* The visible circle stays compact (explicit px, because NativeWind's
-          14pt rem renders `h-7` at 24.5pt): DESIGN.md keeps the target, not the
-          visual, at 44pt. */}
-      <View className="h-[28px] w-[28px] items-center justify-center rounded-full border border-border bg-card">
-        <Check size={14} color={resolved ? colors.good : colors.mutedForeground} />
-      </View>
-    </Pressable>
   );
 }

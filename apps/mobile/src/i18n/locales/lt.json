@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Grįžti",
     "idle": "Laukia",
+    "scheduled": "Suplanuota",
     "keepEditing": "Tęsti redagavimą",
     "keepRunning": "Tęsti vykdymą",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Pridėti priėjimo raktą",
     "passkeyDefaultName": "Priėjimo raktas",
     "passkeyAddedOn": "Pridėta {{date}}",
+    "passkeyLastUsedOn": "Paskutinį kartą naudota {{date}}",
     "passkeyAdded": "Priėjimo raktas pridėtas.",
     "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
     "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
@@ -588,7 +590,14 @@
       "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "deleteComment": "Ištrinti komentarą",
+      "deleteCommentTitle": "Ištrinti komentarą?",
+      "deleteCommentMessage": "Šis komentaras bus ištrintas iš pakeitimų užklausos.",
+      "commentEditFailed": "Nepavyko išsaugoti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentEditUnavailable": "Šio komentaro negalima redaguoti. Jis gali būti ištrintas.",
+      "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -779,6 +788,8 @@
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
+      "commentUpdated": "Komentaras atnaujintas",
+      "commentDeleted": "Komentaras ištrintas",
       "reviewSubmitted": "Peržiūra pateikta",
       "autoMergeEnabled": "Automatinis sujungimas įjungtas"
     },
@@ -2067,12 +2078,14 @@
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
       "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
+      "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
       "tryAdjustFilters": "Pabandyk pakeisti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko atlikti sesijų paieškos.",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
+      "pastSessions": "Ankstesnės sesijos",
       "live": "TIESIOGIAI",
       "updating": "Atnaujinama"
     },
@@ -2141,6 +2154,7 @@
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
       "readOnly": "Šią sesiją galima tik skaityti.",
+      "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
@@ -2842,7 +2856,8 @@
     "optionsExpiredDescription": "Grįžkite ir iš ankstesnio ekrano iš naujo atidarykite šį parinkiklį."
   },
   "sessionRow": {
-    "needsInput": "LAUKIA ATSAKYMO"
+    "needsInput": "LAUKIA ATSAKYMO",
+    "scheduled": "SUPLANUOTA"
   },
   "voiceInput": {
     "listening": "Klausomasi...",
@@ -3252,6 +3267,7 @@
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
+    "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {
@@ -3281,7 +3297,8 @@
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "newestResult": "Naujausias rezultatas"
+    "newestResult": "Naujausias rezultatas",
+    "scheduledWakes": "prabunda {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",

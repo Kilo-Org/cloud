@@ -111,24 +111,12 @@ export type RootRuntimeDisappearance = {
 };
 export type RootRetirementScope = 'shared' | 'sole' | 'stale';
 
-export type WorktreeKiloRuntimes = {
-  readonly kiloCliVersion?: string | null;
-  attach(
-    identity: SessionRequestIdentity,
-    kilo: WorktreeKiloAuth,
-    env?: Record<string, string>,
-    canRefreshCredentials?: () => boolean,
-    runtimeIsolation?: RuntimeIsolation,
-    beforeMutation?: () => void,
-    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
-  ): WorktreeKiloAttachment;
-  detach(identity: SessionRequestIdentity): boolean;
-  retireForRecovery(
-    identity: SessionRequestIdentity,
-    recoveryId: string,
-    assertIdle: () => void
-  ): Promise<RecoveryRetirement>;
-  deleteDirectory(directory: string): Promise<void>;
+/**
+ * Native-runtime retirement surface shared by the runtime registry and the
+ * operation-registry dependency boundary. Optional members are capability
+ * probes; callers must treat an absent member as unsupported.
+ */
+export type NativeRuntimeControl = {
   retireRuntime?(
     directory: string,
     deadlineAt: number,
@@ -158,6 +146,27 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
+};
+
+export type WorktreeKiloRuntimes = NativeRuntimeControl & {
+  readonly kiloCliVersion?: string | null;
+  attach(
+    identity: SessionRequestIdentity,
+    kilo: WorktreeKiloAuth,
+    env?: Record<string, string>,
+    canRefreshCredentials?: () => boolean,
+    runtimeIsolation?: RuntimeIsolation,
+    beforeMutation?: () => void,
+    onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void,
+    mcp?: SessionAttachPayload['mcp']
+  ): WorktreeKiloAttachment;
+  detach(identity: SessionRequestIdentity): boolean;
+  retireForRecovery(
+    identity: SessionRequestIdentity,
+    recoveryId: string,
+    assertIdle: () => void
+  ): Promise<RecoveryRetirement>;
+  deleteDirectory(directory: string): Promise<void>;
   getRetained?(
     identity: SessionRequestIdentity | string,
     runtimeId?: string
@@ -204,6 +213,7 @@ type RuntimeEntry = {
   kilo: WorktreeKiloAuth;
   directory: string;
   env: Record<string, string>;
+  mcpSignature: string;
   abort: AbortController;
   roots: Set<RootAttachment>;
   runtime?: WorktreeKiloRuntime;
@@ -253,6 +263,7 @@ type RootPublicationCounters = {
 };
 
 const KILO_STARTUP_TIMEOUT_MS = 30_000;
+const MAX_KILO_CONFIG_BYTES = 96 * 1024;
 const BITBUCKET_METADATA_ENV_VARS = new Set([
   'KILO_BITBUCKET_WORKSPACE_SLUG',
   'KILO_BITBUCKET_REPOSITORY_SLUG',
@@ -291,7 +302,8 @@ export function buildWorktreeKiloEnvironment(
   home: string,
   kilo: WorktreeKiloAuth,
   environment: Record<string, string> = {},
-  inherited: NodeJS.ProcessEnv = process.env
+  inherited: NodeJS.ProcessEnv = process.env,
+  mcp?: SessionAttachPayload['mcp']
 ): Record<string, string> {
   const env: Record<string, string> = {};
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
@@ -325,7 +337,11 @@ export function buildWorktreeKiloEnvironment(
         },
       },
     },
+    ...(mcp ? { mcp } : {}),
   });
+  if (Buffer.byteLength(config, 'utf8') > MAX_KILO_CONFIG_BYTES) {
+    throw new WorktreeKiloRuntimeError('protocol_error', 'Kilo configuration is too large', false);
+  }
 
   return {
     ...env,
@@ -455,6 +471,10 @@ function sameAuth(left: WorktreeKiloAuth, right: WorktreeKiloAuth): boolean {
     left.targets.providerBaseUrl === right.targets.providerBaseUrl &&
     left.targets.sessionIngestBaseUrl === right.targets.sessionIngestBaseUrl
   );
+}
+
+function mcpSignature(mcp: SessionAttachPayload['mcp']): string {
+  return JSON.stringify(mcp ?? {});
 }
 
 // Environment keys whose value derives from the Kilo token. A difference in any of
@@ -1457,14 +1477,16 @@ export function createWorktreeKiloRuntimes(options: {
       canRefreshCredentials,
       runtimeIsolation,
       beforeMutation,
-      onCleanupTarget
+      onCleanupTarget,
+      mcp
     ) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
       }
       const { directory } = identity;
-      const isolation = runtimeIsolation ?? 'directory-shared';
+      const isolation = mcp ? 'per-session' : (runtimeIsolation ?? 'directory-shared');
       const key = entryKey(identity, isolation);
+      const signature = mcpSignature(mcp);
       if (recoveryGates.has(identityKey(identity))) {
         throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
       }
@@ -1487,6 +1509,13 @@ export function createWorktreeKiloRuntimes(options: {
       // The containment-off refresh branch below must distinguish a sibling join
       // from renewal of an already-attached root.
       const newRoot = !root;
+      if (entry && entry.mcpSignature !== signature) {
+        throw new WorktreeKiloRuntimeError(
+          'unauthorized',
+          'Kilo worktree MCP configuration mismatch',
+          false
+        );
+      }
       if (
         (scopeDirectory && scopeDirectory !== directory) ||
         (entry && !sameAuth(entry.kilo, kilo)) ||
@@ -1522,7 +1551,8 @@ export function createWorktreeKiloRuntimes(options: {
           entry.env.HOME,
           kilo,
           environment,
-          options.inheritedEnv
+          options.inheritedEnv,
+          mcp
         );
         const currentEnv = entry.env;
         changedEnvKeys = Object.keys({ ...currentEnv, ...env }).filter(
@@ -1587,12 +1617,14 @@ export function createWorktreeKiloRuntimes(options: {
           isolation,
           kilo: { ...kilo, targets: { ...kilo.targets } },
           directory,
+          mcpSignature: signature,
           env: buildWorktreeKiloEnvironment(
             directory,
             home,
             kilo,
             environment,
-            options.inheritedEnv
+            options.inheritedEnv,
+            mcp
           ),
           abort: new AbortController(),
           roots: new Set(),

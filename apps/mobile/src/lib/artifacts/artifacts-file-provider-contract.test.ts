@@ -123,9 +123,12 @@ describe('artifacts File Provider extension contract', () => {
     // title (free text: nullable, unbounded, may carry a path separator) before
     // it lands in the manifest, which is also the label Android shows.
     expect(manifestWriterSource).toContain('export function safeArtifactSessionName');
-    expect(crawlSource).toContain(
-      'safeArtifactSessionName({ id: session.id, title: session.title })'
-    );
+    // The crawl gates the raw title through `sessionDisplayTitle` first, so a
+    // row still carrying the backend placeholder reaches the sanitizer as a
+    // missing title and falls back to `Session <id>` rather than the machine
+    // string the app never paints.
+    expect(crawlSource).toContain('title: safeArtifactSessionName({');
+    expect(crawlSource).toContain('title: sessionDisplayTitle(session.title) ?? null,');
   });
 
   it('returns the mirrored file through the app group container', () => {

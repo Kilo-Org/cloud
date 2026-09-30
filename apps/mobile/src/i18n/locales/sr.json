@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepovezano",
     "notifications": "Obaveštenja",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitorijumi",
     "securityAgent": "Bezbednosni agent",
     "unknown": "Nepoznato",
@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Nazad",
     "idle": "U mirovanju",
+    "scheduled": "Zakazano",
     "keepEditing": "Nastavi uređivanje",
     "keepRunning": "Nastavi izvršavanje",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Dodaj pristupni ključ",
     "passkeyDefaultName": "Pristupni ključ",
     "passkeyAddedOn": "Dodato {{date}}",
+    "passkeyLastUsedOn": "Poslednje korišćenje {{date}}",
     "passkeyAdded": "Pristupni ključ je dodat.",
     "passkeyAddFailed": "Pristupni ključ nije mogao da se doda. Pokušaj ponovo.",
     "passkeyAddUnsupported": "Ovaj uređaj ne može da pravi pristupne ključeve.",
@@ -577,7 +579,14 @@
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
       "moreLinesAbove_one": "… Iznad ima još redova: {{displayCount}}.",
       "moreLinesAbove_other": "… Iznad ima još redova: {{displayCount}}.",
-      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}."
+      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}.",
+      "deleteComment": "Obriši komentar",
+      "deleteCommentTitle": "Obrisati komentar?",
+      "deleteCommentMessage": "Ovaj komentar će biti obrisan iz zahteva za spajanje.",
+      "commentEditFailed": "Nije moguće sačuvati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentEditUnavailable": "Ovaj komentar se ne može urediti. Možda je obrisan.",
+      "commentDeleteFailed": "Nije moguće obrisati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentDeleteUnavailable": "Ovaj komentar se ne može obrisati."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti podešavanja GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -727,7 +736,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Izmeni zastareli komentar na čekanju za {{location}}",
       "editA11y": "Izmeni komentar na čekanju za {{location}}",
-      "staleHint": "pR je izmenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je izmenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju za {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled će biti poslat samo sa vrstom pregleda izabranom iznad.",
@@ -763,6 +772,8 @@
     "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",
+      "commentUpdated": "Komentar ažuriran",
+      "commentDeleted": "Komentar obrisan",
       "reviewSubmitted": "Pregled poslat",
       "autoMergeEnabled": "Automatsko spajanje je uključeno"
     },
@@ -2042,12 +2053,14 @@
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije.",
       "couldNotRefresh": "Nije moguće osvežiti",
       "noSessionsYetDescription": "Započni zadatak programiranja sa telefona. Tvoje sesije će se pojaviti ovde.",
+      "viewHistory": "Istorija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj sa drugim pojmom za pretragu.",
       "tryAdjustFilters": "Pokušaj da promeniš ili ukloniš filtere.",
       "couldNotSearch": "Nije moguće pretražiti sesije.",
       "completedWillAppear": "Završene sesije će se pojaviti ovde.",
       "noPastSessions": "Nema prethodnih sesija",
+      "pastSessions": "Prethodne sesije",
       "live": "UŽIVO",
       "updating": "Ažuriranje"
     },
@@ -2113,6 +2126,7 @@
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ovu sesiju možeš samo da čitaš.",
+      "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
@@ -2686,7 +2700,7 @@
       "open": "otvoren PR",
       "closed": "zatvoren zahtev za spajanje",
       "merged": "spojen zahtev za spajanje",
-      "draft": "pR u nacrtu",
+      "draft": "PR u nacrtu",
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2801,7 +2815,8 @@
     "optionsExpiredDescription": "Vrati se na prethodni ekran i ponovo otvori ovaj izbor."
   },
   "sessionRow": {
-    "needsInput": "ČEKA UNOS"
+    "needsInput": "ČEKA UNOS",
+    "scheduled": "ZAKAZANO"
   },
   "voiceInput": {
     "listening": "Slušam…",
@@ -3209,6 +3224,7 @@
     "emptyTitle": "Nema pouzdanih hostova",
     "emptyDescription": "Kada označiš host kao pouzdan, linkovi ka njemu otvaraju se bez ponovne potvrde.",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
+    "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
     "backToPreferences": "Nazad na podešavanja"
   },
   "quickChat": {
@@ -3238,7 +3254,8 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
-    "newestResult": "Najnoviji rezultat"
+    "newestResult": "Najnoviji rezultat",
+    "scheduledWakes": "budi se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",

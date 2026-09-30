@@ -430,11 +430,33 @@ async function harness(
     success: true,
     capability: 'kka1.test-capability',
   }));
+  const containerUsageMeter = {
+    recordStart: vi.fn(async (input: { instanceId: string; startEpochMs: number }) => ({
+      success: true as const,
+      ack: {
+        intervalId: `${input.instanceId}:${input.startEpochMs}`,
+        durable: 'pg' as const,
+        dedup: false,
+      },
+    })),
+    recordHeartbeat: vi.fn(async (input: { instanceId: string; startEpochMs: number }) => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg' as const,
+      dedup: false,
+      budget: { verdict: 'continue' as const },
+    })),
+    recordStop: vi.fn(async (input: { instanceId: string; startEpochMs: number }) => ({
+      intervalId: `${input.instanceId}:${input.startEpochMs}`,
+      durable: 'pg' as const,
+      dedup: false,
+    })),
+  };
   const env = {
     WORKER_URL: 'https://example.test',
     ...namespaces,
     SANDBOX_CONTAINERS: sandboxContainers,
     GIT_TOKEN_SERVICE: { issueKiloSessionCapability },
+    CONTAINER_USAGE_METER: containerUsageMeter,
     KILOCODE_BACKEND_BASE_URL: 'https://backend.example.test',
     KILO_OPENROUTER_BASE: 'https://provider.example.test',
     KILO_SESSION_INGEST_URL: 'https://ingest.example.test',
@@ -3640,6 +3662,27 @@ describe('SandboxControl lifecycle boundaries', () => {
           expect(h.alarmAt).toBe(expectedAlarm);
         }
       );
+    }
+  );
+
+  it.each([false, true])(
+    'normalizes invalid attach configuration with operation results %s',
+    async supportsOperationResults => {
+      const h = await harness();
+      h.socket.supportsOperationResults = () => supportsOperationResults;
+      await h.create();
+      await h.ready();
+      const schedule = await readSchedule(h.storage);
+
+      await expect(
+        h.control.request({
+          operation: 'session.attach',
+          session: ROUTE,
+          payload: { directory: 123, env: { SECRET_VALUE: 'private-environment-value' } },
+        })
+      ).rejects.toMatchObject({ name: 'Error', message: 'Invalid session.attach payload' });
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(await readSchedule(h.storage)).toEqual(schedule);
     }
   );
 

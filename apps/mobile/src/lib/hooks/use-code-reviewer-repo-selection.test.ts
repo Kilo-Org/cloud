@@ -323,7 +323,7 @@ describe('useRepoSelectionToggle debounced delta sender', () => {
     expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
   });
 
-  it('re-sends an earlier in-flight save\'s ids when that save fails and a later save succeeds', () => {
+  it("re-sends an earlier in-flight save's ids when that save fails and a later save succeeds", () => {
     vi.useFakeTimers();
     seedReviewConfigCache([1, 2]);
     const { toggleRepo, deltaOptions } = getToggleRepo(PERSONAL_SCOPE, 'github');

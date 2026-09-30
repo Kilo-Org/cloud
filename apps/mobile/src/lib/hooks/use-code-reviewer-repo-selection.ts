@@ -85,10 +85,7 @@ function sameSelection(a: (number | string)[] | null, b: (number | string)[] | n
 // optimistic selection can contain ids this save never sent. Adopting it would
 // mark those ids server-confirmed and the reconciliation diff would never
 // re-send them.
-function applyDelta(
-  base: (number | string)[],
-  delta: RepoSelectionDelta
-): (number | string)[] {
+function applyDelta(base: (number | string)[], delta: RepoSelectionDelta): (number | string)[] {
   const removed = new Set(delta.remove);
   const kept = base.filter(id => !removed.has(id));
   return [...kept, ...delta.add.filter(id => !kept.includes(id))];

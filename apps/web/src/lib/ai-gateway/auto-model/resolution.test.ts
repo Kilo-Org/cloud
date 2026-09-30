@@ -6,12 +6,12 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
     '@/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsFromDatabase: jest.fn(),
+  getCurrentModelIds: jest.fn(async () => mockCurrentModelIds),
 }));
 
 import type * as AutoModelResolution from './resolution';
 import {
-  FRONTIER_CODE_MODEL,
-  FRONTIER_MODE_TO_MODEL,
+  getFrontierModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -20,7 +20,14 @@ import {
 } from '@/lib/ai-gateway/auto-model';
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { FALLBACK_CURRENT_MODEL_IDS, type CurrentModelIds } from '@/lib/ai-gateway/current-models';
+
+const mockCurrentModelIds: CurrentModelIds = {
+  ...FALLBACK_CURRENT_MODEL_IDS,
+  claudeOpus: 'anthropic/claude-opus-resolved',
+  claudeSonnet: 'anthropic/claude-sonnet-resolved',
+  glmFlash: 'z-ai/glm-resolved-flash',
+};
 
 const { resolveAutoModel, applyResolvedAutoModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
@@ -36,7 +43,7 @@ const baseParams = {
 
 const nullUserPromise = Promise.resolve(null);
 const zeroBalancePromise = Promise.resolve(0);
-const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
+const primaryDefaultFallback = { model: mockCurrentModelIds.glmFlash };
 const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
   jest.Mocked<typeof GatewayModelsCache>
 >('@/lib/ai-gateway/providers/gateway-models-cache');
@@ -114,7 +121,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: { model: 'anthropic/claude-haiku-4' } });
   });
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=responses', async () => {
+  it('falls back to the resolved primary default model when no thunk is provided and apiKind=responses', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'responses' },
       nullUserPromise,
@@ -124,7 +131,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=messages', async () => {
+  it('falls back to the resolved primary default model when no thunk is provided and apiKind=messages', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'messages' },
       nullUserPromise,
@@ -134,7 +141,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when no thunk is provided and apiKind=chat_completions', async () => {
+  it('falls back to the resolved primary default model when no thunk is provided and apiKind=chat_completions', async () => {
     const result = await resolveAutoModel(
       { ...baseParams, apiKind: 'chat_completions' },
       nullUserPromise,
@@ -145,7 +152,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
   });
 
   it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
-    'falls back to PRIMARY_DEFAULT_MODEL for %s when the worker returns no decision',
+    'falls back to the resolved primary default model for %s when the worker returns no decision',
     async model => {
       const result = await resolveAutoModel(
         {
@@ -162,7 +169,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     }
   );
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when the worker returns a virtual auto model', async () => {
+  it('falls back to the resolved primary default model when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -270,7 +277,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     });
   });
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when variant is absent from the model catalog', async () => {
+  it('falls back to the resolved primary default model when variant is absent from the model catalog', async () => {
     // Claude has no "thinking" key — only none/low/medium/high/xhigh/max
     const result = await resolveAutoModel(
       {
@@ -289,7 +296,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: primaryDefaultFallback });
   });
 
-  it('falls back to PRIMARY_DEFAULT_MODEL when the model exposes no variants but decision has a variant', async () => {
+  it('falls back to the resolved primary default model when the model exposes no variants but decision has a variant', async () => {
     const result = await resolveAutoModel(
       {
         ...baseParams,
@@ -526,7 +533,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: FRONTIER_MODE_TO_MODEL.plan,
+      resolved: getFrontierModel(mockCurrentModelIds, 'plan'),
       routingTarget: 'kilo-auto/frontier',
     });
   });
@@ -770,8 +777,8 @@ describe('applyResolvedAutoModel', () => {
     );
 
     expect(request.body).toMatchObject({
-      model: FRONTIER_CODE_MODEL.model,
-      reasoning: FRONTIER_CODE_MODEL.reasoning,
+      model: mockCurrentModelIds.claudeSonnet,
+      reasoning: getFrontierModel(mockCurrentModelIds, null).reasoning,
     });
     expect(request.body).not.toHaveProperty('reasoning_effort');
   });

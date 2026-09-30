@@ -25,7 +25,8 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { useTRPC } from '@/lib/trpc/utils';
 import { RepositoryMultiSelect } from './RepositoryMultiSelect';
@@ -46,14 +47,16 @@ type BitbucketReviewConfigFormProps = {
   organizationId: string;
 };
 
-const DEFAULT_CONFIG: BitbucketReviewConfig = {
-  reviewStyle: 'balanced',
-  focusAreas: [],
-  customInstructions: '',
-  modelSlug: PRIMARY_DEFAULT_MODEL,
-  thinkingEffort: null,
-  selectedRepositoryIds: [],
-};
+function createDefaultConfig(modelSlug: string): BitbucketReviewConfig {
+  return {
+    reviewStyle: 'balanced',
+    focusAreas: [],
+    customInstructions: '',
+    modelSlug,
+    thinkingEffort: null,
+    selectedRepositoryIds: [],
+  };
+}
 
 function configFingerprint(config: BitbucketReviewConfig): string {
   return JSON.stringify({
@@ -76,8 +79,9 @@ export function BitbucketReviewConfigForm({ organizationId }: BitbucketReviewCon
     trpc.organizations.reviewAgent.getBitbucketReadiness.queryOptions({ organizationId })
   );
   const { modelOptions, isLoadingModels } = useOrganizationModels(organizationId);
-  const [draft, setDraft] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
-  const [baseline, setBaseline] = useState<BitbucketReviewConfig>(DEFAULT_CONFIG);
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
+  const [draft, setDraft] = useState(() => createDefaultConfig(primaryDefaultModel));
+  const [baseline, setBaseline] = useState(() => createDefaultConfig(primaryDefaultModel));
   const [validationError, setValidationError] = useState<string | null>(null);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [manualReviewUrl, setManualReviewUrl] = useState('');

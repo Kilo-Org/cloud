@@ -18,7 +18,8 @@ import {
   RepositoryMultiSelect,
   type Repository,
 } from '@/components/code-reviews/RepositoryMultiSelect';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 
 type AutoTriageConfigFormProps = {
   organizationId?: string;
@@ -65,7 +66,8 @@ export function AutoTriageConfigForm({ organizationId }: AutoTriageConfigFormPro
   const [duplicateThreshold, setDuplicateThreshold] = useState('0.8');
   const [autoFixThreshold, setAutoFixThreshold] = useState('0.9');
   const [customInstructions, setCustomInstructions] = useState('');
-  const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
+  const [selectedModel, setSelectedModel] = useState(primaryDefaultModel);
   const [maxClassificationTime, setMaxClassificationTime] = useState([5]);
 
   // Update local state when config loads

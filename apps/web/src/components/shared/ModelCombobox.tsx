@@ -25,6 +25,8 @@ import {
 export type { ModelOption };
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { formatShortModelDisplayName } from '@/lib/format-model-name';
+import { getPreferredModels } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 import {
   BYOK_MODEL_LABEL,
   FREE_MODEL_DATA_LABEL,
@@ -100,7 +102,11 @@ export function ModelCombobox({
     listRef.current?.scrollTo({ top: 0 });
   }, []);
 
-  const modelGroups = useMemo(() => buildModelOptionGroups(models), [models]);
+  const currentModelIds = useCurrentModelIds();
+  const modelGroups = useMemo(
+    () => buildModelOptionGroups(models, getPreferredModels(currentModelIds)),
+    [models, currentModelIds]
+  );
 
   const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';

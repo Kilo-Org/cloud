@@ -1,4 +1,5 @@
-import { isPdfSupportingModel, preferredModels } from '@/lib/ai-gateway/models';
+import { getPreferredModels, isPdfSupportingModel } from '@/lib/ai-gateway/models';
+import { resolveCurrentModelIds } from '@/lib/ai-gateway/current-models';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -132,6 +133,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     getDataCollectionRequiredModelIds(),
   ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
+  const preferredModels = getPreferredModels(resolveCurrentModelIds(endpointsMetadata));
   const summaries = await getTerminalBenchSummaries();
   const enhancedModels = await Promise.all(
     models

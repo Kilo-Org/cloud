@@ -1,12 +1,15 @@
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/models';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-
-const preferredSet = new Set(preferredModels);
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 export const modelsRouter = createTRPCRouter({
   list: baseProcedure.query(async () => {
-    const response = await getEnhancedOpenRouterModels();
+    const [response, currentModelIds] = await Promise.all([
+      getEnhancedOpenRouterModels(),
+      getCurrentModelIds(),
+    ]);
+    const preferredSet = new Set(getPreferredModels(currentModelIds));
 
     return (response.data ?? []).map(model => ({
       id: model.id,
@@ -15,4 +18,6 @@ export const modelsRouter = createTRPCRouter({
       isPreferred: preferredSet.has(model.id),
     }));
   }),
+
+  currentModelIds: baseProcedure.query(() => getCurrentModelIds()),
 });

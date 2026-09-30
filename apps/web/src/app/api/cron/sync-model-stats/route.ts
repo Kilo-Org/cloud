@@ -18,7 +18,7 @@ import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 
 /**
  * Vercel Cron Job: Sync Model Stats
@@ -50,6 +50,7 @@ export async function GET(request: NextRequest) {
     // Fetch all models from OpenRouter (raw, unfiltered data)
     const openRouterResponse = await getRawOpenRouterModels();
     const enhancedOpenRouterResponse = await getEnhancedOpenRouterModels();
+    const monitoredModels = await getMonitoredModels();
 
     // Create a map of enhanced models for pricing lookup (includes Kilo free models with $0 pricing)
     const enhancedModelsMap = new Map(

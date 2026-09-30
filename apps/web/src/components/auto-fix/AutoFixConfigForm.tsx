@@ -20,7 +20,8 @@ import {
   RepositoryMultiSelect,
   type Repository,
 } from '@/components/code-reviews/RepositoryMultiSelect';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 
 type AutoFixConfigFormProps = {
   organizationId?: string;
@@ -65,7 +66,8 @@ export function AutoFixConfigForm({ organizationId }: AutoFixConfigFormProps) {
   const [skipLabels, setSkipLabels] = useState<string>('');
   const [requiredLabels, setRequiredLabels] = useState<string>('');
   const [customInstructions, setCustomInstructions] = useState('');
-  const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
+  const [selectedModel, setSelectedModel] = useState(primaryDefaultModel);
   const [maxPRCreationTime, setMaxPRCreationTime] = useState([15]);
   const [prTitleTemplate, setPrTitleTemplate] = useState('Fix #{issue_number}: {issue_title}');
   const [enabledForReviewComments, setEnabledForReviewComments] = useState(false);

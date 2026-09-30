@@ -6,7 +6,8 @@ import {
   type OrganizationTrialDisplayStatus,
 } from '@/lib/organizations/trial-utils';
 import { z } from 'zod';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 
 export function useOrganizationWithMembers(id: string, options?: { enabled?: boolean }) {
   const trpc = useTRPC();
@@ -763,11 +764,14 @@ const OrganizationDefaultsResponseSchema = z.object({
 type OrganizationDefaultsResponse = z.infer<typeof OrganizationDefaultsResponseSchema>;
 
 export function useOrganizationDefaults(organizationId?: string) {
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
   return useQuery<OrganizationDefaultsResponse>({
-    queryKey: ['organization-defaults', organizationId],
+    queryKey: organizationId
+      ? ['organization-defaults', organizationId]
+      : ['organization-defaults', organizationId, primaryDefaultModel],
     queryFn: async (): Promise<OrganizationDefaultsResponse> => {
       if (!organizationId) {
-        return { defaultModel: PRIMARY_DEFAULT_MODEL };
+        return { defaultModel: primaryDefaultModel };
       }
 
       const response = await fetch(`/api/organizations/${organizationId}/defaults`);

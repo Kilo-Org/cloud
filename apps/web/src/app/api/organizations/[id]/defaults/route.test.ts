@@ -12,7 +12,9 @@ import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { FALLBACK_CURRENT_MODEL_IDS } from '@/lib/ai-gateway/current-models';
+import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 jest.mock('@/lib/organizations/organization-auth');
 jest.mock('@/lib/ai-gateway/providers/openrouter');
@@ -21,6 +23,14 @@ jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server
   getProviderSlugsForModel: jest.fn(),
 }));
 
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getCurrentModelIds: async () => FALLBACK_CURRENT_MODEL_IDS,
+}));
+
+const PRIMARY_DEFAULT_MODEL = getPrimaryDefaultModel(FALLBACK_CURRENT_MODEL_IDS);
 const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);
 const mockedGetModelIdToProviderSlugsIndex = jest.mocked(getModelIdToProviderSlugsIndex);
@@ -72,7 +82,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     await db.delete(kilocode_users);
   });
 
-  test('no policy returns PRIMARY_DEFAULT_MODEL without calling OpenRouter', async () => {
+  test('no policy returns the primary default model without calling OpenRouter', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 
@@ -125,7 +135,7 @@ describe('GET /api/organizations/[id]/defaults', () => {
     expect(response.status).toBe(409);
   });
 
-  test('deny list blocking PRIMARY_DEFAULT_MODEL falls back to first non-denied model from OpenRouter', async () => {
+  test('deny list blocking the primary default model falls back to first non-denied model from OpenRouter', async () => {
     const user = await insertTestUser();
     const organization = await createOrganization('Test Org', user.id);
 

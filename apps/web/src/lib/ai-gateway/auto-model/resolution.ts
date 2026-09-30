@@ -17,21 +17,23 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   modeSchema,
-  FRONTIER_MODE_TO_MODEL,
-  FRONTIER_CODE_MODEL,
+  getFrontierModel,
   type ResolvedAutoModel,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import {
   autoFreeModels,
-  PRIMARY_DEFAULT_MODEL,
+  getPrimaryDefaultModel,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveFreeModel,
 } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  getCurrentModelIds,
+  getOpenRouterModelsFromDatabase,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import {
   getOrganizationAutoRoute,
   isOrganizationAutoTargetModel,
@@ -311,7 +313,6 @@ export async function resolveAutoModel(
     };
   }
   if (model === KILO_AUTO_EFFICIENT_MODEL.id || model === KILO_AUTO_BALANCED_MODEL.id) {
-    const fallbackModel = { model: PRIMARY_DEFAULT_MODEL };
     const decision = params.efficientDecision ? await params.efficientDecision() : null;
     if (decision && !isVirtualAutoModelId(decision.model)) {
       const resolvedFromDecision = await resolveEfficientDecisionModel(decision);
@@ -320,15 +321,16 @@ export async function resolveAutoModel(
       }
       // Exact catalog variant missing or removed: never serve the chosen model
       // with implicit defaults — use the same fallback as the no-decision path.
-      return { kind: 'ok', resolved: fallbackModel };
     }
-    // Static fallback when the worker is slow or unavailable.
-    return { kind: 'ok', resolved: fallbackModel };
+    // Also the fallback when the worker is slow or unavailable.
+    return {
+      kind: 'ok',
+      resolved: { model: getPrimaryDefaultModel(await getCurrentModelIds()) },
+    };
   }
-  const mode = resolveMode(modeHeader, featureHeader);
   return {
     kind: 'ok',
-    resolved: (mode !== null ? FRONTIER_MODE_TO_MODEL[mode] : null) ?? FRONTIER_CODE_MODEL,
+    resolved: getFrontierModel(await getCurrentModelIds(), resolveMode(modeHeader, featureHeader)),
   };
 }
 

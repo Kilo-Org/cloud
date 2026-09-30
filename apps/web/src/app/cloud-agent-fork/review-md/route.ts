@@ -28,7 +28,8 @@ import {
   REVIEW_MD_CONVERSION_RATE_LIMIT,
   REVIEW_MD_CONVERSION_RATE_WINDOW_SECONDS,
 } from '@/lib/code-reviews/core/constants';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { buildReviewMdConversionPrompt } from '@/lib/code-reviews/prompts/review-md-conversion-prompt';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import { redisClient } from '@/lib/redis';
@@ -211,7 +212,7 @@ export async function GET(request: NextRequest) {
         nonce: crypto.randomUUID(),
       }),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: config.modelSlug || PRIMARY_DEFAULT_MODEL,
+      model: config.modelSlug || getPrimaryDefaultModel(await getCurrentModelIds()),
       // Start the turn in the same call rather than requiring a follow-up
       // initiateFromPreparedSession.
       autoInitiate: true,

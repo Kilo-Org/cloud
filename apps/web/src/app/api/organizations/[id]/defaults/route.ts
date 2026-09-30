@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import type { NextRequest } from 'next/server';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getModelIdToProviderSlugsIndex } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { KILO_AUTO_FREE_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
@@ -107,16 +108,16 @@ export async function GET(
 
   // Fallback to global default if no organization default is set or it's not allowed
   if (!defaultModel) {
+    const primaryDefaultModel = getPrimaryDefaultModel(await getCurrentModelIds());
     if (
       policy.memberGrant.mode === 'unrestricted' &&
       policy.organizationModelDenyList.length === 0 &&
       !policy.organizationProviderCeiling &&
       !policy.requireModelInCurrentSnapshot
     ) {
-      // No restrictions - use PRIMARY_DEFAULT_MODEL directly
-      defaultModel = PRIMARY_DEFAULT_MODEL;
+      defaultModel = primaryDefaultModel;
     } else {
-      defaultModel = await findFirstAllowedModel([PRIMARY_DEFAULT_MODEL]);
+      defaultModel = await findFirstAllowedModel([primaryDefaultModel]);
 
       if (!defaultModel) {
         defaultModel = await findFirstAllowedModelFromDbSnapshot();

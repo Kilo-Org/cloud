@@ -17,23 +17,19 @@ import {
   updateOrganizationUserLimit,
 } from '@/lib/organizations/organization-usage';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
+import { FALLBACK_CURRENT_MODEL_IDS } from '@/lib/ai-gateway/current-models';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
 import { demoOrganizationSettings, SALES_DEMO_REMAINING_MICRODOLLARS } from './sales-demo-settings';
 import type { FEATURE_VALUES } from '@/lib/feature-detection';
 
-// Stable per-1K-token rates (microdollars) for the current paid models. Rates
+// Stable per-1K-token rates (microdollars) for the fallback current paid models. Rates
 // are illustrative only; the seed step needs determinism, not exact billing.
 const MODELS = [
-  { id: CLAUDE_SONNET_CURRENT_MODEL_ID, inputPer1k: 3000, outputPer1k: 15000 },
-  { id: CLAUDE_OPUS_CURRENT_MODEL_ID, inputPer1k: 15000, outputPer1k: 75000 },
-  { id: GPT_SOL_CURRENT_MODEL_ID, inputPer1k: 2500, outputPer1k: 10000 },
-  { id: GLM_CURRENT_MODEL_ID, inputPer1k: 1000, outputPer1k: 4000 },
-  { id: KIMI_CURRENT_MODEL_ID, inputPer1k: 600, outputPer1k: 2400 },
+  { id: FALLBACK_CURRENT_MODEL_IDS.claudeSonnet, inputPer1k: 3000, outputPer1k: 15000 },
+  { id: FALLBACK_CURRENT_MODEL_IDS.claudeOpus, inputPer1k: 15000, outputPer1k: 75000 },
+  { id: FALLBACK_CURRENT_MODEL_IDS.gptSol, inputPer1k: 2500, outputPer1k: 10000 },
+  { id: FALLBACK_CURRENT_MODEL_IDS.glm, inputPer1k: 1000, outputPer1k: 4000 },
+  { id: FALLBACK_CURRENT_MODEL_IDS.kimi, inputPer1k: 600, outputPer1k: 2400 },
   { id: MINIMAX_CURRENT_MODEL_ID, inputPer1k: 300, outputPer1k: 1200 },
 ] as const;
 

@@ -1,7 +1,7 @@
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import {
   AUTO_SMALL_TARGET_MODELS,
-  FRONTIER_MODE_TO_MODEL,
+  getFrontierModelIds,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
@@ -11,6 +11,7 @@ import {
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
 import { getCachedRoutingTable } from '@/lib/ai-gateway/auto-routing-table-cache';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 function visibleConcreteModelIds(models: Iterable<string>, availableModelIds: ReadonlySet<string>) {
   return [
@@ -32,9 +33,10 @@ export async function addAutoRoutingModels(
     return models;
   }
 
-  const [table, autoFreeCandidates] = await Promise.all([
+  const [table, autoFreeCandidates, currentModelIds] = await Promise.all([
     getCachedRoutingTable(),
     getAutoFreeCandidates(null).catch(() => null),
+    getCurrentModelIds(),
   ]);
 
   const efficientModelIds = visibleConcreteModelIds(
@@ -44,7 +46,7 @@ export async function addAutoRoutingModels(
     availableModelIds
   );
   const frontierModelIds = visibleConcreteModelIds(
-    Object.values(FRONTIER_MODE_TO_MODEL).map(({ model }) => model),
+    getFrontierModelIds(currentModelIds),
     availableModelIds
   );
   const freeModelIds = visibleConcreteModelIds(autoFreeCandidates ?? [], availableModelIds);

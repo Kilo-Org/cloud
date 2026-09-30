@@ -2,6 +2,7 @@ import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode
 import { desc } from 'drizzle-orm';
 import * as z from 'zod';
 import { createCachedFetch } from '@/lib/cached-fetch';
+import { resolveCurrentModelIds, type CurrentModelIds } from '@/lib/ai-gateway/current-models';
 import { readDb } from '@/lib/drizzle';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -47,6 +48,10 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
 
   const models = await getOpenRouterModelsMetadataFromDatabase();
   return models[modelId]?.alias_target?.slug ?? modelId;
+}
+
+export async function getCurrentModelIds(): Promise<CurrentModelIds> {
+  return resolveCurrentModelIds(await getOpenRouterModelsMetadataFromDatabase());
 }
 
 /** The ids of language models, including those with no endpoints. */

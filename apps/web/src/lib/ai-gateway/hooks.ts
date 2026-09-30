@@ -13,6 +13,8 @@ import {
   type OpenRouterModel,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import { FALLBACK_CURRENT_MODEL_IDS, type CurrentModelIds } from '@/lib/ai-gateway/current-models';
+import { useTRPC } from '@/lib/trpc/utils';
 
 interface OpenRouterProvider {
   name: string;
@@ -70,6 +72,18 @@ interface OpenRouterData {
   total_providers: number;
   total_models: number;
   generated_at: string;
+}
+
+const CURRENT_MODEL_IDS_STALE_TIME_MS = 5 * 60_000;
+
+/** Returns fallback ids until the server has resolved the OpenRouter latest aliases. */
+export function useCurrentModelIds(): CurrentModelIds {
+  const trpc = useTRPC();
+  const { data } = useQuery({
+    ...trpc.models.currentModelIds.queryOptions(),
+    staleTime: CURRENT_MODEL_IDS_STALE_TIME_MS,
+  });
+  return data ?? FALLBACK_CURRENT_MODEL_IDS;
 }
 
 export function useOpenRouterModels() {

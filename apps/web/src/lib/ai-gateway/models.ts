@@ -3,20 +3,20 @@
  */
 
 import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
+import type { CurrentModelIds } from '@/lib/ai-gateway/current-models';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
 import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
 import { MINIMAX_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/minimax';
-import { KIMI_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { GPT_SOL_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getRandomNumber } from '@/lib/ai-gateway/getRandomNumber';
 
-export const PRIMARY_DEFAULT_MODEL = GLM_FLASH_CURRENT_MODEL_ID;
+export function getPrimaryDefaultModel(currentModelIds: CurrentModelIds): string {
+  return currentModelIds.glmFlash;
+}
 
 export type AutoFreeModel = {
   model: string;
@@ -63,19 +63,21 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
-export const preferredModels = [
-  KILO_AUTO_EFFICIENT_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
+export function getPreferredModels(currentModelIds: CurrentModelIds): string[] {
+  return [
+    KILO_AUTO_EFFICIENT_MODEL.id,
+    KILO_AUTO_FREE_MODEL.id,
 
-  ...autoFreeModels.map(({ model }) => model),
+    ...autoFreeModels.map(({ model }) => model),
 
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  GPT_SOL_CURRENT_MODEL_ID,
-  DEEPSEEK_V4_1_FLASH_MODEL_ID,
-  GLM_FLASH_CURRENT_MODEL_ID,
-  KIMI_CURRENT_MODEL_ID,
-  MINIMAX_CURRENT_MODEL_ID,
-];
+    currentModelIds.claudeOpus,
+    currentModelIds.gptSol,
+    DEEPSEEK_V4_1_FLASH_MODEL_ID,
+    currentModelIds.glmFlash,
+    currentModelIds.kimi,
+    MINIMAX_CURRENT_MODEL_ID,
+  ];
+}
 
 export function isPdfSupportingModel(model: string): boolean {
   return (

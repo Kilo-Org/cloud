@@ -64,7 +64,8 @@ import {
   type RepositoryModelOverrideValue,
 } from './RepositoryModelOverrides';
 import { CodeReviewActionRequiredAlert } from './CodeReviewActionRequiredAlert';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 import { thinkingEffortLabel } from '@/lib/code-reviews/core/model-variants';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -245,7 +246,8 @@ export function ReviewConfigForm({
   // visible for the rest of the session even if the user clears it.
   const [showCustomInstructions, setShowCustomInstructions] = useState(false);
   const [conversionDialogOpen, setConversionDialogOpen] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(PRIMARY_DEFAULT_MODEL);
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
+  const [selectedModel, setSelectedModel] = useState(primaryDefaultModel);
   const [thinkingEffort, setThinkingEffort] = useState<string | null>(null);
   const [gateThreshold, setGateThreshold] = useState<'off' | 'all' | 'warning' | 'critical'>('off');
   const [repositorySelectionMode, setRepositorySelectionMode] = useState<'all' | 'selected'>('all');

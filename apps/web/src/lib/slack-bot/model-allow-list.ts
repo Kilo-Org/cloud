@@ -1,4 +1,5 @@
-import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import {
   getEffectiveModelDecision,
@@ -11,7 +12,7 @@ import {
  */
 export async function getDefaultAllowedModel(
   organizationId: string,
-  globalDefault = PRIMARY_DEFAULT_MODEL
+  globalDefault: string
 ): Promise<string> {
   const organization = await getOrganizationById(organizationId);
   if (!organization) {
@@ -47,7 +48,7 @@ export async function getDefaultAllowedModel(
   }
 
   // Try each preferred/recommended model in order
-  for (const model of preferredModels) {
+  for (const model of getPreferredModels(await getCurrentModelIds())) {
     if (await isAllowed(model)) {
       return model;
     }

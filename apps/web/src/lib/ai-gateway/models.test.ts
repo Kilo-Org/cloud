@@ -1,5 +1,7 @@
 import { describe, test, expect } from '@jest/globals';
-import { autoFreeModels, preferredModels, selectAutoFreeCandidate } from './models';
+import { autoFreeModels, getPreferredModels, selectAutoFreeCandidate } from './models';
+import { FALLBACK_CURRENT_MODEL_IDS } from './current-models';
+
 import {
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
@@ -19,6 +21,8 @@ import {
 import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
+
+const preferredModels = getPreferredModels(FALLBACK_CURRENT_MODEL_IDS);
 
 describe('rate-limited Kilo-exclusive models', () => {
   test('only includes free Gemma', () => {

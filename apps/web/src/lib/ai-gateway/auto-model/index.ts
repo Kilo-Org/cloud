@@ -1,8 +1,5 @@
 import { z } from 'zod';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+import type { CurrentModelFamily, CurrentModelIds } from '@/lib/ai-gateway/current-models';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import {
   ORGANIZATION_AUTO_MODEL_ID,
@@ -57,32 +54,40 @@ type Mode = z.infer<typeof modeSchema>;
 const FRONTIER_REASONING = { enabled: true, effort: 'medium' } as const;
 const FRONTIER_VERBOSITY = 'medium' as const;
 
-const OPUS_FRONTIER: ResolvedAutoModel = {
-  model: CLAUDE_OPUS_CURRENT_MODEL_ID,
-  reasoning: FRONTIER_REASONING,
-  verbosity: FRONTIER_VERBOSITY,
+type FrontierModelFamily = Extract<CurrentModelFamily, 'claudeOpus' | 'claudeSonnet'>;
+
+const FRONTIER_CODE_MODEL_FAMILY: FrontierModelFamily = 'claudeSonnet';
+
+const FRONTIER_MODE_TO_MODEL_FAMILY: Record<Mode, FrontierModelFamily> = {
+  claw: 'claudeOpus',
+  plan: 'claudeOpus',
+  general: 'claudeOpus',
+  architect: 'claudeOpus',
+  orchestrator: 'claudeOpus',
+  ask: 'claudeOpus',
+  debug: 'claudeOpus',
+  build: 'claudeSonnet',
+  explore: 'claudeSonnet',
+  code: 'claudeSonnet',
 };
 
-const SONNET_FRONTIER: ResolvedAutoModel = {
-  model: CLAUDE_SONNET_CURRENT_MODEL_ID,
-  reasoning: FRONTIER_REASONING,
-  verbosity: FRONTIER_VERBOSITY,
-};
+export function getFrontierModel(
+  currentModelIds: CurrentModelIds,
+  mode: Mode | null
+): ResolvedAutoModel {
+  const family = mode === null ? FRONTIER_CODE_MODEL_FAMILY : FRONTIER_MODE_TO_MODEL_FAMILY[mode];
+  return {
+    model: currentModelIds[family],
+    reasoning: FRONTIER_REASONING,
+    verbosity: FRONTIER_VERBOSITY,
+  };
+}
 
-export const FRONTIER_CODE_MODEL: ResolvedAutoModel = SONNET_FRONTIER;
-
-export const FRONTIER_MODE_TO_MODEL: Record<Mode, ResolvedAutoModel> = {
-  claw: OPUS_FRONTIER,
-  plan: OPUS_FRONTIER,
-  general: OPUS_FRONTIER,
-  architect: OPUS_FRONTIER,
-  orchestrator: OPUS_FRONTIER,
-  ask: OPUS_FRONTIER,
-  debug: OPUS_FRONTIER,
-  build: SONNET_FRONTIER,
-  explore: SONNET_FRONTIER,
-  code: SONNET_FRONTIER,
-};
+export function getFrontierModelIds(currentModelIds: CurrentModelIds): string[] {
+  return [
+    ...new Set(Object.values(FRONTIER_MODE_TO_MODEL_FAMILY).map(family => currentModelIds[family])),
+  ];
+}
 
 const UNKNOWN_PRICING: AutoModelPricing = {
   prompt: '-1',

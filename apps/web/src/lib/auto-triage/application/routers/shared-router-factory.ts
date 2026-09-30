@@ -2,8 +2,9 @@ import type { TRPCContext } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
-import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage/core/defaults';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { createDefaultAutoTriageConfig } from '@/lib/auto-triage/core/defaults';
 import { AUTO_TRIAGE_CONSTANTS } from '@/lib/auto-triage/core/constants';
 import {
   listTriageTickets,
@@ -163,10 +164,10 @@ export function createAutoTriageRouter({
     getAutoTriageConfig: async ({ ctx, input }: { ctx: TRPCContext; input: unknown }) => {
       const owner = await ownerResolver(ctx, input);
       const config = await agentConfigGetter(owner, 'auto_triage', 'github');
+      const primaryDefaultModel = getPrimaryDefaultModel(await getCurrentModelIds());
 
       if (!config) {
-        // Return default configuration
-        return DEFAULT_AUTO_TRIAGE_CONFIG;
+        return createDefaultAutoTriageConfig(primaryDefaultModel);
       }
 
       const cfg = config.config as AutoTriageAgentConfig;
@@ -186,7 +187,7 @@ export function createAutoTriageRouter({
         max_concurrent_per_owner:
           cfg.max_concurrent_per_owner || AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER,
         custom_instructions: cfg.custom_instructions || null,
-        model_slug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
+        model_slug: cfg.model_slug || primaryDefaultModel,
         max_classification_time_minutes: cfg.max_classification_time_minutes || 5,
         max_pr_creation_time_minutes: cfg.max_pr_creation_time_minutes || 15,
       };
@@ -206,6 +207,7 @@ export function createAutoTriageRouter({
       }) => {
         try {
           const owner = await ownerResolver(ctx, input);
+          const primaryDefaultModel = getPrimaryDefaultModel(await getCurrentModelIds());
 
           // Ensure bot user exists when saving config for organizations with enabled_for_issues
           if (owner.type === 'org' && input.enabled_for_issues) {
@@ -232,7 +234,7 @@ export function createAutoTriageRouter({
                 input.max_concurrent_per_owner ??
                 AUTO_TRIAGE_CONSTANTS.MAX_CONCURRENT_TICKETS_PER_OWNER,
               custom_instructions: input.custom_instructions || null,
-              model_slug: input.model_slug || PRIMARY_DEFAULT_MODEL,
+              model_slug: input.model_slug || primaryDefaultModel,
               pr_branch_prefix: input.pr_branch_prefix ?? 'auto-triage',
               pr_title_template: input.pr_title_template ?? 'Fix #{issue_number}: {issue_title}',
               pr_body_template: input.pr_body_template,

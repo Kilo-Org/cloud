@@ -1,18 +1,18 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
 
 type DefaultCodeReviewConfigOptions = {
+  modelSlug: string;
   reviewAnalyticsEnabled?: boolean;
 };
 
 export function createDefaultCodeReviewConfig(
-  options: DefaultCodeReviewConfigOptions = {}
+  options: DefaultCodeReviewConfigOptions
 ): CodeReviewAgentConfig {
   return {
     review_style: 'balanced',
     focus_areas: [],
     custom_instructions: null,
-    model_slug: PRIMARY_DEFAULT_MODEL,
+    model_slug: options.modelSlug,
     thinking_effort: null,
     gate_threshold: 'off',
     repository_selection_mode: 'all',

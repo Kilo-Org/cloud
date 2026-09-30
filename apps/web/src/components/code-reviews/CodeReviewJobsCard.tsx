@@ -46,7 +46,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { CodeReviewStreamView } from './CodeReviewStreamView';
 import { useOrganizationModels } from '@/components/cloud-agent/hooks/useOrganizationModels';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { useCurrentModelIds } from '@/lib/ai-gateway/hooks';
 import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -149,6 +150,7 @@ function getManualJobUrlError(
 function selectInitialManualJobModel(params: {
   configuredModelSlug?: string | null;
   defaultModel?: string;
+  primaryDefaultModel: string;
   modelOptions: ModelOption[];
 }): string {
   const configuredModelSlug = params.configuredModelSlug?.trim();
@@ -158,14 +160,14 @@ function selectInitialManualJobModel(params: {
   if (params.defaultModel && params.modelOptions.some(model => model.id === params.defaultModel)) {
     return params.defaultModel;
   }
-  if (params.modelOptions.some(model => model.id === PRIMARY_DEFAULT_MODEL)) {
-    return PRIMARY_DEFAULT_MODEL;
+  if (params.modelOptions.some(model => model.id === params.primaryDefaultModel)) {
+    return params.primaryDefaultModel;
   }
   return (
     params.modelOptions[0]?.id ??
     configuredModelSlug ??
     params.defaultModel ??
-    PRIMARY_DEFAULT_MODEL
+    params.primaryDefaultModel
   );
 }
 
@@ -202,8 +204,9 @@ export function CodeReviewJobsCard({
   const [manualJobDialogOpen, setManualJobDialogOpen] = useState(false);
   const [manualJobUrl, setManualJobUrl] = useState('');
   const [manualJobUrlTouched, setManualJobUrlTouched] = useState(false);
+  const primaryDefaultModel = getPrimaryDefaultModel(useCurrentModelIds());
   const [manualJobModelSlug, setManualJobModelSlug] = useState(
-    defaultModelSlug ?? PRIMARY_DEFAULT_MODEL
+    defaultModelSlug ?? primaryDefaultModel
   );
   const [manualJobThinkingEffort, setManualJobThinkingEffort] = useState<string | null>(null);
   const [manualJobInstructions, setManualJobInstructions] = useState('');
@@ -333,6 +336,7 @@ export function CodeReviewJobsCard({
     const nextModelSlug = selectInitialManualJobModel({
       configuredModelSlug: defaultModelSlug,
       defaultModel,
+      primaryDefaultModel,
       modelOptions,
     });
     setManualJobModelSlug(nextModelSlug);
@@ -352,12 +356,14 @@ export function CodeReviewJobsCard({
     manualJobDialogOpen,
     manualJobModelAllowed,
     modelOptions,
+    primaryDefaultModel,
   ]);
 
   function resetManualJobForm() {
     const nextModelSlug = selectInitialManualJobModel({
       configuredModelSlug: defaultModelSlug,
       defaultModel,
+      primaryDefaultModel,
       modelOptions,
     });
     setManualJobUrl('');

@@ -2,7 +2,7 @@ import { db, sql } from '@/lib/drizzle';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
 
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';
@@ -98,6 +98,7 @@ export async function GET(
     anchorTime = parsed;
   }
 
+  const monitoredModels = await getMonitoredModels();
   const alertingModels = monitoredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
   const excludedModels = monitoredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
 

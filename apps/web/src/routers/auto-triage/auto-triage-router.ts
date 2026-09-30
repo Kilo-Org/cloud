@@ -33,7 +33,9 @@ import {
   createTriageTicket,
 } from '@/lib/auto-triage/db/triage-tickets';
 import { getAgentConfig, upsertAgentConfig } from '@/lib/agent-config/db/agent-configs';
-import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage';
+import { createDefaultAutoTriageConfig } from '@/lib/auto-triage';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { parseGitHubIssueUrl, fetchIssueForOwner } from '@/lib/auto-triage/github/fetch-issue';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
@@ -257,7 +259,9 @@ export const autoTriageRouter = createTRPCRouter({
 
         if (!config) {
           return successResult({
-            config: DEFAULT_AUTO_TRIAGE_CONFIG,
+            config: createDefaultAutoTriageConfig(
+              getPrimaryDefaultModel(await getCurrentModelIds())
+            ),
             isEnabled: false,
           });
         }

@@ -26,7 +26,8 @@ import {
 } from '@/lib/agent-config/core/types';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import { fetchGitLabRepositoriesForOrganization } from '@/lib/cloud-agent/gitlab-integration-helpers';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { createDefaultCodeReviewConfig } from '@/lib/code-reviews/core/default-config';
 import { isCouncilEntitledForOrganization } from '@/lib/code-reviews/core/council-entitlement';
 import {
@@ -537,6 +538,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const platform = input.platform ?? 'github';
       const config = await getAgentConfig(input.organizationId, 'code_review', platform);
+      const primaryDefaultModel = getPrimaryDefaultModel(await getCurrentModelIds());
 
       if (!config) {
         // Return default configuration
@@ -545,7 +547,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           reviewStyle: 'balanced' as const,
           focusAreas: [],
           customInstructions: null,
-          modelSlug: PRIMARY_DEFAULT_MODEL,
+          modelSlug: primaryDefaultModel,
           thinkingEffort: null satisfies string | null,
           gateThreshold: 'off' as const,
           repositorySelectionMode:
@@ -576,7 +578,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
         reviewStyle: cfg.review_style || 'balanced',
         focusAreas: cfg.focus_areas || [],
         customInstructions: cfg.custom_instructions || null,
-        modelSlug: cfg.model_slug || PRIMARY_DEFAULT_MODEL,
+        modelSlug: cfg.model_slug || primaryDefaultModel,
         thinkingEffort: cfg.thinking_effort ?? null,
         gateThreshold: isBitbucket ? ('off' as const) : (cfg.gate_threshold ?? 'off'),
         repositorySelectionMode: isBitbucket
@@ -882,12 +884,13 @@ export const organizationReviewAgentRouter = createTRPCRouter({
           ].filter(repositoryId => !remove.has(repositoryId));
         }
 
+        const primaryDefaultModel = getPrimaryDefaultModel(await getCurrentModelIds());
         const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
           reviewStyle: prevCfg.review_style || 'balanced',
           focusAreas: prevCfg.focus_areas || [],
           customInstructions: prevCfg.custom_instructions ?? null,
-          modelSlug: prevCfg.model_slug || PRIMARY_DEFAULT_MODEL,
+          modelSlug: prevCfg.model_slug || primaryDefaultModel,
           thinkingEffort: prevCfg.thinking_effort ?? null,
           gateThreshold: isBitbucket ? 'off' : (prevCfg.gate_threshold ?? 'off'),
           repositorySelectionMode: isBitbucket
@@ -1033,7 +1036,7 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             review_style: merged.reviewStyle ?? 'balanced',
             focus_areas: merged.focusAreas ?? [],
             custom_instructions: merged.customInstructions ?? null,
-            model_slug: merged.modelSlug ?? PRIMARY_DEFAULT_MODEL,
+            model_slug: merged.modelSlug ?? primaryDefaultModel,
             thinking_effort: merged.thinkingEffort ?? null,
             gate_threshold: gateThreshold,
             repository_selection_mode: repositorySelectionMode,
@@ -1283,7 +1286,9 @@ export const organizationReviewAgentRouter = createTRPCRouter({
             platform,
             isEnabled: true,
             createdBy: ctx.user.id,
-            config: createDefaultCodeReviewConfig(),
+            config: createDefaultCodeReviewConfig({
+              modelSlug: getPrimaryDefaultModel(await getCurrentModelIds()),
+            }),
           });
           didChange = true;
         } else {

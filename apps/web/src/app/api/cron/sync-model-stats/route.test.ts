@@ -32,9 +32,7 @@ jest.mock('@/lib/model-stats/model-stats-cache', () => ({
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
 jest.mock('@/lib/ai-gateway/monitored-models', () => ({
-  get monitoredModels() {
-    return mockMonitoredModels;
-  },
+  getMonitoredModels: async () => mockMonitoredModels,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 

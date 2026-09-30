@@ -1,9 +1,6 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { FALLBACK_CURRENT_MODEL_IDS } from '@/lib/ai-gateway/current-models';
 import { addAutoRoutingModels } from './auto-routing-models';
 
 jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
@@ -12,11 +9,19 @@ jest.mock('@/lib/ai-gateway/auto-routing-table-cache', () => ({
 jest.mock('@/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getCurrentModelIds: jest.fn(),
+}));
 
 const { getCachedRoutingTable } = jest.requireMock('@/lib/ai-gateway/auto-routing-table-cache');
 const { getAutoFreeCandidates } = jest.requireMock('@/lib/ai-gateway/auto-model/resolution');
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
+const { getCurrentModelIds } = jest.requireMock('@/lib/ai-gateway/providers/gateway-models-cache');
+const mockedGetCurrentModelIds = jest.mocked(getCurrentModelIds);
+
+const RESOLVED_OPUS_MODEL_ID = 'anthropic/claude-opus-resolved';
+const RESOLVED_SONNET_MODEL_ID = 'anthropic/claude-sonnet-resolved';
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -48,6 +53,11 @@ describe('addAutoRoutingModels', () => {
     jest.resetAllMocks();
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
+    mockedGetCurrentModelIds.mockResolvedValue({
+      ...FALLBACK_CURRENT_MODEL_IDS,
+      claudeOpus: RESOLVED_OPUS_MODEL_ID,
+      claudeSonnet: RESOLVED_SONNET_MODEL_ID,
+    });
   });
 
   test('only lists candidates present in the provided catalog', async () => {
@@ -69,17 +79,17 @@ describe('addAutoRoutingModels', () => {
     ]);
   });
 
-  test('annotates the frontier auto model with its visible targets', async () => {
+  test('annotates the frontier auto model with its resolved visible targets', async () => {
     const frontierModel = makeModel('kilo-auto/frontier');
-    const opusModel = makeModel(CLAUDE_OPUS_CURRENT_MODEL_ID);
-    const sonnetModel = makeModel(CLAUDE_SONNET_CURRENT_MODEL_ID);
+    const opusModel = makeModel(RESOLVED_OPUS_MODEL_ID);
+    const sonnetModel = makeModel(RESOLVED_SONNET_MODEL_ID);
 
     const result = await addAutoRoutingModels([frontierModel, sonnetModel, opusModel]);
 
     expect(result).toEqual([
       {
         ...frontierModel,
-        autoRouting: { models: [CLAUDE_OPUS_CURRENT_MODEL_ID, CLAUDE_SONNET_CURRENT_MODEL_ID] },
+        autoRouting: { models: [RESOLVED_OPUS_MODEL_ID, RESOLVED_SONNET_MODEL_ID] },
       },
       sonnetModel,
       opusModel,

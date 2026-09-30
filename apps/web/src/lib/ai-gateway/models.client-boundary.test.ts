@@ -1,5 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import type * as ModelsModule from '@/lib/ai-gateway/models';
+import type * as CurrentModelsModule from '@/lib/ai-gateway/current-models';
 import type * as AutoModelModule from '@/lib/ai-gateway/auto-model';
 import type * as AnthropicModule from '@/lib/ai-gateway/providers/anthropic.constants';
 import type * as GoogleModule from '@/lib/ai-gateway/providers/google';
@@ -18,6 +19,9 @@ describe('client-safe model imports', () => {
   test('loads model preferences, auto-model IDs and vendor helpers without server dependencies', () => {
     jest.isolateModules(() => {
       const models = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+      const currentModels = jest.requireActual<typeof CurrentModelsModule>(
+        '@/lib/ai-gateway/current-models'
+      );
       const autoModel = jest.requireActual<typeof AutoModelModule>('@/lib/ai-gateway/auto-model');
       const anthropic = jest.requireActual<typeof AnthropicModule>(
         '@/lib/ai-gateway/providers/anthropic.constants'
@@ -28,9 +32,12 @@ describe('client-safe model imports', () => {
         '@/lib/ai-gateway/providers/stepfun'
       );
 
-      expect(models.preferredModels).toContain(models.PRIMARY_DEFAULT_MODEL);
+      const currentModelIds = currentModels.FALLBACK_CURRENT_MODEL_IDS;
+      expect(models.getPreferredModels(currentModelIds)).toContain(
+        models.getPrimaryDefaultModel(currentModelIds)
+      );
       expect(autoModel.AUTO_SMALL_TARGET_MODELS.free).toBe(google.GEMMA_4_26B_A4B_IT_FREE_ID);
-      expect(anthropic.isClaudeModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
+      expect(anthropic.isClaudeModel(currentModelIds.claudeOpus)).toBe(true);
       expect(google.isGeminiModel(google.GEMINI_PRO_CURRENT_MODEL_ID)).toBe(true);
       expect(qwen.isQwenModel(qwen.QWEN37_PLUS_MODEL_ID)).toBe(true);
       expect(stepfun.isStepModel('stepfun/step-3.7-flash')).toBe(true);

@@ -1,13 +1,14 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import { createDefaultCodeReviewConfig } from './default-config';
+
+const modelSlug = 'vendor/default-model';
 
 describe('createDefaultCodeReviewConfig', () => {
   it('returns the canonical Code Reviewer defaults', () => {
-    expect(createDefaultCodeReviewConfig()).toEqual({
+    expect(createDefaultCodeReviewConfig({ modelSlug })).toEqual({
       review_style: 'balanced',
       focus_areas: [],
       custom_instructions: null,
-      model_slug: PRIMARY_DEFAULT_MODEL,
+      model_slug: modelSlug,
       thinking_effort: null,
       gate_threshold: 'off',
       repository_selection_mode: 'all',
@@ -20,7 +21,9 @@ describe('createDefaultCodeReviewConfig', () => {
   });
 
   it('overrides analytics state for analytics-created rows', () => {
-    expect(createDefaultCodeReviewConfig({ reviewAnalyticsEnabled: true })).toMatchObject({
+    expect(
+      createDefaultCodeReviewConfig({ modelSlug, reviewAnalyticsEnabled: true })
+    ).toMatchObject({
       review_analytics_enabled: true,
     });
   });

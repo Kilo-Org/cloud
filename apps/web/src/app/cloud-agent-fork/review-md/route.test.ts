@@ -88,7 +88,7 @@ jest.mock('@/lib/redis', () => ({
 }));
 
 jest.mock('@/lib/ai-gateway/models', () => ({
-  PRIMARY_DEFAULT_MODEL: 'test/primary-default-model',
+  getPrimaryDefaultModel: () => 'test/primary-default-model',
 }));
 
 let getRoute: RouteGet;

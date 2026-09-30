@@ -12,7 +12,7 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
 }));
 
 jest.mock('@/lib/ai-gateway/models', () => ({
-  preferredModels: [],
+  getPreferredModels: () => [],
 }));
 
 jest.mock('@/lib/ai-gateway/providers/model-settings', () => ({

@@ -1,33 +1,30 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPreferredModels, getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
-import {
-  CLAUDE_OPUS_CURRENT_MODEL_ID,
-  CLAUDE_SONNET_CURRENT_MODEL_ID,
-} from '@/lib/ai-gateway/providers/anthropic.constants';
+import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { FALLBACK_CURRENT_MODEL_IDS as current } from '@/lib/ai-gateway/current-models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { DEEPSEEK_V4_1_FLASH_MODEL_ID } from '@/lib/ai-gateway/providers/deepseek';
-import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { GEMMA_4_26B_A4B_IT_ID } from '@/lib/ai-gateway/providers/google';
 import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 
 describe('OpenRouter Models Config', () => {
+  const preferredModels = getPreferredModels(current);
+
   test('preferred models should contain expected models', () => {
-    expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
-    expect(GPT_SOL_CURRENT_MODEL_ID).toBe('openai/gpt-6.1-sol');
+    expect(getPrimaryDefaultModel(current)).toBe(current.glmFlash);
 
     const expectedModels = [
-      CLAUDE_OPUS_CURRENT_MODEL_ID,
-      GPT_SOL_CURRENT_MODEL_ID,
+      current.claudeOpus,
+      current.gptSol,
       DEEPSEEK_V4_1_FLASH_MODEL_ID,
-      GLM_FLASH_CURRENT_MODEL_ID,
+      current.glmFlash,
     ];
 
     expectedModels.forEach(model => {
@@ -47,8 +44,8 @@ describe('OpenRouter Models Config', () => {
       'stealth/qwen3.6-plus',
       QWEN37_PLUS_MODEL_ID,
       'deepseek/deepseek-v4-pro',
-      CLAUDE_SONNET_CURRENT_MODEL_ID,
-      GLM_CURRENT_MODEL_ID,
+      current.claudeSonnet,
+      current.glm,
       'tencent/hy3:free',
       'meituan/longcat-2.0-free',
     ];
@@ -58,13 +55,18 @@ describe('OpenRouter Models Config', () => {
     });
 
     expect(preferredModels.indexOf(DEEPSEEK_V4_1_FLASH_MODEL_ID)).toBeLessThan(
-      preferredModels.indexOf(GLM_FLASH_CURRENT_MODEL_ID)
+      preferredModels.indexOf(current.glmFlash)
     );
   });
 
-  test('monitors only concrete preferred models', () => {
-    expect(preferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
-    expect(monitoredModels).toEqual(preferredModels.filter(model => !isKiloAutoModel(model)));
+  test('monitors only concrete preferred models', async () => {
+    const monitoredModels = await getMonitoredModels();
+    const resolvedPreferredModels = getPreferredModels(await getCurrentModelIds());
+
+    expect(resolvedPreferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
+    expect(monitoredModels).toEqual(
+      resolvedPreferredModels.filter(model => !isKiloAutoModel(model))
+    );
     expect(monitoredModels).not.toContain(GEMMA_4_26B_A4B_IT_ID);
     expect(monitoredModels).not.toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });

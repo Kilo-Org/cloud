@@ -1,4 +1,5 @@
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPrimaryDefaultModel } from '@/lib/ai-gateway/models';
+import { getCurrentModelIds } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { db } from '@/lib/drizzle';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -85,7 +86,7 @@ describe('Code Reviewer analytics settings', () => {
         review_style: 'balanced',
         focus_areas: [],
         custom_instructions: null,
-        model_slug: PRIMARY_DEFAULT_MODEL,
+        model_slug: getPrimaryDefaultModel(await getCurrentModelIds()),
         thinking_effort: null,
         gate_threshold: 'off',
         repository_selection_mode: 'all',

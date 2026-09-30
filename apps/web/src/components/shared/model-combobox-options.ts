@@ -1,5 +1,3 @@
-import { preferredModels } from '@/lib/ai-gateway/models';
-
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"
   name: string; // e.g., "Claude Sonnet 4.5"
@@ -26,7 +24,10 @@ export type ModelOptionGroup = {
   models: ModelOption[];
 };
 
-export function buildModelOptionGroups(models: ModelOption[]): ModelOptionGroup[] {
+export function buildModelOptionGroups(
+  models: ModelOption[],
+  preferredModels: readonly string[]
+): ModelOptionGroup[] {
   const groups: ModelOptionGroup[] = [];
   const groupIndexes = new Map<string, number>();
   const ungrouped: ModelOption[] = [];

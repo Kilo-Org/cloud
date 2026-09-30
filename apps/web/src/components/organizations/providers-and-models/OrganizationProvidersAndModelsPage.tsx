@@ -6,7 +6,7 @@ import {
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
-import { useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
+import { useCurrentModelIds, useOpenRouterModelsAndProviders } from '@/lib/ai-gateway/hooks';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
@@ -29,7 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/models';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
@@ -117,14 +117,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     openRouterProviders,
   });
 
+  const currentModelIds = useCurrentModelIds();
   const preferredIndexByModelId = useMemo(() => {
+    const preferredModels = getPreferredModels(currentModelIds);
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
       const modelId = normalizeModelId(preferredModels[i]);
       index.set(modelId, i);
     }
     return index;
-  }, []);
+  }, [currentModelIds]);
 
   const providerIndex = selectors.modelProvidersIndex;
 

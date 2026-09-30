@@ -29,7 +29,7 @@ describe('CurrentTaskList', () => {
     ).toBe('');
   });
 
-  it('renders pending, in-progress and completed states with progress', () => {
+  it('shows only the active task and progress until the checklist is opened', () => {
     const html = render({
       shown: [pending, active, done],
       completed: 1,
@@ -41,15 +41,13 @@ describe('CurrentTaskList', () => {
 
     expect(html).toContain('aria-label="1 of 3 tasks completed"');
     expect(html).toContain('Active task');
-    expect(html).toContain('Pending task');
-    expect(html).toContain('Finished task');
-    expect(html).toContain('Pending:');
-    expect(html).toContain('In progress:');
-    expect(html).toContain('Completed:');
-    expect(html).toContain('aria-expanded="true"');
+    expect(html).not.toContain('Pending task');
+    expect(html).not.toContain('Finished task');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain('aria-haspopup="dialog"');
   });
 
-  it('surfaces the compact view hidden counts', () => {
+  it('keeps hidden counts out of the status row', () => {
     const html = render({
       shown: [active],
       completed: 1,
@@ -59,7 +57,24 @@ describe('CurrentTaskList', () => {
       sourcePartId: 'p',
     });
 
-    expect(html).toContain('1 earlier task hidden');
-    expect(html).toContain('2 later tasks hidden');
+    expect(html).not.toContain('1 earlier task hidden');
+    expect(html).not.toContain('2 later tasks hidden');
+    expect(html).toContain('aria-label="1 of 4 tasks completed"');
+  });
+
+  it('reduces a completed list to the task count with a checkmark', () => {
+    const html = render({
+      shown: [done],
+      completed: 1,
+      total: 1,
+      hiddenBefore: 0,
+      hiddenAfter: 0,
+      sourcePartId: 'p',
+    });
+
+    expect(html).toContain('aria-label="1 of 1 tasks completed"');
+    expect(html).toContain('lucide-check');
+    expect(html).not.toContain('Finished task');
+    expect(html).toContain('aria-expanded="false"');
   });
 });

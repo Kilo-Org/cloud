@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AppActionRequest } from './app-action-contract';
 import {
+  _resetPendingAppActionForTests,
+  clearAccountBoundPendingAppAction,
   getPendingAppAction,
+  setCurrentAppActionUserId,
   setPendingAppAction,
   subscribePendingAppAction,
   takePendingAppAction,
@@ -12,7 +15,7 @@ const OPEN_NEEDS_INPUT: AppActionRequest = { action: 'OpenNeedsInput' };
 const OPEN_SESSION: AppActionRequest = { action: 'OpenSession', sessionId: 'ses_1' };
 
 beforeEach(() => {
-  takePendingAppAction();
+  _resetPendingAppActionForTests();
 });
 
 describe('pending app action store', () => {
@@ -55,5 +58,54 @@ describe('pending app action store', () => {
     expect(takePendingAppAction()).toBeNull();
     expect(listener).not.toHaveBeenCalled();
     unsubscribe();
+  });
+});
+
+describe('pending app action account binding', () => {
+  it('drops an account-bound request when a different account signs in', () => {
+    setCurrentAppActionUserId('user_a');
+    setPendingAppAction(OPEN_SESSION);
+    setCurrentAppActionUserId('user_b');
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('keeps a request bound to the same account', () => {
+    setCurrentAppActionUserId('user_a');
+    setPendingAppAction(OPEN_SESSION);
+    setCurrentAppActionUserId('user_a');
+    expect(getPendingAppAction()).toEqual(OPEN_SESSION);
+  });
+
+  it('drops a request parked while signed out when an account signs in', () => {
+    setCurrentAppActionUserId(null);
+    setPendingAppAction(OPEN_SESSION);
+    setCurrentAppActionUserId('user_b');
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('adopts a request parked before the account is known when a user settles', () => {
+    setPendingAppAction(OPEN_SESSION);
+    setCurrentAppActionUserId('user_b');
+    expect(getPendingAppAction()).toEqual(OPEN_SESSION);
+  });
+
+  it('drops a request parked before the account settles signed out', () => {
+    setPendingAppAction(OPEN_SESSION);
+    setCurrentAppActionUserId(null);
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('clearAccountBoundPendingAppAction drops an account-bound request', () => {
+    setCurrentAppActionUserId('user_a');
+    setPendingAppAction(OPEN_SESSION);
+    clearAccountBoundPendingAppAction();
+    expect(getPendingAppAction()).toBeNull();
+  });
+
+  it('clearAccountBoundPendingAppAction keeps a signed-out request', () => {
+    setCurrentAppActionUserId(null);
+    setPendingAppAction(OPEN_SESSION);
+    clearAccountBoundPendingAppAction();
+    expect(getPendingAppAction()).toEqual(OPEN_SESSION);
   });
 });

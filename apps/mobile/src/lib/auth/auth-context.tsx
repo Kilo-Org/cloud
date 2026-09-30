@@ -21,6 +21,10 @@ import {
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
+import {
+  clearAccountBoundPendingAppAction,
+  setCurrentAppActionUserId,
+} from '@/lib/app-actions/pending-app-action';
 import { writeSignedOutSnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { deleteAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { runLogoutCleanup, unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
@@ -245,6 +249,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
+              setCurrentAppActionUserId(readUserIdFromToken(pair.token));
               setIsLoading(false);
               return;
             }
@@ -285,12 +290,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             }
             setToken(published);
             setCurrentDeepLinkUserId(published ? readUserIdFromToken(published) : null);
+            setCurrentAppActionUserId(published ? readUserIdFromToken(published) : null);
             return;
           }
           markRestoredAuthenticatedOwner();
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
+          setCurrentAppActionUserId(readUserIdFromToken(stored));
         } else if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
           // A launch that positively restored no session owns the index: the
           // sign-out teardown's clear is fire-and-forget and the process can
@@ -307,6 +314,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // captured before this point is not this process's to open, so the
           // settle drops it instead of holding it for whoever signs in next.
           setCurrentDeepLinkUserId(null);
+          // The same settle for an action parked before the account was known:
+          // a signed-out slug must not start an agent on the next account.
+          setCurrentAppActionUserId(null);
         }
       } catch {
         // Every read exhausted its retries. The session is not known to be
@@ -380,6 +390,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
         setCurrentDeepLinkUserId(readUserIdFromToken(tokenValue));
+        // The same binding for a parked app action: a StartAgent or OpenSession
+        // parked for another account (or while signed out) must not be taken
+        // with this account's credentials and credits.
+        setCurrentAppActionUserId(readUserIdFromToken(tokenValue));
         const epoch = currentAuthEpoch();
         const published = await persistSignInCredentialsAtEpoch(tokenValue, refreshTokenValue, {
           expiresIn,
@@ -459,6 +473,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       // opened just before sign-in, must not lose it). The in-memory clear is
       // synchronous; the persisted delete chains behind any in-flight persist.
       clearAccountBoundPendingDeepLink();
+      // The same synchronous drop for a parked app action: a StartAgent parked
+      // for this account must not be taken during the teardown window, before
+      // the signed-out settle below.
+      clearAccountBoundPendingAppAction();
       try {
         // Close ownership persistence before any await so a late list
         // response cannot write the previous account's answer during
@@ -512,6 +530,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // The signed-out session owns no user id: a destination captured
         // during teardown is recorded as "captured while signed out".
         setCurrentDeepLinkUserId(null);
+        setCurrentAppActionUserId(null);
         clearActiveToken();
         try {
           // Independent local cleanup, concurrent via allSettled: a

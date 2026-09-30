@@ -82,7 +82,6 @@ vi.mock('@/lib/use-github-repos-refresh', () => ({
     openGitHubIntegration: vi.fn(),
     refreshReposForceFresh: mocks.refreshGitHubForceFresh,
     isRefreshingRepos: false,
-    connectCheckFailed: false,
   }),
 }));
 

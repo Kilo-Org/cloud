@@ -117,10 +117,7 @@ export function useNewSessionRepos({
     openGitHubIntegration,
     refreshReposForceFresh: refreshGitHubForceFresh,
     isRefreshingRepos: isRefreshingGitHub,
-  } = useGitHubReposRefresh({
-    organizationId,
-    integrationInstalled: githubQuery.data?.integrationInstalled,
-  });
+  } = useGitHubReposRefresh({ organizationId });
 
   const githubRepositories = useMemo<NewSessionRepository[]>(
     () =>

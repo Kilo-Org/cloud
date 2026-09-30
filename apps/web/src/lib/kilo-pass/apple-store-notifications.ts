@@ -881,11 +881,14 @@ export async function processAppStoreKiloPassNotification(params: {
       // signed a reversal after it, so its credits must stay where the reversal
       // put them. A refund the store signs *after* a reversal is not superseded
       // and claws the pack back again.
-      const superseded = await isStoreRefundDeliverySuperseded(tx, {
-        paymentProvider: KiloPassPaymentProvider.AppStore,
-        providerTransactionIds: [transaction.transactionId],
-        signedDateMs: notification.signedDate ?? null,
-      });
+      const isCreditPack = Boolean(getStoreCreditProductByAppleProductId(transaction.productId));
+      const superseded =
+        isCreditPack &&
+        (await isStoreRefundDeliverySuperseded(tx, {
+          paymentProvider: KiloPassPaymentProvider.AppStore,
+          providerTransactionIds: [transaction.transactionId],
+          signedDateMs: notification.signedDate ?? null,
+        }));
 
       let reversal: CreditReversalResult | null = null;
       if (!superseded) {
@@ -913,7 +916,7 @@ export async function processAppStoreKiloPassNotification(params: {
       // refunded share; a full refund, a family revoke, or a missing share
       // reverses the whole pack.
       let storeCreditReversal: StoreCreditReversalResult | null = null;
-      if (!superseded && getStoreCreditProductByAppleProductId(transaction.productId)) {
+      if (!superseded && isCreditPack) {
         storeCreditReversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.AppStore,
           providerTransactionId: transaction.transactionId,
@@ -924,9 +927,13 @@ export async function processAppStoreKiloPassNotification(params: {
               : STORE_FULL_MILLIUNITS,
         });
       }
-      await endStoreSubscription(tx, transaction);
+      if (!superseded) {
+        await endStoreSubscription(tx, transaction);
+      }
       await appendKiloPassAuditLog(tx, {
-        action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
+        action: superseded
+          ? KiloPassAuditLogAction.StoreNotificationReceived
+          : KiloPassAuditLogAction.StoreSubscriptionRefunded,
         result: KiloPassAuditLogResult.Success,
         payload: {
           notificationUUID: notification.notificationUUID,
@@ -953,7 +960,13 @@ export async function processAppStoreKiloPassNotification(params: {
     return { processed: true };
   }
 
-  if (transaction && notification.notificationType === NotificationTypeV2.REFUND_REVERSED) {
+  // Refund reinstatement here covers consumable credit packs, not Kilo Pass
+  // subscription credits or access. Keep the existing subscription lifecycle unchanged.
+  if (
+    transaction &&
+    notification.notificationType === NotificationTypeV2.REFUND_REVERSED &&
+    getStoreCreditProductByAppleProductId(transaction.productId)
+  ) {
     await db.transaction(async tx => {
       // Serialize with the grant and the refund of the same purchase, in either
       // order: a reversal that runs beside the refund it reverses must read the

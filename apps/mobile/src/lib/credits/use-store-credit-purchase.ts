@@ -111,6 +111,12 @@ export type StoreCreditPurchaseActionsDeps = {
    * retrying the same pack returns it for the same user. The owner looks the
    * outstanding transaction up and completes it; a genuine ownership refusal
    * comes back from that completion, which is where the account copy belongs.
+   *
+   * Returns whether the failure was handled — `true` when a completion was
+   * attempted, so the credits were announced or the backend's refusal was
+   * already shown. The purchase path then reports nothing itself. `false` means
+   * no outstanding transaction was found (or the store or account could not
+   * answer), so the store error still owes its own failure copy.
    */
   recoverOwnedPurchase?: () => Promise<boolean>;
 };

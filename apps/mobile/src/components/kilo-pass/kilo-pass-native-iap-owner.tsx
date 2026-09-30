@@ -350,6 +350,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
     () =>
       createAppStoreKiloPassPurchaseActions({
         storefront,
+        appAccountToken: serverProductsQuery.data?.appAccountToken ?? '',
         requestPurchase,
         getAvailablePurchases: getAvailableIapPurchases,
         restorePurchases: restoreStorePurchases,
@@ -406,6 +407,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       queryClient,
       requestPurchase,
       restoreStorePurchases,
+      serverProductsQuery.data?.appAccountToken,
       trpc,
     ]
   );

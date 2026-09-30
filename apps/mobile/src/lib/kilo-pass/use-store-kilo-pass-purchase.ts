@@ -53,6 +53,11 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
   // Which storefront the current device buys from. The owner injects this from
   // `Platform.OS` so this module never imports `react-native`.
   storefront: 'app_store' | 'play';
+  // The account token the app attaches to the store purchase. It comes from the
+  // backend catalog response (never from a store-fetched product), so recovery
+  // and live purchase agree on the token even when the store fetch failed. Empty
+  // until the catalog answers, at which point no account scope is known.
+  appAccountToken: string;
   // The real implementations (expo-iap's mutateAsync, the tRPC mutation) each
   // resolve to their own concrete result; this module never reads it, only
   // awaits it, so `Promise<void>` can't stand in here — `Promise<X>` requires
@@ -123,7 +128,17 @@ type PurchaseCompletionOutcome = {
   stale: boolean;
 };
 
+// Keyed by the account submitting the completion as well as the transaction: a
+// completion is posted under `deps.appAccountToken`, the backend's per-user
+// `app_store_account_token`, so an unresolved request may only be joined by that
+// same account. With no token yet (the catalog has not answered) the entry is
+// unique rather than shared, so it can never be joined across accounts.
 const sharedPurchaseCompletions = new Map<string, Promise<PurchaseCompletionResult>>();
+
+// Scope for a completion whose account is not known yet (the catalog has not
+// answered, so no account token exists). Each gets its own key: sharing an
+// in-flight completion is only safe when the account scope is known.
+let unknownAccountCompletionSequence = 0;
 
 /**
  * Purchases the backend terminally refused in this process. The store keeps an
@@ -356,12 +371,20 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       if (Object.hasOwn(TERMINAL_PURCHASE_MESSAGES, refusalMessage)) {
         terminallyRejectedPurchaseIds.add(getPurchaseCompletionId(purchase));
       }
-      const message = getKiloPassPurchaseErrorMessage(
-        error,
-        i18n.t('kiloPass.purchaseFailed'),
-        deps.storefront
-      );
-      return { completed: false, errorMessage: message };
+      // The account can also change while the backend answers. The refusal
+      // belongs to the old session: the new account's UI must not be shown it,
+      // and clearing the pending completion callback would drop the new
+      // session's own sheet callback. The store transaction is left unfinished so
+      // the new session posts its own receipt.
+      const stale = !deps.isAccountCurrent();
+      const message = stale
+        ? null
+        : getKiloPassPurchaseErrorMessage(
+            error,
+            i18n.t('kiloPass.purchaseFailed'),
+            deps.storefront
+          );
+      return { completed: false, stale, errorMessage: message };
     }
   }
 
@@ -383,12 +406,30 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
   ): Promise<PurchaseCompletionOutcome> {
-    const purchaseId = getPurchaseCompletionId(purchase);
+    // Keyed by the account submitting it as well as the transaction. A
+    // completion is posted under `deps.appAccountToken`, the backend's per-user
+    // `app_store_account_token`, so an unresolved request may only be joined by
+    // that same account: keyed by transaction id alone, a logout/login that
+    // replaced the recovery mount let the new account join the old account's
+    // in-flight request and inherit its ownership refusal instead of submitting
+    // its own. With no token yet (the catalog has not answered) the entry is
+    // unique rather than shared, so it can never be joined across accounts.
+    const accountScope =
+      deps.appAccountToken === ''
+        ? `unknown-account-${(unknownAccountCompletionSequence += 1)}`
+        : deps.appAccountToken;
+    const purchaseId = `${accountScope}\u0000${getPurchaseCompletionId(purchase)}`;
+    // Re-checked after the await: the account may change while this caller waits
+    // on the shared completion, or between the backend answer and here, so an
+    // outcome that outlived its session is always reported as stale.
     const existingCompletion = sharedPurchaseCompletions.get(purchaseId);
     if (existingCompletion) {
       const result = await existingCompletion;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return { completed: result.completed, stale: result.stale ?? false };
+      return {
+        completed: result.completed,
+        stale: (result.stale ?? false) || !deps.isAccountCurrent(),
+      };
     }
 
     const completion = completePurchase(purchase, options);
@@ -396,7 +437,10 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     try {
       const result = await completion;
       reportPurchaseCompletionErrorIfNeeded(result, options);
-      return { completed: result.completed, stale: result.stale ?? false };
+      return {
+        completed: result.completed,
+        stale: (result.stale ?? false) || !deps.isAccountCurrent(),
+      };
     } finally {
       sharedPurchaseCompletions.delete(purchaseId);
     }

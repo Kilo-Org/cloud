@@ -332,6 +332,7 @@ function createActions(
 ) {
   return createAppStoreKiloPassPurchaseActions({
     storefront: 'app_store',
+    appAccountToken: product.appAccountToken,
     completeAppStorePurchase: vi.fn(),
     completePlayPurchase: vi.fn(),
     enabledAppleProductIds: [product.appleProductId],
@@ -839,6 +840,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const purchase = createPurchase();
     const recoveryActions = createAppStoreKiloPassPurchaseActions({
       storefront: 'app_store',
+      appAccountToken: product.appAccountToken,
       completeAppStorePurchase: completeFromRecovery,
       completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
@@ -853,6 +855,7 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
     const sheetActions = createAppStoreKiloPassPurchaseActions({
       storefront: 'app_store',
+      appAccountToken: product.appAccountToken,
       completeAppStorePurchase: completeFromSheet,
       completePlayPurchase: vi.fn(),
       enabledAppleProductIds: [product.appleProductId],
@@ -952,6 +955,79 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(invalidateAfterCompletion).not.toHaveBeenCalled();
     // The store transaction is still finished for this device.
     expect(finishTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not report or clear the pending callback for a failure that outlived its account', async () => {
+    let signedInAccount = 'account-a';
+    const backendGate = createDeferredRejectablePromise();
+    const completeAppStorePurchase = vi.fn().mockReturnValue(backendGate.promise);
+    const setPendingPurchaseCompletedCallback = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      isAccountCurrent: () => signedInAccount === 'account-a',
+      completeAppStorePurchase,
+      setPendingPurchaseCompletedCallback: onCompleted => {
+        setPendingPurchaseCompletedCallback(onCompleted);
+      },
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    const completion = actions.handlePurchaseSuccess(createPurchase());
+    // The account changes while the backend call is in flight, then the backend
+    // refuses the receipt. The refusal belongs to the old session: the new
+    // account's UI must not be told about it, and clearing the pending sheet
+    // callback would drop the new session's own callback.
+    signedInAccount = 'account-b';
+    backendGate.reject(
+      new Error('App Store purchase account token does not match the signed-in user.')
+    );
+
+    await expect(completion).resolves.toBe(false);
+    expect(showError).not.toHaveBeenCalled();
+    expect(setPendingPurchaseCompletedCallback).not.toHaveBeenCalled();
+  });
+
+  it('does not let a new account join an unresolved completion the old account left behind', async () => {
+    const purchase = createPurchase();
+    const backendGate = createDeferredPromise();
+    const completeForAccountA = vi.fn().mockReturnValue(backendGate.promise);
+    // Account A is mid-completion when the account changes; the new account's
+    // recovery finds the same transaction. It must submit its own request under
+    // its own account token, not join A's and inherit its result.
+    const completeForAccountB = vi
+      .fn()
+      .mockRejectedValue(
+        new Error('App Store purchase account token does not match the signed-in user.')
+      );
+    const showErrorForAccountB = vi.fn();
+    const actionsForAccountA = createActions({
+      appAccountToken: 'account-a-token',
+      completeAppStorePurchase: completeForAccountA,
+    });
+    const actionsForAccountB = createActions({
+      appAccountToken: 'account-b-token',
+      completeAppStorePurchase: completeForAccountB,
+      showError: message => {
+        showErrorForAccountB(message);
+      },
+    });
+
+    const accountACompletion = actionsForAccountA.handlePurchaseSuccess(purchase);
+    const accountBCompletion = actionsForAccountB.handlePurchaseSuccess(purchase);
+    backendGate.resolve({ alreadyProcessed: false });
+
+    await expect(accountBCompletion).resolves.toBe(false);
+    await expect(accountACompletion).resolves.toBe(true);
+
+    expect(completeForAccountA).toHaveBeenCalledTimes(1);
+    expect(completeForAccountB).toHaveBeenCalledTimes(1);
+    // B's own refusal is the explicit account-token refusal, so it is the one
+    // that earns the different-account copy on B's UI.
+    expect(showErrorForAccountB).toHaveBeenCalledWith(
+      i18n.t('kiloPass.purchaseOwnedByAnotherAccount')
+    );
   });
 
   it('explicitly restores active Kilo Pass purchases through StoreKit and backend completion', async () => {

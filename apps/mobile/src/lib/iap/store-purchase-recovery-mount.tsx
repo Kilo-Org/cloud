@@ -176,6 +176,7 @@ export function StorePurchaseRecoveryMount(): null {
     () =>
       createAppStoreKiloPassPurchaseActions({
         storefront,
+        appAccountToken: kiloPassCatalog.data?.appAccountToken ?? '',
         requestPurchase: requestStorePurchase,
         getAvailablePurchases: async () => {
           const pendingPurchases = await withStoreDeadline(
@@ -199,6 +200,7 @@ export function StorePurchaseRecoveryMount(): null {
       completePlayKiloPass.mutateAsync,
       invalidateAfterKiloPassCompletion,
       kiloPassAppleProductIds,
+      kiloPassCatalog.data?.appAccountToken,
       kiloPassGoogleProductIds,
       storefront,
     ]

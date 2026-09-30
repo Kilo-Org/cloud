@@ -487,6 +487,109 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.completedPurchaseCount).toBe(1);
   });
 
+  it('shares one already-owned recovery between the error listener and the request rejection', async () => {
+    // The store reports one `AlreadyOwned` failure through both channels: the
+    // error listener fires and the purchase request rejects. Both call
+    // `recoverOwnedCreditPurchase`, which must run one pass and give both the
+    // same result — otherwise the rejection path sees the listener's deduped
+    // `false` and shows the generic failure after the success was announced.
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const alreadyOwned = { code: 'already-owned', message: 'Item already owned' };
+    mockedIap.requestPurchase.mockRejectedValueOnce(alreadyOwned);
+    const { handle } = await mountOwner();
+
+    const purchaseResult = handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseError(alreadyOwned);
+    await flushPromises();
+
+    expect(await purchaseResult).toBe(false);
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
+  it('shares one already-owned recovery when the request rejection starts it first', async () => {
+    // The reverse order: the rejection starts the recovery, which is still
+    // waiting on the store when the listener delivers the same failure. The
+    // listener must join that in-flight pass instead of opening a second one.
+    const pendingLookup = Promise.withResolvers<Purchase[]>();
+    mockedIap.getAvailablePurchases.mockReturnValueOnce(pendingLookup.promise);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const alreadyOwned = { code: 'already-owned', message: 'Item already owned' };
+    mockedIap.requestPurchase.mockRejectedValueOnce(alreadyOwned);
+    const { handle } = await mountOwner();
+
+    const purchaseResult = handle.value?.purchase(creditPack);
+    await flushPromises();
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+
+    mockedIap.handlers?.onPurchaseError(alreadyOwned);
+    await flushPromises();
+
+    pendingLookup.resolve([createPurchase()]);
+    await flushPromises();
+
+    expect(await purchaseResult).toBe(false);
+    expect(mockedIap.getAvailablePurchases).toHaveBeenCalledTimes(1);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
+  it('keeps the backend ownership refusal when both triggers recover one already-owned failure', async () => {
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    // The backend refuses the receipt as another account's. The recovery pass
+    // reports that through `notifyErrors` and returns "handled", so the purchase
+    // path must not overwrite the account copy with the generic failure.
+    mockedQuery.completePurchase.mockRejectedValue({
+      message: 'This purchase is already linked to another Kilo account.',
+    });
+    const alreadyOwned = { code: 'already-owned', message: 'Item already owned' };
+    mockedIap.requestPurchase.mockRejectedValueOnce(alreadyOwned);
+    const { handle } = await mountOwner();
+
+    const purchaseResult = handle.value?.purchase(creditPack);
+    mockedIap.handlers?.onPurchaseError(alreadyOwned);
+    await flushPromises();
+
+    expect(await purchaseResult).toBe(false);
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(0);
+    expect(handle.value?.errorMessageKey).toBe('credits.purchaseOwnedByAnotherAccount');
+  });
+
+  it('still reports the generic failure when the recovery finds no outstanding purchase', async () => {
+    mockedIap.getAvailablePurchases.mockResolvedValue([]);
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    mockedIap.requestPurchase.mockRejectedValueOnce({
+      code: 'already-owned',
+      message: 'Item already owned',
+    });
+    const { handle } = await mountOwner();
+
+    // Nothing in the store queue to recover, so the store error still owes its
+    // own failure copy.
+    expect(await handle.value?.purchase(creditPack)).toBe(false);
+    await flushPromises();
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+  });
+
   it('does not submit a recovery pass that outlived an account change', async () => {
     const pendingLookup = Promise.withResolvers<Purchase[]>();
     mockedIap.getAvailablePurchases.mockReturnValueOnce(pendingLookup.promise);

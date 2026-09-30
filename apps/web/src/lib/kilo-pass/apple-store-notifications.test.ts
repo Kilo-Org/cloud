@@ -1677,6 +1677,7 @@ describe('processAppStoreKiloPassNotification', () => {
       const staleAudit = await db.query.kilo_pass_audit_log.findFirst({
         where: sql`${kilo_pass_audit_log.payload_json}->>'notificationUUID' = 'credit-pack-stale-refund'`,
       });
+      expect(staleAudit?.action).toBe(KiloPassAuditLogAction.StoreNotificationReceived);
       expect(staleAudit?.payload_json).toMatchObject({
         supersededByStoreReversal: true,
         storeCreditReversal: null,

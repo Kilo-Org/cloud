@@ -109,6 +109,13 @@ export function useCreditNativeIap(): CreditNativeIapContextValue {
 type ActivePurchaseRequest = { productId: string; generation: number };
 
 /**
+ * The one in-flight already-owned recovery, scoped to the auth epoch that
+ * started it. The store error listener and the `requestPurchase` rejection both
+ * report the same `AlreadyOwned`; sharing this promise gives them one decision.
+ */
+type InFlightOwnedRecovery = { epoch: number; promise: Promise<boolean> };
+
+/**
  * The single `useIAP` call site for the credits route.
  *
  * expo-iap registers its purchase listeners at module scope, so the app must
@@ -131,6 +138,7 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
+  const inFlightOwnedRecoveryRef = useRef<InFlightOwnedRecovery | null>(null);
   const activePurchaseRequestRef = useRef<ActivePurchaseRequest | null>(null);
   const purchaseRequestGenerationRef = useRef(0);
   // The auth epoch this owner belongs to. Sign-out/sign-in bumps it and this
@@ -330,49 +338,92 @@ export function CreditNativeIapOwner({ children }: { children: ReactNode }) {
   // for the same user. Look the outstanding transaction up and complete it —
   // announced, because the user just tried to buy — and let the backend's own
   // ownership refusal be the thing that names another account.
+  //
+  // The boolean means "handled", not "recovered": `true` once a completion was
+  // attempted, which covers both the announced grant and the backend's refusal
+  // shown through `notifyErrors`. `false` means no outstanding transaction was
+  // found, so the caller still owes its own failure copy. Both triggers below
+  // share this one decision.
   const recoverOwnedCreditPurchase = useCallback(async (): Promise<boolean> => {
-    // A recovery belongs to the account that asked for it. If the session
-    // changes while the store answers, the new account's own pass recovers.
-    let pendingPurchases: Purchase[] = [];
-    try {
-      pendingPurchases = await fetchPendingStorePurchases(storefront);
-    } catch {
-      // The store cannot answer; the retry re-runs this.
-      return false;
+    // One store `AlreadyOwned` failure reaches this owner twice: the `useIAP`
+    // error listener and the `requestPurchase` rejection both report it, and a
+    // pass per trigger would each read the other's dedupe as "nothing
+    // recovered". Instead both await this one promise, so they share the same
+    // decision — the second never sees a `false` the first did not.
+    //
+    // Keyed by the epoch that started it: a recovery belongs to the account
+    // that asked for it, so a session change starts a fresh pass instead of
+    // letting the new account join the old account's result.
+    const epoch = authEpochRef.current;
+    const inFlight = inFlightOwnedRecoveryRef.current;
+    if (inFlight?.epoch === epoch) {
+      return inFlight.promise;
     }
-    if (!isCurrentAuthEpoch(authEpochRef.current)) {
-      return false;
-    }
-    const outstandingPurchases = pendingPurchases.filter(
-      purchase =>
-        isRecoverableCreditPurchase(
-          purchase,
-          creditPackAppleProductIds,
-          creditPackGoogleProductIds
-        ) &&
-        !recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase)) &&
-        !recoveryInFlightPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
-    );
-    if (outstandingPurchases.length === 0) {
-      return false;
-    }
-    for (const purchase of outstandingPurchases) {
-      recoveryInFlightPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
-    }
-    try {
-      const recoveredPurchases = await actions.recoverPurchases(outstandingPurchases, {
-        notifyCompletion: true,
-        notifyErrors: true,
-      });
-      for (const purchase of recoveredPurchases) {
-        recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+
+    const recovery = (async (): Promise<boolean> => {
+      try {
+        // A recovery belongs to the account that asked for it. If the session
+        // changes while the store answers, the new account's own pass recovers.
+        let pendingPurchases: Purchase[] = [];
+        try {
+          pendingPurchases = await fetchPendingStorePurchases(storefront);
+        } catch {
+          // The store cannot answer; the retry re-runs this.
+          return false;
+        }
+        if (!isCurrentAuthEpoch(authEpochRef.current)) {
+          return false;
+        }
+        const outstandingPurchases = pendingPurchases.filter(
+          purchase =>
+            isRecoverableCreditPurchase(
+              purchase,
+              creditPackAppleProductIds,
+              creditPackGoogleProductIds
+            ) &&
+            !recoveredPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase)) &&
+            !recoveryInFlightPurchaseIdsRef.current.has(getPurchaseCompletionId(purchase))
+        );
+        if (outstandingPurchases.length === 0) {
+          return false;
+        }
+        for (const purchase of outstandingPurchases) {
+          recoveryInFlightPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+        }
+        try {
+          const recoveredPurchases = await actions.recoverPurchases(outstandingPurchases, {
+            notifyCompletion: true,
+            notifyErrors: true,
+          });
+          for (const purchase of recoveredPurchases) {
+            recoveredPurchaseIdsRef.current.add(getPurchaseCompletionId(purchase));
+          }
+          // Reaching here means the pass matched an outstanding transaction and
+          // tried to complete it, so this pass owns the outcome: either the
+          // credits were announced, or the backend's own refusal was shown
+          // through `notifyErrors`. The purchase path must not add the generic
+          // failure on top of that — which is why this is `true`, not
+          // `recoveredPurchases.length > 0`: a refusal has no recovered
+          // purchases but is still a handled `AlreadyOwned`.
+          return true;
+        } finally {
+          for (const purchase of outstandingPurchases) {
+            recoveryInFlightPurchaseIdsRef.current.delete(getPurchaseCompletionId(purchase));
+          }
+        }
+      } finally {
+        // This pass holds its epoch's slot until it settles — a same-epoch call
+        // joins it rather than replacing it — so the epoch identifies the entry
+        // to release. An epoch change has already installed a newer pass.
+        if (inFlightOwnedRecoveryRef.current?.epoch === epoch) {
+          inFlightOwnedRecoveryRef.current = null;
+        }
       }
-      return recoveredPurchases.length > 0;
-    } finally {
-      for (const purchase of outstandingPurchases) {
-        recoveryInFlightPurchaseIdsRef.current.delete(getPurchaseCompletionId(purchase));
-      }
-    }
+    })();
+
+    inFlightOwnedRecoveryRef.current = { epoch, promise: recovery };
+    const handled = await recovery;
+    return handled;
   }, [actions, creditPackAppleProductIds, creditPackGoogleProductIds, storefront]);
 
   useEffect(() => {

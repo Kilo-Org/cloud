@@ -368,6 +368,31 @@ export async function listWorkerRequests(
   };
 }
 
+export async function getWorkerRequest(
+  userId: string | undefined,
+  organizationId: string | undefined,
+  triggerId: string,
+  requestId: string
+): Promise<WorkerResponse<Pick<CapturedRequest, 'id' | 'processStatus' | 'cloudAgentSessionId'>>> {
+  const namespace = buildNamespace(userId, organizationId);
+  const result = await workerFetch<unknown>(
+    `${buildTriggerPath(namespace, triggerId)}/requests/${encodeURIComponent(requestId)}`,
+    { method: 'GET' }
+  );
+  if (!result.success) return result;
+  const parsed = z
+    .object({
+      id: z.string(),
+      processStatus: z.enum(['captured', 'inprogress', 'success', 'failed']),
+      cloudAgentSessionId: z.string().nullable(),
+    })
+    .safeParse(result.data);
+  if (!parsed.success || parsed.data.id !== requestId) {
+    return { success: false, error: 'Invalid request response', status: 502 };
+  }
+  return { ...result, data: parsed.data };
+}
+
 export function buildInboundUrl(
   userId: string | undefined,
   organizationId: string | undefined,

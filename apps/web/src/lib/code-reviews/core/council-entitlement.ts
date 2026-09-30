@@ -2,7 +2,7 @@ import 'server-only';
 
 import { TRPCError } from '@trpc/server';
 import { getOrganizationById } from '@/lib/organizations/organizations';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seats';
+import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
 import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
 import { isLocalCodeReviewDevelopmentEnabled } from '@/lib/config.server';
 import type { CodeReviewType } from '@kilocode/db/schema-types';

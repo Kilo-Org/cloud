@@ -241,6 +241,7 @@
     "addPasskey": "Kirish kaliti qoʻshish",
     "passkeyDefaultName": "Kirish kaliti",
     "passkeyAddedOn": "{{date}} qoʻshildi",
+    "passkeyLastUsedOn": "Oxirgi marta ishlatilgan {{date}}",
     "passkeyAdded": "Kirish kaliti qoʻshildi.",
     "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
     "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",

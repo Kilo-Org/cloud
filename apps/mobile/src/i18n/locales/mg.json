@@ -241,6 +241,7 @@
     "addPasskey": "Hanampy fanalahidin'ny fidirana",
     "passkeyDefaultName": "Fanalahidin'ny fidirana",
     "passkeyAddedOn": "Nampiana {{date}}",
+    "passkeyLastUsedOn": "Nampiasaina farany {{date}}",
     "passkeyAdded": "Nampiana ny fanalahidin'ny fidirana.",
     "passkeyAddFailed": "Tsy afaka nanampy fanalahidin'ny fidirana. Andramo indray.",
     "passkeyAddUnsupported": "Tsy afaka mamorona fanalahidin'ny fidirana ity fitaovana ity.",

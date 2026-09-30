@@ -1,5 +1,5 @@
-import { and, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
-import { cloud_agent_code_reviews } from '@kilocode/db/schema';
+import { and, eq, gte, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { cloud_agent_code_review_attempts, cloud_agent_code_reviews } from '@kilocode/db/schema';
 import {
   CODE_REVIEW_BENIGN_TERMINAL_REASONS,
   CODE_REVIEW_TERMINAL_REASONS,
@@ -16,6 +16,7 @@ export const REVIEW_OUTCOME_METRIC = 'review_outcome';
 export const REVIEW_REASON_METRIC = 'review_reason';
 export const REVIEW_START_METRIC = 'review_start';
 export const REVIEW_OPEN_METRIC = 'review_open';
+export const REVIEW_PUBLICATION_METRIC = 'review_publication';
 export const REVIEW_COLLECTION_METRIC = 'collection';
 
 export const REVIEW_BUCKET_MINUTES = 5;
@@ -50,6 +51,10 @@ type OpenCountsRow = {
   oldestPendingAgeMs: number | null;
   staleQueuedClaimCount: number;
   runningOverNinetyMinutes: number;
+};
+type PublicationCountsRow = {
+  missingPublication: number;
+  coverageUnknown: number;
 };
 
 export type ReviewOutcomeHeadline = {
@@ -169,6 +174,37 @@ export function reviewTerminalMissingOutcomeTimeQuery(database: Database) {
 async function selectTerminalMissingOutcomeTime(database: Database): Promise<number> {
   const [row] = await reviewTerminalMissingOutcomeTimeQuery(database);
   return row?.terminalMissingOutcomeTime ?? 0;
+}
+
+export function reviewPublicationQuery(database: Database, window: ReviewWindow) {
+  return database
+    .select({
+      missingPublication: sql<number>`(count(*) filter (where ${cloud_agent_code_review_attempts.publication_status} = 'missing'))::int`,
+      coverageUnknown: sql<number>`(count(*) filter (where ${cloud_agent_code_review_attempts.id} is null or ${cloud_agent_code_review_attempts.publication_status} is null or ${cloud_agent_code_review_attempts.publication_status} = 'unknown'))::int`,
+    })
+    .from(cloud_agent_code_reviews)
+    .leftJoin(
+      cloud_agent_code_review_attempts,
+      sql`${cloud_agent_code_review_attempts.code_review_id} = ${cloud_agent_code_reviews.id} and ${cloud_agent_code_review_attempts.attempt_number} = (select max(latest_attempt.attempt_number) from cloud_agent_code_review_attempts latest_attempt where latest_attempt.code_review_id = ${cloud_agent_code_reviews.id})`
+    )
+    .where(
+      and(
+        eq(cloud_agent_code_reviews.status, 'completed'),
+        gte(cloud_agent_code_reviews.completed_at, window.start),
+        lt(cloud_agent_code_reviews.completed_at, window.end)
+      )
+    );
+}
+
+async function selectPublicationCounts(
+  database: Database,
+  window: ReviewWindow
+): Promise<PublicationCountsRow> {
+  const [row] = await reviewPublicationQuery(database, window);
+  return {
+    missingPublication: row?.missingPublication ?? 0,
+    coverageUnknown: row?.coverageUnknown ?? 0,
+  };
 }
 
 function isTerminalStatus(status: string): status is TerminalReviewStatus {
@@ -319,6 +355,39 @@ async function collectReviewStart(
   }
 }
 
+async function collectReviewPublication(
+  observedAt: string,
+  window: ReviewWindow,
+  database: Database
+): Promise<CodeReviewCollectionStatus> {
+  try {
+    const counts = await selectPublicationCounts(database, window);
+    console.log(
+      JSON.stringify({
+        metric: REVIEW_PUBLICATION_METRIC,
+        environment: reviewEnvironment(),
+        observedAt,
+        windowStart: window.start,
+        windowEnd: window.end,
+        missingPublication: counts.missingPublication,
+        coverageUnknown: counts.coverageUnknown,
+      })
+    );
+    return 'complete';
+  } catch {
+    console.error(
+      JSON.stringify({
+        metric: REVIEW_COLLECTION_METRIC,
+        collector: REVIEW_PUBLICATION_METRIC,
+        environment: reviewEnvironment(),
+        observedAt,
+        status: 'failed',
+      })
+    );
+    return 'failed';
+  }
+}
+
 export async function collectCodeReviewOutcome(
   now = new Date(),
   database: Database = db
@@ -327,7 +396,12 @@ export async function collectCodeReviewOutcome(
   const window = reviewWindow(now);
   const outcomeStatus = await collectReviewOutcome(observedAt, window, database);
   const startStatus = await collectReviewStart(observedAt, window, database);
-  return outcomeStatus === 'complete' && startStatus === 'complete' ? 'complete' : 'failed';
+  const publicationStatus = await collectReviewPublication(observedAt, window, database);
+  return outcomeStatus === 'complete' &&
+    startStatus === 'complete' &&
+    publicationStatus === 'complete'
+    ? 'complete'
+    : 'failed';
 }
 
 export async function collectCodeReviewOpenStock(

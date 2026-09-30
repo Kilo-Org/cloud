@@ -10,7 +10,6 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
-  checkOrganizationModelRestrictions,
   countAndStoreFimUsage,
   extractFimPromptInfo,
   extractFraudAndProjectHeaders,
@@ -188,7 +187,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   setTag('ui.ai_model', requestBody.model);
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -200,14 +199,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     );
   }
 
-  // Use shared helper for organization model restrictions.
-  const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-    modelId: requestBody.model,
-    settings,
-    organizationPlan: plan,
-  });
-  if (modelRestrictionError) return modelRestrictionError;
-
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
@@ -218,29 +209,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
       return modelNotAllowedResponse();
     }
-  }
-
-  // FIM routes directly to providers, so enforce the resolved provider name here.
-  if (providerConfig?.only && !providerConfig.only.includes(fimProvider)) {
-    return NextResponse.json(
-      {
-        error: 'Provider not allowed for your team.',
-        error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${fimProvider}" is not allowed for your team.`,
-      },
-      { status: 403 }
-    );
-  }
-
-  if (providerConfig?.ignore?.includes(fimProvider)) {
-    return NextResponse.json(
-      {
-        error: 'Provider not allowed for your team.',
-        error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${fimProvider}" is not allowed for your team.`,
-      },
-      { status: 403 }
-    );
   }
 
   const systemKey = getSystemApiKey(fimProvider);

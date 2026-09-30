@@ -10,7 +10,6 @@ import { sentryRootSpan } from '@/lib/getRootSpan';
 import { getUserFromAuth } from '@/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
-  checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
   extractEditPromptInfo,
   extractFraudAndProjectHeaders,
@@ -186,7 +185,7 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // Use read replica for balance check - this is a read-only operation that can tolerate
   // slight replication lag, and provides lower latency for US users.
-  const { balance, settings, plan } = await getBalanceAndOrgSettings(organizationId, user, readDb);
+  const { balance, settings } = await getBalanceAndOrgSettings(organizationId, user, readDb);
 
   if (balance <= 0 && !isFreeModel(requestBody.model) && !userByok) {
     return NextResponse.json(
@@ -197,13 +196,6 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
       { status: 402 }
     );
   }
-
-  const { error: modelRestrictionError, providerConfig } = checkOrganizationModelRestrictions({
-    modelId: requestBody.model,
-    settings,
-    organizationPlan: plan,
-  });
-  if (modelRestrictionError) return modelRestrictionError;
 
   if (organizationId) {
     const { decision } = await resolveOrganizationMemberModelDecision({
@@ -233,30 +225,8 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   // the standard API tier we call here. Until we sign an enterprise agreement
   // or Inception adds a per-request flag, refusing is the only way to honor
   // the org's stated intent.
-  if (providerConfig?.data_collection === 'deny') {
+  if (settings?.data_collection === 'deny') {
     return dataCollectionRequiredResponse();
-  }
-
-  if (providerConfig?.only && !providerConfig.only.includes(editProvider)) {
-    return NextResponse.json(
-      {
-        error: 'Provider not allowed for your team.',
-        error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${editProvider}" is not allowed for your team.`,
-      },
-      { status: 403 }
-    );
-  }
-
-  if (providerConfig?.ignore?.includes(editProvider)) {
-    return NextResponse.json(
-      {
-        error: 'Provider not allowed for your team.',
-        error_type: ProxyErrorType.provider_not_allowed,
-        message: `The provider "${editProvider}" is not allowed for your team.`,
-      },
-      { status: 403 }
-    );
   }
 
   const systemKey = getSystemApiKey(editProvider);

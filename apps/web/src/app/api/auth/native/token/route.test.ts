@@ -57,11 +57,9 @@ jest.mock('@sentry/nextjs', () => ({
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
-// Jest also runs this factory while it generates the automatic `@/lib/user`
-// mock, so reuse one capture mock across calls.
 jest.mock('@/lib/posthog', () => {
-  mockPosthogCapture ??= jest.fn();
-  const capture = mockPosthogCapture;
+  const capture = jest.fn();
+  mockPosthogCapture = capture;
   return {
     __esModule: true,
     default: jest.fn(() => ({

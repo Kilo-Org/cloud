@@ -1,5 +1,4 @@
-import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { redirect } from 'next/navigation';
 

@@ -37,9 +37,9 @@ import {
   type PushData,
 } from '@kilocode/notifications';
 
+import { namedSessionTitle } from '@/components/agents/session-detail-rename-state';
 import { type CachedActiveSession, isAttentionStatus } from '@/lib/active-sessions-live';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
-import { sessionDisplayTitle } from '@/lib/session-display-title';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
 import { i18n } from '@/i18n';
 
@@ -198,8 +198,10 @@ function toNotificationRow(
     sessionId: row.id,
     // The backend's `New session - <ISO>` is machine output, so the notification
     // shows the same 'Untitled session' fallback the session list rows use
-    // instead of the raw identifier (SPOT-DEFECT e7.png).
-    title: sessionDisplayTitle(row.title) ?? i18n.t('agents.sessionRow.untitled'),
+    // instead of the raw identifier (SPOT-DEFECT e7.png). `namedSessionTitle`
+    // also keeps a placeholder-shaped title the user's own rename flow wrote,
+    // so the notification shows the same name the session list rows show.
+    title: namedSessionTitle(row.title, row.id) ?? i18n.t('agents.sessionRow.untitled'),
     kind,
     prUrl: row.associatedPr?.url ?? null,
     organizationId: row.organizationId ?? null,

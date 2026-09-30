@@ -12,6 +12,12 @@ const MAX_COUNT = 500;
 /** A run's start/completion lag behind `created_at`, a few minutes apart. */
 const STARTED_AFTER_MINUTES = 2;
 const COMPLETED_AFTER_MINUTES = 5;
+/**
+ * How far in the past the newest row's completion sits. Without this, rows
+ * created near `now` finish after `now`, so a terminal "Completed" review would
+ * render a future relative time ("in 3 minutes").
+ */
+const NEWEST_COMPLETED_AGO_MINUTES = 1;
 
 /** This topic owns these rows, so a rerun deletes exactly its own fixtures. */
 const SEED_REPO_FULL_NAME = 'kilo-seed/review-list';
@@ -134,14 +140,18 @@ function usageFields(index: number, completed: boolean): Partial<ReviewRow> {
 
 /**
  * Deterministic, terminal-only rows. `created_at` descends one minute per row,
- * so item 0001 is the newest and the second page starts at item 0051.
+ * so item 0001 is the newest and the second page starts at item 0051. The whole
+ * timeline is anchored so the newest row's completion is already in the past,
+ * keeping every terminal timestamp behind `nowMs`.
  */
 export function generateReviewRows(userId: string, count: number, nowMs: number): ReviewRow[] {
   const rows: ReviewRow[] = [];
+  const newestCreatedAtMs =
+    nowMs - (COMPLETED_AFTER_MINUTES + NEWEST_COMPLETED_AGO_MINUTES) * MINUTE_MS;
 
   for (let index = 0; index < count; index++) {
     const prNumber = SEED_PR_NUMBER_BASE + index;
-    const createdAtMs = nowMs - index * MINUTE_MS;
+    const createdAtMs = newestCreatedAtMs - index * MINUTE_MS;
     const startedAtMs = createdAtMs + STARTED_AFTER_MINUTES * MINUTE_MS;
     const completedAtMs = createdAtMs + COMPLETED_AFTER_MINUTES * MINUTE_MS;
     const completedAt = new Date(completedAtMs).toISOString();

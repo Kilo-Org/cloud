@@ -13,20 +13,12 @@ import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { reviewMemoryOwnerInput } from '@/lib/code-reviewer-config';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
-
-// Review memory only exists for GitHub, so the owner input pins the platform
-// and only varies the scope segment (personal vs. an organization id).
-function reviewMemoryOwnerInput(scope: string) {
-  return scope === PERSONAL_SCOPE
-    ? ({ platform: 'github' } as const)
-    : ({ organizationId: scope, platform: 'github' } as const);
-}
 
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();

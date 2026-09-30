@@ -19,6 +19,16 @@ export type ReviewerPlatform = CodeReviewPlatform;
 
 export const PERSONAL_SCOPE = 'personal';
 
+// Review memory only exists for GitHub, so the owner input pins the platform
+// and only varies the scope segment (personal vs. an organization id). Shared
+// so the screen's query key and the toggle hook's invalidation key cannot
+// drift apart.
+export function reviewMemoryOwnerInput(scope: string) {
+  return scope === PERSONAL_SCOPE
+    ? ({ platform: 'github' } as const)
+    : ({ organizationId: scope, platform: 'github' } as const);
+}
+
 export const PLATFORM_CAPABILITIES = {
   github: {
     scopes: 'all',

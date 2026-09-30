@@ -26,7 +26,7 @@ import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-helpers';
+import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';

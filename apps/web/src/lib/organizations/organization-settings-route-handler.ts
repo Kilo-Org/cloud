@@ -1,11 +1,13 @@
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
 import { createTRPCRouteHandler } from '@/lib/trpc/route-handler';
-import { organizationsSettingsRouter } from '@/routers/organizations/organization-settings-router';
+import { listAvailableModelsProcedure } from '@/routers/organizations/organization-available-models-procedure';
 
-// Mounts the settings router at its root-router path, so callers keep using
-// `caller.organizations.settings.*` without importing every router.
+// Mounts listAvailableModels at its root-router path, so callers keep using
+// `caller.organizations.settings.listAvailableModels` without importing every router.
 const organizationSettingsRouter = createTRPCRouter({
-  organizations: createTRPCRouter({ settings: organizationsSettingsRouter }),
+  organizations: createTRPCRouter({
+    settings: createTRPCRouter({ listAvailableModels: listAvailableModelsProcedure }),
+  }),
 });
 
 export const handleTRPCRequest = createTRPCRouteHandler(

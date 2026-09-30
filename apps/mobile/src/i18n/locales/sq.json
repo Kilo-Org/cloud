@@ -241,6 +241,7 @@
     "addPasskey": "Shto një çelës hyrjeje",
     "passkeyDefaultName": "Çelës hyrjeje",
     "passkeyAddedOn": "Shtuar {{date}}",
+    "passkeyLastUsedOn": "Përdorur së fundi {{date}}",
     "passkeyAdded": "Çelësi i hyrjes u shtua.",
     "passkeyAddFailed": "Nuk u arrit të shtohej një çelës hyrjeje. Provo përsëri.",
     "passkeyAddUnsupported": "Kjo pajisje nuk mund të krijojë çelësa hyrjeje.",

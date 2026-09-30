@@ -241,6 +241,7 @@
     "addPasskey": "إضافة مفتاح مرور",
     "passkeyDefaultName": "مفتاح المرور",
     "passkeyAddedOn": "أُضيف في {{date}}",
+    "passkeyLastUsedOn": "آخر استخدام في {{date}}",
     "passkeyAdded": "تمت إضافة مفتاح المرور.",
     "passkeyAddFailed": "تعذّرت إضافة مفتاح المرور. حاول مرة أخرى.",
     "passkeyAddUnsupported": "لا يمكن لهذا الجهاز إنشاء مفاتيح مرور.",

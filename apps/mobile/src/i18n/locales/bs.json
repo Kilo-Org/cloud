@@ -241,6 +241,7 @@
     "addPasskey": "Dodaj pristupni ključ",
     "passkeyDefaultName": "Pristupni ključ",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Posljednje korišteno {{date}}",
     "passkeyAdded": "Pristupni ključ dodan.",
     "passkeyAddFailed": "Pristupni ključ nije mogao biti dodan. Pokušaj ponovo.",
     "passkeyAddUnsupported": "Ovaj uređaj ne može kreirati pristupne ključeve.",

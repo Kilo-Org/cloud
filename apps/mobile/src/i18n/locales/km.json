@@ -241,6 +241,7 @@
     "addPasskey": "បន្ថែមកូនសោចូល",
     "passkeyDefaultName": "កូនសោចូល",
     "passkeyAddedOn": "បានបន្ថែម {{date}}",
+    "passkeyLastUsedOn": "ប្រើប្រាស់ចុងក្រោយ {{date}}",
     "passkeyAdded": "បានបន្ថែមកូនសោចូល។",
     "passkeyAddFailed": "មិនអាចបន្ថែមកូនសោចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "passkeyAddUnsupported": "ឧបករណ៍នេះមិនអាចបង្កើតកូនសោចូលបានទេ។",

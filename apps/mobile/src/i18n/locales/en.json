@@ -241,6 +241,7 @@
     "addPasskey": "Add a passkey",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Added {{date}}",
+    "passkeyLastUsedOn": "Last used {{date}}",
     "passkeyAdded": "Passkey added.",
     "passkeyAddFailed": "Could not add a passkey. Try again.",
     "passkeyAddUnsupported": "This device cannot create passkeys.",

@@ -241,6 +241,7 @@
     "addPasskey": "ଏକ ପାସକି ଯୋଡ଼ନ୍ତୁ",
     "passkeyDefaultName": "ପାସକି",
     "passkeyAddedOn": "{{date}} ରେ ଯୋଡ଼ାଗଲା",
+    "passkeyLastUsedOn": "ଶେଷ ବ୍ୟବହାର {{date}}",
     "passkeyAdded": "ପାସକି ଯୋଡ଼ାଗଲା।",
     "passkeyAddFailed": "ପାସକି ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "passkeyAddUnsupported": "ଏହି ଡିଭାଇସ୍ ପାସକି ତିଆରି କରିପାରିବ ନାହିଁ।",

@@ -21,7 +21,7 @@ import { GLM_CURRENT_MODEL_ID, GLM_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gatew
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
     expect(PRIMARY_DEFAULT_MODEL).toBe(GLM_FLASH_CURRENT_MODEL_ID);
-    expect(GPT_SOL_CURRENT_MODEL_ID).toBe('openai/gpt-6-sol');
+    expect(GPT_SOL_CURRENT_MODEL_ID).toBe('openai/gpt-6.1-sol');
 
     const expectedModels = [
       CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -40,6 +40,7 @@ describe('OpenRouter Models Config', () => {
     });
 
     const supersededModels = [
+      'openai/gpt-6-sol',
       'openai/gpt-5.6-sol',
       'openai/gpt-5.6-terra',
       'stealth/claude-opus-4.8',

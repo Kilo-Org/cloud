@@ -2,8 +2,11 @@ const mockNextAuthHttpHandler = jest.fn<Promise<Response>, [NextRequest, unknown
 const mockGetUserFromSession = jest.fn<Promise<{ id: string } | null>, []>();
 const mockGetAccountLinkingSession = jest.fn<Promise<{ organizationId?: string } | null>, []>();
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@/lib/user/next-auth-options', () => ({
   nextAuthHttpHandler: (...args: [NextRequest, unknown]) => mockNextAuthHttpHandler(...args),
+}));
+
+jest.mock('@/lib/user/server', () => ({
   getUserFromSession: () => mockGetUserFromSession(),
 }));
 

@@ -12,9 +12,13 @@ import { eq, inArray } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { activatePaidAgreement, createPendingAgreement, createParentSupplement } from './service';
+import {
+  activatePaidAgreement,
+  createPendingAgreement,
+  createParentSupplement,
+} from '@/lib/kilo-pass-org/service';
 import { recordOrganizationConsumption } from './consumption';
-import { repairExpiredOrganizationPassBonuses } from './bonus-repair';
+import { repairExpiredOrganizationPassBonuses } from '@/lib/kilo-pass-org/bonus-repair';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 
 const activeWindow = {

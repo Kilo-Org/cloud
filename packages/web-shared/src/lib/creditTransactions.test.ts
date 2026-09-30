@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { insertTestUser } from '../tests/helpers/user.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 
 import {
   getCreditTransactionsSummaryByUserId,

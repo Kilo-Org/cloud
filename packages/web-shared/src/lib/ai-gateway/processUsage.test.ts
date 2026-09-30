@@ -18,12 +18,12 @@ import {
 } from './processUsage';
 import { reportUsageEvent } from '@/lib/bouncer/client';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
-import { verifyApproval } from '../../tests/helpers/approval.helper';
-import { insertTestUser } from '../../tests/helpers/user.helper';
+import { verifyApproval } from '@/tests/helpers/approval.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   defineMicrodollarUsage,
   insertUsageWithOverrides,
-} from '../../tests/helpers/microdollar-usage.helper';
+} from '@/tests/helpers/microdollar-usage.helper';
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';

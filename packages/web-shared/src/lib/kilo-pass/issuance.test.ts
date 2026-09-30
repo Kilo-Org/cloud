@@ -42,7 +42,7 @@ import {
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
-} from './subscription-accounting';
+} from '@/lib/kilo-pass/subscription-accounting';
 
 import { KILO_PASS_TIER_CONFIG } from './constants';
 import { getEffectiveKiloPassThreshold } from './threshold';

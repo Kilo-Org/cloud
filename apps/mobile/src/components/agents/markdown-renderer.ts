@@ -314,6 +314,27 @@ export class MarkdownRenderer extends Renderer {
   }
 
   /**
+   * react-native-marked's parser routes a link whose first child is an image
+   * (`[![alt](img)](href)`) through `linkImage`, not `link`. Without this
+   * override the base Renderer wraps the image in a TouchableHighlight that
+   * calls `Linking.openURL(href)` directly and hardcodes the English
+   * "Opens in a new window" hint, bypassing the host confirm and
+   * `onLongPressLink` routing. Delegate to `link`, whose image branch keeps the
+   * image's own tap target (viewer / Load) and exposes the href through the
+   * same trusted-host confirmation as every other link.
+   */
+  // eslint-disable-next-line eslint/max-params -- signature fixed by react-native-marked's RendererInterface
+  override linkImage(
+    href: string,
+    imageUrl: string,
+    alt?: string,
+    style?: ImageStyle,
+    title?: string
+  ): ReactNode {
+    return this.link([this.image(imageUrl, alt, style, title)], href, undefined, title);
+  }
+
+  /**
    * Interaction wiring for the Text link branch. The image branch consumes only
    * `onLongPress` (sighted long-press) and `accessibilityLabel` from this set.
    */

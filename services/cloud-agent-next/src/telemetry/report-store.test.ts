@@ -199,6 +199,21 @@ describe('cloud agent reporting store', () => {
     });
   });
 
+  it('does not update an existing session on a conflicting session insert', async () => {
+    const fake = makeDb();
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.createSessionReport({
+      cloudAgentSessionId,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      initialMessageId: 'msg_initial',
+      occurredAt,
+    });
+    const insert = fake.inserts.find(call => call.table === cloud_agent_sessions);
+    expect(insert).toBeDefined();
+    expect(insert?.conflictValues).toBeUndefined();
+    expect(fake.updates).toHaveLength(0);
+  });
+
   it('accepts control-plane workspace_ session ids on the session report', async () => {
     const workspaceSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
     const fake = makeDb();

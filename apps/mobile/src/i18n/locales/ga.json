@@ -2181,6 +2181,7 @@
       "renamePlaceholder": "Ainm an tseisiúin",
       "transcriptAccessibility": "Athscríbhinn an tseisiúin",
       "readOnly": "Is seisiún inléite amháin é seo.",
+      "continueInNewSession": "Lean ar aghaidh i seisiún nua",
       "emptyDescription": "Seol teachtaireacht thíos chun tosú.",
       "scrollToBottom": "Scrollaigh go dtí an bun",
       "emptyTitle": "Níl aon teachtaireacht ann fós",

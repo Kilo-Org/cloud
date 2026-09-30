@@ -2125,6 +2125,7 @@
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",
       "readOnly": "Aquesta sessió és només de lectura.",
+      "continueInNewSession": "Continua en una sessió nova",
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",

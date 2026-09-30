@@ -1608,6 +1608,7 @@
       "renamePlaceholder": "Назва сеансу",
       "transcriptAccessibility": "Історія повідомлень сеансу",
       "readOnly": "Цей сеанс доступний лише для читання.",
+      "continueInNewSession": "Продовжити в новому сеансі",
       "emptyDescription": "Надішліть повідомлення нижче, щоб почати.",
       "scrollToBottom": "Прокрутити вниз",
       "emptyTitle": "Повідомлень ще немає",

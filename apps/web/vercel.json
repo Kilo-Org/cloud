@@ -139,6 +139,10 @@
     {
       "path": "/api/cron/prune-spend-alert-hourly",
       "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/code-review-outcome-aggregate",
+      "schedule": "*/5 * * * *"
     }
   ],
   "build": {

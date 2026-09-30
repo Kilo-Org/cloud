@@ -589,6 +589,66 @@ describe('codeReviewRouter.get role-gated ids', () => {
       await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
     }
   });
+
+  it('returns the billing-derived session cost for a terminal review', async () => {
+    const sessionId = `ses_get_cost_${crypto.randomUUID()}`;
+    const usageId = crypto.randomUUID();
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values({
+        owned_by_organization_id: null,
+        owned_by_user_id: ownerUser.id,
+        platform_integration_id: null,
+        repo_full_name: 'test-org/get-cost-repo',
+        pr_number: 2,
+        pr_url: 'https://github.com/test-org/get-cost-repo/pull/2',
+        pr_title: 'Get cost PR',
+        pr_author: 'octocat',
+        base_ref: 'main',
+        head_ref: 'feature/get-cost',
+        head_sha: 'sha-get-cost',
+        status: 'completed',
+        session_id: `agent_${crypto.randomUUID()}`,
+        cli_session_id: sessionId,
+        // The orchestrator never accumulated usage for this review, so the review's
+        // own total is 0 and the billing aggregate is the only cost available.
+        total_cost_musd: 0,
+        created_at: '2026-06-18T09:00:00.000Z',
+        completed_at: '2026-06-18T11:00:00.000Z',
+      })
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    await db.insert(microdollar_usage).values({
+      id: usageId,
+      kilo_user_id: ownerUser.id,
+      cost: 1234,
+      input_tokens: 1000,
+      output_tokens: 100,
+      cache_write_tokens: 0,
+      cache_hit_tokens: 0,
+      created_at: '2026-06-18T10:00:00.000Z',
+      model: 'anthropic/claude-sonnet-4.6',
+    });
+    await db.insert(microdollar_usage_metadata).values({
+      id: usageId,
+      message_id: `msg_${usageId}`,
+      session_id: sessionId,
+      created_at: '2026-06-18T10:00:00.000Z',
+    });
+
+    try {
+      const ownerCaller = await createCallerForUser(ownerUser.id);
+      const ownerResult = await ownerCaller.codeReviews.get({ reviewId: review.id });
+      expect(ownerResult.success).toBe(true);
+      if (!ownerResult.success) throw new Error('expected owner get success');
+      expect(ownerResult.sessionCostMusd).toBe(1234);
+      expect(ownerResult.review.total_cost_musd).toBe(0);
+    } finally {
+      await db.delete(microdollar_usage_metadata).where(eq(microdollar_usage_metadata.id, usageId));
+      await db.delete(microdollar_usage).where(eq(microdollar_usage.id, usageId));
+      await db.delete(cloud_agent_code_reviews).where(eq(cloud_agent_code_reviews.id, review.id));
+    }
+  });
 });
 
 describe('personalReviewAgent.createManualReviewJob', () => {

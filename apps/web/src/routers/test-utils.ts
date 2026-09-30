@@ -1,5 +1,5 @@
 import { createCallerFactory } from '@/lib/trpc/init';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { rootRouter } from '@/routers/root-router';
 import { generateApiToken } from '@/lib/tokens';
 

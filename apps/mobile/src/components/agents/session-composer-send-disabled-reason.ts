@@ -3,7 +3,8 @@ import { type CloudStatus, type SdkStatusMessageCode } from '@kilocode/cloud-age
 import { i18n } from '@/i18n';
 
 import {
-  describeTerminalFailure,
+  isRetryableTerminalFailure,
+  sessionStatusErrorMessage,
   statusCopyKeyForCode,
 } from '@/components/agents/session-terminal-error';
 
@@ -102,18 +103,32 @@ function resolveReason(
           : 'error',
     };
   }
-  // A terminal error with no message, or one on a transcript with no messages,
-  // is the failed load behind the full-screen Retry — not a runtime failure of
-  // a running session. A non-empty message on a running session falls to the
-  // class copy below, so each failure keeps its own reason.
+  // A terminal error with no message (and no code) is the failed load behind
+  // the full-screen Retry. A terminal error on a transcript with no messages is
+  // that same load failure only when a Retry can recover it (transient, busy,
+  // or a service outage). A non-retryable class (not authorized, insufficient
+  // credits, selected model unavailable, session gone) is the full-screen error
+  // whose Retry the UI withholds, so the reason states that class instead of
+  // instructing an action the screen does not provide.
   const isTerminalError = indicator.type === undefined || indicator.type === 'error';
-  if (isTerminalError && (indicator.message.trim() === '' || input.messageCount === 0)) {
-    return { message: i18n.t('agentChat.composer.sessionLoadFailed'), tone: 'error' };
+  if (isTerminalError) {
+    const isUncodedEmptyMessage = indicator.code === undefined && indicator.message.trim() === '';
+    const retryable = isRetryableTerminalFailure({
+      message: indicator.message,
+      code: indicator.code,
+    });
+    if (isUncodedEmptyMessage || (input.messageCount === 0 && retryable)) {
+      return { message: i18n.t('agentChat.composer.sessionLoadFailed'), tone: 'error' };
+    }
   }
-  // `describeTerminalFailure` maps every `TerminalErrorClass` to its catalog
-  // copy: permission, credits, busy, model, gone, unavailable, transient and
-  // unknown.
-  return { message: describeTerminalFailure(indicator.message).message, tone: 'error' };
+  // Resolve through the transcript's own status surface
+  // (`sessionStatusErrorMessage`) so the reason beside Send and the transcript
+  // never disagree: a recognized class gets its catalog copy, the Durable
+  // Object's safe failure projection passes through, and an unrecognized
+  // runtime failure gets the assistant-failure line. Classifying through
+  // `describeTerminalFailure` would give that last case the page-load line,
+  // which contradicts the loaded transcript this reason is rendered on.
+  return { message: sessionStatusErrorMessage(indicator), tone: 'error' };
 }
 
 /**
@@ -124,11 +139,13 @@ function resolveReason(
  * is the same one the input row exposes to screen readers.
  *
  * Precedence matches the surfaces the reader already sees: a failed load (the
- * error atom on an empty transcript, or a terminal error on an empty
- * transcript) points at Retry; Cloud setup and teardown state their phase; a
- * status line with its own catalog copy states it; any other terminal failure
- * gets the class copy the transcript's status indicator renders; and an
- * unresolved/connecting session gets the generic line.
+ * error atom on an empty transcript, or a retryable terminal error on an empty
+ * transcript) points at Retry; a non-retryable terminal error on an empty
+ * transcript states its own class, matching the full-screen error that offers
+ * no Retry; Cloud setup and teardown state their phase; a status line with its
+ * own catalog copy states it; any other terminal failure gets the class copy
+ * the transcript's status indicator renders; and an unresolved/connecting
+ * session gets the generic line.
  */
 export function resolveComposerSendDisabledReason(
   input: ComposerSendDisabledReasonInput

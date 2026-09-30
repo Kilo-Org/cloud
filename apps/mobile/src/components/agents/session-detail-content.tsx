@@ -2497,48 +2497,10 @@ export function SessionDetailContent({
               exiting={FadeOut.duration(150)}
               layout={LinearTransition.duration(150)}
             >
-              <ChatComposer
-                key={`${composerAccount.epoch}:${sessionId}`}
-                onSend={handleSend}
-                onSendCommand={handleSendCommand}
-                onCreateSession={handleCreateSession}
-                onRestartSession={handleRestartSession}
-                onExitSession={handleExitSession}
-                onStop={handleStop}
-                disabled={isComposerDisabled}
-                sendDisabled={!canSend}
-                sendDisabledReason={sendDisabledReason}
-                sendDisabledReasonTone={sendDisabledReasonTone}
-                isStreaming={isStreaming}
-                placeholder={composerPlaceholder}
-                mode={currentMode}
-                onModeChange={handleModeChange}
-                model={displayModel}
-                variant={displayVariant}
-                modelOptions={modelOptionsForToolbar}
-                customOptions={customOptions}
-                modelLocked={modelLocked}
-                modelLockLabel={pinned.agentName}
-                onModelSelect={handleModelSelect}
-                organizationId={organizationId}
-                attachmentsEnabled={supportsAttachments}
-                activeSessionType={activeSessionType}
-                commands={availableCommands}
-                commandCatalogStatus={availableCommandsCatalogStatus}
-                commandState={remoteCommandState}
-                shareId={shareId}
-                autoSend={autoSend}
-                draftKey={userId ? sessionComposerDraftKey : undefined}
-                initialDraft={composerDraft.settled ? (composerDraft.value ?? '') : undefined}
-                sessionId={sessionId}
-                suggestion={activeSuggestion}
-                onAcceptSuggestion={async (requestId, index) => {
-                  await manager.acceptSuggestion(requestId, index);
-                }}
-                onDismissSuggestion={async requestId => {
-                  await manager.dismissSuggestion(requestId);
-                }}
-                controlRef={composerControlRef}
+              <RemoteSessionExitFailure
+                message={exitFailure.message}
+                onRetry={handleRetryExit}
+                isRetrying={isRetryingExit}
               />
             </Animated.View>
           ) : null}
@@ -2556,6 +2518,8 @@ export function SessionDetailContent({
               onStop={handleStop}
               disabled={isComposerDisabled}
               sendDisabled={!canSend}
+              sendDisabledReason={sendDisabledReason}
+              sendDisabledReasonTone={sendDisabledReasonTone}
               isStreaming={isStreaming}
               placeholder={composerPlaceholder}
               mode={currentMode}

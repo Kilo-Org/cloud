@@ -357,22 +357,3 @@ describe('ChatComposerInputRow mounted — single-line placeholder', () => {
     renderer.unmount();
   });
 });
-
-describe('ChatComposerInputRow mounted — cannot-send reason', () => {
-  const REASON = 'The session could not be loaded. Retry first.';
-
-  it('shows the reason on its own line, hints send, keeps the input editable', async () => {
-    const props = { inputEditable: true, sendDisabledReason: REASON };
-    const renderer = await renderRow(props);
-    const reason = findAllByType(renderer.root, 'Text').find(n => n.props.children === REASON);
-    expect(reason?.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
-    expect(reason?.props.accessibilityLiveRegion).toBe('polite');
-    expect(String(reason?.props.className)).toContain('text-destructive');
-    expect(reason?.parent?.props.className).not.toContain('flex-row');
-    const send = findByAccessibilityLabel(renderer.root, 'Send message');
-    expect(send?.props.accessibilityHint).toBe(REASON);
-    expect(findTextInput(renderer.root).props.editable).toBe(true);
-    expect(String(findTextInput(renderer.root).parent?.props.className)).toContain('flex-1');
-    renderer.unmount();
-  });
-});

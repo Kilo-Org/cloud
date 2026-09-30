@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
@@ -171,17 +172,13 @@ export function ChatComposerInputRow({
     // flex-1 input or push the trailing send control off the screen.
     <View className="p-2.5 px-3">
       {sendDisabledReason ? (
-        <Text
-          accessibilityLiveRegion="polite"
+        <AccessibleStatus
+          message={sendDisabledReason}
+          tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
           numberOfLines={1}
           ellipsizeMode="tail"
-          className={cn(
-            'mb-1 text-right text-xs',
-            sendDisabledReasonTone === 'neutral' ? 'text-muted-foreground' : 'text-destructive'
-          )}
-        >
-          {sendDisabledReason}
-        </Text>
+          className="mb-1 text-right text-xs"
+        />
       ) : null}
 
       <View className="flex-row items-center">

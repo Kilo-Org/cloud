@@ -8,7 +8,7 @@ import {
   resolveComposerSendDisabledReason,
   resolveComposerSendDisabledReasonTone,
 } from './session-composer-send-disabled-reason';
-import { statusCopyKeyForCode } from './session-terminal-error';
+import { sessionStatusErrorMessage, statusCopyKeyForCode } from './session-terminal-error';
 
 const idle = {
   canSend: false,
@@ -55,7 +55,7 @@ const CLASS_CASES: [string, string, string][] = [
     'Connection lost. Please retry in a moment.',
     'agentChat.session.connectionTrouble',
   ],
-  ['unknown', 'some unexpected failure', 'agentChat.session.failedToLoadDetails'],
+  ['unknown', 'some unexpected failure', 'agentChat.messageFailure.assistantFailed'],
 ];
 
 /** One code per entry in `STATUS_COPY_KEY_BY_CODE`, with its catalog key. */
@@ -116,6 +116,67 @@ describe('resolveComposerSendDisabledReason', () => {
         statusIndicator: { type: 'error', message: '' },
       })
     ).toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+  });
+
+  // A non-retryable class on an empty transcript is the full-screen error that
+  // offers no Retry, so the reason beside send states the class instead of
+  // telling the reader to Retry an action the screen does not provide.
+  it.each([
+    [
+      'credits',
+      'Insufficient credits. Please add at least $1 to continue using Cloud Agent.',
+      'agentChat.session.notEnoughCredits',
+    ],
+    [
+      'permission',
+      'You are not authorized to use the Cloud Agent.',
+      'queryError.permissionDescription',
+    ],
+    [
+      'model',
+      'Selected model is unavailable for Cloud Agent.',
+      'agentChat.session.modelUnavailable',
+    ],
+    ['gone', 'This session is no longer available.', 'queryError.notFoundDescription'],
+  ])('states the %s class for a non-retryable empty-transcript failure', (_cls, message, key) => {
+    expect(
+      resolveComposerSendDisabledReason({
+        ...idle,
+        messageCount: 0,
+        statusIndicator: { type: 'error', message },
+      })
+    ).toBe(i18n.t(key));
+  });
+
+  it('states the coded class for a non-retryable empty-transcript failure', () => {
+    expect(
+      resolveComposerSendDisabledReason({
+        ...idle,
+        messageCount: 0,
+        statusIndicator: { type: 'error', message: '', code: 'insufficient-credits' },
+      })
+    ).toBe(i18n.t('agentChat.session.notEnoughCredits'));
+    expect(
+      resolveComposerSendDisabledReason({
+        ...idle,
+        messageCount: 0,
+        statusIndicator: { type: 'error', message: '', code: 'selected-model-unavailable' },
+      })
+    ).toBe(i18n.t('agentChat.session.modelUnavailable'));
+    expect(
+      resolveComposerSendDisabledReason({
+        ...idle,
+        messageCount: 0,
+        statusIndicator: { type: 'error', message: '', code: 'not-authorized' },
+      })
+    ).toBe(i18n.t('queryError.permissionDescription'));
+    expect(
+      resolveComposerSendDisabledReason({
+        ...idle,
+        messageCount: 0,
+        statusIndicator: { type: 'error', message: '', code: 'child-session-not-found' },
+      })
+    ).toBe(i18n.t('queryError.notFoundDescription'));
   });
 
   it('states the preparing phase for cloud setup', () => {
@@ -217,6 +278,24 @@ describe('resolveComposerSendDisabledReason', () => {
         statusIndicator: { type: 'error', message: 'Something odd happened.' },
       })
     ).not.toBe(i18n.t('agentChat.composer.sessionLoadFailed'));
+  });
+
+  it('resolves the transcript status line, never a load-failure line', () => {
+    // The transcript's status surface resolves the same indicator through
+    // `sessionStatusErrorMessage`: an uncoded unknown failure is the
+    // assistant-failure line (not the page-load line) and the Durable Object's
+    // safe projection passes through, so the reason beside Send reads the same.
+    const unknown = { type: 'error' as const, message: 'Something odd happened.' };
+    const safe = { type: 'error' as const, message: 'Workspace setup failed' };
+    for (const statusIndicator of [unknown, safe]) {
+      expect(resolveComposerSendDisabledReason({ ...idle, messageCount: 5, statusIndicator })).toBe(
+        sessionStatusErrorMessage(statusIndicator)
+      );
+    }
+    expect(sessionStatusErrorMessage(unknown)).toBe(
+      i18n.t('agentChat.messageFailure.assistantFailed')
+    );
+    expect(sessionStatusErrorMessage(safe)).toBe('Workspace setup failed');
   });
 
   it('paints the load failure and runtime classes in the error tone', () => {

@@ -1028,7 +1028,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   // ── Case 12: the Run on helper sentence stays in plain language ──
-  it('renders the plain help sentence, without CLI jargon, for cloud and remote targets', async () => {
+  it('renders the plain help sentence, without CLI jargon, only for the cloud target', async () => {
     const { NewSessionConfigureForm } = await import('./new-session-configure-form');
 
     const helpSentence = 'To run on your computer, start Kilo there and leave it running.';
@@ -1057,7 +1057,9 @@ describe('NewSessionConfigureForm', () => {
       runOnInstance: INSTANCE,
       showRunOnSelector: false,
     }) as Node;
-    expect(findTextContent(remote, t => t === helpSentence)).toBe(true);
+    // The sentence tells the user to start Kilo on their computer, so it must
+    // not sit beside an already-selected computer target and contradict it.
+    expect(findTextContent(remote, t => t === helpSentence)).toBe(false);
     for (const term of cliTerms) {
       expect(
         findTextContent(remote, t => t.includes(term)),

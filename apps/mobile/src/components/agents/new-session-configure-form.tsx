@@ -285,9 +285,11 @@ export function NewSessionConfigureForm({
         />
       ) : null}
 
-      <Text className="mt-2 text-xs text-muted-foreground">
-        {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
-      </Text>
+      {!isRemote ? (
+        <Text className="mt-2 text-xs text-muted-foreground">
+          {stripInlineCodeMarkers(t('agentChat.newSession.remoteHint'))}
+        </Text>
+      ) : null}
 
       {runOnNote ? <Text className="mt-2 text-sm text-muted-foreground">{runOnNote}</Text> : null}
 

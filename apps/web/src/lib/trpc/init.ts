@@ -10,8 +10,6 @@ import {
   emitAdminAccessEvent,
 } from '@/lib/admin/admin-access-log';
 import { setTag, trpcMiddleware } from '@sentry/nextjs';
-import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
-import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { AuthContextError, trpcErrorFormatter } from '@/lib/trpc/transport';
 import {
   appUpdateRequiredError,
@@ -19,9 +17,6 @@ import {
   getMinimumVersions,
   isMobileClient,
 } from '@/lib/trpc/min-version';
-import { db } from '@/lib/drizzle';
-import { kilocode_users } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
 import {
   buildTimingLine,
   readClientDimensions,
@@ -222,8 +217,9 @@ export const baseProcedure = t.procedure
   .use(auditContextMiddleware)
   .use(minimumVersionMiddleware);
 
-// Admin-only procedure. creditManager/superadmin/sessionViewer chain on this,
-// so emitting here covers the whole admin.* tRPC surface with a single event.
+// Admin-only procedure. The creditManager/superadmin/sessionViewer procedures in
+// lib/trpc/admin-procedures chain on this, so emitting here covers the whole
+// admin.* tRPC surface with a single event.
 export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }) => {
   if (!ctx.user.is_admin) {
     throw new TRPCError({
@@ -243,48 +239,5 @@ export const adminProcedure = baseProcedure.use(async ({ ctx, path, type, next }
     method: type,
     ip: ctx.ip ?? null,
   });
-  return next();
-});
-
-export const creditManagerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanManageCredits(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Credit management access required',
-    });
-  }
-
-  return next();
-});
-
-async function getCurrentUserFromPrimary(userId: string) {
-  return db.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
-
-export const superadminProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-  if (!currentUser || currentUser.blocked_reason !== null || !userIsSuperadmin(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Superadmin access required',
-    });
-  }
-
-  return next();
-});
-
-export const sessionViewerProcedure = adminProcedure.use(async ({ ctx, next }) => {
-  const currentUser = await getCurrentUserFromPrimary(ctx.user.id);
-
-  if (!currentUser || currentUser.blocked_reason !== null || !userCanViewSessions(currentUser)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Session viewing access required',
-    });
-  }
-
   return next();
 });

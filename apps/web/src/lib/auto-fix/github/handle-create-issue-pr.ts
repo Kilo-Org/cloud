@@ -18,6 +18,7 @@ type HandleCreateIssuePRParams = {
   ticketId: string;
   sessionId: string;
   branchName?: string;
+  headRepoFullName?: string;
 };
 
 type HandleCreateIssuePRResult =
@@ -85,6 +86,7 @@ The changes implement the fix as described in the original issue.
 
     const pr = await createPullRequest({
       repoFullName: ticket.repo_full_name,
+      headRepoFullName: params.headRepoFullName,
       baseBranch,
       headBranch: branchName,
       title: prTitle,

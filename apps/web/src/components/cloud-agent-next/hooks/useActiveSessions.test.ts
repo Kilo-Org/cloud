@@ -1,5 +1,6 @@
 import {
   applyActiveSessionsHeartbeat,
+  applyActiveSessionsList,
   getRootSessionsFromHeartbeatPayload,
   getRootSessionsFromListPayload,
   removeActiveSessionsForConnection,
@@ -144,6 +145,83 @@ describe('useActiveSessions live payload helpers', () => {
     expect(sessions).toEqual([
       { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
       { id: 'root-3', status: 'busy', title: 'CLI title', connectionId: 'conn-1' },
+    ]);
+  });
+
+  it('replaces a row in place when another connection takes it over', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [
+        { id: 'root-1', status: 'busy', title: 'Moved', connectionId: 'conn-1' },
+        { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+      ],
+      {
+        connectionId: 'conn-2',
+        sessions: [
+          { id: 'root-1', status: 'busy', title: 'Moved', connectionId: 'conn-2' },
+          { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+        ],
+      }
+    );
+
+    expect(sessions).toEqual([
+      { id: 'root-1', status: 'busy', title: 'Moved', connectionId: 'conn-2' },
+      { id: 'root-2', status: 'busy', title: 'Other CLI', connectionId: 'conn-2' },
+    ]);
+  });
+
+  it('carries the cached enrichment through a full sessions.list snapshot', () => {
+    const sessions = applyActiveSessionsList(
+      [
+        {
+          id: 'root-1',
+          status: 'idle',
+          title: 'DB title',
+          connectionId: 'conn-1',
+          createdOnPlatform: 'cli',
+          organizationId: null,
+        },
+        { id: 'root-3', status: 'busy', title: 'Gone', connectionId: 'conn-1' },
+      ],
+      [{ id: 'root-1', status: 'busy', title: 'Stale CLI title', connectionId: 'conn-1' }]
+    );
+
+    expect(sessions).toEqual([
+      {
+        id: 'root-1',
+        status: 'busy',
+        title: 'DB title',
+        connectionId: 'conn-1',
+        createdOnPlatform: 'cli',
+        organizationId: null,
+      },
+    ]);
+  });
+
+  it('keeps an org attribution through a heartbeat that omits it', () => {
+    const sessions = applyActiveSessionsHeartbeat(
+      [
+        {
+          id: 'root-1',
+          status: 'idle',
+          title: 'Org session',
+          connectionId: 'conn-1',
+          organizationId: 'org_1',
+        },
+      ],
+      {
+        connectionId: 'conn-1',
+        sessions: [{ id: 'root-1', status: 'busy', title: 'Org session', connectionId: 'conn-1' }],
+      }
+    );
+
+    expect(sessions).toEqual([
+      {
+        id: 'root-1',
+        status: 'busy',
+        title: 'Org session',
+        connectionId: 'conn-1',
+        organizationId: 'org_1',
+      },
     ]);
   });
 

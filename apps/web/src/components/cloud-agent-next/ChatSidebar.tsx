@@ -80,9 +80,8 @@ type ActiveSession = {
   connectionId: string;
   gitUrl?: string;
   gitBranch?: string;
-  /** Stored origin, and the origin the connected CLI reported. */
+  /** Stored origin from `cli_sessions_v2`, absent until the session is ingested. */
   createdOnPlatform?: string;
-  platform?: string;
 };
 
 type ChatSidebarProps = {
@@ -766,27 +765,19 @@ export function ChatSidebar({
 
   // Live sessions the stored list does not carry. The live rows bypass the
   // server-side filter the stored list gets, so they have to honor the same
-  // selections here or the sidebar shows rows the filters exclude.
-  const liveOnlySessions = useMemo(() => {
-    // Heartbeats leave every row where it was, so the order is still decided
-    // here: attention first, then working, id last.
-    const remotePriority = (status: string) =>
-      status === 'question' || status === 'permission'
-        ? 2
-        : status === 'busy' || status === 'retry'
-          ? 1
-          : 0;
-    return filterLiveSidebarSessions(
-      activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
-      {
-        platformFilter: platformFilter ?? [],
-        projectFilter: projectFilter ?? [],
-        searchQuery,
-      }
-    ).toSorted(
-      (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
-    );
-  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery]);
+  // scope and selections here or the sidebar shows rows the filters exclude.
+  const liveOnlySessions = useMemo(
+    () =>
+      filterLiveSidebarSessions(
+        activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
+        {
+          organizationId: organizationId ?? null,
+          platformFilter: platformFilter ?? [],
+          projectFilter: projectFilter ?? [],
+          searchQuery,
+        }
+      ),
+    [activeSessions, sessions, organizationId, platformFilter, projectFilter, searchQuery]
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 

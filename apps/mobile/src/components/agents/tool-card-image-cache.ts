@@ -1,5 +1,5 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
 
@@ -11,13 +11,10 @@ const inFlightOrDone = new Set<string>();
 /** Reactive map of partId → file:// URI, updated only after a successful write. */
 const urisByPartId = new Map<string, string>();
 const listeners = new Set<() => void>();
-/** Bumped on every URI map mutation so useSyncExternalStore sees a new snapshot. */
-let urisVersion = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
 
 function emitChange(): void {
-  urisVersion += 1;
   for (const listener of listeners) {
     listener();
   }
@@ -28,10 +25,6 @@ function subscribe(listener: () => void): () => void {
   return () => {
     listeners.delete(listener);
   };
-}
-
-function getVersionSnapshot(): number {
-  return urisVersion;
 }
 
 function ensureCacheDirectory(): Directory {
@@ -170,10 +163,14 @@ export function getToolCardImageUri(partId: string): string | undefined {
  * Reactive lookup of a cached tool-card image URI.
  * Returns `undefined` until a successful write (or a pre-existing file) is
  * recorded for `partId`.
+ *
+ * The snapshot is this part's own map entry, not a global version counter, so
+ * React bails out when an unrelated part's attachment is cached and only the
+ * changed part's subscribers re-render.
  */
 export function useToolCardImageUri(partId: string): string | undefined {
-  useSyncExternalStore(subscribe, getVersionSnapshot, getVersionSnapshot);
-  return urisByPartId.get(partId);
+  const getSnapshot = useCallback(() => urisByPartId.get(partId), [partId]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 /**

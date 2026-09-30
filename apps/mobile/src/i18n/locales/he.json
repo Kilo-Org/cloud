@@ -39,7 +39,7 @@
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "מאגרים",
     "securityAgent": "סוכן אבטחה",
     "unknown": "לא ידוע",
@@ -2167,7 +2167,7 @@
       "unavailable": "הפעלה זו אינה יכולה לקבל בקשות הרשאה."
     },
     "prBadge": {
-      "open": "pR פתוח",
+      "open": "PR פתוח",
       "closed": "בקשת משיכה שנסגרה",
       "merged": "בקשת משיכה שמוזגה",
       "draft": "טיוטת PR",

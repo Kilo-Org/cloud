@@ -152,7 +152,9 @@ function validatePath(
     stripRequiredPrefix(url.pathname, '/api/gateway/v1') ??
     stripRequiredPrefix(url.pathname, '/api/openrouter/v1') ??
     stripRequiredPrefix(url.pathname, '/api/gateway') ??
-    stripRequiredPrefix(url.pathname, '/api/openrouter');
+    stripRequiredPrefix(url.pathname, '/api/openrouter') ??
+    // The ai-gateway app serves the proxy under /api/v1.
+    stripRequiredPrefix(url.pathname, '/api/v1');
 
   if (
     pathSuffix === '/chat/completions' ||

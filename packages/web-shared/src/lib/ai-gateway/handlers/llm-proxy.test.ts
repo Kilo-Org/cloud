@@ -171,8 +171,13 @@ const provider = {
   transformRequest: jest.fn(),
 } satisfies Provider;
 
-function makeRequest(body: unknown, headers?: HeadersInit, path = '/chat/completions') {
-  return new NextRequest(`http://localhost:3000/api/openrouter/v1${path}`, {
+function makeRequest(
+  body: unknown,
+  headers?: HeadersInit,
+  path = '/chat/completions',
+  prefix = '/api/openrouter/v1'
+) {
+  return new NextRequest(`http://localhost:3000${prefix}${path}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -596,6 +601,28 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       message: 'The providerOptions field is not supported. Use provider instead.',
     });
     expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('accepts the ai-gateway app /api/v1 path', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(), undefined, '/chat/completions', '/api/v1') as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalled();
+  });
+
+  it('rejects unknown paths under /api/v1', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(), undefined, '/unknown', '/api/v1') as never
+    );
+
+    expect(response.status).toBe(400);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 

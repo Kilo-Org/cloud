@@ -254,11 +254,10 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             // content-size change (the footer grows/shrinks as the fetch flips
             // between loading and error), so the retry footer never settles and
             // its Retry control is unreachable. `isFetchNextPageError` is the
-            // state a failed load-more leaves behind (a next-page failure keeps
-            // `isError` false because data already exists), matching the
-            // sibling review list. `isError` also covers a failed
-            // foreground/invalidated refetch. Leave recovery to the user's
-            // Retry tap until a fetch succeeds.
+            // state a failed load-more leaves behind; `isError` also covers a
+            // failed foreground/invalidated refetch. Suppress auto-paging in
+            // either case and leave recovery to the user's Retry tap until a
+            // fetch succeeds.
             if (
               findings.hasNextPage &&
               !findings.isFetchingNextPage &&
@@ -275,12 +274,18 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             <View className="pt-3">
               <FindingsListFooter
                 loading={findings.isFetchingNextPage}
-                // Must match the onEndReached guard. A failed load-more leaves
-                // `isFetchNextPageError` true while `isError` stays false, so
-                // the footer has to key on both or the inline Retry would be
-                // hidden and paging would stop with no recovery control.
+                // Must match the onEndReached guard. This covers both a failed
+                // load-more (`isFetchNextPageError`) and a failed
+                // foreground/invalidated refetch (`isError`, which react-query
+                // sets even when cached rows exist). Route the inline Retry to
+                // the matching call: `fetchNextPage()` cannot clear a refetch
+                // error, and `refetch()` is needed to reload the failed page.
                 error={findings.isFetchNextPageError || findings.isError}
-                onRetry={() => void findings.fetchNextPage()}
+                onRetry={() =>
+                  void (findings.isFetchNextPageError
+                    ? findings.fetchNextPage()
+                    : findings.refetch())
+                }
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
             </View>

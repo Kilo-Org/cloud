@@ -1,8 +1,20 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { ToolPart } from './types';
-import type { ToolCardShell } from './ToolCardShell';
+import type * as ToolCardShellModule from './ToolCardShell';
 
+let mockExpanded = false;
+
+jest.mock('./ToolCardShell', () => {
+  const actual = jest.requireActual<typeof ToolCardShellModule>('./ToolCardShell');
+  return {
+    ToolCardShell: (props: React.ComponentProps<typeof actual.ToolCardShell>) =>
+      React.createElement(actual.ToolCardShell, {
+        ...props,
+        defaultExpanded: mockExpanded ? true : props.defaultExpanded,
+      }),
+  };
+});
 jest.mock('react-markdown', () =>
   process.getBuiltinModule('module').createRequire(__filename)('react-markdown')
 );
@@ -41,8 +53,13 @@ function completedTool(
   };
 }
 
-function expanded(card: React.ReactElement<React.ComponentProps<typeof ToolCardShell>>): string {
-  return renderToStaticMarkup(React.cloneElement(card, { defaultExpanded: true }));
+function expanded(card: React.ReactElement): string {
+  mockExpanded = true;
+  try {
+    return renderToStaticMarkup(card);
+  } finally {
+    mockExpanded = false;
+  }
 }
 
 function genericJsonOutput(output: string) {
@@ -102,7 +119,7 @@ describe('BashToolCard', () => {
       { command: 'pnpm test', description: 'Run focused tests' },
       'Tests passed'
     );
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
     expect(html.match(/Run focused tests/g)).toHaveLength(1);
     expect(html).not.toContain('>Command<');
@@ -120,7 +137,7 @@ describe('BashToolCard', () => {
       { command: 'pwd', workdir: '/workspace/project' },
       '/result'
     );
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
     const trigger = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/)?.[0];
 
     expect(html).toContain('<code>pwd</code>');
@@ -140,7 +157,7 @@ describe('BashToolCard', () => {
     const command = `cat ${path}\npwd`;
     const part = completedTool('bash', { command }, 'done');
     const collapsed = renderToStaticMarkup(React.createElement(BashToolCard, { toolPart: part }));
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
     expect(collapsed).toContain('cat ./README');
     expect(collapsed).not.toContain('/workspace/');
@@ -156,7 +173,7 @@ describe('BashToolCard', () => {
       metadata: { output: '\u001b[32m10%\r100%\r\nPassed\u001b[0m\n' },
       time: { start: 1 },
     };
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
     expect(html).toContain('<code>100%\nPassed\n</code>');
     expect(html).not.toContain('10%');
@@ -167,7 +184,7 @@ describe('BashToolCard', () => {
 
   it.each(['final output', ''])('uses the final output instead of stale metadata: %j', output => {
     const part = completedTool('bash', { command: 'pwd' }, output, { output: 'stale snapshot' });
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
     expect(html).not.toContain('stale snapshot');
     expect(html).toContain(output || 'Command completed with no output.');
@@ -181,7 +198,7 @@ describe('BashToolCard', () => {
       'Finished',
       { command: 'pwd', description: 'Inspect current directory' }
     );
-    const html = expanded(BashToolCard({ toolPart: part }));
+    const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
     expect(html).toContain('Inspect current directory');
     expect(html).toContain('<code>pwd</code>');
@@ -206,7 +223,7 @@ describe('BashToolCard', () => {
     'shows an explicit waiting state when no output is available',
     (state, expected) => {
       const part = { ...completedTool('bash', {}, ''), state };
-      const html = expanded(BashToolCard({ toolPart: part }));
+      const html = expanded(React.createElement(BashToolCard, { toolPart: part }));
 
       expect(html).toContain(expected);
       expect(html).not.toContain('Copy output');

@@ -100,7 +100,7 @@ a rewrite to another Vercel app, where PoP hops accumulate.
 
 `VERCEL_REGION` is documented as "the ID of the Region where the app is running",
 i.e. the function region. Given the table above it should only ever be `fra1` or
-`sfo1`, which is what makes `isUSRegion` in `apps/web/src/lib/drizzle.ts` behave
+`sfo1`, which is what makes `isUSRegion` in `packages/web-shared/src/lib/drizzle.ts` behave
 correctly for the SFO half of `kilocode-global-app`.
 
 ## Failure UX

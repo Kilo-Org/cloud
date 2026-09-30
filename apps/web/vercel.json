@@ -73,10 +73,6 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/cron/minimax-token-health",
-      "schedule": "0 13 * * *"
-    },
-    {
       "path": "/api/cron/usage-daily-rollup-repairs",
       "schedule": "5 * * * *"
     },
@@ -134,6 +130,18 @@
     },
     {
       "path": "/api/cron/dispatch-spend-alerts",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/drain-spend-alert-deliveries",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/prune-spend-alert-hourly",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/cron/code-review-outcome-aggregate",
       "schedule": "*/5 * * * *"
     }
   ],

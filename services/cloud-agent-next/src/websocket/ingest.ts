@@ -29,11 +29,12 @@ import {
   type CompleteEventData,
   type KilocodeEventData,
   type CloudStatusData,
+  type CommandsAvailableData,
 } from '../shared/protocol.js';
-import type { SlashCommandInfo } from '../shared/slash-commands.js';
 import { logger } from '../logger.js';
 import type { WrapperSupervisor, WrapperTerminalEvent } from '../session/wrapper-supervisor.js';
 import type { TerminalizeParams } from '../session/session-message-state.js';
+import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
@@ -100,22 +101,6 @@ const wrapperEventTruncatedSchema = z.object({
 });
 
 const wrapperGenerationParamSchema = z.coerce.number().int().nonnegative();
-
-function getAssistantErrorMessage(error: unknown): string | undefined {
-  if (error === undefined || error === null) return undefined;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object') {
-    if ('data' in error && error.data && typeof error.data === 'object') {
-      if ('message' in error.data && typeof error.data.message === 'string') {
-        return error.data.message;
-      }
-    }
-    if ('message' in error && typeof error.message === 'string') {
-      return error.message;
-    }
-  }
-  return 'Assistant message failed';
-}
 
 function sanitizeKilocodeEventData(data: unknown): unknown {
   if (typeof data !== 'object' || data === null) return data;
@@ -254,8 +239,11 @@ export type IngestDOContext = {
     params: TerminalizeParams & { assistantMessageId?: string },
     wrapperRunId: string
   ) => Promise<void>;
-  /** Persist the slash-command catalog so connecting clients can be hydrated. */
-  setAvailableCommands: (commands: SlashCommandInfo[]) => Promise<void>;
+  /**
+   * Persist the slash-command catalog and its bound status so connecting
+   * clients can be hydrated with the notice that rows are missing.
+   */
+  setAvailableCommands: (data: CommandsAvailableData) => Promise<void>;
   /**
    * Optional callback invoked for qualifying question/permission kilocode
    * events. Synchronous/fire-and-forget; the DO owns any `waitUntil` for
@@ -740,7 +728,7 @@ export function createIngestHandler(
 
         if (eventType === 'commands.available') {
           await handleCommandsAvailable(ingestEvent.data, {
-            setAvailableCommands: cmds => doContext.setAvailableCommands(cmds),
+            setAvailableCommands: data => doContext.setAvailableCommands(data),
             logger: console,
           });
         }
@@ -775,7 +763,7 @@ export function createIngestHandler(
             const properties = data.properties as Record<string, unknown> | undefined;
             const info = properties?.info as Record<string, unknown> | undefined;
             const assistantError = info?.error;
-            const assistantErrorMessage = getAssistantErrorMessage(assistantError);
+            const assistantErrorMessage = assistantErrorDetail(assistantError);
             const parentMessageId =
               info?.role === 'assistant' && typeof info.parentID === 'string'
                 ? info.parentID

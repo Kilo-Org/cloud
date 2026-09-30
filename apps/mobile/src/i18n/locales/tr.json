@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Geri dön",
     "idle": "Boşta",
+    "scheduled": "Zamanlandı",
     "keepEditing": "Düzenlemeye devam et",
     "keepRunning": "Çalıştırmaya devam et",
     "kiloclaw": "KiloClaw",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
       "couldNotRefresh": "Yenilenemedi",
       "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
+      "viewHistory": "Oturum geçmişi",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",
       "tryAdjustFilters": "Filtrelerini değiştirmeyi veya temizlemeyi dene.",
       "couldNotSearch": "Oturumlar aranamadı.",
       "completedWillAppear": "Tamamlanan oturumlar burada görünecek.",
       "noPastSessions": "Geçmiş oturum yok",
+      "pastSessions": "Geçmiş oturumlar",
       "live": "CANLI",
       "updating": "Güncelleniyor"
     },
@@ -1581,6 +1584,7 @@
       "renamePlaceholder": "Oturum adı",
       "transcriptAccessibility": "Oturum dökümü",
       "readOnly": "Bu oturum salt okunur.",
+      "continueInNewSession": "Yeni oturumda devam et",
       "emptyDescription": "Başlamak için aşağıdan bir mesaj gönder.",
       "scrollToBottom": "En alta kaydır",
       "emptyTitle": "Henüz mesaj yok",
@@ -2094,6 +2098,10 @@
       "resumeCodexDescription": "bir OpenAI Codex oturum dökümünü içe aktar",
       "reviewDescription": "değişiklikleri incele [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} komutunu kullan",
+      "useSkillCommand": "/{{command}} becerisini kullan",
+      "skillBadge": "Beceri",
+      "catalogFull": "Komut kataloğu dolu, bu yüzden bazı komutlar gizli.",
+      "catalogOverLimit": "Beceri kataloğu boyut sınırını aşıyor, bu yüzden tüm beceriler listeleniyor.",
       "insert": "Ekle",
       "upgradeRequiredFallback": "Bu komutu kullanmak için CLI'yı güncelle.",
       "exitCapabilityUnavailable": "Oturumdan çıkmak için CLI'yı güncelle.",
@@ -2252,7 +2260,8 @@
     "optionsExpiredDescription": "Geri dön ve bu seçim penceresini önceki ekrandan yeniden aç."
   },
   "sessionRow": {
-    "needsInput": "YANIT BEKLİYOR"
+    "needsInput": "YANIT BEKLİYOR",
+    "scheduled": "ZAMANLANDI"
   },
   "voiceInput": {
     "listening": "Dinleniyor...",
@@ -2284,6 +2293,7 @@
     "gatewayModelUnavailableNotice": "Bu model artık sunulmuyor. Başka bir tane seçmek için $t(transcriptionModel.title) öğesine dokun.",
     "gatewaySignInRequired": "Kilo Gateway ile dönüştürmeyi kullanmak için oturum açın.",
     "gatewayNoModel": "Önce Tercihler'den bir metne dönüştürme modeli seçin.",
+    "gatewayInsufficientCredits": "Kilo Gateway ile dönüştürmeyi kullanmak için kredi ekle.",
     "testTitle": "Sesli girişi test et",
     "testPlaceholder": "Mikrofona dokunun ve konuşmaya başlayın.",
     "testClear": "Metni temizle"
@@ -2616,7 +2626,14 @@
       "deletedUser": "silinen kullanıcı",
       "replyForbiddenTerm": "Bu {{term}}ne yanıt verme iznin yok.",
       "moreLinesAbove_one": "… yukarıda {{displayCount}} satır daha var.",
-      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var."
+      "moreLinesAbove_other": "… yukarıda {{displayCount}} satır daha var.",
+      "deleteComment": "Yorumu sil",
+      "deleteCommentTitle": "Yorum silinsin mi?",
+      "deleteCommentMessage": "Bu yorum çekme isteğinden silinecek.",
+      "commentEditFailed": "Yorumun kaydedilemedi. Bağlantını kontrol et ve tekrar dene.",
+      "commentEditUnavailable": "Bu yorum düzenlenemez. Silinmiş olabilir.",
+      "commentDeleteFailed": "Yorumun silinemedi. Bağlantını kontrol et ve tekrar dene.",
+      "commentDeleteUnavailable": "Bu yorum silinemez."
     },
     "entry": {
       "eyebrow": "URL ile bir çekme isteği veya birleştirme isteği aç",
@@ -2929,6 +2946,8 @@
     "linkPasteNotAPullRequest": "Bu bir çekme isteği veya birleştirme isteği bağlantısı değil",
     "announce": {
       "commentPosted": "Yorum gönderildi",
+      "commentUpdated": "Yorum güncellendi",
+      "commentDeleted": "Yorum silindi",
       "reviewSubmitted": "İnceleme gönderildi",
       "autoMergeEnabled": "Otomatik birleştirme açıldı"
     },
@@ -3162,6 +3181,7 @@
     "emptyTitle": "Güvenilen sunucu yok",
     "emptyDescription": "Bir bağlantının sunucusunu güvenilir olarak işaretlediğinde o sunucunun bağlantıları tekrar onay istemeden açılır.",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
+    "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
     "backToPreferences": "Tercihlere dön"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç.",
     "openSession": "Aç",
     "approveFailed": "Onaylanamadı. Tekrar denemek için $t(common.approve) öğesine dokun.",
-    "newestResult": "En yeni sonuç"
+    "newestResult": "En yeni sonuç",
+    "scheduledWakes": "{{time}} uyanır"
   },
   "transcriptionModel": {
     "title": "Metne dönüştürme modeli",

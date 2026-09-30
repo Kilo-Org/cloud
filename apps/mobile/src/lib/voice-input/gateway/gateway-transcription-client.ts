@@ -49,11 +49,19 @@ export type TranscriptionClassification =
   | 'timeout'
   | 'model-unavailable'
   | 'auth'
+  | 'insufficient-credits'
   | 'server'
   | 'invalid-response';
 
 const MODEL_UNAVAILABLE_STATUSES = new Set([400, 404, 410, 422]);
 const AUTH_STATUSES = new Set([401, 403]);
+/**
+ * The gateway answers a transcription blocked by an exhausted Kilo balance
+ * with this status and an actionable credits body. It is terminal: the same
+ * request cannot succeed until credits are added, so it must never be folded
+ * into the generic retryable server state.
+ */
+const PAYMENT_REQUIRED_STATUS = 402;
 
 /**
  * Wire headers for the transcription upload. The organization header is
@@ -157,8 +165,8 @@ export async function transcribeRecording({
  * Map a transcription outcome onto one user-facing state. The caller (the
  * voice-input controller) turns each value into copy: success → insert the
  * text; no-speech → the empty state; unreachable/timeout/server → a retryable
- * error; model-unavailable/auth → a non-retryable error with its own guidance;
- * invalid-response → an unexpected gateway body.
+ * error; model-unavailable/auth/insufficient-credits → a non-retryable error
+ * with its own guidance; invalid-response → an unexpected gateway body.
  */
 export function classifyTranscriptionFailure(
   input:
@@ -180,6 +188,9 @@ export function classifyTranscriptionFailure(
   }
   if (status !== undefined && AUTH_STATUSES.has(status)) {
     return 'auth';
+  }
+  if (status === PAYMENT_REQUIRED_STATUS) {
+    return 'insufficient-credits';
   }
   if (status !== undefined && status >= 400) {
     return 'server';

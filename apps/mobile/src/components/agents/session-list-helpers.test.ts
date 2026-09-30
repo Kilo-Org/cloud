@@ -14,6 +14,7 @@ import {
   composeSessionProvenanceSubtitle,
   expandPlatformFilter,
   formatMeta,
+  formatScheduledWake,
   knownPlatformBucket,
   normalisePlatformSelection,
   PLATFORM_FILTERS,
@@ -136,6 +137,24 @@ describe('remoteMeta', () => {
     expect(remoteMeta({ lastActivityAt, updatedAt })).toBe(formatMeta(lastActivityAt));
   });
 
+  it('formats the relative time from the caller\u2019s sampled clock', () => {
+    // A memoized row cannot read the wall clock behind the memo, so the caller
+    // passes the tick that re-rendered it. The same timestamp therefore reads
+    // differently for two sampled clocks, and each matches `timeAgo`.
+    const updatedAt = '2026-01-01T00:00:00.000Z';
+    const base = parseTimestamp(updatedAt).getTime();
+    const firstTick = base + 5 * 60_000;
+    const laterTick = base + 20 * 60_000;
+
+    expect(remoteMeta({ updatedAt }, firstTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, firstTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).toBe(
+      timeAgo(parseTimestamp(updatedAt), undefined, laterTick).toUpperCase()
+    );
+    expect(remoteMeta({ updatedAt }, laterTick)).not.toBe(remoteMeta({ updatedAt }, firstTick));
+  });
+
   it('falls back to updatedAt when lastActivityAt is absent', () => {
     const updatedAt = '2024-01-01T00:00:00.000Z';
     expect(remoteMeta({ updatedAt })).toBe(formatMeta(updatedAt));
@@ -169,6 +188,28 @@ describe('formatMeta (moved helper, regression guard)', () => {
     expect(formatMeta('2024-01-01T00:00:00.000Z')).toBe(
       timeAgo(parseTimestamp('2024-01-01T00:00:00.000Z')).toUpperCase()
     );
+  });
+});
+
+describe('formatScheduledWake', () => {
+  it('returns null when the timestamp does not parse', () => {
+    expect(formatScheduledWake('not-a-timestamp')).toBeNull();
+    expect(formatScheduledWake('')).toBeNull();
+    expect(formatScheduledWake('2026-13-45T99:99:99Z')).toBeNull();
+  });
+
+  it('formats a valid ISO wake as a clock time with an hour and a minute', () => {
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).toMatch(/\d/);
+    expect(wake).toContain(':');
+  });
+
+  it('follows the active language (German uses a 24-hour clock)', async () => {
+    await i18n.changeLanguage('de');
+    const wake = formatScheduledWake('2026-09-24T09:00:00.000Z');
+    expect(wake).not.toBeNull();
+    expect(wake).not.toMatch(/AM|PM/);
   });
 });
 

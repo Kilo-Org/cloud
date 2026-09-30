@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Quay lại",
     "idle": "Đang rảnh",
+    "scheduled": "Đã lên lịch",
     "keepEditing": "Tiếp tục chỉnh sửa",
     "keepRunning": "Tiếp tục chạy",
     "kiloclaw": "KiloClaw",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "couldNotRefresh": "Không thể làm mới",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "viewHistory": "Lịch sử phiên",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
       "tryAdjustFilters": "Thử điều chỉnh hoặc bỏ bộ lọc.",
       "couldNotSearch": "Không thể tìm kiếm phiên.",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Chưa có phiên đã hoàn tất",
+      "pastSessions": "Các phiên trước đây",
       "live": "TRỰC TIẾP",
       "updating": "Đang cập nhật"
     },
@@ -1581,6 +1584,7 @@
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",
       "readOnly": "Bạn chỉ có thể xem phiên này.",
+      "continueInNewSession": "Tiếp tục trong phiên mới",
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
       "emptyTitle": "Chưa có tin nhắn",
@@ -2094,6 +2098,10 @@
       "resumeCodexDescription": "nhập bản ghi phiên OpenAI Codex",
       "reviewDescription": "xem lại các thay đổi [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Dùng /{{command}}",
+      "useSkillCommand": "Dùng kỹ năng /{{command}}",
+      "skillBadge": "Kỹ năng",
+      "catalogFull": "Danh mục lệnh đã đầy, nên một số lệnh bị ẩn.",
+      "catalogOverLimit": "Danh mục kỹ năng vượt quá giới hạn kích thước, nên mọi kỹ năng đều được liệt kê.",
       "insert": "Chèn",
       "upgradeRequiredFallback": "Vui lòng nâng cấp CLI của bạn để sử dụng lệnh này.",
       "exitCapabilityUnavailable": "Cập nhật CLI của bạn để thoát phiên.",
@@ -2252,7 +2260,8 @@
     "optionsExpiredDescription": "Quay lại màn hình trước rồi mở lại danh sách lựa chọn này."
   },
   "sessionRow": {
-    "needsInput": "CẦN PHẢN HỒI"
+    "needsInput": "CẦN PHẢN HỒI",
+    "scheduled": "ĐÃ LÊN LỊCH"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -2284,6 +2293,7 @@
     "gatewayModelUnavailableNotice": "Mô hình này không còn được cung cấp nữa. Nhấn $t(transcriptionModel.title) để chọn mô hình khác.",
     "gatewaySignInRequired": "Đăng nhập để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
     "gatewayNoModel": "Trước tiên, hãy chọn một mô hình chuyển giọng nói trong Tùy chọn.",
+    "gatewayInsufficientCredits": "Nạp tiền để dùng tính năng chuyển giọng nói qua Kilo Gateway.",
     "testTitle": "Kiểm tra nhập bằng giọng nói",
     "testPlaceholder": "Chạm vào micrô và bắt đầu nói.",
     "testClear": "Xóa văn bản"
@@ -2616,7 +2626,14 @@
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
       "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
-      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
+      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên.",
+      "deleteComment": "Xóa bình luận",
+      "deleteCommentTitle": "Xóa bình luận?",
+      "deleteCommentMessage": "Bình luận này sẽ bị xóa khỏi PR.",
+      "commentEditFailed": "Không thể lưu bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentEditUnavailable": "Không thể chỉnh sửa bình luận này. Có thể nó đã bị xóa.",
+      "commentDeleteFailed": "Không thể xóa bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentDeleteUnavailable": "Không thể xóa bình luận này."
     },
     "entry": {
       "eyebrow": "Mở PR hoặc merge request bằng URL",
@@ -2929,6 +2946,8 @@
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
+      "commentUpdated": "Đã cập nhật bình luận",
+      "commentDeleted": "Đã xóa bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
       "autoMergeEnabled": "Đã bật tự động hợp nhất"
     },
@@ -3162,6 +3181,7 @@
     "emptyTitle": "Chưa có máy chủ được tin cậy",
     "emptyDescription": "Khi bạn đánh dấu máy chủ là tin cậy, liên kết đến máy chủ đó sẽ mở mà không cần xác nhận lại.",
     "revoke": "Bỏ tin cậy {{host}}",
+    "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất"
+    "newestResult": "Kết quả mới nhất",
+    "scheduledWakes": "thức dậy {{time}}"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",

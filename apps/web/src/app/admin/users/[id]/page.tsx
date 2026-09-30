@@ -14,12 +14,13 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import { eq, inArray, desc } from 'drizzle-orm';
-import { findUserById, getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
+import { getCrossAccountEmailConflicts, inferRowlessAuthProviders } from '@/lib/user';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);

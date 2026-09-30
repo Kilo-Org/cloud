@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { type LayoutChangeEvent, Text, type TextStyle, View, type ViewStyle } from 'react-native';
 
+import { alignComposerInputHeightToLines } from '@/components/agents/chat-composer-input-height';
+
 type UseTextHeightOptions = {
   minHeight: number;
   maxHeight: number;
@@ -15,12 +17,37 @@ type UseTextHeightOptions = {
    * and native scaling applies (the kilo-chat message input path).
    */
   fontScale?: number;
+  /**
+   * Content height the caller's real `TextInput` reported for the same text,
+   * in dp (`onContentSizeChange`), including the input's own vertical padding.
+   * It is the only faithful measure of the pitch that input lays lines out at:
+   * the mirror `Text` honors `lineHeight`, while the native input uses the
+   * platform's own line box. Without it the cap stays raw, which is the
+   * behavior of every caller that does not report one.
+   */
+  nativeContentHeight?: number | null;
   initialText?: string;
 };
+
+/** Plausible band for the native pitch around the requested line height. */
+const NATIVE_PITCH_MIN_RATIO = 0.6;
+const NATIVE_PITCH_MAX_RATIO = 1.4;
 
 /**
  * Mirrors uncontrolled TextInput contents into a hidden Text node so we can
  * measure wrapped height without relying on TextInput.onContentSizeChange.
+ *
+ * The published cap is snapped down to a whole number of the lines the native
+ * input actually renders (see `alignComposerInputHeightToLines`). A capped
+ * multiline input scrolls to the caret by `contentHeight - viewHeight`; if that
+ * difference is not a whole number of rendered lines, the first visible line is
+ * painted cut against the input's top edge. Android's `TextInput` lays lines
+ * out at the font's own line box rather than the requested `lineHeight` — on
+ * this composer's 16dp Roboto at 420dpi the real input reports 49px per line,
+ * 18.67dp against a requested 20dp — so the snap uses the pitch measured from
+ * the real input's reported content height over the mirror's line count, not
+ * the requested line height. The floor is snapped to that same pitch, so a cap
+ * that lands on the minimum stays a whole number of native lines too.
  */
 export function useTextHeight({
   minHeight,
@@ -30,6 +57,7 @@ export function useTextHeight({
   fontSize,
   lineHeight,
   fontScale,
+  nativeContentHeight,
   initialText = '',
 }: UseTextHeightOptions) {
   const [text, setMeasuredText] = useState(initialText);
@@ -47,6 +75,45 @@ export function useTextHeight({
   // Disable native scaling only when the caller pre-scaled, so the scale is
   // applied exactly once instead of twice.
   const maxFontSizeMultiplier = fontScale == null ? undefined : 1;
+  // The mirror and the native input wrap the same text at the same width into
+  // the same number of lines, so the input's rendered pitch is its reported
+  // content height (minus the padding it carries) over the mirror's line
+  // count. The count grows with the draft, so the estimate sharpens exactly
+  // where it matters: the cap below only bites once the content is tall enough
+  // to scroll, and by then the report is several lines deep.
+  const mirrorLineCount = Math.max(
+    1,
+    Math.round((contentHeight - verticalPadding) / scaledLineHeight)
+  );
+  const nativePitch =
+    nativeContentHeight != null && nativeContentHeight > verticalPadding
+      ? (nativeContentHeight - verticalPadding) / mirrorLineCount
+      : null;
+  // `minHeight` is the caller's one-line floor in the requested line box
+  // (`scaledLineHeight + padding`), while the snap floors to the pitch the
+  // native input really renders. A cap that lands on the minimum would publish
+  // that unaligned minimum and clip the first visible line again, so the floor
+  // is re-expressed in whole native lines. It is clamped to the cap, which
+  // keeps the snapped height from ever exceeding the space the composer has.
+  const alignedMinHeight =
+    nativePitch !== null
+      ? Math.min(
+          verticalPadding +
+            Math.max(1, Math.floor((minHeight - verticalPadding) / nativePitch)) * nativePitch,
+          maxHeight
+        )
+      : minHeight;
+  const effectiveMaxHeight =
+    nativePitch !== null &&
+    nativePitch >= scaledLineHeight * NATIVE_PITCH_MIN_RATIO &&
+    nativePitch <= scaledLineHeight * NATIVE_PITCH_MAX_RATIO
+      ? alignComposerInputHeightToLines({
+          height: maxHeight,
+          lineHeight: nativePitch,
+          verticalPadding,
+          minHeight: alignedMinHeight,
+        })
+      : maxHeight;
 
   function handleMeasureLayout(event: LayoutChangeEvent) {
     const textHeight = event.nativeEvent.layout.height;
@@ -55,9 +122,9 @@ export function useTextHeight({
   }
 
   useEffect(() => {
-    const nextHeight = Math.min(Math.max(contentHeight, minHeight), maxHeight);
+    const nextHeight = Math.min(Math.max(contentHeight, minHeight), effectiveMaxHeight);
     setHeight(current => (current === nextHeight ? current : nextHeight));
-  }, [contentHeight, minHeight, maxHeight]);
+  }, [contentHeight, minHeight, effectiveMaxHeight]);
 
   function setText(nextText: string) {
     setMeasuredText(nextText);
@@ -91,7 +158,7 @@ export function useTextHeight({
       </View>
     ) : null;
 
-  return { height, measureElement, reset, setText };
+  return { height, maxHeight: effectiveMaxHeight, measureElement, reset, setText };
 }
 
 const hiddenContainer: ViewStyle = {

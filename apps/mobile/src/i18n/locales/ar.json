@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "رجوع",
     "idle": "خامل",
+    "scheduled": "مجدول",
     "keepEditing": "متابعة التعديل",
     "keepRunning": "متابعة التشغيل",
     "kiloclaw": "KiloClaw",
@@ -1549,12 +1550,14 @@
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة.",
       "couldNotRefresh": "تعذّر التحديث",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
+      "viewHistory": "سجل الجلسات",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب كلمة بحث أخرى.",
       "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
       "couldNotSearch": "تعذّر البحث في الجلسات.",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
+      "pastSessions": "الجلسات السابقة",
       "live": "مباشر",
       "updating": "جارٍ التحديث"
     },
@@ -1629,6 +1632,7 @@
       "renamePlaceholder": "اسم الجلسة",
       "transcriptAccessibility": "سجل المحادثة في الجلسة",
       "readOnly": "هذه الجلسة للقراءة فقط.",
+      "continueInNewSession": "المتابعة في جلسة جديدة",
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
@@ -2182,6 +2186,10 @@
       "resumeCodexDescription": "استيراد نص جلسة OpenAI Codex",
       "reviewDescription": "راجع التغييرات [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "استخدام /{{command}}",
+      "useSkillCommand": "استخدام مهارة /{{command}}",
+      "skillBadge": "مهارة",
+      "catalogFull": "كتالوج الأوامر ممتلئ، لذا بعض الأوامر مخفية.",
+      "catalogOverLimit": "كتالوج المهارات يتجاوز حد الحجم، لذا تُعرض كل المهارات.",
       "insert": "إدراج",
       "upgradeRequiredFallback": "حدّث CLI لاستخدام هذا الأمر.",
       "exitCapabilityUnavailable": "حدّث CLI للخروج من الجلسة.",
@@ -2352,7 +2360,8 @@
     "optionsExpiredDescription": "ارجع إلى الشاشة السابقة وأعد فتح قائمة الاختيار."
   },
   "sessionRow": {
-    "needsInput": "بانتظار تدخلك"
+    "needsInput": "بانتظار تدخلك",
+    "scheduled": "مجدول"
   },
   "voiceInput": {
     "listening": "جارٍ الاستماع...",
@@ -2384,6 +2393,7 @@
     "gatewayModelUnavailableNotice": "لم يعد هذا النموذج معروضًا. اضغط على $t(transcriptionModel.title) لاختيار نموذج آخر.",
     "gatewaySignInRequired": "سجّل الدخول لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
     "gatewayNoModel": "اختر نموذج التفريغ الصوتي في التفضيلات أولًا.",
+    "gatewayInsufficientCredits": "اشحن رصيدك لاستخدام التفريغ الصوتي عبر Kilo Gateway.",
     "testTitle": "اختبار الإدخال الصوتي",
     "testPlaceholder": "اضغط على الميكروفون وابدأ التحدث.",
     "testClear": "مسح النص"
@@ -2736,7 +2746,14 @@
       "moreLinesAbove_zero": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_two": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_few": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}."
+      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "deleteComment": "حذف التعليق",
+      "deleteCommentTitle": "حذف التعليق؟",
+      "deleteCommentMessage": "سيُحذف هذا التعليق من طلب السحب.",
+      "commentEditFailed": "تعذّر حفظ تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentEditUnavailable": "لا يمكن تعديل هذا التعليق. ربما حُذف.",
+      "commentDeleteFailed": "تعذّر حذف تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentDeleteUnavailable": "لا يمكن حذف هذا التعليق."
     },
     "entry": {
       "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
@@ -3097,6 +3114,8 @@
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
     "announce": {
       "commentPosted": "تم نشر التعليق",
+      "commentUpdated": "تم تحديث التعليق",
+      "commentDeleted": "تم حذف التعليق",
       "reviewSubmitted": "تم إرسال المراجعة",
       "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
     },
@@ -3334,6 +3353,7 @@
     "emptyTitle": "لا يوجد مضيفون موثوقون",
     "emptyDescription": "عندما تعتبر مضيف الرابط موثوقًا، تُفتح روابطه دون طلب تأكيد مجددًا.",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
+    "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
     "backToPreferences": "العودة إلى التفضيلات"
   },
   "quickChat": {
@@ -3363,7 +3383,8 @@
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
-    "newestResult": "أحدث نتيجة"
+    "newestResult": "أحدث نتيجة",
+    "scheduledWakes": "يستيقظ {{time}}"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",

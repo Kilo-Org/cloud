@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mine tagasi",
     "idle": "Ooterežiimis",
+    "scheduled": "Ajastatud",
     "keepEditing": "Jätka muutmist",
     "keepRunning": "Jätka tööd",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "kustutatud kasutaja",
       "replyForbiddenTerm": "Sul pole õigust sellele {{term}}ele vastata.",
       "moreLinesAbove_one": "Ülal on veel {{displayCount}} rida.",
-      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida."
+      "moreLinesAbove_other": "Ülal on veel {{displayCount}} rida.",
+      "deleteComment": "Kustuta kommentaar",
+      "deleteCommentTitle": "Kustuta kommentaar?",
+      "deleteCommentMessage": "See kommentaar kustutatakse tõmbetaotlusest.",
+      "commentEditFailed": "Sinu kommentaari ei õnnestunud salvestada. Kontrolli ühendust ja proovi uuesti.",
+      "commentEditUnavailable": "Seda kommentaari ei saa muuta. Võib-olla on see kustutatud.",
+      "commentDeleteFailed": "Sinu kommentaari ei õnnestunud kustutada. Kontrolli ühendust ja proovi uuesti.",
+      "commentDeleteUnavailable": "Seda kommentaari ei saa kustutada."
     },
     "couldNotOpenGitHubAppSettings": "GitHubi rakenduse seadeid ei õnnestunud avada.",
     "installKiloGitHubApp": "Installi Kilo GitHubi rakendus",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "See pole tõmbetaotluse ega liitmistaotluse link",
     "announce": {
       "commentPosted": "Kommentaar on postitatud",
+      "commentUpdated": "Kommentaar uuendatud",
+      "commentDeleted": "Kommentaar kustutatud",
       "reviewSubmitted": "Ülevaatus on esitatud",
       "autoMergeEnabled": "Automaatne ühendamine on lubatud"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "couldNotRefresh": "Värskendamine ebaõnnestus",
       "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
+      "viewHistory": "Seansside ajalugu",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "tryAdjustFilters": "Proovi filtreid muuta või eemaldada.",
       "couldNotSearch": "Seansse ei õnnestunud otsida.",
       "completedWillAppear": "Lõpetatud seansid ilmuvad siia.",
       "noPastSessions": "Varasemaid seansse pole",
+      "pastSessions": "Varasemad seansid",
       "live": "REAALAJAS",
       "updating": "Uuendamine"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "Seansi nimi",
       "transcriptAccessibility": "Seansi vestlusajalugu",
       "readOnly": "Seda seanssi saab ainult lugeda.",
+      "continueInNewSession": "Jätka uues seansis",
       "emptyDescription": "Alustamiseks kirjuta allolevale väljale sõnum ja saada see.",
       "scrollToBottom": "Keri lõppu",
       "emptyTitle": "Sõnumeid pole veel",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "impordi OpenAI Codexi seansi transkript",
       "reviewDescription": "vaata muudatused üle [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Kasuta /{{command}}",
+      "useSkillCommand": "Kasuta oskust /{{command}}",
+      "skillBadge": "Oskus",
+      "catalogFull": "Käskude loend on täis, seega on osa käske peidetud.",
+      "catalogOverLimit": "Oskuste loend ületab suuruspiiri, seega kuvatakse kõik oskused.",
       "insert": "Lisa",
       "upgradeRequiredFallback": "Selle käsu kasutamiseks uuenda CLI-d.",
       "exitCapabilityUnavailable": "Seansist väljumiseks uuenda CLI-d.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "Mine tagasi ja ava see valik eelmiselt ekraanilt uuesti."
   },
   "sessionRow": {
-    "needsInput": "VAJAB SISENDIT"
+    "needsInput": "VAJAB SISENDIT",
+    "scheduled": "AJASTATUD"
   },
   "voiceInput": {
     "listening": "Kuulamine...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "Seda mudelit enam ei pakuta. Puuduta $t(transcriptionModel.title), et valida teine.",
     "gatewaySignInRequired": "Logi sisse, et kasutada Kilo Gateway kõnetuvastust.",
     "gatewayNoModel": "Vali kõigepealt Eelistustes kõnetuvastuse mudel.",
+    "gatewayInsufficientCredits": "Lisa krediiti, et kasutada Kilo Gateway kõnetuvastust.",
     "testTitle": "Testi häälsisestust",
     "testPlaceholder": "Puuduta mikrofoni ja hakka rääkima.",
     "testClear": "Tühjenda tekst"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "Usaldatud hoste pole",
     "emptyDescription": "Kui usaldad lingi hosti, avatakse selle hosti lingid edaspidi kinnitust küsimata.",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
+    "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente.",
     "openSession": "Ava",
     "approveFailed": "Kinnitamine ebaõnnestus. Uuesti proovimiseks puuduta $t(common.approve).",
-    "newestResult": "Uusim tulemus"
+    "newestResult": "Uusim tulemus",
+    "scheduledWakes": "ärkab {{time}}"
   },
   "transcriptionModel": {
     "title": "Kõnetuvastuse mudel",

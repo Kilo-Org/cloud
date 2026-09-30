@@ -86,6 +86,8 @@ const FAILURE_CODE_REASONS = {
 const ASSISTANT_REASON_REASONS = {
   rate_limited: 'assistant_rate_limited',
   provider_unavailable: 'assistant_unavailable',
+  provider_disconnect: 'assistant_provider_disconnect',
+  gateway_unavailable: 'assistant_gateway_unavailable',
   timeout: 'assistant_timeout',
   provider_authentication: 'assistant_unauthorized',
   invalid_request: 'assistant_invalid_request',
@@ -107,6 +109,22 @@ const RATE_LIMITED_BY_OWNERSHIP = {
   byok: 'assistant_rate_limited_byok',
   managed: 'assistant_rate_limited_managed',
   unknown: 'assistant_rate_limited',
+} as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
+
+/**
+ * A provider authentication failure split by whose key was rejected. A BYOK key
+ * the provider rejects is actionable by the owner — the existing action-required
+ * flow disables the reviewer and emails them to fix the key — whereas a managed
+ * or unattributed 401 is ours to investigate and stays the generic reason.
+ *
+ * The safe callback message is only ever the projected 'Assistant request was not
+ * authorized', so the raw '[BYOK]' sentence never reaches this receiver; ownership
+ * is the only signal that this is the customer's key and not ours.
+ */
+const PROVIDER_AUTHENTICATION_BY_OWNERSHIP = {
+  byok: 'byok_invalid_key',
+  managed: 'assistant_unauthorized',
+  unknown: 'assistant_unauthorized',
 } as const satisfies Record<CloudAgentProviderOwnership, CodeReviewTerminalReason>;
 
 /**
@@ -149,13 +167,17 @@ export function terminalReasonFromCloudAgentFailure(
   }
 
   if (failure.code === 'assistant_error') {
-    // Structured reason wins. Rate limiting refines further by whose key was
-    // throttled, which is the difference between an actionable failure and one
-    // only the customer can resolve.
+    // Structured reason wins. Rate limiting and provider authentication refine
+    // further by whose key failed, which is the difference between an actionable
+    // failure and one only we can investigate.
     if (failure.assistantReason) {
-      return failure.assistantReason === 'rate_limited'
-        ? RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown']
-        : ASSISTANT_REASON_REASONS[failure.assistantReason];
+      if (failure.assistantReason === 'rate_limited') {
+        return RATE_LIMITED_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      if (failure.assistantReason === 'provider_authentication') {
+        return PROVIDER_AUTHENTICATION_BY_OWNERSHIP[failure.providerOwnership ?? 'unknown'];
+      }
+      return ASSISTANT_REASON_REASONS[failure.assistantReason];
     }
 
     // Older payloads carry only the flattened text.

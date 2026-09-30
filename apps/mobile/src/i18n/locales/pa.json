@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ਵਾਪਸ ਜਾਓ",
     "idle": "ਵਿਹਲਾ",
+    "scheduled": "ਨਿਰਧਾਰਿਤ",
     "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
     "keepRunning": "ਚੱਲਣ ਦਿਓ",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ਮਿਟਾਇਆ ਗਿਆ ਵਰਤੋਂਕਾਰ",
       "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moreLinesAbove_one": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨ ਹੈ।",
-      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।"
+      "moreLinesAbove_other": "… ਉੱਪਰ {{displayCount}} ਹੋਰ ਲਾਈਨਾਂ ਹਨ।",
+      "deleteComment": "ਟਿੱਪਣੀ ਮਿਟਾਓ",
+      "deleteCommentTitle": "ਟਿੱਪਣੀ ਮਿਟਾਉਣੀ?",
+      "deleteCommentMessage": "ਇਹ ਟਿੱਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਤੋਂ ਮਿਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
+      "commentEditFailed": "ਤੁਹਾਡੀ ਟਿੱਪਣੀ ਸੰਭਾਲੀ ਨਹੀਂ ਜਾ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "commentEditUnavailable": "ਇਹ ਟਿੱਪਣੀ ਸੋਧੀ ਨਹੀਂ ਜਾ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਮਿਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ।",
+      "commentDeleteFailed": "ਤੁਹਾਡੀ ਟਿੱਪਣੀ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
+      "commentDeleteUnavailable": "ਇਹ ਟਿੱਪਣੀ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕਦੀ।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ਐਪ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਨਹੀਂ ਖੁੱਲ੍ਹ ਸਕੀਆਂ।",
     "installKiloGitHubApp": "Kilo GitHub ਐਪ ਸਥਾਪਿਤ ਕਰੋ",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
     "announce": {
       "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
+      "commentUpdated": "ਟਿੱਪਣੀ ਅੱਪਡੇਟ ਹੋਈ",
+      "commentDeleted": "ਟਿੱਪਣੀ ਮਿਟਾਈ ਗਈ",
       "reviewSubmitted": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਹੋ ਗਈ",
       "autoMergeEnabled": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਹੋ ਗਿਆ"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "couldNotRefresh": "ਰੀਫ੍ਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
+      "viewHistory": "ਸੈਸ਼ਨਾਂ ਦਾ ਇਤਿਹਾਸ",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਕਿਸੇ ਹੋਰ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
       "tryAdjustFilters": "ਆਪਣੇ ਫਿਲਟਰ ਬਦਲ ਕੇ ਜਾਂ ਹਟਾ ਕੇ ਵੇਖੋ।",
       "couldNotSearch": "ਸੈਸ਼ਨ ਖੋਜੇ ਨਹੀਂ ਜਾ ਸਕੇ।",
       "completedWillAppear": "ਮੁਕੰਮਲ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noPastSessions": "ਕੋਈ ਪਿਛਲਾ ਸੈਸ਼ਨ ਨਹੀਂ",
+      "pastSessions": "ਪਿਛਲੇ ਸੈਸ਼ਨ",
       "live": "ਲਾਈਵ",
       "updating": "ਅੱਪਡੇਟ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ",
       "transcriptAccessibility": "ਸੈਸ਼ਨ ਦੀ ਲਿਖਤ",
       "readOnly": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਸਿਰਫ਼ ਪੜ੍ਹਿਆ ਜਾ ਸਕਦਾ ਹੈ।",
+      "continueInNewSession": "ਨਵੇਂ ਸੈਸ਼ਨ ਵਿੱਚ ਜਾਰੀ ਰੱਖੋ",
       "emptyDescription": "ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਹੇਠਾਂ ਇੱਕ ਸੁਨੇਹਾ ਭੇਜੋ।",
       "scrollToBottom": "ਸਭ ਤੋਂ ਹੇਠਾਂ ਸਕ੍ਰੋਲ ਕਰੋ",
       "emptyTitle": "ਅਜੇ ਕੋਈ ਸੁਨੇਹਾ ਨਹੀਂ",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "OpenAI Codex ਸੈਸ਼ਨ ਦੀ ਟ੍ਰਾਂਸਕ੍ਰਿਪਟ ਆਯਾਤ ਕਰੋ",
       "reviewDescription": "ਬਦਲਾਵਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰੋ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ਵਰਤੋ",
+      "useSkillCommand": "/{{command}} ਹੁਨਰ ਵਰਤੋ",
+      "skillBadge": "ਹੁਨਰ",
+      "catalogFull": "ਕਮਾਂਡ ਸੂਚੀ ਭਰ ਗਈ ਹੈ, ਇਸ ਲਈ ਕੁਝ ਕਮਾਂਡ ਲੁਕੇ ਹੋਏ ਹਨ।",
+      "catalogOverLimit": "ਹੁਨਰ ਸੂਚੀ ਆਕਾਰ ਸੀਮਾ ਤੋਂ ਵੱਧ ਹੈ, ਇਸ ਲਈ ਹਰ ਹੁਨਰ ਦਿਖਾਈ ਦਿੰਦਾ ਹੈ।",
       "insert": "ਸ਼ਾਮਲ ਕਰੋ",
       "upgradeRequiredFallback": "ਕਿਰਪਾ ਕਰਕੇ ਇਸ ਕਮਾਂਡ ਨੂੰ ਵਰਤਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਗਰੇਡ ਕਰੋ।",
       "exitCapabilityUnavailable": "ਸੈਸ਼ਨ ਤੋਂ ਬਾਹਰ ਨਿਕਲਣ ਲਈ ਆਪਣਾ CLI ਅੱਪਡੇਟ ਕਰੋ।",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "ਵਾਪਸ ਜਾਓ ਅਤੇ ਪਿਛਲੀ ਸਕ੍ਰੀਨ ਤੋਂ ਚੋਣ ਵਾਲੀ ਇਹ ਸਕ੍ਰੀਨ ਮੁੜ ਖੋਲ੍ਹੋ।"
   },
   "sessionRow": {
-    "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ"
+    "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
+    "scheduled": "ਨਿਰਧਾਰਿਤ"
   },
   "voiceInput": {
     "listening": "ਸੁਣਿਆ ਜਾ ਰਿਹਾ ਹੈ...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "ਇਹ ਮਾਡਲ ਹੁਣ ਪੇਸ਼ ਨਹੀਂ ਕੀਤਾ ਜਾਂਦਾ। ਹੋਰ ਚੁਣਨ ਲਈ $t(transcriptionModel.title) 'ਤੇ ਟੈਪ ਕਰੋ।",
     "gatewaySignInRequired": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਸਾਈਨ ਇਨ ਕਰੋ।",
     "gatewayNoModel": "ਪਹਿਲਾਂ ਤਰਜੀਹਾਂ ਵਿੱਚ ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਵਾਲਾ ਮਾਡਲ ਚੁਣੋ।",
+    "gatewayInsufficientCredits": "Kilo Gateway ਬਦਲੀ ਵਰਤਣ ਲਈ ਕ੍ਰੈਡਿਟ ਜੋੜੋ।",
     "testTitle": "ਵੌਇਸ ਇਨਪੁਟ ਦੀ ਜਾਂਚ ਕਰੋ",
     "testPlaceholder": "ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ ਅਤੇ ਬੋਲਣਾ ਸ਼ੁਰੂ ਕਰੋ।",
     "testClear": "ਲਿਖਤ ਸਾਫ਼ ਕਰੋ"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "ਕੋਈ ਭਰੋਸੇਯੋਗ ਹੋਸਟ ਨਹੀਂ",
     "emptyDescription": "ਜਦੋਂ ਤੁਸੀਂ ਕਿਸੇ ਲਿੰਕ ਦੇ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰਦੇ ਹੋ, ਇਹ ਦੁਬਾਰਾ ਪੁੱਛੇ ਬਿਨਾਂ ਖੁੱਲ੍ਹਦਾ ਹੈ।",
     "revoke": "{{host}} ਨੂੰ ਭਰੋਸੇਯੋਗ ਹੋਸਟਾਂ ਤੋਂ ਹਟਾਓ",
+    "revokeMessage": "ਇਸ ਹੋਸਟ ਦੇ ਲਿੰਕ ਦੁਬਾਰਾ ਪੁਸ਼ਟੀ ਮੰਗਣਗੇ।",
     "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।",
     "openSession": "ਖੋਲ੍ਹੋ",
     "approveFailed": "ਮਨਜ਼ੂਰ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ $t(common.approve) 'ਤੇ ਟੈਪ ਕਰੋ।",
-    "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ"
+    "newestResult": "ਸਭ ਤੋਂ ਨਵਾਂ ਨਤੀਜਾ",
+    "scheduledWakes": "{{time}} ਜਾਗੇਗਾ"
   },
   "transcriptionModel": {
     "title": "ਬੋਲੀ ਨੂੰ ਲਿਖਤ ਵਿੱਚ ਬਦਲਣ ਦਾ ਮਾਡਲ",

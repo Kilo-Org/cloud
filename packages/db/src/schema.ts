@@ -101,6 +101,7 @@ import {
   CODE_REVIEW_ANALYTICS_SCHEMA_VERSION,
   CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -303,6 +304,7 @@ export const SCHEMA_CHECK_ENUMS = {
   CodingPlanSubscriptionStatus,
   CodingPlanTermKind,
   CodeReviewAnalyticsCaptureStatus,
+  CodeReviewPublicationStatus,
   CodeReviewAnalyticsChangeType,
   CodeReviewAnalyticsImpactLevel,
   CodeReviewAnalyticsComplexityLevel,
@@ -2669,6 +2671,18 @@ export const microdollar_usage = pgTable(
   },
   table => [
     index('idx_created_at').on(table.created_at),
+    // Covering index for the spend-alert hourly rollup: it scans
+    // `created_at >= $from AND created_at <= $now` and reads exactly
+    // `kilo_user_id`, `organization_id` and `cost`, so leading with
+    // `created_at` and carrying those three payload columns lets Postgres
+    // satisfy the scan index-only. Drizzle 0.45's PgIndexBuilder cannot
+    // declare `INCLUDE`, and this composite is size-equivalent to one (both
+    // store the payload columns per entry). Built CONCURRENTLY because
+    // `microdollar_usage` is ~1.6B rows; `idx_created_at` stays in place so
+    // the table is never left without a `created_at` index during the build.
+    index('idx_microdollar_usage_created_at_rollup')
+      .on(table.created_at, table.kilo_user_id, table.organization_id, table.cost)
+      .concurrently(),
     index('idx_abuse_classification').on(table.abuse_classification),
     index('idx_kilo_user_id_created_at2').on(table.kilo_user_id, table.created_at),
     index('idx_microdollar_usage_organization_id')
@@ -2817,12 +2831,18 @@ export const api_request_log = pgTable(
     provider: text(),
     model: text(),
     status_code: integer(),
+    /** Legacy inline request body; new rows store it in R2 under `request_r2_key`. */
     request: jsonb(),
+    /** Legacy inline response body; new rows store it in R2 under `response_r2_key`. */
     response: text(),
     error: jsonb(),
+    request_r2_key: text(),
+    response_r2_key: text(),
   },
   table => [index('idx_api_request_log_created_at').on(table.created_at)]
 );
+
+export type ApiRequestLog = typeof api_request_log.$inferSelect;
 
 export const http_user_agent = pgTable(
   'http_user_agent',
@@ -5893,6 +5913,7 @@ export const cloud_agent_code_reviews = pgTable(
     // Previous summary captured before the agent updates the platform comment
     previous_summary_body: text(),
     previous_summary_head_sha: text(),
+    previous_summary_observed: boolean(),
 
     // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
@@ -5934,6 +5955,24 @@ export const cloud_agent_code_reviews = pgTable(
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
     // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
+    // Outcome-time windows and the start-latency sample each range-scan their own
+    // timestamp; the missing-outcome-time aggregate matches only null completed_at
+    // on terminal rows, which neither idx_cloud_agent_code_reviews_status nor the
+    // non-null completed_at index can serve.
+    index('idx_cloud_agent_code_reviews_completed_at')
+      .on(table.completed_at)
+      .concurrently()
+      .where(isNotNull(table.completed_at)),
+    index('idx_cloud_agent_code_reviews_started_at')
+      .on(table.started_at)
+      .concurrently()
+      .where(isNotNull(table.started_at)),
+    index('idx_cloud_agent_code_reviews_terminal_missing_completed_at')
+      .on(table.status)
+      .concurrently()
+      .where(
+        sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
+      ),
     // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
@@ -6064,6 +6103,7 @@ export const cloud_agent_code_review_attempts = pgTable(
     terminal_reason: text(),
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    publication_status: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6086,6 +6126,11 @@ export const cloud_agent_code_review_attempts = pgTable(
     check(
       'cloud_agent_code_review_attempts_attempt_number_check',
       sql`${table.attempt_number} >= 1`
+    ),
+    enumCheck(
+      'cloud_agent_code_review_attempts_publication_status_check',
+      table.publication_status,
+      CodeReviewPublicationStatus
     ),
   ]
 );
@@ -6487,6 +6532,8 @@ export type CloudAgentFailureReason =
   | 'managed_provider_authentication'
   | 'managed_model_configuration'
   | 'provider_unavailable'
+  | 'provider_disconnect'
+  | 'gateway_unavailable'
   | 'request_timeout'
   | 'assistant_invalid_request'
   | 'assistant_context_limit'

@@ -8,11 +8,8 @@ import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { Lock } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
-import { validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-
-/** Server bound: `ProfileDescriptionSchema`'s `z.string().max(500)`. */
-const PROFILE_DESCRIPTION_MAX_LENGTH = 500;
 
 /** One manual environment variable as the sheet saves it. */
 type SaveProfileVar = Readonly<{ key: string; value: string; isSecret: boolean }>;
@@ -71,7 +68,7 @@ export function SaveProfileSheet({
       );
       return;
     }
-    if (description.length > PROFILE_DESCRIPTION_MAX_LENGTH) {
+    if (validateProfileDescription(description) !== null) {
       setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
@@ -139,10 +136,7 @@ export function SaveProfileSheet({
           autoCorrect={false}
           onChangeText={value => {
             descriptionRef.current = value;
-            if (
-              descriptionError !== null &&
-              value.trim().length <= PROFILE_DESCRIPTION_MAX_LENGTH
-            ) {
+            if (descriptionError !== null && validateProfileDescription(value) === null) {
               setDescriptionError(null);
             }
           }}

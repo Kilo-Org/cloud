@@ -120,7 +120,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     const rendered = await runWidgetTask(handler, width);
     // Two agents wait, so the widget offers the in-place approval under the
     // counts (and in its reserved newest line, which is empty here).
-    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve'];
+    const expected = ['2', 'Needs input', '2', 'Working', '0', 'Scheduled', '0', 'Idle', 'Approve'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -189,7 +189,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -211,7 +211,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     vi.setSystemTime(Date.parse(old.expiresAt));
 
     const rendered = await runWidgetTask(handler, width);
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
   });
@@ -292,7 +292,7 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     });
     read.resolve(JSON.stringify(stored));
     const rendered = await rendering;
-    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Idle'];
+    const expected = ['0', 'Needs input', '1', 'Working', '0', 'Scheduled', '0', 'Idle'];
 
     expect(collectText(rendered.light)).toEqual(expected);
     expect(collectText(rendered.dark)).toEqual(expected);
@@ -312,7 +312,17 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
     // ...and the redraw after it drops the line without moving the rows.
     const settled = collectText(settledRender?.light);
     expect(settled).not.toContain('Approving…');
-    expect(settled).toEqual(['2', 'Needs input', '2', 'Working', '0', 'Idle', 'Approve']);
+    expect(settled).toEqual([
+      '2',
+      'Needs input',
+      '2',
+      'Working',
+      '0',
+      'Scheduled',
+      '0',
+      'Idle',
+      'Approve',
+    ]);
     expect(settledRender?.light.props).toMatchObject({
       clickAction: 'OPEN_URI',
       clickActionData: { uri: 'kiloapp:///cloud/sessions' },
@@ -344,6 +354,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       'Needs input',
       '1',
       'Working',
+      '0',
+      'Scheduled',
       '0',
       'Idle',
     ]);
@@ -379,6 +391,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       '1',
       'Working',
       '0',
+      'Scheduled',
+      '0',
       'Idle',
     ]);
   });
@@ -412,6 +426,8 @@ describe.each([120, 250])('registered widget handler at %d dp', width => {
       'Needs input',
       '2',
       'Working',
+      '0',
+      'Scheduled',
       '0',
       'Idle',
       'Could not approve',

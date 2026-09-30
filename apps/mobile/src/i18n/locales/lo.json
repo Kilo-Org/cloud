@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ກັບຄືນ",
     "idle": "ວ່າງ",
+    "scheduled": "ກຳນົດເວລາ",
     "keepEditing": "ແກ້ໄຂຕໍ່",
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
       "moreLinesAbove_one": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
-      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ."
+      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
+      "deleteComment": "ລຶບຄຳເຫັນ",
+      "deleteCommentTitle": "ລຶບຄຳເຫັນ?",
+      "deleteCommentMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄຳຂໍລວມໂຄດ.",
+      "commentEditFailed": "ບໍ່ສາມາດບັນທຶກຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentEditUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດແກ້ໄຂໄດ້. ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "commentDeleteFailed": "ບໍ່ສາມາດລຶບຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentDeleteUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດລຶບໄດ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
+      "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
+      "commentDeleted": "ລຶບຄຳເຫັນແລ້ວ",
       "reviewSubmitted": "ສົ່ງຜົນການກວດທານແລ້ວ",
       "autoMergeEnabled": "ເປີດການລວມອັດຕະໂນມັດແລ້ວ"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
       "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
       "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
+      "viewHistory": "ປະຫວັດເຊດຊັນ",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",
       "tryAdjustFilters": "ລອງປັບ ຫຼື ລ້າງຕົວກັ່ນຕອງຂອງທ່ານ.",
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນໄດ້.",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດແລ້ວຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
+      "pastSessions": "ເຊດຊັນທີ່ຜ່ານມາ",
       "live": "ສົດ",
       "updating": "ກຳລັງອັບເດດ"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "ຊື່ເຊດຊັນ",
       "transcriptAccessibility": "ບັນທຶກການສົນທະນາໃນເຊດຊັນ",
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
+      "continueInNewSession": "ສືບຕໍ່ໃນເຊດຊັນໃໝ່",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
       "emptyTitle": "ຍັງບໍ່ມີຂໍ້ຄວາມ",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "ນຳເຂົ້າບົດບັນທຶກເຊສຊັນ OpenAI Codex",
       "reviewDescription": "ກວດສອບການປ່ຽນແປງ [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ໃຊ້ /{{command}}",
+      "useSkillCommand": "ໃຊ້ທັກສະ /{{command}}",
+      "skillBadge": "ທັກສະ",
+      "catalogFull": "ລາຍການຄຳສັ່ງເຕັມແລ້ວ ດັ່ງນັ້ນບາງຄຳສັ່ງຖືກເຊື່ອງໄວ້.",
+      "catalogOverLimit": "ລາຍການທັກສະເກີນຂີດຈຳກັດຂະໜາດ ດັ່ງນັ້ນທັກສະທັງໝົດຖືກສະແດງ.",
       "insert": "ແຊກ",
       "upgradeRequiredFallback": "ອັບເກຣດ CLI ເພື່ອໃຊ້ຄຳສັ່ງນີ້.",
       "exitCapabilityUnavailable": "ອັບເດດ CLI ເພື່ອອອກຈາກເຊສຊັນ.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "ກັບໄປທີ່ໜ້າຈໍກ່ອນໜ້າ ແລ້ວເປີດໜ້າເລືອກນີ້ອີກຄັ້ງ."
   },
   "sessionRow": {
-    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ"
+    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "scheduled": "ກຳນົດເວລາ"
   },
   "voiceInput": {
     "listening": "ກຳລັງຟັງ...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "ໂມເດວນີ້ບໍ່ໄດ້ສະເໜີອີກຕໍ່ໄປ. ແຕະ $t(transcriptionModel.title) ເພື່ອເລືອກອັນອື່ນ.",
     "gatewaySignInRequired": "ເຂົ້າສູ່ລະບົບເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
     "gatewayNoModel": "ເລືອກໂມເດວຖອດສຽງໃນການຕັ້ງຄ່າສ່ວນຕົວກ່ອນ.",
+    "gatewayInsufficientCredits": "ເຕີມເຄຣດິດເພື່ອໃຊ້ການຖອດສຽງຜ່ານ Kilo Gateway.",
     "testTitle": "ທົດສອບການປ້ອນດ້ວຍສຽງ",
     "testPlaceholder": "ແຕະໄມໂຄຣໂຟນ ແລ້ວເລີ່ມເວົ້າ.",
     "testClear": "ລ້າງຂໍ້ຄວາມ"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "ຍັງບໍ່ມີໂຮສທີ່ໄວ້ໃຈໄດ້",
     "emptyDescription": "ເມື່ອທ່ານເລືອກໄວ້ໃຈໂຮສຂອງລິ້ງ ລິ້ງຈາກໂຮສນັ້ນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
+    "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "newestResult": "ຜົນຫຼ້າສຸດ"
+    "newestResult": "ຜົນຫຼ້າສຸດ",
+    "scheduledWakes": "ຕື່ນ {{time}}"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",

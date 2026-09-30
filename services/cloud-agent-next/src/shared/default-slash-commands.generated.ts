@@ -11,13 +11,14 @@ export type SlashCommandInfo = {
 /**
  * Source Kilo version / ref used to generate this catalog.
  *
- * Note: skills (source: 'skill') are intentionally omitted. The Kilo TUI
- * filters them from slash-command autocomplete, so they never appear in the
- * local `/` list even though they can be invoked by typing the name manually.
+ * Note: this snapshot is generated with project config disabled, so it carries
+ * the commands the CLI always has and no session skills. Skills are surfaced
+ * from the live wrapper-reported catalog, which keeps every `source: 'skill'`
+ * row the CLI reports for the session.
  *
  * Regenerate with `pnpm --filter cloud-agent-next update-default-slash-commands`.
  */
-export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.6.2';
+export const DEFAULT_SLASH_COMMANDS_SOURCE = 'kilo@7.8.1';
 
 /**
  * Default slash command catalog used when no live wrapper-reported catalog is
@@ -35,6 +36,13 @@ export const DEFAULT_SLASH_COMMANDS = [
     description: 'guided AGENTS.md setup',
     source: 'command',
     hints: ['$ARGUMENTS'],
+  },
+  {
+    name: 'kilo-config',
+    description:
+      'Guide for Kilo configuration: config paths, kilo.json fields, commands, agents, skills, permissions, MCPs, providers, TUI settings, plus Agent Manager worktree setup/run scripts, workflows, and state. Use for Kilo config questions, locating loaded config, changing settings, or Agent Manager questions about run/setup scripts, worktree setup/workflows, apply/merge/PR/conflicts, missing sessions/worktrees, and agent-manager.json recovery.',
+    source: 'skill',
+    hints: ['$1', '$ARGUMENTS'],
   },
   {
     name: 'resume-claude',

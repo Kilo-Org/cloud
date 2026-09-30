@@ -3,7 +3,7 @@ import {
   ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET,
   ABUSE_SERVICE_URL,
 } from '@/lib/config.server';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import 'server-only';
 
 async function fetchAbuseService<T>(

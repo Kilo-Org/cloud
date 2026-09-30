@@ -313,6 +313,24 @@ describe('control effect port — create', () => {
     }).create(CREATE);
     expect(thrownCreate).toEqual({ outcome: 'unknown', reason: 'network' });
   });
+
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'maps a thrown create to unknown for the %s provider family',
+    async providerFamily => {
+      const target: AllocationTarget = {
+        ...TARGET,
+        provider: providerFamily === 'vercel' ? 'vercel' : 'cloudflare',
+      };
+      const effect = await port({
+        provider: {
+          create: async () => {
+            throw new Error('provider create failed');
+          },
+        },
+      }).create({ ...CREATE, target });
+      expect(effect).toEqual({ outcome: 'unknown', reason: 'provider create failed' });
+    }
+  );
 });
 
 describe('control effect port — launch', () => {

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ফিরে যান",
     "idle": "নিষ্ক্রিয়",
+    "scheduled": "নির্ধারিত",
     "keepEditing": "সম্পাদনা চালিয়ে যান",
     "keepRunning": "চালিয়ে রাখুন",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "মুছে ফেলা ব্যবহারকারী",
       "replyForbiddenTerm": "এই {{term}}ে উত্তর দেওয়ার অনুমতি আপনার নেই।",
       "moreLinesAbove_one": "… ওপরে আরও {{displayCount}}টি লাইন আছে।",
-      "moreLinesAbove_other": "… ওপরে আরও {{displayCount}}টি লাইন আছে।"
+      "moreLinesAbove_other": "… ওপরে আরও {{displayCount}}টি লাইন আছে।",
+      "deleteComment": "মন্তব্য মুছুন",
+      "deleteCommentTitle": "মন্তব্য মুছবেন?",
+      "deleteCommentMessage": "এই মন্তব্যটি পুল রিকোয়েস্ট থেকে মুছে ফেলা হবে।",
+      "commentEditFailed": "আপনার মন্তব্য সংরক্ষণ করা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "commentEditUnavailable": "এই মন্তব্যটি সম্পাদনা করা যাবে না। এটি মুছে ফেলা হয়ে থাকতে পারে।",
+      "commentDeleteFailed": "আপনার মন্তব্য মুছে ফেলা যায়নি। আপনার সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।",
+      "commentDeleteUnavailable": "এই মন্তব্যটি মুছে ফেলা যাবে না।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "এটি পুল রিকোয়েস্ট বা মার্জ রিকোয়েস্টের লিংক নয়",
     "announce": {
       "commentPosted": "মন্তব্য পোস্ট হয়েছে",
+      "commentUpdated": "মন্তব্য আপডেট হয়েছে",
+      "commentDeleted": "মন্তব্য মুছে ফেলা হয়েছে",
       "reviewSubmitted": "রিভিউ জমা হয়েছে",
       "autoMergeEnabled": "অটো-মার্জ চালু হয়েছে"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
       "couldNotRefresh": "রিফ্রেশ করা যায়নি",
       "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
+      "viewHistory": "সেশনের ইতিহাস",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
       "tryAdjustFilters": "ফিল্টার বদলে বা সরিয়ে আবার চেষ্টা করুন।",
       "couldNotSearch": "সেশন খোঁজা যায়নি।",
       "completedWillAppear": "শেষ হওয়া সেশনগুলো এখানে দেখা যাবে।",
       "noPastSessions": "আগের কোনো সেশন নেই",
+      "pastSessions": "আগের সেশনগুলো",
       "live": "লাইভ",
       "updating": "আপডেট হচ্ছে"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "সেশনের নাম",
       "transcriptAccessibility": "সেশনের কথোপকথন",
       "readOnly": "এই সেশনের বার্তাগুলো শুধু পড়া যায়।",
+      "continueInNewSession": "নতুন সেশনে চালিয়ে যান",
       "emptyDescription": "শুরু করতে নিচে একটি বার্তা পাঠান।",
       "scrollToBottom": "একেবারে নিচে স্ক্রল করুন",
       "emptyTitle": "এখনো কোনো বার্তা নেই",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "OpenAI Codex সেশনের ট্রান্সক্রিপ্ট আমদানি করুন",
       "reviewDescription": "পরিবর্তনগুলি পর্যালোচনা করুন [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} ব্যবহার করুন",
+      "useSkillCommand": "/{{command}} স্কিল ব্যবহার করুন",
+      "skillBadge": "স্কিল",
+      "catalogFull": "কমান্ড তালিকা পূর্ণ, তাই কিছু কমান্ড লুকানো আছে।",
+      "catalogOverLimit": "স্কিল তালিকা আকার সীমা ছাড়িয়ে গেছে, তাই সব স্কিল দেখানো হয়েছে।",
       "insert": "যোগ করুন",
       "upgradeRequiredFallback": "এই কমান্ডটি ব্যবহার করতে আপনার CLI আপগ্রেড করুন।",
       "exitCapabilityUnavailable": "সেশন শেষ করতে আপনার CLI আপডেট করুন।",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "আগের স্ক্রিনে ফিরে গিয়ে বিকল্প বেছে নেওয়ার এই তালিকা আবার খুলুন।"
   },
   "sessionRow": {
-    "needsInput": "ইনপুট প্রয়োজন"
+    "needsInput": "ইনপুট প্রয়োজন",
+    "scheduled": "নির্ধারিত"
   },
   "voiceInput": {
     "listening": "শোনা হচ্ছে...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "এই মডেলটি আর দেওয়া হয় না। অন্য একটি বেছে নিতে $t(transcriptionModel.title) স্পর্শ করুন।",
     "gatewaySignInRequired": "Kilo Gateway দিয়ে কথা থেকে লেখা ব্যবহার করতে সাইন ইন করুন।",
     "gatewayNoModel": "প্রথমে পছন্দের সেটিংস থেকে কথা থেকে লেখার একটি মডেল বেছে নিন।",
+    "gatewayInsufficientCredits": "Kilo Gateway দিয়ে কথা থেকে লেখা ব্যবহার করতে ক্রেডিট যোগ করুন।",
     "testTitle": "ভয়েস ইনপুট পরীক্ষা করুন",
     "testPlaceholder": "মাইক্রোফোনে ট্যাপ করুন এবং কথা বলা শুরু করুন।",
     "testClear": "লেখা মুছুন"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "কোনো বিশ্বস্ত হোস্ট নেই",
     "emptyDescription": "কোনো লিঙ্কের হোস্টকে বিশ্বস্ত হিসেবে রাখলে সেই হোস্টের লিঙ্ক খুলতে আর অনুমতি চাওয়া হবে না।",
     "revoke": "বিশ্বস্ত হোস্টের তালিকা থেকে {{host}} সরান",
+    "revokeMessage": "এই হোস্টের লিঙ্কগুলি আবার নিশ্চিতকরণ চাইবে।",
     "backToPreferences": "পছন্দসমূহে ফিরুন"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "লক স্ক্রিনে সক্রিয় এজেন্ট দেখতে সেটিংসে লাইভ অ্যাক্টিভিটি চালু করুন।",
     "openSession": "খুলুন",
     "approveFailed": "অনুমোদন করা যায়নি। আবার চেষ্টা করতে $t(common.approve) স্পর্শ করুন।",
-    "newestResult": "সর্বশেষ ফলাফল"
+    "newestResult": "সর্বশেষ ফলাফল",
+    "scheduledWakes": "{{time}} জাগবে"
   },
   "transcriptionModel": {
     "title": "কথা থেকে লেখার মডেল",

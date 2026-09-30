@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Vissza",
     "idle": "Tétlen",
+    "scheduled": "Ütemezve",
     "keepEditing": "Szerkesztés folytatása",
     "keepRunning": "Futtatás folytatása",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "törölt felhasználó",
       "replyForbiddenTerm": "Nincs jogosultságod a {{term}} megválaszolására.",
       "moreLinesAbove_one": "… még {{displayCount}} sor feljebb.",
-      "moreLinesAbove_other": "… még {{displayCount}} sor feljebb."
+      "moreLinesAbove_other": "… még {{displayCount}} sor feljebb.",
+      "deleteComment": "Hozzászólás törlése",
+      "deleteCommentTitle": "Törlöd a hozzászólást?",
+      "deleteCommentMessage": "Ez a hozzászólás törlődni fog a módosítási kérelemből.",
+      "commentEditFailed": "Nem sikerült menteni a hozzászólásodat. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "commentEditUnavailable": "Ez a hozzászólás nem szerkeszthető. Lehet, hogy törölték.",
+      "commentDeleteFailed": "Nem sikerült törölni a hozzászólásodat. Ellenőrizd az internetkapcsolatot, és próbáld újra.",
+      "commentDeleteUnavailable": "Ez a hozzászólás nem törölhető."
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub-alkalmazás beállításait.",
     "installKiloGitHubApp": "A Kilo GitHub-alkalmazásának telepítése",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ez nem egy PR vagy merge request hivatkozása",
     "announce": {
       "commentPosted": "Hozzászólás közzétéve",
+      "commentUpdated": "Hozzászólás frissítve",
+      "commentDeleted": "Hozzászólás törölve",
       "reviewSubmitted": "Kódellenőrzés elküldve",
       "autoMergeEnabled": "Automatikus összevonás engedélyezve"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket.",
       "couldNotRefresh": "Nem sikerült frissíteni",
       "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról. A munkameneteid itt jelennek meg.",
+      "viewHistory": "Munkamenet-előzmények",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbálj másik keresőszót.",
       "tryAdjustFilters": "Próbáld módosítani vagy törölni a szűrőket.",
       "couldNotSearch": "Nem sikerült keresni a munkamenetek között.",
       "completedWillAppear": "A befejezett munkamenetek itt jelennek meg.",
       "noPastSessions": "Nincs korábbi munkamenet",
+      "pastSessions": "Korábbi munkamenetek",
       "live": "ÉLŐ",
       "updating": "Frissítés"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "Munkamenet neve",
       "transcriptAccessibility": "A munkamenet átirata",
       "readOnly": "Ez a munkamenet csak olvasható.",
+      "continueInNewSession": "Folytatás új munkamenetben",
       "emptyDescription": "A kezdéshez küldj egy üzenetet az alábbi mezőből.",
       "scrollToBottom": "Görgetés az aljára",
       "emptyTitle": "Még nincs üzenet",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "importálj egy OpenAI Codex munkamenet-átiratot",
       "reviewDescription": "tekintsd át a változásokat [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} használata",
+      "useSkillCommand": "/{{command}} készség használata",
+      "skillBadge": "Készség",
+      "catalogFull": "A parancskatalógus megtelt, ezért néhány parancs rejtve van.",
+      "catalogOverLimit": "A készségkatalógus túllépi a méretkorlátot, ezért minden készség megjelenik.",
       "insert": "Beszúrás",
       "upgradeRequiredFallback": "A parancs használatához frissítsd a CLI-t.",
       "exitCapabilityUnavailable": "A munkamenetből való kilépéshez frissítsd a CLI-t.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "Lépj vissza az előző képernyőre, és nyisd meg újra a választóablakot."
   },
   "sessionRow": {
-    "needsInput": "VÁLASZRA VÁR"
+    "needsInput": "VÁLASZRA VÁR",
+    "scheduled": "ÜTEMEZVE"
   },
   "voiceInput": {
     "listening": "Beszéd figyelése…",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "Ez a modell már nem elérhető. Koppints a $t(transcriptionModel.title) elemre egy másik kiválasztásához.",
     "gatewaySignInRequired": "Jelentkezz be a Kilo Gateway-es átírás használatához.",
     "gatewayNoModel": "Először válassz egy átírási modellt a Beállításokban.",
+    "gatewayInsufficientCredits": "A Kilo Gateway-es átírás használatához töltsd fel az egyenlegedet.",
     "testTitle": "Hangbevitel tesztelése",
     "testPlaceholder": "Érintse meg a mikrofont, és kezdjen el beszélni.",
     "testClear": "Szöveg törlése"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "Nincsenek megbízható webhelyek",
     "emptyDescription": "Ha egy webhelyet megbízhatónak jelölsz, a hivatkozásai többé nem kérnek jóváhagyást megnyitáskor.",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
+    "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
     "backToPreferences": "Vissza a beállításokhoz"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn.",
     "openSession": "Megnyitás",
     "approveFailed": "Nem sikerült jóváhagyni. Az újrapróbáláshoz koppints a $t(common.approve) elemre.",
-    "newestResult": "Legújabb eredmény"
+    "newestResult": "Legújabb eredmény",
+    "scheduledWakes": "{{time}} felébred"
   },
   "transcriptionModel": {
     "title": "Átírási modell",

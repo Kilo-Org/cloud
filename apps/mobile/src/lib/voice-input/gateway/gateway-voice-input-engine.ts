@@ -79,20 +79,14 @@ type GatewayCredentials = {
 };
 
 type GatewaySession = {
-  /** Monotonic id; every async continuation checks it still owns the session. */
-  id: number;
   /** BCP-47 hint carried from `start()` into every segment upload. */
   languageTag: string;
   /** The recorder we currently own, or null once it has been detached. */
   handle: RecorderHandle | null;
-  /** Set when `stop()` arrives while the recorder is still preparing. */
-  stopRequested: boolean;
   /** Owns the in-flight upload; `abort()` cancels it. */
   uploadController: AbortController | null;
   /** Set by `stop()`/`abort()`; a stopped session never rotates again. */
   stopped: boolean;
-  /** True once the first recorder has started, i.e. `start` was emitted. */
-  recordingStarted: boolean;
   /** Pending rotation timer, or null when none is scheduled. */
   rotationTimer: ReturnType<typeof setTimeout> | null;
   /** True while a rotation stops the old segment and starts the next. */
@@ -218,7 +212,6 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
   const segmentDurationMs = deps.segmentDurationMs ?? GATEWAY_SEGMENT_DURATION_MS;
   const listeners = new Map<keyof VoiceInputNativeEvent, Set<AnyListener>>();
   let session: GatewaySession | null = null;
-  let sessionSeq = 0;
 
   const emit = <K extends keyof VoiceInputNativeEvent>(
     event: K,
@@ -421,9 +414,11 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         // only when the whole session produced nothing.
         return;
       }
-      // 'unreachable' | 'timeout' | 'model-unavailable' | 'auth' | 'server' |
-      // 'invalid-response' → 'gateway-unreachable' | 'gateway-timeout' |
-      // 'gateway-model-unavailable' | 'gateway-auth' | 'gateway-server' |
+      // 'unreachable' | 'timeout' | 'model-unavailable' | 'auth' |
+      // 'insufficient-credits' | 'server' | 'invalid-response' →
+      // 'gateway-unreachable' | 'gateway-timeout' |
+      // 'gateway-model-unavailable' | 'gateway-auth' |
+      // 'gateway-insufficient-credits' | 'gateway-server' |
       // 'gateway-invalid-response' — the codes voice-input-state classifies.
       fail(current, `gateway-${classification}`);
     } finally {
@@ -620,10 +615,10 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       return;
     }
     // Only hand the recorder to `stop()`/`abort()` once it can actually
-    // record; while preparing, `stop()` sets `stopRequested` instead.
+    // record; while preparing, `stop()` sets `stopped`, which the check below
+    // reads once the recorder is live.
     current.handle = handle;
     emit('start', null);
-    current.recordingStarted = true;
     if (current.stopped) {
       // `stop()` arrived while we were still preparing: emit transcribing
       // after start, then run the upload path so the session terminalizes.
@@ -684,19 +679,15 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       }
       // Any previous session's upload (if still in flight) owns its own abort
       // controller and cannot emit into this one.
-      sessionSeq += 1;
       const current: GatewaySession = {
         credentials: null,
         finalizing: false,
         handle: null,
-        id: sessionSeq,
         languageTag: options.lang,
         producedText: false,
-        recordingStarted: false,
         rotationInFlight: false,
         rotationTimer: null,
         stopped: false,
-        stopRequested: false,
         // eslint-disable-next-line prefer-await-to-then -- Promise.resolve() is the empty-chain sentinel; there is no async context to await in
         uploadChain: Promise.resolve(),
         uploadController: null,
@@ -718,8 +709,8 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
       }
       const handle = current.handle;
       if (!handle) {
-        // Still preparing; `startPrep` runs the upload path when it lands.
-        current.stopRequested = true;
+        // Still preparing; `stopped` is set, and `startPrep` runs the upload
+        // path once the recorder lands.
         return;
       }
       // Synchronous first signal: the UI flips to "Transcribing…" before the

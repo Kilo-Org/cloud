@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ย้อนกลับ",
     "idle": "รอทำงาน",
+    "scheduled": "กำหนดเวลาไว้",
     "keepEditing": "แก้ไขต่อ",
     "keepRunning": "ให้ทำงานต่อ",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "ผู้ใช้ที่ถูกลบ",
       "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
       "moreLinesAbove_one": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
-      "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน"
+      "moreLinesAbove_other": "… ยังมีอีก {{displayCount}} บรรทัดด้านบน",
+      "deleteComment": "ลบความคิดเห็น",
+      "deleteCommentTitle": "ลบความคิดเห็นหรือไม่?",
+      "deleteCommentMessage": "ความคิดเห็นนี้จะถูกลบออกจาก PR",
+      "commentEditFailed": "ไม่สามารถบันทึกความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "commentEditUnavailable": "ไม่สามารถแก้ไขความคิดเห็นนี้ได้ อาจถูกลบไปแล้ว",
+      "commentDeleteFailed": "ไม่สามารถลบความคิดเห็นของคุณได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง",
+      "commentDeleteUnavailable": "ไม่สามารถลบความคิดเห็นนี้ได้"
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์พูลรีเควสต์หรือ merge request",
     "announce": {
       "commentPosted": "โพสต์ความคิดเห็นแล้ว",
+      "commentUpdated": "อัปเดตความคิดเห็นแล้ว",
+      "commentDeleted": "ลบความคิดเห็นแล้ว",
       "reviewSubmitted": "ส่งรีวิวแล้ว",
       "autoMergeEnabled": "เปิดการรวมอัตโนมัติแล้ว"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
       "couldNotRefresh": "รีเฟรชไม่ได้",
       "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
+      "viewHistory": "ประวัติเซสชัน",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
       "tryAdjustFilters": "ลองปรับหรือล้างตัวกรองของคุณ",
       "couldNotSearch": "ไม่สามารถค้นหาเซสชันได้",
       "completedWillAppear": "เซสชันที่เสร็จแล้วจะแสดงที่นี่",
       "noPastSessions": "ยังไม่มีเซสชันที่ผ่านมา",
+      "pastSessions": "เซสชันที่ผ่านมา",
       "live": "กำลังทำงาน",
       "updating": "กำลังอัปเดต"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "ชื่อเซสชัน",
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
+      "continueInNewSession": "ดำเนินการต่อในเซสชันใหม่",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "นำเข้าบันทึกเซสชัน OpenAI Codex",
       "reviewDescription": "ตรวจสอบการเปลี่ยนแปลง [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "ใช้ /{{command}}",
+      "useSkillCommand": "ใช้ทักษะ /{{command}}",
+      "skillBadge": "ทักษะ",
+      "catalogFull": "รายการคำสั่งเต็มแล้ว จึงมีบางคำสั่งถูกซ่อนไว้",
+      "catalogOverLimit": "รายการทักษะเกินขีดจำกัดขนาด จึงแสดงทักษะทั้งหมด",
       "insert": "แทรก",
       "upgradeRequiredFallback": "กรุณาอัปเดต CLI เพื่อใช้คำสั่งนี้",
       "exitCapabilityUnavailable": "อัปเดต CLI ของคุณเพื่อออกจากเซสชัน",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "กลับไปที่หน้าจอก่อนหน้าแล้วเปิดหน้าต่างเลือกนี้อีกครั้ง"
   },
   "sessionRow": {
-    "needsInput": "รอข้อมูลจากคุณ"
+    "needsInput": "รอข้อมูลจากคุณ",
+    "scheduled": "กำหนดเวลาไว้"
   },
   "voiceInput": {
     "listening": "กำลังฟัง...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "โมเดลนี้ไม่ให้บริการแล้ว แตะ $t(transcriptionModel.title) เพื่อเลือกโมเดลอื่น",
     "gatewaySignInRequired": "เข้าสู่ระบบเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
     "gatewayNoModel": "เลือกโมเดลถอดเสียงในการตั้งค่าก่อน",
+    "gatewayInsufficientCredits": "เติมเครดิตเพื่อใช้การถอดเสียงผ่าน Kilo Gateway",
     "testTitle": "ทดสอบการพิมพ์ด้วยเสียง",
     "testPlaceholder": "แตะไมโครโฟนแล้วเริ่มพูด",
     "testClear": "ล้างข้อความ"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "ไม่มีโฮสต์ที่เชื่อถือ",
     "emptyDescription": "เมื่อคุณเชื่อถือโฮสต์ของลิงก์ แอปจะเปิดลิงก์จากโฮสต์นั้นโดยไม่ถามอีก",
     "revoke": "เลิกเชื่อถือ {{host}}",
+    "revokeMessage": "ลิงก์ไปยังโฮสต์นี้จะขอการยืนยันอีกครั้ง",
     "backToPreferences": "กลับไปที่การตั้งค่า"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก",
     "openSession": "เปิด",
     "approveFailed": "อนุมัติไม่สำเร็จ แตะ $t(common.approve) เพื่อลองอีกครั้ง",
-    "newestResult": "ผลลัพธ์ล่าสุด"
+    "newestResult": "ผลลัพธ์ล่าสุด",
+    "scheduledWakes": "ตื่น {{time}}"
   },
   "transcriptionModel": {
     "title": "โมเดลถอดเสียง",

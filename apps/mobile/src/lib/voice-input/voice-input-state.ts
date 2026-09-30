@@ -170,6 +170,17 @@ export function classifyVoiceInputError(code: string): VoiceInputFeedback {
         retryable: false,
       };
     }
+    case 'gateway-insufficient-credits': {
+      // The gateway refused the upload with HTTP 402: the Kilo balance is
+      // exhausted, and a retry cannot succeed until credits are added, so the
+      // user gets actionable copy with no retry affordance.
+      return {
+        action: 'none',
+        availability: 'available',
+        message: i18n.t('voiceInput.gatewayInsufficientCredits'),
+        retryable: false,
+      };
+    }
     case 'gateway-server': {
       return {
         action: 'none',

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Volver",
     "idle": "En espera",
+    "scheduled": "Programada",
     "keepEditing": "Seguir editando",
     "keepRunning": "Mantener en ejecución",
     "kiloclaw": "KiloClaw",
@@ -1522,12 +1523,14 @@
       "couldNotLoadActive": "No se pudieron cargar las sesiones activas.",
       "couldNotRefresh": "No se pudo actualizar",
       "noSessionsYetDescription": "Inicia una tarea de programación desde tu teléfono. Tus sesiones aparecerán aquí.",
+      "viewHistory": "Historial de sesiones",
       "noMatches": "No hay sesiones que coincidan con los filtros",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",
       "tryAdjustFilters": "Prueba a cambiar o quitar los filtros.",
       "couldNotSearch": "No se pudieron buscar las sesiones.",
       "completedWillAppear": "Las sesiones completadas aparecerán aquí.",
       "noPastSessions": "No hay sesiones anteriores",
+      "pastSessions": "Sesiones anteriores",
       "live": "EN DIRECTO",
       "updating": "Actualizando"
     },
@@ -1593,6 +1596,7 @@
       "renamePlaceholder": "Nombre de la sesión",
       "transcriptAccessibility": "Transcripción de la sesión",
       "readOnly": "Esta sesión es de solo lectura.",
+      "continueInNewSession": "Continuar en una sesión nueva",
       "emptyDescription": "Envía un mensaje para empezar.",
       "scrollToBottom": "Desplazarse al final",
       "emptyTitle": "Aún no hay mensajes",
@@ -2116,6 +2120,10 @@
       "resumeCodexDescription": "importa una transcripción de sesión de OpenAI Codex",
       "reviewDescription": "revisa los cambios [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "Usar /{{command}}",
+      "useSkillCommand": "Usar habilidad /{{command}}",
+      "skillBadge": "Habilidad",
+      "catalogFull": "El catálogo de comandos está lleno, así que algunos comandos están ocultos.",
+      "catalogOverLimit": "El catálogo de habilidades supera su límite de tamaño, así que se muestran todas las habilidades.",
       "insert": "Insertar",
       "upgradeRequiredFallback": "Actualiza tu CLI para usar este comando.",
       "exitCapabilityUnavailable": "Actualiza tu CLI para salir de la sesión.",
@@ -2277,7 +2285,8 @@
     "optionsExpiredDescription": "Vuelve atrás y abre de nuevo este selector desde la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "EN ESPERA DE RESPUESTA"
+    "needsInput": "EN ESPERA DE RESPUESTA",
+    "scheduled": "PROGRAMADA"
   },
   "voiceInput": {
     "listening": "Escuchando...",
@@ -2309,6 +2318,7 @@
     "gatewayModelUnavailableNotice": "Este modelo ya no se ofrece. Toca $t(transcriptionModel.title) para elegir otro.",
     "gatewaySignInRequired": "Inicia sesión para usar la transcripción con Kilo Gateway.",
     "gatewayNoModel": "Elige primero un modelo de transcripción en Preferencias.",
+    "gatewayInsufficientCredits": "Añade créditos para usar la transcripción con Kilo Gateway.",
     "testTitle": "Probar el dictado",
     "testPlaceholder": "Toca el micrófono y empieza a hablar.",
     "testClear": "Borrar texto"
@@ -2646,7 +2656,14 @@
       "replyForbiddenTerm": "No tienes permiso para responder a {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} línea más arriba",
       "moreLinesAbove_other": "… {{displayCount}} líneas más arriba",
-      "moreLinesAbove_many": "… {{displayCount}} líneas más arriba"
+      "moreLinesAbove_many": "… {{displayCount}} líneas más arriba",
+      "deleteComment": "Eliminar comentario",
+      "deleteCommentTitle": "¿Eliminar el comentario?",
+      "deleteCommentMessage": "Este comentario se eliminará de la PR.",
+      "commentEditFailed": "No se pudo guardar tu comentario. Comprueba tu conexión e inténtalo de nuevo.",
+      "commentEditUnavailable": "Este comentario no se puede editar. Es posible que se haya eliminado.",
+      "commentDeleteFailed": "No se pudo eliminar tu comentario. Comprueba tu conexión e inténtalo de nuevo.",
+      "commentDeleteUnavailable": "Este comentario no se puede eliminar."
     },
     "entry": {
       "eyebrow": "Abre una PR o una merge request mediante su URL",
@@ -2971,6 +2988,8 @@
     "linkPasteNotAPullRequest": "No es un enlace a una PR o una merge request",
     "announce": {
       "commentPosted": "Comentario publicado",
+      "commentUpdated": "Comentario actualizado",
+      "commentDeleted": "Comentario eliminado",
       "reviewSubmitted": "Revisión enviada",
       "autoMergeEnabled": "Fusión automática activada"
     },
@@ -3205,6 +3224,7 @@
     "emptyTitle": "No hay dominios de confianza",
     "emptyDescription": "Si marcas un dominio como de confianza, sus enlaces se abrirán sin volver a pedir confirmación.",
     "revoke": "Dejar de confiar en {{host}}",
+    "revokeMessage": "Los enlaces a este dominio volverán a pedir confirmación.",
     "backToPreferences": "Volver a preferencias"
   },
   "quickChat": {
@@ -3234,7 +3254,8 @@
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo.",
     "openSession": "Abrir",
     "approveFailed": "No se pudo aprobar. Toca $t(common.approve) para intentarlo de nuevo.",
-    "newestResult": "Resultado más reciente"
+    "newestResult": "Resultado más reciente",
+    "scheduledWakes": "se activa {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo de transcripción",

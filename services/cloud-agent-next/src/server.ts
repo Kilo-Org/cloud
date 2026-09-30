@@ -400,7 +400,10 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
       name.startsWith('x-forwarded-') ||
       name.startsWith('x-internal-') ||
       name.startsWith('x-kilo-') ||
-      name.startsWith('x-kilocode-') ||
+      // Feature is attribution, not a credential: the gateway's
+      // `validateFeatureHeader` owns value validation, so forward the
+      // sandbox-supplied value like any other client instead of restoring it.
+      (name.startsWith('x-kilocode-') && name !== 'x-kilocode-feature') ||
       name === 'forwarded' ||
       name === 'x-real-ip' ||
       name === 'x-kilocode-organizationid'
@@ -612,6 +615,34 @@ async function rejectLegacyWrapperTokenForRuntimeGrant(
   return status === 'legacy'
     ? null
     : new Response('Legacy wrapper token is not authorized', { status: 401 });
+}
+
+type WrapperTicketAuthorization =
+  | { ok: true; claims: WrapperAuthClaims }
+  | { ok: false; response: Response };
+
+async function authorizeWrapperTicketForSession(
+  c: Context<HonoContext>,
+  userId: string,
+  sessionId: string
+): Promise<WrapperTicketAuthorization> {
+  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
+  const authResult = await validateWrapperDispatchTicket(
+    c.req.header('Authorization') ?? null,
+    nextAuthSecret
+  );
+  if (!authResult.success) return { ok: false, response: c.text(authResult.error, 401) };
+  if (authResult.claims.userId !== userId) {
+    return { ok: false, response: c.text('Token does not match session user', 403) };
+  }
+  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+    c.env,
+    authResult.claims,
+    userId,
+    sessionId
+  );
+  if (legacyRejection) return { ok: false, response: legacyRejection };
+  return { ok: true, claims: authResult.claims };
 }
 
 async function routeToUserKiloFacade(
@@ -853,23 +884,9 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Invalid userId encoding', 400);
   }
 
-  const authHeader = c.req.header('Authorization');
-  const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-  const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-  if (!authResult.success) {
-    return c.text(authResult.error, 401);
-  }
-  if (authResult.claims.userId !== userId) {
-    return c.text('Token does not match session user', 403);
-  }
-
-  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
-    c.env,
-    authResult.claims,
-    userId,
-    sessionId
-  );
-  if (legacyRejection) return legacyRejection;
+  const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
+  if (!ticketAuth.ok) return ticketAuth.response;
+  const { claims } = ticketAuth;
 
   const url = new URL(c.req.url);
   const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
@@ -878,7 +895,7 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Invalid wrapperGeneration parameter', 400);
   }
   if (
-    ticketClaimsMismatchRequestFence(authResult.claims, {
+    ticketClaimsMismatchRequestFence(claims, {
       cloudAgentSessionId: sessionId,
       kiloSessionId: url.searchParams.get('kiloSessionId'),
       wrapperRunId: url.searchParams.get('wrapperRunId'),
@@ -938,31 +955,17 @@ app.put(
       return c.text('Invalid filename', 400);
     }
 
-    const authHeader = c.req.header('Authorization');
-    const nextAuthSecret = await resolveSecret(c.env.NEXTAUTH_SECRET);
-    const authResult = await validateWrapperDispatchTicket(authHeader ?? null, nextAuthSecret);
-    if (!authResult.success) {
-      return c.text(authResult.error, 401);
-    }
-    if (authResult.claims.userId !== userId) {
-      return c.text('Token does not match session user', 403);
-    }
-
-    const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
-      c.env,
-      authResult.claims,
-      userId,
-      sessionId
-    );
-    if (legacyRejection) return legacyRejection;
+    const ticketAuth = await authorizeWrapperTicketForSession(c, userId, sessionId);
+    if (!ticketAuth.ok) return ticketAuth.response;
+    const { claims } = ticketAuth;
 
     const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
-    if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {
+    if (!kiloSessionId && claims.type === 'wrapper_dispatch_ticket') {
       return c.text('Missing kiloSessionId parameter', 400);
     }
 
     if (
-      ticketClaimsMismatchRequestFence(authResult.claims, {
+      ticketClaimsMismatchRequestFence(claims, {
         cloudAgentSessionId: sessionId,
         kiloSessionId,
       })
@@ -1092,7 +1095,7 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
-export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -1124,7 +1127,7 @@ export default {
     }
     if (controller.cron === OUTCOME_AGGREGATE_CRON) {
       try {
-        await runCloudAgentOutcomeCollection(env);
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
       } finally {
         await runCloudAgentOpenStockCollection(env);
       }

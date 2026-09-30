@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "بازگشت",
     "idle": "بیکار",
+    "scheduled": "زمانبندیشده",
     "keepEditing": "ادامه ویرایش",
     "keepRunning": "ادامه اجرا",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
       "moreLinesAbove_one": "… {{displayCount}} خط دیگر در بالا",
-      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا"
+      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا",
+      "deleteComment": "حذف نظر",
+      "deleteCommentTitle": "نظر حذف شود؟",
+      "deleteCommentMessage": "این نظر از درخواست ادغام حذف می‌شود.",
+      "commentEditFailed": "ذخیرهٔ نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentEditUnavailable": "این نظر قابل ویرایش نیست. ممکن است حذف شده باشد.",
+      "commentDeleteFailed": "حذف نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentDeleteUnavailable": "این نظر قابل حذف نیست."
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",
+      "commentUpdated": "نظر به‌روزرسانی شد",
+      "commentDeleted": "نظر حذف شد",
       "reviewSubmitted": "بازبینی ارسال شد",
       "autoMergeEnabled": "ادغام خودکار فعال شد"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
       "couldNotRefresh": "بازخوانی ممکن نشد",
       "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
+      "viewHistory": "تاریخچه نشست‌ها",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
       "tryAdjustFilters": "فیلترها را تغییر دهید یا پاک کنید.",
       "couldNotSearch": "جستجوی نشست‌ها ممکن نشد.",
       "completedWillAppear": "نشست‌های پایان‌یافته اینجا نمایش داده می‌شوند.",
       "noPastSessions": "نشست قبلی وجود ندارد",
+      "pastSessions": "نشست‌های قبلی",
       "live": "زنده",
       "updating": "در حال به‌روزرسانی"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
       "readOnly": "این نشست فقط خواندنی است.",
+      "continueInNewSession": "ادامه در یک نشست جدید",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "رونوشت نشست OpenAI Codex را درونریزی کن",
       "reviewDescription": "تغییرات را بازبینی کن [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "استفاده از /{{command}}",
+      "useSkillCommand": "استفاده از مهارت /{{command}}",
+      "skillBadge": "مهارت",
+      "catalogFull": "فهرست فرمان‌ها پر است، بنابراین برخی فرمان‌ها پنهان شده‌اند.",
+      "catalogOverLimit": "فهرست مهارت‌ها از حد اندازه فراتر رفته است، بنابراین همه مهارت‌ها نمایش داده می‌شوند.",
       "insert": "درج",
       "upgradeRequiredFallback": "برای استفاده از این دستور، CLI خود را ارتقا دهید.",
       "exitCapabilityUnavailable": "برای خروج از نشست، CLI خود را به‌روزرسانی کنید.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "به عقب برگردید و این انتخاب‌گر را از صفحه قبلی دوباره باز کنید."
   },
   "sessionRow": {
-    "needsInput": "در انتظار ورودی"
+    "needsInput": "در انتظار ورودی",
+    "scheduled": "زمانبندیشده"
   },
   "voiceInput": {
     "listening": "در حال گوش دادن...",
@@ -2788,6 +2806,7 @@
     "gatewayModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(transcriptionModel.title) ضربه بزنید.",
     "gatewaySignInRequired": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway وارد شوید.",
     "gatewayNoModel": "ابتدا در تنظیمات دلخواه یک مدل تبدیل گفتار به متن انتخاب کنید.",
+    "gatewayInsufficientCredits": "برای استفاده از تبدیل گفتار به متن با Kilo Gateway اعتبار اضافه کنید.",
     "testTitle": "آزمایش ورودی صوتی",
     "testPlaceholder": "میکروفون را لمس کنید و شروع به صحبت کنید.",
     "testClear": "پاک کردن متن"
@@ -3162,6 +3181,7 @@
     "emptyTitle": "میزبان مورد اعتمادی نیست",
     "emptyDescription": "اگر به میزبان یک پیوند اعتماد کنید، پیوندهای آن بدون درخواست تأیید دوباره باز می‌شوند.",
     "revoke": "لغو اعتماد به {{host}}",
+    "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
     "backToPreferences": "بازگشت به تنظیمات"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
-    "newestResult": "جدیدترین نتیجه"
+    "newestResult": "جدیدترین نتیجه",
+    "scheduledWakes": "{{time}} بیدار می‌شود"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",

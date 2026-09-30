@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
+    "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
     "kiloclaw": "KiloClaw",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
       "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
+      "viewHistory": "Sessiegeschiedenis",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Pas je filters aan of wis ze.",
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
+      "pastSessions": "Eerdere sessies",
       "live": "ACTIEF",
       "updating": "Bijwerken"
     },
@@ -1581,6 +1584,7 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
+      "continueInNewSession": "Doorgaan in een nieuwe sessie",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
@@ -2094,6 +2098,10 @@
       "resumeCodexDescription": "een OpenAI Codex-sessietranscript importeren",
       "reviewDescription": "wijzigingen bekijken [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} gebruiken",
+      "useSkillCommand": "Vaardigheid /{{command}} gebruiken",
+      "skillBadge": "Vaardigheid",
+      "catalogFull": "De opdrachtcatalogus is vol, dus sommige opdrachten zijn verborgen.",
+      "catalogOverLimit": "De vaardighedencatalogus overschrijdt de groottelimiet, dus elke vaardigheid wordt weergegeven.",
       "insert": "Invoegen",
       "upgradeRequiredFallback": "Werk je CLI bij om deze opdracht te gebruiken.",
       "exitCapabilityUnavailable": "Werk je CLI bij om de sessie af te sluiten.",
@@ -2252,7 +2260,8 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "INVOER NODIG"
+    "needsInput": "INVOER NODIG",
+    "scheduled": "GEPLAND"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2284,6 +2293,7 @@
     "gatewayModelUnavailableNotice": "Dit model wordt niet meer aangeboden. Tik op $t(transcriptionModel.title) om een ander te kiezen.",
     "gatewaySignInRequired": "Meld je aan om transcriptie via Kilo Gateway te gebruiken.",
     "gatewayNoModel": "Kies eerst een transcriptiemodel bij Voorkeuren.",
+    "gatewayInsufficientCredits": "Vul je tegoed aan om transcriptie via Kilo Gateway te gebruiken.",
     "testTitle": "Spraakinvoer testen",
     "testPlaceholder": "Tik op de microfoon en begin te spreken.",
     "testClear": "Tekst wissen"
@@ -2616,7 +2626,14 @@
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
       "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
-      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}.",
+      "deleteComment": "Opmerking verwijderen",
+      "deleteCommentTitle": "Opmerking verwijderen?",
+      "deleteCommentMessage": "Deze opmerking wordt uit de PR verwijderd.",
+      "commentEditFailed": "Je opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.",
+      "commentEditUnavailable": "Deze opmerking kan niet worden bewerkt. Mogelijk is deze verwijderd.",
+      "commentDeleteFailed": "Je opmerking kon niet worden verwijderd. Controleer je verbinding en probeer het opnieuw.",
+      "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2929,6 +2946,8 @@
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
+      "commentUpdated": "Opmerking bijgewerkt",
+      "commentDeleted": "Opmerking verwijderd",
       "reviewSubmitted": "Beoordeling verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
     },
@@ -3162,6 +3181,7 @@
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
     "revoke": "Vertrouwen in {{host}} intrekken",
+    "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {
@@ -3191,7 +3211,8 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat"
+    "newestResult": "Nieuwste resultaat",
+    "scheduledWakes": "wordt wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

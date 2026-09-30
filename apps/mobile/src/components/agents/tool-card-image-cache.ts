@@ -60,14 +60,6 @@ export function extensionForMime(mime: string): string {
 }
 
 /**
- * Map an image mime to a file extension.
- * `image/jpeg` → `jpg`; other `image/*` subtypes use the subtype as-is.
- */
-export function extensionForImageMime(mime: string): string {
-  return extensionForMime(mime);
-}
-
-/**
  * Strip the `data:<mime>;base64,` prefix from a data URL. Returns undefined
  * when the payload is not a base64 data URL for the given mime.
  */
@@ -114,7 +106,7 @@ function recordUri(partId: string, uri: string): void {
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
- * `partId.extensionForImageMime(mime)` naming is used. The partId→uri map and
+ * `partId.extensionForMime(mime)` naming is used. The partId→uri map and
  * first-wins dedupe are unchanged.
  */
 export function cacheToolAttachment(
@@ -149,16 +141,6 @@ export function cacheToolAttachment(
   } catch {
     inFlightOrDone.delete(partId);
   }
-}
-
-/**
- * Backward-compatible alias. Calls {@link cacheToolAttachment} without a
- * filename, using the legacy extension-based naming. Kept for existing
- * consumers that don't pass a filename (call sites that only handle images).
- *
- */
-export function cacheToolCardImage(partId: string, mime: string, dataUrl: string): void {
-  cacheToolAttachment(partId, { mime, dataUrl });
 }
 
 /** Synchronous lookup used by the hook and by tests. */

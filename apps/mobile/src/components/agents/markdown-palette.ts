@@ -176,10 +176,13 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
     link: htmlTagStyles.a,
     ...getMarkdownHeadingStyles(palette),
     // Override the library defaults that set italic + light weight on codespan.
+    // Use the bundled JetBrains Mono (same face as fenced `code` blocks) rather
+    // than the iOS-only `Menlo`, which Android silently replaces with the
+    // proportional system font.
     codespan: {
       color: textColor,
       backgroundColor: codeBackground,
-      fontFamily: 'Menlo',
+      fontFamily: 'JetBrainsMono_500Medium',
       fontSize: 14,
       fontStyle: 'normal',
       fontWeight: '400',

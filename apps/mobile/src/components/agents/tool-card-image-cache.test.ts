@@ -3,14 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   __resetToolCardImageCacheForTests,
   cacheToolAttachment,
-  cacheToolCardImage,
   clearToolCardImageCache,
-  extensionForImageMime,
   extensionForMime,
   getToolCardImageUri,
   stripDataUrlBase64Prefix,
   useToolCardImageUri,
 } from '@/components/agents/tool-card-image-cache';
+
+/** Cache an image attachment through the public API (no filename). */
+function cacheImage(partId: string, mime: string, dataUrl: string): void {
+  cacheToolAttachment(partId, { mime, dataUrl });
+}
 
 type FileInstance = {
   exists: boolean;
@@ -69,16 +72,8 @@ beforeEach(() => {
   __resetToolCardImageCacheForTests();
 });
 
-describe('extensionForImageMime', () => {
-  it('maps png and jpeg, and passes other subtypes through', () => {
-    expect(extensionForImageMime('image/png')).toBe('png');
-    expect(extensionForImageMime('image/jpeg')).toBe('jpg');
-    expect(extensionForImageMime('image/webp')).toBe('webp');
-  });
-});
-
 describe('extensionForMime', () => {
-  it('maps image mimes identically to extensionForImageMime', () => {
+  it('maps image mimes to their extension', () => {
     expect(extensionForMime('image/png')).toBe('png');
     expect(extensionForMime('image/jpeg')).toBe('jpg');
     expect(extensionForMime('image/webp')).toBe('webp');
@@ -110,9 +105,9 @@ describe('stripDataUrlBase64Prefix', () => {
   });
 });
 
-describe('cacheToolCardImage', () => {
+describe('image fallback (cacheToolAttachment without filename)', () => {
   it('writes base64 payload under a mime-derived filename and exposes the file URI', () => {
-    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,QUJD');
+    cacheImage('part-1', 'image/png', 'data:image/png;base64,QUJD');
 
     expect(expoFileSystemMock.Directory).toHaveBeenCalledWith('file:///cache', 'tool-card-images');
     expect(expoFileSystemMock.directoryCreate).toHaveBeenCalledWith({
@@ -127,13 +122,13 @@ describe('cacheToolCardImage', () => {
   });
 
   it('derives jpg for image/jpeg', () => {
-    cacheToolCardImage('part-jpg', 'image/jpeg', 'data:image/jpeg;base64,AAA');
+    cacheImage('part-jpg', 'image/jpeg', 'data:image/jpeg;base64,AAA');
     expect(fileInstances[0]?.filename).toBe('part-jpg.jpg');
   });
 
   it('does not rewrite when the same part id is cached twice (Set dedupe)', () => {
-    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,AAA');
-    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,BBB');
+    cacheImage('part-1', 'image/png', 'data:image/png;base64,AAA');
+    cacheImage('part-1', 'image/png', 'data:image/png;base64,BBB');
 
     expect(fileInstances).toHaveLength(1);
     expect(fileInstances[0]?.write).toHaveBeenCalledTimes(1);
@@ -158,14 +153,14 @@ describe('cacheToolCardImage', () => {
       return instance;
     });
 
-    cacheToolCardImage('part-exists', 'image/png', 'data:image/png;base64,AAA');
+    cacheImage('part-exists', 'image/png', 'data:image/png;base64,AAA');
 
     expect(fileInstances[0]?.write).not.toHaveBeenCalled();
     expect(getToolCardImageUri('part-exists')).toBe(
       'file:///cache/tool-card-images/part-exists.png'
     );
     // Second call must still be deduped by the Set (no second File).
-    cacheToolCardImage('part-exists', 'image/png', 'data:image/png;base64,BBB');
+    cacheImage('part-exists', 'image/png', 'data:image/png;base64,BBB');
     expect(fileInstances).toHaveLength(1);
   });
 
@@ -188,14 +183,14 @@ describe('cacheToolCardImage', () => {
     });
 
     expect(() => {
-      cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
+      cacheImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     }).not.toThrow();
 
     expect(fileInstances[0]?.write).toHaveBeenCalled();
     expect(getToolCardImageUri('part-fail')).toBeUndefined();
 
     // Failure cleared the mark — a retry is allowed and should attempt again.
-    cacheToolCardImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
+    cacheImage('part-fail', 'image/png', 'data:image/png;base64,AAA');
     expect(fileInstances).toHaveLength(2);
     expect(fileInstances[1]?.write).toHaveBeenCalledWith('AAA', { encoding: 'base64' });
     expect(getToolCardImageUri('part-fail')).toBe('file:///cache/tool-card-images/part-fail.png');
@@ -203,7 +198,7 @@ describe('cacheToolCardImage', () => {
 
   it('never throws on invalid input', () => {
     expect(() => {
-      cacheToolCardImage('part-x', 'image/png', 'not-a-data-url');
+      cacheImage('part-x', 'image/png', 'not-a-data-url');
     }).not.toThrow();
     expect(fileInstances).toHaveLength(0);
     expect(getToolCardImageUri('part-x')).toBeUndefined();
@@ -303,8 +298,8 @@ describe('cacheToolAttachment', () => {
     expect(file?.write).toHaveBeenCalled();
   });
 
-  it('shares the dedupe set with cacheToolCardImage', () => {
-    cacheToolCardImage('part-shared', 'image/png', 'data:image/png;base64,AAA');
+  it('shares the dedupe set across cacheToolAttachment calls', () => {
+    cacheImage('part-shared', 'image/png', 'data:image/png;base64,AAA');
     cacheToolAttachment('part-shared', {
       mime: 'image/png',
       dataUrl: 'data:image/png;base64,BBB',
@@ -323,14 +318,14 @@ describe('useToolCardImageUri', () => {
   it('is the Slice 4 lookup export and reads the same store as getToolCardImageUri', () => {
     expect(typeof useToolCardImageUri).toBe('function');
     expect(getToolCardImageUri('missing')).toBeUndefined();
-    cacheToolCardImage('part-hook', 'image/png', 'data:image/png;base64,AAA');
+    cacheImage('part-hook', 'image/png', 'data:image/png;base64,AAA');
     expect(getToolCardImageUri('part-hook')).toBe('file:///cache/tool-card-images/part-hook.png');
   });
 });
 
 describe('clearToolCardImageCache', () => {
   it('deletes the cache directory and resets in-memory state', () => {
-    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,AAA');
+    cacheImage('part-1', 'image/png', 'data:image/png;base64,AAA');
     expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
 
     clearToolCardImageCache();
@@ -338,7 +333,7 @@ describe('clearToolCardImageCache', () => {
     expect(expoFileSystemMock.directoryDelete).toHaveBeenCalledTimes(1);
     expect(getToolCardImageUri('part-1')).toBeUndefined();
     // The dedupe set reset, so the same part id can be cached again.
-    cacheToolCardImage('part-1', 'image/png', 'data:image/png;base64,BBB');
+    cacheImage('part-1', 'image/png', 'data:image/png;base64,BBB');
     expect(getToolCardImageUri('part-1')).toBe('file:///cache/tool-card-images/part-1.png');
     expect(fileInstances).toHaveLength(2);
   });

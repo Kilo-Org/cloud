@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
-import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
+import { getFilename, truncateText } from './tool-card-utils';
 import { listPatchFilePaths } from './tool-patch-model';
 import { buildResultRowsModel } from './tool-list-model';
 import { suggestionToolMetadataSchema } from './suggestion-card-state';
@@ -174,7 +174,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return {
         title: i18n.t('agentChat.toolCard.toolList'),
         subtitle: resolvedPath
-          ? getDirectoryName(resolvedPath)
+          ? getFilename(resolvedPath)
           : i18n.t('agentChat.toolCard.toolList'),
         translatable: resolvedPath !== '',
       };

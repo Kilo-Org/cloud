@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   finishTransaction as finishStoreTransaction,
@@ -266,13 +266,18 @@ export function StorePurchaseRecoveryMount(): null {
     }
   }, [creditActions, kiloPassActions, knownProductIdCount, signedIn, storefront]);
 
-  // The pass is held in a ref so the triggers below depend on state, never on a
-  // callback identity: a rebuilt callback would re-run the pass on a render that
-  // changed nothing about the app.
+  // Keep the next pass current before passive effects run. A pending store call
+  // can settle immediately after a sign-out commit.
   const recoverRef = useRef(recoverUnfinishedPurchases);
-  useEffect(() => {
+  useLayoutEffect(() => {
     recoverRef.current = recoverUnfinishedPurchases;
   }, [recoverUnfinishedPurchases]);
+  useLayoutEffect(
+    () => () => {
+      rerunRequestedRef.current = false;
+    },
+    []
+  );
 
   const hasCreditProducts =
     creditPackAppleProductIds.length + creditPackGoogleProductIds.length > 0;

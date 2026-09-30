@@ -172,6 +172,28 @@ describe('StorePurchaseRecoveryMount', () => {
     expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
   });
 
+  it('drops a queued catalog pass after unmount', async () => {
+    const pendingLookup = Promise.withResolvers<Purchase[]>();
+    delete mockedQuery.catalogs['kiloPass.getMobileStoreProducts'];
+    mockedIap.getPendingTransactionsIOS
+      .mockReturnValueOnce(pendingLookup.promise)
+      .mockResolvedValue([createPurchase({ productId: KILO_PASS_PRODUCT_ID })]);
+
+    const renderer = await mountRecovery();
+    mockedQuery.catalogs['kiloPass.getMobileStoreProducts'] = kiloPassCatalog;
+    await rerender(renderer);
+    act(() => {
+      renderer.unmount();
+    });
+    act(() => {
+      pendingLookup.resolve([]);
+    });
+    await flushPromises();
+
+    expect(mockedIap.getPendingTransactionsIOS).toHaveBeenCalledTimes(1);
+    expect(completionsNamed('kiloPass.completeAppStorePurchase')).toHaveLength(0);
+  });
+
   it('leaves a pending transaction no catalog sells untouched', async () => {
     mockedIap.getPendingTransactionsIOS.mockResolvedValue([
       createPurchase({ productId: 'some.other.product' }),

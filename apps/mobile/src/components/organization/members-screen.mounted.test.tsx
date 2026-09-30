@@ -22,7 +22,7 @@ import { OrganizationMembersScreen } from './members-screen';
 
 const withMembersQuery = vi.hoisted(() => ({
   data: undefined as unknown,
-  isLoading: false,
+  isPending: false,
   isFetching: false,
   isError: false,
   error: null as unknown,
@@ -203,7 +203,7 @@ async function renderScreen(): Promise<string[]> {
 
 beforeEach(() => {
   withMembersQuery.data = undefined;
-  withMembersQuery.isLoading = false;
+  withMembersQuery.isPending = false;
   withMembersQuery.isFetching = false;
   withMembersQuery.isError = false;
   withMembersQuery.error = null;
@@ -252,7 +252,7 @@ describe('OrganizationMembersScreen empty-state precedence', () => {
   });
 
   it('keeps the loading skeleton ahead of error and empty states', async () => {
-    withMembersQuery.isLoading = true;
+    withMembersQuery.isPending = true;
     withMembersQuery.isError = true;
     const texts = await renderScreen();
     expect(texts).not.toContain('QUERY_ERROR');
@@ -328,7 +328,7 @@ describe('OrganizationMembersScreen invite header control', () => {
   });
 
   it('keeps the invite control in place while skeletons swap to rows', async () => {
-    withMembersQuery.isLoading = true;
+    withMembersQuery.isPending = true;
     const loading = await renderWithProviders(createElement(OrganizationMembersScreen));
     const loadingControl = findInviteControl(loading.renderer.root)[0];
     if (!loadingControl) {
@@ -337,7 +337,7 @@ describe('OrganizationMembersScreen invite header control', () => {
     const loadingClassName = loadingControl.props.className;
     loading.unmount();
 
-    withMembersQuery.isLoading = false;
+    withMembersQuery.isPending = false;
     withMembersQuery.data = {
       settings: {},
       members: [{ status: 'active', id: 'member-1', name: 'Ada', email: 'ada@example.com' }],

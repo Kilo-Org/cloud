@@ -1,7 +1,7 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
 import { UserPlus, Users } from '@/components/ui/icons';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View, type ViewStyle } from 'react-native';
 
@@ -84,16 +84,17 @@ export function OrganizationMembersScreen() {
   const activeMembers = sortActiveMembers(members.filter(m => isActiveOrgMember(m)));
   const invitedMembers = sortInvitedMembers(members.filter(m => isInvitedOrgMember(m)));
 
-  const items = useMemo(
-    () => buildMembersListItems({ activeMembers, invitedMembers }),
-    [activeMembers, invitedMembers]
-  );
+  const items = buildMembersListItems({ activeMembers, invitedMembers });
 
   if (isResolving || organizationId == null || org == null) {
     return <OrganizationBoundary title={t('organization.members.title')} />;
   }
 
-  const isLoading = orgWithMembers.isLoading;
+  // isPending (no data AND no error) rather than isLoading: an offline paused
+  // fetch has isLoading false but no data — it must show the skeleton instead
+  // of the empty state. The organizationId guard above keeps a disabled query
+  // (null org, isPending forever) falling through to OrganizationBoundary.
+  const isLoading = orgWithMembers.isPending;
   const isError = orgWithMembers.isError && !orgWithMembers.data;
   const enableUsageLimits = orgWithMembers.data?.settings.enable_usage_limits !== false;
   const canInvite = isMoneyRole(role);

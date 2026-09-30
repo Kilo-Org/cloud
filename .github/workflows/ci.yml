@@ -8,7 +8,7 @@ on:
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -51,6 +51,12 @@ jobs:
 
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
+
+      - name: Test scheduled deployment wiring
+        run: node --test scripts/deployment-workflows.test.mjs
+
+      - name: Test meta-janitor approval gates
+        run: node --test scripts/meta-janitor-approve.test.mjs
 
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed

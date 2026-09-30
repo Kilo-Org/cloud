@@ -58,7 +58,10 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
-import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  inferRuntimeCredentialProxyRoute,
+  type RuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -473,7 +476,7 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const requestPath = new URL(c.req.url).pathname;
   if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
-  if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
     return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 }
@@ -482,7 +485,7 @@ async function forwardRuntimeCredentialProxy(
   c: Context<HonoContext>,
   handle: string,
   claims: RuntimeProxyHandleClaims,
-  route: 'backend' | 'provider' | 'ingest',
+  route: RuntimeCredentialProxyRoute,
   path: string
 ): Promise<Response> {
   if (!claims) return c.text('Unauthorized', 401);
@@ -523,7 +526,7 @@ async function forwardRuntimeCredentialProxy(
   try {
     // The route allowlist is resolved above before a proof is issued.
     const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'provider' ? 'kilo-gateway' : 'session-ingest';
+      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -1095,7 +1098,11 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
-export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
+// Cloudflare has been observed to keep firing a previously configured `*/3` trigger after a
+// deploy changed it to `*/5`. Accept both so a stale trigger cannot silently disable collection;
+// the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
+export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -1125,9 +1132,9 @@ export default {
       await removeExpiredCloudAgentReportData(env);
       return;
     }
-    if (controller.cron === OUTCOME_AGGREGATE_CRON) {
+    if (OUTCOME_AGGREGATE_CRONS.has(controller.cron)) {
       try {
-        await runCloudAgentOutcomeCollection(env);
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
       } finally {
         await runCloudAgentOpenStockCollection(env);
       }

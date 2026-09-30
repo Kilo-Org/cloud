@@ -12,9 +12,10 @@ import { SheetHeader } from '@/components/sheet-header';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
 
-import { handleMessageDetailsCopy } from './message-details-copy';
+import { useMessageDetailsCopyFeedback } from './message-details-copy';
 import { getMessageDetailsContent } from './message-details-content';
 import { MessageTextSelectSheet } from './message-text-select-sheet';
 import { Row, TokenRow } from './session-detail-rows';
@@ -63,6 +64,7 @@ export function MessageDetailsSheet({
     () => (message ? getMessageDetailsContent(message, modelOptions, deliveryState) : null),
     [message, modelOptions, deliveryState]
   );
+  const copyFeedback = useMessageDetailsCopyFeedback(visible, message?.info.id ?? null);
 
   const reportMutation = useMutation(
     trpc.moderation.reportContent.mutationOptions({
@@ -95,7 +97,7 @@ export function MessageDetailsSheet({
   }, [visible]);
 
   const handleCopy = () => {
-    handleMessageDetailsCopy(content?.copyText);
+    copyFeedback.handleCopy(content?.copyText);
   };
 
   const handleReport = () => {
@@ -199,6 +201,18 @@ export function MessageDetailsSheet({
                         {t('agentChat.messageDetails.selectText')}
                       </Text>
                     </Pressable>
+                  ) : null}
+
+                  {copyFeedback.status ? (
+                    <Text
+                      className={cn(
+                        'text-center text-sm',
+                        copyFeedback.state === 'failed' ? 'text-destructive' : 'text-foreground'
+                      )}
+                      testID="message-details-copy-feedback"
+                    >
+                      {copyFeedback.status}
+                    </Text>
                   ) : null}
                 </View>
               ) : null}

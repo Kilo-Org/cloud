@@ -349,6 +349,9 @@ export async function applyResolvedAutoModel(
       request.body.thinking = { type: resolved.reasoning.enabled ? 'adaptive' : 'disabled' };
     } else {
       request.body.reasoning = { ...resolved.reasoning };
+      if (request.kind === 'chat_completions') {
+        delete request.body.reasoning_effort;
+      }
     }
   }
   if (resolved.verbosity) {

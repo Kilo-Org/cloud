@@ -6,7 +6,7 @@ import { validateMagicLinkSignupEmail } from '@/lib/schemas/email';
 import { isEmailBlacklistedByDomainAsync, isBlockedTLD } from '@/lib/user/server';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
 import type { AuthErrorType } from '@/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';

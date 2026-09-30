@@ -5,6 +5,8 @@ import { z } from 'zod';
 import { db } from '@/lib/drizzle';
 import { cloud_agent_webhook_triggers } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
+import { sessionViewerProcedure } from '@/lib/trpc/admin-procedures';
 import { triggerIdSchema } from '@/lib/webhook-trigger-validation';
 import {
   getWorkerTrigger,
@@ -131,6 +133,35 @@ export const adminWebhookTriggersRouter = createTRPCRouter({
       inboundUrl,
     };
   }),
+
+  getRequestLogs: sessionViewerProcedure
+    .input(AdminTriggerGetInput.and(z.object({ requestId: z.string().uuid() })))
+    .query(async ({ input }) => {
+      const { scope, id } = resolveScope(input);
+      const [trigger] = await db
+        .select({ id: cloud_agent_webhook_triggers.id })
+        .from(cloud_agent_webhook_triggers)
+        .where(
+          and(
+            eq(cloud_agent_webhook_triggers.trigger_id, input.triggerId),
+            scope === 'org'
+              ? eq(cloud_agent_webhook_triggers.organization_id, id)
+              : and(
+                  eq(cloud_agent_webhook_triggers.user_id, id),
+                  isNull(cloud_agent_webhook_triggers.organization_id)
+                )
+          )
+        );
+      if (!trigger) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Trigger not found' });
+      }
+      return getWebhookRequestLogs(
+        scope === 'user' ? id : undefined,
+        scope === 'org' ? id : undefined,
+        input.triggerId,
+        input.requestId
+      );
+    }),
 
   listRequests: adminProcedure
     .input(AdminTriggerRequestsInput)

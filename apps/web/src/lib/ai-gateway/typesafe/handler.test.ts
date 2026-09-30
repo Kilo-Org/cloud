@@ -14,10 +14,10 @@ import {
   isGatewayAccountRateLimited,
 } from '@/lib/ai-gateway/gateway-account-rate-limit';
 import {
-  checkOrganizationModelRestrictions,
   creditsBlockedResponse,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
+  getOrganizationProviderPrivacy,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -25,7 +25,7 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
-import { EmptyFraudDetectionHeaders } from '@/lib/utils';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { handleSystemOneRequest } from './handler';
 
 jest.mock('next/server', () => ({
@@ -45,10 +45,10 @@ jest.mock('@/lib/ai-gateway/gateway-account-rate-limit', () => ({
   isGatewayAccountRateLimited: jest.fn(),
 }));
 jest.mock('@/lib/ai-gateway/llm-proxy-helpers', () => ({
-  checkOrganizationModelRestrictions: jest.fn(),
   creditsBlockedResponse: jest.fn(),
   extractFraudAndProjectHeaders: jest.fn(),
   extractHeaderAndLimitLength: jest.fn(),
+  getOrganizationProviderPrivacy: jest.fn(),
   modelNotAllowedResponse: jest.fn(),
   wrapInSafeNextResponse: jest.fn(),
 }));
@@ -151,7 +151,6 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({ balance: 1_000_000 });
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
-    jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({ error: null });
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
@@ -257,11 +256,7 @@ describe('handleSystemOneRequest', () => {
         'x-title': 'Kilo Code',
       });
       expect(generateProviderSpecificHash).toHaveBeenCalledWith(user.id, OPENROUTER);
-      expect(checkOrganizationModelRestrictions).toHaveBeenCalledWith({
-        modelId: TYPESAFE_MODEL,
-        settings: undefined,
-        organizationPlan: undefined,
-      });
+      expect(getOrganizationProviderPrivacy).toHaveBeenCalledWith(undefined);
     }
   );
 
@@ -344,10 +339,9 @@ describe('handleSystemOneRequest', () => {
           balance: 1000,
           settings: { data_collection: organizationDataCollection },
         });
-        jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({
-          error: null,
-          providerConfig: { data_collection: organizationDataCollection },
-        });
+        jest
+          .mocked(getOrganizationProviderPrivacy)
+          .mockReturnValue({ data_collection: organizationDataCollection });
       }
 
       const response = await handleSystemOneRequest(makeRequest({ ...requestBody, provider }));
@@ -522,29 +516,7 @@ describe('handleSystemOneRequest', () => {
       organizationId: 'org-123',
       balanceLimitedByUserAllowance: true,
     });
-    expect(checkOrganizationModelRestrictions).not.toHaveBeenCalled();
-    expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
-  });
-
-  it('honors organization model restrictions before resolving member access', async () => {
-    setAuth('org-123');
-    const settings = { model_deny_list: [TYPESAFE_MODEL] };
-    jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
-      balance: 1000,
-      settings,
-      plan: 'enterprise',
-    });
-    const error = NextResponse.json({ error_type: 'model_not_allowed' }, { status: 404 });
-    jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({ error });
-
-    expect(await handleSystemOneRequest(makeRequest())).toBe(error);
-    expect(checkOrganizationModelRestrictions).toHaveBeenCalledWith({
-      modelId: TYPESAFE_MODEL,
-      settings,
-      organizationPlan: 'enterprise',
-    });
-    expect(resolveOrganizationMemberModelDecision).not.toHaveBeenCalled();
+    expect(getOrganizationProviderPrivacy).not.toHaveBeenCalled();
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();
   });
@@ -572,23 +544,16 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
-    {
-      only: ['typesafe', 'other'],
-      eligible: ['typesafe', 'outside-ceiling'],
-      expected: ['typesafe'],
-    },
-    { only: undefined, eligible: ['typesafe'], expected: ['typesafe'] },
-    { only: ['typesafe'], eligible: undefined, expected: ['typesafe'] },
-  ])('applies the provider policy intersection: %j', async ({ only, eligible, expected }) => {
+    { eligible: ['typesafe'], expected: { only: ['typesafe'] } },
+    { eligible: ['typesafe', 'virtual'], expected: { only: ['typesafe'] } },
+    { eligible: undefined, expected: {} },
+  ])('routes through the member decision provider routes: %j', async ({ eligible, expected }) => {
     setAuth('org-123');
     jest.mocked(getBalanceAndOrgSettings).mockResolvedValue({
       balance: 1000,
       settings: { data_collection: 'allow' },
     });
-    jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({
-      error: null,
-      providerConfig: { only, data_collection: 'allow' },
-    });
+    jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'allow' });
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
       ...memberDecision,
       decision: { allowed: true, eligibleProviderRoutes: eligible ? new Set(eligible) : undefined },
@@ -603,7 +568,7 @@ describe('handleSystemOneRequest', () => {
 
     expect(response.status).toBe(200);
     expect(upstreamRequest().body.provider).toEqual({
-      only: expected,
+      ...expected,
       data_collection: 'deny',
       zdr: false,
     });
@@ -623,26 +588,22 @@ describe('handleSystemOneRequest', () => {
     expect(upstreamRequest().body.provider).toEqual({ ...provider, only: ['typesafe'] });
   });
 
-  it.each([
-    { only: ['other'], eligible: ['typesafe'] },
-    { only: [], eligible: ['typesafe'] },
-    { only: undefined, eligible: [] },
-  ])('rejects an empty provider policy intersection: %j', async ({ only, eligible }) => {
-    setAuth('org-123');
-    jest.mocked(checkOrganizationModelRestrictions).mockReturnValue({
-      error: null,
-      providerConfig: { only, data_collection: 'deny' },
-    });
-    jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
-      ...memberDecision,
-      decision: { allowed: true, eligibleProviderRoutes: new Set(eligible) },
-    });
+  it.each([[[]], [['virtual']]])(
+    'rejects member routes without a real provider: %j',
+    async eligible => {
+      setAuth('org-123');
+      jest.mocked(getOrganizationProviderPrivacy).mockReturnValue({ data_collection: 'deny' });
+      jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue({
+        ...memberDecision,
+        decision: { allowed: true, eligibleProviderRoutes: new Set(eligible) },
+      });
 
-    expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
-    expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
-    expect(mockedFetch).not.toHaveBeenCalled();
-    expect(after).not.toHaveBeenCalled();
-  });
+      expect((await handleSystemOneRequest(makeRequest())).status).toBe(404);
+      expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(after).not.toHaveBeenCalled();
+    }
+  );
 
   it('cancels the upstream body on credit exhaustion and returns a service error without charging', async () => {
     const cancel = jest.fn();

@@ -8,7 +8,7 @@ import { createAuditLog } from './organizations/organization-audit-logs';
 import { promoCreditCategoriesByKey } from './promoCreditCategories';
 import PostHogClient from '@/lib/posthog';
 import type { PromoCreditCategoryConfig } from './PromoCreditCategoryConfig';
-import { toMicrodollars } from './utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { logExceptInTest } from '@/lib/utils.server';
 import { millisecondsInHour } from 'date-fns/constants';
 import { successResult, type CustomResult } from '@/lib/maybe-result';

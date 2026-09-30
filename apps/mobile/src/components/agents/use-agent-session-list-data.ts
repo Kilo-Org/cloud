@@ -13,6 +13,10 @@ import {
   useAgentSessionSearch,
   useRecentAgentRepositories,
 } from '@/lib/hooks/use-agent-sessions';
+import {
+  useCommittedConnectivityStatus,
+  useConnectivityStatus,
+} from '@/lib/hooks/use-offline-banner-state';
 
 export function useAgentSessionListData(options: {
   organizationId: string | null;
@@ -42,6 +46,7 @@ export function useAgentSessionListData(options: {
     activeIsError,
     storedIsError,
     storedIsPending,
+    storedIsPaused,
     storedFetchedSinceMount,
     hasNextPage,
     isFetchingNextPage,
@@ -72,7 +77,35 @@ export function useAgentSessionListData(options: {
     organizationId,
     enabled: ready,
   });
-  const contentIsError = isSearching ? search.isError : storedIsError;
+  // A paused query (offline, NetInfo down) is neither loading nor errored, but
+  // it has no rows and will not resolve until the network returns. Surface a
+  // *confirmed-offline* pause as the body-driving error so the list settles out
+  // of its skeletons and offers the retry affordance instead of spinning
+  // forever.
+  //
+  // React Query pauses on NetInfo's boot `unknown` reachability too (the app
+  // maps `unknown` to offline for `onlineManager`), which is not a user-visible
+  // outage: the query resumes the moment reachability settles. Mapping that
+  // boot pause to the error flashed the full-screen "Could not load sessions"
+  // on a healthy cold launch before the first fetch could start. A known
+  // committed connectivity state turns the pause into an error, so the boot
+  // pause keeps its skeleton (and any cached rows). Same rule as ScopeEntryScreen.
+  //
+  // The committed state alone settles a confirmed-offline cold start too late:
+  // the banner debounces the offline report for five seconds before committing
+  // it, so the paused history sat on its skeletons with no retry past the proof
+  // window. NetInfo's immediate classification is already a definite `offline`
+  // on that cold start, and a definite `offline` is not the boot-`unknown`
+  // pause, so the pause becomes an error at once. A boot-`unknown` report stays
+  // `unknown` here and still keeps the skeleton.
+  const committedConnectivity = useCommittedConnectivityStatus();
+  const sourceConnectivity = useConnectivityStatus();
+  const isConnectivityKnown =
+    committedConnectivity !== 'unknown' || sourceConnectivity === 'offline';
+  const contentIsPaused = (isSearching ? search.isPaused : storedIsPaused) && isConnectivityKnown;
+  const contentIsError = isSearching
+    ? search.isError || contentIsPaused
+    : storedIsError || contentIsPaused;
   const handleRetry = useCallback(() => {
     if (!isSearching) {
       void refetch();
@@ -167,6 +200,7 @@ export function useAgentSessionListData(options: {
     search,
     projectOptions,
     contentIsError,
+    contentIsPaused,
     sections,
   };
 }

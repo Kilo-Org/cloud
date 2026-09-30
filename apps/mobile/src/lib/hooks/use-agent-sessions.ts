@@ -225,6 +225,10 @@ export function useAgentSessionSearch(options: UseAgentSessionSearchOptions) {
   return {
     dateGroups,
     isPending: query.isPending,
+    // A paused search (offline, no cached result) never settles, so callers
+    // that gate on "no data yet" must treat it as unresolved and offer a retry
+    // instead of a skeleton that never resolves.
+    isPaused: query.isPaused,
     // Header-level fetch only — footer spinner has its own flag.
     isFetching: query.isFetching && !query.isFetchingNextPage,
     isError: query.isError,

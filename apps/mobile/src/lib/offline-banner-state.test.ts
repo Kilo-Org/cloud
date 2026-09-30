@@ -22,6 +22,35 @@ describe('createOfflineBannerStore', () => {
     expect(probe).not.toHaveBeenCalled();
   });
 
+  it('publishes the source classification immediately while the banner debounces', () => {
+    const { store, source, timer } = createStore();
+    const committedListener = vi.fn<() => void>();
+    const sourceListener = vi.fn<() => void>();
+    store.subscribe(committedListener);
+    store.subscribeSourceStatus(sourceListener);
+    expect(store.sourceStatus()).toBe('unknown');
+
+    source.emit(offlineState);
+    // A definite offline is visible at once so a paused-query gate can settle,
+    // even though the banner itself waits out the confirmation delay. The two
+    // notification channels stay separate: the committed channel is quiet.
+    expect(store.sourceStatus()).toBe('offline');
+    expect(store.state()).toBe('unknown');
+    expect(store.isOffline()).toBe(false);
+    expect(committedListener).not.toHaveBeenCalled();
+    expect(sourceListener).toHaveBeenCalledTimes(1);
+
+    timer.advanceBy(4999);
+    expect(store.sourceStatus()).toBe('offline');
+    expect(store.state()).toBe('unknown');
+
+    source.emit(onlineState);
+    expect(store.sourceStatus()).toBe('online');
+    expect(store.state()).toBe('online');
+    expect(committedListener).toHaveBeenCalledTimes(1);
+    expect(sourceListener).toHaveBeenCalledTimes(2);
+  });
+
   it.each(outcomes)('waits exactly five seconds and one current probe before %s', async outcome => {
     const { store, source, timer, probe, changes, settle } = createStore();
     source.emit(offlineState);

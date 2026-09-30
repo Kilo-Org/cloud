@@ -23,10 +23,12 @@ const listState = vi.hoisted(() => ({
   storedSessions: [] as MockStoredSession[],
   isSearching: false,
   isError: false,
+  searchIsPaused: false,
   // Mirrors the real hook's stored-query flags so the screen's loading
   // decision can be exercised on the first render, before the request
   // settles (isFetching false, isPending true).
   storedIsPending: false,
+  storedIsPaused: false,
   storedIsFetching: false,
   storedFetchedSinceMount: true,
   storedLoadedPageCount: 1,
@@ -85,6 +87,13 @@ const keyboardState = vi.hoisted(() => {
 const focusState = vi.hoisted(() => ({ current: true as boolean }));
 const focusCallbacks = vi.hoisted(() => ({
   current: new Set<() => void>(),
+}));
+// The committed connectivity and NetInfo's immediate classification the data
+// hook reads to decide whether a paused query is a confirmed-offline outage or
+// a boot-`unknown` pause.
+const connectivityState = vi.hoisted(() => ({
+  status: 'unknown' as 'online' | 'offline' | 'unknown',
+  source: 'unknown' as 'online' | 'offline' | 'unknown',
 }));
 const handleRefetchSpy = vi.hoisted(() => vi.fn());
 const readFilterRecord = vi.hoisted(() => vi.fn<(storageKey: string) => Promise<string | null>>());
@@ -179,6 +188,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         activeIsError: false,
         storedIsError: listState.isError,
         storedIsPending: listState.storedIsPending,
+        storedIsPaused: listState.storedIsPaused,
         storedIsFetching: listState.storedIsFetching,
         storedFetchedSinceMount: listState.storedFetchedSinceMount,
         storedLoadedPageCount: listState.storedLoadedPageCount,
@@ -195,6 +205,7 @@ vi.mock('@/lib/hooks/use-agent-sessions', async () => {
         isError: listState.isError,
         isFetching: false,
         isPending: false,
+        isPaused: listState.searchIsPaused,
         hasNextPage: false,
         isFetchingNextPage: false,
         isPlaceholderData: false,
@@ -230,6 +241,10 @@ vi.mock('@/lib/persist/drafts', () => ({
 }));
 vi.mock('@/lib/organization-context', () => ({
   useOrganization: () => listState.organization,
+}));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => connectivityState.status,
+  useConnectivityStatus: () => connectivityState.source,
 }));
 
 const mountedRenderers: TestRenderer.ReactTestRenderer[] = [];
@@ -329,10 +344,14 @@ describe('SessionHistoryScreen', () => {
     listState.storedSessions = [];
     listState.isSearching = false;
     listState.isError = false;
+    listState.searchIsPaused = false;
     listState.storedIsPending = false;
+    listState.storedIsPaused = false;
     listState.storedIsFetching = false;
     listState.storedFetchedSinceMount = true;
     listState.storedLoadedPageCount = 1;
+    connectivityState.status = 'unknown';
+    connectivityState.source = 'unknown';
     Object.assign(listState.organization, { organizationId: null, isLoaded: true });
     listState.storedQuery.mockClear();
     listState.searchQuery.mockClear();
@@ -619,6 +638,68 @@ describe('SessionHistoryScreen', () => {
 
     const content = findNodeByType(renderer, 'AgentSessionListContent');
     expect(content.props.isLoading).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  // Regression: React Query pauses an offline query, and `isPending` stays
+  // true for the whole pause. The cold open must settle out of the skeleton
+  // and hand the body an error so the offline session can be reached through
+  // the retry control instead of an unending loading placeholder.
+  it('settles a paused offline cold open to the retryable error', async () => {
+    connectivityState.status = 'offline';
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsPaused = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.isError).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  // Regression: on a confirmed-offline cold start the banner has not yet
+  // committed its offline state (it debounces the report for five seconds), so
+  // gating only on the committed state left the history on its skeletons with
+  // no retry past the proof window. NetInfo's immediate `offline` must settle
+  // the pause at once.
+  it('settles a confirmed-offline pause before the banner commits', async () => {
+    connectivityState.status = 'unknown';
+    connectivityState.source = 'offline';
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsPaused = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(false);
+    expect(content.props.isError).toBe(true);
+    expect(content.props.hasAnySessions).toBe(false);
+  });
+
+  // Regression: NetInfo reports `unknown` reachability on a healthy cold
+  // launch and the app maps that to a React Query pause. The boot pause must
+  // stay on the skeleton (and any cached rows) instead of flashing the
+  // full-screen "Could not load sessions" before the first fetch starts.
+  it('keeps a boot-unknown paused cold open on the skeleton', async () => {
+    connectivityState.status = 'unknown';
+    listState.storedSessions = [];
+    listState.storedIsPending = true;
+    listState.storedIsPaused = true;
+    listState.storedIsFetching = false;
+    listState.storedLoadedPageCount = 0;
+
+    const renderer = await renderScreen();
+
+    const content = findNodeByType(renderer, 'AgentSessionListContent');
+    expect(content.props.isLoading).toBe(true);
+    expect(content.props.isError).toBe(false);
     expect(content.props.hasAnySessions).toBe(false);
   });
 

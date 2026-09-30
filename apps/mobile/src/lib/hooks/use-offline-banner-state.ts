@@ -3,6 +3,7 @@ import { addEventListener } from '@react-native-community/netinfo';
 import { useSyncExternalStore } from 'react';
 
 import { API_BASE_URL } from '@/lib/config';
+import { type ConnectivityStatus } from '@/lib/connectivity-online';
 import {
   type BannerState,
   type ConnectivitySource,
@@ -52,6 +53,16 @@ export function useOfflineBannerState(): boolean {
 
 export function useCommittedConnectivityStatus(): BannerState {
   return useSyncExternalStore(getStore().subscribe, getStore().state);
+}
+
+/**
+ * NetInfo's immediate connectivity classification, before the banner's
+ * five-second confirm-offline debounce commits `useCommittedConnectivityStatus`.
+ * A definite `offline` here lets a surface settle a paused query at once
+ * instead of waiting for the banner to commit.
+ */
+export function useConnectivityStatus(): ConnectivityStatus {
+  return useSyncExternalStore(getStore().subscribeSourceStatus, getStore().sourceStatus);
 }
 
 /**

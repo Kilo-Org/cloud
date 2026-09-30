@@ -165,6 +165,10 @@ vi.mock('@/lib/organization-context', () => ({
 vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ deleteSession: vi.fn(), renameSession: vi.fn() }),
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+  useConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: vi.fn() }));
 vi.mock('@/lib/a11y/status-announcement', () => ({
   useStatusAnnouncement: vi.fn(),

@@ -89,6 +89,7 @@ export function SessionHistoryScreen() {
     search,
     projectOptions,
     contentIsError,
+    contentIsPaused,
     sections,
   } = useAgentSessionListData({
     organizationId,
@@ -172,6 +173,7 @@ export function SessionHistoryScreen() {
     isSearching,
     searchIsPending: search.isPending,
     storedIsPending,
+    isPaused: contentIsPaused,
   });
 
   // Reserve the search header through the initial load too: the cold-open

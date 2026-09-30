@@ -1,4 +1,8 @@
-import { type ConnectivityState, connectivityStatus } from '@/lib/connectivity-online';
+import {
+  type ConnectivityState,
+  type ConnectivityStatus,
+  connectivityStatus,
+} from '@/lib/connectivity-online';
 
 /** Wait out transient NetInfo reports before confirming offline with a probe. */
 const OFFLINE_BANNER_SHOW_DELAY_MS = 5000;
@@ -34,13 +38,33 @@ export type ConnectivitySource = {
 
 export type OfflineBannerStore = {
   subscribe: (listener: () => void) => () => void;
+  /**
+   * Subscribes to `sourceStatus` changes. Kept separate from `subscribe` (the
+   * committed banner state) so a surface that only reads committed state is not
+   * woken by a source report the banner is still debouncing.
+   */
+  subscribeSourceStatus: (listener: () => void) => () => void;
   isOffline: () => boolean;
   state: () => BannerState;
+  /**
+   * The source's immediate classification, before the confirm-offline debounce
+   * commits `state`. A definite `offline` here is a confirmed outage even while
+   * `state` is still `unknown`, so a surface that settles a paused query can
+   * react at once instead of waiting out `OFFLINE_BANNER_SHOW_DELAY_MS`.
+   */
+  sourceStatus: () => ConnectivityStatus;
   destroy: () => void;
 };
 
 /** The banner's committed connectivity state. */
 export type BannerState = 'online' | 'offline' | 'unknown';
+
+/** Wake every listener in a subscription set. */
+function notifyListeners(recipients: ReadonlySet<() => void>): void {
+  for (const listener of recipients) {
+    listener();
+  }
+}
 
 export function createOfflineBannerStore(options: {
   source: ConnectivitySource;
@@ -51,10 +75,17 @@ export function createOfflineBannerStore(options: {
 
   // Start unknown: neither NetInfo nor a probe has confirmed connectivity yet.
   let state: BannerState = 'unknown';
+  // NetInfo's latest classification, published immediately. Kept separate from
+  // the debounced `state` so the banner can wait out transient reports while a
+  // consumer that settles a paused query still sees a definite offline at once.
+  let sourceStatus: ConnectivityStatus = 'unknown';
   let pending: { cancel(): void } | null = null;
   let generation = 0;
   let destroyed = false;
+  // Committed-state subscribers (the banner and the tri-state hook).
   const listeners = new Set<() => void>();
+  // Source-status subscribers (a paused-query gate that must react immediately).
+  const sourceListeners = new Set<() => void>();
 
   function cancelPending(): void {
     pending?.cancel();
@@ -69,9 +100,17 @@ export function createOfflineBannerStore(options: {
     // Notify on every committed state change. The banner's `getSnapshot`
     // (`isOffline`) is unchanged on an unknown → online edge, so it does not
     // re-render there; the tri-state hook's `getSnapshot` (`state`) does.
-    for (const listener of listeners) {
-      listener();
+    notifyListeners(listeners);
+  }
+
+  function setSourceStatus(next: ConnectivityStatus): void {
+    if (sourceStatus === next) {
+      return;
     }
+    sourceStatus = next;
+    // Wake the source-status subscribers only. The banner is not woken: its
+    // committed snapshot is unchanged while it debounces the report.
+    notifyListeners(sourceListeners);
   }
 
   async function confirmConnectivity(attempt: number): Promise<void> {
@@ -94,6 +133,7 @@ export function createOfflineBannerStore(options: {
       return;
     }
     const status = connectivityStatus(sourceState);
+    setSourceStatus(status);
     if (status === 'unknown') {
       // Unknown cancels confirmation but preserves the last committed state —
       // except committed-offline with the radio back up (e.g. airplane mode
@@ -131,9 +171,18 @@ export function createOfflineBannerStore(options: {
     };
   };
 
+  const subscribeSourceStatus = (listener: () => void): (() => void) => {
+    sourceListeners.add(listener);
+    return () => {
+      sourceListeners.delete(listener);
+    };
+  };
+
   const isOffline = (): boolean => state === 'offline';
 
   const getState = (): BannerState => state;
+
+  const getSourceStatus = (): ConnectivityStatus => sourceStatus;
 
   const destroy = (): void => {
     destroyed = true;
@@ -141,7 +190,15 @@ export function createOfflineBannerStore(options: {
     cancelPending();
     unsubscribeSource();
     listeners.clear();
+    sourceListeners.clear();
   };
 
-  return { subscribe, isOffline, state: getState, destroy };
+  return {
+    subscribe,
+    subscribeSourceStatus,
+    isOffline,
+    state: getState,
+    sourceStatus: getSourceStatus,
+    destroy,
+  };
 }

@@ -9,6 +9,7 @@ function loading(overrides: Partial<Parameters<typeof selectSessionListIsLoading
     isSearching: false,
     searchIsPending: false,
     storedIsPending: false,
+    isPaused: false,
     ...overrides,
   });
 }
@@ -41,6 +42,18 @@ describe('selectSessionListIsLoading', () => {
       expect(loading({ isSearching: false, searchIsPending: false, storedIsPending: false })).toBe(
         false
       );
+    });
+
+    it('settles a paused stored cold open instead of spinning skeletons forever', () => {
+      // React Query pauses an offline query; `isPending` stays true for the
+      // whole pause. The screen must stop loading so the error + retry shows.
+      expect(loading({ storedIsPending: true, isPaused: true })).toBe(false);
+    });
+
+    it('settles a paused search cold open instead of spinning skeletons forever', () => {
+      expect(
+        loading({ isSearching: true, searchIsPending: true, isPaused: true, storedIsPending: true })
+      ).toBe(false);
     });
 
     it('stops loading when a search settles with no matches', () => {
@@ -88,6 +101,16 @@ describe('selectSessionListIsLoading', () => {
       expect(selectSessionListContentSurface({ isLoading, ...surfaceInput })).toEqual({
         kind: 'history-empty',
       });
+    });
+
+    it('selects the retryable error surface for a paused offline cold open', () => {
+      // The paused query is the body-driving error (see
+      // use-agent-session-list-data), so the surface settles on the
+      // full-screen error with its Retry instead of skeletons.
+      const isLoading = loading({ storedIsPending: true, isPaused: true });
+      expect(
+        selectSessionListContentSurface({ isLoading, ...surfaceInput, isError: true })
+      ).toEqual({ kind: 'full-screen-error' });
     });
   });
 });

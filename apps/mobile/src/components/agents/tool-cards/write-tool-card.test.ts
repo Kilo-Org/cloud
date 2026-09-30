@@ -256,7 +256,10 @@ describe('WriteToolCardBody — smart render routing', () => {
       el => (el.props as { children?: unknown }).children === 'common.truncated'
     );
     expect(notice).toBeDefined();
-    expect((notice?.props as { accessibilityLabel?: string }).accessibilityLabel).toBe(
+    if (!notice) {
+      throw new Error('notice not found');
+    }
+    expect((notice.props as { accessibilityLabel?: string }).accessibilityLabel).toBe(
       'common.contentTruncated'
     );
     expect(findByType(root, 'CodeBlock')).toHaveLength(0);

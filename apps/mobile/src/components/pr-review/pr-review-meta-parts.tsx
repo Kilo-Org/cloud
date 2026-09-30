@@ -3,7 +3,6 @@
 // the issues it closes. Every section hides itself when GitHub reports nothing,
 // so a bare PR renders exactly what it does today.
 
-import * as WebBrowser from 'expo-web-browser';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -19,6 +18,7 @@ import {
 } from '@/components/ui/icons';
 import { PrAvatar } from '@/components/pr-review/pr-review-overview-parts';
 import { Text } from '@/components/ui/text';
+import { openExternalUrl } from '@/lib/external-link';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import {
@@ -162,7 +162,11 @@ function PrLinkedIssues({ issues }: Readonly<{ issues: PrOverviewDto['linkedIssu
             accessibilityRole="link"
             accessibilityLabel={t('prReview.overview.openIssueA11y', { number: issue.number })}
             onPress={() => {
-              void WebBrowser.openBrowserAsync(issue.url);
+              void openExternalUrl(issue.url, {
+                // A short noun label, not the action's accessibility label: the
+                // helper renders it as "Could not open {{label}}".
+                label: t('prReview.overview.linkedIssues'),
+              });
             }}
             className="min-h-11 flex-row items-center gap-2 active:opacity-70"
           >

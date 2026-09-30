@@ -2183,7 +2183,7 @@
       "invalidLink": "לא ניתן לפתוח קישור זה.",
       "hostConfirmTitle": "לפתוח קישור חיצוני?",
       "hostConfirmMessage": "קישור זה פותח את {{host}} בדפדפן שלך.",
-      "open": "פתוח",
+      "open": "פתיחה",
       "trustThisHost": "מתן אמון באתר הזה"
     },
     "folderPicker": {
@@ -2563,7 +2563,7 @@
     "discussion": {
       "acceptTerms": "אישור",
       "accessDeniedMessage": "אין לך הרשאה לצפות בדיון של ה-PR הזה.",
-      "addReaction": "הוספת תגובת אימוג׳י",
+      "addReaction": "הוספת תגובת אמוג׳י",
       "block": "חסימה",
       "blockedUser": "{{login}} נחסם",
       "collapseThread": "כיווץ השרשור",
@@ -2600,10 +2600,10 @@
       "comment_one": "תגובה אחת",
       "outdated": "לא עדכני",
       "quotedDiffSnippet": "קטע מצוטט מהשוואת השינויים",
-      "reactionPill": "תגובת אימוג׳י {{emoji}}, {{displayCount}} {{countLabel}}",
+      "reactionPill": "תגובת אמוג׳י {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction": "תגובות אמוג׳י",
       "reaction_other": "תגובות אמוג׳י",
-      "reaction_one": "תגובת אימוג׳י",
+      "reaction_one": "תגובת אמוג׳י",
       "replyBadRequest": "לא ניתן לפרסם את התשובה הזו. ייתכן שהשרשור השתנה.",
       "replyBody": "תוכן התשובה",
       "replyForbidden": "אין לך הרשאה להשיב לבקשת המשיכה הזו.",
@@ -2633,7 +2633,7 @@
       "termsCheckRetryCopy": "לא ניתן היה לבדוק את תנאי השירות. בדוק את החיבור ונסה שוב.",
       "termsOutdatedCopy": "תנאי השירות השתנו. פתח מחדש את המסך הזה כדי לאשר את הגרסה האחרונה.",
       "comment_two": "{{displayCount}} תגובות",
-      "reaction_two": "תגובות אימוג׳י",
+      "reaction_two": "תגובות אמוג׳י",
       "reactions": {
         "thumbsUp": "אגודל למעלה",
         "thumbsDown": "אגודל למטה",
@@ -2678,7 +2678,7 @@
       "openAccessibility": "פתיחת בקשת משיכה או בקשת מיזוג",
       "clearLink": "ניקוי הקישור",
       "pasteLink": "הדבקת קישור לבקשת משיכה או מיזוג",
-      "open": "פתוח"
+      "open": "פתיחה"
     },
     "eventChips": {
       "comment": "תגובה",

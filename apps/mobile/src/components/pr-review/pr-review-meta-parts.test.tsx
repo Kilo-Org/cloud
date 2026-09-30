@@ -20,7 +20,7 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-router', () => ({ DarkTheme: {}, DefaultTheme: {} }));
-vi.mock('expo-web-browser', () => ({ openBrowserAsync: vi.fn() }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -135,8 +135,8 @@ describe('PrOverviewMeta', () => {
     expect(pending.props.color).toBe(lightColors.mutedForeground);
   });
 
-  it('opens a linked issue in the browser', async () => {
-    const { openBrowserAsync } = await import('expo-web-browser');
+  it('opens a linked issue through the shared external-link helper', async () => {
+    const { openExternalUrl } = await import('@/lib/external-link');
     const renderer = render(
       overview({
         linkedIssues: [
@@ -153,6 +153,8 @@ describe('PrOverviewMeta', () => {
     act(() => {
       (row.props.onPress as () => void)();
     });
-    expect(openBrowserAsync).toHaveBeenCalledWith('https://github.com/kilo/flux/issues/42');
+    expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/kilo/flux/issues/42', {
+      label: 'prReview.overview.linkedIssues',
+    });
   });
 });

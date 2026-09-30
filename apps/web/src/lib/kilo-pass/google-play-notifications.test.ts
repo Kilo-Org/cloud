@@ -25,6 +25,7 @@ import {
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
+import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 
 const mockAcknowledge = jest
   .fn<(...args: unknown[]) => Promise<void>>()
@@ -83,6 +84,11 @@ function getPosthogTrackingMock(): PosthogTrackingMock {
 let processGooglePlayKiloPassNotification: typeof GooglePlayNotifications.processGooglePlayKiloPassNotification;
 
 const GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS = Date.parse('2026-05-15T00:00:00.000Z');
+
+// The mobile clients match this exact backend string, so it is pinned here
+// rather than imported from the constant the completion throws it from.
+const STORE_PURCHASE_REFUNDED_MESSAGE =
+  'This store purchase has been refunded, so Kilo cannot credit it.';
 
 function pubsubMessage(
   params: {
@@ -1180,6 +1186,88 @@ describe('processGooglePlayKiloPassNotification', () => {
       where: eq(kilocode_users.id, user.id),
     });
     expect(replayed!.total_microdollars_acquired).toBe(0);
+  });
+
+  it('refuses a late completion of a credit pack order refunded before the grant', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    const message = {
+      messageId: crypto.randomUUID(),
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(Date.now()),
+          voidedPurchaseNotification: {
+            purchaseToken,
+            orderId,
+            productType: 2,
+            refundType: 1,
+          },
+        })
+      ).toString('base64'),
+    };
+
+    // The refund arrives before the client finishes the purchase: there is
+    // nothing to claw back, but the voided purchase is recorded as processed.
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true });
+
+    const event = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, message.messageId),
+    });
+    expect(event?.processed_at).not.toBeNull();
+    expect(
+      await db.query.credit_transactions.findFirst({
+        where: eq(
+          credit_transactions.credit_category,
+          `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+        ),
+      })
+    ).toBeUndefined();
+
+    // A grant keyed by the purchase token and one keyed by the order id are both
+    // refused: the voided notification records the order id while Play reports
+    // no order id for a one-time purchase, so the completion may hold either.
+    for (const key of [purchaseToken, orderId]) {
+      await expect(
+        completeStoreCreditPurchase({
+          user,
+          purchase: {
+            paymentProvider: KiloPassPaymentProvider.GooglePlay,
+            productId: 'credits_usd10',
+            providerTransactionId: key,
+            appAccountToken: user.app_store_account_token,
+            quantity: 1,
+            amountUsd: 10,
+            amountMicrodollars: toMicrodollars(10),
+            purchasedAtIso: '2026-05-15T00:00:00.000Z',
+            environment: 'Production',
+            rawPayload: {},
+          },
+        })
+      ).rejects.toThrow(STORE_PURCHASE_REFUNDED_MESSAGE);
+    }
+
+    expect(
+      await db.query.credit_transactions.findFirst({
+        where: eq(
+          credit_transactions.stripe_payment_id,
+          storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, purchaseToken)
+        ),
+      })
+    ).toBeUndefined();
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after?.total_microdollars_acquired).toBe(0);
   });
 
   describe('voided credit pack refund types', () => {

@@ -45,6 +45,7 @@ import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
 import {
   getStoreCreditConsumptionMilliunits,
+  lockStoreCreditPurchase,
   reverseStoreCreditPurchase,
   STORE_FULL_MILLIUNITS,
   type StoreCreditReversalResult,
@@ -853,6 +854,16 @@ export async function processAppStoreKiloPassNotification(params: {
 
   if (transaction && REFUND_TYPES.has(notification.notificationType)) {
     await db.transaction(async tx => {
+      // Serialize with a completion of the same store transaction, in either
+      // order: a refund that runs first is visible to a later completion, which
+      // then refuses to grant the pack at all, and a grant that runs first is
+      // clawed back here. Without the lock both could read the other's absence
+      // and leave the refunded credits granted.
+      await lockStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        providerTransactionIds: [transaction.transactionId],
+      });
+
       let reversal: CreditReversalResult | null = null;
       try {
         reversal = await reverseAppStoreRefundCredits(tx, transaction);

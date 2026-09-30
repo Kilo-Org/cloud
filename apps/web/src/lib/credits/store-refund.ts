@@ -1,6 +1,7 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { NotificationTypeV2 } from '@apple/app-store-server-library';
+import { and, eq, or, sql } from 'drizzle-orm';
 
-import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
+import { credit_transactions, kilocode_users, kilo_pass_store_events } from '@kilocode/db/schema';
 import type { db, DrizzleTransaction } from '@/lib/drizzle';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
@@ -11,6 +12,108 @@ export type StoreCreditReversalResult = {
   creditTransactionId: string | null;
   amountMicrodollars: number;
 };
+
+/**
+ * The backend contract string for a completion of a store transaction the
+ * store has already refunded. Kilo refused to grant the pack, so the client
+ * must not treat the purchase as completed; the mobile error mapping matches
+ * this exact message.
+ */
+export const STORE_PURCHASE_REFUNDED_MESSAGE =
+  'This store purchase has been refunded, so Kilo cannot credit it.';
+
+export type StoreCreditRefundEvent = {
+  eventId: string;
+  notificationType: string | null;
+};
+
+/**
+ * The `kilo_pass_store_events` notification types that mean the store refunded
+ * or revoked a purchase. Both handlers store the decoded type verbatim in
+ * `payload_json`, so a processed event with one of these types is the durable
+ * record that a purchase was refunded — including a refund that arrived before
+ * Kilo granted anything. Stripe never delivers a store refund event.
+ */
+const STORE_REFUND_NOTIFICATION_TYPES: Record<KiloPassPaymentProvider, readonly string[]> = {
+  [KiloPassPaymentProvider.Stripe]: [],
+  [KiloPassPaymentProvider.AppStore]: [NotificationTypeV2.REFUND, NotificationTypeV2.REVOKE],
+  // Play reports a one-time product refund as a voided purchase, for both a
+  // full refund and a quantity-based partial refund.
+  [KiloPassPaymentProvider.GooglePlay]: ['voided_purchase'],
+};
+
+/**
+ * The processed refund event for a store credit pack, or null when the store
+ * never refunded it.
+ *
+ * A store credit pack is one purchase, but Play names it by two ids: the order
+ * id and the purchase token. A completion keys the grant by whichever the Play
+ * API returned first, and a voided-purchase notification always carries an
+ * order id, so every id the purchase is known by is matched here.
+ */
+export async function findProcessedStoreCreditRefundEvent(
+  dbOrTx: DrizzleTransaction | typeof db,
+  params: { paymentProvider: KiloPassPaymentProvider; providerTransactionIds: string[] }
+): Promise<StoreCreditRefundEvent | null> {
+  const notificationTypes = STORE_REFUND_NOTIFICATION_TYPES[params.paymentProvider];
+  const keys = [...new Set(params.providerTransactionIds)].sort();
+  if (notificationTypes.length === 0 || keys.length === 0) return null;
+
+  const keyFilter = keys.flatMap(key => [
+    eq(kilo_pass_store_events.provider_transaction_id, key),
+    // Only Play keys a purchase by a token; an App Store `provider_subscription_id`
+    // is the original transaction id of a subscription, never a credit pack.
+    ...(params.paymentProvider === KiloPassPaymentProvider.GooglePlay
+      ? [eq(kilo_pass_store_events.provider_subscription_id, key)]
+      : []),
+  ]);
+
+  const events = await dbOrTx
+    .select({
+      eventId: kilo_pass_store_events.event_id,
+      notificationType: sql<
+        string | null
+      >`${kilo_pass_store_events.payload_json}->>'notificationType'`,
+    })
+    .from(kilo_pass_store_events)
+    .where(
+      and(
+        eq(kilo_pass_store_events.payment_provider, params.paymentProvider),
+        sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
+        sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN (${sql.join(
+          notificationTypes.map(type => sql`${type}`),
+          sql`, `
+        )})`,
+        keyFilter.length === 1 ? keyFilter[0] : or(...keyFilter)
+      )
+    )
+    .limit(1);
+
+  return events[0] ?? null;
+}
+
+/**
+ * Serialize the grant of a store credit pack with the refund of the same
+ * purchase, in either arrival order.
+ *
+ * Both the completion and the refund handlers take this transaction-scoped
+ * advisory lock, keyed by the store payment id, before they read anything, so
+ * the two can never interleave: a completion that runs first is clawed back by
+ * the refund that follows, and a refund that runs first is visible to the
+ * completion, which then refuses to grant at all. A plain read-then-write check
+ * on either side would let both read "nothing happened yet" and leave the
+ * credits granted. Keys are locked in sorted order so two refunds sharing one
+ * purchase cannot deadlock.
+ */
+export async function lockStoreCreditPurchase(
+  tx: DrizzleTransaction,
+  params: { paymentProvider: KiloPassPaymentProvider; providerTransactionIds: string[] }
+): Promise<void> {
+  for (const key of [...new Set(params.providerTransactionIds)].sort()) {
+    const paymentId = storeCreditPaymentId(params.paymentProvider, key);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${paymentId}, 0))`);
+  }
+}
 
 /**
  * Store proportions are milliunits, as Apple's `consumptionPercentage` and

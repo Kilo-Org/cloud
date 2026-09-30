@@ -8,6 +8,7 @@ import {
   assertGooglePlayAccountTokenMatchesUser,
 } from '@/lib/credits/store-account-token';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
+import { STORE_PURCHASE_REFUNDED_MESSAGE } from '@/lib/credits/store-refund';
 import { STORE_CREDIT_PRODUCTS } from '@/lib/credits/store-products';
 import {
   acknowledgeGooglePlayCreditPurchase,
@@ -70,6 +71,17 @@ function mapCreditCompletionError(
 ): TRPCError {
   if (error instanceof TRPCError) {
     return error;
+  }
+
+  // A purchase the store refunded is an expected outcome, not an incident: the
+  // store reversed the charge, so no retry can grant it. It is terminal for the
+  // same reason a receipt the store will never let succeed is — the client must
+  // stop replaying it instead of retrying forever.
+  if (error instanceof Error && error.message === STORE_PURCHASE_REFUNDED_MESSAGE) {
+    return new TRPCError({
+      code: 'BAD_REQUEST',
+      message: STORE_PURCHASE_REFUNDED_MESSAGE,
+    });
   }
 
   captureException(error, {

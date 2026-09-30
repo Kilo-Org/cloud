@@ -35,7 +35,11 @@ import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { getStoreCreditProductByGoogleProductId } from '@/lib/credits/store-products';
-import { reverseStoreCreditPurchase, STORE_FULL_MILLIUNITS } from '@/lib/credits/store-refund';
+import {
+  lockStoreCreditPurchase,
+  reverseStoreCreditPurchase,
+  STORE_FULL_MILLIUNITS,
+} from '@/lib/credits/store-refund';
 import { dayjs } from './dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
@@ -714,6 +718,15 @@ export async function processGooglePlayKiloPassNotification(params: {
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
     await db.transaction(async tx => {
+      // Serialize with a completion of the same purchase, in either order. The
+      // completion keys the grant by the order id or by the purchase token, so
+      // both ids are locked here; the reversal itself still tries the order id
+      // first and falls back to the token.
+      await lockStoreCreditPurchase(tx, {
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        providerTransactionIds: [orderId, purchaseToken],
+      });
+
       // The grant is keyed by the order id when Play reported one and by the
       // purchase token otherwise, while a voided notification always carries an
       // order id. Try the order id first and fall back to the purchase token so

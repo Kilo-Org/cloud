@@ -49,6 +49,15 @@ jest.mock('@sentry/nextjs', () => ({
 const USER_ID = 'user-1';
 const ACCOUNT_TOKEN = 'account-token-1';
 
+// The mobile clients match this exact backend string, so it is pinned here
+// rather than imported from the constant it is produced from.
+const STORE_PURCHASE_REFUNDED_MESSAGE =
+  'This store purchase has been refunded, so Kilo cannot credit it.';
+
+function captureExceptionMock() {
+  return jest.mocked(jest.requireMock<typeof Sentry>('@sentry/nextjs').captureException);
+}
+
 let createCaller: Awaited<ReturnType<typeof buildCallerFactory>>;
 
 async function buildCallerFactory() {
@@ -179,6 +188,18 @@ describe('creditsRouter.completeAppStorePurchase', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
   });
 
+  it('reports a refunded purchase as terminal and does not report it as an incident', async () => {
+    mockCompleteStoreCreditPurchase.mockRejectedValue(new Error(STORE_PURCHASE_REFUNDED_MESSAGE));
+
+    await expect(
+      callerForUser().completeAppStorePurchase({ signedTransactionJws: 'signed-jws' })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: STORE_PURCHASE_REFUNDED_MESSAGE,
+    });
+    expect(captureExceptionMock()).not.toHaveBeenCalled();
+  });
+
   it('maps a store or API failure to a retryable internal error', async () => {
     mockVerifyAppleCreditPurchase.mockRejectedValue(new Error('provider unavailable'));
 
@@ -258,6 +279,21 @@ describe('creditsRouter.completePlayPurchase', () => {
         purchaseToken: 'play-purchase-token',
       })
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockAcknowledgeGooglePlayCreditPurchase).not.toHaveBeenCalled();
+  });
+
+  it('reports a refunded purchase as terminal and never consumes it', async () => {
+    mockCompleteStoreCreditPurchase.mockRejectedValue(new Error(STORE_PURCHASE_REFUNDED_MESSAGE));
+
+    await expect(
+      callerForUser().completePlayPurchase({
+        productId: 'credits_usd10',
+        purchaseToken: 'play-purchase-token',
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: STORE_PURCHASE_REFUNDED_MESSAGE,
+    });
     expect(mockAcknowledgeGooglePlayCreditPurchase).not.toHaveBeenCalled();
   });
 });

@@ -81,6 +81,7 @@ export default function ModePickerScreen() {
           label,
           description,
         })}
+        accessibilityState={{ selected }}
       >
         <Icon size={20} color={colors.foreground} />
         <View className="flex-1">

@@ -352,11 +352,11 @@ describe('dedicated data routes emit one api_timing line', () => {
   });
 });
 
-// A bare `export { GET } from '...'` re-exports the already timed handler by
-// reference, so the alias pathname is outside the inner pattern's static prefix
-// and no `api_timing` line is emitted at all. Each alias re-wraps the timed
+// A bare `export { GET } from '...'` of another route's timed handler would
+// leave the alias pathname outside that pattern's static prefix, so no
+// `api_timing` line would be emitted at all. Each alias wraps the shared
 // handler with its own pattern so the alias traffic is measured once.
-describe('alias routes re-exporting a timed handler emit one api_timing line', () => {
+describe('alias routes emit one api_timing line', () => {
   test('GET /api/gateway/models logs the gateway alias pattern only', async () => {
     mockGetEnhancedOpenRouterModels.mockRejectedValue(new Error('catalog down'));
 

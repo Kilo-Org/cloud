@@ -93,6 +93,18 @@ describe('github-integration-helpers', () => {
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
 
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(buildIntegration({ repositories: [] }));
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+    });
+
     it('returns integrationInstalled false when no integration exists', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(null);
 
@@ -215,6 +227,19 @@ describe('github-integration-helpers', () => {
         },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
+    it('returns a synced empty list as the connected-empty snapshot', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([buildIntegration({ repositories: [] })]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.integrationInstalled).toBe(true);
+      expect(result.repositories).toEqual([]);
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+      expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
     it('preserves installation provenance across multiple GitHub organizations', async () => {

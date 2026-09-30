@@ -7,7 +7,7 @@
       "instanceLifecycle": "Ihre Instanz hat ein Update",
       "scheduledAction": "Eine geplante Aktion hat ein Update",
       "lowBalance": "Ihr Guthaben benötigt Aufmerksamkeit",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "Ihre Ausgaben benötigen Aufmerksamkeit",
       "securityFinding": "Ein Sicherheitsbefund benötigt Aufmerksamkeit",
       "activeAgentsGlanceable": "Aktive Agenten haben ein Update"
     }
@@ -44,8 +44,8 @@
       "body": "Das Guthaben von {{organizationName}} fiel unter ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "Ausgaben-Warnung",
+      "body": "Die Ausgaben von {{scopeName}} haben ${{amountUsd}} überschritten"
     },
     "securityFindingNew": {
       "title": "Neuer Sicherheitsbefund ({{severity}})",

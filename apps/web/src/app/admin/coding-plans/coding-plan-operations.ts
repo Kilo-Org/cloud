@@ -82,6 +82,21 @@ export function getCancelSubscriptionDialogCopy(userName: string): {
   };
 }
 
+export function getTerminateSubscriptionDialogCopy(userName: string): {
+  title: string;
+  description: string;
+} {
+  return {
+    title: `Terminate ${userName}'s subscription now?`,
+    description:
+      "Immediately ends access instead of waiting for the current period to finish. Revokes the installed credential, queues it for removal from the provider, and frees this provider so the user can add their own BYOK key right away. This can't be undone.",
+  };
+}
+
+export function getTerminateSubscriptionCompleteToast(): string {
+  return 'Subscription terminated immediately.';
+}
+
 export function getExtendSubscriptionDialogCopy(userName: string): {
   title: string;
   description: string;

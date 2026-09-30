@@ -209,6 +209,30 @@ describe.each(['personal', 'org_123'])('ScopeEntryScreen %s routing', scope => {
   );
 });
 
+describe('ScopeEntryScreen organization connect access', () => {
+  // A member cannot connect at all, and a billing manager may manage the
+  // Security Agent but cannot mint an install state (mintInstallState requires
+  // owner/admin). Neither may render the connect CTA, or the rejected mint loops
+  // on the unrecoverable setup error.
+  it.each(['member', 'billing_manager'])(
+    'shows the read-only notice and never mints for a %s with no integration',
+    async role => {
+      permissionData = { hasIntegration: false, hasPermissions: false, reauthorizeUrl: null };
+      roles = [{ organizationId: 'org_123', role }];
+      const root = await mount('org_123');
+      expect(host(root, 'SecurityAgentSetup')).toHaveLength(0);
+      expect(host(root, 'QueryError')).toHaveLength(0);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(
+        transport.mock.calls.some(([input]) => procedureFor(input) === 'mintInstallState')
+      ).toBe(false);
+      expect(host(root, 'Text').map(node => node.props.children)).toContain(
+        "Security Agent isn't connected. Only organization owners and admins can connect it."
+      );
+    }
+  );
+});
+
 describe.each([
   ['standalone', SettingsOverviewScreen],
   ['inline', ScopeEntryScreen],

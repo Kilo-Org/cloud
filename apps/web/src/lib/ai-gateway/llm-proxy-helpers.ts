@@ -24,7 +24,8 @@ import type {
   OpenRouterProviderConfig,
   GatewayRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getFraudDetectionHeaders, toMicrodollars } from '@/lib/utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toMicrodollars } from '@/lib/microdollars';
 import { normalizeProjectId } from '@/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
 import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
@@ -47,6 +48,7 @@ import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.share
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests
@@ -626,7 +628,7 @@ export function checkOrganizationModelRestrictions(params: {
 
   if (params.organizationPlan === 'enterprise') {
     if (providerAllowList !== undefined) {
-      providerConfig.only = providerAllowList;
+      providerConfig.only = withoutVirtualProvider(providerAllowList);
     }
   }
 

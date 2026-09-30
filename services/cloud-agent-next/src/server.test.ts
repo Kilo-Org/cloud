@@ -151,6 +151,7 @@ const {
   default: worker,
   REPORT_RETENTION_CRON,
   OUTCOME_AGGREGATE_CRON,
+  OUTCOME_AGGREGATE_CRONS,
 } = await import('./server.js');
 
 const secret = 'test-secret';
@@ -404,19 +405,44 @@ describe('server background reporting', () => {
     expect(runCloudAgentOpenStockCollectionMock).not.toHaveBeenCalled();
   });
 
-  it('runs the outcome and open-stock collections on the 3-minute cron', async () => {
+  it('runs the outcome and open-stock collections on the 5-minute cron', async () => {
     const env = createEnv();
+    const scheduledTime = Date.parse('2026-02-01T00:10:42.000Z');
 
     await worker.scheduled(
-      { cron: OUTCOME_AGGREGATE_CRON } as ScheduledController,
+      { cron: OUTCOME_AGGREGATE_CRON, scheduledTime } as ScheduledController,
       env as unknown as Env
     );
 
     expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
-    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(env);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(
+      env,
+      expect.any(Date),
+      scheduledTime
+    );
     expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
     expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
     expect(removeExpiredCloudAgentReportDataMock).not.toHaveBeenCalled();
+  });
+
+  it('runs the collections on the tolerated legacy 3-minute cron', async () => {
+    const env = createEnv();
+    const scheduledTime = Date.parse('2026-02-01T00:10:42.000Z');
+
+    await worker.scheduled(
+      { cron: '*/3 * * * *', scheduledTime } as ScheduledController,
+      env as unknown as Env
+    );
+
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOutcomeCollectionMock).toHaveBeenCalledWith(
+      env,
+      expect.any(Date),
+      scheduledTime
+    );
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledTimes(1);
+    expect(runCloudAgentOpenStockCollectionMock).toHaveBeenCalledWith(env);
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 
   it('still runs the open-stock collection and preserves the outcome error when outcome collection rejects', async () => {
@@ -458,6 +484,8 @@ describe('server background reporting', () => {
 
     expect((config.triggers?.crons ?? []).slice().sort()).toEqual(expected);
     expect((config.env?.dev?.triggers?.crons ?? []).slice().sort()).toEqual(expected);
+    expect(OUTCOME_AGGREGATE_CRON).toBe('*/5 * * * *');
+    expect([...OUTCOME_AGGREGATE_CRONS]).toEqual([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
   });
 });
 
@@ -1211,6 +1239,48 @@ describe('server runtime credential proxy', () => {
       );
       expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
       expect(forwarded.headers.get('x-client-request-id')).toBe('request_proxy');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('forwards the caller feature header while still replacing the organization header', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'X-Kilocode-Feature': 'code-review',
+              'X-Kilocode-OrganizationId': 'attacker-org',
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(upstream).toHaveBeenCalledOnce();
+      const forwarded = upstream.mock.calls[0][0] as Request;
+      expect(forwarded.headers.get('x-kilocode-feature')).toBe('code-review');
+      expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
     } finally {
       vi.unstubAllGlobals();
     }

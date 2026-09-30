@@ -147,7 +147,9 @@ export type AgentStatus =
     }
   | { type: 'error'; message: string; code?: SdkStatusMessageCode }
   | { type: 'disconnected' }
-  | { type: 'interrupted' };
+  | { type: 'interrupted' }
+  /** Scheduled to wake later; does nothing now. `scheduledAt` is the ISO-8601 wake time when the CLI reported one. */
+  | { type: 'scheduled'; scheduledAt?: string };
 
 /** Cloud infrastructure status — independent from agent activity. */
 export type CloudStatus =
@@ -196,6 +198,20 @@ export type SlashCommandInfo = {
   source?: 'command' | 'mcp' | 'skill' | undefined;
   hints: string[];
   subtask?: boolean | undefined;
+};
+
+/**
+ * Bound status the wrapper reports beside a `commands.available` catalog.
+ *
+ * Present only when the wrapper bounded the catalog to the shared 256-command
+ * and 512 KiB limits: `dropped` counts the non-skill rows it removed, and
+ * `overLimit` means the rows it kept still exceed a bound because the skill
+ * rows alone are over it (a skill row is never truncated). A consumer shows a
+ * notice for it, so a catalog that is missing rows is never silent.
+ */
+export type SlashCommandCatalogStatus = {
+  dropped: number;
+  overLimit: boolean;
 };
 
 /** Per-user-message delivery state, tracked via server-emitted cloud.message.* events. */
@@ -279,10 +295,11 @@ export type ResolvedSession =
       kiloSessionId: KiloSessionId;
       /**
        * Per-session capabilities reported by the owning CLI's most recent
-       * heartbeat or `sessions.list`. A `remote` session supports attachments
-       * only when `capabilities?.attachments === true`; absent / false is a
-       * structural no-attachments state (older CLIs, CLIs that have not yet
-       * advertised the capability, or CLIs that have downgraded).
+       * heartbeat or `sessions.list`. The gate is optimistic: a `remote`
+       * session supports attachments while the capability is unknown
+       * (`undefined` — older CLIs, CLIs that have not yet advertised it, or a
+       * mid-reconnect snapshot). Only an explicit `attachments: false`
+       * downgrades it.
        */
       capabilities?: { attachments?: boolean };
     }

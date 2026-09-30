@@ -15,8 +15,6 @@ describe('Town DO Alarm', () => {
     town = getTownStub(townName);
   });
 
-  // ── Rig config management ─────────────────────────────────────────────
-
   const testRigConfig = (rigId = 'test-rig') => ({
     rigId,
     townId: 'town-abc',
@@ -39,8 +37,6 @@ describe('Town DO Alarm', () => {
     });
   });
 
-  // ── Alarm arming ────────────────────────────────────────────────────────
-
   describe('alarm arming', () => {
     it('should arm alarm when hookBead is called', async () => {
       const agent = await town.registerAgent({
@@ -52,7 +48,6 @@ describe('Town DO Alarm', () => {
 
       await town.hookBead(agent.id, bead.id);
 
-      // The alarm should fire without error
       const ran = await runDurableObjectAlarm(town);
       expect(ran).toBe(true);
     });
@@ -66,7 +61,6 @@ describe('Town DO Alarm', () => {
       const bead = await town.createBead({ type: 'issue', title: 'Done bead' });
       await town.hookBead(agent.id, bead.id);
 
-      // Run the initial alarm from hookBead
       await runDurableObjectAlarm(town);
 
       await town.agentDone(agent.id, {
@@ -74,7 +68,6 @@ describe('Town DO Alarm', () => {
         summary: 'Test done',
       });
 
-      // Another alarm should be armed
       const ran = await runDurableObjectAlarm(town);
       expect(ran).toBe(true);
     });
@@ -104,8 +97,6 @@ describe('Town DO Alarm', () => {
     });
   });
 
-  // ── Alarm handler behavior ──────────────────────────────────────────────
-
   describe('alarm handler', () => {
     it('should re-arm when there is active work', async () => {
       await town.configureRig(testRigConfig());
@@ -117,19 +108,15 @@ describe('Town DO Alarm', () => {
       const bead = await town.createBead({ type: 'issue', title: 'Active work' });
       await town.hookBead(agent.id, bead.id);
 
-      // First alarm from hookBead
       await runDurableObjectAlarm(town);
 
-      // Agent is working with an in-progress bead — alarm should re-arm
       const ranAgain = await runDurableObjectAlarm(town);
       expect(ranAgain).toBe(true);
     });
 
     it('should re-arm with idle interval when there is no active work', async () => {
-      // Arm alarm via slingBead
       await town.slingBead({ type: 'issue', title: 'Arm alarm', rigId: 'test-rig' });
 
-      // First alarm — no agents working, so idle interval
       const ran = await runDurableObjectAlarm(town);
       expect(ran).toBe(true);
 
@@ -158,14 +145,11 @@ describe('Town DO Alarm', () => {
       // fail gracefully and mark the review as 'failed'
       await runDurableObjectAlarm(town);
 
-      // The MR bead should no longer be open (alarm processed it)
       const mrBeads = await town.listBeads({ type: 'merge_request' });
       expect(mrBeads).toHaveLength(1);
       expect(mrBeads[0].status).not.toBe('open');
     });
   });
-
-  // ── schedulePendingWork ─────────────────────────────────────────────────
 
   describe('schedule pending work', () => {
     it('should not dispatch agents without rig config', async () => {
@@ -180,7 +164,6 @@ describe('Town DO Alarm', () => {
       // Run alarm — no rig config, so scheduling should be skipped
       await runDurableObjectAlarm(town);
 
-      // Agent should still be idle (not dispatched)
       const updatedAgent = await town.getAgentAsync(agent.id);
       expect(updatedAgent?.status).toBe('idle');
     });
@@ -200,13 +183,10 @@ describe('Town DO Alarm', () => {
       // will fail, but the attempt should be made
       await runDurableObjectAlarm(town);
 
-      // Agent stays idle because container start failed
       const updatedAgent = await town.getAgentAsync(agent.id);
       expect(updatedAgent?.status).toBe('idle');
     });
   });
-
-  // ── witnessPatrol with alarm ────────────────────────────────────────────
 
   describe('witness patrol via alarm', () => {
     it('should still detect dead agents when alarm fires', async () => {
@@ -221,7 +201,6 @@ describe('Town DO Alarm', () => {
       // Run alarm — witnessPatrol runs internally
       await runDurableObjectAlarm(town);
 
-      // Dead agent should still be dead (patrol is internal bookkeeping)
       const agentAfter = await town.getAgentAsync(agent.id);
       expect(agentAfter?.status).toBe('dead');
     });
@@ -247,20 +226,16 @@ describe('Town DO Alarm', () => {
     });
   });
 
-  // ── Full end-to-end: bead created → alarm fires ─────────────────────────
-
   describe('end-to-end alarm flow', () => {
     it('should handle the full bead → hook → alarm → patrol cycle', async () => {
       await town.configureRig(testRigConfig());
 
-      // Register agent
       const agent = await town.registerAgent({
         role: 'polecat',
         name: 'E2E-Polecat',
         identity: `e2e-${townName}`,
       });
 
-      // Create and assign bead
       const bead = await town.createBead({
         type: 'issue',
         title: 'E2E test bead',
@@ -285,7 +260,6 @@ describe('Town DO Alarm', () => {
         summary: 'E2E work complete',
       });
 
-      // Agent should be idle now
       const agentAfterDone = await town.getAgentAsync(agent.id);
       expect(agentAfterDone?.status).toBe('idle');
       expect(agentAfterDone?.current_hook_bead_id).toBeNull();

@@ -42,7 +42,7 @@ import { ShareIntentProvider, useShareIntentContext } from 'expo-share-intent';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -69,6 +69,7 @@ import { markStartup, markStartupComplete } from '@/lib/startup-timing';
 import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
+import { useAppLifecycle } from '@/lib/hooks/use-app-lifecycle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
@@ -883,8 +884,28 @@ function RootLayoutNav({
   // Post-startup hidden windows (a sign-in's redirect + consent check, a
   // sign-out's redirect to login) have no splash over them, so the hidden
   // wrapper would otherwise paint an empty background. Keep one spinner up
-  // for exactly those windows (app-blank-after-oauth).
-  const showBootstrapLoading = shouldShowBootstrapLoading({ startupFinished, hidden });
+  // for exactly those windows (app-blank-after-oauth). A sign-out is the same
+  // exposed window for its teardown: the session is revoked over the network
+  // while the signed-in tree is still published, and the profile it leaves
+  // behind is already stale (explorer signout-loading).
+  //
+  // The teardown half is bounded by the token, not by `isSigningOut` alone:
+  // that flag flips at the start of sign-out and only clears when a *later*
+  // sign-in publishes credentials, so gating on it would hold the surface over
+  // the login screen forever. Once the token clears, `hidden` owns the window
+  // until the login route mounts, so the surface is continuous either way.
+  const signingOutWindow = startupFinished && isSigningOut && token != null;
+  const showBootstrapLoading = shouldShowBootstrapLoading({
+    startupFinished,
+    hidden,
+    signingOut: isSigningOut && token != null,
+  });
+
+  // The wait surface owns the screen for a sign-out's whole teardown too, so
+  // the tree leaves both accessibility trees and stops taking touches for
+  // `wrapperObscured`, and the same signal drives the entry announcement: the
+  // login screen is the deterministic entry context in both cases.
+  const wrapperObscured = hidden || signingOutWindow;
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
@@ -902,11 +923,11 @@ function RootLayoutNav({
   // render's frame can fire, so an interrupted reveal never focuses a stale
   // wrapper.
   const wrapperRef = useRef<View>(null);
-  const wasHiddenRef = useRef(hidden);
+  const wasHiddenRef = useRef(wrapperObscured);
   useEffect(() => {
     const wasHidden = wasHiddenRef.current;
-    wasHiddenRef.current = hidden;
-    if (!wasHidden || hidden || hasBootstrapError) {
+    wasHiddenRef.current = wrapperObscured;
+    if (!wasHidden || wrapperObscured || hasBootstrapError) {
       return undefined;
     }
     announceForA11y(i18n.t('bootstrap.contentReady'));
@@ -916,7 +937,7 @@ function RootLayoutNav({
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [hidden, hasBootstrapError]);
+  }, [wrapperObscured, hasBootstrapError]);
 
   // The restore-error surface is settled, but a successful Retry does not
   // reveal the app immediately: the token publish, the user fetch, and the
@@ -935,7 +956,22 @@ function RootLayoutNav({
     isSigningOut,
   });
 
-  if (hasUserBootstrapError) {
+  // The wait surface (or the held restore surface) covers the tree: it leaves
+  // both accessibility trees, stops taking touches, and paints nothing that
+  // would show through the opaque surface above it.
+  const obscureTree = wrapperObscured || showRestoreError;
+
+  // Sign-out from either error screen below outranks the error: the failure
+  // belongs to the account being revoked, and its Sign out starts the teardown
+  // behind the screen, so the branch would leave the stale error (and the
+  // account copy on it) over the app for the whole revoke (explorer
+  // signout-loading). While `signingOutWindow` owns the screen, the shared
+  // render below paints its wait surface; the error flags below both require
+  // the token, so clearing the token cannot bring the screen back, and the
+  // fall-through also keeps Slot mounted for the login replace.
+  const bootstrapErrorOwnsScreen = !signingOutWindow;
+
+  if (hasUserBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
@@ -952,7 +988,7 @@ function RootLayoutNav({
     );
   }
 
-  if (hasConsentBootstrapError) {
+  if (hasConsentBootstrapError && bootstrapErrorOwnsScreen) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadPrivacy')}
@@ -1026,10 +1062,10 @@ function RootLayoutNav({
         // `bg-background` keeps the root surface opaque: while a rotation
         // relayout runs, frames before React's first commit must show the
         // app's own background, never the window's foreign default.
-        accessibilityElementsHidden={hidden || showRestoreError}
-        importantForAccessibility={hidden || showRestoreError ? 'no-hide-descendants' : 'auto'}
-        className={`flex-1 bg-background ${hidden || showRestoreError ? 'opacity-0' : 'opacity-100'}`}
-        pointerEvents={hidden || showRestoreError ? 'none' : 'auto'}
+        accessibilityElementsHidden={obscureTree}
+        importantForAccessibility={obscureTree ? 'no-hide-descendants' : 'auto'}
+        className={`flex-1 bg-background ${obscureTree ? 'opacity-0' : 'opacity-100'}`}
+        pointerEvents={obscureTree ? 'none' : 'auto'}
       >
         <Slot />
       </View>
@@ -1089,25 +1125,31 @@ function RootLayout() {
   // native listener instead of leaving it alive past the tree that uses it.
   useSystemSearchOpenListener();
 
-  // Reap expired temp files at cold start and whenever the app returns to the
-  // foreground, deferred past the current interaction frame so a navigation
-  // never waits on it. AppState is already `active` at launch, so the change
-  // listener alone never reaps in a launch/use/kill cycle.
+  // Reap expired temp files at cold start, deferred past the current
+  // interaction frame so a navigation never waits on it. AppState is already
+  // `active` at launch, so the foreground edge alone never reaps in a
+  // launch/use/kill cycle.
   useEffect(() => {
     scheduleCacheMaintenance(() => {
       reapTempFiles();
     });
-    const subscription = AppState.addEventListener('change', nextState => {
-      if (nextState === 'active') {
-        scheduleCacheMaintenance(() => {
-          reapTempFiles();
-        });
-      }
-    });
-    return () => {
-      subscription.remove();
-    };
   }, []);
+
+  // The foreground half of the same reap. The app's shared `useAppLifecycle()`
+  // store is the single foreground subscription for this work, so the edge
+  // fires only on background -> active and never on an active -> active echo.
+  // The reap is idempotent, so dropping the layout's own `AppState` listener
+  // for this loses nothing.
+  const { isActive } = useAppLifecycle();
+  const wasActiveRef = useRef(isActive);
+  useEffect(() => {
+    if (!wasActiveRef.current && isActive) {
+      scheduleCacheMaintenance(() => {
+        reapTempFiles();
+      });
+    }
+    wasActiveRef.current = isActive;
+  }, [isActive]);
 
   return (
     <MotionProvider>

@@ -61,6 +61,7 @@ describe('useSecurityAgentCapability status derivation', () => {
 
     expect(capability.status).toBe('allowed');
     expect(capability.canManage).toBe(true);
+    expect(capability.canConnectGitHub).toBe(true);
   });
 
   it.each(['owner', 'admin', 'billing_manager'])(
@@ -71,6 +72,9 @@ describe('useSecurityAgentCapability status derivation', () => {
 
       expect(capability.status).toBe('allowed');
       expect(capability.canManage).toBe(true);
+      // Only owner/admin may mint an install state; a billing manager manages
+      // the agent but not the GitHub App connection.
+      expect(capability.canConnectGitHub).toBe(role !== 'billing_manager');
     }
   );
 
@@ -80,6 +84,7 @@ describe('useSecurityAgentCapability status derivation', () => {
 
     expect(capability.status).toBe('denied');
     expect(capability.canManage).toBe(false);
+    expect(capability.canConnectGitHub).toBe(false);
   });
 
   it('returns error when the org role query fails with no data', () => {

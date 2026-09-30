@@ -9,10 +9,12 @@
 // that same rem, so its own vertical slop, not its frame, is what reaches the
 // minimum. The pill's expanded right edge and the overflow's expanded left edge
 // must never meet: a tap on the pill — including its right edge — must open the
-// session, never the moderation sheet. Keeping the arithmetic in one place lets
-// the row's gap and the two tap areas be checked together (vr1, 2026-09-16).
+// session, never the moderation sheet. The row keeps the literal classes and
+// the slop objects below; `comment-trailing-controls.test.ts` reads the row's
+// source and these two slop objects together so the gap and the two tap areas
+// are checked against what the row actually renders (vr1, 2026-09-16).
 
-import { COMPACT_CONTROL_FRAME_DP, COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/touch-target';
+import { COMPACT_H11_FRAME_DP, COMPACT_H11_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 /**
  * The pill's visual height in pt, read off its classes in
@@ -33,32 +35,18 @@ export const FIX_WITH_KILO_VISUAL_DP = 23;
 export const FIX_WITH_KILO_HIT_SLOP = { top: 11, bottom: 11, left: 2, right: 2 } as const;
 
 /** The overflow's frame: `h-11 w-11` measured on device. */
-export const COMMENT_ACTIONS_FRAME_DP = COMPACT_CONTROL_FRAME_DP;
+export const COMMENT_ACTIONS_FRAME_DP = COMPACT_H11_FRAME_DP;
 
 /** The overflow's visible circle, in explicit dp so rem cannot shrink it. */
 export const COMMENT_ACTIONS_VISUAL_DP = 28;
 
 /** The overflow's hit slop, which lifts its frame to the 44pt minimum. */
 export const COMMENT_ACTIONS_HIT_SLOP = {
-  top: COMPACT_CONTROL_HIT_SLOP_DP,
-  bottom: COMPACT_CONTROL_HIT_SLOP_DP,
-  left: COMPACT_CONTROL_HIT_SLOP_DP,
-  right: COMPACT_CONTROL_HIT_SLOP_DP,
+  top: COMPACT_H11_HIT_SLOP_DP,
+  bottom: COMPACT_H11_HIT_SLOP_DP,
+  left: COMPACT_H11_HIT_SLOP_DP,
+  right: COMPACT_H11_HIT_SLOP_DP,
 } as const;
 
 /** The trailing group's `gap-3` class, in dp: 0.75rem at NativeWind's 14pt rem. */
 export const COMMENT_TRAILING_CONTROLS_GAP_DP = 10.5;
-
-/**
- * Horizontal dp between the pill's expanded right edge and the overflow's
- * expanded left edge: the gap between the two frames less each control's slop
- * on the facing side. The overflow's frame is wider than its visible circle,
- * but the gap and both slops are measured from the frame, so the frame's inset
- * does not enter here. A positive value means the two tap areas never overlap,
- * so each control keeps every tap that lands on it.
- */
-export function commentTrailingControlsClearanceDp(): number {
-  return (
-    COMMENT_TRAILING_CONTROLS_GAP_DP - FIX_WITH_KILO_HIT_SLOP.right - COMMENT_ACTIONS_HIT_SLOP.left
-  );
-}

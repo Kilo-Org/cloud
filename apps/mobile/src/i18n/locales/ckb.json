@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "گەڕانەوە",
     "idle": "بێکار",
+    "scheduled": "خشتەکراو",
     "keepEditing": "بەردەوامبوون لە دەستکاری",
     "keepRunning": "بەردەوامبوونی جێبەجێکردن",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "بەکارهێنەری سڕاوە",
       "replyForbiddenTerm": "مۆڵەتی وەڵامدانەوەی ئەم {{term}}ەت نییە.",
       "moreLinesAbove_one": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە.",
-      "moreLinesAbove_other": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە."
+      "moreLinesAbove_other": "… {{displayCount}} هێڵی زیاتر لە سەرەوە هەیە.",
+      "deleteComment": "سڕینەوەی بۆچوون",
+      "deleteCommentTitle": "بۆچوون بسڕدرێتەوە؟",
+      "deleteCommentMessage": "ئەم بۆچوونە لە داواکارییەی ڕاکێشان بسڕدرێتەوە.",
+      "commentEditFailed": "نەتوانرا بۆچوونەکەت پاشەکەوت بکرێت. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+      "commentEditUnavailable": "ئەم بۆچوونە ناتوانرێت دەستکاری بکرێت. ڕەنگە سڕابێتەوە.",
+      "commentDeleteFailed": "نەتوانرا بۆچوونەکەت بسڕدرێتەوە. پەیوەندییەکەت بپشکنە و دووبارە هەوڵ بدەوە.",
+      "commentDeleteUnavailable": "ئەم بۆچوونە ناتوانرێت بسڕدرێتەوە."
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی ئەپی GitHub بکرێنەوە.",
     "installKiloGitHubApp": "ئەپی Kilo بۆ GitHub دامەزرێنە",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ئەمە بەستەری داواکاری ڕاکێشان یان تێکەڵکردن نییە.",
     "announce": {
       "commentPosted": "بۆچوون بڵاوکرایەوە",
+      "commentUpdated": "بۆچوون نوێکرایەوە",
+      "commentDeleted": "بۆچوون سڕایەوە",
       "reviewSubmitted": "پێداچوونەوە نێردرا",
       "autoMergeEnabled": "تێکەڵکردنی ئۆتۆماتیکی چالاک کرا"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "نەتوانرا سێشنە چالاکەکان بار بکرێن.",
       "couldNotRefresh": "نەتوانرا نوێ بکرێتەوە",
       "noSessionsYetDescription": "لە مۆبایلەکەتەوە ئەرکێکی کۆدنووسین دەست پێ بکە. سێشنەکانت لێرە دەردەکەون.",
+      "viewHistory": "مێژووی سێشنەکان",
       "noMatches": "هیچ سێشنێک ناگونجێت",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
       "tryAdjustFilters": "فیلتەرەکانت بگۆڕە یان پاکیان بکەرەوە.",
       "couldNotSearch": "نەتوانرا لە سێشنەکان بگەڕێین.",
       "completedWillAppear": "سێشنە تەواوکراوەکان لێرە دەردەکەون.",
       "noPastSessions": "هیچ سێشنێکی ڕابردوو نییە",
+      "pastSessions": "سێشنەکانی ڕابردوو",
       "live": "ڕاستەوخۆ",
       "updating": "لە نوێکردنەوەدایە"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "ناوی سێشن",
       "transcriptAccessibility": "تۆماری سێشن",
       "readOnly": "ئەم سێشنە تەنها بۆ خوێندنەوەیە.",
+      "continueInNewSession": "بەردەوامبوون لە سێشنێکی نوێدا",
       "emptyDescription": "بۆ دەستپێکردن، لە خوارەوە پەیامێک بنێرە.",
       "scrollToBottom": "چوون بۆ کۆتایی",
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "دەقی دانیشتنی OpenAI Codex هاوردە بکە",
       "reviewDescription": "گۆڕانکارییەکان بپشکنە [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "بەکارهێنانی /{{command}}",
+      "useSkillCommand": "بەکارهێنانی لێهاتوویی /{{command}}",
+      "skillBadge": "لێهاتوویی",
+      "catalogFull": "پێرستی فەرمانەکان پڕە، بۆیە هەندێک فەرمان شاراوەتەوە.",
+      "catalogOverLimit": "پێرستی لێهاتووییەکان لە سنووری قەبارە دەرچووە، بۆیە هەموو لێهاتووییەکان پیشان دەدرێن.",
       "insert": "تێخستن",
       "upgradeRequiredFallback": "تکایە CLIـی خۆت نوێ بکەرەوە بۆ بەکارهێنانی ئەم فەرمانە.",
       "exitCapabilityUnavailable": "بۆ دەرچوون لە سێشنەکە، CLI ـی خۆت نوێ بکەرەوە.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "بگەڕێوە و ئەم هەڵبژێرە لە شاشەی پێشووەوە دووبارە بکەرەوە."
   },
   "sessionRow": {
-    "needsInput": "چاوەڕێی وەڵام"
+    "needsInput": "چاوەڕێی وەڵام",
+    "scheduled": "خشتەکراو"
   },
   "voiceInput": {
     "listening": "گوێ دەگرێت...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "هیچ خانەخوێیەکی متمانەپێکراو نییە",
     "emptyDescription": "کاتێک متمانە بە خانەخوێی بەستەرێک دەدەیت، بەستەرەکە بەبێ پرسیارکردنی دووبارە دەکرێتەوە.",
     "revoke": "هەڵوەشاندنەوەی متمانە بە {{host}}",
+    "revokeMessage": "بەستەرەکانی ئەم خانەخوێیە دیسانەوە داوای پشتڕاستکردنەوە دەکەن.",
     "backToPreferences": "گەڕانەوە بۆ ڕێکخستنەکان"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵدا، چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکاندا چالاک بکە.",
     "openSession": "بیکەرەوە",
     "approveFailed": "نەتوانرا پەسند بکرێت. بۆ دووبارە هەوڵدانەوە، لە $t(common.approve) بدە.",
-    "newestResult": "نوێترین ئەنجام"
+    "newestResult": "نوێترین ئەنجام",
+    "scheduledWakes": "{{time}} خەبەر دەبێت"
   },
   "transcriptionModel": {
     "title": "مۆدێلی گۆڕینی دەنگ بۆ دەق",

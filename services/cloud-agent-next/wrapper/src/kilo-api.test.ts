@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { Database } from 'bun:sqlite';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer, type IncomingMessage } from 'node:http';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import type { QuestionRequest } from '@kilocode/sdk/v2';
 import {
@@ -146,6 +149,99 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
       '/workspace'
     );
   }
+
+  it('keeps skill-sourced rows in the catalog so the composer can list and invoke them', async () => {
+    const stub = startStub(200, [
+      { name: 'review', description: 'Review', hints: [], source: 'command', template: 'x' },
+      {
+        name: 'kilo-config',
+        description: 'Guide for Kilo configuration',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      },
+    ]);
+
+    const catalog = await createClient(stub.url).listCommands();
+
+    expect(catalog).toEqual({
+      commands: [
+        { name: 'review', description: 'Review', source: 'command', hints: [] },
+        {
+          name: 'kilo-config',
+          description: 'Guide for Kilo configuration',
+          source: 'skill',
+          hints: [],
+        },
+      ],
+      dropped: 0,
+      overLimit: false,
+    });
+  });
+
+  it('keeps every skill row when a full catalog is bounded', async () => {
+    const stub = startStub(200, [
+      ...Array.from({ length: 260 }, (_, index) => ({
+        name: `cmd-${index}`,
+        description: 'Command',
+        hints: [],
+        source: 'command',
+        template: 'x',
+      })),
+      ...Array.from({ length: 3 }, (_, index) => ({
+        name: `skill-${index}`,
+        description: 'Guide',
+        hints: [],
+        source: 'skill',
+        template: 'y',
+      })),
+    ]);
+
+    const catalog = await createClient(stub.url).listCommands();
+
+    expect(catalog.commands).toHaveLength(256);
+    expect(catalog.commands.filter(command => command.source === 'skill')).toEqual([
+      { name: 'skill-0', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-1', description: 'Guide', source: 'skill', hints: [] },
+      { name: 'skill-2', description: 'Guide', source: 'skill', hints: [] },
+    ]);
+    // 260 non-skill rows plus 3 skill rows against a 256-command bound: the
+    // skill rows survive and 7 non-skill rows do not.
+    expect(catalog.dropped).toBe(7);
+    expect(catalog.overLimit).toBe(false);
+  });
+
+  it('reports the full catalog when skill rows alone exceed a bound', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'kilo-api-catalog-'));
+    const logPath = join(directory, 'wrapper.log');
+    const originalLogPath = process.env.WRAPPER_LOG_PATH;
+    process.env.WRAPPER_LOG_PATH = logPath;
+    try {
+      const stub = startStub(
+        200,
+        Array.from({ length: 300 }, (_, index) => ({
+          name: `skill-${index}`,
+          description: 'Guide',
+          hints: [],
+          source: 'skill',
+          template: 'y',
+        }))
+      );
+
+      const catalog = await createClient(stub.url).listCommands();
+
+      // Skill rows are never truncated: the over-limit catalog is returned as
+      // the CLI reported it, and the wrapper says so instead of hiding skills.
+      expect(catalog.commands).toHaveLength(300);
+      expect(catalog.dropped).toBe(0);
+      expect(catalog.overLimit).toBe(true);
+      expect(readFileSync(logPath, 'utf8')).toContain('slash command catalog over limit');
+    } finally {
+      if (originalLogPath === undefined) delete process.env.WRAPPER_LOG_PATH;
+      else process.env.WRAPPER_LOG_PATH = originalLogPath;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
 
   const questions: QuestionRequest[] = [
     {

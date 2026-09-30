@@ -1,11 +1,12 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import Animated, { FadeIn } from 'react-native-reanimated';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import { CenteredState } from '@/components/centered-state';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -13,6 +14,7 @@ import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
 import { SettingsOverviewScreen } from '@/components/security-agent/settings-overview-screen';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { trpcClient } from '@/lib/trpc';
@@ -41,6 +43,29 @@ function ScopeEntrySkeleton() {
         <Skeleton className="h-32 w-full rounded-lg" />
         <Skeleton className="h-48 w-full rounded-lg" />
       </View>
+    </View>
+  );
+}
+
+// Starting a GitHub App installation mints an install state that the server
+// (`githubApps.mintInstallState`) authorizes with ORGANIZATION_MANAGE_ROLES —
+// owner/admin only. A plain organization member and a billing manager (who can
+// manage the Security Agent but not the GitHub App) must not be shown the setup
+// CTA: the mint would be rejected and trap them in a retry loop. Render a
+// Security Agent-specific read-only notice that names the narrower owner/admin
+// contract instead of attempting an action the caller is not allowed to perform.
+// The audit-report header action is threaded through so it stays available
+// whenever the caller can manage the agent.
+function NotConnectedReadOnly({ headerRight }: Readonly<{ headerRight?: ReactNode }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="flex-1 bg-background">
+      <ScreenHeader title={t('common.securityAgent')} headerRight={headerRight} />
+      <CenteredState className="px-6">
+        <Text className="text-center text-xs text-muted-foreground">
+          {t('securityAgent.scopeEntry.notConnectedReadOnly')}
+        </Text>
+      </CenteredState>
     </View>
   );
 }
@@ -107,12 +132,17 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   const reauthUrl = permission.data?.reauthorizeUrl;
 
-  // Mint only when the entry view actually needs a fresh GitHub install URL:
-  // connect-github always, reauthorize only when the server offered no
-  // reauthorize URL. Dashboard and disabled-settings mounts must not mint —
-  // the token is a bearer credential and churning it on every visit is
-  // wasteful.
-  const shouldMint = view === 'connect-github' || (view === 'reauthorize' && !reauthUrl);
+  // Mint only when the entry view actually needs a fresh GitHub install URL
+  // and the caller is allowed to start one: connect-github always, reauthorize
+  // only when the server offered no reauthorize URL. Dashboard and
+  // disabled-settings mounts must not mint — the token is a bearer credential
+  // and churning it on every visit is wasteful. `canConnectGitHub` mirrors the
+  // server's ORGANIZATION_MANAGE_ROLES check on mintInstallState, so a billing
+  // manager or member never mints: the server would reject it and the read-only
+  // branch below renders instead.
+  const shouldMint =
+    capability.canConnectGitHub &&
+    (view === 'connect-github' || (view === 'reauthorize' && !reauthUrl));
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -156,6 +186,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
 
   switch (view) {
     case 'connect-github': {
+      if (!capability.canConnectGitHub) {
+        return <NotConnectedReadOnly headerRight={auditAction} />;
+      }
       if (mintFailed) {
         return (
           <View className="flex-1 bg-background">
@@ -193,6 +226,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       );
     }
     case 'reauthorize': {
+      if (!reauthUrl && !capability.canConnectGitHub) {
+        return <NotConnectedReadOnly headerRight={auditAction} />;
+      }
       if (!reauthUrl && mintFailed) {
         return (
           <View className="flex-1 bg-background">

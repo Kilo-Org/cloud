@@ -801,7 +801,9 @@ function glanceableSnapshot(
     running: 1,
     needsInput: 0,
     idle: 0,
+    scheduled: 0,
     needsInputSince: '2026-01-01T00:00:00.000Z',
+    scheduledAt: null,
     newestResultKind: 'running',
     newestResultAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -1899,7 +1901,11 @@ describe('foreground attention-push suppression', () => {
   it('suppresses the server attention push while the app notification for that session is posted', async () => {
     const { needsInput, registration } = await loadHandler();
 
-    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
 
     const behavior = await registration.handleNotification({
       request: { identifier: 'expo-push-remote-1', content: { data: attentionPush } },
@@ -1911,7 +1917,11 @@ describe('foreground attention-push suppression', () => {
   it('shows the app-owned needs-input notification even while its session is posted', async () => {
     const { needsInput, registration } = await loadHandler();
 
-    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
 
     // The app's own post carries the same parsed payload as the server push;
     // suppressing it would drop the only notification the app presents.
@@ -1950,7 +1960,11 @@ describe('foreground attention-push suppression', () => {
 
   it('shows the server attention push again after the raise is answered headless', async () => {
     const { needsInput, registration } = await loadHandler();
-    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
 
     needsInput.clearPostedNeedsInputNotification('ses_1');
 
@@ -1962,7 +1976,11 @@ describe('foreground attention-push suppression', () => {
 
   it('shows an ordinary agent progress push even while the raise is posted', async () => {
     const { needsInput, registration } = await loadHandler();
-    await needsInput.applyNeedsInputNotifications({ publish: [postedRow], dismiss: [] });
+    await needsInput.applyNeedsInputNotifications({
+      publish: [postedRow],
+      dismiss: [],
+      updates: [],
+    });
 
     const progress = await registration.handleNotification({
       request: {
@@ -2369,6 +2387,8 @@ describe('cold iOS background delivery', () => {
       needsApproval: 0,
       idle: 0,
       needsInputSince: null,
+      scheduled: 0,
+      scheduledAt: null,
       // No ask is recorded for this cold push, so the app-built state says so
       // explicitly; the layout gates Approve on this flag.
       canApprove: false,

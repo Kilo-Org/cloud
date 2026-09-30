@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "பின்செல்லவும்",
     "idle": "ஓய்வில்",
+    "scheduled": "திட்டமிடப்பட்டது",
     "keepEditing": "தொடர்ந்து திருத்தவும்",
     "keepRunning": "தொடர்ந்து இயங்க விடவும்",
     "kiloclaw": "KiloClaw",
@@ -566,7 +567,14 @@
       "deletedUser": "நீக்கப்பட்ட பயனர்",
       "replyForbiddenTerm": "இந்த {{term}}-க்குப் பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
       "moreLinesAbove_one": "… மேலே மேலும் {{displayCount}} வரி உள்ளது.",
-      "moreLinesAbove_other": "… மேலே மேலும் {{displayCount}} வரிகள் உள்ளன."
+      "moreLinesAbove_other": "… மேலே மேலும் {{displayCount}} வரிகள் உள்ளன.",
+      "deleteComment": "கருத்தை நீக்கு",
+      "deleteCommentTitle": "கருத்தை நீக்கவா?",
+      "deleteCommentMessage": "இந்தக் கருத்து இணைப்புக் கோரிக்கையிலிருந்து நீக்கப்படும்.",
+      "commentEditFailed": "உங்கள் கருத்தைச் சேமிக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+      "commentEditUnavailable": "இந்தக் கருத்தைத் திருத்த முடியாது. அது நீக்கப்பட்டிருக்கலாம்.",
+      "commentDeleteFailed": "உங்கள் கருத்தை நீக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
+      "commentDeleteUnavailable": "இந்தக் கருத்தை நீக்க முடியாது."
     },
     "couldNotOpenGitHubAppSettings": "GitHub செயலியின் அமைப்புகளைத் திறக்க முடியவில்லை.",
     "installKiloGitHubApp": "Kilo GitHub செயலியை நிறுவவும்",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "இது இணைப்புக் கோரிக்கை இணைப்பு அல்ல",
     "announce": {
       "commentPosted": "கருத்து இடுகையிடப்பட்டது",
+      "commentUpdated": "கருத்து புதுப்பிக்கப்பட்டது",
+      "commentDeleted": "கருத்து நீக்கப்பட்டது",
       "reviewSubmitted": "மதிப்பாய்வு சமர்ப்பிக்கப்பட்டது",
       "autoMergeEnabled": "தானியங்கி இணைப்பு இயக்கப்பட்டது"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை.",
       "couldNotRefresh": "புதுப்பிக்க முடியவில்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலிலிருந்து ஒரு நிரலாக்கப் பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே காட்டப்படும்.",
+      "viewHistory": "அமர்வு வரலாறு",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
       "tryDifferentSearch": "வேறொரு சொல்லைப் பயன்படுத்தித் தேடவும்.",
       "tryAdjustFilters": "உங்கள் வடிகட்டிகளை மாற்றவும் அல்லது நீக்கவும்.",
       "couldNotSearch": "அமர்வுகளைத் தேட முடியவில்லை.",
       "completedWillAppear": "நிறைவடைந்த அமர்வுகள் இங்கே தோன்றும்.",
       "noPastSessions": "முந்தைய அமர்வுகள் இல்லை",
+      "pastSessions": "முந்தைய அமர்வுகள்",
       "live": "நேரலை",
       "updating": "புதுப்பிக்கப்படுகிறது"
     },
@@ -2085,6 +2097,7 @@
       "renamePlaceholder": "அமர்வின் பெயர்",
       "transcriptAccessibility": "அமர்வின் உரையாடல் பதிவு",
       "readOnly": "இந்த அமர்வைப் படிக்க மட்டுமே முடியும்.",
+      "continueInNewSession": "புதிய அமர்வில் தொடரவும்",
       "emptyDescription": "தொடங்குவதற்குக் கீழே ஒரு செய்தியை அனுப்பவும்.",
       "scrollToBottom": "கடைசிக்குச் செல்லவும்",
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
@@ -2598,6 +2611,10 @@
       "resumeCodexDescription": "OpenAI Codex அமர்வின் படியெடுப்பை இறக்குமதி செய்",
       "reviewDescription": "மாற்றங்களை மதிப்பாய்வு செய் [uncommitted|staged|unpushed|branch|commit|pr]",
       "useCommand": "/{{command}} கட்டளையைப் பயன்படுத்தவும்",
+      "useSkillCommand": "/{{command}} திறனைப் பயன்படுத்தவும்",
+      "skillBadge": "திறன்",
+      "catalogFull": "கட்டளைப் பட்டியல் நிரம்பியுள்ளது, எனவே சில கட்டளைகள் மறைக்கப்பட்டுள்ளன.",
+      "catalogOverLimit": "திறன் பட்டியல் அளவு வரம்பை மீறுகிறது, எனவே எல்லா திறன்களும் காட்டப்படுகின்றன.",
       "insert": "செருகவும்",
       "upgradeRequiredFallback": "இந்தக் கட்டளையைப் பயன்படுத்த உங்கள் CLI-ஐப் புதுப்பிக்கவும்.",
       "exitCapabilityUnavailable": "அமர்விலிருந்து வெளியேற உங்கள் CLI-ஐப் புதுப்பிக்கவும்.",
@@ -2756,7 +2773,8 @@
     "optionsExpiredDescription": "முந்தைய திரைக்குத் திரும்பி இந்தத் தேர்வியை மீண்டும் திறக்கவும்."
   },
   "sessionRow": {
-    "needsInput": "உள்ளீடு தேவை"
+    "needsInput": "உள்ளீடு தேவை",
+    "scheduled": "திட்டமிடப்பட்டது"
   },
   "voiceInput": {
     "listening": "கேட்கிறது...",
@@ -3162,6 +3180,7 @@
     "emptyTitle": "நம்பகமான தளங்கள் இல்லை",
     "emptyDescription": "ஒரு இணைப்பின் தளத்தை நம்பகமானதாகக் குறித்தால், அதன் இணைப்புகள் மீண்டும் அனுமதி கேட்காமல் திறக்கும்.",
     "revoke": "{{host}} தளத்திற்கான நம்பக அனுமதியை ரத்து செய்யவும்",
+    "revokeMessage": "இந்தத் தளத்திற்கான இணைப்புகள் மீண்டும் உறுதிப்படுத்தலைக் கேட்கும்.",
     "backToPreferences": "விருப்பத்தேர்வுகளுக்குத் திரும்பவும்"
   },
   "quickChat": {
@@ -3191,7 +3210,8 @@
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள ஏஜெண்டுகளைப் பார்க்க, அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்.",
     "openSession": "திற",
     "approveFailed": "ஒப்புதல் அளிக்க முடியவில்லை. மீண்டும் முயற்சிக்க $t(common.approve) தட்டவும்.",
-    "newestResult": "சமீபத்திய முடிவு"
+    "newestResult": "சமீபத்திய முடிவு",
+    "scheduledWakes": "{{time}} விழிக்கும்"
   },
   "transcriptionModel": {
     "title": "உரையாக்க மாதிரி",

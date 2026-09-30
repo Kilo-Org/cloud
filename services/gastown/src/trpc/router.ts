@@ -43,8 +43,6 @@ import { ContainerBillingError } from '../billing/ContainerBilling.error';
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
 
-// ── Git credential helpers ─────────────────────────────────────────────
-
 /** Extract 'owner/repo' from a GitHub URL, or null if not a GitHub URL. */
 function extractGithubRepo(gitUrl: string): string | null {
   const m = gitUrl.match(/github\.com[/:]([^/]+\/[^/.]+)/);
@@ -77,8 +75,6 @@ async function refreshGitCredentials(
     },
   });
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────
 
 /** Extract user identity fields from the tRPC context. */
 function userFromCtx(ctx: TRPCContext): { id: string; api_token_pepper: string | null } {
@@ -346,11 +342,7 @@ async function mintKilocodeToken(env: Env, user: { id: string; api_token_pepper:
   return generateKiloApiToken(user, secret);
 }
 
-// ── Router ─────────────────────────────────────────────────────────────
-
 export const gastownRouter = router({
-  // ── Towns ───────────────────────────────────────────────────────────
-
   createTown: gastownProcedure
     .input(z.object({ name: z.string().min(1).max(64) }))
     .output(RpcTownOutput)
@@ -465,8 +457,6 @@ export const gastownRouter = router({
 
       await ownerStub.deleteTown(input.townId);
     }),
-
-  // ── Rigs ────────────────────────────────────────────────────────────
 
   createRig: gastownProcedure
     .input(
@@ -649,8 +639,6 @@ export const gastownRouter = router({
       return updatedRig;
     }),
 
-  // ── Beads ───────────────────────────────────────────────────────────
-
   listBeads: gastownProcedure
     .input(
       z.object({
@@ -726,7 +714,6 @@ export const gastownRouter = router({
       const rig = await verifyRigOwnership(ctx.env, ctx, input.rigId, input.townId);
       const townStub = getTownDOStub(ctx.env, rig.town_id);
 
-      // Verify the bead belongs to this rig
       const existing = await townStub.getBeadAsync(input.beadId);
       if (!existing) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Bead not found' });
@@ -789,8 +776,6 @@ export const gastownRouter = router({
       return { deleted: count };
     }),
 
-  // ── Agents ──────────────────────────────────────────────────────────
-
   listAgents: gastownProcedure
     .input(z.object({ rigId: z.string().uuid(), townId: z.string().uuid().optional() }))
     .output(z.array(RpcAgentOutput))
@@ -827,8 +812,6 @@ export const gastownRouter = router({
       const townStub = getTownDOStub(ctx.env, rig.town_id);
       await townStub.resetAgentDispatchAttempts(input.agentId, rig.id);
     }),
-
-  // ── Work Assignment ─────────────────────────────────────────────────
 
   sling: gastownProcedure
     .input(
@@ -977,8 +960,6 @@ export const gastownRouter = router({
       }
     }),
 
-  // ── Mayor ───────────────────────────────────────────────────────────
-
   sendMessage: gastownProcedure
     .input(
       z.object({
@@ -1101,8 +1082,6 @@ export const gastownRouter = router({
       }
     }),
 
-  // ── Agent Streams ───────────────────────────────────────────────────
-
   getAgentStreamUrl: gastownProcedure
     .input(z.object({ agentId: z.string().uuid(), townId: z.string().uuid() }))
     .output(RpcStreamTicketOutput)
@@ -1130,8 +1109,6 @@ export const gastownRouter = router({
 
       return { url, ticket: ticketData.ticket };
     }),
-
-  // ── PTY ─────────────────────────────────────────────────────────────
 
   createPtySession: gastownProcedure
     .input(z.object({ townId: z.string().uuid(), agentId: z.string().uuid() }))
@@ -1191,8 +1168,6 @@ export const gastownRouter = router({
         });
       }
     }),
-
-  // ── Town Configuration ──────────────────────────────────────────────
 
   getTownConfig: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
@@ -1449,8 +1424,6 @@ export const gastownRouter = router({
       await containerStub.destroy();
     }),
 
-  // ── Events ──────────────────────────────────────────────────────────
-
   getBeadEvents: gastownProcedure
     .input(
       z.object({
@@ -1569,8 +1542,6 @@ export const gastownRouter = router({
       const status = await townStub.getConvoyStatus(input.convoyId);
       return status ?? null;
     }),
-
-  // ── Org Towns & Rigs ────────────────────────────────────────────────
 
   listOrgTowns: gastownProcedure
     .input(z.object({ organizationId: z.string().uuid() }))
@@ -1737,8 +1708,6 @@ export const gastownRouter = router({
       return rig;
     }),
 
-  // ── Wasteland Connection ───────────────────────────────────────────
-
   getTownWastelandConnection: gastownProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .output(
@@ -1819,8 +1788,6 @@ export const gastownRouter = router({
       await townStub.disconnectWasteland(input.wastelandId);
       return { success: true };
     }),
-
-  // ── Admin-only routes (bypass ownership checks) ──────────────────────
 
   adminListBeads: adminProcedure
     .input(
@@ -1952,7 +1919,6 @@ export const gastownRouter = router({
       return { deleted: count };
     }),
 
-  // DEBUG: raw agent_metadata dump — remove after debugging
   debugAgentMetadata: adminProcedure
     .input(z.object({ townId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

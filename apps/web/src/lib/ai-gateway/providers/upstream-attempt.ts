@@ -12,7 +12,7 @@ import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-mod
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import type { FraudDetectionHeaders } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 
 type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;

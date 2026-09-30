@@ -40,9 +40,11 @@ jest.mock('@/lib/auth/device-sessions', () => ({
 }));
 jest.mock('@/lib/user', () => ({
   createOrUpdateUser: jest.fn(),
-  findUserById: jest.fn(),
   findUserByNormalizedEmail: jest.fn(),
   findUserIdByAuthProvider: jest.fn(),
+}));
+jest.mock('@/lib/user/find-user-by-id', () => ({
+  findUserById: jest.fn(),
 }));
 jest.mock('@/lib/tokens', () => ({
   generateApiToken: jest.fn(),

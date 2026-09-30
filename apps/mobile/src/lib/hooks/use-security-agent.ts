@@ -2,6 +2,7 @@ import {
   canManageSecurityAgent,
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
+import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useState } from 'react';
 
@@ -203,6 +204,13 @@ export function useSecurityAgentCapability(scope: string) {
   const { role, isLoading, isError, isFetching, refetch, hasData, isPending, fetchStatus } =
     useSecurityAgentOrgRoleQuery(scope);
   const canManage = canManageSecurityAgent(scope, role);
+  // Starting a GitHub App installation mints an install state, and the server
+  // (`githubApps.mintInstallState`) authorizes that with
+  // ORGANIZATION_MANAGE_ROLES — owner/admin only. A billing manager may manage
+  // the Security Agent itself (owner/admin/billing_manager) but cannot mint, so
+  // the connect/install UI must gate on this narrower capability or it loops on
+  // the server's rejection.
+  const canConnectGitHub = isPersonalSecurityScope(scope) || canManageOrganization(role);
 
   let status: SecurityAgentCapabilityStatus = 'loading';
   if (isPersonalSecurityScope(scope)) {
@@ -221,6 +229,7 @@ export function useSecurityAgentCapability(scope: string) {
 
   return {
     canManage,
+    canConnectGitHub,
     status,
     isLoading,
     isError,

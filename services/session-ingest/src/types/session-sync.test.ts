@@ -145,6 +145,62 @@ describe('SessionItemSchema session_pr_link validation', () => {
   });
 });
 
+describe('SessionItemSchema session_status validation', () => {
+  it.each(['idle', 'busy', 'question', 'permission', 'retry'])(
+    'parses the known %s status',
+    status => {
+      expect(
+        SessionItemSchema.safeParse({ type: 'session_status', data: { status } }).success
+      ).toBe(true);
+    }
+  );
+
+  it('parses the scheduled status with its wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+    });
+  });
+
+  it('parses scheduled without a wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ type: 'session_status', data: { status: 'scheduled' } });
+  });
+
+  it('parses an unrecognized status without dropping the item', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'some-future-status' },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'some-future-status' },
+    });
+  });
+
+  it('parses scheduled with an explicit null wake time', () => {
+    const result = SessionItemSchema.safeParse({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: null },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({
+      type: 'session_status',
+      data: { status: 'scheduled', scheduledAt: null },
+    });
+  });
+});
+
 describe('SessionItemSchema storage key identity', () => {
   it('rejects slash-bearing message IDs before persistence', () => {
     expect(

@@ -16,6 +16,7 @@ import {
   normalizeKilocodeModel,
 } from './persistence/model-utils.js';
 import {
+  installationGitAuthorFromEnv,
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentBitbucketSessionCapability,
@@ -654,25 +655,6 @@ export type ResolvedWorkspaceTokens = {
   gitlabInstanceUrl?: string;
   glabIsOAuth2?: boolean;
 };
-
-function installationGitAuthorFromEnv(
-  env: PersistenceEnv,
-  githubAppType: 'standard' | 'lite'
-): GitAuthorConfig | undefined {
-  const slug =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
-      : env.GITHUB_APP_SLUG;
-  const userId =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
-      : env.GITHUB_APP_BOT_USER_ID;
-  if (!slug || !userId) return undefined;
-  return {
-    name: `${slug}[bot]`,
-    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
-  };
-}
 
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;
@@ -1379,6 +1361,9 @@ export class SessionService {
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
+      // Background subagents let a root session idle before publishing its work,
+      // which the platform treats as completion; keep subagents foreground-only.
+      KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
@@ -1507,6 +1492,9 @@ export class SessionService {
       },
       autoupdate: false,
       snapshot: false,
+      // Codebase indexing would embed the repo and keep a local vector store
+      // alive for the session, which the sandbox does not budget for.
+      indexing: { enabled: false },
     };
     if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
@@ -2876,6 +2864,47 @@ export class SessionService {
     };
   }
 
+  private async executeRestoreCommand(
+    sandbox: SandboxInstance,
+    session: ExecutionSession,
+    kiloSessionId: string,
+    workspacePath: string,
+    options: RestoreRuntimeOptions,
+    operation: string,
+    importFilePath?: string
+  ) {
+    const restoreTokenFilePath = options.devcontainer
+      ? getRestoreTokenFilePath(options.sessionHome)
+      : undefined;
+    try {
+      if (restoreTokenFilePath) {
+        await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability);
+      }
+      const restoreCommand = buildRestoreCommand({
+        kiloSessionId,
+        importFilePath,
+        runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
+        runtimeEnv: options.devcontainer
+          ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
+          : undefined,
+        devContainer: options.devcontainer,
+      });
+      return await timedExec(session, restoreCommand, operation, {
+        timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+        cwd: dirname(workspacePath),
+        env: options.devcontainer ? options.dockerEnv : undefined,
+      });
+    } finally {
+      if (restoreTokenFilePath) {
+        await cleanupRestoreTokenFile(
+          session,
+          restoreTokenFilePath,
+          options.devcontainer?.agentSessionId ?? ''
+        );
+      }
+    }
+  }
+
   private async tryRestoreKiloSessionFromSnapshot(
     sandbox: SandboxInstance,
     session: ExecutionSession,
@@ -2883,34 +2912,14 @@ export class SessionService {
     workspacePath: string,
     options: RestoreRuntimeOptions
   ): Promise<boolean> {
-    const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
-      : undefined;
-    const restoreCommand = buildRestoreCommand({
+    const restoreResult = await this.executeRestoreCommand(
+      sandbox,
+      session,
       kiloSessionId,
-      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
-      runtimeEnv: options.devcontainer
-        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
-        : undefined,
-      devContainer: options.devcontainer,
-    });
-    const restoreResult = await (async () => {
-      try {
-        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.restore', {
-          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-          cwd: dirname(workspacePath),
-          env: options.devcontainer ? options.dockerEnv : undefined,
-        });
-      } finally {
-        if (restoreTokenFilePath) {
-          await cleanupRestoreTokenFile(
-            session,
-            restoreTokenFilePath,
-            options.devcontainer?.agentSessionId ?? ''
-          );
-        }
-      }
-    })();
+      workspacePath,
+      options,
+      'session.prepareWorkspace.restore'
+    );
 
     if (restoreResult.exitCode === 0) {
       logger.info('Session snapshot restore completed');
@@ -2960,35 +2969,15 @@ export class SessionService {
       ? `${options.sessionHome}/tmp/kilo-empty-session-${kiloSessionId}.json`
       : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
     await sandbox.writeFile(importFilePath, minimalSessionJson);
-    const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
-      : undefined;
-    const restoreCommand = buildRestoreCommand({
+    const restoreResult = await this.executeRestoreCommand(
+      sandbox,
+      session,
       kiloSessionId,
-      importFilePath,
-      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
-      runtimeEnv: options.devcontainer
-        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
-        : undefined,
-      devContainer: options.devcontainer,
-    });
-    const restoreResult = await (async () => {
-      try {
-        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.bootstrap', {
-          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-          cwd: dirname(workspacePath),
-          env: options.devcontainer ? options.dockerEnv : undefined,
-        });
-      } finally {
-        if (restoreTokenFilePath) {
-          await cleanupRestoreTokenFile(
-            session,
-            restoreTokenFilePath,
-            options.devcontainer?.agentSessionId ?? ''
-          );
-        }
-      }
-    })();
+      workspacePath,
+      options,
+      'session.prepareWorkspace.bootstrap',
+      importFilePath
+    );
     if (restoreResult.exitCode !== 0) {
       const parsed = parseRestoreScriptOutput(restoreResult.stdout);
       const detail = [

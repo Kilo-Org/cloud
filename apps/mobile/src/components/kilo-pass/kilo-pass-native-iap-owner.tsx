@@ -303,8 +303,9 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const ownedAppleProductId = isAndroid ? null : (ownedPurchase?.productId ?? null);
   const ownedGoogleProductId = isAndroid ? (ownedPurchase?.productId ?? null) : null;
   const ownedOriginalTransactionId =
-    (ownedPurchase as { originalTransactionIdentifierIOS?: string | null } | null)
-      ?.originalTransactionIdentifierIOS ?? null;
+    ownedPurchase && 'originalTransactionIdentifierIOS' in ownedPurchase
+      ? (ownedPurchase.originalTransactionIdentifierIOS ?? null)
+      : null;
   const ownedGooglePurchaseToken = isAndroid ? (ownedPurchase?.purchaseToken ?? null) : null;
 
   const ownedByAnotherAccount = useMemo(

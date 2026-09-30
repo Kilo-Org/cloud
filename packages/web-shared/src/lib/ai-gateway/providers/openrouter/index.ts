@@ -1,4 +1,5 @@
-import { isPdfSupportingModel, preferredModels } from '@/lib/ai-gateway/models';
+import { isPdfSupportingModel } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/preferred-models';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -127,9 +128,10 @@ export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolea
 
 async function enhancedModelList(models: OpenRouterModel[]) {
   const autoModels = buildAutoModels();
-  const [endpointsMetadata, dataCollectionRequiredModelIds] = await Promise.all([
+  const [endpointsMetadata, dataCollectionRequiredModelIds, preferredModels] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
+    getPreferredModels(),
   ]);
   const hasEndpointsMetadata = Object.keys(endpointsMetadata).length > 0;
   const summaries = await getTerminalBenchSummaries();

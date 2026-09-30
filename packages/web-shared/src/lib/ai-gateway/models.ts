@@ -36,15 +36,7 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
-export const preferredModels = [
-  KILO_AUTO_EFFICIENT_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
-
-  'stealth/space-bunny-alpha',
-  'poolside/laguna-s-2.1:free',
-  'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'dots-studio/dots-3-note-preview:free',
-
+const PREFERRED_PAID_MODELS = [
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   GPT_SOL_CURRENT_MODEL_ID,
   DEEPSEEK_V4_1_FLASH_MODEL_ID,
@@ -52,6 +44,22 @@ export const preferredModels = [
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
 ];
+
+/**
+ * Builds the preferred model order. The free section comes from the admin
+ * auto-free configuration, which only the server can read; use
+ * `getPreferredModels` on the server and `usePreferredModels` in client components.
+ */
+export function buildPreferredModels(freeModels: ReadonlyArray<string>): string[] {
+  return [
+    ...new Set([
+      KILO_AUTO_EFFICIENT_MODEL.id,
+      KILO_AUTO_FREE_MODEL.id,
+      ...freeModels,
+      ...PREFERRED_PAID_MODELS,
+    ]),
+  ];
+}
 
 export function isPdfSupportingModel(model: string): boolean {
   return (

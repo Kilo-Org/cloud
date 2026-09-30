@@ -1,4 +1,6 @@
 import { isKiloAutoModel } from '@/lib/ai-gateway/auto-model';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/preferred-models';
 
-export const monitoredModels = preferredModels.filter(model => !isKiloAutoModel(model));
+export async function getMonitoredModels(): Promise<string[]> {
+  return (await getPreferredModels()).filter(model => !isKiloAutoModel(model));
+}

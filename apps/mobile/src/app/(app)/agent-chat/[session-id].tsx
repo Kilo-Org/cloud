@@ -42,7 +42,7 @@ export default function SessionDetailScreen() {
   const confirmation = useIdentityConfirmation();
   const {
     'session-id': rawSessionId,
-    organizationId: routeOrganizationId,
+    organizationId: rawOrganizationId,
     via,
     spawned,
     shareId: shareIdParam,
@@ -81,6 +81,11 @@ export default function SessionDetailScreen() {
   // or a `string[]`, both of which parseParam rejects. Optional params keep
   // the existing first-element unwrapping below.
   const sessionId = parseParam(rawSessionId);
+  // A repeated `organizationId` segment arrives as `string[]`; `parseParam`
+  // collapses it to `null` so it is not mistaken for a concrete org scope
+  // (which would skip the metadata read) and never reaches the provider as an
+  // array.
+  const routeOrganizationId = parseParam(rawOrganizationId) ?? undefined;
   // Param can be string | string[] depending on how the route was opened.
   const shareId = Array.isArray(shareIdParam) ? shareIdParam[0] : shareIdParam;
   const autoSendParam = Array.isArray(autoSendRaw) ? autoSendRaw[0] : autoSendRaw;

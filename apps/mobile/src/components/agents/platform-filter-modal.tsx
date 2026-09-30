@@ -19,8 +19,6 @@ import { platformLabel } from '@/lib/platform-label';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
-export { type ProjectFilterOption };
-
 /** Gap kept between the sheet and the window edges (matches the `px-6` gutter). */
 const SHEET_EDGE_MARGIN = 24;
 

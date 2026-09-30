@@ -1,10 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
-import {
-  mutationErrorDisplay,
-  mutationErrorDisplayFromError,
-} from '@/lib/pr-review/mutation-error-display';
+import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import {
   PR_OPERATION_AMBIGUOUS_MESSAGE,
   PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
@@ -54,11 +51,6 @@ describe('mutationErrorDisplay', () => {
       kind: 'retryable',
       message: PR_OPERATION_AMBIGUOUS_MESSAGE,
     });
-    // The convenience wrapper classifies then selects the same inline copy.
-    expect(mutationErrorDisplayFromError('submit', ambiguous)).toEqual({
-      kind: 'retryable',
-      message: PR_OPERATION_AMBIGUOUS_MESSAGE,
-    });
   });
 
   it('maps the persistence-failure marker to the retry-blocking kind with the honest server copy', () => {
@@ -80,10 +72,6 @@ describe('mutationErrorDisplay', () => {
         message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
       }
     );
-    expect(mutationErrorDisplayFromError('submit', persistenceFailed)).toEqual({
-      kind: 'bad-request',
-      message: PR_OPERATION_PERSISTENCE_FAILED_MESSAGE,
-    });
   });
 
   it('uses the surface-specific bad-request inline message', () => {
@@ -112,12 +100,6 @@ describe('mutationErrorDisplay', () => {
       kind: 'bad-request',
       message: "This comment can't be edited. It may have been deleted.",
     });
-    expect(
-      mutationErrorDisplayFromError('edit-comment', makeError('BAD_REQUEST', 'Comment is too long'))
-    ).toEqual({
-      kind: 'bad-request',
-      message: "This comment can't be edited. It may have been deleted.",
-    });
   });
 
   it('maps a provider 404 to the terminal edit-comment copy', () => {
@@ -125,14 +107,15 @@ describe('mutationErrorDisplay', () => {
     // the deleted-comment copy with Save down (the `not-found` kind), not the
     // retryable fall-through its classifier yields for NOT_FOUND.
     const gone = makeError('NOT_FOUND', 'PR not found, you do not have access');
-    expect(classifyPrReviewMutationError(gone)).toEqual({ kind: 'retryable' });
-    expect(mutationErrorDisplayFromError('edit-comment', gone)).toEqual({
+    const classification = classifyPrReviewMutationError(gone);
+    expect(classification).toEqual({ kind: 'retryable' });
+    expect(mutationErrorDisplay('edit-comment', classification, { rawError: gone })).toEqual({
       kind: 'not-found',
       message: "This comment can't be edited. It may have been deleted.",
     });
     // Other surfaces keep the retryable fall-through: their 404s are outside
     // the own-comment edit slice.
-    expect(mutationErrorDisplayFromError('composer', gone)).toEqual({
+    expect(mutationErrorDisplay('composer', classification, { rawError: gone })).toEqual({
       kind: 'retryable',
       message: 'PR not found, you do not have access',
     });
@@ -146,18 +129,6 @@ describe('mutationErrorDisplay', () => {
       makeError('BAD_REQUEST', 'You cannot perform the requested action')
     );
     expect(mutationErrorDisplay('submit', classification, { term: 'merge request' })).toEqual({
-      kind: 'bad-request',
-      message:
-        "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request.",
-    });
-    // The convenience wrapper forwards the term too.
-    expect(
-      mutationErrorDisplayFromError(
-        'submit',
-        makeError('BAD_REQUEST', 'You cannot perform the requested action'),
-        'merge request'
-      )
-    ).toEqual({
       kind: 'bad-request',
       message:
         "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request.",
@@ -198,16 +169,6 @@ describe('mutationErrorDisplay', () => {
     expect(mutationErrorDisplay('submit', classification, { rawError: networkError })).toEqual({
       kind: 'retryable',
       message: 'Could not submit review. Check your connection and try again.',
-    });
-  });
-
-  it('mutationErrorDisplayFromError classifies then selects', () => {
-    const serverMessage = 'Repository was archived so is read-only.';
-    expect(
-      mutationErrorDisplayFromError('composer', makeError('FORBIDDEN', serverMessage))
-    ).toEqual({
-      kind: 'forbidden',
-      message: serverMessage,
     });
   });
 });

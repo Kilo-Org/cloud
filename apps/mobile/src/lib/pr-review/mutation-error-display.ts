@@ -115,18 +115,3 @@ export function mutationErrorDisplay(
       : i18n.t('prReview.mutationError.couldNotPostComment');
   return { kind: 'retryable', message };
 }
-
-/**
- * Classify + select display in one step. Convenience for call sites that
- * only hold the thrown error.
- */
-export function mutationErrorDisplayFromError(
-  surface: MutationErrorDisplaySurface,
-  error: unknown,
-  term?: string
-): MutationErrorDisplay {
-  return mutationErrorDisplay(surface, classifyPrReviewMutationError(error), {
-    rawError: error,
-    term,
-  });
-}

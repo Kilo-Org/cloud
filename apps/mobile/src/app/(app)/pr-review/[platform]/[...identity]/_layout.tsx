@@ -10,15 +10,13 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { useOrganization } from '@/lib/organization-context';
 import {
-  pendingReviewDraftKey,
   PendingReviewProvider,
+  providerPendingReviewDraftKey,
 } from '@/lib/pr-review/pending-review-provider';
 import {
   parseProviderPrRoute,
-  providerPrRefKey,
   providerPrRoutePath,
   ProviderPrScopeProvider,
-  providerPrTriple,
 } from '@/lib/pr-review/provider-pr-ref';
 import { parseParam } from '@/lib/route-params';
 
@@ -87,8 +85,7 @@ export default function ProviderPrReviewLayout() {
   // suffixed with the s1 collision-free ref identity so a GitLab MR and a
   // GitHub PR that share `owner/repo#number` — and one project reached on two
   // GitLab instances — never share a queue.
-  const triple = providerPrTriple(ref);
-  const draftEntityKey = `${pendingReviewDraftKey(triple.owner, triple.repo, triple.number)}@${providerPrRefKey(ref)}`;
+  const draftEntityKey = providerPendingReviewDraftKey(ref);
 
   return (
     // The prompt provider sits outside the gate: the review-submit sheet

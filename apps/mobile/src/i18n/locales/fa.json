@@ -286,7 +286,7 @@
     "toolSummaryTranslationModelUnavailableNotice": "این مدل دیگر ارائه نمی‌شود. برای انتخاب مدل دیگر روی $t(common.model) ضربه بزنید."
   },
   "prReview": {
-    "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
+    "pullRequestUnavailable": "پول ریکوئست در دسترس نیست",
     "pullRequestUnavailableDescription": "این PR باز نمی‌شود. ممکن است حذف شده باشد، مخزن خصوصی باشد یا برنامهٔ Kilo در GitHub روی مخزن نصب نباشد.",
     "accessDeniedDescription": "اجازهٔ مشاهدهٔ این درخواست ادغام را ندارید.",
     "noFilesChanged": "هیچ فایلی تغییر نکرده است",

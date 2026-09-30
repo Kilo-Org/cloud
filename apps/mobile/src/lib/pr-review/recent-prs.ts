@@ -154,8 +154,7 @@ export async function getRecentPrs(): Promise<RecentPr[]> {
  * indexed recents entry.
  */
 export async function getRecentPrsForIndex(): Promise<RecentPr[] | undefined> {
-  const read = await readStoredValueForUpdate(PR_REVIEW_RECENTS_KEY);
-  return read.status === 'unreadable' ? undefined : parseRecents(read.value);
+  return readRecentsForUpdate();
 }
 
 /**

@@ -575,6 +575,10 @@ describe('NotificationsScreen category availability', () => {
     await waitForEnabledSwitch(renderer, 'Chat messages');
 
     expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.disabled).toBe(true);
+    // The row says the alerts are unavailable, so the control must read OFF:
+    // `fullPrefs` stores balanceAlerts ON, which would otherwise contradict the
+    // "Join an organization to get balance alerts." copy beside it.
+    expect(switchesByLabel(renderer.root, 'Balance alerts')[0]?.props.value).toBe(false);
     expect(
       textWithChildren(renderer.root, en.notifications.category.balanceAlertsUnavailable).length
     ).toBe(1);

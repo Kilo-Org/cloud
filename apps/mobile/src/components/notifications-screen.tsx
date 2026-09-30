@@ -239,13 +239,6 @@ function CategoryRow({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const Icon = meta.icon;
-  // Display the optimistic value while a mutation is in flight; otherwise
-  // fall back to the persisted value (or the default-ON semantics when the
-  // query has not yet resolved).
-  const displayedValue = isPending
-    ? readAgentPushPreference(queryClient, queryKey, meta.key)
-    : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
-  const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   // An unavailable category is a terminal, non-retryable state: the switch is
   // disabled and the row explains itself in the reader's language. The server's
   // old `unavailableReason` sentence is English prose and must never render — it
@@ -254,6 +247,17 @@ function CategoryRow({
   // missing entry (the `noUncheckedIndexedAccess` widening) defaults to
   // available.
   const unavailable = capability?.available === false;
+  // Display the optimistic value while a mutation is in flight; otherwise
+  // fall back to the persisted value (or the default-ON semantics when the
+  // query has not yet resolved).
+  const storedValue = isPending
+    ? readAgentPushPreference(queryClient, queryKey, meta.key)
+    : (preferences?.[meta.key] ?? readAgentPushPreference(queryClient, queryKey, meta.key));
+  // An unavailable category cannot deliver anything: the row says so. The
+  // control must agree with the row it describes, so it reads OFF rather than
+  // showing the persisted preference the user could otherwise enable.
+  const displayedValue = unavailable ? false : storedValue;
+  const editable = deriveAgentPushEditable({ hasData: preferences != null, isPending });
   const unavailableReasonCode = capability?.unavailableReasonCode;
   const isDisabled = disabled || !editable || unavailable;
   const title = t(meta.titleKey);

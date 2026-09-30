@@ -3417,7 +3417,7 @@
       "commandsShort": "{{count}}o"
     },
     "nameLabel": "Ainm próifíle",
-    "namePlaceholder": "e.g. Debugging backend",
+    "namePlaceholder": "m.sh. Dífhabhtú cúlchórais",
     "descriptionLabel": "Cur síos ar phróifíl",
     "descriptionPlaceholder": "Cur síos roghnach",
     "ownerLabel": "Úinéir próifíle",
@@ -3552,10 +3552,10 @@
       "nameConflict": "Tá an t-ainm sin forchoimeádta ag ordú ionsuite"
     },
     "repoBindings": {
-      "title": "Próifílí Réamhshocraithe le haghaidh Repos",
+      "title": "Próifílí Réamhshocraithe le haghaidh Stórtha",
       "add": "Cuir réamhshocraithe leis",
       "empty": "Níl aon réamhshocruithe cumraithe",
-      "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh repo.",
+      "emptyDescription": "Cuir réamhshocrú leis chun próifíl a chur i bhfeidhm go huathoibríoch agus seisiúin á gcur ar bun le haghaidh stór.",
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",
       "remove": "Dícheangail",
@@ -3566,13 +3566,13 @@
       "removedToast": "Baineadh an phróifíl réamhshocraithe le haghaidh \"{{repo}}\"",
       "removeFailed": "Níorbh fhéidir an phróifíl réamhshocraithe a bhaint",
       "pinnedTitle": "Pionáilte chuig stórtha",
-      "pinRepo": "Pin repo",
+      "pinRepo": "Pionáil stór",
       "pinnedEmpty": "Gan pinn chuig aon stórtha.",
       "pinnedDescription": "Uathluchtaithe aon uair a bheidh seisiún dírithe ar cheann de na stórtha sin.",
       "pinnedToast": "Pionnáilte go \"{{repo}}\"",
-      "pinFailed": "Níorbh fhéidir repo a phionáil",
-      "unboundToast": "Repo gan cheangal",
-      "unbindFailed": "Níorbh fhéidir repo a dhícheangal"
+      "pinFailed": "Níorbh fhéidir stór a phionáil",
+      "unboundToast": "Stór gan cheangal",
+      "unbindFailed": "Níorbh fhéidir stór a dhícheangal"
     }
   }
 }

@@ -1,9 +1,8 @@
-import * as Sentry from '@sentry/react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
-import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import { readStoredValueSafe } from '@/lib/auth/secure-store-value';
 
 function noop(): void {
   // Placeholder until the promise executor hands over its resolve.
@@ -54,7 +53,12 @@ export function createSecureStorePreference<T>(options: {
 
   const load = async () => {
     try {
-      const raw = await readStoredValueWithRetry(key);
+      // Total read: a failed read is reported once at warning level with the
+      // stable fingerprint and reads as "nothing stored", so this keeps the
+      // default instead of reporting the same failure a second time. This runs
+      // on mount, before the user has done anything, so there's nothing
+      // actionable to tell them.
+      const raw = await readStoredValueSafe(key);
       if (!dirty) {
         value = parse(raw);
       } else if (mergeOnLoad && !cleared) {
@@ -64,16 +68,6 @@ export function createSecureStorePreference<T>(options: {
         // is not overwritten.
         void persist(value);
       }
-    } catch (error) {
-      // Keep the default on read failure — this runs on mount, before the
-      // user has done anything, so there's nothing actionable to tell them.
-      // Just log so we can see failure rates.
-      Sentry.captureException(error, {
-        tags: {
-          'error.subsystem': 'preferences',
-          'error.operation': 'load_secure_store',
-        },
-      });
     } finally {
       hasLoaded = true;
       markLoaded();

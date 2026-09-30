@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
+
 import { createSecureStorePreference } from './secure-store-preference';
 
 const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
@@ -9,19 +11,8 @@ const { getItemAsync, setItemAsync, deleteItemAsync } = vi.hoisted(() => ({
 }));
 vi.mock('expo-secure-store', () => ({ getItemAsync, setItemAsync, deleteItemAsync }));
 
-const { captureException } = vi.hoisted(() => ({ captureException: vi.fn() }));
-vi.mock('@sentry/react-native', () => ({ captureException }));
-
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast: { error: toastError } }));
-
-// The retrying read imports @/lib/config, whose real module needs the app's
-// baked build `extra` and cannot load under Vitest. Vitest also rejects a mock
-// factory that omits an export the importer reads, so this stub answers the
-// whole surface: every value reads as unset, which keeps the retry helper's
-// fault window closed and leaves the failure to the SecureStore mock.
-const configStub = vi.hoisted(() => new Proxy({}, { get: () => undefined, has: () => true }));
-vi.mock('@/lib/config', () => configStub);
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
 function flushMicrotasks(): Promise<void> {
@@ -33,23 +24,21 @@ function flushMicrotasks(): Promise<void> {
 // eslint-disable-next-line no-empty-function -- listener body is irrelevant, only subscribe()'s side effect (starting the load) is under test
 function noopListener(): void {}
 
-// The retrying read backs off 250/500/1000 ms, so a test that drives a
-// rejection must let those timers fire before the read settles.
-const RETRY_BUDGET_MS = 250 + 500 + 1000 + 250;
-
 describe('createSecureStorePreference', () => {
   beforeEach(() => {
     getItemAsync.mockReset();
     setItemAsync.mockReset();
     deleteItemAsync.mockReset();
-    captureException.mockReset();
     toastError.mockReset();
+    setTelemetrySink(null);
   });
 
-  it('logs to Sentry (not a toast) on a read failure and keeps the default value', async () => {
-    // Every attempt rejects, so the retry budget is exhausted before the
-    // failure is surfaced.
+  it('reports a read failure once and keeps the default value', async () => {
     getItemAsync.mockRejectedValue(new Error('disk error'));
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
@@ -57,28 +46,27 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    vi.useFakeTimers();
-    try {
-      const unsubscribe = store.subscribe(noopListener);
-      await vi.advanceTimersByTimeAsync(RETRY_BUDGET_MS);
+    const unsubscribe = store.subscribe(noopListener);
+    await flushMicrotasks();
 
-      expect(store.get()).toBe(false);
-      expect(store.getHasLoaded()).toBe(true);
-      expect(getItemAsync).toHaveBeenCalledTimes(4);
-      expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
-        tags: { 'error.subsystem': 'preferences', 'error.operation': 'load_secure_store' },
-      });
-      expect(toastError).not.toHaveBeenCalled();
-      unsubscribe();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(store.get()).toBe(false);
+    expect(store.getHasLoaded()).toBe(true);
+    // One total read: the failure is reported once by the shared helper, not
+    // retried and not captured a second time here.
+    expect(getItemAsync).toHaveBeenCalledTimes(1);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.level).toBe('warning');
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'secure_store',
+      'error.operation': 'read',
+    });
+    expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'read']);
+    expect(toastError).not.toHaveBeenCalled();
+    unsubscribe();
   });
 
-  it('retries a rejected read and applies the value from the retry', async () => {
-    getItemAsync
-      .mockRejectedValueOnce(new Error('keychain unavailable'))
-      .mockResolvedValueOnce('true');
+  it('applies the value from a successful read', async () => {
+    getItemAsync.mockResolvedValue('true');
     const store = createSecureStorePreference<boolean>({
       key: 'k',
       defaultValue: false,
@@ -86,17 +74,12 @@ describe('createSecureStorePreference', () => {
       serialize: value => (value ? 'true' : 'false'),
     });
 
-    vi.useFakeTimers();
-    try {
-      const unsubscribe = store.subscribe(noopListener);
-      await vi.advanceTimersByTimeAsync(RETRY_BUDGET_MS);
+    const unsubscribe = store.subscribe(noopListener);
+    await flushMicrotasks();
 
-      expect(store.get()).toBe(true);
-      expect(store.getHasLoaded()).toBe(true);
-      unsubscribe();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(store.get()).toBe(true);
+    expect(store.getHasLoaded()).toBe(true);
+    unsubscribe();
   });
 
   it('shows a toast on a write failure while keeping the in-memory value', async () => {

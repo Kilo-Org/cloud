@@ -212,6 +212,108 @@ function createRuntime(options: {
   };
 }
 
+describe('Kilo startup lifecycle', () => {
+  it('keeps credentials installed while the first feed is opening pending behind the idle gate', async () => {
+    const spawner = createSpawner();
+    const feed = createFeedFactory();
+    const connected = Promise.withResolvers<void>();
+    const environments: Record<string, string>[] = [];
+    const filesystemEnvironments: Record<string, string>[] = [];
+    const scheduler = createScheduler();
+    let idle = false;
+    const original = feed.openFeed;
+    feed.openFeed = (source, callbacks) => {
+      const next = original(source, callbacks);
+      return {
+        ...next,
+        open: async () => {
+          await connected.promise;
+          await next.open();
+        },
+      };
+    };
+    const { runtime } = createRuntime({
+      spawner,
+      feed,
+      scheduler,
+      probe: createProbe(true),
+      isIdle: () => idle,
+      prepareFilesystem: async env => {
+        filesystemEnvironments.push(env);
+      },
+      spawnKilo: async input => {
+        environments.push(input.env);
+        return spawner.spawn(input);
+      },
+    });
+    const starting = runtime.ensure();
+    await waitFor(() => feed.feeds.length === 1);
+    await runtime.installCredentials({ HOME: '/new' });
+    connected.resolve();
+    await starting;
+    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(environments).toEqual([{ HOME: '/old' }]);
+    idle = true;
+    expect(await runtime.applyPendingCredentials()).toBe(true);
+    expect(environments).toEqual([{ HOME: '/old' }, { HOME: '/new' }]);
+    expect(filesystemEnvironments).toEqual(environments);
+    await runtime.shutdown();
+  });
+
+  it('does not spawn after shutdown during filesystem preparation', async () => {
+    const filesystem = Promise.withResolvers<void>();
+    const entered = Promise.withResolvers<void>();
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    const { runtime } = createRuntime({
+      spawner,
+      scheduler,
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      prepareFilesystem: async () => {
+        entered.resolve();
+        await filesystem.promise;
+      },
+    });
+    const starting = runtime.ensure();
+    const rejected = starting.catch(error => error);
+    await entered.promise;
+    await runtime.shutdown();
+    filesystem.resolve();
+    expect(await rejected).toBeInstanceOf(Error);
+    expect(spawner.spawnCount()).toBe(0);
+    expect(scheduler.intervalCount()).toBe(0);
+  });
+
+  it('stops the owned process and rejects startup on shutdown during feed opening', async () => {
+    const spawner = createSpawner();
+    const scheduler = createScheduler();
+    let callbacks: KiloFeedCallbacks | undefined;
+    let closed = 0;
+    const feed = createFeedFactory();
+    feed.openFeed = (_source, next) => {
+      callbacks = next;
+      return {
+        open: async () => new Promise<void>(() => undefined),
+        close: () => {
+          closed += 1;
+        },
+      };
+    };
+    const { runtime } = createRuntime({ spawner, scheduler, feed, probe: createProbe(true) });
+    const starting = runtime.ensure();
+    const rejected = starting.catch(error => error);
+    await waitFor(() => callbacks !== undefined);
+    await runtime.shutdown();
+    expect(await rejected).toBeInstanceOf(Error);
+    callbacks?.onEvent({ type: 'server.connected', properties: {}, nativeRuntimeId: 'r' });
+    expect(spawner.processes[0].stopped).toBe(1);
+    expect(closed).toBe(1);
+    expect(scheduler.intervalCount()).toBe(0);
+    expect(() => runtime.client).toThrow('not started');
+  });
+});
+
 describe('parseKiloPidfile', () => {
   it('accepts a well-formed record and rejects anything else', () => {
     expect(parseKiloPidfile('{"pid":12,"startTime":"345"}')).toEqual({ pid: 12, startTime: '345' });

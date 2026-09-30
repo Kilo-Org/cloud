@@ -501,6 +501,37 @@ describe('turn resubmission', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'completed', lastMessageId: 'm1' });
   });
 
+  it('retains child routing across turns, but drops it on deletion or root release', async () => {
+    const h = createHarness();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+    h.frames.length = 0;
+    const childEvent = kiloEvent('message.updated', {
+      info: { id: 'child-message', sessionID: childId, role: 'assistant' },
+    });
+    h.manager.observeKiloEvent(childEvent);
+    expect(h.frames.some(frame => frame.type === 'session.events')).toBe(true);
+    h.manager.observeKiloEvent(kiloEvent('session.deleted', { info: { id: childId } }));
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(childEvent);
+    expect(h.frames).toEqual([]);
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.release(SESSION_ID);
+    h.registerRoute(routeSpec());
+    h.frames.length = 0;
+    h.manager.observeKiloEvent(childEvent);
+    expect(h.frames).toEqual([]);
+  });
+
   it('fails agent_restarted after real tool progress', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

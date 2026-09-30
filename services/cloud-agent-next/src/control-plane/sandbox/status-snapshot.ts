@@ -41,6 +41,9 @@ export function projectAllocationStatusSnapshot(
   }
   switch (allocation.kind) {
     case 'stopped':
+      if (allocation.unconfirmedProviderRef !== null) {
+        return { ...base, status: 'unknown', detailCode: 'insufficient_evidence' };
+      }
       return { ...base, status: 'sleeping', detailCode: 'sandbox_stopped' };
     case 'creating':
     case 'starting':

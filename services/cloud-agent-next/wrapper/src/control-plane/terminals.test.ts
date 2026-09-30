@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import type { WrapperKiloClient, WrapperPty, WrapperPtySize } from '../kilo-api.js';
 import type { KiloRuntime, KiloRuntimes } from './kilo-runtime.js';
 import { createControlPlaneTerminals } from './terminals.js';
+import { forgetAttachedRoot, rootForSession } from '../control/session-directories.js';
 
 const session = {
   sessionId: 'workspace_terminal',
@@ -116,6 +117,74 @@ function attachedTerminals(client: WrapperKiloClient) {
 }
 
 describe('control-plane terminal adapter (B10)', () => {
+  it('rolls back the global root when attachment reads a restarting runtime client', () => {
+    const runtime = fakeRuntime(fakeClient(serverUrl));
+    Object.defineProperty(runtime, 'client', {
+      get() {
+        throw new Error('not started');
+      },
+    });
+    const terminals = createControlPlaneTerminals({
+      controlUrl: serverUrl,
+      wrapperId: 'wrapper_test',
+      runtimes: fakeRuntimes(runtime),
+    });
+    expect(() => terminals.rememberAttachedSession(session, session.sessionId)).toThrow(
+      'not started'
+    );
+    expect(rootForSession(session.kiloSessionId)).toBeUndefined();
+    terminals.shutdown();
+  });
+
+  it('preserves an existing root when re-attachment fails', () => {
+    const runtime = fakeRuntime(fakeClient(serverUrl));
+    const terminals = createControlPlaneTerminals({
+      controlUrl: serverUrl,
+      wrapperId: 'wrapper_test',
+      runtimes: fakeRuntimes(runtime),
+    });
+    terminals.rememberAttachedSession(session, session.sessionId);
+    Object.defineProperty(runtime, 'client', {
+      get() {
+        throw new Error('not started');
+      },
+    });
+    expect(() => terminals.rememberAttachedSession(session, session.sessionId)).toThrow(
+      'not started'
+    );
+    expect(rootForSession(session.kiloSessionId)).toBe(session.kiloSessionId);
+    forgetAttachedRoot(session.kiloSessionId, session.directory);
+    terminals.shutdown();
+  });
+
+  it('detaches without reading the client of a restarting runtime', async () => {
+    for (const detachDirectory of [false, true]) {
+      const runtime = fakeRuntime(fakeClient(serverUrl));
+      const terminals = createControlPlaneTerminals({
+        controlUrl: serverUrl,
+        wrapperId: 'wrapper_test',
+        runtimes: fakeRuntimes(runtime),
+      });
+      terminals.rememberAttachedSession(session, session.sessionId);
+      const created = await terminals.handle({
+        type: 'terminal.create',
+        requestId: 'restart_detach',
+        session,
+        payload: { operationId: crypto.randomUUID() },
+      });
+      expect(created).toMatchObject({ ok: true, result: { pty: { id: ptyId } } });
+      Object.defineProperty(runtime, 'client', {
+        get() {
+          throw new Error('not started');
+        },
+      });
+      if (detachDirectory) await terminals.detachDirectory(session.directory);
+      else await terminals.forgetSession(session.sessionId);
+      if (!detachDirectory) expect(rootForSession(session.kiloSessionId)).toBeUndefined();
+      forgetAttachedRoot(session.kiloSessionId, session.directory);
+      terminals.shutdown();
+    }
+  });
   it('answers an unattached terminal request with a mapped not_ready result', async () => {
     const terminals = createControlPlaneTerminals({
       controlUrl: serverUrl,

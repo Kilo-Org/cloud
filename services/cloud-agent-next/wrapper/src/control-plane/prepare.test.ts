@@ -79,7 +79,11 @@ type Harness = {
 
 function createHarness(
   activeTimers: ControlPlaneTimers = FAST_TIMERS,
-  options: { hasGit?: boolean } = {}
+  options: {
+    hasGit?: boolean;
+    beforeEnsure?: () => Promise<void>;
+    beforeInstall?: () => Promise<void>;
+  } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
@@ -113,6 +117,7 @@ function createHarness(
     ensure: async input => {
       ensureCalls += 1;
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
+      await options.beforeEnsure?.();
       if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
       if (ensureRejects) throw new Error('kilo server failed to start');
       return {
@@ -124,6 +129,7 @@ function createHarness(
     },
     installCredentials: async (key, env) => {
       installCalls.push({ key, env });
+      await options.beforeInstall?.();
     },
     isUnavailable: key => unavailableKeys.has(key),
     remove: key => {
@@ -239,6 +245,159 @@ function lastFrame(frames: ControlPlaneWrapperFrame[]): ControlPlaneWrapperFrame
 }
 
 describe('createPreparationManager', () => {
+  it('starts a fresh preparation requested before the released owner finishes', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    const next = harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    resume.resolve();
+    await Promise.all([running, next]);
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
+    expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
+      { type: 'session.ready', sessionId: spec.sessionId },
+    ]);
+  });
+
+  it('can release a fresh preparation waiting for the previous owner to finish', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    const next = harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    harness.manager.release(spec.sessionId);
+    resume.resolve();
+    await Promise.all([running, next]);
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(harness.manager.isPreparing()).toBe(false);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+  });
+
+  it('invalidates an in-flight runtime preparation without releasing a shared sibling runtime', async () => {
+    for (const runtimeIsolation of ['per-session', undefined] as const) {
+      const entered = Promise.withResolvers<void>();
+      const resume = Promise.withResolvers<void>();
+      const harness = createHarness(FAST_TIMERS, {
+        beforeEnsure: async () => {
+          entered.resolve();
+          await resume.promise;
+        },
+      });
+      const spec = routeSpec({ runtimeIsolation });
+      const running = harness.manager.prepare(spec);
+      await entered.promise;
+      harness.manager.release(spec.sessionId);
+      resume.resolve();
+      await running;
+      expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+      expect(
+        harness.frames.some(
+          frame => frame.type === 'session.ready' || frame.type === 'session.failed'
+        )
+      ).toBe(false);
+      expect(harness.releaseCalls).toEqual(
+        runtimeIsolation === 'per-session' ? [spec.sessionId] : []
+      );
+      expect(harness.removeCalls).toEqual([]);
+      await harness.manager.prepare(spec);
+      expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
+    }
+  });
+
+  it('suppresses failed and runtime retries after release during a rejected startup', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+        throw new Error('startup failed');
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    resume.resolve();
+    await running;
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.removeCalls).toEqual([]);
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.failed' || frame.type === 'session.ready'
+      )
+    ).toBe(false);
+  });
+
+  it('suppresses ready after release while warm re-prepare awaits credential installation', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeInstall: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    await harness.manager.prepare(spec);
+    harness.frames.length = 0;
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'fresh' },
+    });
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    resume.resolve();
+    await running;
+    expect(harness.frames).toEqual([]);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+  });
+
+  it('does not start a runtime after release during workspace preparation', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<ExecResult>();
+    const harness = createHarness();
+    harness.setClone(async () => {
+      entered.resolve();
+      return resume.promise;
+    });
+    const spec = routeSpec({
+      git: { url: 'https://git.test/repo', token: 'git-token', platform: 'github' },
+    });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    resume.resolve(result(0));
+    await running;
+    expect(harness.ensureCalls()).toBe(0);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' || frame.type === 'session.failed'
+      )
+    ).toBe(false);
+  });
   it('runs clone, checkout, runtime and session, emits progress then ready, and is idempotent', async () => {
     const harness = createHarness();
     const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });

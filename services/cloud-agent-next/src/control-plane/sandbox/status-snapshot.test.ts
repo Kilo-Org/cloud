@@ -56,6 +56,23 @@ describe('projectAllocationStatusSnapshot', () => {
     expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
   });
 
+  it.each(['cloudflare', 'vercel'] as const)(
+    'reports unknown for an unconfirmed stop on %s',
+    provider => {
+      const snapshot = project(
+        { kind: 'stopped', unconfirmedProviderRef: 'unconfirmed-provider-reference' },
+        provider
+      );
+      expect(snapshot).toMatchObject({
+        status: 'unknown',
+        detailCode: 'insufficient_evidence',
+        estimatedSleepAt: null,
+      });
+      expect(JSON.stringify(snapshot)).not.toContain('unconfirmed-provider-reference');
+      expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+    }
+  );
+
   it('omits the sleep estimate when the idle anchor is missing or already past', () => {
     expect(
       project({ kind: 'connected', lastActivityAt: null }, 'cloudflare').estimatedSleepAt

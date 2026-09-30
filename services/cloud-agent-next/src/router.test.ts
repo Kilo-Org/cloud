@@ -1114,25 +1114,75 @@ describe('router sessionId validation', () => {
           expect(result.execution).toBeNull();
         });
 
-        it('projects current accepted message work into the existing execution-shaped field', async () => {
-          const sessionId: SessionId = 'agent_20202020-2020-2020-2020-202020202020';
-          mockGetMetadata.mockResolvedValue(
-            legacySessionMetadata({ version: 1, sessionId, userId: 'test-user-123', timestamp: 1 })
-          );
-          mockGetCurrentMessageWork.mockResolvedValue({
-            messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
-            status: 'running',
-            health: 'healthy',
-          });
+        it.each(['healthy', 'stale'] as const)(
+          'preserves %s health for current legacy message work',
+          async health => {
+            const sessionId: SessionId = 'agent_20202020-2020-2020-2020-202020202020';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                version: 1,
+                sessionId,
+                userId: 'test-user-123',
+                timestamp: 1,
+              })
+            );
+            mockGetCurrentMessageWork.mockResolvedValue({
+              messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+              status: 'running',
+              health,
+            });
 
-          const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
 
-          expect(result.execution).toMatchObject({
-            id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
-            status: 'running',
-            health: 'healthy',
-          });
-        });
+            expect(result.execution).toMatchObject({
+              id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+              status: 'running',
+              health,
+            });
+          }
+        );
+
+        it.each(['accepted', 'queued', null] as const)(
+          'projects control-plane %s work without legacy health lookup',
+          async state => {
+            const sessionId: SessionId = 'workspace_20202020-2020-2020-2020-202020202020';
+            mockGetMetadata.mockResolvedValue(
+              legacySessionMetadata({
+                version: 1,
+                sessionId,
+                userId: 'test-user-123',
+                timestamp: 1,
+              })
+            );
+            const controlStub = {
+              getMetadata: mockGetMetadata,
+              getSession: vi.fn().mockResolvedValue({
+                type: 'found',
+                messages:
+                  state === null ? [] : [{ messageId: 'msg_018f1e2d3c4bHydrateMsgAbCdE', state }],
+                latestEventId: 7,
+              }),
+            };
+            mockContext.env.SANDBOX_SESSION = {
+              idFromName: vi.fn((id: string) => ({ id })),
+              get: vi.fn(() => controlStub),
+            } as unknown as TRPCContext['env']['SANDBOX_SESSION'];
+
+            const result = await caller.getSession({ cloudAgentSessionId: sessionId });
+
+            expect(result.execution).toEqual(
+              state === null
+                ? null
+                : expect.objectContaining({
+                    id: 'msg_018f1e2d3c4bHydrateMsgAbCdE',
+                    status: state === 'accepted' ? 'running' : 'pending',
+                    health: 'healthy',
+                  })
+            );
+            expect(result.latestEventId).toBe(7);
+            expect(mockGetCurrentMessageWork).not.toHaveBeenCalled();
+          }
+        );
 
         it('should work for personal account sessions (no orgId)', async () => {
           const sessionId: SessionId = 'agent_abcdef01-2345-6789-abcd-ef0123456789';

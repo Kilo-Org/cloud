@@ -2,7 +2,11 @@ import {
   ControlTerminalRuntimeError,
   createControlTerminalRuntime,
 } from '../control/terminal-runtime.js';
-import { forgetAttachedRoot, rememberAttachedRoot } from '../control/session-directories.js';
+import {
+  forgetAttachedRoot,
+  rememberAttachedRoot,
+  rootForSession,
+} from '../control/session-directories.js';
 import type { WorktreeKiloRuntime } from '../control/worktree-runtime.js';
 import type { SessionRequestIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 import type {
@@ -112,6 +116,7 @@ export function createControlPlaneTerminals(options: {
   });
 
   function rememberAttachedSession(identity: SessionRequestIdentity, runtimeKey: string): void {
+    const alreadyAttached = rootForSession(identity.kiloSessionId) === identity.kiloSessionId;
     attached.set(identity.sessionId, { identity, runtimeKey });
     // The shared PTY path validates ownership through the attached root, which
     // an older runtime registry would normally seed.
@@ -120,6 +125,7 @@ export function createControlPlaneTerminals(options: {
       runtime.rememberAttachedSession(identity);
     } catch (error) {
       attached.delete(identity.sessionId);
+      if (!alreadyAttached) forgetAttachedRoot(identity.kiloSessionId, identity.directory);
       throw error;
     }
   }

@@ -212,7 +212,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const sleep = deps.sleep ?? defaultSleep;
   const homeRoot = deps.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees');
   const prepared = new Map<string, PreparedRoute>();
-  const preparing = new Map<string, Promise<void>>();
+  const preparing = new Map<string, { promise: Promise<void>; released: boolean }>();
   // Spec §7: clone/checkout/setup mutate one shared worktree, so they must not
   // run concurrently for two sessions on the same directory. The lock is keyed
   // by directory, mirroring legacy `serializeWorkspacePreparation`.
@@ -300,12 +300,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
   }
 
-  async function withOneRetry<T>(operation: () => Promise<T>): Promise<T> {
+  async function withOneRetry<T>(
+    operation: () => Promise<T>,
+    isCurrent: () => boolean
+  ): Promise<T> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= STEP_RETRY_ATTEMPTS; attempt += 1) {
       try {
         return await operation();
       } catch (error) {
+        if (!isCurrent()) throw error;
         lastError = error;
       }
     }
@@ -500,12 +504,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     await client.ensureSession(spec.kiloSessionId, directory, signal);
   }
 
-  async function withRuntimeStartRetry<T>(key: string, operation: () => Promise<T>): Promise<T> {
+  async function withRuntimeStartRetry<T>(
+    key: string,
+    operation: () => Promise<T>,
+    isCurrent: () => boolean
+  ): Promise<T> {
     let lastError: unknown;
     for (let attempt = 1; attempt <= STEP_RETRY_ATTEMPTS; attempt += 1) {
       try {
         return await operation();
       } catch (error) {
+        if (!isCurrent()) throw error;
         lastError = error;
         // M1: a hung spawn leaves `ensure` returning the same pending promise,
         // so drop the runtime before the retry starts a fresh one.
@@ -517,7 +526,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
 
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
-    credentials: ControlPlaneSessionCredentialsPayload | undefined
+    credentials: ControlPlaneSessionCredentialsPayload | undefined,
+    owner: { released: boolean }
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
@@ -573,24 +583,42 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
         await writeBootstrapMarker(directory);
       });
+      if (owner.released) return;
       currentStep = 'kilo_runtime';
       emitProgress(sessionId, 'kilo_runtime');
-      const client = await withRuntimeStartRetry(key, () =>
-        withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
-          deps.runtimes.ensure({ key, directory, env })
-        )
+      const client = await withRuntimeStartRetry(
+        key,
+        () =>
+          withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
+            deps.runtimes.ensure({ key, directory, env })
+          ),
+        () => !owner.released
       );
+      if (owner.released) {
+        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
+        return;
+      }
       currentStep = 'kilo_session';
       emitProgress(sessionId, 'kilo_session');
-      await withOneRetry(() =>
-        withinStep('kilo_session', timers.kiloSessionMs, signal =>
-          resolveKiloSession(spec, directory, env, client, signal)
-        )
+      await withOneRetry(
+        () =>
+          withinStep('kilo_session', timers.kiloSessionMs, signal =>
+            resolveKiloSession(spec, directory, env, client, signal)
+          ),
+        () => !owner.released
       );
+      if (owner.released) {
+        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
+        return;
+      }
       prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
       deps.emit({ type: 'session.ready', sessionId });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
+      if (owner.released) {
+        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
+        return;
+      }
       log(
         `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
           error instanceof Error ? error.message : String(error)
@@ -636,9 +664,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   return {
-    prepare(spec, credentials) {
+    prepare: function prepare(spec, credentials) {
       const existing = preparing.get(spec.sessionId);
-      if (existing) return existing;
+      if (existing && !existing.released) return existing.promise;
+      if (existing) {
+        const owner = { promise: Promise.resolve(), released: false };
+        owner.promise = existing.promise
+          .then(() => {
+            if (owner.released) return;
+            preparing.delete(spec.sessionId);
+            return prepare(spec, credentials);
+          })
+          .finally(() => {
+            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
+          });
+        preparing.set(spec.sessionId, owner);
+        return owner.promise;
+      }
+      const owner = { promise: Promise.resolve(), released: false };
       const route = prepared.get(spec.sessionId);
       if (route) {
         // M2: a failed route (spent restart budget / dead runtime) must start
@@ -658,21 +701,27 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
                 );
               }
             }
-            deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
+            if (!owner.released) {
+              deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
+            }
           })().finally(() => {
-            preparing.delete(spec.sessionId);
+            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
           });
-          preparing.set(spec.sessionId, running);
+          owner.promise = running;
+          preparing.set(spec.sessionId, owner);
           return running;
         }
       }
-      const running = runPrepare(spec, credentials).finally(() => {
-        preparing.delete(spec.sessionId);
+      const running = runPrepare(spec, credentials, owner).finally(() => {
+        if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
       });
-      preparing.set(spec.sessionId, running);
+      owner.promise = running;
+      preparing.set(spec.sessionId, owner);
       return running;
     },
     release(sessionId) {
+      const preparation = preparing.get(sessionId);
+      if (preparation) preparation.released = true;
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);

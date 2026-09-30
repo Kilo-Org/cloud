@@ -806,7 +806,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
     release(sessionId: string): void {
       const route = routes.get(sessionId);
-      if (route !== undefined) turnByKiloSession.delete(route.kiloSessionId);
+      if (route !== undefined) {
+        turnByKiloSession.delete(route.kiloSessionId);
+        for (const [child, root] of childRoots) {
+          if (root === route.kiloSessionId) childRoots.delete(child);
+        }
+      }
       routes.delete(sessionId);
       turns.delete(sessionId);
       stopTickIfIdle();
@@ -842,6 +847,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
       const sessionId = turnByKiloSession.get(root);
       if (sessionId === undefined) return;
       emitEvents(sessionId, [{ type: event.type, properties: event.properties }]);
+      if (event.type === 'session.deleted' && eventSessionId !== root) {
+        if (eventSessionId !== undefined) childRoots.delete(eventSessionId);
+      }
       const turn = turns.get(sessionId);
       if (turn === undefined) return;
       // A subagent's question still pauses the root turn (spec §6).

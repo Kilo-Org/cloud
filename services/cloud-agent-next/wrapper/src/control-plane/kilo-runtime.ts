@@ -432,7 +432,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
    * `healthRequestMs` bound resolves `false`. The runtime owns the hang rule,
    * so the feed runs no watchdog of its own.
    */
-  function openAttempt(url: string): Promise<boolean> {
+  function openAttempt(url: string, signal?: AbortSignal): Promise<boolean> {
     return new Promise<boolean>(resolve => {
       const controller = new AbortController();
       let settled = false;
@@ -441,6 +441,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         if (settled) return false;
         settled = true;
         clearTimeout(timer);
+        signal?.removeEventListener('abort', onAbort);
         if (recovered) {
           feed = next;
         } else {
@@ -453,11 +454,16 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         controller.abort();
         finish(false);
       }, timers.healthRequestMs);
+      const onAbort = (): void => {
+        controller.abort();
+        finish(false);
+      };
       const next = openFeed(
         { directory: options.directory, serverUrl: url },
         {
           signal: controller.signal,
           onEvent: event => {
+            if (controller.signal.aborted || currentPhase() === 'stopped') return;
             // The first frame is always `server.connected`: it proves the stream
             // opened, not that Kilo is delivering events, so it must not clear
             // the silence episode (`lastActivityAt`, `suspected`, the probe).
@@ -475,6 +481,8 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
           },
         }
       );
+      signal?.addEventListener('abort', onAbort, { once: true });
+      if (signal?.aborted) onAbort();
       void next.open().catch(() => finish(false));
     });
   }
@@ -598,7 +606,9 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   async function start(): Promise<WrapperKiloClient> {
     // Spec §7 pre-spawn filesystem: Kilo reads auth.json from disk, and a route
     // with no git and no setup commands never created the worktree directory.
-    await prepareFilesystem(options.env, options.directory);
+    const env = options.env;
+    await prepareFilesystem(env, options.directory);
+    if (currentPhase() === 'stopped') throw new Error('Kilo runtime is shutting down');
     const controller = new AbortController();
     startAbort = controller;
     const deadline = setTimeout(
@@ -609,7 +619,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     try {
       spawned = await spawnKilo({
         directory: options.directory,
-        env: options.env,
+        env,
         signal: controller.signal,
         ...(options.workload ? { workload: options.workload } : {}),
       });
@@ -619,11 +629,11 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       throw error;
     }
     clearTimeout(deadline);
-    if (startAbort === controller) startAbort = undefined;
     if (phase === 'stopped') {
       await spawned.stop(scheduler.now() + KILO_STOP_TIMEOUT_MS);
       throw new Error('Kilo runtime is shutting down');
     }
+    kiloProcess = spawned;
     let file: string | undefined;
     const startTime = (options.readProcessStartTime ?? readLinuxProcessStartTime)(spawned.pid);
     if (startTime !== undefined) {
@@ -634,17 +644,27 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
         .then(() => fsp.writeFile(pidfile, JSON.stringify({ pid: spawned.pid, startTime })))
         .catch(() => undefined);
     }
+    if (currentPhase() === 'stopped') {
+      if (file !== undefined) await fsp.rm(file, { force: true }).catch(() => undefined);
+      throw new Error('Kilo runtime is shutting down');
+    }
+    pidfilePath = file;
     const kilo = createWrapperKiloClient(
       createKiloClient({ baseUrl: spawned.url, directory: options.directory }),
       spawned.url,
       options.directory
     );
-    if (!(await openAttempt(spawned.url))) {
+    if (!(await openAttempt(spawned.url, controller.signal))) {
       // A failed start must not leave a usable-looking handle behind: clean up
       // so `ensure` re-spawns instead of returning a Kilo without a feed.
-      await spawned.stop(scheduler.now() + KILO_STOP_TIMEOUT_MS);
-      if (file !== undefined) await fsp.rm(file, { force: true }).catch(() => undefined);
+      await stopProcess();
+      if (startAbort === controller) startAbort = undefined;
       throw new Error('Kilo event feed failed to open');
+    }
+    if (startAbort === controller) startAbort = undefined;
+    if (currentPhase() === 'stopped') {
+      await stopProcess();
+      throw new Error('Kilo runtime is shutting down');
     }
     kiloProcess = spawned;
     pidfilePath = file;
@@ -652,8 +672,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     probeHealth =
       options.probeHealth ??
       createHealthProbe(spawned.url, options.directory, timers.healthRequestMs);
-    // A start uses the latest stored env, so any pending credential is applied.
-    pendingCredentials = false;
+    pendingCredentials = options.env !== env;
     void spawned.exited.then(() => {
       if (phase !== 'running' && phase !== 'suspected') return;
       // Spec §7 "Kilo supervision": a Kilo process exit restarts Kilo.

@@ -407,7 +407,11 @@ export function createSessionManagementHandlers() {
           const { currentWork, latestEventId } = await sessionFor(
             sessionId,
             async (): Promise<{
-              currentWork: { messageId: string; status: 'pending' | 'running' } | null;
+              currentWork: {
+                messageId: string;
+                status: 'pending' | 'running';
+                health: 'healthy' | 'stale';
+              } | null;
               latestEventId: number | null;
             }> => {
               const snapshot = await withDORetry<
@@ -423,15 +427,19 @@ export function createSessionManagementHandlers() {
               const queued = snapshot.messages.find(message => message.state === 'queued');
               return {
                 currentWork: accepted
-                  ? { messageId: accepted.messageId, status: 'running' }
+                  ? { messageId: accepted.messageId, status: 'running', health: 'healthy' }
                   : queued
-                    ? { messageId: queued.messageId, status: 'pending' }
+                    ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
                     : null,
                 latestEventId: snapshot.latestEventId,
               };
             },
             async (): Promise<{
-              currentWork: { messageId: string; status: 'pending' | 'running' } | null;
+              currentWork: {
+                messageId: string;
+                status: 'pending' | 'running';
+                health: 'healthy' | 'stale';
+              } | null;
               latestEventId: number | null;
             }> => {
               const legacyStub = () => resolveLegacySessionStub(env, userId, sessionId);
@@ -541,7 +549,7 @@ export function createSessionManagementHandlers() {
                   lastHeartbeat: null,
                   processId: null,
                   error: null,
-                  health: 'healthy',
+                  health: currentWork.health,
                 }
               : null,
 

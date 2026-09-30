@@ -40,6 +40,8 @@ import {
   isRenderableSessionCost,
 } from './session-cost-breakdown';
 import { ConversationMessages } from './ConversationMessages';
+import { CurrentTaskList } from './CurrentTaskList';
+import { getCurrentTodos } from './current-todos';
 import { planResumeAttempt, resumeAnchorForTranscript, sendTakesOverResume } from './resume-anchor';
 import { ChildSessionDrawer } from './ChildSessionDrawer';
 import type { ChildSessionDrawerEntry } from './ChildSessionSection';
@@ -354,6 +356,10 @@ export default function CloudChatPage({
     () =>
       commitsByMessageAnchor([...staticMessages, ...dynamicMessages], filesVisible ? commits : []),
     [commits, dynamicMessages, filesVisible, staticMessages]
+  );
+  const currentTodos = useMemo(
+    () => (isCurrentSession ? getCurrentTodos([...staticMessages, ...dynamicMessages]) : null),
+    [dynamicMessages, isCurrentSession, staticMessages]
   );
   const activeWorkspaceTabId =
     !filesVisible && workspaceTabs.activeTabId.startsWith('file:')
@@ -1671,6 +1677,9 @@ export default function CloudChatPage({
                                   />
                                 </div>
                               )}
+                              <div className="px-[max(1rem,calc(50%_-_27rem))]">
+                                <CurrentTaskList todos={currentTodos} />
+                              </div>
                               <ChatInput
                                 onSend={handleSendMessage}
                                 onSendCommand={handleSendSlashCommand}

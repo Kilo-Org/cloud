@@ -179,6 +179,22 @@
       }
     },
     {
+      "files": ["packages/web-shared/**/*.ts", "packages/web-shared/**/*.tsx"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["**/apps/web/**", "@/**"],
+                "message": "packages/web-shared must not import from apps/web."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
       "files": ["packages/web-shared/**/*.ts"],
       "rules": {
         "@typescript-eslint/no-empty-object-type": "off",

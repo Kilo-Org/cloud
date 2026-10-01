@@ -993,7 +993,7 @@ describe('SessionService.resolveWorkspaceTokens', () => {
 });
 
 describe('writeGlobalRules', () => {
-  it('writes the shared Cloud Agent rules sized to the idle timeout', async () => {
+  it('writes the shared Cloud Agent rules sized to the shell-tool default timeout', async () => {
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const sandbox = createSandbox(createSession(), false, writeFile);
 

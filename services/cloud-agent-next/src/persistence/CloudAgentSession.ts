@@ -92,7 +92,6 @@ import {
   projectPublicCloudAgentExtensionEvent,
 } from '../kilo-facade/cloud-agent-extension-events.js';
 import { commandsOrDefault, type SlashCommandInfo } from '../shared/slash-commands.js';
-import { resolveKiloServerIdleTimeoutMs } from '../shared/kilo-server-idle-timeout.js';
 import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
@@ -234,6 +233,9 @@ const LAST_ACTIVITY_KEY = 'last_activity';
 const DELETION_INTENT_KEY = 'session_deletion_intent';
 const EPHEMERAL_SANDBOX_DESTROY_AFTER_KEY = 'ephemeral_sandbox_destroy_after';
 const EPHEMERAL_SANDBOX_DESTROYED_AT_KEY = 'ephemeral_sandbox_destroyed_at';
+
+/** Kilo server idle timeout: 15 minutes */
+const KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT = 15 * 60 * 1000;
 
 /** Default per-execution wall-clock deadline: 60 minutes */
 
@@ -3427,7 +3429,8 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   private getKiloServerIdleTimeoutMs(): number {
-    return resolveKiloServerIdleTimeoutMs(this.env.KILO_SERVER_IDLE_TIMEOUT_MS);
+    const value = Number(this.env.KILO_SERVER_IDLE_TIMEOUT_MS);
+    return Number.isFinite(value) && value > 0 ? value : KILO_SERVER_IDLE_TIMEOUT_MS_DEFAULT;
   }
 
   /**

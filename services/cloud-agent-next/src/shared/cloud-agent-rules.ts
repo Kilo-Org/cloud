@@ -1,6 +1,6 @@
-import { resolveKiloServerIdleTimeoutMs } from './kilo-server-idle-timeout.js';
+import { resolveKiloBashDefaultTimeoutMs } from './kilo-bash-timeout.js';
 
-const COMMAND_IDLE_BUFFER_MS = 30_000;
+const COMMAND_TIMEOUT_BUFFER_MS = 30_000;
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.round(ms / 1000));
@@ -12,9 +12,9 @@ function formatDuration(ms: number): string {
   return parts.join(' ');
 }
 
-export function buildCloudAgentRules(idleTimeoutMs?: string | number | null): string {
+export function buildCloudAgentRules(bashDefaultTimeoutMs?: string | number | null): string {
   const commandTimeoutMs = Math.max(
-    resolveKiloServerIdleTimeoutMs(idleTimeoutMs) - COMMAND_IDLE_BUFFER_MS,
+    resolveKiloBashDefaultTimeoutMs(bashDefaultTimeoutMs) - COMMAND_TIMEOUT_BUFFER_MS,
     0
   );
   return [

@@ -683,7 +683,7 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   await fs.mkdir(rulesDir, { recursive: true });
   await fs.writeFile(
     path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(process.env.KILO_SERVER_IDLE_TIMEOUT_MS)
+    buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
   );
 }
 

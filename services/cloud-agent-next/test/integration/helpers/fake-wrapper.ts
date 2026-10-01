@@ -96,6 +96,22 @@ export class FakeWrapper {
     });
   }
 
+  /**
+   * The next frame whose type is not in `skipped`. Frames the control plane may
+   * send in the background, such as the worktree snapshot capture started when a
+   * wrapper attaches, can land before the frame a test is waiting for.
+   */
+  async nextSkipping(
+    skipped: readonly ControlPlaneWrapperFrame['type'][],
+    timeoutMs = 2_000
+  ): Promise<ControlPlaneWrapperFrame | null> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const frame = await this.next(Math.max(0, deadline - Date.now()));
+      if (frame === null || !skipped.includes(frame.type)) return frame;
+    }
+  }
+
   async hello(input: FakeWrapperHelloInput): Promise<ControlPlaneWrapperFrame | null> {
     this.send({
       type: 'hello',

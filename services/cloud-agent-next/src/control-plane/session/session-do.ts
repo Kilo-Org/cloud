@@ -1675,6 +1675,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
+    const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+    const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
+    if (
+      previous.state !== view.state ||
+      previousAttemptId !== nextAttemptId ||
+      (view.state === 'failed' && (previous.state !== 'failed' || previous.reason !== view.reason))
+    ) {
+      logControlDiagnostic('session_route_view', {
+        sessionId: this.sessionId,
+        from: previous.state,
+        to: view.state,
+        fromAttemptId: previousAttemptId,
+        toAttemptId: nextAttemptId,
+        reason: view.state === 'failed' ? view.reason : undefined,
+        subtype: view.state === 'failed' ? view.subtype : undefined,
+        queuedMessages: this.messages.filter(message => message.state === 'queued').length,
+        acceptedMessages: this.messages.filter(message => message.state === 'accepted').length,
+      });
+    }
     await this.persistRoute(view);
     if (view.state === 'preparing' || view.state === 'reconnecting') {
       await this.clearTransportRecovery();

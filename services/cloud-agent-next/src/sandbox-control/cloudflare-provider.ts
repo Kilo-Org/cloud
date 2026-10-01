@@ -198,7 +198,11 @@ export function createCloudflareProviderAdapter(deps: {
     },
     async stop(ref, intent) {
       const parsed = decodeOwnedProviderRef(resolveProviderRef(ref, intent));
-      const diagnostic = { provider: 'cloudflare', allocationName: deps.sandboxId };
+      const diagnostic = {
+        provider: 'cloudflare',
+        allocationName: deps.sandboxId,
+        intentId: intent?.intentId,
+      };
       if (!parsed) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });
         return 'retryable';

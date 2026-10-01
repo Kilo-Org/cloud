@@ -61,10 +61,12 @@ import {
   finalizePreparationAttempt,
   getPreparationSnapshots,
   readPreparationAttempt,
+  readPreparationSteps,
   type PreparationOutcome,
 } from '../../session/preparation-history.js';
 import type { CommandsAvailableData } from '../../shared/protocol.js';
 import {
+  CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
@@ -74,6 +76,7 @@ import {
   controlPlaneRouteSpecSchema,
   controlPlaneRouteUpdateSchema,
   controlPlaneRouteViewSchema,
+  controlPlaneSetupEventSchema,
   type ControlPlaneAnswerPayload,
   type ControlPlaneAnswerReply,
   type ControlPlaneControlResult,
@@ -87,6 +90,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneSetupEvent,
   type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
@@ -167,8 +171,17 @@ const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 
+/** Wrapper setup-command lifecycle events the Session DO renders itself. */
+const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
+  CONTROL_PLANE_SETUP_EVENTS.started,
+  CONTROL_PLANE_SETUP_EVENTS.output,
+  CONTROL_PLANE_SETUP_EVENTS.finished,
+]);
+
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'sandbox_provision',
+  sandbox_start: 'sandbox_boot',
   clone: 'cloning',
   checkout: 'branch',
   setup: 'setup_commands',
@@ -177,6 +190,8 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 };
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'Creating sandbox',
+  sandbox_start: 'Starting sandbox',
   clone: 'Cloning repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
@@ -191,6 +206,28 @@ const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
  */
 function publicPreparationStep(step: ControlPlanePreparationStep | undefined): string | undefined {
   return step === undefined ? undefined : PREPARING_STEP_PUBLIC[step];
+}
+
+/**
+ * The route state to persist for a view. A preparing view's live detail is not
+ * route state, and a preparing view that names no step (a repeated `prepare`)
+ * keeps the step its attempt already reached.
+ */
+function persistedRouteView(
+  view: ControlPlaneRouteView,
+  previous: ControlPlaneRouteView
+): ControlPlaneRouteView {
+  if (view.state !== 'preparing') return view;
+  const step =
+    view.step ??
+    (previous.state === 'preparing' && previous.attemptId === view.attemptId
+      ? previous.step
+      : undefined);
+  return {
+    state: 'preparing',
+    attemptId: view.attemptId,
+    ...(step === undefined ? {} : { step }),
+  };
 }
 
 /** DO-only session creation input; the Worker builds it from session metadata. */
@@ -1103,8 +1140,9 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           // Spec §10 "Finalization running".
           this.emitCloudStatus({ type: 'finalizing' });
         }
-        if (event.type === 'session.setup.output' && this.recordSetupOutput(event.properties)) {
-          // Rendered as a `preparing` step output; the raw event is not broadcast.
+        if (SETUP_EVENT_TYPES.has(event.type)) {
+          const setupEvent = controlPlaneSetupEventSchema.safeParse(event);
+          if (setupEvent.success) this.recordSetupEvent(setupEvent.data);
           continue;
         }
         const next = applyPendingInteractionEvent(this.pendingInteractions, event);
@@ -1675,11 +1713,31 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
-    await this.persistRoute(view);
-    if (view.state === 'preparing' || view.state === 'reconnecting') {
+    const previousAttemptId = previous.state === 'unknown' ? undefined : previous.attemptId;
+    const nextAttemptId = view.state === 'unknown' ? undefined : view.attemptId;
+    if (
+      previous.state !== view.state ||
+      previousAttemptId !== nextAttemptId ||
+      (view.state === 'failed' && (previous.state !== 'failed' || previous.reason !== view.reason))
+    ) {
+      logControlDiagnostic('session_route_view', {
+        sessionId: this.sessionId,
+        from: previous.state,
+        to: view.state,
+        fromAttemptId: previousAttemptId,
+        toAttemptId: nextAttemptId,
+        reason: view.state === 'failed' ? view.reason : undefined,
+        subtype: view.state === 'failed' ? view.subtype : undefined,
+        queuedMessages: this.messages.filter(message => message.state === 'queued').length,
+        acceptedMessages: this.messages.filter(message => message.state === 'accepted').length,
+      });
+    }
+    const route = persistedRouteView(view, previous);
+    await this.persistRoute(route);
+    if (route.state === 'preparing' || route.state === 'reconnecting') {
       await this.clearTransportRecovery();
     }
-    switch (view.state) {
+    switch (route.state) {
       case 'unknown':
         this.finalizePreparingRoute(previous, {
           status: 'failed',
@@ -1694,7 +1752,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return;
       case 'preparing': {
         // A new route attempt supersedes the previous one's open row.
-        if (previous.state === 'preparing' && previous.attemptId !== view.attemptId) {
+        if (previous.state === 'preparing' && previous.attemptId !== route.attemptId) {
           this.finalizeAttempt(previous.attemptId, {
             status: 'failed',
             safeError: 'Preparation did not complete',
@@ -1703,13 +1761,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Suppress captures while the route prepares; a capture runs after
         // attach (`ready`), like the legacy preparation hooks.
         this.worktreePreparationGeneration = this.worktreeChanges.beginPreparation();
-        const publicStep = publicPreparationStep(view.step) ?? 'workspace_setup';
+        const publicStep = publicPreparationStep(route.step) ?? 'workspace_setup';
         this.emitCloudStatus({ type: 'preparing', step: publicStep });
         const head = oldestOpenMessage(this.messages, 'queued');
-        if (head !== undefined) {
-          this.preparationRecorder(view.attemptId, head.messageId).onProgress(
+        // A stepless repeat of an open attempt (a repeated `prepare`) carries
+        // its step forward and must not overwrite the step's live detail.
+        const stepless = view.state === 'preparing' && view.step === undefined;
+        if (
+          head !== undefined &&
+          (!stepless || readPreparationAttempt(this.eventQueries, route.attemptId) === null)
+        ) {
+          this.preparationRecorder(route.attemptId, head.messageId).onProgress(
             publicStep,
-            view.step === undefined ? 'Preparing environment' : PREPARING_STEP_MESSAGE[view.step]
+            (view.state === 'preparing' ? view.detail : undefined) ??
+              (route.step === undefined
+                ? 'Preparing environment'
+                : PREPARING_STEP_MESSAGE[route.step])
           );
         }
         return;
@@ -1730,18 +1797,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         logger
           .withFields({
             sessionId: this.sessionId,
-            attemptId: view.attemptId,
-            reason: view.reason,
-            ...(view.subtype === undefined ? {} : { subtype: view.subtype }),
+            attemptId: route.attemptId,
+            reason: route.reason,
+            ...(route.subtype === undefined ? {} : { subtype: route.subtype }),
           })
           .warn('Control-plane workspace preparation failed');
-        this.finalizePreparingRoute(previous, { status: 'failed', safeError: view.reason });
-        this.emitCloudStatus({ type: 'error', message: view.reason });
+        this.finalizePreparingRoute(previous, { status: 'failed', safeError: route.reason });
+        this.emitCloudStatus({ type: 'error', message: route.reason });
         await this.settleMessages(
           openMessages(this.messages).map(message => message.messageId),
           'failed',
-          view.reason,
-          view.subtype === undefined ? undefined : { workspaceSubtype: view.subtype }
+          route.reason,
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
         );
         return;
     }
@@ -1998,37 +2065,81 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * Render a wrapper setup-command output line into the active preparation
-   * attempt's setup phase step, which is what the preparation UI shows. The
-   * step id mirrors `createPreparationProgressRecorder`'s `phase:<key>`.
-   * Returns false when no attempt or step exists yet; the caller then keeps the
-   * raw event so it is not lost.
+   * Render a wrapper setup-command lifecycle event into the active preparation
+   * attempt. Each command is its own `setup_command` step under the
+   * `setup_commands` phase (mirroring the legacy bootstrap), so the preparation
+   * UI shows the numbered command, its output, and its terminal state.
    */
-  private recordSetupOutput(properties: Record<string, unknown>): boolean {
-    const output = typeof properties.output === 'string' ? properties.output : '';
-    if (output.length === 0) return false;
-    const attemptId = this.currentAttemptId();
-    if (attemptId === null) return false;
+  private recordSetupEvent(event: ControlPlaneSetupEvent): void {
+    if (this.route.state !== 'preparing') return;
+    const attemptId = this.route.attemptId;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
-    if (attempt === null) return false;
-    const command = typeof properties.command === 'number' ? properties.command : undefined;
-    return applyControlPlanePreparingEvent({
-      sessionId: this.sessionId,
-      data: {
-        version: 2,
-        attemptId,
-        triggerMessageId: attempt.triggerMessageId,
-        revision: attempt.revision + 1,
-        timestamp: Date.now(),
-        step: 'setup_commands',
-        message: command === undefined ? 'Setup command output' : `Setup command ${command} output`,
+    if (attempt?.status !== 'running') return;
+    const command = event.properties.command;
+    const stepId = `setup_command:${command - 1}`;
+    const existingStep = readPreparationSteps(this.eventQueries, attemptId).find(
+      step => step.id === stepId
+    );
+    if (existingStep !== undefined && existingStep.status !== 'running') return;
+    const base = {
+      version: 2 as const,
+      attemptId,
+      triggerMessageId: attempt.triggerMessageId,
+      revision: attempt.revision + 1,
+      timestamp: Date.now(),
+      step: 'setup_commands' as const,
+    };
+    const apply = (data: Record<string, unknown>): boolean =>
+      applyControlPlanePreparingEvent({
+        sessionId: this.sessionId,
+        data,
+        eventQueries: this.eventQueries,
+        broadcast: stored => this.broadcast(stored),
+      });
+
+    if (existingStep === undefined) {
+      const label = `Setup command ${command}`;
+      if (
+        !apply({
+          ...base,
+          message: label,
+          action: 'step_started',
+          stepId,
+          kind: 'setup_command',
+          label,
+          commandIndex: command - 1,
+          ...(event.type === CONTROL_PLANE_SETUP_EVENTS.started
+            ? { commandCount: event.properties.commandCount }
+            : {}),
+        })
+      )
+        return;
+      base.revision += 1;
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
+      apply({
+        ...base,
+        message: `Setup command ${command} output`,
         action: 'step_output',
-        stepId: 'phase:setup_commands',
-        output,
-      },
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcast(event),
-    });
+        stepId,
+        output: event.properties.output,
+      });
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
+      const { exitCode, safeError } = event.properties;
+      const failed = safeError !== undefined || exitCode !== 0;
+      const failedMessage = safeError ?? `Setup command ${command} failed`;
+      apply({
+        ...base,
+        message: failed ? failedMessage : 'Setup command finished',
+        action: failed ? 'step_failed' : 'step_completed',
+        stepId,
+        ...(failed ? { safeError: failedMessage } : {}),
+        exitCode,
+      });
+    }
   }
 
   /** Close one route attempt's open row by persisted identity, never by a scan. */

@@ -126,8 +126,19 @@ type ScreenHeaderProps = {
   /** Controls rendered at the trailing edge of the title row, in the
    * leading-aligned row and beside a centered title alike. The heading keeps
    * `flex-1 min-w-0`, so the title keeps its tail ellipsis and the controls keep
-   * their full width instead of the `headerRight` half-row cap wrapping them. */
+   * their full width instead of the `headerRight` half-row cap wrapping them.
+   * Pass `inlineActionsWidth` for a cluster wide enough to squeeze the title:
+   * the row then drops beneath the title once the two cannot share. */
   inlineActions?: React.ReactNode;
+  /**
+   * Width the `inlineActions` cluster lays out at, in dp. The stacking decision
+   * reserves it (see `shouldStackHeaderActions`) exactly as `headerRightWidth`
+   * does for `headerRight`: on a phone the Agents controls are as wide as the
+   * title's readable minimum, so without this the 30px title broke mid-word
+   * beside them (Croatian "Agenti" → "Age" / "nti"). Omit it for a cluster no
+   * wider than the title can spare.
+   */
+  inlineActionsWidth?: number;
   /** Home, Quick Chat, and session headers supply context below the title.
    * Other callers keep their existing title-only layout when this slot is absent. */
   context?: React.ReactNode;
@@ -184,6 +195,7 @@ export function ScreenHeader({
   headerRightWidth,
   headerRightShrinks = false,
   inlineActions,
+  inlineActionsWidth,
   context,
   modal,
   centerTitle = modal ?? false,
@@ -210,6 +222,12 @@ export function ScreenHeader({
   // title's readable minimum (see `headerRightWidth`).
   const stackActions =
     headerRight != null && shouldStackHeaderActions(windowWidth, fontScale, headerRightWidth ?? 0);
+  // The inline controls row reflows the same way: a caller that declares its
+  // width drops it beneath the title before it squeezes the title's own
+  // readable minimum, so the 30px Agents title never breaks inside a word.
+  const stackInlineActions =
+    inlineActions != null &&
+    shouldStackHeaderActions(windowWidth, fontScale, inlineActionsWidth ?? 0);
 
   // A modal is a native sheet that owns its own top inset; the header keeps the
   // fixed grabber clearance on both platforms. A pinned header adds the app
@@ -394,8 +412,24 @@ export function ScreenHeader({
     ? 'ms-3 max-w-[50%] min-w-0 shrink'
     : 'ms-3 shrink-0';
   const centeredControls =
-    separateHeading && backControl && !inlineActions && (!headerRight || stackActions) ? (
+    separateHeading &&
+    backControl &&
+    (!inlineActions || stackInlineActions) &&
+    (!headerRight || stackActions) ? (
       <View className="h-11 w-11 shrink-0" accessibilityElementsHidden pointerEvents="none" />
+    ) : null;
+  // The inline controls keep the title's row only while it can still hold a
+  // readable title; below that they take a row of their own. On their own row
+  // they keep the header's full width, so a long translation (Croatian
+  // "TRENUTAČNO AKTIVNO" / "PRETHODNE SESIJE" beside the filter) stays legible
+  // instead of squeezing the 30px title into a mid-word break.
+  const inlineActionsSlot =
+    inlineActions && !stackInlineActions ? (
+      <View className="ms-3 min-w-0 shrink">{inlineActions}</View>
+    ) : null;
+  const stackedInlineActionsRow =
+    inlineActions && stackInlineActions ? (
+      <View className="mt-2 min-w-0">{inlineActions}</View>
     ) : null;
 
   return (
@@ -411,7 +445,7 @@ export function ScreenHeader({
               ) : (
                 centeredControls
               )}
-              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+              {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
               // The actions keep the title's own row only while it can hold a
@@ -420,6 +454,7 @@ export function ScreenHeader({
               // inside it instead of running off the edge.
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
+            {stackedInlineActionsRow}
           </>
         ) : (
           <>
@@ -431,11 +466,12 @@ export function ScreenHeader({
               {headerRight && !stackActions ? (
                 <View className={headerRightSlotClassName}>{headerRight}</View>
               ) : null}
-              {inlineActions ? <View className="ms-3 min-w-0 shrink">{inlineActions}</View> : null}
+              {inlineActionsSlot}
             </View>
             {headerRight && stackActions ? (
               <View className="mt-2 min-w-0">{headerRight}</View>
             ) : null}
+            {stackedInlineActionsRow}
           </>
         )}
       </View>

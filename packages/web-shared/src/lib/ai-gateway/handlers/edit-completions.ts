@@ -30,6 +30,7 @@ import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { findSupportedFimModel } from '@/lib/ai-gateway/supported-fim-models';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -263,8 +264,28 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     },
     body: JSON.stringify(bodyForUpstream),
   });
-  usageContext.ttfb_ms = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = proxyRes.status;
+
+  emitApiMetricsForResponse(
+    {
+      kiloUserId: user.id,
+      organizationId,
+      isAnonymous: false,
+      isStreaming: false,
+      userByok: !!userByokEntry,
+      provider: editProvider,
+      requestedModel: requestBody.model,
+      resolvedModel: requestBody.model,
+      toolsAvailable: [],
+      toolsUsed: [],
+      ttfbMs,
+      statusCode: proxyRes.status,
+    },
+    proxyRes.clone(),
+    requestStartedAt
+  );
 
   if (!proxyRes.body) {
     return NextResponse.json(

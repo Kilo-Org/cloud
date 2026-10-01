@@ -70,6 +70,41 @@ describe('createPreparationProgressRecorder', () => {
     ]);
   });
 
+  it('drops an identical repeated report', () => {
+    const eventQueries = createMemoryEventQueries();
+    const broadcasts: StoredEvent[] = [];
+    const recorder = createRecorder(eventQueries, broadcasts);
+
+    recorder.onProgress('sandbox_provision', 'Creating sandbox');
+    recorder.onProgress('sandbox_provision', 'Creating sandbox');
+
+    expect(broadcastActions(broadcasts)).toEqual([
+      'attempt_started',
+      'step_started',
+      'step_progress',
+    ]);
+  });
+
+  it('a fresh recorder for an open attempt closes the step its evicted predecessor left running', () => {
+    const eventQueries = createMemoryEventQueries();
+    createRecorder(eventQueries, []).onProgress('cloning', 'Cloning repository');
+    const startedAt = readStep(eventQueries, 'attempt-1', 'phase:cloning').startedAt;
+
+    // The DO was evicted: the next progress arrives at a new recorder.
+    const broadcasts: StoredEvent[] = [];
+    const recorder = createRecorder(eventQueries, broadcasts);
+    recorder.onProgress('cloning', 'Cloning repository... Receiving objects: 45%');
+    expect(readStep(eventQueries, 'attempt-1', 'phase:cloning')).toMatchObject({
+      status: 'running',
+      startedAt,
+      latestDetail: 'Cloning repository... Receiving objects: 45%',
+    });
+
+    createRecorder(eventQueries, broadcasts).onProgress('branch', 'Checking out branch');
+    expect(readStep(eventQueries, 'attempt-1', 'phase:cloning').status).toBe('completed');
+    expect(readStep(eventQueries, 'attempt-1', 'phase:branch').status).toBe('running');
+  });
+
   it('keeps sandbox provisioning distinct from wrapper workspace setup', () => {
     const eventQueries = createMemoryEventQueries();
     const broadcasts: StoredEvent[] = [];

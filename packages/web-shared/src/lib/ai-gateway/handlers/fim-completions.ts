@@ -29,6 +29,7 @@ import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { findSupportedFimModel, type FimProvider } from '@/lib/ai-gateway/supported-fim-models';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -249,8 +250,28 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     },
     body: JSON.stringify(bodyForUpstream),
   });
-  usageContext.ttfb_ms = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
+  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = proxyRes.status;
+
+  emitApiMetricsForResponse(
+    {
+      kiloUserId: user.id,
+      organizationId,
+      isAnonymous: false,
+      isStreaming: requestBody.stream === true,
+      userByok: !!userByokEntry,
+      provider: fimProvider,
+      requestedModel: requestBody.model,
+      resolvedModel: requestBody.model,
+      toolsAvailable: [],
+      toolsUsed: [],
+      ttfbMs,
+      statusCode: proxyRes.status,
+    },
+    proxyRes.clone(),
+    requestStartedAt
+  );
 
   if (!proxyRes.body) {
     return NextResponse.json(

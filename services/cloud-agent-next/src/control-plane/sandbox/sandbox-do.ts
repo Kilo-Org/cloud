@@ -79,6 +79,11 @@ import { getManagedOutboundContainerId, getSandboxNamespace } from '../../sandbo
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
 import {
+  diagnosticCause,
+  logControlDiagnostic,
+  type ControlDiagnosticFields,
+} from '../../sandbox-control/diagnostics.js';
+import {
   getWorktreeCredentialContainment,
   type CredentialContainmentRequirements,
 } from '../../sandbox-control/credential-containment.js';
@@ -166,6 +171,7 @@ import {
   failExpiredRoutes,
   isCurrentPreparingAttempt,
   listRoutes,
+  notifyPreparingRoutes,
   notifyReadyRoutes,
   onRouteFailed,
   onRouteProgress,
@@ -177,6 +183,7 @@ import {
   writeRoute,
   type RouteContext,
   type RouteGrantIssue,
+  type RoutePreparationProgress,
   type RouteRecord,
 } from './routes.js';
 import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
@@ -329,6 +336,25 @@ function rowToState(row: AllocationRow): AllocationState {
 
 function remainingMs(deadline: number): number {
   return Math.max(1, deadline - Date.now());
+}
+
+/**
+ * The preparation step the allocation owns until the wrapper connects. Once a
+ * wrapper is bound it reports its own steps, so there is none here.
+ */
+function sandboxPreparationProgress(state: AllocationState): RoutePreparationProgress | undefined {
+  switch (state.kind) {
+    case 'stopped':
+    case 'creating':
+      return { step: 'sandbox_create' };
+    case 'stopping':
+      return { step: 'sandbox_create', detail: 'Waiting for the previous sandbox to stop' };
+    case 'starting':
+      return { step: 'sandbox_start' };
+    case 'connected':
+    case 'disconnected':
+      return undefined;
+  }
 }
 
 /** Upper bound on concurrently outstanding wrapper control requests. */
@@ -600,7 +626,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const state = await this.readAllocation();
       const route = await readRoute(this.db, parsed.sessionId);
-      return { sessionId: parsed.sessionId, view: routeView(route, state.kind === 'connected') };
+      return {
+        sessionId: parsed.sessionId,
+        view: routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+      };
     });
   }
 
@@ -1507,6 +1536,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
     await this.writeAllocation(state);
+    if (
+      previous.kind !== state.kind ||
+      previous.stopAttempt !== state.stopAttempt ||
+      (previous.unconfirmedProviderRef === null) !== (state.unconfirmedProviderRef === null)
+    ) {
+      logControlDiagnostic('allocation_transition', {
+        allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+        event: event.type,
+        from: previous.kind,
+        to: state.kind,
+        fromAllocationId: previous.allocationId,
+        toAllocationId: state.allocationId,
+        stopAttempt: state.stopAttempt,
+        stopReason: stopReason ?? 'none',
+        unconfirmedProviderRef: state.unconfirmedProviderRef !== null,
+      });
+    }
     await this.armAlarm(state);
     await this.afterVercelBillingTransition(event);
     await this.applyRouteEffects(previous, state, event, stopReason);
@@ -1641,7 +1687,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             this.routeContext(state),
             { ...spec, attemptId },
             attemptId,
-            billingReason
+            billingReason,
+            'billing_admission'
           );
           return { state: 'failed', attemptId: route.attemptId, reason: billingReason };
         }
@@ -1659,7 +1706,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         state = await this.readAllocation();
       }
     }
-    return routeView(route, state.kind === 'connected');
+    return routeView(route, state.kind === 'connected', sandboxPreparationProgress(state));
   }
 
   /** Stores the sandbox owner on first use and rejects a different one. */
@@ -2036,6 +2083,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
       retireScopeGrants(this.db);
     }
+    // Until the wrapper connects, the allocation is the preparation progress:
+    // show creating, retrying and starting rather than one silent step.
+    if (
+      (next.kind === 'creating' || next.kind === 'starting' || next.kind === 'stopping') &&
+      (previous.kind !== next.kind || previous.allocationId !== next.allocationId)
+    ) {
+      const progress = sandboxPreparationProgress(next);
+      if (progress !== undefined) {
+        await notifyPreparingRoutes(
+          this.routeContext(next),
+          previous.kind === 'creating' && next.kind === 'creating'
+            ? { ...progress, detail: 'Retrying sandbox creation' }
+            : progress
+        );
+      }
+    }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
       for (const route of await listRoutes(this.db)) {
         if (route.state !== 'preparing' || route.grant !== null) continue;
@@ -2054,7 +2117,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
-            'workspace_setup_failed'
+            'workspace_setup_failed',
+            'runtime_proxy_bind_failed'
           );
         }
       }
@@ -2095,7 +2159,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
-    if (await routeRetryAllowed(ctx)) {
+    const retry = await routeRetryAllowed(ctx);
+    const routes = await listRoutes(this.db);
+    logControlDiagnostic('allocation_stopped', {
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      from: previous.kind,
+      unconfirmedProviderRef: next.unconfirmedProviderRef !== null,
+      reallocate: retry,
+      preparingRoutes: routes.filter(route => route.state === 'preparing').length,
+      readyRoutes: routes.filter(route => route.state === 'ready').length,
+      otherRoutes: routes.filter(route => route.state !== 'preparing' && route.state !== 'ready')
+        .length,
+    });
+    if (retry) {
       await this.applyEvent({ type: 'ensure', at: ctx.now(), allocationId: crypto.randomUUID() });
     } else {
       await this.armAlarm(next);
@@ -2367,7 +2443,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.routeContext(state),
         sessionId,
         attemptId,
-        'workspace_setup_failed'
+        'workspace_setup_failed',
+        'prepare_dispatch_failed'
       );
     });
   }
@@ -2542,7 +2619,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         const current = await this.readAllocation();
         if (current.kind !== 'creating' || current.allocationId !== allocationId) {
-          const confirmed = await this.stopRef(createdRef);
+          const confirmed = await this.stopRef(createdRef, allocationId);
           if (pin.provider === 'vercel')
             await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
           return;
@@ -2560,6 +2637,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        logControlDiagnostic(
+          'create_failed',
+          {
+            allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+            stage: createdRef === null ? 'create' : 'launch',
+            permanentReason:
+              error instanceof ProviderCreationError ? (error.permanentReason ?? 'none') : 'none',
+            errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+            cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+          },
+          'warn'
+        );
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
@@ -2570,7 +2659,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (createdRef !== null) {
           const latest = await this.readAllocation();
           if (latest.kind === 'creating' && latest.allocationId === allocationId) {
-            const confirmed = await this.stopRef(createdRef);
+            const confirmed = await this.stopRef(createdRef, allocationId);
             if (this.currentProvider() === 'vercel')
               await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
           }
@@ -2592,12 +2681,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async stopRef(ref: string): Promise<boolean> {
+  private async stopRef(ref: string, allocationId: string | null): Promise<boolean> {
     const result = await withTimeout(
       this.provider.stop(ref, null),
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox cleanup stop timed out'
     ).catch(() => 'retryable' as const);
+    logControlDiagnostic('stop_origin', {
+      origin: 'cleanup',
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      allocationId,
+      result,
+    });
     return result === 'terminal';
   }
 
@@ -2649,6 +2744,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       confirmed = false;
     }
+    logControlDiagnostic('stop_origin', {
+      origin: 'ladder',
+      allocationName: pin.allocationName ?? this.sandboxId,
+      allocationId: state.allocationId,
+      stopAttempt,
+      confirmed,
+    });
     await this.dispatchResult({
       type: 'stop-result',
       at: Date.now(),
@@ -2877,7 +2979,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
       case 'session.progress':
-        await onRouteProgress(ctx, frame.sessionId, frame.step, current);
+        await onRouteProgress(
+          ctx,
+          frame.sessionId,
+          {
+            step: frame.step,
+            ...(frame.detail === undefined ? {} : { detail: frame.detail }),
+          },
+          current
+        );
         return;
       case 'session.ready':
         await onRouteReady(ctx, frame.sessionId, current);
@@ -2934,12 +3044,33 @@ export class SandboxControlV2 extends DurableObject<Env> {
     credential: string | null
   ): Promise<boolean> {
     const state = await this.readAllocation();
-    if (state.kind === 'stopped' || state.kind === 'stopping') return false;
-    if (state.allocationId === null || allocationId !== state.allocationId) return false;
-    if (credential === null) return false;
+    const admission = {
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      allocationKind: state.kind,
+      expectedAllocationId: state.allocationId,
+      receivedAllocationId: allocationId,
+      credentialPresent: credential !== null,
+    };
+    const reject = (reason: string, extra: ControlDiagnosticFields = {}): boolean => {
+      logControlDiagnostic('hello_admission', { ...admission, accepted: false, reason, ...extra });
+      return false;
+    };
+    if (state.kind === 'stopped' || state.kind === 'stopping') {
+      return reject(`allocation_${state.kind}`);
+    }
+    if (state.allocationId === null || allocationId !== state.allocationId) {
+      return reject('allocation_mismatch');
+    }
+    if (credential === null) return reject('missing_credential');
     const storedHash = await this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY);
-    if (typeof storedHash !== 'string' || storedHash.length === 0) return false;
-    return sandboxCredentialMatchesHash(credential, storedHash);
+    if (typeof storedHash !== 'string' || storedHash.length === 0) {
+      return reject('missing_credential_hash', { credentialHashPresent: false });
+    }
+    if (!(await sandboxCredentialMatchesHash(credential, storedHash))) {
+      return reject('credential_mismatch', { credentialHashPresent: true });
+    }
+    logControlDiagnostic('hello_admission', { ...admission, accepted: true, reason: 'accepted' });
+    return true;
   }
 
   private sendFrame(ws: WebSocket, frame: ControlPlaneWrapperFrame): void {
@@ -3105,7 +3236,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
               this.routeContext(state),
               route.sessionId,
               route.attemptId,
-              reason
+              reason,
+              'create_failed'
             );
           }
         }
@@ -3259,7 +3391,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
           'Sandbox billing cleanup observation timed out'
         ).catch(() => ({ status: 'unknown' as const }));
         const confirmed =
-          observation.status === 'terminal' || (await this.stopRef(binding.providerRef));
+          observation.status === 'terminal' ||
+          (await this.stopRef(binding.providerRef, state.allocationId));
         await this.settleStoppedCreatedVercelRef(binding.providerRef, confirmed);
         if (
           !confirmed &&
@@ -3271,7 +3404,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
                 this.routeContext(state),
                 route.sessionId,
                 route.attemptId,
-                'sandbox_lost'
+                'sandbox_lost',
+                'cleanup_unconfirmed'
               );
             }
           }

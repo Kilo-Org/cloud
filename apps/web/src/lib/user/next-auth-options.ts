@@ -43,8 +43,8 @@ import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
 import { whenOk } from '@/lib/maybe-result';
-import type { AuthErrorType } from '@/lib/auth/constants';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {

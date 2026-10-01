@@ -14,7 +14,7 @@ jest.mock('@/lib/config.server', () => ({
 jest.mock('@/lib/user/server', () => ({ getUserFromSessionForCredentialIssuance: jest.fn() }));
 
 import { generateCloudAgentWorkflowToken, generateWorkflowGatewayToken } from '@/lib/tokens';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('workflow service control tokens', () => {
   test('uses bounded modern gateway workflow owner claims', () => {

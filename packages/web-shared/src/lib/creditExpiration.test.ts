@@ -9,7 +9,7 @@ import {
   processLocalExpirations,
 } from './creditExpiration';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
 

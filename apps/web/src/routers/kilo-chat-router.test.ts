@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { JWT_TOKEN_VERSION } from '@/lib/tokens';
 import type { User } from '@kilocode/db/schema';

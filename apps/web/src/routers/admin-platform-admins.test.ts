@@ -2,9 +2,9 @@ import { describe, test, expect } from '@jest/globals';
 import { eq, and, isNull } from 'drizzle-orm';
 import { kilocode_users, user_admin_notes } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 const KILO_DOMAIN = hosted_domain_specials.kilocode_admin;
 const ANACONDA_DOMAIN = 'anaconda.com';

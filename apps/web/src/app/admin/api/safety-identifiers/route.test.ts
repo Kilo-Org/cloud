@@ -3,7 +3,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
-import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET, POST } from './route';
 
 jest.mock('@/lib/user/server');

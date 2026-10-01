@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateCloudAgentWorkflowToken } from '@/lib/tokens';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
 

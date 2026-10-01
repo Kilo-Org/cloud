@@ -23,7 +23,7 @@ import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handleCliV2Sessions } from '@/lib/user/deletion-queue/handlers/cli-v2';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const INGEST_BASE = 'https://test-ingest.example.com/api/session/';
 const boundedTokenFlag = 'BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED';

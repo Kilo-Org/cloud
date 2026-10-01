@@ -33,7 +33,10 @@ import { enqueueHistoricalUserDeletion } from '@/lib/user/deletion-queue/deletio
 import { retryAttentionTask } from '@/lib/user/deletion-queue/deletion-outcomes';
 import { claimNextTaskForRequest } from '@/lib/user/deletion-queue/deletion-task-selector';
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
-import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/config.server', () => ({
   ...jest.requireActual<Record<string, unknown>>('@/lib/config.server'),

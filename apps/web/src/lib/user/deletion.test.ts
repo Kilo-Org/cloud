@@ -12,7 +12,7 @@ import {
   UserDeletionStepKey,
 } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disableUserAccessForDeletion, getUserDeletionRequestById } from '@/lib/user/deletion';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 

@@ -19,7 +19,7 @@ import {
   mcp_gateway_rate_limit_windows,
   mcp_gateway_refresh_tokens,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createGatewayServices } from './services';
 import { revokeGatewayStateForOrganizationMember } from './lifecycle-service';
 import type { GatewayAppConfig } from './config';

@@ -10,7 +10,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { getRevenueKpiData, type RevenueKpiData } from '@/lib/revenueKpi';
 import { SERVICE_FEE_VERSION } from '@/lib/service-fees/constants';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 beforeEach(async () => {
   await cleanupDbForTest();

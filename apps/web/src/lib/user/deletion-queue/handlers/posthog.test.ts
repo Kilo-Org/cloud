@@ -16,7 +16,7 @@ import {
   getPostHogPersonsSearchUrl,
   handlePosthog,
 } from '@/lib/user/deletion-queue/handlers/posthog';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const PERSON_A = 'person-a';
 const PERSON_B = 'person-b';

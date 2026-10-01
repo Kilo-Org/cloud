@@ -9,8 +9,8 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createCodeReview,
   createCodeReviewAttempt,

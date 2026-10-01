@@ -13,7 +13,7 @@ import {
   sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
 import {

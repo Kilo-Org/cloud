@@ -11,7 +11,7 @@ import {
   markCliRunCancelled,
   shouldPersistCliRunControllerStatus,
 } from '@/lib/kiloclaw/cli-runs';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kiloclaw_cli_runs, kiloclaw_instances } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

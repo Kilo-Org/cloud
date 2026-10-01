@@ -1,7 +1,7 @@
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   kiloclaw_admin_audit_logs,
   kiloclaw_subscription_change_log,

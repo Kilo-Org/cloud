@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, jest, test } from '@jest/globals';
 import type { saveUsageRelatedDataLocally as saveUsageRelatedDataLocallyType } from './processUsage';
-import type { defineMicrodollarUsage as defineMicrodollarUsageType } from '@/tests/helpers/microdollar-usage.helper';
-import type { insertTestUser as insertTestUserType } from '@/tests/helpers/user.helper';
+import type { defineMicrodollarUsage as defineMicrodollarUsageType } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
+import type { insertTestUser as insertTestUserType } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { findUserById as findUserByIdType } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 /**
@@ -42,8 +42,9 @@ let findUserById: typeof findUserByIdType;
 
 beforeAll(async () => {
   ({ saveUsageRelatedDataLocally } = await import('./processUsage'));
-  ({ defineMicrodollarUsage } = await import('@/tests/helpers/microdollar-usage.helper'));
-  ({ insertTestUser } = await import('@/tests/helpers/user.helper'));
+  ({ defineMicrodollarUsage } =
+    await import('@kilocode/web-shared/tests/helpers/microdollar-usage.helper'));
+  ({ insertTestUser } = await import('@kilocode/web-shared/tests/helpers/user.helper'));
   ({ findUserById } = await import('@kilocode/web-shared/lib/user/find-user-by-id'));
 });
 

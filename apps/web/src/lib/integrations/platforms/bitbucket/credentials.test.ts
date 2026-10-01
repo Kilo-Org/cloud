@@ -3,8 +3,8 @@ import { generateKeyPairSync } from 'node:crypto';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import { db } from '@/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   kilocode_users,
   organization_memberships,

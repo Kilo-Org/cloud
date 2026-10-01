@@ -11,7 +11,7 @@ import jwt from 'jsonwebtoken';
 import { db } from '@/lib/drizzle';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { JWT_TOKEN_VERSION, TOKEN_EXPIRY } from '@/lib/tokens';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { platform_integrations, kilocode_users } from '@kilocode/db/schema';
 import {
   GASTOWN_AUDIENCE,

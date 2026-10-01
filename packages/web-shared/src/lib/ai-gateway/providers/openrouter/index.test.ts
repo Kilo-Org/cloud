@@ -5,7 +5,10 @@ import {
   getOpenRouterTranscriptionModels,
   shouldSuppressOpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
+import {
+  createMockResponse,
+  mockOpenRouterModels,
+} from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';

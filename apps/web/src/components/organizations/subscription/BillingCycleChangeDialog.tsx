@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Calendar, Repeat } from 'lucide-react';
 import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
-import { seatPrice } from '@/lib/organizations/constants';
+import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 
 type BillingCycleChangeDialogProps = {
   isOpen: boolean;

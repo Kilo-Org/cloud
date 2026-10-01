@@ -12,7 +12,7 @@ import {
 } from '@/lib/organizations/organizations';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
-import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
+import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 

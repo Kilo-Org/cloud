@@ -26,7 +26,7 @@ import {
   KiloPassWelcomePromoEligibilityReason,
   KiloPassWelcomePromoPaymentFingerprintType,
 } from '@/lib/kilo-pass/enums';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type * as affiliateEventsModule from '@/lib/impact/affiliate-events';

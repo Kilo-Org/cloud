@@ -5,7 +5,7 @@ import {
   deleteAllOwnedByUserIdPages,
   deleteOwnedByUserIdPage,
 } from '@/lib/user/owned-by-user-batch-delete';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('owned-by-user batch delete', () => {
   beforeEach(async () => {

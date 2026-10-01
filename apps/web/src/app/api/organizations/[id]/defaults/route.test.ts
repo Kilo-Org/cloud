@@ -7,7 +7,7 @@ import {
   getModelIdToProviderSlugsIndex,
   getProviderSlugsForModel,
 } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';

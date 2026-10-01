@@ -8,7 +8,7 @@ import {
   organization_memberships,
   organizations,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 import { findUserById } from '@/lib/user/find-user-by-id';

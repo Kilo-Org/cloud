@@ -5,7 +5,7 @@ import {
   organization_seats_purchases,
   organization_invitations,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   getUserOrganizationsWithSeats,
   createOrganization,

@@ -9,7 +9,7 @@ import {
   organization_user_limits,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import {
   getUserOrganizationsWithSeats,
@@ -24,7 +24,7 @@ import {
 } from './organizations';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
+import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';
 

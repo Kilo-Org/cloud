@@ -2,7 +2,7 @@ import { db } from '@/lib/drizzle';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createCallerForUser } from '@/routers/test-utils';
 import { expectNonExchangeableSystemToken } from '@/tests/helpers/system-token.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { cli_sessions_v2, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

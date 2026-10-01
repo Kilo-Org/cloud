@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
 import { quickChatRouter } from '@/routers/quick-chat-router';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { quick_chat_messages, quick_chat_threads } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

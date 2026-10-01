@@ -53,8 +53,8 @@ import {
   KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT,
 } from '@/lib/kilo-pass/constants';
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@/tests/helpers/microdollar-usage.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
@@ -3357,7 +3357,7 @@ describe('kiloPassRouter', () => {
 
     beforeAll(async () => {
       ({ insertMicrodollarUsageWithDailyRollup } =
-        await import('@/tests/helpers/microdollar-usage.helper'));
+        await import('@kilocode/web-shared/tests/helpers/microdollar-usage.helper'));
     });
 
     beforeEach(async () => {

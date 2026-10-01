@@ -15,7 +15,7 @@ import { eq, sql } from 'drizzle-orm';
 import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';
 import { ImpactReferralProduct } from '@kilocode/db/schema-types';
 import { REFERRAL_BONUS_AMOUNT } from '@/lib/constants';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('referrals', () => {
   afterEach(async () => {

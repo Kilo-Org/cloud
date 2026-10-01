@@ -27,7 +27,7 @@ import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 
 describe('dolthubRouter', () => {

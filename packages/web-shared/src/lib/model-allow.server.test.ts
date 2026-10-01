@@ -4,7 +4,7 @@ import {
   createAllowPredicateFromRestrictions,
   type ProviderLookup,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
+import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);

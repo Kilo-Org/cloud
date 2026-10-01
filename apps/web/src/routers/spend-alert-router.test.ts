@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
 import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
 const VALID_RULES = [

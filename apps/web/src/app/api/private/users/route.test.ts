@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GET } from './route';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { failureResult } from '@/lib/maybe-result';
 import { getUserFromAuth } from '@/lib/user/server';
 

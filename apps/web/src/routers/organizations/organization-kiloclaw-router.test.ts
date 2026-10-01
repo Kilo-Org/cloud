@@ -3,7 +3,7 @@ process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@/lib/organizations/organizations';
 import type { createCallerForUser as TestUtilsCallerFactory } from '@/routers/test-utils';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';

@@ -3,8 +3,8 @@ import { db } from '@/lib/drizzle';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { createCallerForUser } from '@/routers/test-utils';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { platform_integrations, type Organization, type User } from '@kilocode/db/schema';
 import { eq, or } from 'drizzle-orm';
 

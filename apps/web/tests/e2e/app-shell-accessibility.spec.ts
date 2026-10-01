@@ -2,7 +2,7 @@ import { test, expect } from '@chromatic-com/playwright';
 import { createDrizzleClient } from '@kilocode/db/client';
 import { kilocode_users } from '@kilocode/db/schema';
 import { randomUUID } from 'node:crypto';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 async function seedFakeUser({ isAdmin }: { isAdmin: boolean }) {
   const uniqueId = randomUUID().slice(0, 8);

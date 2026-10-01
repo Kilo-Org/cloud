@@ -22,8 +22,8 @@ import type {
   RotateBitbucketWorkspaceAccessTokenInput,
 } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-credentials';
 import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-utils';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { BitbucketRepositoryListResult } from '@/lib/integrations/platforms/bitbucket/token-service-client';
 import type * as TokenServiceClientModule from '@/lib/integrations/platforms/bitbucket/token-service-client';
 import type * as BitbucketRepositoryCacheModule from '@/lib/integrations/platforms/bitbucket/repository-cache';

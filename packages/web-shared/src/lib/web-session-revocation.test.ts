@@ -3,7 +3,7 @@ import {
   isWebSessionCurrent,
   revokeWebSessions,
 } from '@kilocode/web-shared/lib/web-session-revocation';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 

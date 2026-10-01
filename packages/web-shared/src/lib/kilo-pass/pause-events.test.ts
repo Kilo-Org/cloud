@@ -3,7 +3,7 @@ import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { kilo_pass_pause_events, kilo_pass_subscriptions } from '@kilocode/db/schema';
 import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type { StripeSubscriptionStatus } from '@kilocode/db/schema-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import {
   openPauseEvent,

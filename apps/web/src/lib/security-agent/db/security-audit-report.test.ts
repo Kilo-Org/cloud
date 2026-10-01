@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 import { db, pool } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { kilocode_users, security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction, SecurityAuditLogActorType } from '@kilocode/db/schema-types';
 import { inArray } from 'drizzle-orm';

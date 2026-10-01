@@ -20,7 +20,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken } from '@/lib/tokens';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import {

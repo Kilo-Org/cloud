@@ -21,7 +21,7 @@ import { captureException } from '@sentry/nextjs';
 import { verifyAppleJwtWithJwks } from '@/lib/auth/apple-jwks';
 import { revokeWebSessions } from '@/lib/web-session-revocation';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { POST } from './route';
 
 const mockVerifyAppleJwtWithJwks = jest.mocked(verifyAppleJwtWithJwks);

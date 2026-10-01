@@ -2,7 +2,7 @@ import { describe, expect, it, jest, beforeAll, afterEach } from '@jest/globals'
 import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import {
   cli_sessions_v2,

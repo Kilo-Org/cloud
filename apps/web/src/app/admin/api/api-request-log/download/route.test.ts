@@ -6,8 +6,8 @@ import { strFromU8, unzipSync } from 'fflate';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
-import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET } from './route';
 
 jest.mock('next/server', () => {
@@ -23,7 +23,7 @@ jest.mock('@/lib/r2/client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@/tests/helpers/fake-r2.helper')
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
     .createFakeR2ClientModule()
 );
 

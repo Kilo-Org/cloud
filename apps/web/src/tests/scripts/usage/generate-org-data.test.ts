@@ -14,7 +14,7 @@ import {
   ensureMockOrganizationMembers,
   ensureMockSubOrganizations,
 } from '@/scripts/usage/generate-org-data';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('generate-org-data fixtures', () => {
   let owner: User;

@@ -25,7 +25,7 @@ import {
   KiloPassWelcomePromoPaymentFingerprintType,
 } from '@/lib/kilo-pass/enums';
 import type { SettledInvoicePaymentResolution } from '@/lib/kilo-pass/stripe-handlers-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import {

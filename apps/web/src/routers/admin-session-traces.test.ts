@@ -15,7 +15,7 @@ import {
   getSessionContainerMetrics,
   getSessionContainerMetricsForInfo,
 } from '@/routers/admin/session-container-telemetry';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cliSessions,
   cli_sessions_v2,

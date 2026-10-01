@@ -20,7 +20,7 @@ jest.mock('@/lib/device-auth/device-auth', () => ({
 import { POST } from './route';
 import { APP_URL } from '@/lib/constants';
 import { generateApiToken } from '@/lib/tokens';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 function createRequest(headers: Record<string, string> = {}) {
   return new Request(`${APP_URL}/api/device-auth/tokens`, {

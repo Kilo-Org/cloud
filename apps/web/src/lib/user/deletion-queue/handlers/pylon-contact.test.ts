@@ -10,7 +10,7 @@ import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-e
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handlePylonContact } from '@/lib/user/deletion-queue/handlers/pylon-contact';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const TARGET_EMAIL = 'user@example.com';
 const EXTRA_EMAIL = 'other@example.com';

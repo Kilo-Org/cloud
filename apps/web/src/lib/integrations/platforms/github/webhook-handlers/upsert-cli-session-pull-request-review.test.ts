@@ -1,7 +1,7 @@
 import { db } from '@/lib/drizzle';
 import { cli_sessions_v2, github_branch_pull_requests } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { PullRequestReviewPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { upsertCliSessionPullRequestReviewFromWebhook } from './upsert-cli-session-pull-request-review';
 import type { WebhookInstallationOwner } from './upsert-cli-session-pull-requests';

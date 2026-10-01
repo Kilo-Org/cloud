@@ -8,7 +8,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { runDeletionPreflight } from '@/lib/user/deletion-queue/deletion-preflight';
 import { resolveTicketEmail } from '@/lib/user/deletion-queue/deletion-ticket-resolve';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/user/deletion-queue/deletion-ticket-resolve', () => ({
   resolveTicketEmail: jest.fn(),

@@ -1,5 +1,5 @@
 import { describe, test, expect } from '@jest/globals';
-import { insertTestUser } from './helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getBalanceForUser } from '@/lib/user/balance';
 
 // Mock next/server's after function which requires request context

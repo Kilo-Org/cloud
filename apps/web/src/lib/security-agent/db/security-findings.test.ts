@@ -2,7 +2,7 @@ import { describe, expect, it } from '@jest/globals';
 import { db, pool } from '@/lib/drizzle';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   upsertSecurityFinding,
   supersedeDuplicateFindings,

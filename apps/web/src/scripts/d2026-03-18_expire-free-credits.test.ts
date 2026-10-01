@@ -17,7 +17,7 @@ import path from 'node:path';
 import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 // ── Test user IDs (prefixed to avoid collisions) ────────────────────────────
 

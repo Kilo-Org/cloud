@@ -17,8 +17,8 @@ import {
 } from '@/lib/integrations/oauth/platforms/gitlab-connect';
 import { handleGitLabOAuthCallback } from '@/lib/integrations/oauth/platforms/gitlab-callback';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@/lib/organizations/organizations';
 import { db } from '@/lib/drizzle';
 import { platform_integrations, type Organization, type User } from '@kilocode/db/schema';

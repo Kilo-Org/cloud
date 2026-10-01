@@ -3,7 +3,7 @@ import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { autoFreeModels } from '@/lib/ai-gateway/models';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
 let admin: User;

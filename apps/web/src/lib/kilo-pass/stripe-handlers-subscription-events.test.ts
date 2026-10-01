@@ -10,7 +10,7 @@ import { KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
 import { KiloPassAuditLogAction } from '@/lib/kilo-pass/enums';
 import { KiloPassCadence } from '@/lib/kilo-pass/enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 

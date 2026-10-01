@@ -2,7 +2,7 @@ import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createFixTicket,
   findExistingReviewCommentFixTicket,

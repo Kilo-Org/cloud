@@ -14,8 +14,8 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@/lib/drizzle';
 import { kilocode_users, user_model_preferences } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import type { User } from '@kilocode/db/schema';
 import type {

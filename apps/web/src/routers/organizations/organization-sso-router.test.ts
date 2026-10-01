@@ -5,7 +5,7 @@ import { kilocode_users, organizations, type Organization, type User } from '@ki
 import { db } from '@/lib/drizzle';
 import { createOrganization } from '@/lib/organizations/organizations';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('organization SSO router', () => {
   let admin: User;

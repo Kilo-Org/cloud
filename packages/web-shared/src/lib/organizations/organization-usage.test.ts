@@ -8,8 +8,8 @@ import {
   organization_memberships,
   organization_user_usage,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
 import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
@@ -20,7 +20,7 @@ import {
   scheduleOrganizationLowBalanceAlert,
   updateOrganizationUserLimit,
 } from './organization-usage';
-import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
+import { createOrganizationUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 
 jest.mock('@kilocode/web-shared/lib/email', () => ({
   ...jest.requireActual('@kilocode/web-shared/lib/email'),

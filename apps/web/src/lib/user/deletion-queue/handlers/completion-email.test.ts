@@ -9,7 +9,7 @@ import {
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { sendAccountDeletionCompletedEmail } from '@/lib/email';
 import { handleCompletionEmail } from '@/lib/user/deletion-queue/handlers/completion-email';
 

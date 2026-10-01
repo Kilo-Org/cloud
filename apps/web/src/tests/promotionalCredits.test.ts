@@ -6,7 +6,7 @@ import {
 } from '@/lib/promotionalCredits';
 import type { PromoCreditCategoryConfig } from '@/lib/PromoCreditCategoryConfig';
 import { type User, credit_transactions, kilocode_users } from '@kilocode/db/schema';
-import { defineTestUser, insertTestUser } from './helpers/user.helper';
+import { defineTestUser, insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import { eq, desc } from 'drizzle-orm';
 import { millisecondsInDay, millisecondsInHour } from 'date-fns/constants';

@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createMockUsageContext } from '@/tests/helpers/microdollar-usage.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createMockUsageContext } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, microdollar_usage } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

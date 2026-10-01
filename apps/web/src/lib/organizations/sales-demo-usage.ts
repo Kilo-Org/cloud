@@ -16,7 +16,7 @@ import {
   mutateOrganizationUsage,
   updateOrganizationUserLimit,
 } from '@/lib/organizations/organization-usage';
-import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@/lib/organizations/constants';
+import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
 import { CLAUDE_OPUS_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { CLAUDE_SONNET_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_SOL_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';

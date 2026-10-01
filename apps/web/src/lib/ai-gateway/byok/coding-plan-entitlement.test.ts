@@ -3,7 +3,7 @@ import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
 import { getBYOKforUser } from '@/lib/ai-gateway/byok';
 import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { byok_api_keys, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

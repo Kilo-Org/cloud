@@ -1,7 +1,7 @@
 import { expect, test } from '@jest/globals';
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   credit_transactions,

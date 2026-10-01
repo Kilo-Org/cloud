@@ -8,7 +8,7 @@ import {
 } from '@kilocode/db/schema';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   authorizedBillingContacts,
   derivePushCategoryEnabled,

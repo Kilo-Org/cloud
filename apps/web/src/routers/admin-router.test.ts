@@ -6,10 +6,10 @@ import {
   createSoftDeletedBlockedReason,
 } from '@kilocode/db/user-soft-delete';
 import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { getAllUserProviders } from '@/lib/user';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createOrganization } from '@/lib/organizations/organizations';
 
 async function getBlockState(id: string) {

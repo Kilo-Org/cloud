@@ -15,7 +15,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 import { webhook_events } from '@kilocode/db/schema';
 import { db, cleanupDbForTest } from '@/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { GET, maxDuration } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);

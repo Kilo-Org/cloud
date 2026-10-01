@@ -5,7 +5,7 @@ import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-cl
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
 import type {
   GetWorktreeChangesOutput,

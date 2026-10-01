@@ -35,7 +35,7 @@ import {
 import type { PrepareAssessmentInput } from '@kilocode/web-shared/lib/service-fees/types';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const ACTIVATION = new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000);
 const AFTER_ACTIVATION = new Date((SERVICE_FEE_ACTIVATION_UNIX_SECONDS + 30 * 24 * 60 * 60) * 1000);

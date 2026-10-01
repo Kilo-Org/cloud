@@ -9,7 +9,7 @@ import type * as securityFindingsModule from '../db/security-findings';
 import type * as triageModule from './triage-service';
 import type { startSecurityAnalysis as startSecurityAnalysisType } from './analysis-service';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,

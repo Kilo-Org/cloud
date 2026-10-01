@@ -17,7 +17,7 @@ import {
   addUserToOrganization,
   createOrganization,
 } from '@/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { ensureVerifiedDomainOrganizationMembership } from './verified-domain-membership';
 
 describe('verified-domain automatic membership', () => {

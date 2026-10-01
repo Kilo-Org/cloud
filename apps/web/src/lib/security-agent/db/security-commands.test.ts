@@ -16,7 +16,7 @@ import {
 } from '@kilocode/db';
 import { kilocode_users, security_agent_commands } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('Security Agent command ledger', () => {
   afterEach(async () => {

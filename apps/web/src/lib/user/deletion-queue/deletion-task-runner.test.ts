@@ -11,7 +11,7 @@ import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-e
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import { getDeletionHandler } from '@/lib/user/deletion-queue/handlers';
 import type { DeletionHandler } from '@/lib/user/deletion-queue/handlers/common';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

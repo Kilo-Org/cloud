@@ -31,9 +31,12 @@ const retrieve =
   >();
 const update =
   jest.fn<(id: string, input: Stripe.SubscriptionUpdateParams) => Promise<Stripe.Subscription>>();
-const scheduleCreate = jest.fn<(input: unknown) => Promise<{ id: string }>>();
+const scheduleCreate = jest.fn<(input: unknown) => Promise<Stripe.SubscriptionSchedule>>();
 const scheduleUpdate = jest.fn<(id: string, input: unknown) => Promise<unknown>>();
 const scheduleRetrieve = jest.fn<(id: string) => Promise<Stripe.SubscriptionSchedule>>();
+const scheduleRelease = jest.fn<(id: string) => Promise<Stripe.SubscriptionSchedule>>();
+const captureMessage = jest.fn();
+const warnExceptInTest = jest.fn();
 const invoicePaymentsList =
   jest.fn<
     (params: Stripe.InvoicePaymentListParams) => Promise<Stripe.ApiList<Stripe.InvoicePayment>>
@@ -74,6 +77,7 @@ const createParentSupplement = jest.fn();
 const createPendingAgreement =
   jest.fn<(input: unknown) => Promise<{ agreementId: string; created: boolean }>>();
 const bindProviderSeatAddOnItem = jest.fn();
+const endAgreementAfterPassItemRemoved = jest.fn();
 
 jest.mock('@/lib/stripe-client', () => ({
   client: {
@@ -85,9 +89,21 @@ jest.mock('@/lib/stripe-client', () => ({
       create: scheduleCreate,
       update: scheduleUpdate,
       retrieve: scheduleRetrieve,
+      release: scheduleRelease,
     },
   },
 }));
+jest.mock('@/lib/utils.server', () => {
+  const actual = jest.requireActual('@/lib/utils.server');
+  return {
+    ...(actual as object),
+    warnExceptInTest: (...args: unknown[]) => warnExceptInTest(...args),
+  };
+});
+jest.mock('@sentry/nextjs', () => {
+  const actual = jest.requireActual('@sentry/nextjs');
+  return { ...(actual as object), captureMessage: (...args: unknown[]) => captureMessage(...args) };
+});
 jest.mock('@/lib/drizzle', () => ({
   db: {
     select: (...args: unknown[]) => select(...args),
@@ -99,6 +115,7 @@ jest.mock('./service', () => ({
   bindProviderSeatAddOnItem,
   createParentSupplement,
   createPendingAgreement,
+  endAgreementAfterPassItemRemoved,
   suspendAgreementForPaymentReview: jest.fn(),
 }));
 jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => ({
@@ -149,6 +166,44 @@ const subscription = (overrides: Partial<Stripe.Subscription> = {}) =>
     },
     ...overrides,
   }) as unknown as Stripe.Subscription;
+
+const PERIOD_START = 1_767_225_600;
+const PERIOD_END = 1_769_904_000;
+const NEXT_PERIOD_END = 1_772_582_400;
+const CURRENT_ITEMS = [
+  { price: 'price_seat', quantity: 9 },
+  { price: 'price_pass', quantity: 9 },
+];
+const RETAINED_ITEMS = [{ price: 'price_seat', quantity: 9 }];
+
+function schedulePhase(
+  start: number,
+  end: number,
+  items: { price: string; quantity: number }[],
+  overrides: Record<string, unknown> = {}
+) {
+  return { start_date: start, end_date: end, items, ...overrides };
+}
+
+const schedule = (overrides: Record<string, unknown> = {}) =>
+  ({
+    id: 'sched_cancel',
+    object: 'subscription_schedule',
+    status: 'active',
+    metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
+    current_phase: { start_date: PERIOD_START, end_date: PERIOD_END },
+    phases: [schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS)],
+    ...overrides,
+  }) as unknown as Stripe.SubscriptionSchedule;
+
+const removalPendingSchedule = (overrides: Record<string, unknown> = {}) =>
+  schedule({
+    phases: [
+      schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS),
+      schedulePhase(PERIOD_END, NEXT_PERIOD_END, RETAINED_ITEMS),
+    ],
+    ...overrides,
+  });
 
 function dbAgreement(overrides: Record<string, unknown> = {}) {
   return {
@@ -593,6 +648,179 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
+  test('releases a stale owned schedule before adding the pass at checkout', async () => {
+    const seatOnlyItems = { ...subscription().items, data: [subscription().items.data[0]!] };
+    const staleSchedule = schedule({
+      phases: [
+        schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS),
+        schedulePhase(PERIOD_END, NEXT_PERIOD_END, RETAINED_ITEMS),
+      ],
+    });
+    retrieve
+      .mockResolvedValueOnce(subscription({ items: seatOnlyItems, schedule: staleSchedule }))
+      .mockResolvedValueOnce(subscription({ items: seatOnlyItems }));
+    scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
+    createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
+    update.mockResolvedValue({ ...subscription(), latest_invoice: null });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await createOrganizationKiloPassCheckout({
+      organizationId: 'org_1',
+      actorUserId: 'user_1',
+      tier: 'tier_19',
+      allocations: [],
+    });
+
+    expect(scheduleRelease).toHaveBeenCalledWith('sched_cancel');
+    expect(retrieve).toHaveBeenCalledTimes(2);
+    expect(scheduleRelease.mock.invocationCallOrder[0]).toBeLessThan(
+      update.mock.invocationCallOrder[0]!
+    );
+  });
+
+  test('refuses checkout without changes when a foreign schedule is attached', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        items: { ...subscription().items, data: [subscription().items.data[0]!] },
+        schedule: schedule({
+          metadata: { origin: 'billing-cycle-change' },
+          phases: [schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS)],
+        }),
+      })
+    );
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toMatchObject({ reason: 'schedule_conflict' });
+    expect(scheduleRelease).not.toHaveBeenCalled();
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        tags: expect.objectContaining({ event: 'checkout', reason: 'unowned_schedule' }),
+      })
+    );
+  });
+
+  test('fails checkout closed with a typed, reported error when the schedule cannot be read', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        items: { ...subscription().items, data: [subscription().items.data[0]!] },
+        schedule: 'sched_unreadable',
+      })
+    );
+    scheduleRetrieve.mockRejectedValue(
+      Object.assign(new Error('Request req_1 for cus_secret failed'), {
+        type: 'StripeConnectionError',
+        code: 'connection_error',
+      })
+    );
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toMatchObject({ reason: 'schedule_inspection_failed' });
+
+    const expectedDetails = expect.objectContaining({
+      event: 'checkout',
+      reason: 'schedule_inspection_read_failed',
+      organizationId: 'org_1',
+      subscriptionId: 'sub_1',
+      scheduleId: 'sched_unreadable',
+      failure: { name: 'Error', type: 'StripeConnectionError', code: 'connection_error' },
+    });
+    expect(captureMessage).toHaveBeenCalledWith(expect.any(String), {
+      level: 'warning',
+      tags: {
+        source: 'kilo_pass_org_schedule',
+        event: 'checkout',
+        reason: 'schedule_inspection_read_failed',
+      },
+      extra: expectedDetails,
+    });
+    expect(warnExceptInTest).toHaveBeenCalledWith(expect.any(String), expectedDetails);
+    expect(JSON.stringify(captureMessage.mock.calls)).not.toContain('cus_secret');
+    expect(scheduleRelease).not.toHaveBeenCalled();
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('fails checkout closed with a typed, reported error when release cannot be verified', async () => {
+    const seatOnlyItems = { ...subscription().items, data: [subscription().items.data[0]!] };
+    const staleSchedule = schedule({
+      phases: [schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS)],
+    });
+    retrieve
+      .mockResolvedValueOnce(subscription({ items: seatOnlyItems, schedule: staleSchedule }))
+      .mockRejectedValueOnce(Object.assign(new Error('timeout'), { type: 'StripeAPIError' }));
+    scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toMatchObject({ reason: 'schedule_inspection_failed' });
+
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        tags: expect.objectContaining({ reason: 'post_release_verification_read_failed' }),
+        extra: expect.objectContaining({
+          organizationId: 'org_1',
+          subscriptionId: 'sub_1',
+          scheduleId: 'sched_cancel',
+          phases: [
+            {
+              start_date: PERIOD_START,
+              end_date: PERIOD_END,
+              items: RETAINED_ITEMS,
+            },
+          ],
+          failure: { name: 'Error', type: 'StripeAPIError' },
+        }),
+      })
+    );
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  test('refuses checkout when a released schedule is still attached', async () => {
+    const seatOnlyItems = { ...subscription().items, data: [subscription().items.data[0]!] };
+    const staleSchedule = schedule({
+      phases: [schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS)],
+    });
+    retrieve.mockResolvedValue(subscription({ items: seatOnlyItems, schedule: staleSchedule }));
+    scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
+    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
+
+    await expect(
+      createOrganizationKiloPassCheckout({
+        organizationId: 'org_1',
+        actorUserId: 'user_1',
+        tier: 'tier_19',
+        allocations: [],
+      })
+    ).rejects.toMatchObject({ reason: 'schedule_release_failed' });
+    expect(createPendingAgreement).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   test('reconciles the add-on item when invoice.paid arrives before checkout binding', async () => {
     select.mockReturnValue({
       from: () => ({
@@ -774,139 +1002,100 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(createParentSupplement).not.toHaveBeenCalled();
   });
 
-  test('schedules removal of only the pass item at renewal', async () => {
+  test('schedules removal of only the pass item at the paid period end', async () => {
     retrieve.mockResolvedValue(subscription());
-    scheduleCreate.mockResolvedValue({ id: 'sub_sched_1' });
+    scheduleCreate.mockResolvedValue(schedule({ id: 'sub_sched_1', metadata: {} }));
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
     });
+
     expect(scheduleCreate).toHaveBeenCalledWith({ from_subscription: 'sub_1' });
-    expect(scheduleUpdate).toHaveBeenCalledWith(
-      'sub_sched_1',
-      expect.objectContaining({
-        metadata: { origin: 'kilo-pass-org-cancellation' },
-        phases: expect.arrayContaining([
-          expect.objectContaining({ items: [{ price: 'price_seat', quantity: 9 }] }),
-        ]),
-      })
-    );
+    expect(scheduleUpdate).toHaveBeenCalledWith('sub_sched_1', {
+      metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
+      end_behavior: 'release',
+      phases: [
+        { items: CURRENT_ITEMS, start_date: PERIOD_START, end_date: PERIOD_END },
+        { items: RETAINED_ITEMS },
+      ],
+    });
   });
 
-  test('re-adopts the owned schedule after resume and allows cancellation again', async () => {
-    const resumedSchedule = {
-      id: 'sched_cancel',
-      status: 'active',
-      metadata: { origin: 'kilo-pass-org-cancellation' },
-      phases: [
-        {
-          start_date: 1_767_225_600,
-          end_date: 1_769_904_000,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
-        {
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
-      ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    retrieve.mockResolvedValue(subscription({ schedule: resumedSchedule }));
+  test('repairs a leaked one-phase owned schedule instead of creating another', async () => {
+    retrieve.mockResolvedValue(subscription({ schedule: schedule() }));
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
     });
 
     expect(scheduleCreate).not.toHaveBeenCalled();
     expect(scheduleUpdate).toHaveBeenCalledWith(
       'sched_cancel',
       expect.objectContaining({
-        phases: expect.arrayContaining([
-          expect.objectContaining({ items: [{ price: 'price_seat', quantity: 9 }] }),
-        ]),
+        phases: [
+          expect.objectContaining({
+            items: CURRENT_ITEMS,
+            start_date: PERIOD_START,
+            end_date: PERIOD_END,
+          }),
+          expect.objectContaining({ items: RETAINED_ITEMS }),
+        ],
       })
     );
   });
 
-  test('uses the subscription period rather than the future resumed phase when cancelling again', async () => {
-    const resumedSchedule = {
-      id: 'sched_after_renewal',
-      status: 'active',
-      metadata: { origin: 'kilo-pass-org-cancellation' },
-      phases: [
-        {
-          start_date: 1_767_225_600,
-          end_date: 1_769_904_000,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
+  test('ignores an ended historical phase when rewriting an owned schedule', async () => {
+    const previousStart = PERIOD_START - 2_678_400;
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({
+          phases: [
+            schedulePhase(previousStart, PERIOD_START, [
+              { price: 'price_seat', quantity: 5 },
+              { price: 'price_pass', quantity: 5 },
+            ]),
+            schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS),
           ],
-        },
-        {
-          start_date: 1_769_904_000,
-          end_date: 1_772_582_400,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
-      ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    retrieve.mockResolvedValue(subscription({ schedule: resumedSchedule }));
+        }),
+      })
+    );
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
     });
 
     expect(scheduleUpdate).toHaveBeenCalledWith(
-      'sched_after_renewal',
+      'sched_cancel',
       expect.objectContaining({
-        phases: expect.arrayContaining([
-          expect.objectContaining({ start_date: 1_767_225_600, end_date: 1_769_904_000 }),
-        ]),
+        phases: [
+          expect.objectContaining({ start_date: PERIOD_START, end_date: PERIOD_END }),
+          expect.objectContaining({ items: RETAINED_ITEMS }),
+        ],
       })
     );
   });
 
   test('preserves the later active phase after the subscription has renewed', async () => {
-    const resumedSchedule = {
-      id: 'sched_after_renewal',
-      status: 'active',
-      metadata: { origin: 'kilo-pass-org-cancellation' },
-      current_phase: { start_date: 1_769_904_000, end_date: 1_772_582_400 },
+    const renewedSchedule = schedule({
+      current_phase: { start_date: PERIOD_END, end_date: NEXT_PERIOD_END },
       phases: [
-        {
-          start_date: 1_767_225_600,
-          end_date: 1_769_904_000,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
-        {
-          start_date: 1_769_904_000,
-          end_date: 1_772_582_400,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
+        schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS),
+        schedulePhase(PERIOD_END, NEXT_PERIOD_END, CURRENT_ITEMS),
       ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    const renewed = subscription({ schedule: resumedSchedule });
+    });
+    const renewed = subscription({ schedule: renewedSchedule });
     renewed.items.data.forEach(item => {
-      item.current_period_start = 1_769_904_000;
-      item.current_period_end = 1_772_582_400;
+      item.current_period_start = PERIOD_END;
+      item.current_period_end = NEXT_PERIOD_END;
     });
     retrieve.mockResolvedValue(renewed);
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
@@ -914,95 +1103,283 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
     });
 
     expect(scheduleUpdate).toHaveBeenCalledWith(
-      'sched_after_renewal',
+      'sched_cancel',
       expect.objectContaining({
-        phases: expect.arrayContaining([
-          expect.objectContaining({ start_date: 1_769_904_000, end_date: 1_772_582_400 }),
-        ]),
+        phases: [
+          expect.objectContaining({ start_date: PERIOD_END, end_date: NEXT_PERIOD_END }),
+          expect.objectContaining({ items: RETAINED_ITEMS }),
+        ],
       })
     );
   });
 
-  test('adopts a safe orphaned from-subscription schedule after an update failure', async () => {
-    const orphanedSchedule = {
-      id: 'sched_orphaned',
-      status: 'active',
-      metadata: {},
-      phases: [
-        {
-          start_date: 1_767_225_600,
-          end_date: 1_769_904_000,
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
+  test('re-sends supported phase settings so the rewrite only changes items', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({
+          phases: [
+            schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS, {
+              collection_method: 'send_invoice',
+              default_tax_rates: [{ id: 'txr_1' }],
+              discounts: [{ discount: 'di_1', coupon: null, promotion_code: null }],
+              invoice_settings: { account_tax_ids: null, days_until_due: 14, issuer: null },
+            }),
           ],
-        },
-      ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    retrieve.mockResolvedValue(subscription({ schedule: orphanedSchedule }));
+        }),
+      })
+    );
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
+    });
+
+    const preserved = {
+      collection_method: 'send_invoice',
+      default_tax_rates: ['txr_1'],
+      discounts: [{ discount: 'di_1' }],
+      invoice_settings: { days_until_due: 14 },
+    };
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_cancel',
+      expect.objectContaining({
+        phases: [
+          expect.objectContaining({ items: CURRENT_ITEMS, ...preserved }),
+          expect.objectContaining({ items: RETAINED_ITEMS, ...preserved }),
+        ],
+      })
+    );
+  });
+
+  test('adopts a safe orphaned from-subscription schedule after an update failure', async () => {
+    retrieve.mockResolvedValue(
+      subscription({ schedule: schedule({ id: 'sched_orphaned', metadata: {} }) })
+    );
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
     });
 
     expect(scheduleCreate).not.toHaveBeenCalled();
     expect(scheduleUpdate).toHaveBeenCalledWith(
       'sched_orphaned',
-      expect.objectContaining({ metadata: { origin: 'kilo-pass-org-cancellation' } })
+      expect.objectContaining({
+        metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
+      })
     );
   });
 
-  test('does not adopt a matching single-phase schedule with foreign metadata', async () => {
-    const foreignSchedule = {
-      id: 'sched_foreign',
-      status: 'active',
-      metadata: { supportTicket: 'SUP-1' },
-      phases: [
-        {
-          items: [
-            { price: 'price_seat', quantity: 9 },
-            { price: 'price_pass', quantity: 9 },
-          ],
-        },
-      ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    retrieve.mockResolvedValue(subscription({ schedule: foreignSchedule }));
+  test('leaves an already pending owned removal untouched', async () => {
+    retrieve.mockResolvedValue(subscription({ schedule: removalPendingSchedule() }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
+    });
+
+    expect(scheduleCreate).not.toHaveBeenCalled();
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+  });
+
+  test('records the agreement on a pending removal created before agreement tracking', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: removalPendingSchedule({ metadata: { origin: 'kilo-pass-org-cancellation' } }),
+      })
+    );
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
+    });
+
+    expect(scheduleUpdate).toHaveBeenCalledWith('sched_cancel', {
+      metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
+    });
+  });
+
+  test('rejects and reports a matching single-phase schedule with foreign metadata', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({ id: 'sched_foreign', metadata: { supportTicket: 'SUP-1' } }),
+      })
+    );
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await expect(
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        agreementId: 'agreement_1',
+        organizationId: 'org_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      'Organization Kilo Pass subscription schedule cannot be changed safely',
+      expect.objectContaining({
+        tags: expect.objectContaining({ event: 'cancel', reason: 'unowned_schedule' }),
+        extra: expect.objectContaining({
+          organizationId: 'org_1',
+          subscriptionId: 'sub_1',
+          scheduleId: 'sched_foreign',
+        }),
+      })
+    );
+  });
+
+  test('rejects an owned schedule whose removal phase carries a different seat quantity', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: removalPendingSchedule({
+          phases: [
+            schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS),
+            schedulePhase(PERIOD_END, NEXT_PERIOD_END, [{ price: 'price_seat', quantity: 12 }]),
+          ],
+        }),
+      })
+    );
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      scheduleOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+        agreementId: 'agreement_1',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        tags: expect.objectContaining({ reason: 'phase_items_mismatch' }),
+      })
+    );
+  });
+
+  test('rejects an owned schedule with phase settings a rewrite would drop', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({
+          phases: [
+            schedulePhase(PERIOD_START, PERIOD_END, CURRENT_ITEMS, { trial_end: PERIOD_END }),
+          ],
+        }),
+      })
+    );
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      scheduleOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+        agreementId: 'agreement_1',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleUpdate).not.toHaveBeenCalled();
   });
 
   test('fails closed instead of mistaking a billing-cycle schedule for pass removal', async () => {
-    const billingCycleSchedule = {
-      id: 'sched_cycle',
-      status: 'active',
-      metadata: { origin: 'billing-cycle-change' },
-      phases: [
-        { items: [{ price: 'price_pass', quantity: 9 }] },
-        { items: [{ price: 'price_pass_yearly', quantity: 9 }] },
-      ],
-    } as unknown as Stripe.SubscriptionSchedule;
-    retrieve.mockResolvedValue(subscription({ schedule: billingCycleSchedule }));
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({
+          id: 'sched_cycle',
+          metadata: { origin: 'billing-cycle-change' },
+          phases: [
+            schedulePhase(PERIOD_START, PERIOD_END, [{ price: 'price_pass', quantity: 9 }]),
+            schedulePhase(PERIOD_END, NEXT_PERIOD_END, [
+              { price: 'price_pass_yearly', quantity: 9 },
+            ]),
+          ],
+        }),
+      })
+    );
     const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
 
     await expect(
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        agreementId: 'agreement_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
     expect(scheduleCreate).not.toHaveBeenCalled();
     expect(scheduleUpdate).not.toHaveBeenCalled();
+  });
+
+  test('resumes by releasing the owned schedule, and a later cancel schedules a fresh removal', async () => {
+    const { resumeOrganizationKiloPassCancellation, scheduleOrganizationKiloPassCancellation } =
+      await import('./stripe-adapter');
+    const input = {
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+      agreementId: 'agreement_1',
+    };
+
+    retrieve.mockResolvedValueOnce(subscription({ schedule: removalPendingSchedule() }));
+    scheduleRelease.mockResolvedValueOnce(schedule({ status: 'released' }));
+    await resumeOrganizationKiloPassCancellation(input);
+    expect(scheduleRelease).toHaveBeenCalledWith('sched_cancel');
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+
+    retrieve.mockResolvedValueOnce(subscription());
+    scheduleCreate.mockResolvedValueOnce(schedule({ id: 'sched_second', metadata: {} }));
+    await scheduleOrganizationKiloPassCancellation(input);
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_second',
+      expect.objectContaining({
+        metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
+      })
+    );
+
+    retrieve.mockResolvedValueOnce(
+      subscription({ schedule: removalPendingSchedule({ id: 'sched_second' }) })
+    );
+    scheduleRelease.mockResolvedValueOnce(schedule({ id: 'sched_second', status: 'released' }));
+    await resumeOrganizationKiloPassCancellation(input);
+    expect(scheduleRelease).toHaveBeenLastCalledWith('sched_second');
+  });
+
+  test('treats an already released schedule as a successful resume', async () => {
+    retrieve.mockResolvedValue(subscription({ schedule: removalPendingSchedule() }));
+    scheduleRelease.mockRejectedValue(new Error('schedule is not active'));
+    scheduleRetrieve.mockResolvedValue(removalPendingSchedule({ status: 'released' }));
+    const { resumeOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      resumeOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+      })
+    ).resolves.toBeUndefined();
+  });
+
+  test('refuses to resume by releasing a schedule it does not own', async () => {
+    retrieve.mockResolvedValue(
+      subscription({ schedule: removalPendingSchedule({ metadata: { origin: 'support' } }) })
+    );
+    const { resumeOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      resumeOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleRelease).not.toHaveBeenCalled();
   });
 
   test.each(['void', 'uncollectible'] as const)(
@@ -1183,7 +1560,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     );
   });
 
-  test('reverses a scheduled cancellation for an active agreement', async () => {
+  test('reverses a scheduled cancellation once the provider has no pending removal', async () => {
     const { handleOrganizationKiloPassSubscriptionEvent } = await import('./stripe-adapter');
     select.mockReturnValue({
       from: () => ({
@@ -1195,12 +1572,112 @@ describe('organization Kilo Pass Stripe adapter', () => {
         }),
       }),
     });
+    retrieve.mockResolvedValue(subscription());
 
     await expect(handleOrganizationKiloPassSubscriptionEvent(subscription())).resolves.toBe(true);
     expect(updateSet).toHaveBeenCalledWith({
       state: 'active',
       cancellation_effective_at: null,
     });
+  });
+
+  test('keeps a scheduled cancellation while the owned removal is still pending', async () => {
+    const { handleOrganizationKiloPassSubscriptionEvent } = await import('./stripe-adapter');
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          orderBy: () => ({
+            limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          }),
+        }),
+      }),
+    });
+    retrieve.mockResolvedValue(subscription({ schedule: removalPendingSchedule() }));
+
+    await expect(handleOrganizationKiloPassSubscriptionEvent(subscription())).resolves.toBe(true);
+    expect(retrieve).toHaveBeenCalledWith('sub_1');
+    expect(updateDb).not.toHaveBeenCalled();
+  });
+
+  test('releases the owned schedule once renewal has removed the pass item', async () => {
+    const { handleOrganizationKiloPassSubscriptionEvent } = await import('./stripe-adapter');
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          orderBy: () => ({
+            limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          }),
+        }),
+      }),
+    });
+    retrieve.mockResolvedValue(
+      subscription({
+        items: { data: [subscription().items.data[0]!] } as Stripe.ApiList<Stripe.SubscriptionItem>,
+      })
+    );
+    const renewedSchedule = removalPendingSchedule({
+      current_phase: { start_date: PERIOD_END, end_date: NEXT_PERIOD_END },
+    });
+    const renewed = subscription({
+      schedule: 'sched_cancel',
+      items: {
+        data: [{ ...subscription().items.data[0]!, current_period_end: NEXT_PERIOD_END }],
+      } as Stripe.ApiList<Stripe.SubscriptionItem>,
+    });
+    scheduleRetrieve.mockResolvedValue(renewedSchedule);
+    scheduleRelease.mockResolvedValue({ ...renewedSchedule, status: 'released' });
+
+    await expect(handleOrganizationKiloPassSubscriptionEvent(renewed)).resolves.toBe(true);
+    expect(scheduleRelease).toHaveBeenCalledWith('sched_cancel');
+    expect(endAgreementAfterPassItemRemoved).toHaveBeenCalledWith({
+      agreementId: 'agreement_1',
+      scheduleRelease: { scheduleId: 'sched_cancel', status: 'released', alreadyTerminal: false },
+    });
+
+    scheduleRetrieve.mockResolvedValue({ ...renewedSchedule, status: 'released' });
+    await expect(handleOrganizationKiloPassSubscriptionEvent(renewed)).resolves.toBe(true);
+    expect(scheduleRelease).toHaveBeenCalledTimes(1);
+    expect(endAgreementAfterPassItemRemoved).toHaveBeenLastCalledWith({
+      agreementId: 'agreement_1',
+      scheduleRelease: { scheduleId: 'sched_cancel', status: 'released', alreadyTerminal: true },
+    });
+  });
+
+  test('keeps the agreement open for webhook retry when the schedule release fails', async () => {
+    const { handleOrganizationKiloPassSubscriptionEvent } = await import('./stripe-adapter');
+    select.mockReturnValue({
+      from: () => ({
+        where: () => ({
+          limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          orderBy: () => ({
+            limit: async () => [dbAgreement({ state: 'cancel_at_period_end' })],
+          }),
+        }),
+      }),
+    });
+    retrieve.mockResolvedValue(
+      subscription({
+        items: { data: [subscription().items.data[0]!] } as Stripe.ApiList<Stripe.SubscriptionItem>,
+      })
+    );
+    const renewedSchedule = removalPendingSchedule({
+      current_phase: { start_date: PERIOD_END, end_date: NEXT_PERIOD_END },
+    });
+    scheduleRetrieve.mockResolvedValue(renewedSchedule);
+    scheduleRelease.mockRejectedValue(new Error('stripe unavailable'));
+
+    await expect(
+      handleOrganizationKiloPassSubscriptionEvent(
+        subscription({
+          schedule: 'sched_cancel',
+          items: {
+            data: [subscription().items.data[0]!],
+          } as Stripe.ApiList<Stripe.SubscriptionItem>,
+        })
+      )
+    ).rejects.toThrow('stripe unavailable');
+    expect(endAgreementAfterPassItemRemoved).not.toHaveBeenCalled();
   });
 
   test('binds the persisted provider item instead of the first non-seat item', async () => {

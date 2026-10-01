@@ -345,6 +345,70 @@ describe('organizations subscription trpc router', () => {
         })
       ).rejects.toThrow();
     });
+
+    it('maps an unsafe attached schedule to PRECONDITION_FAILED', async () => {
+      const { KNOWN_SEAT_PRICE_IDS } = await import('@/lib/stripe');
+      const passPriceId =
+        process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ??
+        'price_test_kilo_pass_tier_19_monthly';
+      const seatPriceId = 'price_router_unsafe_schedule_seat';
+      KNOWN_SEAT_PRICE_IDS.add(seatPriceId);
+      const [purchase] = await db
+        .insert(organization_seats_purchases)
+        .values({
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_router_unsafe_schedule',
+          subscription_status: 'active',
+          seat_count: 5,
+          amount_usd: 145,
+          starts_at: '2026-04-01T00:00:00.000Z',
+          expires_at: '2026-05-01T00:00:00.000Z',
+          billing_cycle: 'monthly',
+        })
+        .returning();
+      const item = (id: string, price: string) => ({
+        id,
+        quantity: 5,
+        price: { id: price, recurring: { interval: 'month' } },
+        current_period_start: 1_775_001_600,
+        current_period_end: 1_777_593_600,
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_router_unsafe_schedule',
+        status: 'active',
+        metadata: { type: 'kilo-pass-org', organizationId: testOrganization.id },
+        items: {
+          data: [item('si_seat', seatPriceId), item('si_pass', passPriceId)],
+        },
+        schedule: {
+          id: 'sub_sched_foreign',
+          status: 'active',
+          metadata: { origin: 'billing-cycle-change' },
+          current_phase: null,
+          phases: [],
+        },
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.organizations.subscription.updateSeatCount({
+            organizationId: testOrganization.id,
+            newSeatCount: 6,
+          })
+        ).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: expect.stringContaining('scheduled change'),
+        });
+      } finally {
+        KNOWN_SEAT_PRICE_IDS.delete(seatPriceId);
+        if (purchase) {
+          await db
+            .delete(organization_seats_purchases)
+            .where(eq(organization_seats_purchases.id, purchase.id));
+        }
+      }
+    });
   });
 
   describe('getBillingHistory', () => {

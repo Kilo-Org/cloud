@@ -71,6 +71,10 @@ import {
   type OrganizationKiloPassSeatCapacityStripe,
   type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import {
+  planSeatUpdateForCancellationSchedule,
+  releaseCancellationSchedule,
+} from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
@@ -2336,6 +2340,12 @@ export async function handleUpdateSeatCount(
   }
   const paidSeatQuantity = rawPaidQuantity;
   const organizationPassItem = resolveSeatUpdateOrganizationPassItem(subscription);
+  const schedulePlan = await planSeatUpdateForCancellationSchedule({
+    subscription,
+    paidSeatItem,
+    passItem: organizationPassItem,
+    paidSeatQuantity,
+  });
 
   let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
     prorationDate,
@@ -2391,6 +2401,38 @@ export async function handleUpdateSeatCount(
   try {
     const locked = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+      if (schedulePlan.kind === 'schedule_update') {
+        const updatedSchedule = await client.subscriptionSchedules.update(
+          schedulePlan.scheduleId,
+          {
+            proration_behavior: isIncreasingSeats ? 'always_invoice' : 'none',
+            phases: schedulePlan.phases,
+            expand: ['subscription.latest_invoice.lines'],
+          },
+          { idempotencyKey }
+        );
+        const scheduledSubscription =
+          typeof updatedSchedule.subscription === 'object' && updatedSchedule.subscription
+            ? updatedSchedule.subscription
+            : await client.subscriptions.retrieve(subscriptionStripeId, {
+                expand: ['latest_invoice.lines'],
+              });
+        const latestInvoice = scheduledSubscription.latest_invoice;
+        // Schedule updates cannot pin proration_date or return the proration
+        // invoice directly; only a fresh invoice from this increase is ours.
+        const isFreshProrationInvoice =
+          isIncreasingSeats &&
+          typeof latestInvoice === 'object' &&
+          latestInvoice !== null &&
+          latestInvoice.created >= prorationDate;
+        return {
+          updatedSubscription: scheduledSubscription,
+          invoiceObj: isFreshProrationInvoice ? latestInvoice : null,
+        };
+      }
+      if (schedulePlan.kind === 'release_then_subscription_update') {
+        await releaseCancellationSchedule(schedulePlan.scheduleId);
+      }
       const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {

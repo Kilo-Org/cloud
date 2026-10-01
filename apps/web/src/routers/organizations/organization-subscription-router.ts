@@ -10,6 +10,7 @@ import {
   getPlanForPriceId,
 } from '@/lib/stripe';
 import { scheduleOrganizationPassCapacity } from '@/lib/kilo-pass-org/service';
+import { SCHEDULE_REWRITE_UNSAFE } from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getScheduledSeatDecrease } from '@/components/subscriptions/seats/scheduled-seat-decrease';
 import {
   getMostRecentSeatPurchase,
@@ -361,17 +362,29 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       const purchase = latestPurchase;
-      const result = await handleUpdateSeatCount(
-        purchase.subscription_stripe_id,
-        newSeatCount,
-        total,
-        {},
-        {
-          userId: ctx.user.id,
-          ip: ctx.ip,
-          ipCountry: ipCountryFromHeaders(ctx.headersList),
+      let result: Awaited<ReturnType<typeof handleUpdateSeatCount>>;
+      try {
+        result = await handleUpdateSeatCount(
+          purchase.subscription_stripe_id,
+          newSeatCount,
+          total,
+          {},
+          {
+            userId: ctx.user.id,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+          }
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === SCHEDULE_REWRITE_UNSAFE) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Your subscription has a scheduled change that seat updates cannot safely modify. Cancel that change before updating seats.',
+          });
         }
-      );
+        throw error;
+      }
       if (result.success && newSeatCount < total) {
         await scheduleOrganizationPassCapacity({ organizationId, paidSeatCount: newSeatCount });
       }

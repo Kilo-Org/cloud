@@ -72,8 +72,27 @@ import {
   bindProviderSeatAddOnItem,
   createParentSupplement,
   createPendingAgreement,
+  endAgreementAfterPassItemRemoved,
   suspendAgreementForPaymentReview,
 } from './service';
+import {
+  activeAndFuturePhases,
+  classifyCancellationSchedule,
+  isOwnedCancellationSchedule,
+  isTerminalScheduleStatus,
+  OrganizationKiloPassCheckoutScheduleError,
+  ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN,
+  phaseItemPriceId,
+  phaseUpdateParams,
+  releaseCancellationSchedule,
+  reportOrganizationKiloPassScheduleProblem,
+  retrieveAttachedSchedule,
+  subscriptionScheduleItems,
+  subscriptionScheduleItemsWithout,
+  throwUnsafeOrganizationKiloPassSchedule,
+  type OrganizationKiloPassCheckoutScheduleErrorReason,
+  type ScheduleReleaseResult,
+} from './cancellation-schedule';
 import {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
@@ -84,8 +103,6 @@ export {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
 } from '@/lib/kilo-pass-org/stripe-metadata';
-
-const ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN = 'kilo-pass-org-cancellation';
 
 function intervalToCadence(
   interval: Stripe.Price.Recurring.Interval | undefined
@@ -174,20 +191,6 @@ function organizationPassItem(
   });
   if (!item) throw new Error(`Subscription ${subscription.id} has no Kilo Pass organization item`);
   return item;
-}
-
-function scheduleItemsMatch(
-  actual: Stripe.SubscriptionSchedule.Phase.Item[],
-  expected: { price: string; quantity: number }[]
-) {
-  return (
-    actual.length === expected.length &&
-    actual.every(item =>
-      expected.some(
-        candidate => candidate.price === String(item.price) && candidate.quantity === item.quantity
-      )
-    )
-  );
 }
 
 function paidSeatItem(subscription: Stripe.Subscription) {
@@ -1056,6 +1059,84 @@ export async function prepareOrganizationKiloPassCheckoutFee(input: {
   }
 }
 
+/**
+ * Item updates on a subscription with an attached schedule can be rewritten by
+ * Stripe, so checkout releases only an owned cancellation schedule that
+ * keeps the current items, then proves the subscription is detached.
+ */
+async function detachReleasableCheckoutSchedule(input: {
+  subscription: Stripe.Subscription;
+  organizationId: string;
+}): Promise<Stripe.Subscription> {
+  const report = (
+    reason: string,
+    errorReason: OrganizationKiloPassCheckoutScheduleErrorReason,
+    detail: { schedule: Stripe.SubscriptionSchedule | null; scheduleId?: string; error?: unknown }
+  ): never => {
+    reportOrganizationKiloPassScheduleProblem({
+      event: 'checkout',
+      reason,
+      organizationId: input.organizationId,
+      subscriptionId: input.subscription.id,
+      ...detail,
+    });
+    throw new OrganizationKiloPassCheckoutScheduleError(errorReason);
+  };
+  const reference = input.subscription.schedule;
+  let schedule: Stripe.SubscriptionSchedule | null;
+  try {
+    schedule = await retrieveAttachedSchedule(input.subscription);
+  } catch (error) {
+    return report('schedule_inspection_read_failed', 'schedule_inspection_failed', {
+      schedule: null,
+      scheduleId: typeof reference === 'string' ? reference : reference?.id,
+      error,
+    });
+  }
+  if (!schedule) return input.subscription;
+  const attached = schedule;
+  const reject = (
+    reason: string,
+    errorReason: OrganizationKiloPassCheckoutScheduleErrorReason,
+    rejected: Stripe.SubscriptionSchedule | null = attached
+  ): never => report(reason, errorReason, { schedule: rejected });
+  if (!isOwnedCancellationSchedule(schedule)) reject('unowned_schedule', 'schedule_conflict');
+  const currentItems = subscriptionScheduleItems(input.subscription);
+  const shape = classifyCancellationSchedule({
+    schedule,
+    currentItems,
+    retainedItems: currentItems,
+    periodEnd: Math.floor(periodForItem(paidSeatItem(input.subscription)).end.getTime() / 1000),
+  });
+  if (shape.kind !== 'idle') {
+    reject(shape.kind === 'unsafe' ? shape.reason : shape.kind, 'schedule_conflict');
+  }
+  try {
+    await releaseCancellationSchedule(schedule.id);
+  } catch (error) {
+    report('schedule_release_failed', 'schedule_release_failed', { schedule: attached, error });
+  }
+  let refreshed: Stripe.Subscription;
+  let stillAttached: Stripe.SubscriptionSchedule | null;
+  try {
+    refreshed = await stripe.subscriptions.retrieve(input.subscription.id);
+    stillAttached = await retrieveAttachedSchedule(refreshed);
+  } catch (error) {
+    return report('post_release_verification_read_failed', 'schedule_inspection_failed', {
+      schedule: attached,
+      error,
+    });
+  }
+  if (stillAttached) reject('schedule_still_attached', 'schedule_release_failed', stillAttached);
+  if (refreshed.status !== 'active' || refreshed.ended_at) {
+    throw new Error('An active organization seat subscription is required');
+  }
+  if (resolveOrganizationKiloPassSubscriptionItem({ subscription: refreshed })) {
+    throw new Error('KILO_PASS_ORG_ALREADY_EXISTS');
+  }
+  return refreshed;
+}
+
 export async function createOrganizationKiloPassCheckout(input: {
   organizationId: string;
   actorUserId: string;
@@ -1079,12 +1160,16 @@ export async function createOrganizationKiloPassCheckout(input: {
     .orderBy(desc(organization_seats_purchases.created_at))
     .limit(1);
   if (!purchase) throw new Error('An active organization seat subscription is required');
-  const subscription = await stripe.subscriptions.retrieve(purchase.subscriptionId);
-  if (subscription.status !== 'active' || subscription.ended_at) {
+  const retrieved = await stripe.subscriptions.retrieve(purchase.subscriptionId);
+  if (retrieved.status !== 'active' || retrieved.ended_at) {
     throw new Error('An active organization seat subscription is required');
   }
-  const existingPassItem = resolveOrganizationKiloPassSubscriptionItem({ subscription });
+  const existingPassItem = resolveOrganizationKiloPassSubscriptionItem({ subscription: retrieved });
   if (existingPassItem) throw new Error('KILO_PASS_ORG_ALREADY_EXISTS');
+  const subscription = await detachReleasableCheckoutSchedule({
+    subscription: retrieved,
+    organizationId: input.organizationId,
+  });
   const seatItem = paidSeatItem(subscription);
   const cadence = intervalToCadence(seatItem.price.recurring?.interval);
   const paidSeats = seatItem.quantity ?? 0;
@@ -1469,121 +1554,251 @@ export async function reconcileOrganizationKiloPassPayment(organizationId: strin
 export async function scheduleOrganizationKiloPassCancellation(input: {
   providerSubscriptionId: string;
   providerSeatAddOnItemId: string;
+  agreementId: string;
+  organizationId?: string;
 }) {
+  const metadata = {
+    origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN,
+    agreementId: input.agreementId,
+  };
   const subscription = await stripe.subscriptions.retrieve(input.providerSubscriptionId);
   const passItem = subscription.items.data.find(item => item.id === input.providerSeatAddOnItemId);
   if (!passItem) return;
-  const seatItem = paidSeatItem(subscription);
-  const period = periodForItem(seatItem);
-  const retainedItems = subscription.items.data
-    .filter(item => item.id !== passItem.id)
-    .map(item => ({ price: item.price.id, quantity: item.quantity ?? 1 }));
-  const existingSchedule = subscription.schedule;
-  const schedule =
-    typeof existingSchedule === 'string'
-      ? await stripe.subscriptionSchedules.retrieve(existingSchedule)
-      : existingSchedule;
-  const currentItems = subscription.items.data.map(item => ({
-    price: item.price.id,
-    quantity: item.quantity ?? 1,
-  }));
-  let target = schedule;
-  if (schedule) {
-    const currentPhase = schedule.phases[0];
-    const removalPhase = schedule.phases[1];
-    const isOwnedSchedule =
-      schedule.metadata?.origin === ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN;
-    const hasRemovalScheduled =
-      isOwnedSchedule &&
-      schedule.phases.length === 2 &&
-      removalPhase !== undefined &&
-      scheduleItemsMatch(removalPhase.items, retainedItems);
-    if (hasRemovalScheduled) return;
-    const isResumedSchedule =
-      isOwnedSchedule &&
-      schedule.phases.length === 2 &&
-      removalPhase !== undefined &&
-      scheduleItemsMatch(removalPhase.items, currentItems);
-    const isOrphanedCreate =
-      Object.keys(schedule.metadata ?? {}).length === 0 &&
-      schedule.phases.length === 1 &&
-      currentPhase !== undefined &&
-      scheduleItemsMatch(currentPhase.items, currentItems);
-    if (!isResumedSchedule && !isOrphanedCreate) throw new Error('SCHEDULE_REWRITE_UNSAFE');
-  } else {
-    target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
-  }
-  if (!target) throw new Error('SCHEDULE_REWRITE_UNSAFE');
+  const period = periodForItem(paidSeatItem(subscription));
   const periodStart = Math.floor(period.start.getTime() / 1000);
   const periodEnd = Math.floor(period.end.getTime() / 1000);
-  const activePhase = schedule?.phases.find(
-    phase => phase.start_date <= periodStart && phase.end_date >= periodEnd
-  );
-  const activeStart = activePhase?.start_date ?? schedule?.current_phase?.start_date ?? periodStart;
-  const activeEnd = activePhase?.end_date ?? schedule?.current_phase?.end_date ?? periodEnd;
+  const currentItems = subscriptionScheduleItems(subscription);
+  const retainedItems = subscriptionScheduleItemsWithout(subscription, passItem.id);
+  const organizationId =
+    input.organizationId ?? subscriptionMetadata(subscription)?.organizationId ?? null;
+  const unsafe = (reason: string, schedule: Stripe.SubscriptionSchedule | null): never =>
+    throwUnsafeOrganizationKiloPassSchedule({
+      event: 'cancel',
+      reason,
+      organizationId,
+      subscriptionId: subscription.id,
+      schedule,
+    });
+
+  const existing = await retrieveAttachedSchedule(subscription);
+  let target: Stripe.SubscriptionSchedule;
+  let activePhase: Stripe.SubscriptionSchedule.Phase | null;
+  if (!existing) {
+    target = await stripe.subscriptionSchedules.create({ from_subscription: subscription.id });
+    activePhase = activeAndFuturePhases(target).activePhase ?? target.phases[0] ?? null;
+  } else {
+    const isOrphanedCreate =
+      Object.keys(existing.metadata ?? {}).length === 0 && existing.phases.length === 1;
+    if (!isOwnedCancellationSchedule(existing) && !isOrphanedCreate) {
+      return unsafe('unowned_schedule', existing);
+    }
+    const shape = classifyCancellationSchedule({
+      schedule: existing,
+      currentItems,
+      retainedItems,
+      periodEnd,
+    });
+    if (shape.kind === 'unsafe') return unsafe(shape.reason, existing);
+    if (shape.kind === 'removal_pending') {
+      if (existing.metadata?.agreementId !== input.agreementId) {
+        await stripe.subscriptionSchedules.update(existing.id, { metadata });
+      }
+      return;
+    }
+    target = existing;
+    activePhase = shape.activePhase;
+  }
   await stripe.subscriptionSchedules.update(target.id, {
-    metadata: { origin: ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN },
+    metadata,
     end_behavior: 'release',
     phases: [
-      {
-        items: currentItems,
-        start_date: activeStart,
-        end_date: activeEnd,
-      },
-      { items: retainedItems },
+      phaseUpdateParams(activePhase, currentItems, {
+        start_date: activePhase?.start_date ?? periodStart,
+        end_date: periodEnd,
+      }),
+      phaseUpdateParams(activePhase, retainedItems),
     ],
   });
 }
 
-/** Restores only the Kilo Pass add-on. Shared schedules are never rewritten blindly. */
+/**
+ * Restores the Kilo Pass add-on by releasing the owned cancellation schedule.
+ * The subscription already carries the current items, so release keeps them.
+ */
 export async function resumeOrganizationKiloPassCancellation(input: {
   providerSubscriptionId: string;
   providerSeatAddOnItemId: string;
+  organizationId?: string;
 }) {
   const subscription = await stripe.subscriptions.retrieve(input.providerSubscriptionId);
   const passItem = subscription.items.data.find(item => item.id === input.providerSeatAddOnItemId);
   if (!passItem) throw new Error('KILO_PASS_ADD_ON_UNAVAILABLE');
-  const scheduleReference = subscription.schedule;
-  if (!scheduleReference) return;
-  const schedule =
-    typeof scheduleReference === 'string'
-      ? await stripe.subscriptionSchedules.retrieve(scheduleReference)
-      : scheduleReference;
-  if (schedule.metadata?.origin !== ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN) {
-    throw new Error('SCHEDULE_REWRITE_UNSAFE');
-  }
-  const expectedCurrentItems = subscription.items.data.map(item => ({
-    price: item.price.id,
-    quantity: item.quantity ?? 1,
-  }));
-  const expectedRetainedItems = expectedCurrentItems.filter(
-    item => item.price !== passItem.price.id
+  const schedule = await retrieveAttachedSchedule(subscription);
+  if (!schedule) return;
+  const unsafe = (reason: string): never =>
+    throwUnsafeOrganizationKiloPassSchedule({
+      event: 'resume',
+      reason,
+      organizationId:
+        input.organizationId ?? subscriptionMetadata(subscription)?.organizationId ?? null,
+      subscriptionId: subscription.id,
+      schedule,
+    });
+  if (!isOwnedCancellationSchedule(schedule)) return unsafe('unowned_schedule');
+  const shape = classifyCancellationSchedule({
+    schedule,
+    currentItems: subscriptionScheduleItems(subscription),
+    retainedItems: subscriptionScheduleItemsWithout(subscription, passItem.id),
+    periodEnd: Math.floor(periodForItem(paidSeatItem(subscription)).end.getTime() / 1000),
+  });
+  if (shape.kind === 'unsafe') return unsafe(shape.reason);
+  await releaseCancellationSchedule(schedule.id);
+}
+
+async function retrieveOwnedScheduleFromEvent(
+  subscription: Stripe.Subscription
+): Promise<Stripe.SubscriptionSchedule | null> {
+  if (!subscription.schedule) return null;
+  const schedule = await stripe.subscriptionSchedules.retrieve(
+    typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule.id
   );
-  const removalPhase = schedule.phases[1];
-  if (
-    schedule.phases.length !== 2 ||
-    !removalPhase ||
-    removalPhase.items.length !== expectedRetainedItems.length ||
-    removalPhase.items.some(
-      item =>
-        !expectedRetainedItems.some(
-          expected => expected.price === item.price && expected.quantity === item.quantity
-        )
+  return isOwnedCancellationSchedule(schedule) ? schedule : null;
+}
+
+async function agreementForCancellationSchedule(
+  schedule: Stripe.SubscriptionSchedule,
+  providerSubscriptionId: string
+) {
+  const agreementId = schedule.metadata?.agreementId;
+  if (!agreementId) return null;
+  const [agreement] = await db
+    .select()
+    .from(kilo_pass_org_agreements)
+    .where(
+      and(
+        eq(kilo_pass_org_agreements.id, agreementId),
+        eq(kilo_pass_org_agreements.provider_subscription_id, providerSubscriptionId)
+      )
     )
+    .limit(1);
+  return agreement ?? null;
+}
+
+/**
+ * Subscription events can arrive late. A missing pass item in the payload only
+ * ends a live agreement when a fresh read confirms its item is gone, so an old
+ * event cannot end an agreement repurchased on the same subscription.
+ */
+function isPassItemStillAttached(
+  fresh: Stripe.Subscription,
+  providerSeatAddOnItemId: string | null
+): boolean {
+  return (
+    resolveOrganizationKiloPassSubscriptionItem({
+      subscription: fresh,
+      boundProviderItemId: providerSeatAddOnItemId,
+    }) !== undefined
+  );
+}
+
+/**
+ * Schedules created before agreement tracking carry only the origin. Persist
+ * the agreement before release so a retry after a failed DB write can still
+ * find it once a later event has ended that agreement. Only binds when fresh
+ * state proves the schedule still belongs to this agreement's subscription.
+ */
+async function bindLegacyCancellationSchedule(input: {
+  schedule: Stripe.SubscriptionSchedule;
+  fresh: Stripe.Subscription;
+  agreement: typeof kilo_pass_org_agreements.$inferSelect;
+}): Promise<void> {
+  const { schedule, fresh, agreement } = input;
+  if (schedule.metadata?.agreementId || isTerminalScheduleStatus(schedule.status)) return;
+  const freshScheduleId =
+    typeof fresh.schedule === 'string' ? fresh.schedule : (fresh.schedule?.id ?? null);
+  if (
+    freshScheduleId !== schedule.id ||
+    fresh.id !== agreement.provider_subscription_id ||
+    subscriptionMetadata(fresh)?.organizationId !== agreement.parent_organization_id
   ) {
-    throw new Error('SCHEDULE_REWRITE_UNSAFE');
+    return;
   }
   await stripe.subscriptionSchedules.update(schedule.id, {
-    end_behavior: 'release',
-    phases: [
-      {
-        items: expectedCurrentItems,
-        start_date: schedule.phases[0]?.start_date,
-        end_date: schedule.phases[0]?.end_date,
-      },
-      { items: expectedCurrentItems },
-    ],
+    metadata: { ...schedule.metadata, agreementId: agreement.id },
   });
+}
+
+/**
+ * After renewal removes the pass item, the owned schedule's retained phase
+ * would otherwise stay attached for a full period. Release it only when its
+ * current phase no longer carries a Kilo Pass price.
+ */
+async function releaseScheduleAfterPassItemRemoved(
+  schedule: Stripe.SubscriptionSchedule
+): Promise<ScheduleReleaseResult | null> {
+  if (isTerminalScheduleStatus(schedule.status)) {
+    return { scheduleId: schedule.id, status: schedule.status, alreadyTerminal: true };
+  }
+  const { activePhase } = activeAndFuturePhases(schedule);
+  const passPriceIds = new Set(getKnownStripePriceIdsForKiloPass());
+  if (!activePhase || activePhase.items.some(item => passPriceIds.has(phaseItemPriceId(item)))) {
+    return null;
+  }
+  return releaseCancellationSchedule(schedule.id);
+}
+
+/**
+ * Org cancellation is a schedule, so `cancel_at_period_end` stays false.
+ * Keep the pending cancellation while fresh provider state still shows the
+ * owned removal; event payloads can be stale.
+ */
+async function hasPendingOwnedRemoval(input: {
+  subscriptionId: string;
+  passItemId: string;
+}): Promise<boolean> {
+  const fresh = await stripe.subscriptions.retrieve(input.subscriptionId);
+  const passItem = resolveOrganizationKiloPassSubscriptionItem({
+    subscription: fresh,
+    boundProviderItemId: input.passItemId,
+  });
+  if (!passItem) return true;
+  const schedule = await retrieveAttachedSchedule(fresh);
+  if (!schedule || !isOwnedCancellationSchedule(schedule)) return false;
+  const seatItem = fresh.items.data.find(isSeatLineItem);
+  if (!seatItem) return false;
+  const shape = classifyCancellationSchedule({
+    schedule,
+    currentItems: subscriptionScheduleItems(fresh),
+    retainedItems: subscriptionScheduleItemsWithout(fresh, passItem.id),
+    periodEnd: Math.floor(periodForItem(seatItem).end.getTime() / 1000),
+  });
+  return shape.kind === 'removal_pending';
+}
+
+/**
+ * The cancellation schedule names the agreement it was created for, so a
+ * retried event can finish ending and auditing that agreement even after a
+ * later event ended it or a repurchase made another agreement live. Legacy
+ * schedules are bound to their agreement before release.
+ */
+async function handlePassItemMissing(
+  subscription: Stripe.Subscription,
+  liveAgreement: typeof kilo_pass_org_agreements.$inferSelect | null
+): Promise<boolean> {
+  const schedule = await retrieveOwnedScheduleFromEvent(subscription);
+  const scheduleAgreement = schedule
+    ? await agreementForCancellationSchedule(schedule, subscription.id)
+    : null;
+  const agreement = scheduleAgreement ?? liveAgreement;
+  if (!agreement) return false;
+  if (agreement.state !== KiloPassOrgAgreementState.Ended) {
+    const fresh = await stripe.subscriptions.retrieve(subscription.id);
+    if (isPassItemStillAttached(fresh, agreement.provider_seat_add_on_item_id)) return true;
+    if (schedule) await bindLegacyCancellationSchedule({ schedule, fresh, agreement });
+  }
+  const scheduleRelease = schedule ? await releaseScheduleAfterPassItemRemoved(schedule) : null;
+  await endAgreementAfterPassItemRemoved({ agreementId: agreement.id, scheduleRelease });
+  return true;
 }
 
 /** Subscription events reconcile identity and lifecycle only. Paid capacity is invoice-paid only. */
@@ -1603,17 +1818,14 @@ export async function handleOrganizationKiloPassSubscriptionEvent(
     )
     .orderBy(desc(kilo_pass_org_agreements.created_at))
     .limit(1);
-  if (!agreement) return false;
-  const item = resolveOrganizationKiloPassSubscriptionItem({
-    subscription,
-    boundProviderItemId: agreement.provider_seat_add_on_item_id,
-  });
-  if (!item) {
-    await db
-      .update(kilo_pass_org_agreements)
-      .set({ state: KiloPassOrgAgreementState.Ended })
-      .where(eq(kilo_pass_org_agreements.id, agreement.id));
-    return true;
+  const item = agreement
+    ? resolveOrganizationKiloPassSubscriptionItem({
+        subscription,
+        boundProviderItemId: agreement.provider_seat_add_on_item_id,
+      })
+    : undefined;
+  if (!agreement || !item) {
+    return handlePassItemMissing(subscription, agreement ?? null);
   }
   if (agreement.provider_seat_add_on_item_id !== item.id)
     await bindProviderSeatAddOnItem({
@@ -1641,6 +1853,11 @@ export async function handleOrganizationKiloPassSubscriptionEvent(
       .update(kilo_pass_org_agreements)
       .set({ state: KiloPassOrgAgreementState.CancelAtPeriodEnd })
       .where(eq(kilo_pass_org_agreements.id, agreement.id));
+  } else if (
+    agreement.state === KiloPassOrgAgreementState.CancelAtPeriodEnd &&
+    (await hasPendingOwnedRemoval({ subscriptionId: subscription.id, passItemId: item.id }))
+  ) {
+    return true;
   } else {
     await db
       .update(kilo_pass_org_agreements)

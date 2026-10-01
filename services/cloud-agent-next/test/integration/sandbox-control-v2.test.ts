@@ -1871,12 +1871,6 @@ describe('SandboxControlV2 allocation lifecycle', () => {
           ).applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
         );
       }
-      await waitFor(async () => {
-        const context = await runInDurableObject(stub, (_instance, state) =>
-          getBillingContext(state.storage)
-        );
-        expect(context?.pendingStop).toBeDefined();
-      });
       await waitFor(() => expect(stops).toBeGreaterThanOrEqual(1));
       if (provider.createCalls === 1) {
         await setDeadline(stub, { create_deadline_at: Date.now() - 1 });

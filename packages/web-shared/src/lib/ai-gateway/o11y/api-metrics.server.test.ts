@@ -1,15 +1,20 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterEach, describe, expect, test } from '@jest/globals';
+import { after } from 'next/server';
 import type {
   GatewayMessagesRequest,
   GatewayRequest,
   GatewayResponsesRequest,
   OpenRouterChatCompletionRequest,
 } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getToolsAvailable, getToolsUsed } from './api-metrics.server';
+import { emitApiMetricsForResponse, getToolsAvailable, getToolsUsed } from './api-metrics.server';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
+}));
+jest.mock('@/lib/config.server', () => ({
+  O11Y_SERVICE_URL: 'https://o11y.test',
+  O11Y_KILO_GATEWAY_CLIENT_SECRET: 'test-secret',
 }));
 
 function chatRequest(overrides: Partial<OpenRouterChatCompletionRequest> = {}): GatewayRequest {
@@ -181,5 +186,63 @@ describe('getToolsUsed', () => {
         })
       )
     ).toEqual(['function:read_file']);
+  });
+});
+
+describe('emitApiMetricsForResponse', () => {
+  const originalFetch = globalThis.fetch;
+
+  afterEach(() => {
+    jest.useRealTimers();
+    globalThis.fetch = originalFetch;
+    jest.mocked(after).mockReset();
+  });
+
+  test('stops draining an open stream at the deadline with a single timer', async () => {
+    jest.useFakeTimers();
+    const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
+    mockedFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    globalThis.fetch = mockedFetch;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('data: {"provider":"Fireworks"}\n\n'));
+      },
+    });
+
+    emitApiMetricsForResponse(
+      {
+        kiloUserId: 'user-1',
+        isAnonymous: false,
+        isStreaming: true,
+        userByok: false,
+        provider: 'openrouter',
+        requestedModel: 'test-model',
+        resolvedModel: 'test-model',
+        toolsAvailable: [],
+        toolsUsed: [],
+        ttfbMs: 10,
+        statusCode: 200,
+      },
+      new Response(stream, { headers: { 'content-type': 'text/event-stream' } }),
+      performance.now()
+    );
+
+    const [callback] = jest.mocked(after).mock.calls[0] ?? [];
+    if (typeof callback !== 'function') throw new Error('Expected deferred metrics callback');
+    const drained = callback();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(jest.getTimerCount()).toBe(1);
+
+    await jest.advanceTimersByTimeAsync(60_000);
+    await drained;
+
+    expect(jest.getTimerCount()).toBe(0);
+    expect(mockedFetch).toHaveBeenCalledTimes(1);
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      inferenceProvider: 'Fireworks',
+      clientSecret: 'test-secret',
+    });
   });
 });

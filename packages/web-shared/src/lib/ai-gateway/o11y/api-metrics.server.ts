@@ -195,6 +195,11 @@ export function emitApiMetrics(params: ApiMetricsParams) {
   });
 }
 
+export function emitGatewayApiMetrics(params: Omit<ApiMetricsParams, 'clientSecret'>) {
+  if (!O11Y_KILO_GATEWAY_CLIENT_SECRET) return;
+  emitApiMetrics({ ...params, clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET });
+}
+
 export function emitApiMetricsForResponse(
   params: Omit<ApiMetricsParams, 'clientSecret' | 'completeRequestMs'>,
   responseToDrain: Response,
@@ -234,8 +239,12 @@ async function drainResponseBodyForInferenceProvider(
   const reader = body.getReader();
   const contentType = response.headers.get('content-type') ?? '';
   const isEventStream = contentType.includes('text/event-stream');
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    reader.cancel().catch(() => {});
+  }, timeoutMs);
   try {
-    const startedAt = performance.now();
     const decoder = new TextDecoder();
     let inferenceProvider: string | undefined;
 
@@ -254,30 +263,8 @@ async function drainResponseBodyForInferenceProvider(
     const MAX_BUFFER_CHARS = 512_000;
 
     while (true) {
-      const elapsedMs = performance.now() - startedAt;
-      const remainingMs = timeoutMs - elapsedMs;
-      if (remainingMs <= 0) {
-        try {
-          await reader.cancel();
-        } catch {
-          /** intentionally empty */
-        }
-        return inferenceProvider;
-      }
-
-      const result = await Promise.race([
-        reader.read(),
-        sleep(remainingMs).then(() => ({ timeout: true as const })),
-      ]);
-
-      if ('timeout' in result) {
-        try {
-          await reader.cancel();
-        } catch {
-          /** intentionally empty */
-        }
-        return inferenceProvider;
-      }
+      const result = await reader.read();
+      if (timedOut) return inferenceProvider;
 
       if (result.done) {
         if (!inferenceProvider && !isEventStream && buffered) {
@@ -297,6 +284,7 @@ async function drainResponseBodyForInferenceProvider(
       }
     }
   } finally {
+    clearTimeout(timeout);
     reader.releaseLock();
   }
 }
@@ -368,8 +356,4 @@ function safeParseJson(payload: string): unknown {
   } catch {
     return null;
   }
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
 }

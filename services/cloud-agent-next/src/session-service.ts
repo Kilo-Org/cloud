@@ -870,14 +870,14 @@ async function cleanupRestoreTokenFile(
 export async function writeGlobalRules(
   sandbox: SandboxInstance,
   sessionHome: string,
-  sessionId: string
+  bashDefaultTimeoutMs?: string | number | null
 ): Promise<void> {
   const rulesDir = `${sessionHome}/.kilocode/rules`;
   const rulesPath = `${rulesDir}/cloud-agent.md`;
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
 }
 
 function shortHash(input: string): string {
@@ -1332,14 +1332,7 @@ export class SessionService {
     }
 
     const permission: Record<string, unknown> = {
-      external_directory: {
-        '*': 'deny',
-        [`/tmp/${sessionId}/**`]: 'allow',
-        [`/tmp/attachments/${sessionId}/**`]: 'allow',
-        [`${workspacePath}/**`]: 'allow',
-        [`${sessionHome}/.kilocode/skills/**`]: 'allow',
-        ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
-      },
+      external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
@@ -1356,6 +1349,11 @@ export class SessionService {
       todowrite: 'allow',
       todoread: 'allow',
       suggest: 'deny',
+      schedule_wakeup: 'deny',
+      cancel_wakeup: 'deny',
+      cron_create: 'deny',
+      cron_list: 'deny',
+      cron_delete: 'deny',
     };
 
     if (commandGuardPolicy) {
@@ -2471,7 +2469,7 @@ export class SessionService {
       await this.sanitizeGitRemote(session, workspacePath, metadata, resolvedTokens);
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
-      await writeGlobalRules(sandbox, sessionHome, sessionId);
+      await writeGlobalRules(sandbox, sessionHome, env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS);
 
       const detectedDevcontainer = metadata.workspace?.devcontainerRequested
         ? await detectDevContainer(session, workspacePath)

@@ -106,6 +106,15 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('Line could not be resolved');
   });
 
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+    expect(prompt).not.toContain('the review was skipped');
+  });
+
   it('does not include GitHub diff line-number safeguards for GitLab', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       platform: 'gitlab',

@@ -29,7 +29,7 @@ import {
 } from '@/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
-import { reportCreditEvent, type CreditEvent } from '@/lib/bouncer/client';
+import { reportCreditEvent, type CreditEvent, type StoreCreditEvent } from '@/lib/bouncer/client';
 import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
@@ -246,11 +246,12 @@ async function resolveBouncerCreditOwner(params: {
 }
 
 /** A credit event without its payer: `reportWebhookCreditEvent` resolves the payer. */
-type WebhookCreditEvent = CreditEvent extends infer Event
-  ? Event extends CreditEvent
-    ? Omit<Event, 'userId' | 'orgId'>
-    : never
-  : never;
+type WebhookCreditEvent =
+  Exclude<CreditEvent, StoreCreditEvent> extends infer Event
+    ? Event extends CreditEvent
+      ? Omit<Event, 'userId' | 'orgId'>
+      : never
+    : never;
 
 /**
  * Resolves the payer and reports one webhook outcome to bouncer. It never throws: the owner

@@ -2189,6 +2189,8 @@
       "leaveChanges": "වෙනස්කම් තබන්න",
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
+      "selectRepositoryToStart": "ආරම්භ කිරීමට ගබඩාවක් තෝරන්න.",
+      "connectProviderToStart": "ආරම්භ කිරීමට සැපයුම්කරුවෙකු සම්බන්ධ කරන්න.",
       "promptPlaceholder": "ඔබට කිරීමට අවශ්‍ය කාර්යය කුමක්ද?",
       "couldNotLoadModels": "මාදිලි පූරණය කළ නොහැකි විය.",
       "prefillRepoAndModelUnavailable": "මුල් සැසියේ ගබඩාව සහ මාදිලිය තවදුරටත් ලබා ගත නොහැක. පහතින් ගබඩාවක් සහ මාදිලියක් තෝරන්න.",

@@ -2189,6 +2189,8 @@
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
+      "selectRepositoryToStart": "Chagua hazina ili kuanza.",
+      "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
       "prefillRepoAndModelUnavailable": "Hazina na modeli ya kikao cha awali hazipatikani tena. Chagua hazina na modeli hapa chini.",

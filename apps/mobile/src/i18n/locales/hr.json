@@ -2217,6 +2217,8 @@
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
+      "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "connectProviderToStart": "Poveži pružatelja za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",

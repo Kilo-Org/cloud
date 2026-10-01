@@ -2217,6 +2217,8 @@
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
+      "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",

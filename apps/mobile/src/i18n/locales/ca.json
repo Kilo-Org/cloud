@@ -2217,6 +2217,8 @@
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
+      "selectRepositoryToStart": "Selecciona un repositori per començar.",
+      "connectProviderToStart": "Connecta un proveïdor per començar.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",

@@ -2189,6 +2189,8 @@
       "leaveChanges": "बदल ठेवा",
       "commitAndPush": "कमिट आणि पुश करा",
       "startSession": "सत्र सुरू करा",
+      "selectRepositoryToStart": "प्रारंभ करण्यासाठी रिपॉझिटरी निवडा.",
+      "connectProviderToStart": "प्रारंभ करण्यासाठी सेवा पुरवठादार जोडा.",
       "promptPlaceholder": "तुम्हाला कशावर काम करायचे आहे?",
       "couldNotLoadModels": "मॉडेल लोड करता आली नाहीत.",
       "prefillRepoAndModelUnavailable": "मूळ सत्रातील रिपॉझिटरी आणि मॉडेल आता उपलब्ध नाहीत. खाली नवीन रिपॉझिटरी आणि मॉडेल निवडा.",

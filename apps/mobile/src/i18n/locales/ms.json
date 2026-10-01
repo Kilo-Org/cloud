@@ -2189,6 +2189,8 @@
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
+      "selectRepositoryToStart": "Pilih repositori untuk bermula.",
+      "connectProviderToStart": "Sambungkan penyedia untuk bermula.",
       "promptPlaceholder": "Apa yang ingin anda usahakan?",
       "couldNotLoadModels": "Tidak dapat memuatkan model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model sesi asal tidak lagi tersedia. Pilih repositori dan model lain di bawah.",

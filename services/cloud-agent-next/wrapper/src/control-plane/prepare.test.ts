@@ -10,7 +10,7 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { ExecResult, ProcessOutputStream } from '../utils.js';
+import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
@@ -65,7 +65,9 @@ type Harness = {
   ensureSessionCalls: () => number;
   cloneParallelism: () => number;
   setClone: (value: ExecResult | (() => Promise<ExecResult>)) => void;
-  setGit: (value: (args: string[]) => ExecResult | Promise<ExecResult>) => void;
+  setGit: (
+    value: (args: string[], options?: ProcessOptions) => ExecResult | Promise<ExecResult>
+  ) => void;
   setSessionExists: (value: boolean) => void;
   setSessionExistsHung: (value: boolean) => void;
   setRestore: (value: () => Promise<unknown>) => void;
@@ -99,7 +101,9 @@ function createHarness(
   const releaseCalls: string[] = [];
   const removeCalls: string[] = [];
   let clone: ExecResult | (() => Promise<ExecResult>) = result(0);
-  let customGit: ((args: string[]) => ExecResult | Promise<ExecResult>) | undefined;
+  let customGit:
+    | ((args: string[], options?: ProcessOptions) => ExecResult | Promise<ExecResult>)
+    | undefined;
   let sessionExists = true;
   let sessionExistsHung = false;
   let restore = async (): Promise<unknown> => ({
@@ -167,9 +171,9 @@ function createHarness(
     configureGitAuthor: async (_directory, _runGit, author) => {
       authorCalls.push(author);
     },
-    runGit: async args => {
+    runGit: async (args, options) => {
       gitCalls.push(args);
-      if (customGit) return customGit(args);
+      if (customGit) return customGit(args, options);
       if (args[0] === 'clone') {
         activeClones += 1;
         maxActiveClones = Math.max(maxActiveClones, activeClones);
@@ -506,9 +510,41 @@ describe('createPreparationManager', () => {
     if (frame.type !== 'session.prepare') throw new Error('Wrong frame type');
     await harness.manager.prepare(frame.spec);
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
-    expect(harness.gitCalls).toContainEqual(['clone', expect.any(String), spec.directory]);
+    expect(harness.gitCalls).toContainEqual([
+      'clone',
+      '--progress',
+      expect.any(String),
+      spec.directory,
+    ]);
     expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
     expect(harness.authorCalls).toEqual([author]);
+  });
+
+  it('reports live clone progress and clone retries as step details', async () => {
+    const harness = createHarness();
+    let clones = 0;
+    harness.setGit((args, options) => {
+      if (args[0] !== 'clone') return result(0);
+      clones += 1;
+      if (clones === 1) return result(128, 'fatal: unable to access: Could not resolve host');
+      options?.onOutput?.('stderr', 'Receiving objects:  45% (450/1000)\r');
+      return result(0);
+    });
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
+
+    await harness.manager.prepare(spec);
+
+    const details = harness.frames.flatMap(frame =>
+      frame.type === 'session.progress' && frame.detail !== undefined
+        ? [{ step: frame.step, detail: frame.detail }]
+        : []
+    );
+    expect(details).toEqual([
+      { step: 'clone', detail: 'Retrying clone (attempt 2 of 3)' },
+      { step: 'clone', detail: 'Cloning repository... Receiving objects: 45%' },
+    ]);
+    for (const frame of harness.frames) controlPlaneWrapperFrameSchema.parse(frame);
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
   });
 
   it('fails the clone step with the classified git subtype', async () => {
@@ -564,7 +600,7 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec);
 
     expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
-    expect(harness.gitCalls).toContainEqual(['checkout', '-b', 'session/scope-1']);
+    expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);
     expect(harness.gitCalls).not.toContainEqual([
       'checkout',
       '-B',
@@ -590,6 +626,7 @@ describe('createPreparationManager', () => {
 
     expect(harness.gitCalls).toContainEqual([
       'checkout',
+      '--progress',
       '-b',
       'feature',
       '--track',

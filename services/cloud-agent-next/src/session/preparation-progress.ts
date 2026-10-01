@@ -6,6 +6,7 @@ import {
   finalizePreparationAttempt,
   materializePreparationEvent,
   readPreparationAttempt,
+  readPreparationSteps,
   type PreparationOutcome,
 } from './preparation-history.js';
 
@@ -37,7 +38,7 @@ export function createPreparationProgressRecorder(options: {
 }): PreparationProgressRecorder {
   const { attemptId, triggerMessageId, sessionId, eventQueries, broadcast } = options;
   const now = options.now ?? Date.now;
-  let activeStep: { id: string; key: PreparingStep } | undefined;
+  let activeStep: { id: string; key: PreparingStep; detail?: string } | undefined;
 
   function emit(
     step: PreparingStep,
@@ -80,6 +81,19 @@ export function createPreparationProgressRecorder(options: {
       emit('workspace_setup', 'Preparing environment', { action: 'attempt_started' });
     }
     const stepId = `phase:${key}`;
+    if (activeStep === undefined && existing) {
+      // A fresh recorder for an open attempt (the DO was evicted mid-step)
+      // recovers its step from storage: continue the same step, or close the
+      // one it was on so it does not spin forever.
+      for (const running of readPreparationSteps(eventQueries, attemptId)) {
+        if (running.kind !== 'phase' || running.status !== 'running') continue;
+        if (running.id === stepId) {
+          activeStep = { id: stepId, key, detail: running.latestDetail };
+        } else {
+          emit(running.key, message, { action: 'step_completed', stepId: running.id });
+        }
+      }
+    }
     if (activeStep?.id !== stepId) {
       if (activeStep) {
         emit(activeStep.key, message, { action: 'step_completed', stepId: activeStep.id });
@@ -91,8 +105,12 @@ export function createPreparationProgressRecorder(options: {
         label: key.replaceAll('_', ' '),
       });
       activeStep = { id: stepId, key };
+    } else if (activeStep.detail === message) {
+      // A repeated report (a `prepare` reply and its notification) adds nothing.
+      return existing?.status === 'running';
     }
     emit(key, message, { action: 'step_progress', stepId, detail: message });
+    activeStep.detail = message;
     return readPreparationAttempt(eventQueries, attemptId)?.status === 'running';
   }
 

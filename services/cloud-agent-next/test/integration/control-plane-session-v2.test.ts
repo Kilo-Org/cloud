@@ -790,6 +790,8 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
     const phases = [
+      { step: 'sandbox_create', key: 'sandbox_provision', detail: 'Creating sandbox' },
+      { step: 'sandbox_start', key: 'sandbox_boot', detail: 'Starting sandbox' },
       { step: 'clone', key: 'cloning', detail: 'Cloning repository' },
       { step: 'checkout', key: 'branch', detail: 'Checking out branch' },
       { step: 'setup', key: 'setup_commands', detail: 'Running setup commands' },
@@ -808,6 +810,29 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
           ?.stepSnapshot
       ).toMatchObject({ latestDetail: phase.detail });
     }
+    stream.close();
+  });
+
+  it('shows live step detail and keeps it across a stepless repeated prepare', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    const detail = 'Cloning repository... Receiving objects: 45%';
+    await stub.onRoute({ state: 'preparing', step: 'clone', attemptId: peer.attemptId });
+    await stub.onRoute({ state: 'preparing', step: 'clone', detail, attemptId: peer.attemptId });
+    // A second message re-prepares; the Sandbox returns the stepless view.
+    await stub.send(promptPayload('m2'));
+
+    const stream = await connectStream(sessionId);
+    const connected = await waitForStreamEvent(stream, 'connected');
+    expect(connected.data).toMatchObject({ cloudStatus: { type: 'preparing', step: 'cloning' } });
+    const steps = preparingRows(await drainStream(stream)).flatMap(row =>
+      row.action === 'step_snapshot' && row.stepSnapshot ? [row.stepSnapshot] : []
+    );
+    expect(steps.map(step => [step.key, step.status, step.latestDetail])).toEqual([
+      ['workspace_setup', 'completed', 'Preparing environment'],
+      ['cloning', 'running', detail],
+    ]);
     stream.close();
   });
 
@@ -1200,10 +1225,13 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
             route: { attemptId: attemptB.attemptId },
           });
         } else {
-          const recoveryAt = await runInDurableObject(sessionStub, (_instance, state) =>
-            state.storage.get('control_plane_transport_recovery_at')
-          );
-          expect(recoveryAt).toEqual(expect.any(Number));
+          // The prepare response is withheld, so the fresh send must keep
+          // `new-B` queued on the new attempt. Sandbox allocation progress
+          // (creating, starting) may reach the session and clear the transport
+          // recovery the ambiguous prepare scheduled, so recovery is not
+          // required to persist; the message staying queued is the durable
+          // ownership signal.
+          expect(await messageStatus(sessionStub, 'new-B')).toBe('queued');
         }
         await waitFor(() => expect(retirementUpdates).toHaveLength(1));
         expect(retirementUpdates[0]).toEqual({

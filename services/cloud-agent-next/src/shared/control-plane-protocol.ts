@@ -24,7 +24,14 @@ export const CONTROL_PLANE_ALLOCATION_ID_ENV = 'CONTROL_PLANE_ALLOCATION_ID';
 export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
+/**
+ * Route preparation steps. `sandbox_create` and `sandbox_start` come from the
+ * Sandbox DO's allocation (provider create, then waiting for the wrapper's
+ * `hello`); the rest come from the wrapper's `session.progress`.
+ */
 export const CONTROL_PLANE_PREPARATION_STEPS = [
+  'sandbox_create',
+  'sandbox_start',
   'clone',
   'checkout',
   'setup',
@@ -39,6 +46,20 @@ export type ControlPlanePreparationStep = (typeof CONTROL_PLANE_PREPARATION_STEP
  * wrapper chunk and the Session DO agree on one name.
  */
 export const CONTROL_PLANE_WRAPPER_FINALIZING_EVENT = 'wrapper_finalizing';
+
+/**
+ * Setup-command lifecycle events the wrapper sends inside `session.events`.
+ * The Session DO renders them as per-command preparation steps. `command` is
+ * the 1-based command number in every event.
+ */
+export const CONTROL_PLANE_SETUP_EVENTS = {
+  /** `{ command, commandCount, text }`: the command started. */
+  started: 'session.setup.started',
+  /** `{ command, output }`: a redacted output chunk. */
+  output: 'session.setup.output',
+  /** `{ command, exitCode, safeError? }`: the command ended; `safeError` on failure. */
+  finished: 'session.setup.finished',
+} as const;
 
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
@@ -61,6 +82,13 @@ export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VAL
 export const controlPlaneFailureReasonSchema = z.enum(CONTROL_PLANE_FAILURE_REASON_VALUES);
 
 export const controlPlanePreparationStepSchema = z.enum(CONTROL_PLANE_PREPARATION_STEPS);
+
+/** Bound on a live progress line within a step ("Receiving objects: 45%"). */
+export const CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH = 200;
+const controlPlanePreparationDetailSchema = z
+  .string()
+  .min(1)
+  .max(CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH);
 
 export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'insufficient_credits',
@@ -379,6 +407,7 @@ const controlPlaneRoutePreparingSchema = z
     state: z.literal('preparing'),
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
+    detail: controlPlanePreparationDetailSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
@@ -564,6 +593,7 @@ const controlPlaneSessionProgressFrameSchema = z
     type: z.literal('session.progress'),
     sessionId: z.string().min(1),
     step: controlPlanePreparationStepSchema,
+    detail: controlPlanePreparationDetailSchema.optional(),
   })
   .strict();
 

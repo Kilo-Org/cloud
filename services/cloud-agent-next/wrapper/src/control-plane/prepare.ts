@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import type {
-  ControlPlanePreparationStep,
-  ControlPlaneRouteSpec,
-  ControlPlaneSessionCredentialsPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_SETUP_EVENTS,
+  type ControlPlanePreparationStep,
+  type ControlPlaneRouteSpec,
+  type ControlPlaneSessionCredentialsPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
@@ -30,7 +31,7 @@ import {
 import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
 import { stripAnsi } from '../event-parser.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
-import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
+import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
@@ -46,6 +47,8 @@ const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 const STEP_RETRY_ATTEMPTS = 2;
 /** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
 const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
+/** Upper bound on the command text shown for a running setup command. */
+const SETUP_COMMAND_TEXT_LIMIT = 1_024;
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -237,8 +240,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     });
   const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
 
-  function emitProgress(sessionId: string, step: ControlPlanePreparationStep): void {
-    deps.emit({ type: 'session.progress', sessionId, step });
+  function emitProgress(
+    sessionId: string,
+    step: ControlPlanePreparationStep,
+    detail?: string
+  ): void {
+    deps.emit({
+      type: 'session.progress',
+      sessionId,
+      step,
+      ...(detail === undefined ? {} : { detail }),
+    });
   }
 
   function emitFailure(sessionId: string, step: ControlPlanePreparationStep, error: unknown): void {
@@ -333,10 +345,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       let lastError: WrapperBootstrapError | undefined;
       for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
         signal.throwIfAborted();
-        const cloned = await runGit(['clone', cloneUrl, directory], {
+        if (attempt > 1) {
+          emitProgress(
+            spec.sessionId,
+            'clone',
+            `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
+          );
+        }
+        const cloned = await runGit(['clone', '--progress', cloneUrl, directory], {
           env,
           inheritEnv: false,
           signal,
+          onOutput: createGitProgressReporter(progressText =>
+            emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
+          ),
         });
         if (cloned.exitCode === 0) {
           lastError = undefined;
@@ -350,8 +372,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     }
     onCheckout();
     emitProgress(spec.sessionId, 'checkout');
-    const runBranchGit = (args: string[]): Promise<ExecResult> =>
-      runGit(args, { cwd: directory, env, inheritEnv: false, signal });
+    const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
+      runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal });
     // Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic):
     // `-B <branch> origin/<branch>` breaks a working branch or a `session/*`
     // branch that has no upstream, so resolve the refs first.
@@ -408,7 +430,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           ];
         }
       }
-      const checked = await runBranchGit(checkoutArgs);
+      const checked = await runBranchGit(['checkout', '--progress', ...checkoutArgs.slice(1)], {
+        onOutput: createGitProgressReporter(progressText =>
+          emitProgress(spec.sessionId, 'checkout', `Checking out branch... ${progressText}`)
+        ),
+      });
       signal.throwIfAborted();
       if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact);
     }
@@ -430,30 +456,30 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const commands = spec.setupCommands ?? [];
     if (commands.length === 0) return;
     emitProgress(spec.sessionId, 'setup');
+    // Spec §9: a setup failure must show the command output, so each command's
+    // start, output and end go on the wire, not only to the wrapper log. The
+    // Session renders them as per-command preparation steps.
+    const emitSetupEvent = (type: string, properties: Record<string, unknown>): void => {
+      deps.emit({ type: 'session.events', sessionId: spec.sessionId, events: [{ type, properties }] });
+    };
     for (const [index, command] of commands.entries()) {
       signal.throwIfAborted();
+      const commandNumber = index + 1;
+      emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.started, {
+        command: commandNumber,
+        commandCount: commands.length,
+        text: redact(command).trim().slice(0, SETUP_COMMAND_TEXT_LIMIT),
+      });
       const output = createOutputRedactor(
         text => redact(stripAnsi(text)),
         text => {
           if (signal.aborted) return;
           const cleaned = text.trim();
           if (!cleaned) return;
-          log(`control-plane setup command ${index + 1} produced output`);
-          // Spec §9: a setup failure must show the command output, so surface it
-          // on the wire rather than only in the wrapper log. B8/the Session owns
-          // rendering `session.setup.output`.
-          deps.emit({
-            type: 'session.events',
-            sessionId: spec.sessionId,
-            events: [
-              {
-                type: 'session.setup.output',
-                properties: {
-                  command: index + 1,
-                  output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
-                },
-              },
-            ],
+          log(`control-plane setup command ${commandNumber} produced output`);
+          emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.output, {
+            command: commandNumber,
+            output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
           });
         }
       );
@@ -465,13 +491,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         log(
           `control-plane setup command failed sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} index=${index + 1} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${Date.now() - startedAt} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
         );
+        const message = `Setup command ${commandNumber} ${timedOut ? 'timed out' : 'failed'}`;
+        emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.finished, {
+          command: commandNumber,
+          exitCode: result.exitCode,
+          safeError: message,
+        });
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
           subtype: timedOut ? 'setup_command_timeout' : 'setup_command_failed',
-          message: `Setup command ${index + 1} ${timedOut ? 'timed out' : 'failed'}`,
+          message,
           retryable: true,
         });
       }
+      emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.finished, { command: commandNumber, exitCode: 0 });
     }
   }
 
@@ -484,6 +517,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     await seedRegistration(spec.kiloSessionId, env, signal);
     if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
+    emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
     const restored = await restore(spec.kiloSessionId, directory, undefined, { env, signal });
     if (restored.ok) {
       if (restored.diffs.skipped > 0) {

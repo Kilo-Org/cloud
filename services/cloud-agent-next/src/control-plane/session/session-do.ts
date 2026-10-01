@@ -169,6 +169,8 @@ const AVAILABLE_COMMANDS_KEY = 'available_commands';
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'sandbox_provision',
+  sandbox_start: 'sandbox_boot',
   clone: 'cloning',
   checkout: 'branch',
   setup: 'setup_commands',
@@ -177,6 +179,8 @@ const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
 };
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
+  sandbox_create: 'Creating sandbox',
+  sandbox_start: 'Starting sandbox',
   clone: 'Cloning repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
@@ -191,6 +195,28 @@ const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
  */
 function publicPreparationStep(step: ControlPlanePreparationStep | undefined): string | undefined {
   return step === undefined ? undefined : PREPARING_STEP_PUBLIC[step];
+}
+
+/**
+ * The route state to persist for a view. A preparing view's live detail is not
+ * route state, and a preparing view that names no step (a repeated `prepare`)
+ * keeps the step its attempt already reached.
+ */
+function persistedRouteView(
+  view: ControlPlaneRouteView,
+  previous: ControlPlaneRouteView
+): ControlPlaneRouteView {
+  if (view.state !== 'preparing') return view;
+  const step =
+    view.step ??
+    (previous.state === 'preparing' && previous.attemptId === view.attemptId
+      ? previous.step
+      : undefined);
+  return {
+    state: 'preparing',
+    attemptId: view.attemptId,
+    ...(step === undefined ? {} : { step }),
+  };
 }
 
 /** DO-only session creation input; the Worker builds it from session metadata. */
@@ -1694,11 +1720,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         acceptedMessages: this.messages.filter(message => message.state === 'accepted').length,
       });
     }
-    await this.persistRoute(view);
-    if (view.state === 'preparing' || view.state === 'reconnecting') {
+    const route = persistedRouteView(view, previous);
+    await this.persistRoute(route);
+    if (route.state === 'preparing' || route.state === 'reconnecting') {
       await this.clearTransportRecovery();
     }
-    switch (view.state) {
+    switch (route.state) {
       case 'unknown':
         this.finalizePreparingRoute(previous, {
           status: 'failed',
@@ -1713,7 +1740,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         return;
       case 'preparing': {
         // A new route attempt supersedes the previous one's open row.
-        if (previous.state === 'preparing' && previous.attemptId !== view.attemptId) {
+        if (previous.state === 'preparing' && previous.attemptId !== route.attemptId) {
           this.finalizeAttempt(previous.attemptId, {
             status: 'failed',
             safeError: 'Preparation did not complete',
@@ -1722,13 +1749,22 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         // Suppress captures while the route prepares; a capture runs after
         // attach (`ready`), like the legacy preparation hooks.
         this.worktreePreparationGeneration = this.worktreeChanges.beginPreparation();
-        const publicStep = publicPreparationStep(view.step) ?? 'workspace_setup';
+        const publicStep = publicPreparationStep(route.step) ?? 'workspace_setup';
         this.emitCloudStatus({ type: 'preparing', step: publicStep });
         const head = oldestOpenMessage(this.messages, 'queued');
-        if (head !== undefined) {
-          this.preparationRecorder(view.attemptId, head.messageId).onProgress(
+        // A stepless repeat of an open attempt (a repeated `prepare`) carries
+        // its step forward and must not overwrite the step's live detail.
+        const stepless = view.state === 'preparing' && view.step === undefined;
+        if (
+          head !== undefined &&
+          (!stepless || readPreparationAttempt(this.eventQueries, route.attemptId) === null)
+        ) {
+          this.preparationRecorder(route.attemptId, head.messageId).onProgress(
             publicStep,
-            view.step === undefined ? 'Preparing environment' : PREPARING_STEP_MESSAGE[view.step]
+            (view.state === 'preparing' ? view.detail : undefined) ??
+              (route.step === undefined
+                ? 'Preparing environment'
+                : PREPARING_STEP_MESSAGE[route.step])
           );
         }
         return;
@@ -1749,18 +1785,18 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         logger
           .withFields({
             sessionId: this.sessionId,
-            attemptId: view.attemptId,
-            reason: view.reason,
-            ...(view.subtype === undefined ? {} : { subtype: view.subtype }),
+            attemptId: route.attemptId,
+            reason: route.reason,
+            ...(route.subtype === undefined ? {} : { subtype: route.subtype }),
           })
           .warn('Control-plane workspace preparation failed');
-        this.finalizePreparingRoute(previous, { status: 'failed', safeError: view.reason });
-        this.emitCloudStatus({ type: 'error', message: view.reason });
+        this.finalizePreparingRoute(previous, { status: 'failed', safeError: route.reason });
+        this.emitCloudStatus({ type: 'error', message: route.reason });
         await this.settleMessages(
           openMessages(this.messages).map(message => message.messageId),
           'failed',
-          view.reason,
-          view.subtype === undefined ? undefined : { workspaceSubtype: view.subtype }
+          route.reason,
+          route.subtype === undefined ? undefined : { workspaceSubtype: route.subtype }
         );
         return;
     }

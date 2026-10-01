@@ -1,10 +1,10 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
-import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@/lib/autoTopUpConstants';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
+import { AUTO_TOP_UP_IN_FLIGHT_WINDOW_SECONDS } from '@kilocode/web-shared/lib/autoTopUpConstants';
 
 describe('isAutoTopUpInFlight', () => {
   let userId: string;

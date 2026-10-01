@@ -1,17 +1,17 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_subscriptions,
   kilo_pass_pause_events,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { KiloPassCadence, KiloPassPaymentProvider } from './enums';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 
 function stripeSubscriptionFields(prefix: string): {
   provider_subscription_id: string;

@@ -11,7 +11,7 @@ import {
   setAdminAccessSinkForTest,
   UNSCOPED_TARGET,
   type AdminAccessEvent,
-} from '@/lib/admin/admin-access-log';
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
 const testRouter = createTRPCRouter({

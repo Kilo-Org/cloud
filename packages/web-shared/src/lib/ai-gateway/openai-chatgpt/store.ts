@@ -2,9 +2,13 @@ import 'server-only';
 
 import { and, eq, isNotNull, isNull, sql, type SQL } from 'drizzle-orm';
 import { openai_chatgpt_connections } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { decryptApiKey, encryptApiKey, type EncryptedData } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import {
+  decryptApiKey,
+  encryptApiKey,
+  type EncryptedData,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { OpenAiChatGptConnectionSchema, type OpenAiChatGptConnection } from './types';
 import { isChatGptUsageLimitCurrent, type ChatGptUsageLimit } from './usage-limit';
 

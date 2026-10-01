@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { getEnvVariable } from '@/lib/dotenvx';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 function requireEnvVariable(key: string): string {
   const value = getEnvVariable(key);

@@ -1,4 +1,4 @@
-import type { CustomerInfo } from '@/lib/customerInfo';
+import type { CustomerInfo } from '@kilocode/web-shared/lib/customerInfo';
 import { created_before } from './promoCustomerRequirement';
 
 function makeCustomerInfo(overrides: { created_at: string }): CustomerInfo {

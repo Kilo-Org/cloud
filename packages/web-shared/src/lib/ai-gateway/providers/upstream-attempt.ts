@@ -1,19 +1,19 @@
 import { after, type NextResponse } from 'next/server';
 
-import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
   clearOpenAiChatGptUsageLimit,
   recordOpenAiChatGptUsageLimit,
   type OpenAiChatGptOwner,
-} from '@/lib/ai-gateway/openai-chatgpt/store';
-import { readChatGptUsageLimit } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
-import { applyProviderSpecificLogic } from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
-import type { GetProviderProviderResult } from '@/lib/ai-gateway/providers/get-provider';
-import { isValidOpenRouterModelId } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { getReasoningEffort } from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { readChatGptUsageLimit } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { applyProviderSpecificLogic } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import type { GetProviderProviderResult } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 
 type SendUpstreamAttemptInput = {
   providerContext: GetProviderProviderResult;

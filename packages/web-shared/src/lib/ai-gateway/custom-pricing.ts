@@ -1,12 +1,12 @@
 import { captureMessage } from '@sentry/nextjs';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import type { JustTheCostsUsageStats } from '@/lib/ai-gateway/processUsage.types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   calculateCost_mUsd,
   type Pricing,
   type PricingTiers,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export type CustomPricing = {
   pricing: PricingTiers;

@@ -2,7 +2,7 @@ import 'server-only';
 import type { User } from '@kilocode/db/schema';
 import { captureException } from '@sentry/nextjs';
 import { headers } from 'next/headers';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Per-request, identity-attributed audit telemetry for Kilocode admin access.

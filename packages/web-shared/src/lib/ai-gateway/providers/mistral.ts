@@ -1,5 +1,8 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { dropToolStrictProperties, normalizeToolCallIds } from '@/lib/ai-gateway/tool-calling';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import {
+  dropToolStrictProperties,
+  normalizeToolCallIds,
+} from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
 export function isMistralModel(model: string) {
   return model.includes('mistral');

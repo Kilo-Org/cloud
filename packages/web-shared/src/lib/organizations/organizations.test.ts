@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach, beforeEach } from '@jest/globals';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_invitations,

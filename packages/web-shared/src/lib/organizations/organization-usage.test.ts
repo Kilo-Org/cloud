@@ -1,8 +1,8 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { after } from 'next/server';
-import { sendBalanceAlertEmail } from '@/lib/email';
-import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
-import { db } from '@/lib/drizzle';
+import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
+import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_memberships,
@@ -22,12 +22,12 @@ import {
 } from './organization-usage';
 import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
 
-jest.mock('@/lib/email', () => ({
-  ...jest.requireActual('@/lib/email'),
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/email'),
   sendBalanceAlertEmail: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('@/lib/notifications-worker-client', () => ({
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchLowBalancePush: jest.fn().mockResolvedValue(undefined),
   dispatchSecurityFindingPush: jest.fn().mockResolvedValue(undefined),
 }));

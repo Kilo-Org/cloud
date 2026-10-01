@@ -5,6 +5,7 @@ import { FormField } from './form-field';
 import { AccessibleStatus } from './accessible-status';
 import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
+import { compiledLengthDp } from '@/test/native-dimensions';
 import ar from '@/i18n/locales/ar.json';
 import en from '@/i18n/locales/en.json';
 
@@ -225,6 +226,35 @@ describe('FormField multiline inset', () => {
     expect(input.props.className).not.toContain('leading-[normal]');
     expect(input.props.textAlignVertical).toBe('top');
     expect(input.props.placeholder).toBe(i18n.t('profiles.descriptionPlaceholder'));
+  });
+
+  it('compiles the profile description field to a native box that insets its content', async () => {
+    // The token assertions above pin intent; this compiles the exact className
+    // the merged field renders through the app's NativeWind compiler, so the
+    // inset the value and placeholder get is a real native box — the rules
+    // Metro emits and the on-device accessibility explorer measures. `px-3` is
+    // 10.5pt and `py-2.5` is 8.75pt at the app's 14pt rem; padding is static,
+    // so focus, theme, and an open keyboard leave it unchanged.
+    act(() => {
+      renderer = TestRenderer.create(
+        createElement(FormField, {
+          label: i18n.t('profiles.descriptionLabel'),
+          placeholder: i18n.t('profiles.descriptionPlaceholder'),
+          multiline: true,
+          textAlignVertical: 'top',
+          className: 'min-h-20 leading-5',
+        })
+      );
+    });
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    const className = renderer.root.findByType('TextInput').props.className as string;
+
+    expect(await compiledLengthDp(className, 'paddingInline')).toBe(10.5);
+    expect(await compiledLengthDp(className, 'paddingBlock')).toBe(8.75);
+    // The caller's `min-h-20` survives the inset merge as the field's native floor.
+    expect(await compiledLengthDp(className, 'minHeight')).toBe(70);
   });
 });
 

@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Input, INPUT_BOX_CLASS, INPUT_MULTILINE_INSET_CLASS } from './input';
 import { act, TestRenderer } from '@/test/renderer';
+import { compiledLengthDp } from '@/test/native-dimensions';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
 vi.mock('react-native', () => ({
@@ -157,6 +158,40 @@ describe('Input multiline', () => {
     expect(input.props.className).toContain('py-3');
     expect(input.props.className).not.toContain('px-3');
     expect(input.props.className).not.toContain('py-2.5');
+  });
+
+  it('compiles the shared inset to the real native padding that clears the value and placeholder', async () => {
+    // A token assertion pins intent; compiling the same class through the app's
+    // NativeWind compiler pins the box the platform lays out — the rules Metro
+    // emits and the on-device accessibility explorer measures. At the app's
+    // 14pt rem `px-3` is 10.5pt and `py-2.5` is 8.75pt per side. Padding is
+    // static, so focus and an open keyboard do not change it.
+    expect(await compiledLengthDp(INPUT_MULTILINE_INSET_CLASS, 'paddingInline')).toBe(10.5);
+    expect(await compiledLengthDp(INPUT_MULTILINE_INSET_CLASS, 'paddingBlock')).toBe(8.75);
+  });
+
+  it('compiles the profile description field to the inset without dropping its own box', async () => {
+    const input = mountInput({
+      multiline: true,
+      textAlignVertical: 'top',
+      className: 'min-h-20 leading-5',
+    });
+    const className = input.props.className as string;
+
+    expect(await compiledLengthDp(className, 'paddingInline')).toBe(10.5);
+    expect(await compiledLengthDp(className, 'paddingBlock')).toBe(8.75);
+    // The caller's `min-h-20` survives the inset merge as the field's native floor.
+    expect(await compiledLengthDp(className, 'minHeight')).toBe(70);
+  });
+
+  it('compiles a caller padding override instead of the shared inset', async () => {
+    const input = mountInput({ multiline: true, className: 'px-4 py-3 leading-5' });
+    const className = input.props.className as string;
+
+    // tailwind-merge drops the shared `px-3`/`py-2.5` before NativeWind sees
+    // them, so the native box is the caller's 14pt/10.5pt padding.
+    expect(await compiledLengthDp(className, 'paddingInline')).toBe(14);
+    expect(await compiledLengthDp(className, 'paddingBlock')).toBe(10.5);
   });
 
   it('does not force an alignment when the caller sets none', () => {

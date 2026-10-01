@@ -13,6 +13,11 @@ const nextConfig = {
     root: monorepoRoot,
   },
 
+  // packages/web-shared/src/lib/email.ts reads these at runtime.
+  outputFileTracingIncludes: {
+    '/**': ['../../packages/web-shared/src/emails/*.html'],
+  },
+
   // Same as apps/web, so gateway clients see identical trailing-slash handling.
   skipTrailingSlashRedirect: true,
 };

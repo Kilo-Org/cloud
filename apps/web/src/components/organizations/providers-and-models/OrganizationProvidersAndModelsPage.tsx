@@ -470,12 +470,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           showBackButton={false}
         />
 
-        <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
-
         <Tabs defaultValue="models">
           <TabsList className="w-fit">
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
+            <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -515,6 +514,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onToggleProviderEnabled={handleToggleProviderEnabled}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
+          </TabsContent>
+
+          <TabsContent value="auto-routing" className="mt-6">
+            <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>
 

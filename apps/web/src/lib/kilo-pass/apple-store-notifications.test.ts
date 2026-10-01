@@ -3375,6 +3375,81 @@ describe('App Store bouncer store events', () => {
     });
   });
 
+  it('grants base credits to a paid resubscribe in the month of a refunded pass', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user } = await subscribeWithIssuedCredits(decodedTransaction);
+    await processAppStoreKiloPassNotification(
+      refund(
+        'same-month-refund',
+        appStoreTransaction(decodedTransaction, {
+          appAccountToken: user.app_store_account_token,
+        })
+      )
+    );
+    expect(await readTotal(user.id)).toBe(0);
+
+    // The user pays again later in the same calendar month (after the refund)
+    // on the same subscription.
+    const resubscribe = transaction({
+      originalTransactionId: decodedTransaction.originalTransactionId,
+      transactionId: `tx-${crypto.randomUUID()}`,
+      appAccountToken: user.app_store_account_token,
+      purchaseDate: SIGNED_DATE_MS + 60 * 60_000,
+    });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'same-month-resubscribe',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: `resubscribe-${resubscribe.transactionId}`,
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.RESUBSCRIBE,
+        }),
+      decodeTransaction: async () => resubscribe,
+    });
+
+    expect(await readTotal(user.id)).toBe(toMicrodollars(19));
+    expect(await readSubscription(decodedTransaction.originalTransactionId)).toMatchObject({
+      status: 'active',
+    });
+  });
+
+  it('does not re-grant a month whose refund Apple reversed', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+    });
+    await processAppStoreKiloPassNotification(refund('reversed-month-refund', refundTransaction));
+    await processAppStoreKiloPassNotification(
+      refundReversed(
+        'reversed-month-reversal',
+        refundTransaction,
+        'Sandbox',
+        SIGNED_DATE_MS + 1_000
+      )
+    );
+    expect(await readTotal(user.id)).toBe(totalAfterPurchase);
+
+    // The month's base credits stand again, so a same-month renewal issues none.
+    const renewal = transaction({
+      originalTransactionId: decodedTransaction.originalTransactionId,
+      transactionId: `tx-${crypto.randomUUID()}`,
+      appAccountToken: user.app_store_account_token,
+      purchaseDate: SIGNED_DATE_MS + 60 * 60_000,
+    });
+    await processAppStoreKiloPassNotification({
+      signedPayload: 'reversed-month-renewal',
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: `renewal-${renewal.transactionId}`,
+          notificationType: NotificationTypeV2.DID_RENEW,
+        }),
+      decodeTransaction: async () => renewal,
+    });
+
+    expect(await readTotal(user.id)).toBe(totalAfterPurchase);
+  });
+
   it('keeps the pass refunded when a reversal older than the refund arrives last', async () => {
     const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
     const { user } = await subscribeWithIssuedCredits(decodedTransaction);

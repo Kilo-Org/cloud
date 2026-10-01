@@ -2331,6 +2331,43 @@ describe('Google Play bouncer store events', () => {
     });
   });
 
+  it('grants base credits to a same-month renewal after the refunded order', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `refund-renew-token-${crypto.randomUUID()}`;
+    const refundedOrderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, refundedOrderId, obfsAccountId);
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId: refundedOrderId,
+      purchaseToken: token,
+      state: 'REFUNDED',
+    });
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedMessage('refund-before-renew', token, refundedOrderId),
+    });
+    const afterRefund = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterRefund!.total_microdollars_acquired).toBe(0);
+
+    // Play charges a new order on the same subscription in the same month.
+    const renewedOrderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, renewedOrderId)
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 2,
+        purchaseToken: token,
+        messageId: `renew-${renewedOrderId}`,
+      }),
+    });
+
+    const afterRenewal = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterRenewal!.total_microdollars_acquired).toBe(toMicrodollars(19));
+  });
+
   it('reports a production purchase with its USD amount in cents', async () => {
     const { user, obfsAccountId } = await insertGooglePlayUser();
     const token = `purchase-token-${crypto.randomUUID()}`;

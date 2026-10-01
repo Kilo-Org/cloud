@@ -87,6 +87,46 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
+test('ai-gateway deploys skip until its Vercel project variable is set', () => {
+  const redeploy = workflow('redeploy-web');
+  const unconfigured = /vars\.VERCEL_PROJECT_ID_AI_GATEWAY != ''/;
+  for (const job of [
+    production.jobs['stage-ai-gateway'],
+    staging.jobs['deploy-ai-gateway'],
+    redeploy.jobs['stage-ai-gateway'],
+  ]) {
+    assert.match(job.if, unconfigured);
+    assert.equal(job.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+    assert.equal(job.secrets.VERCEL_PROJECT_TOKEN, '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}');
+  }
+  assert.match(production.jobs['stage-ai-gateway'].if, /should_deploy == 'true'/);
+  assert.match(staging.jobs['deploy-ai-gateway'].if, /should_deploy == 'true'/);
+  assert.deepEqual(production.jobs['promote-ai-gateway'].needs, [
+    'stage-ai-gateway',
+    'check-production-db-startup',
+    'run-migrations',
+  ]);
+  assert.deepEqual(staging.jobs['deploy-ai-gateway'].needs, [
+    'check-changes',
+    'check-staging-db-startup',
+    'run-migrations',
+  ]);
+  assert.equal(redeploy.jobs['promote-ai-gateway'].needs, 'stage-ai-gateway');
+
+  for (const [deployment, jobs] of [
+    [production, ['stage-ai-gateway', 'promote-ai-gateway']],
+    [staging, ['deploy-ai-gateway']],
+  ]) {
+    const record = deployment.jobs['record-deployment'];
+    for (const job of jobs) {
+      assert.ok(record.needs.includes(job));
+      assert.ok(
+        record.if.includes(`contains(fromJSON('["success","skipped"]'), needs.${job}.result)`)
+      );
+    }
+  }
+});
+
 test('staging and production Worker changes use independent deployment baselines', () => {
   assert.equal(workers.concurrency.group, 'deploy-workers-${{ inputs.target_environment }}');
   assert.equal(

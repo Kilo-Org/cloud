@@ -1508,6 +1508,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
     await this.writeAllocation(state);
+    if (
+      previous.kind !== state.kind ||
+      previous.stopAttempt !== state.stopAttempt ||
+      (previous.unconfirmedProviderRef === null) !== (state.unconfirmedProviderRef === null)
+    ) {
+      logControlDiagnostic('allocation_transition', {
+        allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+        event: event.type,
+        from: previous.kind,
+        to: state.kind,
+        stopAttempt: state.stopAttempt,
+        stopReason: stopReason ?? 'none',
+        unconfirmedProviderRef: state.unconfirmedProviderRef !== null,
+      });
+    }
     await this.armAlarm(state);
     await this.afterVercelBillingTransition(event);
     await this.applyRouteEffects(previous, state, event, stopReason);
@@ -2096,7 +2111,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
-    if (await routeRetryAllowed(ctx)) {
+    const retry = await routeRetryAllowed(ctx);
+    const routes = await listRoutes(this.db);
+    logControlDiagnostic('allocation_stopped', {
+      allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      from: previous.kind,
+      unconfirmedProviderRef: next.unconfirmedProviderRef !== null,
+      reallocate: retry,
+      preparingRoutes: routes.filter(route => route.state === 'preparing').length,
+      readyRoutes: routes.filter(route => route.state === 'ready').length,
+      otherRoutes: routes.filter(route => route.state !== 'preparing' && route.state !== 'ready')
+        .length,
+    });
+    if (retry) {
       await this.applyEvent({ type: 'ensure', at: ctx.now(), allocationId: crypto.randomUUID() });
     } else {
       await this.armAlarm(next);

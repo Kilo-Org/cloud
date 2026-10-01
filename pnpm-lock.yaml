@@ -1773,6 +1773,9 @@ importers:
       '@kilocode/encryption':
         specifier: workspace:*
         version: link:../encryption
+      '@kilocode/session-ingest-contracts':
+        specifier: workspace:*
+        version: link:../session-ingest-contracts
       aws4fetch:
         specifier: 'catalog:'
         version: 1.0.20

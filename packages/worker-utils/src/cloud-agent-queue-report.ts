@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
 import {
   CloudAgentFailureCodeSchema,
   CloudAgentFailureReasonSchema,
@@ -51,7 +52,6 @@ export const DIAGNOSTIC_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 const IsoTimestampSchema = z.string().datetime({ offset: true });
 const OperationalIdentifierSchema = z.string().min(1).max(MAX_OPERATIONAL_IDENTIFIER_LENGTH);
-const kiloSessionIdSchema = z.string().startsWith('ses_').length(30);
 const WrapperRunIdentifierSchema = OperationalIdentifierSchema.regex(/^wr_[A-Za-z0-9_-]+$/);
 const validFailureClassifications = new Set(
   CloudAgentRunFailureClassifications.map(

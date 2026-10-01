@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'bun:test';
-import fsp from 'node:fs/promises';
-import path from 'node:path';
 import {
   CONTROL_PLANE_TIMERS,
   type ControlPlaneTimers,
@@ -55,6 +53,7 @@ type EnsureInput = { key: string; directory: string; env: Record<string, string>
 type Harness = {
   manager: ReturnType<typeof createPreparationManager>;
   frames: ControlPlaneWrapperFrame[];
+  logs: string[];
   gitCalls: string[][];
   authorCalls: Array<{ name: string; email: string } | undefined>;
   ensureCalls: () => number;
@@ -91,6 +90,7 @@ function createHarness(
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
+  const logs: string[] = [];
   const gitCalls: string[][] = [];
   const authorCalls: Array<{ name: string; email: string } | undefined> = [];
   const ensureInputs: EnsureInput[] = [];
@@ -153,6 +153,7 @@ function createHarness(
   const manager = createPreparationManager({
     timers: activeTimers,
     emit: frame => frames.push(frame),
+    log: message => logs.push(message),
     runtimes,
     inheritedEnv: {},
     homeRoot: '/tmp/prepare-test-homes',
@@ -198,6 +199,7 @@ function createHarness(
   return {
     manager,
     frames,
+    logs,
     gitCalls,
     authorCalls,
     ensureCalls: () => ensureCalls,
@@ -725,7 +727,7 @@ describe('createPreparationManager', () => {
     expect(harness.ensureSessionCalls()).toBe(1);
   });
 
-  it('reports an incomplete restore and writes the agent rules file', async () => {
+  it('logs an incomplete restore and completes preparation', async () => {
     const harness = createHarness();
     harness.setSessionExists(false);
     harness.setRestore(async () => ({
@@ -743,12 +745,10 @@ describe('createPreparationManager', () => {
 
     await harness.manager.prepare(spec);
 
-    const home = harness.ensureInputs.find(input => input.env.HOME !== undefined)?.env.HOME;
-    expect(home).toBeDefined();
-    const rules = path.join(home!, '.kilocode/rules/restore-incomplete.md');
-    const content = await fsp.readFile(rules, 'utf8');
-    expect(content.length).toBeGreaterThan(0);
-    await fsp.rm(home!, { recursive: true, force: true });
+    expect(harness.logs).toContain(
+      `bootstrap restore incomplete kiloSessionId=${spec.kiloSessionId} skipped=1 total=2 reasons=conflict paths=a.ts`
+    );
+    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
   });
 
   it('uses the existing Kilo session without restoring', async () => {

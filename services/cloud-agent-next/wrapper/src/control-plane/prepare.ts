@@ -482,12 +482,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
     const restored = await restore(spec.kiloSessionId, directory, undefined, { env, signal });
     if (restored.ok) {
-      // Spec §7/§9: a skipped diff is a named outcome, not just a progress line —
-      // report it and write the rules file the agent reads (legacy port).
       if (restored.diffs.skipped > 0) {
         await reportRestoreIncomplete({
           diffs: restored.diffs,
-          sessionHome: env.HOME ?? directory,
           identity: `kiloSessionId=${spec.kiloSessionId}`,
           log,
         }).catch(() => undefined);

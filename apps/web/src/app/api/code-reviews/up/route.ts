@@ -15,7 +15,7 @@ import {
 
 // Hardcoded query-string filter that the BetterStack monitor passes. Not a
 // secret — just a low-friction way to keep scanners and accidental hits from
-// running detector queries.
+// running detector queries. Mirrors `apps/web/src/app/api/models/up/route.ts`.
 const HEALTH_CHECK_KEY = 'kilo-code-reviews-health-check';
 const DETECTOR_STATEMENT_TIMEOUT_MS = 10_000;
 

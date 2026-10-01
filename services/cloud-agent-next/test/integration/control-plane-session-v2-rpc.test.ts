@@ -143,7 +143,9 @@ function createFakeProvider(): { adapter: ProviderAdapter; createCalls: number }
       provider.createCalls += 1;
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch() {},
+    async launch() {
+      return { startSource: 'image' as const };
+    },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },

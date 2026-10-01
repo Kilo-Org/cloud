@@ -1,5 +1,5 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject, SELF } from 'cloudflare:test';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -313,6 +313,7 @@ function createFakeProvider(): FakeProvider {
     },
     async launch(_ref, launchEnv) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -1116,9 +1117,12 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
         for (const [key, value] of retained) await state.storage.put(key, value);
         expect(await state.storage.get('control_plane_generation')).toBe(2);
         db.insert(allocationTable).values(allocation).run();
-        db.insert(routesTable)
-          .values({ ...route, grant: JSON.stringify(grant) })
-          .run();
+        // Raw SQL: the pre-B routes table predates `repo_key`, which the schema now carries.
+        db.run(
+          sql`INSERT INTO routes (session_id, spec, grant, credential_source, state, attempt_id, attempt_deadline_at, reason, updated_at)
+              VALUES (${route.session_id}, ${route.spec}, ${JSON.stringify(grant)}, ${route.credential_source},
+                      ${route.state}, ${route.attempt_id}, ${route.attempt_deadline_at}, ${route.reason}, ${route.updated_at})`
+        );
         const originalPeerFor = instance.sessionPeerFor;
         let reconstructed: SandboxControlV2 | undefined;
         const restore = () => {

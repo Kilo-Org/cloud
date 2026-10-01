@@ -170,16 +170,20 @@ const AVAILABLE_COMMANDS_KEY = 'available_commands';
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
   clone: 'cloning',
+  restore: 'workspace_restore',
   checkout: 'branch',
   setup: 'setup_commands',
+  snapshot: 'workspace_backup',
   kilo_runtime: 'kilo_server',
   kilo_session: 'kilo_session',
 };
 
 const PREPARING_STEP_MESSAGE: Record<ControlPlanePreparationStep, string> = {
   clone: 'Cloning repository',
+  restore: 'Using prepared repository',
   checkout: 'Checking out branch',
   setup: 'Running setup commands',
+  snapshot: 'Saving repository for faster starts',
   kilo_runtime: 'Starting Kilo runtime',
   kilo_session: 'Preparing Kilo session',
 };

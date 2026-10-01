@@ -21,6 +21,8 @@ import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
+import { logger } from '../logger.js';
+import { repoSnapshotIndexKey } from './repo-snapshot-index.js';
 import {
   ContainersAllocationConflictError,
   SandboxContainers,
@@ -38,8 +40,7 @@ const REF_B = 'ref-b';
 type StoredRecord = {
   state: 'idle' | 'launching' | 'running' | 'stopping';
   allocationRef: string | null;
-  stopOpId: string | null;
-  lastSnapshot: { id: string; sourceAllocation: string } | null;
+  startSource?: 'image' | 'repository';
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
@@ -48,8 +49,6 @@ type StoredRecord = {
 const idleRecord: StoredRecord = {
   state: 'idle',
   allocationRef: null,
-  stopOpId: null,
-  lastSnapshot: null,
 };
 
 type ExecBehavior = {
@@ -178,7 +177,9 @@ class FakeContainer {
 
 type PutDecision = 'pass' | 'hold' | 'fail';
 
-function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {}) {
+function setup(
+  options: { record?: StoredRecord; attachContainer?: boolean; env?: Partial<Env> } = {}
+) {
   const container = new FakeContainer();
   let alarm: number | undefined;
   const pendingTasks: Promise<unknown>[] = [];
@@ -230,7 +231,7 @@ function setup(options: { record?: StoredRecord; attachContainer?: boolean } = {
       pendingTasks.push(promise);
     },
   } as unknown as DurableObjectState;
-  const instance = new SandboxContainers(ctx, {} as Env);
+  const instance = new SandboxContainers(ctx, (options.env ?? {}) as Env);
   const readRecord = () => storage.map.get(RECORD_KEY) as StoredRecord;
   return {
     storage,
@@ -267,7 +268,7 @@ describe('SandboxContainers launch', () => {
 
     const result = await launch(instance, REF_A, { FOO: 'bar' });
 
-    expect(result).toEqual({ started: true });
+    expect(result).toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toEqual([
       { image: 'registry.example/kilo/app:test', instance: 'standard-2', enableInternet: true },
     ]);
@@ -279,30 +280,9 @@ describe('SandboxContainers launch', () => {
 
     const again = await launch(instance, REF_A, { FOO: 'bar' });
 
-    expect(again).toEqual({ started: false });
+    expect(again).toEqual({ started: false, startSource: 'image' });
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toHaveLength(1);
-  });
-
-  it('restores a stored snapshot with containerSnapshot and never passes image', async () => {
-    const { instance, container } = setup({
-      record: {
-        state: 'idle',
-        allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: { id: 'snap-stored', sourceAllocation: REF_A },
-      },
-    });
-
-    await instance.launchWrapper({ allocationRef: REF_B, env: {}, instance: 'lite' });
-
-    const options = container.startCalls[0] as Record<string, unknown>;
-    expect(options).toEqual({
-      containerSnapshot: { id: 'snap-stored' },
-      instance: 'lite',
-      enableInternet: true,
-    });
-    expect('image' in options).toBe(false);
   });
 
   it('installs the Kilo and git outbound proxy before a contained start', async () => {
@@ -360,7 +340,7 @@ describe('SandboxContainers launch', () => {
       containment: true,
     });
 
-    expect(resumed).toEqual({ started: true });
+    expect(resumed).toEqual({ started: true, startSource: 'image' });
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(container.execCalls[1]?.options?.env).toEqual({
       FOO: 'bar',
@@ -384,7 +364,7 @@ describe('SandboxContainers launch', () => {
     adopts.container.running = true;
     adopts.container.execHandler = () => makeExecProcess({ exitCode: 0 });
     const adopted = await launch(adopts.instance, REF_A);
-    expect(adopted).toEqual({ started: true });
+    expect(adopted).toEqual({ started: true, startSource: 'image' });
     expect(adopts.readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
     expect(adopts.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
 
@@ -399,7 +379,7 @@ describe('SandboxContainers launch', () => {
     reexecs.container.execHandler = cmd =>
       makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
     const reexecuted = await launch(reexecs.instance, REF_A);
-    expect(reexecuted).toEqual({ started: true });
+    expect(reexecuted).toEqual({ started: true, startSource: 'image' });
     expect(reexecs.readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
     expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
   });
@@ -448,7 +428,7 @@ describe('SandboxContainers launch', () => {
     });
 
     await vi.advanceTimersByTimeAsync(5_000);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
     expect(maxActiveProbes).toBe(1);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('pgrep');
@@ -481,7 +461,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(999);
     expect(buns).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
     expect(buns).toBe(2);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('/bin/sh');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
@@ -523,7 +503,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(999);
     expect(buns).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
 
     expect(buns).toBe(2);
     expect(bunStarts).toEqual([0, 1_000]);
@@ -898,25 +878,12 @@ describe('SandboxContainers launch', () => {
       instance: 'standard-3',
     });
 
-    expect(resumed).toEqual({ started: true });
+    expect(resumed).toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toEqual([
       { image: 'registry.example/kilo/app:test', instance: 'standard-3', enableInternet: true },
     ]);
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
-  });
-
-  it('repairs a stopping record that lacks a stop op id before snapshotting', async () => {
-    const { instance, readRecord } = setup({
-      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: null },
-    });
-
-    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
-
-    expect(readRecord()).toMatchObject({
-      state: 'idle',
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
-    });
   });
 
   it('leaves launching and throws when the probe exits with an unexpected code, never re-execing', async () => {
@@ -1047,7 +1014,10 @@ describe('SandboxContainers wrapper attempt gate', () => {
     });
     container.running = true;
 
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: false });
+    await expect(launch(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
 
     expect(container.startCalls).toHaveLength(0);
     expect(container.execCalls).toHaveLength(0);
@@ -1073,7 +1043,10 @@ describe('SandboxContainers wrapper attempt gate', () => {
       container.running = true;
       container.execHandler = () => makeExecProcess({ exitCode: 0 });
 
-      await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+      await expect(launch(instance, REF_A)).resolves.toEqual({
+        started: true,
+        startSource: 'image',
+      });
 
       expect(container.startCalls).toHaveLength(0);
       expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep']);
@@ -1279,7 +1252,7 @@ describe('SandboxContainers observe', () => {
       { record: { ...idleRecord, state: 'launching', allocationRef: REF_A }, running: true },
       { record: { ...idleRecord, state: 'running', allocationRef: REF_A }, running: true },
       {
-        record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: 'op-1' },
+        record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
         running: true,
       },
       { record: { ...idleRecord, state: 'launching', allocationRef: REF_A }, running: false },
@@ -1308,198 +1281,7 @@ describe('SandboxContainers observe', () => {
 });
 
 describe('SandboxContainers stop', () => {
-  it('serialises duplicate stops while the snapshot resolves, destroying once after confirmation', async () => {
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    let first: 'terminal' | 'retryable' | undefined;
-    let second: 'terminal' | 'retryable' | undefined;
-    const firstStop = instance.stop(REF_A).then(result => {
-      first = result;
-    });
-    const secondStop = instance.stop(REF_A).then(result => {
-      second = result;
-    });
-
-    await vi.waitFor(() => expect(container.snapshotCalls).toBe(1));
-    expect(first).toBeUndefined();
-    expect(second).toBeUndefined();
-    expect(container.destroyCalls).toBe(0);
-
-    container.deferredSnapshots[0]?.resolve('snap-1');
-    await Promise.all([firstStop, secondStop]);
-
-    expect(first).toBe('terminal');
-    expect(second).toBe('terminal');
-    expect(container.snapshotCalls).toBe(1);
-    expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, stopOpId: null });
-  });
-
-  it('retains ownership when destroy fails, then a retried stop resumes the persisted op and destroys', async () => {
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.destroyBehavior = 'reject';
-
-    const first = await instance.stop(REF_A);
-
-    expect(first).toBe('retryable');
-    const persistedOpId = readRecord().stopOpId;
-    expect(persistedOpId).toEqual(expect.any(String));
-    expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
-    expect(container.running).toBe(true);
-
-    container.snapshotBehavior = { kind: 'deferred' };
-    container.destroyBehavior = 'ok';
-    let second: 'terminal' | 'retryable' | undefined;
-    const secondStop = instance.stop(REF_A).then(result => {
-      second = result;
-    });
-
-    await vi.waitFor(() => expect(container.snapshotCalls).toBe(2));
-    expect(second).toBeUndefined();
-    expect(readRecord().stopOpId).toBe(persistedOpId);
-
-    container.deferredSnapshots[0]?.resolve('snap-2');
-    await secondStop;
-
-    expect(second).toBe('terminal');
-    expect(readRecord()).toEqual({
-      state: 'idle',
-      allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: { id: 'snap-2', sourceAllocation: REF_A },
-    });
-  });
-
-  it('does not publish a snapshot that resolves after the allocation was replaced', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    const stopPromise = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-
-    await vi.advanceTimersByTimeAsync(11_000);
-    await expect(stopPromise).resolves.toBe('terminal');
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
-
-    await launch(instance, REF_B);
-    expect(readRecord()).toMatchObject({
-      state: 'running',
-      allocationRef: REF_B,
-      lastSnapshot: null,
-    });
-
-    container.deferredSnapshots[0]?.resolve('late-snap');
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord().lastSnapshot).toBeNull();
-  });
-
-  it('does not let a timed-out stop publish after a later stop owns the record (no ABA)', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-
-    const firstStop = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-    const firstOpId = readRecord().stopOpId;
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    await expect(firstStop).resolves.toBe('terminal');
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
-    expect(container.deferredSnapshots).toHaveLength(1);
-
-    await launch(instance, REF_A);
-    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
-
-    const secondStop = instance.stop(REF_A);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(2);
-    const secondOpId = readRecord().stopOpId;
-    expect(secondOpId).toEqual(expect.any(String));
-    expect(secondOpId).not.toBe(firstOpId);
-
-    container.deferredSnapshots[0]?.resolve('late-op1');
-    await vi.advanceTimersByTimeAsync(0);
-    expect(readRecord()).toEqual({
-      state: 'stopping',
-      allocationRef: REF_A,
-      stopOpId: secondOpId,
-      lastSnapshot: null,
-      instance: 'standard-2',
-    });
-
-    container.deferredSnapshots[1]?.resolve('op2');
-    await secondStop;
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord().lastSnapshot).toEqual({ id: 'op2', sourceAllocation: REF_A });
-  });
-
-  it('defers a late snapshot behind a pending destroy so it cannot publish during cleanup', async () => {
-    vi.useFakeTimers();
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'deferred' };
-    container.destroyBehavior = 'deferred';
-
-    let settled: 'terminal' | 'retryable' | undefined;
-    const stopPromise = instance.stop(REF_A).then(result => {
-      settled = result;
-      return result;
-    });
-
-    await vi.advanceTimersByTimeAsync(0);
-    expect(container.snapshotCalls).toBe(1);
-    const opId = readRecord().stopOpId;
-
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(container.destroyCalls).toBe(1);
-    expect(container.deferredDestroy).not.toBeNull();
-    expect(settled).toBeUndefined();
-
-    container.deferredSnapshots[0]?.resolve('late-snap');
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(readRecord()).toEqual({
-      state: 'stopping',
-      allocationRef: REF_A,
-      stopOpId: opId,
-      lastSnapshot: null,
-    });
-
-    container.deferredDestroy?.resolve();
-    await stopPromise;
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(settled).toBe('terminal');
-    expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toEqual({
-      state: 'idle',
-      allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: null,
-    });
-  });
-
-  it('returns retryable and keeps the live stop op when destroy never acknowledges', async () => {
+  it('returns retryable and keeps the stopping record when destroy never acknowledges', async () => {
     vi.useFakeTimers();
     const { instance, container, readRecord } = setup({
       record: { ...idleRecord, state: 'running', allocationRef: REF_A },
@@ -1515,8 +1297,6 @@ describe('SandboxContainers stop', () => {
 
     await vi.advanceTimersByTimeAsync(0);
     expect(container.destroyCalls).toBe(1);
-    const opId = readRecord().stopOpId;
-    expect(opId).toEqual(expect.any(String));
     expect(settled).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(30_000);
@@ -1526,14 +1306,12 @@ describe('SandboxContainers stop', () => {
     expect(readRecord()).toEqual({
       state: 'stopping',
       allocationRef: REF_A,
-      stopOpId: opId,
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
     });
   });
 
   it('returns retryable for a stale stop while another allocation is stopping, then terminal after its destroy confirms', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: 'op-a' },
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
     });
     container.running = true;
 
@@ -1568,7 +1346,6 @@ describe('SandboxContainers stop', () => {
     expect(first).toBeUndefined();
     expect(second).toBeUndefined();
     expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
-    expect(readRecord().stopOpId).toEqual(expect.any(String));
 
     container.deferredDestroy?.resolve();
     await Promise.all([firstStop, secondStop]);
@@ -1579,23 +1356,7 @@ describe('SandboxContainers stop', () => {
     expect(readRecord()).toEqual({
       state: 'idle',
       allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: { id: 'snap-1', sourceAllocation: REF_A },
     });
-  });
-
-  it('destroys even when the snapshot fails', async () => {
-    const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
-    });
-    container.running = true;
-    container.snapshotBehavior = { kind: 'reject' };
-
-    const result = await instance.stop(REF_A);
-
-    expect(result).toBe('terminal');
-    expect(container.destroyCalls).toBe(1);
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, lastSnapshot: null });
   });
 
   it('does not clear a pending phase when a timed-out destroy later resolves, but a confirmed stop does', async () => {
@@ -1692,9 +1453,9 @@ describe('SandboxContainers force destroy', () => {
       state: 'idle',
       currentAllocationRef: null,
     });
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, stopOpId: null });
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
 
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toHaveLength(1);
   });
 });
@@ -1741,6 +1502,339 @@ describe('SandboxContainers lease and log', () => {
 
     await expect(instance.readLog(REF_A, CONTROL_WRAPPER_LOG_PATH, 100)).resolves.toBe('');
     expect(container.execCalls).toEqual([]);
+  });
+});
+
+type KvCall = { op: 'get' | 'put' | 'delete'; key: string; options?: unknown };
+
+function fakeKv(initial: Record<string, unknown> = {}) {
+  const data = new Map<string, string>(
+    Object.entries(initial).map(([key, value]) => [key, JSON.stringify(value)])
+  );
+  const calls: KvCall[] = [];
+  const failing = { get: false, put: false };
+  const kv = {
+    async get(key: string) {
+      calls.push({ op: 'get', key });
+      if (failing.get) throw new Error('kv unavailable');
+      const raw = data.get(key);
+      return raw === undefined ? null : JSON.parse(raw);
+    },
+    async put(key: string, value: string, options?: unknown) {
+      calls.push({ op: 'put', key, options });
+      if (failing.put) throw new Error('kv unavailable');
+      data.set(key, value);
+    },
+    async delete(key: string) {
+      calls.push({ op: 'delete', key });
+      data.delete(key);
+    },
+  };
+  return { kv: kv as unknown as KVNamespace, data, calls, failing };
+}
+
+const IMAGE = 'registry.example/kilo/app:test';
+const REPO_KEY = 'repo-key-1';
+
+async function indexKeyFor(repoKey = REPO_KEY, image = IMAGE) {
+  return repoSnapshotIndexKey(repoKey, image);
+}
+
+function launchFromRepo(instance: SandboxContainers, ref: string, extra = {}) {
+  return instance.launchWrapper({
+    allocationRef: ref,
+    env: {},
+    instance: 'standard-2',
+    repoKey: REPO_KEY,
+    ...extra,
+  });
+}
+
+describe('SandboxContainers repository snapshots', () => {
+  it('starts from the repository snapshot stored for the repo key and the current image', async () => {
+    const key = await indexKeyFor();
+    const { kv } = fakeKv({ [key]: { snapshotId: 'snap-repo', commit: 'abc123' } });
+    const { instance, container, readRecord } = setup({ env: { REPO_SNAPSHOTS: kv } });
+
+    const result = await launchFromRepo(instance, REF_A);
+
+    expect(result).toEqual({ started: true, startSource: 'repository' });
+    const options = container.startCalls[0] as Record<string, unknown>;
+    expect(options).toEqual({
+      containerSnapshot: { id: 'snap-repo' },
+      instance: 'standard-2',
+      enableInternet: true,
+    });
+    expect('image' in options).toBe(false);
+    expect(readRecord()).toMatchObject({ state: 'running', startSource: 'repository' });
+    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+    });
+  });
+
+  it('starts from the image when the index has no entry, and a different image has none', async () => {
+    const other = await indexKeyFor(REPO_KEY, 'registry.example/kilo/app:previous');
+    const { kv } = fakeKv({ [other]: { snapshotId: 'snap-old-image' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: kv } });
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toEqual({
+      image: IMAGE,
+      instance: 'standard-2',
+      enableInternet: true,
+    });
+  });
+
+  it('never consults the index without a repo key or a KV binding', async () => {
+    const key = await indexKeyFor();
+    const withoutKey = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const first = setup({ env: { REPO_SNAPSHOTS: withoutKey.kv } });
+    await expect(launch(first.instance, REF_A)).resolves.toMatchObject({ startSource: 'image' });
+    expect(withoutKey.calls).toEqual([]);
+
+    const second = setup();
+    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'image',
+    });
+  });
+
+  it('treats an unavailable or malformed index entry as a miss', async () => {
+    const key = await indexKeyFor();
+    const broken = fakeKv();
+    broken.failing.get = true;
+    const first = setup({ env: { REPO_SNAPSHOTS: broken.kv } });
+    await expect(launchFromRepo(first.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'image',
+    });
+
+    const malformed = fakeKv({ [key]: { snapshotId: 42 } });
+    const second = setup({ env: { REPO_SNAPSHOTS: malformed.kv } });
+    await expect(launchFromRepo(second.instance, REF_A)).resolves.toMatchObject({
+      startSource: 'image',
+    });
+  });
+
+  it('forgets the snapshot when its start fails, so the next start is from the image', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-missing' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'reject';
+
+    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
+    expect(store.data.has(key)).toBe(false);
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-missing' } });
+  });
+
+  it('forgets the snapshot when the wrapper cannot start from it', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-broken' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.execHandler = async () => {
+      throw new Error('exec failed');
+    };
+
+    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('exec failed');
+    expect(store.data.has(key)).toBe(false);
+  });
+
+  it('forgets nothing when an image start fails', async () => {
+    const store = fakeKv();
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    container.startBehavior = 'reject';
+
+    await expect(launchFromRepo(instance, REF_A)).rejects.toThrow('container start failed');
+    expect(store.calls.filter(call => call.op === 'delete')).toEqual([]);
+  });
+
+  it('discards the stored snapshot and starts from the image when asked', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-bad' } });
+    const { instance, container } = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+
+    const result = await launchFromRepo(instance, REF_A, { discardRepository: true });
+
+    expect(result).toEqual({ started: true, startSource: 'image' });
+    expect(store.data.has(key)).toBe(false);
+    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+  });
+
+  it('uses the recorded source when it resumes a launch that never started the wrapper', async () => {
+    const key = await indexKeyFor();
+    const store = fakeKv({ [key]: { snapshotId: 'snap-repo' } });
+    const { instance, container, readRecord } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-2',
+        startSource: 'repository',
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    const result = await launchFromRepo(instance, REF_A);
+
+    expect(result).toEqual({ started: true, startSource: 'repository' });
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-repo' } });
+    expect(readRecord().startSource).toBe('repository');
+  });
+
+  it('falls back to the image when the snapshot of an interrupted launch has expired', async () => {
+    const store = fakeKv();
+    const { instance, container, readRecord } = setup({
+      env: { REPO_SNAPSHOTS: store.kv },
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-2',
+        startSource: 'repository',
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+
+    await expect(launchFromRepo(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+    expect(readRecord().startSource).toBe('image');
+  });
+
+  it('ignores a session snapshot left in a pre-change record and never takes one on stop', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        lastSnapshot: { id: 'snap-session', sourceAllocation: REF_A },
+      } as StoredRecord,
+    });
+
+    await launch(instance, REF_B);
+    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+
+    await expect(instance.stop(REF_B)).resolves.toBe('terminal');
+    expect(container.snapshotCalls).toBe(0);
+    expect(readRecord()).not.toHaveProperty('lastSnapshot');
+  });
+});
+
+describe('SandboxContainers repository capture', () => {
+  async function runningWithIndex() {
+    const store = fakeKv();
+    const harness = setup({ env: { REPO_SNAPSHOTS: store.kv } });
+    await launchFromRepo(harness.instance, REF_A);
+    return { ...harness, store };
+  }
+
+  it('publishes the snapshot under the repo key and image with a 10 day ttl', async () => {
+    const { instance, container, store } = await runningWithIndex();
+    container.snapshotBehavior = { kind: 'resolve', id: 'snap-captured' };
+
+    await expect(instance.captureRepository(REF_A, REPO_KEY, 'deadbeef')).resolves.toBe(true);
+
+    const key = await indexKeyFor();
+    expect(JSON.parse(store.data.get(key) as string)).toEqual({
+      snapshotId: 'snap-captured',
+      commit: 'deadbeef',
+    });
+    expect(store.calls.find(call => call.op === 'put')).toEqual({
+      op: 'put',
+      key,
+      options: { expirationTtl: 864_000 },
+    });
+    expect(container.snapshotCalls).toBe(1);
+  });
+
+  it('logs one line per capture with its outcome and duration, and no key or id', async () => {
+    const lines: Array<{ level: string; fields: Record<string, unknown>; message: string }> = [];
+    vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
+      info: (message: string) => lines.push({ level: 'info', fields, message }),
+      warn: (message: string) => lines.push({ level: 'warn', fields, message }),
+    })) as unknown as typeof logger.withFields);
+
+    const stored = await runningWithIndex();
+    await stored.instance.captureRepository(REF_A, REPO_KEY, 'abc123');
+    const rejected = await runningWithIndex();
+    rejected.container.snapshotBehavior = { kind: 'reject' };
+    await rejected.instance.captureRepository(REF_A, REPO_KEY);
+    const unavailable = await runningWithIndex();
+    unavailable.store.failing.put = true;
+    await unavailable.instance.captureRepository(REF_A, REPO_KEY);
+
+    const captures = lines.filter(line => line.fields.outcome !== undefined);
+    expect(captures.map(line => [line.level, line.fields.outcome, line.message])).toEqual([
+      ['info', 'stored', 'Repository snapshot captured'],
+      ['warn', 'failed', 'Repository snapshot not saved'],
+      ['warn', 'index_unavailable', 'Repository snapshot not saved'],
+    ]);
+    for (const line of captures) expect(line.fields.durationMs).toEqual(expect.any(Number));
+    expect(JSON.stringify(lines)).not.toContain(REPO_KEY);
+    expect(JSON.stringify(lines)).not.toContain('abc123');
+    vi.restoreAllMocks();
+  });
+
+  it('does nothing without a KV binding, a running container or the running allocation', async () => {
+    const noIndex = setup();
+    await launchFromRepo(noIndex.instance, REF_A);
+    await expect(noIndex.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(noIndex.container.snapshotCalls).toBe(0);
+
+    const { instance, container } = await runningWithIndex();
+    await expect(instance.captureRepository(REF_B, REPO_KEY)).resolves.toBe(false);
+    container.running = false;
+    await expect(instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(container.snapshotCalls).toBe(0);
+  });
+
+  it('reports a failed snapshot or index write as false and publishes nothing', async () => {
+    const failedSnapshot = await runningWithIndex();
+    failedSnapshot.container.snapshotBehavior = { kind: 'reject' };
+    await expect(failedSnapshot.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(failedSnapshot.store.data.size).toBe(0);
+
+    const failedWrite = await runningWithIndex();
+    failedWrite.store.failing.put = true;
+    await expect(failedWrite.instance.captureRepository(REF_A, REPO_KEY)).resolves.toBe(false);
+    expect(failedWrite.store.data.size).toBe(0);
+  });
+
+  it('gives up on a capture that never finishes and does not block a stop', async () => {
+    vi.useFakeTimers();
+    const { instance, container, store, readRecord } = await runningWithIndex();
+    container.snapshotBehavior = { kind: 'deferred' };
+
+    const capture = instance.captureRepository(REF_A, REPO_KEY);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(container.snapshotCalls).toBe(1);
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+
+    await vi.advanceTimersByTimeAsync(3 * 60_000 + 1_000);
+    await expect(capture).resolves.toBe(false);
+    container.deferredSnapshots[0]?.resolve('late');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(store.data.size).toBe(0);
+  });
+
+  it('does not publish a snapshot that finishes after the allocation stopped', async () => {
+    const { instance, container, store } = await runningWithIndex();
+    container.snapshotBehavior = { kind: 'deferred' };
+
+    const capture = instance.captureRepository(REF_A, REPO_KEY);
+    await vi.waitFor(() => expect(container.snapshotCalls).toBe(1));
+    await instance.stop(REF_A);
+    container.deferredSnapshots[0]?.resolve('late');
+
+    await expect(capture).resolves.toBe(false);
+    expect(store.data.size).toBe(0);
   });
 });
 

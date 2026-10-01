@@ -66,8 +66,8 @@ repository.
    preparation under the triggering message: the current step, and the running
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
-   checking out the branch, restoring a previous workspace, running setup
-   commands.
+   using a prepared repository, checking out the branch, restoring a previous
+   workspace, running setup commands, saving the repository for faster starts.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,

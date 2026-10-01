@@ -338,6 +338,15 @@ export function setupNotificationHandler() {
       ) {
         return suppressed;
       }
+      // A delivered push with no visible title or body has nothing the OS can
+      // present: the notification-library default would show a bare app-name row
+      // (the empty "Kilo" notification in the report). Whitespace-only fields
+      // are just as invisible, so trim before deciding. Never let that surface
+      // on either platform — suppress it unless it carries real content.
+      const { title, body } = notification.request.content;
+      if (!title?.trim() && !body?.trim()) {
+        return suppressed;
+      }
       return shown;
     },
   });

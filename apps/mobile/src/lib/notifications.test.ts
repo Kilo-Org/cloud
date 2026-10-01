@@ -1008,13 +1008,15 @@ describe('glanceable app badge sink', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { content: { data: unknown } };
+        request: { content: { data: unknown; title?: string | null; body?: string | null } };
       }) => Promise<{ shouldSetBadge: boolean }>;
     };
 
     const ordinary = await registration.handleNotification({
       request: {
         content: {
+          title: 'Kilo',
+          body: 'A message arrived',
           data: {
             type: 'chat.message',
             sandboxId: 'sandbox-1',
@@ -1076,7 +1078,7 @@ describe('glanceable app badge sink', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { content: { data: unknown } };
+        request: { content: { data: unknown; title?: string | null; body?: string | null } };
       }) => Promise<{ shouldSetBadge: boolean }>;
     };
 
@@ -1101,6 +1103,8 @@ describe('glanceable app badge sink', () => {
     await registration.handleNotification({
       request: {
         content: {
+          title: 'Kilo',
+          body: 'A message arrived',
           data: {
             type: 'chat.message',
             sandboxId: 'sandbox-1',
@@ -1142,7 +1146,9 @@ describe('glanceable app badge sink', () => {
 
 // The registered foreground handler, as `setupNotificationHandler` passes it to
 // expo-notifications.
-type ForegroundHandler = (notification: { request: { content: { data: unknown } } }) => Promise<{
+type ForegroundHandler = (notification: {
+  request: { content: { data: unknown; title?: string | null; body?: string | null } };
+}) => Promise<{
   shouldPlaySound: boolean;
   shouldSetBadge: boolean;
   shouldShowBanner: boolean;
@@ -1202,7 +1208,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: progressPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Agent progress',
+            body: 'Session session-1 is running',
+            data: progressPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1212,7 +1226,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: needsInputPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Needs input',
+            body: 'Session session-1 needs you',
+            data: needsInputPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1222,7 +1244,15 @@ describe('per-Focus agent-progress suppression', () => {
     const handleNotification = await loadForegroundHandler();
 
     await expect(
-      handleNotification({ request: { content: { data: progressPush } } })
+      handleNotification({
+        request: {
+          content: {
+            title: 'Agent progress',
+            body: 'Session session-1 is running',
+            data: progressPush,
+          },
+        },
+      })
     ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 
@@ -1249,6 +1279,64 @@ describe('per-Focus agent-progress suppression', () => {
 
     expect(behavior.shouldSetBadge).toBe(true);
     expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
+  });
+});
+
+describe('contentless notification suppression', () => {
+  it.each(['android', 'ios'] as const)(
+    'suppresses a delivered push with neither a title nor a body on %s',
+    async platform => {
+      mocks.platform.OS = platform;
+      const handleNotification = await loadForegroundHandler();
+
+      await expect(handleNotification({ request: { content: { data: null } } })).resolves.toEqual(
+        SUPPRESSED_BEHAVIOR
+      );
+    }
+  );
+
+  it('suppresses a bodyless push whose title is empty', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: '', body: '', data: null } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it.each([
+    ['both fields whitespace-only', { title: '   ', body: '\n\t ' }],
+    ['a whitespace-only title with no body', { title: '  ' }],
+    ['a whitespace-only body with no title', { body: '\t\n' }],
+  ])('suppresses a push whose %s', async (_name, content) => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { ...content, data: null } } })
+    ).resolves.toEqual(SUPPRESSED_BEHAVIOR);
+  });
+
+  it('still shows a push whose title has visible content around whitespace', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: '  Kilo  ', body: '  ', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('still shows a push that carries only a title', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { title: 'Kilo', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
+  });
+
+  it('still shows a push that carries only a body', async () => {
+    const handleNotification = await loadForegroundHandler();
+
+    await expect(
+      handleNotification({ request: { content: { body: 'Session is running', data: null } } })
+    ).resolves.toEqual(SHOWN_BEHAVIOR);
   });
 });
 
@@ -1877,7 +1965,10 @@ describe('foreground attention-push suppression', () => {
     loaded.setupNotificationHandler();
     const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
       handleNotification: (notification: {
-        request: { identifier?: string; content: { data: unknown } };
+        request: {
+          identifier?: string;
+          content: { data: unknown; title?: string | null; body?: string | null };
+        };
       }) => Promise<{ shouldShowBanner: boolean; shouldSetBadge: boolean }>;
     };
     return { loaded, needsInput, registration };
@@ -1928,7 +2019,7 @@ describe('foreground attention-push suppression', () => {
     const behavior = await registration.handleNotification({
       request: {
         identifier: needsInput.notificationIdentifierForSession('ses_1'),
-        content: { data: attentionPush },
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
     expect(behavior.shouldShowBanner).toBe(true);
@@ -1943,7 +2034,7 @@ describe('foreground attention-push suppression', () => {
     const behavior = await registration.handleNotification({
       request: {
         identifier: 'needs-input:ses_1',
-        content: { data: attentionPush },
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
       },
     });
     expect(behavior.shouldShowBanner).toBe(true);
@@ -1953,7 +2044,9 @@ describe('foreground attention-push suppression', () => {
     const { registration } = await loadHandler();
 
     const behavior = await registration.handleNotification({
-      request: { content: { data: attentionPush } },
+      request: {
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
     });
     expect(behavior.shouldShowBanner).toBe(true);
   });
@@ -1969,7 +2062,9 @@ describe('foreground attention-push suppression', () => {
     needsInput.clearPostedNeedsInputNotification('ses_1');
 
     const behavior = await registration.handleNotification({
-      request: { content: { data: attentionPush } },
+      request: {
+        content: { title: 'Needs input', body: 'Session ses_1 needs you', data: attentionPush },
+      },
     });
     expect(behavior.shouldShowBanner).toBe(true);
   });
@@ -1985,6 +2080,8 @@ describe('foreground attention-push suppression', () => {
     const progress = await registration.handleNotification({
       request: {
         content: {
+          title: 'Agent progress',
+          body: 'Session ses_1 is running',
           data: { type: 'cloud_agent_session', cliSessionId: 'ses_1' },
         },
       },

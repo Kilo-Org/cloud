@@ -22,7 +22,7 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@/lib/kilo-pass/issuance';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import {
   getKiloPassMetadataFromStripeMetadata,
   getKiloPassPriceMetadataFromInvoice,

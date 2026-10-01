@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     schema,
   ] = await Promise.all([
     import('drizzle-orm'),
-    import('@/lib/balanceCache'),
+    import('@kilocode/web-shared/lib/balanceCache'),
     import('@/lib/drizzle'),
     import('@/lib/kilo-pass/constants'),
     import('@/lib/kilo-pass/dayjs'),

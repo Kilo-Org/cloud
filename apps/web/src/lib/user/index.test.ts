@@ -166,7 +166,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {
   KiloPassCadence,

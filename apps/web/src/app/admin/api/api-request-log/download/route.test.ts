@@ -153,10 +153,28 @@ describe('GET /admin/api/api-request-log/download', () => {
     [{ endTime: '10:00:00' }],
     [{ startDate: '', startTime: '10:00' }],
     [{ startDate: '2026/08/01' }],
+    [{ startDate: '2026-02-30', endDate: '2026-03-02' }],
   ])('rejects invalid date or time parameters %j', async overrides => {
     const response = await GET(createRequest(overrides));
 
     expect(response.status).toBe(400);
+  });
+
+  it('treats an empty time as the whole day', async () => {
+    const request_r2_key = '2026-08-01/empty-time/request.json';
+    fakeR2.objects.set(`${BUCKET}/${request_r2_key}`, JSON.stringify({ empty: true }));
+    await db.insert(api_request_log).values({
+      ...baseRow,
+      created_at: '2026-08-01T23:59:00.000Z',
+      request_r2_key,
+    });
+
+    const response = await GET(createRequest({ startTime: '', endTime: '' }));
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Content-Disposition')).toBe(
+      'attachment; filename="api-request-log_api-request-log-download-test-user_2026-08-01_2026-08-01_poolside-laguna-s-2.1-free.zip"'
+    );
   });
 
   it('rejects a start after the end', async () => {

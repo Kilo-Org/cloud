@@ -81,9 +81,13 @@ function parseBoundary(
   if (!DATE_PATTERN.test(date) || (time && !TIME_PATTERN.test(time))) {
     return { ok: false };
   }
-  const suffix = edge === 'start' ? `${time ?? '00:00'}:00.000Z` : `${time ?? '23:59'}:59.999Z`;
+  const suffix = edge === 'start' ? `${time || '00:00'}:00.000Z` : `${time || '23:59'}:59.999Z`;
   const value = new Date(`${date}T${suffix}`);
-  return isNaN(value.getTime()) ? { ok: false } : { ok: true, value };
+  // Date rolls calendar-invalid days over (2026-02-30 becomes 2026-03-02).
+  if (isNaN(value.getTime()) || value.toISOString().slice(0, 10) !== date) {
+    return { ok: false };
+  }
+  return { ok: true, value };
 }
 
 function formatBoundaryForFilename(date: string | null, time: string | null, fallback: string) {

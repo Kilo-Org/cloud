@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globa
 // The client deadline this budget must stay under. Imported from source rather
 // than restated so the two constants can never drift apart.
 import { CONTROL_PLANE_DEADLINE_MS } from '../../../../packages/event-service/src/deadline';
+import { CONTROL_PLANE_PROCEDURE_BUDGET_MS } from '@kilocode/web-shared/lib/trpc/control-plane-budget';
 import {
   CONTROL_PLANE_UPSTREAM_BUDGET_MS,
   ServiceFetchTimeoutError,
@@ -30,6 +31,11 @@ describe('fetchWithinBudget', () => {
   test('the upstream budget is strictly under the client control-plane deadline', () => {
     expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBe(8_000);
     expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
+  });
+
+  test('the upstream budget is strictly under the tRPC control-plane procedure budget', () => {
+    // The inner internal-service fetch bound fires first, so the procedure budget is the backstop.
+    expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_PROCEDURE_BUDGET_MS);
   });
 
   test('rejects with ServiceFetchTimeoutError when the upstream never answers', async () => {

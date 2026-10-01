@@ -982,6 +982,140 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
+  it.each(['preparing', 'unknown'] as const)(
+    'never persists or broadcasts setup command text with route %s',
+    async routeState => {
+      const { sessionId, stub, peer } = await setup();
+      const stream = await connectStream(sessionId);
+      if (routeState === 'preparing') {
+        peer.prepareView = peer.view('preparing');
+        await stub.send(promptPayload('m1'));
+      }
+      await stub.onEvents({
+        events: [
+          {
+            type: 'session.setup.started',
+            properties: { command: 1, commandCount: 1, text: 'curl -u user:inline-secret-canary' },
+          },
+        ],
+      });
+      const live = await drainStream(stream);
+      expect(JSON.stringify(live)).not.toContain('inline-secret-canary');
+      expect(live.some(message => message.streamEventType === 'kilocode')).toBe(false);
+      stream.close();
+
+      const replay = await connectStream(sessionId);
+      expect(JSON.stringify(await drainStream(replay))).not.toContain('inline-secret-canary');
+      replay.close();
+    }
+  );
+
+  it.each([0, 1])(
+    'recovers missing setup starts and retains output and exit code %s',
+    async exitCode => {
+      const { sessionId, stub, peer } = await setup();
+      peer.prepareView = peer.view('preparing');
+      await stub.send(promptPayload('m1'));
+      await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
+      const stream = await connectStream(sessionId);
+      await drainStream(stream);
+      await stub.onEvents({
+        events: [
+          {
+            type: 'session.setup.output',
+            properties: { command: 1, output: 'surviving diagnostics\n' },
+          },
+          { type: 'session.setup.finished', properties: { command: 1, exitCode } },
+        ],
+      });
+      const live = await drainStream(stream);
+      expect(preparingRows(live).map(row => row.action)).toEqual([
+        'step_started',
+        'step_output',
+        exitCode === 0 ? 'step_completed' : 'step_failed',
+      ]);
+      expect(live.some(message => message.streamEventType === 'kilocode')).toBe(false);
+      stream.close();
+
+      const replay = await connectStream(sessionId);
+      const rows = preparingRows(await drainStream(replay));
+      expect(
+        rows.find(row => row.stepSnapshot?.id === 'setup_command:0')?.stepSnapshot
+      ).toMatchObject({
+        status: exitCode === 0 ? 'completed' : 'failed',
+        outputTail: 'surviving diagnostics\n',
+        exitCode,
+      });
+      replay.close();
+    }
+  );
+
+  it('discards setup lifecycle events received after preparation failure', async () => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'preparation_timeout',
+    };
+    await stub.onRoute({
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'preparation_timeout',
+    });
+    await expect(stub.getSession()).resolves.toMatchObject({ route: { state: 'failed' } });
+    const stream = await connectStream(sessionId);
+    await drainStream(stream);
+    await stub.onEvents({
+      events: [
+        { type: 'session.setup.started', properties: { command: 1, commandCount: 1 } },
+        { type: 'session.setup.output', properties: { command: 1, output: 'late output' } },
+        { type: 'session.setup.finished', properties: { command: 1, exitCode: 0 } },
+      ],
+    });
+    expect(await drainStream(stream)).toEqual([]);
+    stream.close();
+
+    const replay = await connectStream(sessionId);
+    const rows = preparingRows(await drainStream(replay));
+    expect(rows.some(row => row.stepSnapshot?.id === 'setup_command:0')).toBe(false);
+    expect(rows.find(row => row.attempt?.id === peer.attemptId)?.attempt).toMatchObject({
+      status: 'failed',
+    });
+    replay.close();
+  });
+
+  it.each([
+    { type: 'session.setup.finished', properties: { command: 1, exitCode: '1' } },
+    { type: 'session.setup.finished', properties: { command: 1 } },
+    { type: 'session.setup.finished', properties: { exitCode: 1 } },
+    { type: 'session.setup.started', properties: { command: 0, commandCount: 1 } },
+    { type: 'session.setup.started', properties: { command: 21, commandCount: 21 } },
+    { type: 'session.setup.started', properties: { command: 1.5, commandCount: 2 } },
+    { type: 'session.setup.started', properties: { command: 2, commandCount: 1 } },
+    { type: 'session.setup.output', properties: { command: 1, output: 123 } },
+  ])('discards malformed setup lifecycle event $type with $properties', async event => {
+    const { sessionId, stub, peer } = await setup();
+    peer.prepareView = peer.view('preparing');
+    await stub.send(promptPayload('m1'));
+    await stub.onEvents({
+      events: [{ type: 'session.setup.started', properties: { command: 1, commandCount: 1 } }],
+    });
+    const stream = await connectStream(sessionId);
+    await drainStream(stream);
+    await stub.onEvents({ events: [event] });
+    expect(await drainStream(stream)).toEqual([]);
+    stream.close();
+
+    const replay = await connectStream(sessionId);
+    const rows = preparingRows(await drainStream(replay));
+    expect(
+      rows.find(row => row.stepSnapshot?.id === 'setup_command:0')?.stepSnapshot
+    ).toMatchObject({ status: 'running' });
+    replay.close();
+  });
+
   it('derives the connected cloud status from the persisted route view after eviction', async () => {
     const { sessionId, stub, peer } = await setup();
     peer.prepareView = peer.view('preparing');

@@ -53,13 +53,41 @@ export const CONTROL_PLANE_WRAPPER_FINALIZING_EVENT = 'wrapper_finalizing';
  * the 1-based command number in every event.
  */
 export const CONTROL_PLANE_SETUP_EVENTS = {
-  /** `{ command, commandCount, text }`: the command started. */
   started: 'session.setup.started',
-  /** `{ command, output }`: a redacted output chunk. */
   output: 'session.setup.output',
-  /** `{ command, exitCode, safeError? }`: the command ended; `safeError` on failure. */
   finished: 'session.setup.finished',
 } as const;
+
+const controlPlaneSetupCommandNumberSchema = z.number().int().min(1).max(20);
+
+// Command bodies may contain inline credentials. Only these properties can be projected.
+export const controlPlaneSetupEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.started),
+    properties: z
+      .object({
+        command: controlPlaneSetupCommandNumberSchema,
+        commandCount: controlPlaneSetupCommandNumberSchema,
+      })
+      .refine(value => value.command <= value.commandCount),
+  }),
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.output),
+    properties: z.object({
+      command: controlPlaneSetupCommandNumberSchema,
+      output: z.string().min(1).max(8_192),
+    }),
+  }),
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.finished),
+    properties: z.object({
+      command: controlPlaneSetupCommandNumberSchema,
+      exitCode: z.number().int(),
+      safeError: z.string().min(1).max(4_096).optional(),
+    }),
+  }),
+]);
+export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema>;
 
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',

@@ -678,6 +678,31 @@ describe('createPreparationManager', () => {
     });
   });
 
+  it('does not publish silent setup command bodies containing inline credentials', async () => {
+    const harness = createHarness();
+    await harness.manager.prepare(
+      routeSpec({
+        setupCommands: [
+          "npm config set //registry.npmjs.org/:_authToken 'inline-token-canary'",
+          'curl -u user:inline-password-canary https://example.com',
+        ],
+      })
+    );
+
+    const started = harness.frames.flatMap(frame =>
+      frame.type === 'session.events'
+        ? frame.events.filter(event => event.type === 'session.setup.started')
+        : []
+    );
+    expect(started.map(event => event.properties)).toEqual([
+      { command: 1, commandCount: 2 },
+      { command: 2, commandCount: 2 },
+    ]);
+    expect(JSON.stringify(harness.frames)).not.toContain('inline-token-canary');
+    expect(JSON.stringify(harness.frames)).not.toContain('inline-password-canary');
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+
   it('fails the setup step when a setup command exits non-zero', async () => {
     const harness = createHarness();
     harness.setSetupResult(result(1, 'command failed'));

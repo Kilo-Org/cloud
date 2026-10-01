@@ -7,6 +7,7 @@ import {
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
+  type ControlPlaneSetupEvent,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
@@ -47,8 +48,6 @@ const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 const STEP_RETRY_ATTEMPTS = 2;
 /** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
 const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
-/** Upper bound on the command text shown for a running setup command. */
-const SETUP_COMMAND_TEXT_LIMIT = 1_024;
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -459,20 +458,19 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     // Spec §9: a setup failure must show the command output, so each command's
     // start, output and end go on the wire, not only to the wrapper log. The
     // Session renders them as per-command preparation steps.
-    const emitSetupEvent = (type: string, properties: Record<string, unknown>): void => {
+    const emitSetupEvent = (event: ControlPlaneSetupEvent): void => {
       deps.emit({
         type: 'session.events',
         sessionId: spec.sessionId,
-        events: [{ type, properties }],
+        events: [event],
       });
     };
     for (const [index, command] of commands.entries()) {
       signal.throwIfAborted();
       const commandNumber = index + 1;
-      emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.started, {
-        command: commandNumber,
-        commandCount: commands.length,
-        text: redact(command).trim().slice(0, SETUP_COMMAND_TEXT_LIMIT),
+      emitSetupEvent({
+        type: CONTROL_PLANE_SETUP_EVENTS.started,
+        properties: { command: commandNumber, commandCount: commands.length },
       });
       const output = createOutputRedactor(
         text => redact(stripAnsi(text)),
@@ -481,9 +479,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           const cleaned = text.trim();
           if (!cleaned) return;
           log(`control-plane setup command ${commandNumber} produced output`);
-          emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.output, {
-            command: commandNumber,
-            output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
+          emitSetupEvent({
+            type: CONTROL_PLANE_SETUP_EVENTS.output,
+            properties: {
+              command: commandNumber,
+              output: cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT),
+            },
           });
         }
       );
@@ -496,10 +497,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           `control-plane setup command failed sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} index=${index + 1} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${Date.now() - startedAt} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
         );
         const message = `Setup command ${commandNumber} ${timedOut ? 'timed out' : 'failed'}`;
-        emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.finished, {
-          command: commandNumber,
-          exitCode: result.exitCode,
-          safeError: message,
+        emitSetupEvent({
+          type: CONTROL_PLANE_SETUP_EVENTS.finished,
+          properties: { command: commandNumber, exitCode: result.exitCode, safeError: message },
         });
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
@@ -508,7 +508,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           retryable: true,
         });
       }
-      emitSetupEvent(CONTROL_PLANE_SETUP_EVENTS.finished, { command: commandNumber, exitCode: 0 });
+      emitSetupEvent({
+        type: CONTROL_PLANE_SETUP_EVENTS.finished,
+        properties: { command: commandNumber, exitCode: 0 },
+      });
     }
   }
 

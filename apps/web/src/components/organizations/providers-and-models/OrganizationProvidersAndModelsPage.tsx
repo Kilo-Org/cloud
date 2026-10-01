@@ -516,7 +516,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             />
           </TabsContent>
 
-          <TabsContent value="auto-routing" className="mt-6">
+          <TabsContent
+            value="auto-routing"
+            forceMount
+            className="mt-6 data-[state=inactive]:hidden"
+          >
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>

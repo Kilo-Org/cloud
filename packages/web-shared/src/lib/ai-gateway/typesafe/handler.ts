@@ -59,7 +59,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   if (!parsed.success) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
-  const { model } = parsed.data;
+  const { model: requestedModel } = parsed.data;
 
   const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
@@ -82,8 +82,8 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
-      modelId: model,
-      providerLookup: async () => new Set([SYSTEM_ONE_MODEL_PROVIDERS[model]]),
+      modelId: requestedModel,
+      providerLookup: async () => new Set([SYSTEM_ONE_MODEL_PROVIDERS[requestedModel]]),
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
@@ -161,7 +161,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         api_kind: 'systemone',
         kiloUserId: user.id,
         provider: 'openrouter',
-        requested_model: model,
+        requested_model: requestedModel,
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,

@@ -2,6 +2,8 @@ import { credit_transactions } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
+import { reportCreditEvent } from '@/lib/bouncer/client';
+import { runAfterResponse } from '@/lib/after-response';
 import { processTopUp } from '@/lib/credits';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
@@ -144,4 +146,31 @@ export async function completeStoreCreditPurchase(params: {
   };
 
   return dbOrTx ? complete(dbOrTx) : db.transaction(complete);
+}
+
+/**
+ * Reports a newly granted production credit pack to bouncer, post-response.
+ * A replayed completion reports nothing: the first grant already did. The
+ * catalog amount is in US dollars, so it is sent as cents.
+ */
+export async function reportStoreCreditPurchaseToBouncer(params: {
+  userId: string;
+  purchase: ValidatedStoreCreditPurchase;
+  result: { alreadyProcessed: boolean; amountUsd: number };
+}): Promise<void> {
+  const { userId, purchase, result } = params;
+  if (result.alreadyProcessed || purchase.environment !== 'Production') return;
+  const isAppStore = purchase.paymentProvider === KiloPassPaymentProvider.AppStore;
+  await runAfterResponse(() =>
+    reportCreditEvent({
+      type: 'store.purchase',
+      amountCents: roundUsdToCents(result.amountUsd),
+      provider: isAppStore ? 'apple' : 'google',
+      eventId: storeCreditPaymentId(purchase.paymentProvider, purchase.providerTransactionId),
+      occurredAt: purchase.purchasedAtIso,
+      userId,
+      referenceId: purchase.providerTransactionId,
+      environment: 'production',
+    })
+  );
 }

@@ -806,6 +806,7 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
+    let refundedUserId: string | null = null;
     await db.transaction(async tx => {
       // Serialize with a completion of the same purchase, in either order. The
       // completion keys the grant by the order id, or by a digest of the
@@ -834,6 +835,14 @@ export async function processGooglePlayKiloPassNotification(params: {
           refundedMilliunits: STORE_FULL_MILLIUNITS,
         });
       }
+      if (reversal.creditTransactionId) {
+        const [clawback] = await tx
+          .select({ kiloUserId: credit_transactions.kilo_user_id })
+          .from(credit_transactions)
+          .where(eq(credit_transactions.id, reversal.creditTransactionId))
+          .limit(1);
+        refundedUserId = clawback?.kiloUserId ?? null;
+      }
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
         result: KiloPassAuditLogResult.Success,
@@ -853,6 +862,17 @@ export async function processGooglePlayKiloPassNotification(params: {
           )
         );
     });
+    // Only a pack Kilo granted and clawed back is a customer refund to report.
+    await runAfterResponse(() =>
+      reportGooglePlayCreditEventToBouncer({
+        environment: 'Production',
+        eventId,
+        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+        referenceId: orderId,
+        event: { type: 'store.refund', reason: 'other' },
+        userId: refundedUserId,
+      })
+    );
     return { processed: true };
   }
 

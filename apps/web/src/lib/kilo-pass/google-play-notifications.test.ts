@@ -2447,4 +2447,73 @@ describe('Google Play bouncer store events', () => {
 
     expect(reportCreditEvent).not.toHaveBeenCalled();
   });
+
+  function voidedCreditPackMessage(messageId: string, purchaseToken: string, orderId: string) {
+    return {
+      messageId,
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+          voidedPurchaseNotification: { purchaseToken, orderId, productType: 2, refundType: 1 },
+        })
+      ).toString('base64'),
+    };
+  }
+
+  it('reports a refunded credit pack for the pack owner', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void', purchaseToken, orderId),
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.refund',
+      reason: 'other',
+      provider: 'google',
+      eventId: expect.any(String),
+      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
+  it('reports nothing for a refunded credit pack Kilo never granted', async () => {
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void-ungranted', purchaseToken, orderId),
+    });
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
+  });
 });

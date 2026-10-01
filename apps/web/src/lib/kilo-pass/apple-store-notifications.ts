@@ -48,7 +48,10 @@ import {
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { reportCreditEvent, type StoreEventKind } from '@/lib/bouncer/client';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
-import { getStoreCreditProductByAppleProductId } from '@/lib/credits/store-products';
+import {
+  getStoreCreditProductByAppleProductId,
+  storeCreditPaymentId,
+} from '@/lib/credits/store-products';
 import {
   getStoreCreditConsumptionMilliunits,
   isStoreRefundDeliverySuperseded,
@@ -1029,6 +1032,19 @@ async function resolveAppStoreKiloPassOwner(
     )
     .limit(1);
   if (purchaseRows[0]) return purchaseRows[0].kiloUserId;
+
+  // A credit pack has no Kilo Pass row; its grant row names the owner.
+  const creditPackRows = await db
+    .select({ kiloUserId: credit_transactions.kilo_user_id })
+    .from(credit_transactions)
+    .where(
+      eq(
+        credit_transactions.stripe_payment_id,
+        storeCreditPaymentId(KiloPassPaymentProvider.AppStore, transaction.transactionId)
+      )
+    )
+    .limit(1);
+  if (creditPackRows[0]) return creditPackRows[0].kiloUserId;
 
   if (!transaction.appAccountToken) return null;
   const tokenRows = await db

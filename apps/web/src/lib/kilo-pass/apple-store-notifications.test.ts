@@ -3165,6 +3165,58 @@ describe('App Store bouncer store events', () => {
     expect(reportCreditEvent).not.toHaveBeenCalled();
   });
 
+  it('reports a production credit-pack refund for the pack owner', async () => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const transactionId = `tx-${crypto.randomUUID()}`;
+    await completeStoreCreditPurchase({
+      user,
+      purchase: {
+        paymentProvider: KiloPassPaymentProvider.AppStore,
+        productId: 'credits.usd10.v1',
+        providerTransactionId: transactionId,
+        appAccountToken: user.app_store_account_token,
+        quantity: 1,
+        amountUsd: 10,
+        amountMicrodollars: toMicrodollars(10),
+        purchasedAtIso: '2026-05-15T00:00:00.000Z',
+        environment: 'Production',
+        rawPayload: {},
+      },
+    });
+    // The refund carries no account token, so only the grant row names the owner.
+    const refundTransaction = transaction({
+      transactionId,
+      originalTransactionId: transactionId,
+      productId: 'credits.usd10.v1',
+      revocationDate: SIGNED_DATE_MS,
+      revocationType: RevocationType.REFUND_FULL,
+      revocationPercentage: 100_000,
+    });
+    const notificationUUID = `bouncer-credit-pack-${crypto.randomUUID()}`;
+
+    await processAppStoreKiloPassNotification(
+      refund(notificationUUID, refundTransaction, 'Production')
+    );
+
+    const clawback = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.AppStore}:${transactionId}`
+      ),
+    });
+    expect(clawback?.amount_microdollars).toBe(-toMicrodollars(10));
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toMatchObject({
+      type: 'store.refund',
+      reason: 'other',
+      provider: 'apple',
+      eventId: notificationUUID,
+      userId: user.id,
+      referenceId: transactionId,
+      environment: 'production',
+    });
+  });
+
   it('restores the clawed-back credits and reopens the subscription on a refund reversal', async () => {
     const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
     const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);

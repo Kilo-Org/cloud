@@ -34,21 +34,33 @@ jest.mock('@/lib/credits', () => {
   };
 });
 
+jest.mock('@/lib/bouncer/client', () => ({
+  __esModule: true,
+  ...jest.requireActual<object>('@/lib/bouncer/client'),
+  reportCreditEvent: jest.fn(),
+}));
+
+const mockReportCreditEvent = jest.mocked(
+  jest.requireMock<{ reportCreditEvent: jest.Mock }>('@/lib/bouncer/client').reportCreditEvent
+);
+
 const mockProcessTopUp = jest.mocked(
   jest.requireMock<typeof Credits>('@/lib/credits').processTopUp
 );
 
 let completeStoreCreditPurchase: typeof StoreCompletion.completeStoreCreditPurchase;
+let reportStoreCreditPurchaseToBouncer: typeof StoreCompletion.reportStoreCreditPurchaseToBouncer;
 
 beforeAll(() => {
   // Loaded here rather than through a static import for the same reason: a
   // static import is bound before the mock above is registered.
-  ({ completeStoreCreditPurchase } =
+  ({ completeStoreCreditPurchase, reportStoreCreditPurchaseToBouncer } =
     jest.requireActual<typeof StoreCompletion>('./store-completion'));
 });
 
 beforeEach(() => {
   mockProcessTopUp.mockClear();
+  mockReportCreditEvent.mockClear();
 });
 
 function purchase(
@@ -641,5 +653,52 @@ describe('completeStoreCreditPurchase', () => {
       )
     ).toEqual([]);
     expect(await balanceOf(user.id)).toBe(0);
+  });
+});
+
+describe('reportStoreCreditPurchaseToBouncer', () => {
+  it('reports a new production grant once, in US cents', async () => {
+    const user = await insertTestUser();
+    const storePurchase = purchase({ environment: 'Production' });
+    const granted = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    await reportStoreCreditPurchaseToBouncer({
+      userId: user.id,
+      purchase: storePurchase,
+      result: granted,
+    });
+    const replayed = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    await reportStoreCreditPurchaseToBouncer({
+      userId: user.id,
+      purchase: storePurchase,
+      result: replayed,
+    });
+
+    expect(mockReportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(mockReportCreditEvent.mock.calls[0]?.[0]).toEqual({
+      type: 'store.purchase',
+      amountCents: 1000,
+      provider: 'apple',
+      eventId: storeCreditPaymentId(
+        storePurchase.paymentProvider,
+        storePurchase.providerTransactionId
+      ),
+      occurredAt: storePurchase.purchasedAtIso,
+      userId: user.id,
+      referenceId: storePurchase.providerTransactionId,
+      environment: 'production',
+    });
+  });
+
+  it('reports nothing for a sandbox grant', async () => {
+    const user = await insertTestUser();
+    const storePurchase = purchase({ environment: 'Sandbox' });
+    const granted = await completeStoreCreditPurchase({ user, purchase: storePurchase });
+    await reportStoreCreditPurchaseToBouncer({
+      userId: user.id,
+      purchase: storePurchase,
+      result: granted,
+    });
+
+    expect(mockReportCreditEvent).not.toHaveBeenCalled();
   });
 });

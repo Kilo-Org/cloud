@@ -46,6 +46,7 @@ jest.mock('@/lib/credits/store-verifier', () => ({
 
 jest.mock('@/lib/credits/store-completion', () => ({
   completeStoreCreditPurchase: (...args: unknown[]) => mockCompleteStoreCreditPurchase(...args),
+  reportStoreCreditPurchaseToBouncer: async () => {},
 }));
 
 jest.mock('@sentry/nextjs', () => ({

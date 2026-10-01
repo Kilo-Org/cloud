@@ -114,6 +114,15 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
    */
   isAccountCurrent: () => boolean;
   showError: (message: string) => void;
+  /**
+   * Resolves a store-side `AlreadyOwned` refusal before any copy is shown. The
+   * store can report a Pass as owned when this same user was charged and the
+   * backend completion failed, so the owner looks up and completes the
+   * outstanding transaction first. Resolves `true` when it handled the refusal
+   * (a completion ran, announced or refused by the backend), `false` when no
+   * outstanding transaction exists and the caller still owes its own copy.
+   */
+  recoverOwnedPurchase?: () => Promise<boolean>;
 };
 
 export type StoreKiloPassPurchaseOptions = {
@@ -270,7 +279,7 @@ function isUserCancelledPurchaseError(error: unknown): boolean {
   return userCancelledPurchaseErrorSchema.safeParse(error).success;
 }
 
-function isAlreadyOwnedPurchaseError(error: unknown): boolean {
+export function isAlreadyOwnedPurchaseError(error: unknown): boolean {
   return alreadyOwnedPurchaseErrorSchema.safeParse(error).success;
 }
 
@@ -296,6 +305,8 @@ export function getKiloPassPurchaseErrorMessage(
   }
 
   if (isAlreadyOwnedPurchaseError(error)) {
+    // Only reached when no outstanding transaction of this user explains the
+    // refusal: the owner recovers that case before asking for copy.
     return i18n.t(
       storefront === 'play'
         ? 'kiloPass.purchaseOwnedByAnotherAccountPlay'
@@ -603,6 +614,18 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         });
         return true;
       } catch (error) {
+        if (
+          isAlreadyOwnedPurchaseError(error) &&
+          deps.recoverOwnedPurchase &&
+          (await deps.recoverOwnedPurchase())
+        ) {
+          // The store says a Pass is already owned. Recover the outstanding
+          // transaction before saying anything: it is usually this user's
+          // charge whose backend completion failed. A real cross-account
+          // refusal surfaces from that completion.
+          deps.setPendingPurchaseCompletedCallback?.(null);
+          return false;
+        }
         const message = getKiloPassPurchaseErrorMessage(
           error,
           i18n.t(

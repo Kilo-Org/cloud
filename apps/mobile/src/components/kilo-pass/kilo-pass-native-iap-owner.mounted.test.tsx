@@ -366,6 +366,55 @@ describe('KiloPassNativeIapOwner', () => {
     expect(handle.value?.isPending).toBe(false);
   });
 
+  it('recovers an owned pass before showing the different-account copy', async () => {
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [{ appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_monthly' }],
+    };
+    const { handle } = await mountOwner();
+    await flushPromises();
+    // This user was charged and the backend completion failed: the transaction
+    // is still pending, so the store refuses a new purchase as AlreadyOwned.
+    // Both store channels report that one refusal.
+    const alreadyOwned = Object.assign(new Error('Item already owned'), {
+      code: 'already-owned',
+    });
+    mockedIap.getAvailablePurchases.mockResolvedValue([createPurchase()]);
+    mockedIap.requestPurchase.mockRejectedValueOnce(alreadyOwned);
+
+    await act(async () => {
+      await handle.value?.purchase(createPassProduct(KILO_PASS_PRODUCT_ID, 'kilo_pass_monthly'));
+    });
+    mockedIap.handlers?.onPurchaseError(alreadyOwned);
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+    expect(handle.value?.errorMessage).toBeNull();
+  });
+
+  it('shows the different-account copy when no outstanding pass explains AlreadyOwned', async () => {
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [{ appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_monthly' }],
+    };
+    const { handle } = await mountOwner();
+    await flushPromises();
+    mockedIap.requestPurchase.mockRejectedValueOnce(
+      Object.assign(new Error('Item already owned'), { code: 'already-owned' })
+    );
+
+    await act(async () => {
+      await handle.value?.purchase(createPassProduct(KILO_PASS_PRODUCT_ID, 'kilo_pass_monthly'));
+    });
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    expect(handle.value?.errorMessage).toBe('kiloPass.purchaseOwnedByAnotherAccount');
+  });
+
   it('feeds the store answer into the ownership preflight and the owned ids', async () => {
     mockedIap.connected = true;
     mockedQuery.serverProductsData = {

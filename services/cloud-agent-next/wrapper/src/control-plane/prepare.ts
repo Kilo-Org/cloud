@@ -460,7 +460,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     // start, output and end go on the wire, not only to the wrapper log. The
     // Session renders them as per-command preparation steps.
     const emitSetupEvent = (type: string, properties: Record<string, unknown>): void => {
-      deps.emit({ type: 'session.events', sessionId: spec.sessionId, events: [{ type, properties }] });
+      deps.emit({
+        type: 'session.events',
+        sessionId: spec.sessionId,
+        events: [{ type, properties }],
+      });
     };
     for (const [index, command] of commands.entries()) {
       signal.throwIfAborted();

@@ -17,7 +17,8 @@ const GITHUB_SUMMARY_WRITE_COMMANDS = [
   /(?:^|[\s;&|(])gh\s+api\s+repos\/\S+\/issues\/\d+\/comments\b[^\n]*\s--input\b/,
   /(?:^|[\s;&|(])gh\s+api\s+repos\/\S+\/issues\/comments\/\d+\b[^\n]*\s(?:-X|--method)[\s=]+PATCH\b/i,
 ];
-const GITHUB_ISSUE_COMMENT_URL = /"html_url"\s*:\s*"[^"]*#issuecomment-\d+"/;
+// Only the created or updated comment's html_url carries this fragment; GitHub error bodies do not.
+const GITHUB_ISSUE_COMMENT_URL = /https?:\/\/[^\s"']+#issuecomment-\d+/;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -29,8 +30,8 @@ export function isGitHubSummaryWriteCommand(command: string): boolean {
 
 /**
  * Whether a Kilo `message.part.updated` part is a summary write that GitHub accepted. Requires
- * positive evidence: a zero exit code, or, when no exit code is reported, the created or
- * updated comment's URL in the response.
+ * the created or updated comment's URL in the output: a zero exit code alone is not evidence,
+ * because an allowed pipeline such as `… | jq` exits 0 even when the write failed.
  */
 export function isSuccessfulGitHubSummaryWrite(part: unknown): boolean {
   if (!isRecord(part) || part.type !== 'tool' || part.tool !== 'bash') return false;
@@ -41,7 +42,7 @@ export function isSuccessfulGitHubSummaryWrite(part: unknown): boolean {
   if (!command || !isGitHubSummaryWriteCommand(command)) return false;
 
   const exit = isRecord(toolState.metadata) ? toolState.metadata.exit : undefined;
-  if (typeof exit === 'number') return exit === 0;
+  if (typeof exit === 'number' && exit !== 0) return false;
   return typeof toolState.output === 'string' && GITHUB_ISSUE_COMMENT_URL.test(toolState.output);
 }
 

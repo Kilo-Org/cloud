@@ -17,13 +17,23 @@ function bash(command: string, state: Record<string, unknown> = {}) {
 
 describe('isSuccessfulGitHubSummaryWrite', () => {
   it('counts only summary writes that GitHub accepted', () => {
-    expect(isSuccessfulGitHubSummaryWrite(bash(CREATE_SUMMARY, { metadata: { exit: 0 } }))).toBe(
-      true
-    );
-    // Without an exit code, the created comment's URL is the evidence.
+    expect(
+      isSuccessfulGitHubSummaryWrite(
+        bash(CREATE_SUMMARY, { metadata: { exit: 0 }, output: COMMENT_URL })
+      )
+    ).toBe(true);
     expect(isSuccessfulGitHubSummaryWrite(bash(UPDATE_SUMMARY, { output: COMMENT_URL }))).toBe(
       true
     );
+    // A pipeline such as `… | jq` exits 0 even when GitHub rejected the write.
+    expect(
+      isSuccessfulGitHubSummaryWrite(
+        bash(`${UPDATE_SUMMARY} | jq .`, {
+          metadata: { exit: 0 },
+          output: '{"message":"Validation Failed","status":"422"}',
+        })
+      )
+    ).toBe(false);
     expect(
       isSuccessfulGitHubSummaryWrite(
         bash(CREATE_SUMMARY, { metadata: { exit: 1 }, output: COMMENT_URL })

@@ -19,6 +19,7 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 const USER_ID = 'user_c1a';
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
 const NATIVE_KILO_TOKEN = 'native-kilo-token-user';
+const WORKER_URL = 'https://management.test';
 
 function newSessionId(): string {
   return `workspace_${crypto.randomUUID()}`;
@@ -118,6 +119,7 @@ async function installPeer(
   peer: FakeSandboxPeer
 ): Promise<void> {
   await runInDurableObject(stub, instance => {
+    instance.env.WORKER_URL = WORKER_URL;
     instance.sandboxPeerFor = () => peer;
   });
 }
@@ -205,6 +207,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     });
 
     // A ready route delivers the queued message, which becomes accepted.
+    peer.prepareView = peer.view('ready');
     await stub.onRoute(peer.view('ready'));
     await expect(stub.getSession()).resolves.toMatchObject({
       type: 'found',
@@ -259,7 +262,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     const revokedSession = newSessionId();
     const revokedStub = sessions.getByName(revokedSession);
     await installPeer(revokedStub, new FakeSandboxPeer());
-    await revokedStub.registerSessionFromMetadata({
+    const registration = await revokedStub.registerSessionFromMetadata({
       metadata: metadata({
         sessionId: revokedSession,
         kiloSessionId: kiloSessionId(),
@@ -268,9 +271,13 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       }),
       sandboxSelection: { provider: 'cloudflare' },
     });
+    expect(registration).toEqual({ success: true });
     await expect(revokedStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
       state: 'revoked',
     });
+    await expect(
+      runInDurableObject(revokedStub, instance => instance.getRuntimeToken())
+    ).rejects.toThrow('Runtime authorization has been revoked');
 
     // A stored active authorization is active; an expired one is revoked.
     const activeSession = newSessionId();
@@ -279,9 +286,10 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     const activeStub = sessions.getByName(activeSession);
     await runInDurableObject(activeStub, instance => {
       instance.env.NEXTAUTH_SECRET = secret;
+      instance.env.WORKER_URL = WORKER_URL;
       instance.sandboxPeerFor = () => new FakeSandboxPeer();
     });
-    await activeStub.createSessionWithInitialAdmission({
+    const admission = await activeStub.createSessionWithInitialAdmission({
       metadata: metadata({
         sessionId: activeSession,
         kiloSessionId: kiloSessionId(),
@@ -292,6 +300,7 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
       sandboxSelection: { provider: 'cloudflare' },
       runtimeAuthorizationSeal: activeSeal,
     });
+    expect(admission.success).toBe(true);
     await expect(activeStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
       state: 'active',
     });
@@ -309,6 +318,37 @@ describe('SandboxSessionV2 management and worktree-deletion RPCs (C1a)', () => {
     );
     await expect(activeStub.getRuntimeAuthorizationStatus()).resolves.toMatchObject({
       state: 'expired',
+    });
+  });
+
+  it('rejects invalid modern proxy configuration without installing session or authorization state', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+    const stub = sessions.getByName(sessionId);
+    await installPeer(stub, new FakeSandboxPeer());
+    await runInDurableObject(stub, instance => {
+      instance.env.WORKER_URL = undefined;
+    });
+    const result = await stub.registerSessionFromMetadata({
+      metadata: metadata({
+        sessionId,
+        sandboxId,
+        kiloSessionId: kiloSessionId(),
+        kiloToken: runtimeAuthorizedKiloToken(),
+      }),
+      sandboxSelection: { provider: 'cloudflare' },
+    });
+    expect(result).toMatchObject({
+      success: false,
+      code: 'BAD_REQUEST',
+      error: 'Runtime credential proxy configuration is unavailable',
+    });
+    expect(await stub.getMetadata()).toBeNull();
+    expect(await stub.getSession()).toEqual({ type: 'session-not-found' });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.get('session_metadata')).toBeUndefined();
+      expect(await state.storage.get('control_plane_session')).toBeUndefined();
+      expect(await state.storage.get('runtime_authorization')).toBeUndefined();
     });
   });
 

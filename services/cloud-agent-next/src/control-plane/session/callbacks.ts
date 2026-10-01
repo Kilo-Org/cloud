@@ -60,6 +60,7 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable: 'Sandbox billing is unavailable',
+  invalid_configuration: 'Sandbox configuration is invalid or unsupported',
   connection_lost: 'The sandbox connection was lost',
   sandbox_lost: 'The sandbox was lost',
   agent_restarted: 'The agent restarted',

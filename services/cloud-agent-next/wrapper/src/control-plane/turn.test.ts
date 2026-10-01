@@ -195,6 +195,7 @@ function createHarness(
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
   const envs = new Map<string, Record<string, string>>();
+  const retiredClients = new WeakSet<WrapperKiloClient>();
   const timeouts: Array<{ handler: () => void; ms: number; cancelled: boolean }> = [];
   let clock = 0;
   let materializeCalls = 0;
@@ -240,9 +241,10 @@ function createHarness(
       directory: spec.directory,
       env: envs.get(key) as Record<string, string>,
       get client() {
-        return fake.client;
+        return clients.get(key)!.client;
       },
-      ensure: async () => fake.client,
+      ensure: async () => clients.get(key)!.client,
+      isRetiredClient: client => retiredClients.has(client),
       isSuspected: () => flags.get(key)?.suspected ?? false,
       isRestarting: () => flags.get(key)?.restarting ?? false,
       isUnavailable: () => flags.get(key)?.unavailable ?? false,
@@ -272,6 +274,11 @@ function createHarness(
     },
     setFlags(spec: ControlPlaneRouteSpec, next: Flags): void {
       flags.set(runtimeKey(spec), { ...flags.get(runtimeKey(spec)), ...next });
+    },
+    retireClient(spec: ControlPlaneRouteSpec): void {
+      const key = runtimeKey(spec);
+      retiredClients.add(clients.get(key)!.client);
+      clients.set(key, createFakeClient());
     },
     setEnv(spec: ControlPlaneRouteSpec, env: Record<string, string>): void {
       envs.set(runtimeKey(spec), env);
@@ -398,6 +405,203 @@ describe('turn manager submission', () => {
 });
 
 describe('turn resubmission', () => {
+  it.each(['before-recovery', 'after-recovery'])(
+    'preserves a retired-client native application failure %s',
+    async order => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      const result = Promise.withResolvers<void>();
+      h.client(spec).setPromptImpl(() => result.promise);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.retireClient(spec);
+      if (order === 'after-recovery') {
+        h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+        await settle();
+      }
+      result.reject(
+        new Error('Native application rejected input', {
+          cause: { message: 'fetch failed', code: 'invalid_model' },
+        })
+      );
+      await settle();
+      expect(outcomeFrames(h.frames)).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: SESSION_ID,
+          status: 'failed',
+          reason: 'prompt_failed',
+          lastMessageId: 'm1',
+        },
+      ]);
+      const calls = h.client(spec).prompts.length;
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      expect(h.client(spec).prompts).toHaveLength(calls);
+    }
+  );
+
+  it.each(['abort', 'release'])(
+    'fences a retired submission result after %s and a newer turn',
+    async action => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      const result = Promise.withResolvers<void>();
+      h.client(spec).setPromptImpl(() => result.promise);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.retireClient(spec);
+      h.manager[action](SESSION_ID);
+      if (action === 'release') h.registerRoute(spec);
+      h.manager.submit(SESSION_ID, promptPayload('m2'));
+      await settle();
+      result.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
+      await settle();
+      expect(h.client(spec).prompts.map(call => call.messageId)).toEqual(['m2']);
+      expect(outcomeFrames(h.frames).filter(frame => frame.status === 'failed')).toEqual([]);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames).at(-1)).toMatchObject({
+        status: 'completed',
+        lastMessageId: 'm2',
+      });
+    }
+  );
+
+  it('fails a retired held submission with real progress as agent_restarted, not prompt_failed', async () => {
+    const h = createHarness();
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    const result = Promise.withResolvers<void>();
+    h.client(spec).setPromptImpl(() => result.promise);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: KILO_SESSION, messageID: 'assistant', type: 'tool' },
+      })
+    );
+    h.retireClient(spec);
+    result.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([]);
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(h.client(spec).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({
+      status: 'failed',
+      reason: 'agent_restarted',
+    });
+  });
+
+  it('fails attachment errors without dispatch or restart recovery', async () => {
+    const h = createHarness({
+      materializeAttachments: async () => {
+        throw new Error('Attachment unavailable');
+      },
+    });
+    const spec = routeSpec();
+    h.registerRoute(spec);
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(h.client(spec).prompts).toEqual([]);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'prompt_failed' });
+  });
+
+  it.each(['before-recovery', 'after-recovery'])(
+    'recovers a held retired-client transport rejection %s without prompt_failed',
+    async order => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      const rejected = Promise.withResolvers<void>();
+      h.client(spec).setPromptImpl(() => rejected.promise);
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      h.manager.submit(SESSION_ID, promptPayload('m2'));
+      h.setFlags(spec, { restarting: true });
+      h.retireClient(spec);
+      if (order === 'before-recovery') {
+        rejected.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
+        await settle();
+        expect(outcomeFrames(h.frames)).toEqual([]);
+      }
+      h.setFlags(spec, { restarting: false });
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      expect(h.client(spec).prompts.map(call => call.messageId)).toEqual(['m1', 'm2']);
+      if (order === 'after-recovery') {
+        rejected.reject(Object.assign(new Error('socket closed'), { code: 'ECONNRESET' }));
+        await settle();
+      }
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      h.manager.observeKiloEvent(completedKiloTurn());
+      await settle();
+      expect(outcomeFrames(h.frames)).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: SESSION_ID,
+          status: 'completed',
+          lastMessageId: 'm2',
+        },
+      ]);
+    }
+  );
+
+  it.each(['hang', 'credentials'] as const)(
+    'does not spend recovery on the first dispatch of a prompt received during %s restart',
+    async reason => {
+      const h = createHarness();
+      const spec = routeSpec();
+      h.registerRoute(spec);
+      h.setFlags(spec, { restarting: true });
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      h.setFlags(spec, { restarting: false });
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason, key: DIRECTORY });
+      await settle();
+      expect(h.client(spec).prompts.map(call => call.messageId)).toEqual(['m1']);
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      expect(h.client(spec).prompts.map(call => call.messageId)).toEqual(['m1', 'm1']);
+      expect(outcomeFrames(h.frames)).toEqual([]);
+      h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+      await settle();
+      expect(outcomeFrames(h.frames)).toEqual([
+        {
+          type: 'session.outcome',
+          sessionId: SESSION_ID,
+          status: 'failed',
+          reason: 'agent_restarted',
+          lastMessageId: 'm1',
+        },
+      ]);
+    }
+  );
+
+  it('keeps credential restart eligibility independent for MCP-isolated runtime keys', async () => {
+    const h = createHarness();
+    const specA = routeSpec({
+      sessionId: 'workspace_a',
+      kiloSessionId: 'ses_a',
+      runtimeIsolation: 'per-session',
+    });
+    const specB = routeSpec({
+      sessionId: 'workspace_b',
+      kiloSessionId: 'ses_b',
+      runtimeIsolation: 'per-session',
+    });
+    h.registerRoute(specA);
+    h.registerRoute(specB);
+    h.manager.submit(specA.sessionId, promptPayload('m1'));
+    await settle();
+    expect(h.manager.canRestartRuntime(runtimeKey(specA))).toBe(false);
+    expect(h.manager.canRestartRuntime(runtimeKey(specB))).toBe(true);
+  });
+
   it('ignores the user prompt echo and resubmits the same messageIds once', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());

@@ -114,6 +114,8 @@ const cases: ReadonlyArray<
   ['workspace_setup_failed', 'accepted', 'failed', 'pre_dispatch', 'workspace_setup_failed'],
   ['billing_blocked', 'pre_dispatch', 'failed', 'pre_dispatch', 'payment_required'],
   ['billing_blocked', 'accepted', 'failed', 'pre_dispatch', 'payment_required'],
+  ['invalid_configuration', 'pre_dispatch', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
+  ['invalid_configuration', 'accepted', 'failed', 'pre_dispatch', 'sandbox_connect_failed'],
   [
     'billing_unavailable',
     'pre_dispatch',

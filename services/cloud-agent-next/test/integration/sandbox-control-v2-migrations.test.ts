@@ -9,6 +9,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import {
   allocation as allocationTable,
   routes as routesTable,
+  scopeGrants,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -111,6 +112,7 @@ function newSandboxStub(): DurableObjectStub<SandboxControlV2> {
 }
 
 function clearSchema(db: MigrationDb): void {
+  db.run(sql`DROP TABLE IF EXISTS scope_grants`);
   db.run(sql`DROP TABLE IF EXISTS allocation`);
   db.run(sql`DROP TABLE IF EXISTS routes`);
   db.run(sql`DROP TABLE IF EXISTS __drizzle_migrations`);
@@ -165,10 +167,17 @@ describe('sandbox control V2 consolidated migrations', () => {
 
       await migrate(db, migrations);
 
-      expect(appTableNames(db)).toEqual(['allocation', 'routes']);
+      expect(appTableNames(db)).toEqual(['allocation', 'routes', 'scope_grants']);
       expect(columnSignatures(db, 'allocation')).toEqual(EXPECTED_ALLOCATION_COLUMNS);
       expect(columnSignatures(db, 'routes')).toEqual(EXPECTED_ROUTES_COLUMNS);
-      expect(appliedMigrations(db)).toEqual([{ hash: '', created_at: 1790455891314 }]);
+      expect(columnSignatures(db, 'scope_grants')).toEqual([
+        { name: 'grant', type: 'text', notnull: 1, dflt_value: null, pk: 0 },
+        { name: 'id', type: 'text', notnull: 1, dflt_value: null, pk: 1 },
+      ]);
+      expect(appliedMigrations(db)).toHaveLength(2);
+      const applied = appliedMigrations(db);
+      await migrate(db, migrations);
+      expect(appliedMigrations(db)).toEqual(applied);
     });
   });
 
@@ -203,7 +212,9 @@ describe('sandbox control V2 consolidated migrations', () => {
 
       await expect(migrate(db, migrations)).resolves.toBeUndefined();
 
-      expect(appliedMigrations(db)).toEqual(oldApplied);
+      expect(appliedMigrations(db).slice(0, oldApplied.length)).toEqual(oldApplied);
+      expect(appliedMigrations(db)).toHaveLength(oldApplied.length + 1);
+      expect(db.select().from(scopeGrants).all()).toEqual([]);
       expect(columnSignatures(db, 'allocation')).toEqual(oldAllocationColumns);
       expect(columnSignatures(db, 'routes')).toEqual(oldRoutesColumns);
       expect(db.select().from(allocationTable).get()).toMatchObject({

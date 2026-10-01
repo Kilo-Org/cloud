@@ -10,10 +10,10 @@ type ServerState = {
   attempts: number;
   connections: number;
   hellos: Array<Record<string, unknown>>;
-  mode: 'accept' | 'reject';
+  mode: 'accept' | 'reject' | 'shutdown';
 };
 
-function startControlServer(mode: 'accept' | 'reject'): {
+function startControlServer(mode: ServerState['mode']): {
   port: number;
   state: ServerState;
   send: (frame: unknown) => void;
@@ -33,6 +33,11 @@ function startControlServer(mode: 'accept' | 'reject'): {
       open(socket) {
         state.connections += 1;
         sockets.add(socket);
+        if (state.mode === 'shutdown') {
+          socket.send(JSON.stringify({ type: 'shutdown', reason: 'hello_rejected' }));
+          socket.close(1008, 'shutdown');
+          return;
+        }
         socket.send(JSON.stringify({ type: 'welcome', protocolVersion: PROTOCOL_VERSION }));
       },
       message(_socket, raw) {
@@ -100,6 +105,25 @@ async function waitForExit(child: Bun.Subprocess, timeoutMs: number): Promise<nu
 }
 
 describe('control-plane wrapper process', () => {
+  it('exits 0 on terminal admission rejection before welcome without reconnecting', async () => {
+    const server = startControlServer('shutdown');
+    const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {
+      env: childEnv(`ws://127.0.0.1:${server.port}/sandbox-control/fake`, {
+        CONTROL_PLANE_TIMER_DIVISOR: '50',
+      }),
+      stdout: 'ignore',
+      stderr: 'ignore',
+    });
+    try {
+      expect(await waitForExit(child, 6_000)).toBe(0);
+      expect(server.state.attempts).toBe(1);
+    } finally {
+      if (child.exitCode === null) child.kill();
+      await child.exited;
+      server.stop();
+    }
+  }, 10_000);
+
   it('stays alive across reconnect backoff instead of exiting', async () => {
     const server = startControlServer('reject');
     const child = Bun.spawn([process.execPath, 'run', MAIN_PATH], {

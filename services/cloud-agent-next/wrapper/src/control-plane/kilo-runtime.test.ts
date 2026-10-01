@@ -7,6 +7,8 @@ import {
   type ControlPlaneTimers,
 } from '../../../src/shared/control-plane-timers.js';
 import type { KiloFeedEvent, KiloEventFeedSource } from './kilo-event-feed.js';
+import { createTurnManager } from './turn.js';
+import type { ControlPlaneWrapperFrame } from '../../../src/shared/control-plane-protocol.js';
 import {
   cleanupStaleKiloPidfiles,
   createKiloRuntime,
@@ -252,10 +254,10 @@ describe('Kilo startup lifecycle', () => {
     await runtime.installCredentials({ HOME: '/new' });
     connected.resolve();
     await starting;
-    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
     expect(environments).toEqual([{ HOME: '/old' }]);
     idle = true;
-    expect(await runtime.applyPendingCredentials()).toBe(true);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
     expect(environments).toEqual([{ HOME: '/old' }, { HOME: '/new' }]);
     expect(filesystemEnvironments).toEqual(environments);
     await runtime.shutdown();
@@ -363,6 +365,178 @@ describe('cleanupStaleKiloPidfiles', () => {
 });
 
 describe('createKiloRuntime', () => {
+  it('reserves credential retirement before ensure can hand out a client, and retains old-client identity after recovery', async () => {
+    const spawner = createSpawner();
+    const stopping = Promise.withResolvers<void>();
+    const releaseStop = Promise.withResolvers<void>();
+    const { runtime } = createRuntime({
+      spawner,
+      scheduler: createScheduler(),
+      feed: createFeedFactory(),
+      probe: createProbe(true),
+      isIdle: () => true,
+      spawnKilo: async input => {
+        const process = await spawner.spawn(input);
+        return {
+          ...process,
+          stop: async deadline => {
+            stopping.resolve();
+            await releaseStop.promise;
+            return process.stop(deadline);
+          },
+        };
+      },
+    });
+    const oldClient = await runtime.ensure();
+    await runtime.installCredentials({ HOME: '/new' });
+    const applying = runtime.applyPendingCredentials(() => true);
+    await stopping.promise;
+    expect(runtime.isRestarting()).toBe(true);
+    expect(runtime.isRetiredClient(oldClient)).toBe(true);
+    let ensured = false;
+    const ensuring = runtime.ensure().then(client => {
+      ensured = true;
+      return client;
+    });
+    await Bun.sleep(1);
+    expect(ensured).toBe(false);
+    releaseStop.resolve();
+    expect(await applying).toBe(true);
+    expect(await ensuring).not.toBe(oldClient);
+    expect(runtime.isRestarting()).toBe(false);
+    expect(runtime.isRetiredClient(oldClient)).toBe(true);
+    expect(runtime.isRetiredClient(runtime.client)).toBe(false);
+    await runtime.shutdown();
+  });
+
+  it.each(['busy', 'finalizing', 'pending-attachment'])(
+    'blocks shared-sibling credential retirement during %s',
+    async activity => {
+      const spawner = createSpawner();
+      const inspected = Promise.withResolvers<boolean>();
+      const attachment = Promise.withResolvers<{ prompt: string }>();
+      const finalization = Promise.withResolvers<{ success: boolean }>();
+      const { runtime } = createRuntime({
+        spawner,
+        scheduler: createScheduler(),
+        feed: createFeedFactory(),
+        probe: createProbe(true),
+        isIdle: () => inspected.promise,
+      });
+      const client = await runtime.ensure();
+      client.sendPromptAsync = async () => undefined;
+      const turns = createTurnManager({
+        timers: TEST_TIMERS,
+        runtimes: { get: () => runtime },
+        emit: () => undefined,
+        materializeAttachments: async message => ({
+          ...message,
+          ...(activity === 'pending-attachment' ? await attachment.promise : { prompt: 'hello' }),
+        }),
+        runAutoCommit: () => finalization.promise,
+      });
+      turns.registerRoute({
+        sessionId: 'workspace_a',
+        kiloSessionId: 'ses_a',
+        directory: runtime.directory,
+        attemptId: 'a',
+      });
+      turns.registerRoute({
+        sessionId: 'workspace_b',
+        kiloSessionId: 'ses_b',
+        directory: runtime.directory,
+        attemptId: 'b',
+      });
+      await runtime.installCredentials({ HOME: '/new' });
+      const applying = runtime.applyPendingCredentials(() =>
+        turns.canRestartRuntime(runtime.directory)
+      );
+      turns.submit('workspace_b', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+        finalization: { autoCommit: activity === 'finalizing' },
+      });
+      await Bun.sleep(1);
+      if (activity === 'finalizing') {
+        turns.observeKiloEvent({
+          type: 'session.turn.close',
+          properties: { sessionID: 'ses_b', reason: 'completed' },
+          nativeRuntimeId: 'r',
+        });
+      }
+      inspected.resolve(true);
+      expect(await applying).toBe(false);
+      expect(spawner.processes[0].stopped).toBe(0);
+      attachment.resolve({ prompt: 'hello' });
+      finalization.resolve({ success: true });
+      turns.release('workspace_b');
+      turns.shutdown();
+      await runtime.shutdown();
+    }
+  );
+
+  it.each(['idle-first', 'attachment-first'])(
+    'does not retire a submission client after held idle inspection: %s',
+    async order => {
+      const spawner = createSpawner();
+      const scheduler = createScheduler();
+      const inspected = Promise.withResolvers<boolean>();
+      const attachment = Promise.withResolvers<{ prompt: string }>();
+      const frames: ControlPlaneWrapperFrame[] = [];
+      const { runtime } = createRuntime({
+        spawner,
+        scheduler,
+        feed: createFeedFactory(),
+        probe: createProbe(true),
+        isIdle: () => inspected.promise,
+      });
+      const client = await runtime.ensure();
+      const submitted: string[] = [];
+      client.sendPromptAsync = async input => {
+        submitted.push(input.messageId ?? '');
+      };
+      const turns = createTurnManager({
+        timers: TEST_TIMERS,
+        runtimes: { get: () => runtime },
+        emit: frame => frames.push(frame),
+        materializeAttachments: async message => ({ ...message, ...(await attachment.promise) }),
+      });
+      turns.registerRoute({
+        sessionId: 'workspace_a',
+        kiloSessionId: 'ses_a',
+        directory: runtime.directory,
+        attemptId: 'a',
+      });
+      const installation = runtime.installCredentials({ HOME: '/new' });
+      const applying = runtime.applyPendingCredentials(() =>
+        turns.canRestartRuntime(runtime.directory)
+      );
+      turns.submit('workspace_a', {
+        messageId: 'm1',
+        turn: { type: 'prompt', prompt: 'hello' },
+        agent: { mode: 'code', model: 'test/model' },
+      });
+      if (order === 'idle-first') {
+        inspected.resolve(true);
+        await applying;
+        attachment.resolve({ prompt: 'hello' });
+      } else {
+        attachment.resolve({ prompt: 'hello' });
+        await waitFor(() => submitted.length > 0);
+        inspected.resolve(true);
+        await applying;
+      }
+      await installation;
+      await waitFor(() => submitted.length > 0);
+      expect(spawner.processes[0].stopped).toBe(0);
+      expect(spawner.spawnCount()).toBe(1);
+      expect(frames.filter(frame => frame.type === 'session.outcome')).toEqual([]);
+      turns.shutdown();
+      await runtime.shutdown();
+    }
+  );
+
   it('restarts on an unexpected Kilo exit but not after a deliberate stop', async () => {
     const spawner = createSpawner();
     const scheduler = createScheduler();
@@ -817,6 +991,8 @@ describe('createKiloRuntime', () => {
 
     await runtime.ensure();
     await runtime.installCredentials({ HOME: '/new' });
+    expect(spawner.spawnCount()).toBe(1);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
     await waitFor(() => spawner.spawnCount() === 2);
     expect(runtime.env.HOME).toBe('/new');
     expect(restarts).toEqual([{ reason: 'credentials' }]);
@@ -847,11 +1023,11 @@ describe('createKiloRuntime', () => {
     await runtime.installCredentials({ HOME: '/new' });
     expect(spawner.spawnCount()).toBe(1);
     expect(runtime.env.HOME).toBe('/new');
-    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
     expect(restarts).toEqual([]);
 
     idle = true;
-    expect(await runtime.applyPendingCredentials()).toBe(true);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(true);
     await waitFor(() => spawner.spawnCount() === 2);
     expect(restarts).toEqual([{ reason: 'credentials' }]);
   });
@@ -872,7 +1048,7 @@ describe('createKiloRuntime', () => {
     await runtime.ensure();
     await runtime.installCredentials({ HOME: '/new' });
     expect(spawner.spawnCount()).toBe(1);
-    expect(await runtime.applyPendingCredentials()).toBe(false);
+    expect(await runtime.applyPendingCredentials(() => true)).toBe(false);
     expect(restarts).toEqual([]);
   });
 

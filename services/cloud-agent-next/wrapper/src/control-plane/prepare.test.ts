@@ -909,6 +909,27 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
+  it('records refreshed Kilo environment before awaiting Git credential maintenance', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
+    await harness.manager.prepare(spec);
+    const gitStarted = Promise.withResolvers<void>();
+    const finishGit = Promise.withResolvers<ExecResult>();
+    harness.setGit(async () => {
+      gitStarted.resolve();
+      return finishGit.promise;
+    });
+    const installing = harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'kilo-token-2' },
+      git: { token: 'git-2' },
+    });
+    await gitStarted.promise;
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
+    finishGit.resolve(result(0));
+    await installing;
+  });
+
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
     const harness = createHarness();
     const spec = routeSpec();

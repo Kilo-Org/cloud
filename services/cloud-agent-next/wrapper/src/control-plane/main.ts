@@ -312,6 +312,7 @@ export async function runControlPlaneWrapper(
       ensure: input => runtimes.ensure(input),
       installCredentials: async (key, nextEnv) => {
         await runtimes.get(key)?.installCredentials(nextEnv);
+        turnsRef.current?.credentialsInstalled(key);
       },
       isUnavailable: key => {
         const runtime = runtimes.get(key);

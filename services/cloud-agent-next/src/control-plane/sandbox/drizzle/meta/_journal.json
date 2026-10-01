@@ -8,6 +8,13 @@
       "when": 1790455891314,
       "tag": "0000_sandbox_control_v2",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790793579352,
+      "tag": "0001_scope_grants",
+      "breakpoints": true
     }
   ]
 }

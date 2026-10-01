@@ -87,6 +87,7 @@ import {
   type ControlPlaneRouteUpdate,
   type ControlPlaneRouteView,
   type ControlPlaneSessionRefPayload,
+  type ControlPlaneStatusResult,
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
 } from '../../shared/control-plane-protocol.js';
@@ -162,6 +163,7 @@ const GENERATION = 2;
 const REGISTRATION_KEY = 'control_plane_session';
 const SESSION_METADATA_KEY = 'session_metadata';
 const ROUTE_KEY = 'control_plane_route';
+const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
 
@@ -253,6 +255,7 @@ export type ControlPlaneSessionSnapshot =
  * `SANDBOX_CONTROL` binding; tests may inject a fake through `sandboxPeerFor`.
  */
 export type ControlPlaneSandboxPeer = {
+  status(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneStatusResult>;
   prepare(input: ControlPlanePrepareInputWithSelection): Promise<ControlPlaneRouteView>;
   deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult>;
   abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult>;
@@ -276,6 +279,8 @@ export type ControlPlaneSandboxPeer = {
 };
 
 type SessionMessageRow = typeof controlPlaneMessages.$inferSelect;
+
+type TransportPass = { deadlineAt: number; scheduleRecovery: boolean };
 
 function rowToMessage(row: SessionMessageRow): SessionMessage {
   return {
@@ -392,6 +397,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private runtimeAuthorization: RuntimeAuthorization | undefined;
   private messages: SessionMessage[] = [];
   private route: ControlPlaneRouteView = { state: 'unknown' };
+  private transportRecoveryAt: number | null = null;
   private pendingInteractions: PendingInteractions | undefined;
   private availableCommands: CommandsAvailableData = { commands: [] };
   /** Report obligations for terminal messages (plan B5); repair is best effort. */
@@ -541,6 +547,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.availableCommands = commands?.commands ? commands : { commands: [] };
     this.messages = await this.loadMessages();
     this.route = await this.loadRoute();
+    const recoveryAt = z
+      .number()
+      .int()
+      .nonnegative()
+      .safeParse(await this.ctx.storage.get<unknown>(TRANSPORT_RECOVERY_KEY));
+    this.transportRecoveryAt = recoveryAt.success ? recoveryAt.data : null;
   }
 
   // --- registration -----------------------------------------------------------
@@ -597,7 +609,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       registration = buildControlPlaneSessionRegistration(
         validated.data,
         sandboxSelection,
-        this.env.AGENT_ENV_VARS_PRIVATE_KEY
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        {
+          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          workerUrl: this.env.WORKER_URL,
+        }
       );
     } catch (error) {
       return createFailure('BAD_REQUEST', errorMessage(error));
@@ -655,7 +671,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       registration = buildControlPlaneSessionRegistration(
         metadata,
         sandboxSelection,
-        this.env.AGENT_ENV_VARS_PRIVATE_KEY
+        this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+        {
+          containmentEnabled: this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false',
+          workerUrl: this.env.WORKER_URL,
+        }
       );
     } catch (error) {
       return createFailure('BAD_REQUEST', errorMessage(error));
@@ -699,6 +719,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     const authorization = RuntimeAuthorizationSchema.safeParse(
       await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
     );
+    const containment = this.registration?.sandboxSelection?.containment;
+    const contained =
+      containment === undefined
+        ? this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false'
+        : containment.kilocode || containment.github;
     return issuePersistedRuntimeProxyGrant({
       env: this.env,
       storage: this.ctx.storage,
@@ -706,7 +731,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       authorization: authorization.success ? authorization.data : null,
       fence,
       token,
-      mode: 'contained',
+      mode: contained ? 'contained' : 'direct',
     });
   }
 
@@ -864,16 +889,28 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * The one admission path for a prompt: append it `queued`, then deliver it or
-   * prepare the route and act on the view. `send` and the settled-answer
+   * The one admission path: confirm an old preparing owner before fresh work,
+   * append it `queued`, then deliver or prepare. `send` and the settled-answer
    * fallback share it so an answer continues exactly like a sent message. It
    * reports `queueMessage`'s refusal of a new message over the queued bound; the
    * reducer owns the count and `admitMessage` does not re-derive it.
    */
   private async admitMessage(parsed: ControlPlanePromptPayload): Promise<'ok' | 'queue-full'> {
     const now = Date.now();
-    const reduction = queueMessage(this.messages, parsed, now);
+    let reduction = queueMessage(this.messages, parsed, now);
     if (reduction.rejected === 'queue-full') return 'queue-full';
+    const pass = this.transportPass();
+    if (
+      reduction.changed.length > 0 &&
+      this.route.state === 'preparing' &&
+      this.messages.some(message => message.state === 'queued')
+    ) {
+      const view = await this.readSandboxView(pass);
+      if (view?.state === 'failed' && view.attemptId === this.currentAttemptId()) {
+        await this.applyView(view, pass);
+        reduction = queueMessage(this.messages, parsed, now);
+      }
+    }
     if (reduction.changed.length > 0) {
       this.messages = reduction.messages;
       await this.persistMessages(reduction.changed);
@@ -881,10 +918,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       this.ensureReportAnchor(reduction.changed[0]);
     }
     await this.armAlarm();
-    if (this.route.state === 'ready') await this.deliverQueued();
+    if (!this.messages.some(message => message.state === 'queued')) return 'ok';
+    if (this.route.state === 'ready') await this.deliverQueued(pass);
     else {
-      const view = await this.prepareSandbox();
-      if (view !== null) await this.applyView(view);
+      const view = await this.prepareSandbox(pass);
+      if (view !== null) await this.applyView(view, pass);
     }
     await this.armAlarm();
     return 'ok';
@@ -902,7 +940,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
       const peer = this.sandboxPeer();
       if (peer !== null) {
         try {
-          await peer.abort({ sessionId: this.sessionId });
+          await withDORetry(
+            () => this.sandboxPeer() ?? peer,
+            current => current.abort({ sessionId: this.sessionId }),
+            'session.abort',
+            this.sandboxRpcConfig(this.transportPass())
+          );
         } catch {
           // Abort is best effort (spec §5).
         }
@@ -992,8 +1035,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     await this.enqueue(async () => {
       // A delete queued ahead of this notification wiped the session.
       if (this.registration === null) return;
+      if (
+        this.messages.some(message => message.state === 'queued') &&
+        (this.route.state === 'failed' ||
+          this.transportRecoveryAt !== null ||
+          (this.route.state === 'preparing' &&
+            parsed.state !== 'unknown' &&
+            (parsed.attemptId !== this.route.attemptId || parsed.state !== 'preparing')))
+      ) {
+        const pass = this.transportPass();
+        pass.scheduleRecovery = this.transportRecoveryAt !== null;
+        await this.recoverQueued(pass, parsed);
+        await this.armAlarm();
+        return;
+      }
+      const pass = this.transportPass();
       if (parsed.state === 'unknown') {
-        await this.applyView(parsed);
+        await this.applyView(parsed, pass);
         return;
       }
       // A notification names its route attempt. Ignore one for an older or
@@ -1009,12 +1067,14 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         await this.applyView({ state: 'unknown' });
         await this.armAlarm();
         if (this.messages.some(message => message.state === 'queued')) {
-          const view = await this.prepareSandbox();
-          if (view !== null) await this.applyView(view);
+          const view = await this.prepareSandbox(pass);
+          if (view !== null) await this.applyView(view, pass);
         }
+        await this.armAlarm();
         return;
       }
-      await this.applyView(parsed);
+      await this.applyView(parsed, pass);
+      await this.armAlarm();
     });
   }
 
@@ -1136,18 +1196,25 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           await this.settleMessages(ids, 'failed', reason);
         }
       }
+      if (this.transportRecoveryAt !== null && this.transportRecoveryAt <= now) {
+        await this.clearTransportRecovery();
+        await this.recoverQueued(this.transportPass(false));
+      }
       await this.armAlarm();
     });
   }
 
   /**
    * The one place that sets the alarm. It wakes for the earliest backstop
-   * deadline, the next report obligation, or the next callback obligation, and
-   * is cleared only when all three are empty. Outbox due times are what give a
-   * failed report/callback send its retry once no message is open.
+   * deadline, transport recovery, the next report or callback obligation.
+   * Outbox due times retry failed reporting even once no message is open.
    */
   private async armAlarm(): Promise<void> {
+    if (!this.messages.some(message => message.state === 'queued')) {
+      await this.clearTransportRecovery();
+    }
     const candidates = [
+      this.transportRecoveryAt,
       nextBackstopAt(this.messages, this.sessionTimers()),
       this.reportOutbox.nextDueAt() ?? null,
       this.messageCallbacks.nextCallbackDueAt() ?? null,
@@ -1516,6 +1583,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.runtimeAuthorization = undefined;
     this.messages = [];
     this.route = { state: 'unknown' };
+    this.transportRecoveryAt = null;
     this.pendingInteractions = undefined;
     this.availableCommands = { commands: [] };
     this.worktreePreparationGeneration = undefined;
@@ -1602,13 +1670,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
 
   // --- route view -------------------------------------------------------------
 
-  private async applyView(view: ControlPlaneRouteView): Promise<void> {
+  private async applyView(view: ControlPlaneRouteView, pass = this.transportPass()): Promise<void> {
     // The route view is the source of the preparation row: the previous
     // persisted view names the attempt that is open, so a transition closes it
     // even if this process lost its in-memory recorder map to eviction.
     const previous = this.route;
-    this.route = view;
-    await this.persistRoute();
+    await this.persistRoute(view);
+    if (view.state === 'preparing' || view.state === 'reconnecting') {
+      await this.clearTransportRecovery();
+    }
     switch (view.state) {
       case 'unknown':
         this.finalizePreparingRoute(previous, {
@@ -1652,7 +1722,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
         }
         this.finalizePreparingRoute(previous, { status: 'completed' });
         this.emitCloudStatus({ type: 'ready' });
-        await this.deliverQueued();
+        await this.deliverQueued(pass);
         return;
       }
       case 'failed':
@@ -1693,16 +1763,16 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     this.worktreePreparationGeneration = undefined;
   }
 
-  private async deliverQueued(): Promise<void> {
+  private async deliverQueued(pass = this.transportPass()): Promise<void> {
     const queued = this.messages.filter(message => message.state === 'queued');
     if (queued.length === 0) return;
     const peer = this.sandboxPeer();
-    if (peer === null) return;
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return;
+    }
     let result: ControlPlaneDeliverResult;
     try {
-      // No deadline: the Sandbox keeps running the deliver after a caller
-      // timeout, so giving up would leave a delivered prompt marked queued.
-      // `withDORetry` still retries retryable errors (bounded attempts).
       result = await withDORetry(
         () => this.sandboxPeer() ?? peer,
         stub =>
@@ -1711,9 +1781,10 @@ export class SandboxSessionV2 extends DurableObject<Env> {
             messages: queued.map(message => message.intent),
           }),
         'session.deliver',
-        DEFAULT_DO_RETRY_CONFIG
+        this.sandboxRpcConfig(pass)
       );
     } catch {
+      await this.scheduleTransportRecovery(pass);
       return;
     }
     if (result === 'sent') {
@@ -1743,24 +1814,26 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     // (spec §5). A `ready` view only updates the stored route and returns: it
     // must not re-enter delivery in this task, or a write that keeps losing to
     // a ready route would recurse with no exit. The next `send` or `onRoute`
-    // retries; if none arrives, the 20-minute queued backstop fails the
-    // messages.
-    const view = await this.prepareSandbox();
+    // retries, with one transport recovery opportunity if still ready.
+    const view = await this.prepareSandbox(pass);
     if (view === null) return;
     if (view.state === 'ready') {
-      this.route = view;
-      await this.persistRoute();
+      await this.persistRoute(view);
+      await this.scheduleTransportRecovery(pass);
       return;
     }
-    await this.applyView(view);
+    await this.applyView(view, pass);
   }
 
-  private async prepareSandbox(): Promise<ControlPlaneRouteView | null> {
+  private async prepareSandbox(pass = this.transportPass()): Promise<ControlPlaneRouteView | null> {
     const peer = this.sandboxPeer();
     const registration = this.registration;
-    if (peer === null || registration === null) return null;
+    if (registration === null) return null;
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
     try {
-      // Idempotent, so a bounded deadline is safe here (unlike `deliver`).
       return await withDORetry(
         () => this.sandboxPeer() ?? peer,
         stub =>
@@ -1772,18 +1845,120 @@ export class SandboxSessionV2 extends DurableObject<Env> {
               : {}),
           }),
         'session.prepare',
-        this.sandboxRpcConfig()
+        this.sandboxRpcConfig(pass)
       );
     } catch {
       // `unknown` must come only from the Sandbox, never from a transport error.
+      await this.scheduleTransportRecovery(pass);
       return null;
     }
   }
 
-  private sandboxRpcConfig() {
+  private async recoverQueued(
+    pass: TransportPass,
+    ownerHint?: ControlPlaneRouteUpdate
+  ): Promise<void> {
+    if (!this.messages.some(message => message.state === 'queued')) return;
+    let view = await this.readSandboxView(pass);
+    if (view === null) return;
+    if (
+      ownerHint?.state === 'lost' &&
+      ownerHint.attemptId === this.currentAttemptId() &&
+      (view.state === 'unknown' || view.attemptId !== ownerHint.attemptId)
+    ) {
+      await this.settleMessages(
+        this.messages
+          .filter(message => message.state === 'accepted')
+          .map(message => message.messageId),
+        'failed',
+        ownerHint.reason
+      );
+    }
+    if (ownerHint && view.state !== 'unknown' && view.attemptId !== this.currentAttemptId()) {
+      pass.scheduleRecovery = true;
+    }
+    if (
+      view.state === 'unknown' ||
+      (view.state === 'failed' &&
+        this.route.state === 'failed' &&
+        view.attemptId === this.route.attemptId)
+    ) {
+      const prepared = await this.prepareSandbox(pass);
+      if (prepared === null) return;
+      if (
+        prepared.state === 'failed' &&
+        this.route.state === 'failed' &&
+        prepared.attemptId === this.route.attemptId
+      ) {
+        await this.scheduleTransportRecovery(pass);
+        return;
+      }
+      view = prepared;
+    }
+    if (
+      ownerHint?.state === 'preparing' &&
+      view.state === 'preparing' &&
+      ownerHint.attemptId === view.attemptId
+    ) {
+      view = ownerHint;
+    } else if (
+      ownerHint?.state === 'failed' &&
+      view.state === 'failed' &&
+      ownerHint.attemptId === view.attemptId &&
+      ownerHint.reason === view.reason
+    ) {
+      view = ownerHint;
+    }
+    await this.applyView(view, pass);
+  }
+
+  private async readSandboxView(pass: TransportPass): Promise<ControlPlaneRouteView | null> {
+    const peer = this.sandboxPeer();
+    if (peer === null) {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+    try {
+      const status = await withDORetry(
+        () => this.sandboxPeer() ?? peer,
+        current => current.status({ sessionId: this.sessionId }),
+        'session.status',
+        this.sandboxRpcConfig(pass)
+      );
+      return controlPlaneRouteViewSchema.parse(status.view);
+    } catch {
+      await this.scheduleTransportRecovery(pass);
+      return null;
+    }
+  }
+
+  private transportPass(scheduleRecovery = true): TransportPass {
+    return { deadlineAt: Date.now() + this.sessionTimers().sandboxRpcDeadlineMs, scheduleRecovery };
+  }
+
+  private async scheduleTransportRecovery(pass: TransportPass): Promise<void> {
+    if (
+      !pass.scheduleRecovery ||
+      this.transportRecoveryAt !== null ||
+      !this.messages.some(message => message.state === 'queued')
+    )
+      return;
+    const dueAt = Date.now() + this.sessionTimers().transportRecoveryMs;
+    await this.ctx.storage.put(TRANSPORT_RECOVERY_KEY, dueAt);
+    this.transportRecoveryAt = dueAt;
+    await this.armAlarm();
+  }
+
+  private async clearTransportRecovery(): Promise<void> {
+    if (this.transportRecoveryAt === null) return;
+    await this.ctx.storage.delete(TRANSPORT_RECOVERY_KEY);
+    this.transportRecoveryAt = null;
+  }
+
+  private sandboxRpcConfig(pass: TransportPass) {
     return {
       ...DEFAULT_DO_RETRY_CONFIG,
-      scope: { deadlineAt: Date.now() + this.sandboxTimers().sessionNotifyDeadlineMs },
+      scope: { deadlineAt: pass.deadlineAt },
     };
   }
 
@@ -2153,8 +2328,23 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /** The route view is the one persisted route state (attempt id included). */
-  private async persistRoute(): Promise<void> {
-    await this.ctx.storage.put(ROUTE_KEY, this.route);
+  private async persistRoute(view: ControlPlaneRouteView): Promise<void> {
+    const previousAttempt = this.currentAttemptId();
+    if (
+      previousAttempt !== null &&
+      view.state !== 'unknown' &&
+      view.attemptId !== previousAttempt
+    ) {
+      await this.settleMessages(
+        this.messages
+          .filter(message => message.state === 'accepted')
+          .map(message => message.messageId),
+        'failed',
+        'agent_restarted'
+      );
+    }
+    await this.ctx.storage.put(ROUTE_KEY, view);
+    this.route = view;
   }
 
   private async loadRoute(): Promise<ControlPlaneRouteView> {
@@ -2175,11 +2365,6 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   private sessionTimers() {
     return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
       .session;
-  }
-
-  private sandboxTimers() {
-    return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
-      .sandbox;
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

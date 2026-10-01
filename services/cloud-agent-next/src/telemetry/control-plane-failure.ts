@@ -100,6 +100,8 @@ export function classifyControlPlaneFailure(
       return { stage: 'pre_dispatch', code: 'payment_required' };
     case 'billing_unavailable':
       return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
+    case 'invalid_configuration':
+      return PRE_DISPATCH_SANDBOX_CONNECT;
     case 'agent_unavailable':
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED

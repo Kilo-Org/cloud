@@ -40,7 +40,6 @@ import {
   KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
-import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
 import {
   getSandboxSessionStub,
   resolveLegacySessionStub,
@@ -49,6 +48,7 @@ import {
 import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
 import { withDORetry } from './utils/do-retry.js';
 import { parseBearerCredential } from './sandbox-control/credential.js';
+import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
@@ -286,18 +286,7 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 registerControlLogRoutes(app);
 
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId || !isSandboxControlId(sandboxId)) {
-    return c.text('Invalid sandboxId', 400);
-  }
-
-  const stub = getSandboxControlStub(c.env, sandboxId);
-  return stub.fetch(c.req.raw);
+  return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {

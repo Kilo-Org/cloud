@@ -5,7 +5,42 @@ import {
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
 import { z } from 'zod';
+import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
+
+export type ProviderCreationCause =
+  | 'insufficient_credits'
+  | 'stopping'
+  | 'meter_unavailable'
+  | 'invalid_configuration';
+
+export class ProviderCreationError extends AgentSandboxUnavailableError {
+  constructor(public readonly code: ProviderCreationCause) {
+    super(
+      code === 'insufficient_credits'
+        ? 'Sandbox billing requires additional credits'
+        : code === 'invalid_configuration'
+          ? 'Sandbox configuration is invalid or unsupported'
+          : code === 'stopping'
+            ? 'Sandbox is stopping'
+            : 'Sandbox billing admission is temporarily unavailable',
+      code === 'insufficient_credits'
+        ? 'billing_blocked'
+        : code === 'invalid_configuration'
+          ? 'provider_not_configured'
+          : 'runtime_creation_failed'
+    );
+    this.name = 'ProviderCreationError';
+  }
+
+  get permanentReason(): 'billing_blocked' | 'invalid_configuration' | null {
+    return this.code === 'insufficient_credits'
+      ? 'billing_blocked'
+      : this.code === 'invalid_configuration'
+        ? 'invalid_configuration'
+        : null;
+  }
+}
 
 export const vercelAllocationConfigSchema = z
   .object({

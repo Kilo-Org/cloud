@@ -24,6 +24,8 @@ import {
   type SessionMetadata,
 } from '../../persistence/session-metadata.js';
 import { hasModernRuntimeAuthorization } from '../../session/runtime-authorization-persistence.js';
+import { getWorktreeCredentialContainment } from '../../sandbox-control/credential-containment.js';
+import { runtimeCredentialProxyFacadeBaseUrl } from '../../runtime-credential-proxy.js';
 import type { ControlPlaneSessionRegistration } from './session-do.js';
 
 /**
@@ -150,7 +152,8 @@ function materializeAttachPayload(
 export function buildControlPlaneSessionRegistration(
   metadata: SessionMetadata,
   sandboxSelection: ControlPlaneSandboxSelection,
-  mcpPrivateKey?: string
+  mcpPrivateKey?: string,
+  runtimeConfiguration?: { containmentEnabled: boolean; workerUrl: string | undefined }
 ): ControlPlaneSessionRegistration {
   const kiloSessionId = metadata.auth.kiloSessionId;
   if (kiloSessionId === undefined || kiloSessionId.length === 0) {
@@ -179,6 +182,20 @@ export function buildControlPlaneSessionRegistration(
   if (sandboxSelection.billing !== undefined && sandboxSelection.billing.sandboxId !== sandboxId) {
     throw new Error('Sandbox selection billing does not match the session sandbox');
   }
+  const containment =
+    sandboxSelection.containment ??
+    getWorktreeCredentialContainment(runtimeConfiguration?.containmentEnabled ?? true);
+  if (sandboxProvider === 'vercel' && !containment.kilocode && !containment.github) {
+    throw new Error('Vercel requires credential containment');
+  }
+  if (
+    hasModernRuntimeAuthorization(metadata) &&
+    runtimeConfiguration &&
+    (!runtimeConfiguration.workerUrl ||
+      !runtimeCredentialProxyFacadeBaseUrl(runtimeConfiguration.workerUrl))
+  ) {
+    throw new Error('Runtime credential proxy configuration is unavailable');
+  }
   const payload = materializeAttachPayload(metadata, mcpPrivateKey);
   if (payload.mcp !== undefined) {
     const validated = parseSessionAttachMcpServers(payload.mcp);
@@ -199,5 +216,5 @@ export function buildControlPlaneSessionRegistration(
     scopeId: metadata.workspace?.worktreeId ?? metadata.identity.sessionId,
     ...(encryptedMcpServers === undefined ? {} : { mcpServers: encryptedMcpServers }),
   };
-  return { sandboxId, spec, credentials, sandboxSelection };
+  return { sandboxId, spec, credentials, sandboxSelection: { ...sandboxSelection, containment } };
 }

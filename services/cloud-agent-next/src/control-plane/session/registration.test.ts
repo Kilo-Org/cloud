@@ -1,4 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { CurrentSessionMetadataSchema } from '../../persistence/session-metadata.js';
 import {
@@ -45,6 +46,76 @@ function metadata(overrides: Record<string, unknown> = {}) {
 }
 
 const selection = { provider: 'cloudflare' as const };
+
+describe('runtime authorization admission', () => {
+  it.each(['cloudflare', 'cloudflare-containers', 'vercel'] as const)(
+    'isolates modern %s runtimes and freezes the admission containment selection',
+    provider => {
+      const modern = metadata({
+        auth: {
+          kiloSessionId: 'ses_12345678901234567890123456',
+          kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+        },
+        workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: provider },
+      });
+      const registration = buildControlPlaneSessionRegistration(modern, { provider }, undefined, {
+        containmentEnabled: true,
+        workerUrl: 'https://worker.test',
+      });
+      expect(registration.spec.runtimeIsolation).toBe('per-session');
+      expect(registration.spec.env?.KILOCODE_TOKEN).toBeUndefined();
+      expect(registration.sandboxSelection?.containment).toEqual({
+        kilocode: true,
+        github: true,
+        worktreeScoped: true,
+      });
+    }
+  );
+
+  it('preserves direct SCM admission independently of modern runtime authorization', () => {
+    const modern = metadata({
+      auth: {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+      },
+    });
+    const registration = buildControlPlaneSessionRegistration(
+      modern,
+      { ...selection, containment: { kilocode: false, github: false, worktreeScoped: true } },
+      undefined,
+      { containmentEnabled: true, workerUrl: 'https://worker.test' }
+    );
+    expect(registration.spec.runtimeIsolation).toBe('per-session');
+    expect(registration.sandboxSelection?.containment).toMatchObject({
+      kilocode: false,
+      github: false,
+    });
+  });
+
+  it('rejects unsupported Vercel direct mode and invalid modern proxy configuration at registration', () => {
+    const vercel = metadata({
+      workspace: { sandboxId: 'ses-0123456789abcdef', sandboxProvider: 'vercel' },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(vercel, {
+        provider: 'vercel',
+        containment: { kilocode: false, github: false },
+      })
+    ).toThrow('Vercel requires credential containment');
+    const modern = metadata({
+      auth: {
+        kiloSessionId: 'ses_12345678901234567890123456',
+        kilocodeToken: jwt.sign({ runtimeAuthorization: { id: crypto.randomUUID() } }, 'test'),
+      },
+    });
+    expect(() =>
+      buildControlPlaneSessionRegistration(modern, selection, undefined, {
+        containmentEnabled: false,
+        workerUrl: 'http://worker.test',
+      })
+    ).toThrow('Runtime credential proxy configuration is unavailable');
+  });
+});
 
 describe('buildControlPlaneSessionRegistration MCP materialization', () => {
   it('keeps materialized servers out of the spec and isolates the session', () => {

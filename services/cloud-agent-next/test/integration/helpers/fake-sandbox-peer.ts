@@ -21,8 +21,10 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   deliverResult: ControlPlaneDeliverResult = 'sent';
   /** When set, `prepare` rejects (a transport failure, not a route view). */
   prepareError: Error | null = null;
-  /** Delay `deliver` to prove the Session DO does not impose a deadline on it. */
   deliverDelayMs = 0;
+  deliverError: Error | null = null;
+  statusError: Error | null = null;
+  readonly statusCalls: string[] = [];
   /** Optional fence returned by `getRuntimeCredentialProxyFence` (H4 tests). */
   runtimeCredentialProxyFence: ControlRuntimeCredentialProxyFence | null = null;
   /** The snapshot returned by `getStatusSnapshot` (B10 badge tests). */
@@ -55,6 +57,7 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
 
   async deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult> {
     this.deliverCalls.push(payload);
+    if (this.deliverError !== null) throw this.deliverError;
     if (this.deliverDelayMs > 0) {
       await new Promise(resolve => setTimeout(resolve, this.deliverDelayMs));
     }
@@ -72,6 +75,12 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
   }
 
   async release(): Promise<void> {}
+
+  async status(payload: { sessionId: string }) {
+    this.statusCalls.push(payload.sessionId);
+    if (this.statusError !== null) throw this.statusError;
+    return { sessionId: payload.sessionId, view: injectAttempt(this.prepareView, this.attemptId) };
+  }
 
   async getRuntimeCredentialProxyFence(): Promise<ControlRuntimeCredentialProxyFence | null> {
     return this.runtimeCredentialProxyFence;

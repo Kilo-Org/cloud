@@ -37,9 +37,12 @@ import {
 import {
   generateSandboxCredential,
   hashSandboxCredential,
-  parseBearerCredential,
+  mintSandboxLaunchCredential,
+  parseSandboxLaunchBearer,
   sandboxCredentialMatchesHash,
+  verifySandboxLaunchCredential,
 } from '../../sandbox-control/credential.js';
+import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admission.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
   createCloudflareProviderAdapter,
@@ -48,6 +51,7 @@ import {
 import { parseControlPlaneCredential } from '../../sandbox-control/managed-credential.js';
 import {
   sandboxProviderConfigurationSchema,
+  ProviderCreationError,
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
@@ -62,6 +66,7 @@ import {
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
 import {
   buildControlNetworkPolicy,
+  kiloTokenHasRuntimeAuthorization,
   prepareCredentialGrant,
   resolveSessionCredential,
   sessionCredentialsPayloadFromGrant,
@@ -174,7 +179,14 @@ import {
   type RouteGrantIssue,
   type RouteRecord,
 } from './routes.js';
-import { allocation as allocationTable } from './sqlite-schema.js';
+import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
+import {
+  listScopeGrants,
+  readScopeGrant,
+  retireScopeGrants,
+  scopeGrantId,
+  writeScopeGrant,
+} from './scope-grants.js';
 import {
   beginWorktreeDeletion,
   controlPlaneWorktreeDeletionInputSchema,
@@ -187,6 +199,7 @@ import {
   type WorktreeDeletionPlan,
 } from './worktree-deletion.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
+import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 
@@ -216,12 +229,14 @@ export type EnsureAllocationInput = {
   containment?: CredentialContainmentRequirements;
 };
 
-type WrapperSocketAttachment = {
-  credential: string | null;
-  allocationId?: string;
-  connectionId?: string;
-  wrapperId?: string;
-};
+const wrapperSocketAttachmentSchema = z.object({
+  credential: z.string().nullable(),
+  helloDeadlineAt: z.number().finite().nonnegative().optional(),
+  allocationId: z.string().optional(),
+  connectionId: z.string().optional(),
+  wrapperId: z.string().optional(),
+});
+type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
 
 /**
  * The Sandbox DO -> Session DO notification surface (spec §10). The V2 Session
@@ -421,13 +436,14 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sessionId
   ) => this.resolveSessionPeer(ownerId, sessionId);
 
-  /**
-   * Session notifications (route, events, outcome) are dispatched on this
-   * promise tail after the current queue step ends, so a Session DO that calls
-   * back into this DO (`deliver`) is never blocked behind one, and ordering
-   * across notification kinds is preserved. Best effort.
-   */
-  private notificationTail: Promise<void> = Promise.resolve();
+  private readonly notifications = createSandboxNotificationDispatcher({
+    budgetMs: () => this.sandboxTimers().sessionNotifyDeadlineMs,
+    send: (sessionId, notification, deadlineAt, signal) =>
+      this.notifySession(sessionId, notification, deadlineAt, signal),
+    waitUntil: work => this.ctx.waitUntil(work),
+    diagnostic: loss =>
+      logger.withFields({ sandboxId: this.sandboxId, ...loss }).warn('Sandbox notification loss'),
+  });
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -564,7 +580,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     await this.enqueue(async () => {
-      // Revocation: dropping the route drops its grant (and its membership).
+      this.notifications.retire(parsed.sessionId);
       await deleteRoute(this.db, parsed.sessionId);
       // Rebuild the policy inside the queue; if it cannot apply, stop the
       // sandbox as a platform failure so the alias is not left injected.
@@ -915,7 +931,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * raw socket message path (before the serial queue) so a queued request that
    * awaits its own result cannot deadlock the queue.
    */
-  private resolvePendingControlResult(message: string | ArrayBuffer): void {
+  private resolvePendingControlResult(ws: WebSocket, message: string | ArrayBuffer): void {
     let parsed: unknown;
     try {
       const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
@@ -937,6 +953,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     const frame = result.data;
+    if (this.pendingControlRequests.get(frame.requestId)?.socket !== ws) return;
     this.settlePendingControlRequest(
       frame.requestId,
       frame.ok ? { ok: true, result: frame.result } : { ok: false, error: frame.error }
@@ -969,9 +986,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (expectedOutbound === null || input.outboundContainerId !== expectedOutbound) {
           return null;
         }
-        for (const route of await listRoutes(this.db)) {
-          const grant = route.grant;
-          if (grant === null || grant.userId !== ownerId) continue;
+        for (const grant of listScopeGrants(this.db)) {
+          if (grant.userId !== ownerId) continue;
           if (!(await this.grantMatchesAlias(grant, input.credential))) continue;
           const resolved = await resolveSessionCredential({ env: this.env, grant, ...input });
           if (!resolved) return null;
@@ -982,7 +998,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ) {
             return null;
           }
-          await writeRoute(this.db, { ...route, grant: resolved.grant });
+          writeScopeGrant(this.db, resolved.grant);
           return {
             credential: resolved.credential,
             ...(alias.purpose === 'kilo' ? { organizationId: resolved.organizationId ?? '' } : {}),
@@ -1016,12 +1032,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     return this.enqueue(async () => {
       const state = await this.readAllocation();
-      // The fence is provider-neutral (legacy `SandboxControl.ts:986-1053` has no
-      // provider gate); the mint/bind step is what is Vercel-only.
       if (state.kind !== 'connected') return null;
       const owner = await this.requireOwner();
       if (owner === null || owner !== input.ownerId) return null;
       const route = await readRoute(this.db, input.sessionId);
+      if (route?.state === 'failed') return null;
       const grant = route?.grant ?? null;
       const provisioned =
         grant !== null &&
@@ -1078,9 +1093,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       throw new Error('Invalid runtime credential proxy handle');
     }
     return this.enqueue(async () => {
-      if (this.currentProvider() !== 'vercel') {
-        throw new Error('Sandbox credential containment mismatch');
-      }
       const owner = await this.requireOwner();
       if (owner === null || owner !== input.ownerId) {
         throw new Error('Sandbox owner mismatch');
@@ -1089,6 +1101,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const grant = route?.grant ?? null;
       if (
         route === null ||
+        route.state === 'failed' ||
         grant === null ||
         grant.userId !== input.ownerId ||
         grant.directory !== input.directory ||
@@ -1130,10 +1143,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           },
         },
       };
-      await writeRoute(this.db, { ...route, grant: updated });
-      if (!(await this.refreshVercelNetworkPolicy())) {
+      if (!(await this.applyCandidateGrantPolicy(updated))) {
         throw new Error('Sandbox credential policy is unavailable');
       }
+      writeScopeGrant(this.db, updated);
       return { bound: true };
     });
   }
@@ -1182,22 +1195,52 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
     }
-    // N3: accept the upgrade even for a bad credential. An unbound socket
-    // cannot change state; a bad `hello` gets `shutdown` so the wrapper exits 0.
-    const credential = parseBearerCredential(request.headers.get('Authorization'));
-    const pair = new WebSocketPair();
-    const client = pair[0];
-    const server = pair[1];
-    this.ctx.acceptWebSocket(server);
-    server.serializeAttachment({ credential });
-    return new Response(null, { status: 101, webSocket: client });
+    const token = parseSandboxLaunchBearer(request.headers.get('Authorization'));
+    if (token === null)
+      return new Response('Invalid or missing Authorization header', { status: 401 });
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return new Response('Authentication unavailable', { status: 503 });
+    const launch = verifySandboxLaunchCredential(token, secret);
+    return this.enqueue(async () => {
+      if (
+        launch === null ||
+        launch.sandboxId !== this.sandboxId ||
+        !(await this.validateAllocationCredential(launch.allocationId, launch.credential))
+      ) {
+        return rejectSandboxWrapperUpgrade();
+      }
+      this.expireUnboundSockets(Date.now());
+      const candidates = this.ctx.getWebSockets().filter(ws => {
+        const attachment = this.readAttachment(ws);
+        return (
+          ws.readyState === WebSocket.OPEN &&
+          attachment?.helloDeadlineAt !== undefined &&
+          attachment.allocationId === launch.allocationId
+        );
+      });
+      if (candidates.length >= 2) {
+        const pair = new WebSocketPair();
+        pair[1].accept();
+        pair[1].close(1013, 'Handshake capacity');
+        return new Response(null, { status: 101, webSocket: pair[0] });
+      }
+      const pair = new WebSocketPair();
+      this.ctx.acceptWebSocket(pair[1]);
+      pair[1].serializeAttachment({
+        credential: launch.credential,
+        allocationId: launch.allocationId,
+        helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
+      } satisfies WrapperSocketAttachment);
+      await this.armAlarm(await this.readAllocation());
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    });
   }
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await this.initialized;
     // Resolve an outstanding control request before the serial queue so the
     // queued request that awaits it cannot block its own reply.
-    this.resolvePendingControlResult(message);
+    this.resolvePendingControlResult(ws, message);
     await this.enqueue(() => this.handleFrame(ws, message));
   }
 
@@ -1210,7 +1253,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     await this.enqueue(async () => {
       const attachment = this.readAttachment(ws);
-      if (attachment?.allocationId === undefined || attachment.connectionId === undefined) return;
+      if (attachment?.allocationId === undefined || attachment.connectionId === undefined) {
+        ws.serializeAttachment({ credential: null });
+        await this.armAlarm(await this.readAllocation());
+        return;
+      }
       await this.applyEvent({
         type: 'socket-closed',
         at: Date.now(),
@@ -1227,6 +1274,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   async alarm(): Promise<void> {
     await this.initialized;
     await this.enqueue(async () => {
+      this.expireUnboundSockets(Date.now());
       const state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
       if (state.kind === 'creating' && this.createInFlight) {
@@ -1241,6 +1289,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
+            this.earliestHelloDeadlineAt() ?? Infinity,
             this.billingSchedule.snapshotEarliestDue() ?? Infinity
           )
         );
@@ -1314,7 +1363,58 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const pin = (await this.readProviderPin()) ?? this.defaultPin('cloudflare');
     this.providerPin = pin;
     this.provider = this.createProviderAdapter(pin);
-    await this.armAlarm(rowToState(row));
+    let state = rowToState(row);
+    const routes = this.db.select().from(routesTable).all();
+    if (
+      routes.some(
+        route =>
+          route.grant?.trimStart().startsWith('{') ||
+          (route.state === 'ready' &&
+            route.credential_source !== null &&
+            (route.grant === null || readScopeGrant(this.db, route.grant) === null))
+      )
+    ) {
+      // Per-route snapshots do not identify which sibling's aliases the runtime installed.
+      const now = Date.now();
+      const stopped = reduceAllocation(
+        state,
+        { type: 'stop-requested', at: now, reason: 'agent_restarted' },
+        this.sandboxTimers()
+      ).state;
+      state =
+        state.kind !== 'stopping' && stopped.kind === 'stopping'
+          ? { ...stopped, stopPending: true, stopAt: now }
+          : stopped;
+      this.db.transaction(tx => {
+        retireScopeGrants(tx);
+        for (const route of routes) {
+          tx.update(routesTable)
+            .set({
+              grant: null,
+              ...(route.state === 'failed' ? {} : { state: 'failed', reason: 'agent_restarted' }),
+              updated_at: now,
+            })
+            .where(eq(routesTable.session_id, route.session_id))
+            .run();
+        }
+        tx.update(allocationTable)
+          .set(stateToRow(state))
+          .where(eq(allocationTable.id, ALLOCATION_ROW_ID))
+          .run();
+      });
+      for (const route of routes) {
+        if (route.state === 'failed') continue;
+        this.notifications.enqueue(route.session_id, {
+          kind: 'route',
+          payload: {
+            state: route.state === 'ready' ? 'lost' : 'failed',
+            attemptId: route.attempt_id,
+            reason: 'agent_restarted',
+          },
+        });
+      }
+    }
+    await this.armAlarm(state);
   }
 
   private currentProvider(): AgentSandboxProvider {
@@ -1433,7 +1533,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       routePreparationMs: this.sandboxTimers().routePreparationMs,
       sendPrepare: route => this.sendSessionPrepare(state, route),
       notify: (sessionId, update) => {
-        this.enqueueNotification(() => this.notifyRoute(sessionId, update));
+        this.notifications.enqueue(sessionId, { kind: 'route', payload: update });
         return Promise.resolve();
       },
       issueGrant: (spec, source) =>
@@ -1442,7 +1542,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           this.grantIssueTimeoutMs(),
           'Credential grant issuance timed out'
         ),
-      applyPolicy: () => this.refreshVercelNetworkPolicy(),
+      applyPolicy: candidate =>
+        candidate === undefined
+          ? this.refreshVercelNetworkPolicy()
+          : this.applyCandidateGrantPolicy(candidate),
+      publishGrant: route => this.publishRouteGrant(route),
     };
   }
 
@@ -1468,6 +1572,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       source.scopeId ?? spec.sessionId
     );
     if (deletionJournal !== undefined && !deletionJournal.completed) {
+      this.notifications.retire(spec.sessionId);
       await deleteRoute(this.db, spec.sessionId);
       return {
         state: 'failed',
@@ -1574,16 +1679,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return typeof stored === 'string' && stored.length > 0 ? stored : null;
   }
 
-  /**
-   * Mints the route grant and projects the wrapper-safe spec (the DO-only
-   * credential source never leaves this method). A fresh attempt rotates the
-   * alias/capability material, so re-issue is a new grant, not just a longer
-   * expiry.
-   */
   private async issueRouteGrant(
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource,
-    priorGrant?: SessionCredentialGrant
+    source: ControlPlaneCredentialSource
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
     const outboundContainerId =
@@ -1598,6 +1696,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.git ? { git: spec.git } : {}),
     };
     const scopeId = source.scopeId ?? spec.sessionId;
+    const modern = kiloTokenHasRuntimeAuthorization(source.kiloToken);
+    const scopes = listScopeGrants(this.db);
+    const existing = scopes.find(
+      grant => grant.scopeId === scopeId && (grant.kilo.runtimeProxy !== undefined) === modern
+    );
     const { grant, payload } = await prepareCredentialGrant({
       env: this.env,
       source,
@@ -1609,18 +1712,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
       scopeId,
       payload: base,
       leaseMs: this.sandboxTimers().credentialGrantMs,
-      ...(priorGrant?.kilo.runtimeProxy?.members === undefined
-        ? {}
-        : { runtimeProxyMembers: priorGrant.kilo.runtimeProxy.members }),
+      ...(existing === undefined ? {} : { existing }),
+      refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
       ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
     });
-    // Cross-route scope/directory mismatch (B3 review 5): two different scopes
-    // must not share a working directory or a member identity.
-    for (const other of await listRoutes(this.db)) {
-      if (other.sessionId === spec.sessionId) continue;
-      const otherGrant = other.grant;
-      if (otherGrant === null || otherGrant.scopeId === scopeId) continue;
+    for (const otherGrant of scopes) {
+      if (scopeGrantId(otherGrant) === scopeGrantId(grant)) continue;
       if (
+        otherGrant.scopeId === grant.scopeId &&
+        otherGrant.repository?.type === 'git' &&
+        grant.repository?.type === 'git' &&
+        otherGrant.userId === grant.userId &&
+        otherGrant.orgId === grant.orgId &&
+        otherGrant.directory === grant.directory &&
+        otherGrant.provider === grant.provider &&
+        otherGrant.outboundContainerId === grant.outboundContainerId &&
+        otherGrant.containmentEnabled === grant.containmentEnabled &&
+        JSON.stringify(otherGrant.repository) === JSON.stringify(grant.repository) &&
+        JSON.stringify(otherGrant.kilo.targets) === JSON.stringify(grant.kilo.targets) &&
+        !otherGrant.members.some(
+          member =>
+            member.sessionId === spec.sessionId || member.kiloSessionId === source.kiloSessionId
+        )
+      )
+        continue;
+      if (
+        otherGrant.scopeId === scopeId ||
         otherGrant.directory === grant.directory ||
         otherGrant.members.some(
           member =>
@@ -1631,6 +1748,23 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     return { grant, spec: this.projectRouteSpec(spec, payload) };
+  }
+
+  private publishRouteGrant(route: RouteRecord): void {
+    this.db.transaction(tx => {
+      if (route.grant !== null) writeScopeGrant(tx, route.grant);
+      writeRoute(tx, route);
+    });
+  }
+
+  private applyCandidateGrantPolicy(candidate: SessionCredentialGrant): Promise<boolean> {
+    const now = Date.now();
+    return this.refreshVercelNetworkPolicy([
+      ...listScopeGrants(this.db).filter(
+        grant => scopeGrantId(grant) !== scopeGrantId(candidate) && grant.expiresAt > now
+      ),
+      candidate,
+    ]);
   }
 
   private projectRouteSpec(
@@ -1733,24 +1867,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Bound the token-service round trip so a warm-route `deliver` cannot
       // hang forever; the grant-issue bound is the provider-stop bound.
       issued = await withTimeout(
-        this.issueRouteGrant(route.spec, source, route.grant ?? undefined),
+        this.issueRouteGrant(route.spec, source),
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
     } catch {
       return 'failed';
     }
-    // Build the policy from the candidate grant set, then persist only if it
-    // applied; never store an alias the provider firewall does not know.
-    const now = Date.now();
-    const candidateGrants: SessionCredentialGrant[] = [];
-    for (const existing of await listRoutes(this.db)) {
-      const grant = existing.sessionId === route.sessionId ? issued.grant : existing.grant;
-      if (grant !== null && grant.expiresAt > now) candidateGrants.push(grant);
-    }
-    if (!(await this.refreshVercelNetworkPolicy(candidateGrants))) return 'policy_failed';
+    if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
-    await writeRoute(this.db, next);
+    this.publishRouteGrant(next);
     const payload: ControlPlaneSessionCredentialsPayload = {
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
     };
@@ -1834,11 +1960,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
-    const grants: SessionCredentialGrant[] = [];
-    for (const route of await listRoutes(this.db)) {
-      if (route.grant !== null && route.grant.expiresAt > now) grants.push(route.grant);
-    }
-    return grants;
+    return listScopeGrants(this.db).filter(grant => grant.expiresAt > now);
   }
 
   /**
@@ -1911,7 +2033,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     event: AllocationEvent,
     stopReason: ControlPlaneFailureReason | undefined
   ): Promise<void> {
+    if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
+      retireScopeGrants(this.db);
+    }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
+      for (const route of await listRoutes(this.db)) {
+        if (route.state !== 'preparing' || route.grant !== null) continue;
+        if (route.credentialSource === null) continue;
+        try {
+          const issued = await withTimeout(
+            this.issueRouteGrant(route.spec, route.credentialSource),
+            this.grantIssueTimeoutMs(),
+            'Credential binding timed out'
+          );
+          if (!(await this.applyCandidateGrantPolicy(issued.grant)))
+            throw new Error('Credential policy unavailable');
+          this.publishRouteGrant({ ...route, ...issued });
+        } catch {
+          await failCurrentAttempt(
+            this.routeContext(next),
+            route.sessionId,
+            route.attemptId,
+            'workspace_setup_failed'
+          );
+        }
+      }
       const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
       await onWrapperConnected(this.routeContext(next), restarted);
       return;
@@ -1939,6 +2085,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     next: AllocationState
   ): Promise<void> {
     const ctx = this.routeContext(next);
+    retireScopeGrants(this.db);
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
     // all reach `stopped` without arming an alarm, so sweep expired routes now.
     await failExpiredRoutes(ctx);
@@ -1960,13 +2107,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     current: boolean
   ): void {
     if (!current) return;
-    this.enqueueNotification(() =>
-      this.notifySession(
-        frame.sessionId,
-        peer => peer.onEvents({ events: frame.events }),
-        'onEvents'
-      )
-    );
+    this.notifications.enqueue(frame.sessionId, {
+      kind: 'events',
+      payload: { events: frame.events },
+    });
   }
 
   private forwardOutcome(
@@ -1984,9 +2128,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         : { providerOwnership: frame.providerOwnership }),
       lastMessageId: frame.lastMessageId,
     };
-    this.enqueueNotification(() =>
-      this.notifySession(outcome.sessionId, peer => peer.onOutcome(outcome), 'onOutcome')
-    );
+    this.notifications.enqueue(outcome.sessionId, { kind: 'outcome', payload: outcome });
   }
 
   /**
@@ -2122,8 +2264,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
           runtimeProxyHandleGrantId(member.handle) !== runtimeProxyHandleGrantId(handle)
         ) {
           try {
-            // Vercel binds the handle into the route grant and network policy, as
-            // today; other providers have no runtime proxy grant to bind.
             await this.bindRuntimeCredentialProxyHandle({
               ownerId,
               sessionId,
@@ -2222,45 +2362,38 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  /**
-   * Chain a Session notification onto the ordered tail without awaiting it in
-   * the caller's serial queue. `ctx.waitUntil` keeps the isolate alive.
-   */
-  private enqueueNotification(operation: () => Promise<void>): void {
-    const run = this.notificationTail.then(operation, operation);
-    this.notificationTail = run.then(
-      () => undefined,
-      () => undefined
-    );
-    this.ctx.waitUntil(run);
-  }
-
-  private async notifyRoute(sessionId: string, update: ControlPlaneRouteUpdate): Promise<void> {
-    await this.notifySession(sessionId, peer => peer.onRoute(update), 'onRoute');
-  }
-
   private async notifySession(
     sessionId: string,
-    operation: (peer: ControlPlaneSessionPeer) => Promise<void>,
-    name: string
+    notification: SandboxNotification,
+    deadlineAt: number,
+    signal: AbortSignal
   ): Promise<void> {
     // One owner per sandbox (B3 review 5), stored on first prepare/registration.
     // The Session DO name is `ownerId:sessionId`, so resolve that stored owner
     // here rather than the bare session id.
     const ownerId = await this.requireOwner();
-    if (ownerId === null) return;
+    if (Date.now() >= deadlineAt || signal.aborted) throw new Error('Notification expired');
+    if (ownerId === null) throw new Error('Notification owner unavailable');
     const peer = this.sessionPeerFor(ownerId, sessionId);
-    if (peer === null) return;
-    try {
-      // Bounded: a session notification is best-effort, so a slow Session DO
-      // cannot stall the serialized queue (the Session DO backstop covers a drop).
-      await withDORetry(() => this.sessionPeerFor(ownerId, sessionId) ?? peer, operation, name, {
+    if (peer === null) throw new Error('Notification peer unavailable');
+    await withDORetry(
+      () => this.sessionPeerFor(ownerId, sessionId) ?? peer,
+      target => {
+        switch (notification.kind) {
+          case 'events':
+            return target.onEvents(notification.payload);
+          case 'route':
+            return target.onRoute(notification.payload);
+          case 'outcome':
+            return target.onOutcome(notification.payload);
+        }
+      },
+      `notification.${notification.kind}`,
+      {
         ...DEFAULT_DO_RETRY_CONFIG,
-        scope: { deadlineAt: Date.now() + this.sandboxTimers().sessionNotifyDeadlineMs },
-      });
-    } catch {
-      // Best effort: the Session DO backstop covers a dropped notification.
-    }
+        scope: { deadlineAt, signal },
+      }
+    );
   }
 
   private resolveSessionPeer(ownerId: string, sessionId: string): ControlPlaneSessionPeer | null {
@@ -2361,7 +2494,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
               .warn('Vercel billing admission failed');
           }
           if (admission !== 'admitted') {
-            await this.failVercelBillingRoutes(
+            await this.failCreationRoutes(
               allocationId,
               admission === 'retry',
               admission === 'blocked' ? 'billing_blocked' : 'billing_unavailable'
@@ -2416,7 +2549,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           allocationId,
           providerRef: createdRef,
         });
-      } catch {
+      } catch (error) {
+        if (error instanceof ProviderCreationError && error.permanentReason !== null) {
+          await this.failCreationRoutes(allocationId, false, error.permanentReason);
+          return;
+        }
         // N5: only clean up a container the reducer still owns. If a `hello`
         // was accepted during a slow launch, the sandbox has an owner and must
         // not be destroyed here.
@@ -2540,6 +2677,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async revokeWorktreeRoutes(sessionIds: readonly string[]): Promise<void> {
     for (const sessionId of sessionIds) {
+      this.notifications.retire(sessionId);
       await deleteRoute(this.db, sessionId);
     }
   }
@@ -2606,11 +2744,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
   // --- wrapper socket ---------------------------------------------------------
 
   private readAttachment(ws: WebSocket): WrapperSocketAttachment | null {
-    const value: unknown = ws.deserializeAttachment();
-    return isRecord(value) ? (value as WrapperSocketAttachment) : null;
+    const parsed = wrapperSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
+    return parsed.success ? parsed.data : null;
+  }
+
+  private earliestHelloDeadlineAt(): number | null {
+    let earliest: number | null = null;
+    for (const ws of this.ctx.getWebSockets()) {
+      const deadline = this.readAttachment(ws)?.helloDeadlineAt;
+      if (ws.readyState === WebSocket.OPEN && deadline !== undefined) {
+        earliest = Math.min(earliest ?? Infinity, deadline);
+      }
+    }
+    return earliest;
+  }
+
+  private expireUnboundSockets(now: number): void {
+    for (const ws of this.ctx.getWebSockets()) {
+      const deadline = this.readAttachment(ws)?.helloDeadlineAt;
+      if (deadline !== undefined && deadline <= now) {
+        ws.serializeAttachment({ credential: null });
+        ws.close(1008, 'Hello timeout');
+      }
+    }
   }
 
   private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    const deadline = this.readAttachment(ws)?.helloDeadlineAt;
+    if (deadline !== undefined && deadline <= Date.now()) {
+      this.expireUnboundSockets(Date.now());
+      await this.armAlarm(await this.readAllocation());
+      return;
+    }
     let parsedMessage: unknown;
     try {
       const text = typeof message === 'string' ? message : new TextDecoder().decode(message);
@@ -2638,7 +2804,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
     if (frame.type === 'hello') {
       const credential = typeof attachment?.credential === 'string' ? attachment.credential : null;
-      const accepted = await this.validateHello(frame, credential);
+      const accepted = await this.validateAllocationCredential(frame.allocationId, credential);
       if (!accepted) {
         this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
         ws.close(1008, 'shutdown');
@@ -2723,6 +2889,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'session.outcome':
         this.forwardOutcome(frame, current);
         return;
+      case 'events_dropped':
+        if (current) this.notifications.wrapperDropped(frame.dropped);
+        return;
       default:
         return;
     }
@@ -2732,7 +2901,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     for (const other of this.ctx.getWebSockets()) {
       if (other === ws) continue;
       const attachment = this.readAttachment(other);
-      if (attachment?.allocationId !== allocationId) continue;
+      if (attachment?.allocationId !== allocationId || attachment.connectionId === undefined)
+        continue;
       // A replaced wrapper is about to be closed by `other.close`; settle its
       // outstanding control requests now (the close handler may not run).
       this.settlePendingForSocket(
@@ -2749,13 +2919,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
-  private async validateHello(
-    frame: Extract<ControlPlaneWrapperFrame, { type: 'hello' }>,
+  private async validateAllocationCredential(
+    allocationId: string,
     credential: string | null
   ): Promise<boolean> {
     const state = await this.readAllocation();
     if (state.kind === 'stopped' || state.kind === 'stopping') return false;
-    if (state.allocationId === null || frame.allocationId !== state.allocationId) return false;
+    if (state.allocationId === null || allocationId !== state.allocationId) return false;
     if (credential === null) return false;
     const storedHash = await this.ctx.storage.get<string>(CREDENTIAL_HASH_KEY);
     if (typeof storedHash !== 'string' || storedHash.length === 0) return false;
@@ -2773,15 +2943,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const signingSecret = await withTimeout(
       resolveSecret(this.env.NEXTAUTH_SECRET),
       1_000,
-      'Diagnostic signing secret lookup timed out'
+      'Wrapper launch signing secret lookup timed out'
     ).catch(() => null);
+    if (!signingSecret) throw new Error('Wrapper launch signing unavailable');
+    const launchCredential = mintSandboxLaunchCredential(
+      { sandboxId: this.sandboxId, allocationId, credential },
+      signingSecret
+    );
     const workloadCgroup = (this.env as { CONTROL_WORKLOAD_CGROUP?: unknown })
       .CONTROL_WORKLOAD_CGROUP;
     return {
       ...buildControlWrapperLaunchEnv({
         workerUrl: this.env.WORKER_URL,
         sandboxId: this.sandboxId,
-        credential,
+        credential: launchCredential,
         diagnostics: { allocationId, signingSecret },
         ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
       }),
@@ -2905,7 +3080,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return true;
   }
 
-  private async failVercelBillingRoutes(
+  private async failCreationRoutes(
     allocationId: string,
     retryable: boolean,
     reason: ControlPlaneFailureReason
@@ -2923,6 +3098,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
               reason
             );
           }
+        }
+        if (state.providerRef !== null) {
+          await this.applyEvent({ type: 'stop-requested', at: Date.now(), reason });
+          return;
         }
       }
       await this.applyEvent({
@@ -3390,7 +3569,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const routeAt = await earliestRouteDeadlineAt(this.db);
     if (this.billingSchedule.snapshotEarliestDue() === undefined) await this.billingSchedule.load();
     const billingAt = this.billingSchedule.snapshotEarliestDue() ?? null;
-    const candidates = [allocationAt, routeAt, billingAt].filter((at): at is number => at !== null);
+    const candidates = [allocationAt, routeAt, billingAt, this.earliestHelloDeadlineAt()].filter(
+      (at): at is number => at !== null
+    );
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;

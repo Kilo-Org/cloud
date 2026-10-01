@@ -12,22 +12,15 @@ import {
   type ControlPlaneRouteView,
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
-import {
-  sessionCredentialGrantSchema,
-  type SessionCredentialGrant,
-} from '../../sandbox-control/session-credentials.js';
+import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
 import { routes as routesTable } from './sqlite-schema.js';
+import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 
 export type RouteDatabase = ReturnType<typeof drizzle>;
 
 export const ROUTE_STATES = ['preparing', 'ready', 'failed'] as const;
 export type RouteState = (typeof ROUTE_STATES)[number];
 
-/**
- * The per-session credential grant the Sandbox DO mints and stores on the route
- * (credentials half of B3). It is DO-private: only its wrapper-facing projection
- * (the B1 credential payload) is serialized into `session.prepare`.
- */
 export type RouteGrant = SessionCredentialGrant;
 
 /**
@@ -81,7 +74,8 @@ export type RouteContext = {
    * `true` when applied (or not applicable) and `false` on failure; callers must
    * not send a credential-bearing frame when it returns `false`.
    */
-  applyPolicy: () => Promise<boolean>;
+  applyPolicy: (candidate?: RouteGrant) => Promise<boolean>;
+  publishGrant: (route: RouteRecord) => void;
 };
 
 type RouteRow = typeof routesTable.$inferSelect;
@@ -92,11 +86,11 @@ function parseRouteState(value: string): RouteState {
   return found;
 }
 
-export function routeFromRow(row: RouteRow): RouteRecord {
+export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
   return {
     sessionId: row.session_id,
     spec: controlPlaneRouteSpecSchema.parse(JSON.parse(row.spec)),
-    grant: row.grant === null ? null : sessionCredentialGrantSchema.parse(JSON.parse(row.grant)),
+    grant: row.grant === null ? null : readScopeGrant(db, row.grant),
     credentialSource:
       row.credential_source === null || row.credential_source === undefined
         ? null
@@ -112,7 +106,7 @@ function routeToRow(route: RouteRecord): typeof routesTable.$inferInsert {
   return {
     session_id: route.sessionId,
     spec: JSON.stringify(route.spec),
-    grant: route.grant === null ? null : JSON.stringify(route.grant),
+    grant: route.grant === null ? null : scopeGrantId(route.grant),
     credential_source:
       route.credentialSource === null ? null : JSON.stringify(route.credentialSource),
     state: route.state,
@@ -169,24 +163,27 @@ export function routeView(route: RouteRecord | null, connected: boolean): Contro
 export async function readRoute(db: RouteDatabase, sessionId: string): Promise<RouteRecord | null> {
   const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
   const row = rows[0];
-  return row === undefined ? null : routeFromRow(row);
+  return row === undefined ? null : routeFromRow(db, row);
 }
 
 export async function listRoutes(db: RouteDatabase): Promise<RouteRecord[]> {
   const rows = await db.select().from(routesTable);
-  return rows.map(routeFromRow);
+  return rows.map(row => routeFromRow(db, row));
 }
 
-export async function writeRoute(db: RouteDatabase, route: RouteRecord): Promise<void> {
+export function writeRoute(db: Pick<RouteDatabase, 'insert'>, route: RouteRecord): void {
   const row = routeToRow(route);
-  await db
-    .insert(routesTable)
+  db.insert(routesTable)
     .values(row)
-    .onConflictDoUpdate({ target: routesTable.session_id, set: row });
+    .onConflictDoUpdate({ target: routesTable.session_id, set: row })
+    .run();
 }
 
 export async function deleteRoute(db: RouteDatabase, sessionId: string): Promise<void> {
-  await db.delete(routesTable).where(eq(routesTable.session_id, sessionId));
+  db.transaction(tx => {
+    removeScopeMember(tx, sessionId);
+    tx.delete(routesTable).where(eq(routesTable.session_id, sessionId)).run();
+  });
 }
 
 /** Latest attempt deadline among preparing routes, or null when there is none. */
@@ -239,17 +236,18 @@ export async function failRoute(
   attemptId: string,
   reason: ControlPlaneFailureReason
 ): Promise<RouteRecord> {
+  const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
     sessionId: spec.sessionId,
     spec: redactRouteSpec(spec),
-    grant: null,
-    credentialSource: null,
+    grant: existing?.grant ?? null,
+    credentialSource: existing?.credentialSource ?? null,
     state: 'failed',
     attemptId,
     attemptDeadlineAt: 0,
     reason,
   };
-  await writeRoute(ctx.db, route);
+  writeRoute(ctx.db, route);
   await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
   return route;
 }
@@ -320,11 +318,9 @@ export async function startAttempt(
     issued.grant,
     source
   );
-  // The route row must exist before the policy is built from the stored grants.
-  await writeRoute(ctx.db, route);
   for (let attempt = 1; attempt <= ATTEMPT_POLICY_ATTEMPTS; attempt += 1) {
-    // The provider credential policy must land before the wrapper sees the frame.
-    if (await ctx.applyPolicy()) {
+    if (await ctx.applyPolicy(issued.grant)) {
+      ctx.publishGrant(route);
       ctx.sendPrepare(route);
       return route;
     }
@@ -406,7 +402,7 @@ export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
   const now = ctx.now();
   for (const route of await listRoutes(ctx.db)) {
     if (route.state !== 'preparing' || route.attemptDeadlineAt > now) continue;
-    await writeRoute(ctx.db, { ...route, state: 'failed', reason: 'preparation_timeout' });
+    writeRoute(ctx.db, { ...route, state: 'failed', reason: 'preparation_timeout' });
     await ctx.notify(route.sessionId, {
       state: 'failed',
       attemptId: route.attemptId,
@@ -441,7 +437,7 @@ export async function onRouteReady(
   if (!current) return;
   const route = await readRoute(ctx.db, sessionId);
   if (route === null || route.state === 'failed') return;
-  await writeRoute(ctx.db, { ...route, state: 'ready', reason: null });
+  writeRoute(ctx.db, { ...route, state: 'ready', reason: null });
   await ctx.notify(sessionId, { state: 'ready', attemptId: route.attemptId });
 }
 
@@ -455,7 +451,7 @@ export async function onRouteFailed(
   if (!current) return;
   const route = await readRoute(ctx.db, sessionId);
   if (route === null || route.state === 'failed') return;
-  await writeRoute(ctx.db, { ...route, state: 'failed', reason });
+  writeRoute(ctx.db, { ...route, state: 'failed', reason });
   await ctx.notify(sessionId, {
     state: 'failed',
     attemptId: route.attemptId,

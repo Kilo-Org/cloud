@@ -640,6 +640,20 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
     if (!route) return;
+    const nextEnv = buildWorktreeKiloEnvironment(
+      route.directory,
+      route.home,
+      {
+        ...route.kilo,
+        token: credentials.proxy?.handle ?? credentials.kilo.token,
+        targets: credentials.proxy?.targets ?? route.kilo.targets,
+      },
+      route.spec.env ?? {},
+      inheritedEnv,
+      route.spec.mcp
+    );
+    route.env = nextEnv;
+    await deps.runtimes.installCredentials(route.key, nextEnv);
     if (credentials.git?.token && route.spec.git) {
       const url = authenticatedGitUrl(
         route.spec.git.url,
@@ -655,20 +669,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         log(`control-plane Git credential refresh failed session=${credentials.sessionId}`);
       }
     }
-    const nextEnv = buildWorktreeKiloEnvironment(
-      route.directory,
-      route.home,
-      {
-        ...route.kilo,
-        token: credentials.proxy?.handle ?? credentials.kilo.token,
-        targets: credentials.proxy?.targets ?? route.kilo.targets,
-      },
-      route.spec.env ?? {},
-      inheritedEnv,
-      route.spec.mcp
-    );
-    route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
   }
 
   return {

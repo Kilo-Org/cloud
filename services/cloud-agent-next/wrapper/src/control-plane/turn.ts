@@ -17,7 +17,7 @@ import {
 } from '../condense-on-complete.js';
 import { childFromSessionCreated, eventKiloSessionId } from '../control/feed.js';
 import type { KiloFeedEvent } from '../control/worktree-feed.js';
-import type { WrapperKiloClient } from '../kilo-api.js';
+import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { KiloRestartReason } from './kilo-runtime.js';
 import { runtimeKey } from './prepare.js';
@@ -39,7 +39,8 @@ export type TurnKiloRuntime = {
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
-  applyPendingCredentials?(): Promise<boolean>;
+  isRetiredClient(client: WrapperKiloClient): boolean;
+  applyPendingCredentials?(canRestart: () => boolean): Promise<boolean>;
 };
 
 export type TurnScheduler = {
@@ -72,7 +73,7 @@ export type TurnPhase = 'busy' | 'finalizing';
 type MaterializedPrompt = Awaited<ReturnType<typeof materializeMessageAttachments>>;
 type PendingPrompt = {
   payload: ControlPlanePromptPayload;
-  message?: MaterializedPrompt;
+  message?: Promise<MaterializedPrompt>;
   /** The prompt, compact or command call has been made to Kilo. */
   dispatched?: boolean;
 };
@@ -278,15 +279,19 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const runtime = deps.runtimes.get(runtimeKeyValue);
     if (runtime?.applyPendingCredentials === undefined) return;
     try {
-      await runtime.applyPendingCredentials();
+      await runtime.applyPendingCredentials(() => canRestartRuntime(runtimeKeyValue));
     } catch {
       // The next idle retries; a failed credential restart never fails a turn.
     }
   }
 
   function maybeApplyPendingCredentials(runtimeKeyValue: string): void {
-    if (turnsForRuntimeKey(runtimeKeyValue).length > 0) return;
+    if (!canRestartRuntime(runtimeKeyValue)) return;
     void applyPendingCredentials(runtimeKeyValue);
+  }
+
+  function canRestartRuntime(runtimeKeyValue: string): boolean {
+    return turnsForRuntimeKey(runtimeKeyValue).length === 0;
   }
 
   function queueState(route: TurnRoute): QueueState {
@@ -373,8 +378,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   function chainSubmit(turn: Turn, pending: PendingPrompt): void {
+    const prompts = turn.prompts;
     turn.submitting = turn.submitting
-      .then(() => submitPayloadInner(turn, pending))
+      .then(() => submitPayloadInner(turn, pending, prompts))
       .catch(error => {
         const message = error instanceof Error ? error.message : String(error);
         log(`turn: prompt submission failed - ${message}`);
@@ -384,8 +390,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
       });
   }
 
-  async function submitPayloadInner(turn: Turn, pending: PendingPrompt): Promise<void> {
-    if (turns.get(turn.route.sessionId) !== turn) {
+  async function submitPayloadInner(
+    turn: Turn,
+    pending: PendingPrompt,
+    prompts: PendingPrompt[]
+  ): Promise<void> {
+    const isCurrent = () => turns.get(turn.route.sessionId) === turn && turn.prompts === prompts;
+    if (!isCurrent()) {
       // The turn already reached a terminal outcome (Stop, failure or restart),
       // which settled everything the wrapper received. Sending it again would
       // run a message the user already terminalized.
@@ -394,13 +405,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const route = turn.route;
     const runtime = deps.runtimes.get(route.runtimeKey);
     if (runtime === undefined) throw new Error('Kilo runtime is unavailable');
-    const client = await runtime.ensure();
-    if (turns.get(turn.route.sessionId) !== turn) return;
     const model = pending.payload.agent.model;
+    let message: MaterializedPrompt | undefined;
     if (pending.payload.turn.type === 'prompt') {
       // Materialize once: a resubmission after a restart reuses the parts that
       // are already on disk under the same message id.
-      pending.message ??= await materialize(
+      pending.message ??= materialize(
         {
           id: pending.payload.messageId,
           prompt: pending.payload.turn.prompt,
@@ -409,47 +419,66 @@ export function createTurnManager(deps: TurnManagerDeps) {
         },
         {}
       );
-      if (turns.get(turn.route.sessionId) !== turn) return;
-      // Now handed to Kilo. The mark lives on the prompt, so a resubmission of
-      // the same messageId cannot outrun the receipt count.
-      markDispatched(turn, pending);
-      await client.sendPromptAsync({
-        sessionId: route.kiloSessionId,
-        directory: route.directory,
-        messageId: pending.payload.messageId,
-        agent: pending.payload.agent.mode,
-        ...(pending.payload.agent.variant === undefined
-          ? {}
-          : { variant: pending.payload.agent.variant }),
-        ...(pending.message.prompt === undefined ? {} : { prompt: pending.message.prompt }),
-        ...(pending.message.parts === undefined ? {} : { parts: pending.message.parts }),
-        ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
-      });
-    } else if (pending.payload.turn.command === 'compact') {
-      if (model === undefined) throw new Error('Compact requires a model');
-      markDispatched(turn, pending);
-      const summarized = await client.summarizeSession({
-        sessionId: route.kiloSessionId,
-        directory: route.directory,
-        model: { modelID: model },
-      });
-      if (!summarized) throw new Error('Session summarization failed');
-    } else {
-      markDispatched(turn, pending);
-      await client.sendCommand({
-        sessionId: route.kiloSessionId,
-        directory: route.directory,
-        command: pending.payload.turn.command,
-        args: pending.payload.turn.arguments,
-        messageId: pending.payload.messageId,
-        agent: pending.payload.agent.mode,
-        ...(pending.payload.agent.variant === undefined
-          ? {}
-          : { variant: pending.payload.agent.variant }),
-        ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
-      });
+      message = await pending.message;
     }
-    recordSubmitted(turn, pending);
+    if (!isCurrent()) return;
+    if (queueState(route) === 'queue') {
+      if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
+      return;
+    }
+    const client = await runtime.ensure();
+    if (!isCurrent()) return;
+    if (runtime.isRetiredClient(client) || queueState(route) === 'queue') {
+      if (!turn.inbox.includes(pending)) turn.inbox.push(pending);
+      return;
+    }
+    try {
+      if (pending.payload.turn.type === 'prompt') {
+        if (message === undefined) throw new Error('Prompt attachments were not materialized');
+        // Now handed to Kilo. The mark lives on the prompt, so a resubmission of
+        // the same messageId cannot outrun the receipt count.
+        markDispatched(turn, pending);
+        await client.sendPromptAsync({
+          sessionId: route.kiloSessionId,
+          directory: route.directory,
+          messageId: pending.payload.messageId,
+          agent: pending.payload.agent.mode,
+          ...(pending.payload.agent.variant === undefined
+            ? {}
+            : { variant: pending.payload.agent.variant }),
+          ...(message.prompt === undefined ? {} : { prompt: message.prompt }),
+          ...(message.parts === undefined ? {} : { parts: message.parts }),
+          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+        });
+      } else if (pending.payload.turn.command === 'compact') {
+        if (model === undefined) throw new Error('Compact requires a model');
+        markDispatched(turn, pending);
+        const summarized = await client.summarizeSession({
+          sessionId: route.kiloSessionId,
+          directory: route.directory,
+          model: { modelID: model },
+        });
+        if (!summarized) throw new Error('Session summarization failed');
+      } else {
+        markDispatched(turn, pending);
+        await client.sendCommand({
+          sessionId: route.kiloSessionId,
+          directory: route.directory,
+          command: pending.payload.turn.command,
+          args: pending.payload.turn.arguments,
+          messageId: pending.payload.messageId,
+          agent: pending.payload.agent.mode,
+          ...(pending.payload.agent.variant === undefined
+            ? {}
+            : { variant: pending.payload.agent.variant }),
+          ...(model === undefined ? {} : { model: { providerID: 'kilo', modelID: model } }),
+        });
+      }
+    } catch (error) {
+      if (runtime.isRetiredClient(client) && isKiloServerUnreachableError(error)) return;
+      throw error;
+    }
+    if (isCurrent()) recordSubmitted(turn, pending);
   }
 
   function recordSubmitted(turn: Turn, pending: PendingPrompt): void {
@@ -789,6 +818,12 @@ export function createTurnManager(deps: TurnManagerDeps) {
   }
 
   return {
+    canRestartRuntime,
+
+    credentialsInstalled(runtimeKeyValue: string): void {
+      maybeApplyPendingCredentials(runtimeKeyValue);
+    },
+
     registerRoute(spec: ControlPlaneRouteSpec): void {
       const existing = routes.get(spec.sessionId);
       if (existing !== undefined && existing.kiloSessionId !== spec.kiloSessionId) {
@@ -883,7 +918,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
           // copy of the text parts (Kilo 7.8.1). The duplicate is accepted: it
           // only happens for a no-progress turn, so it repeats no tool side
           // effects, and the resubmission carries the same messageIDs.
-          turn.resubmitted = true;
+          turn.resubmitted = turn.prompts.some(pending => pending.dispatched === true);
+          turn.prompts = [...turn.prompts];
+          for (const pending of turn.prompts) pending.dispatched = false;
+          turn.submitting = Promise.resolve();
           turn.inbox = [...turn.prompts];
           drainInbox(turn);
           continue;

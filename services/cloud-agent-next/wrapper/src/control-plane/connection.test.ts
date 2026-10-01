@@ -247,6 +247,27 @@ describe('createControlPlaneConnection', () => {
     }
   });
 
+  it('closes permanently on shutdown even when the callback does not exit the process', async () => {
+    const sandbox = createFakeSandbox();
+    const shutdowns: Array<string | undefined> = [];
+    const connection = await connect(sandbox, { onShutdown: reason => shutdowns.push(reason) });
+    try {
+      await waitFor(() => sandbox.helloFrames.length === 1);
+      sandbox.send({ type: 'shutdown', reason: 'hello_rejected' });
+      await waitFor(() => shutdowns.length === 1);
+      sandbox.setMode('reject');
+      sandbox.send({ type: 'shutdown', reason: 'hello_rejected' });
+      connection.recycle();
+      await Bun.sleep(80);
+      expect(shutdowns).toEqual(['hello_rejected']);
+      expect(sandbox.attempts()).toBe(1);
+      expect(sandbox.connectionCount()).toBe(1);
+    } finally {
+      connection.close();
+      sandbox.stop();
+    }
+  });
+
   it('recycles the connection on demand', async () => {
     const sandbox = createFakeSandbox();
     let connected = 0;

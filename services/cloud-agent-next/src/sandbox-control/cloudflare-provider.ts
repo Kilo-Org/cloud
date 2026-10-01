@@ -8,7 +8,6 @@ import {
   isSandboxContainerRunning,
   parseSandboxBillingInput,
 } from '../container-usage-context.js';
-import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../sandbox-id.js';
 import type { SandboxInstance } from '../types.js';
 import { DEADLINE_MS } from './deadlines.js';
@@ -18,6 +17,7 @@ import type {
   ProviderAllocationIntent,
   ProviderCreateIntent,
 } from './provider.js';
+import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
 
@@ -100,19 +100,19 @@ export function createCloudflareProviderAdapter(deps: {
   ) => {
     if (!billing) return;
     const parsed = decodeOwnedProviderRef(ref);
-    if (!parsed) throw new Error('Invalid Cloudflare sandbox allocation');
-    const input = parseSandboxBillingInput({ ...billing, sandboxId: parsed.sandboxId });
+    if (!parsed) throw new ProviderCreationError('invalid_configuration');
+    let input: ReturnType<typeof parseSandboxBillingInput>;
+    try {
+      input = parseSandboxBillingInput({ ...billing, sandboxId: parsed.sandboxId });
+    } catch {
+      throw new ProviderCreationError('invalid_configuration');
+    }
     const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
     const blocked = await isSandboxBillingBlocked(sandbox, input.enforcementRequested);
     if (input.enforcementRequested || blocked) {
       const admission = await ensureSandboxBillingAdmissionInput(sandbox, input);
       if (!admission.success) {
-        throw new AgentSandboxUnavailableError(
-          admission.code === 'insufficient_credits' || admission.code === 'stopping'
-            ? 'Container billing requires additional credits'
-            : 'Container billing admission is temporarily unavailable',
-          'billing_blocked'
-        );
+        throw new ProviderCreationError(admission.code);
       }
     } else {
       await configureSandboxBillingInput(sandbox, input).catch(() => undefined);
@@ -165,7 +165,7 @@ export function createCloudflareProviderAdapter(deps: {
     async launch(ref, env) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
-        throw new Error('Invalid Cloudflare sandbox allocation');
+        throw new ProviderCreationError('invalid_configuration');
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);

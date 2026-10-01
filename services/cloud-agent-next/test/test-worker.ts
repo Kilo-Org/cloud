@@ -20,7 +20,8 @@ import type {
   SendCloudAgentSessionNotificationResult,
 } from '../src/notifications-binding.js';
 import { CloudAgentSession as RealCloudAgentSession } from '../src/persistence/CloudAgentSession';
-import { getSandboxControlStub, isSandboxControlId } from '../src/sandbox-control/stub';
+import { isSandboxControlId } from '../src/sandbox-control/stub';
+import { admitSandboxWrapperUpgrade } from '../src/sandbox-control/socket-admission.js';
 import { SandboxControlV2 } from '../src/control-plane/sandbox/sandbox-do';
 import { SandboxSessionV2 } from '../src/control-plane/session/session-do';
 import { getSandboxSessionStub, resolveSessionStub } from '../src/sandbox-session/session-stub';
@@ -81,6 +82,7 @@ type TestEnv = {
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   SANDBOX_CONTROL: Env['SANDBOX_CONTROL'];
   SANDBOX_SESSION: Env['SANDBOX_SESSION'];
+  NEXTAUTH_SECRET: Env['NEXTAUTH_SECRET'];
 };
 
 function routeToUserKiloFacade(request: Request, env: TestEnv, userId: string): Promise<Response> {
@@ -122,15 +124,8 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname.startsWith('/sandbox-control/')) {
-      const upgradeHeader = request.headers.get('Upgrade');
-      if (upgradeHeader?.toLowerCase() !== 'websocket') {
-        return new Response('Expected WebSocket upgrade', { status: 426 });
-      }
       const sandboxId = decodeURIComponent(url.pathname.slice('/sandbox-control/'.length));
-      if (!sandboxId || sandboxId.includes('/') || !isSandboxControlId(sandboxId)) {
-        return new Response('Invalid sandboxId', { status: 400 });
-      }
-      return getSandboxControlStub(env, sandboxId).fetch(request);
+      return admitSandboxWrapperUpgrade(request, env, sandboxId);
     }
 
     if (url.pathname.startsWith('/sandbox-control-v2/')) {

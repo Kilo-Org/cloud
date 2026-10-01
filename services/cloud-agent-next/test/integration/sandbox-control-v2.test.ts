@@ -1,4 +1,10 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
+import { resolveSecret } from '../../src/auth.js';
+import {
+  mintSandboxLaunchCredential,
+  verifySandboxLaunchCredential,
+} from '../../src/sandbox-control/credential.js';
+import type { Env } from '../../src/types.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -18,6 +24,7 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
+import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
 import { VERCEL_BILLING_SETTLEMENT_CALLBACK } from '../../src/sandbox-control/vercel-billing.js';
 import { encodeVercelProviderRef } from '../../src/sandbox-control/vercel-provider.js';
 import {
@@ -335,6 +342,278 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 allocation lifecycle', () => {
+  it('fails permanent launch configuration promptly while cleanup retains the existing stop ladder and uncertainty', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    provider.stopResults = Array.from(
+      { length: TIMERS.providerStopLadderMs.length + 1 },
+      () => 'retryable'
+    );
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new ProviderCreationError('invalid_configuration'))
+    );
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'waiting' })).view).toMatchObject({
+        state: 'failed',
+        reason: 'invalid_configuration',
+      })
+    );
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('stopping'));
+    for (let attempt = 1; attempt <= TIMERS.providerStopLadderMs.length + 1; attempt += 1) {
+      await waitFor(() => expect(provider.stopCalls).toHaveLength(attempt));
+      await waitFor(async () => {
+        const state = await readState(stub);
+        expect(state.kind === 'stopped' || state.stopPending).toBe(true);
+      });
+      if ((await readState(stub)).kind === 'stopped') break;
+      await setDeadline(stub, { stop_at: Date.now() - 1 });
+      await runAlarm(stub);
+    }
+    const stopped = await readState(stub);
+    expect(stopped.kind).toBe('stopped');
+    expect(stopped.unconfirmedProviderRef).toBe(provider.refs[0]);
+    expect(provider.createCalls).toBe(1);
+    expect(provider.stopCalls).toEqual(
+      Array.from({ length: TIMERS.providerStopLadderMs.length + 1 }, () => provider.refs[0])
+    );
+  });
+
+  it('ignores a permanent late launch rejection after hello has acquired the allocation', async () => {
+    const provider = createFakeProvider({ gateLaunch: true });
+    const stub = await startAllocation(provider, { preparingRoute: 'waiting' });
+    await waitFor(() => expect(provider.launchGates).toHaveLength(1));
+    await insertPreparingRoute(stub, {
+      sessionId: 'sibling',
+      attemptDeadlineAt: Date.now() + MINUTE,
+    });
+    const { wrapper } = await connectAndHello(provider, stub);
+    wrapper.send({ type: 'session.ready', sessionId: 'sibling' });
+    await waitFor(async () =>
+      expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready')
+    );
+    const before = await readState(stub);
+    await releaseGate(stub, () =>
+      provider.launchGates[0](new ProviderCreationError('invalid_configuration'))
+    );
+    expect(await readState(stub)).toEqual(before);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    expect((await stub.status({ sessionId: 'sibling' })).view.state).toBe('ready');
+    expect(provider.stopCalls).toEqual([]);
+    wrapper.close();
+  });
+
+  it('retains at most two unbound candidates without replacing a healthy socket', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const first = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    const second = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await evictAllDurableObjects();
+    const overflow = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await expect(overflow.waitForClose()).resolves.toBe(1013);
+    expect(await readState(stub)).toEqual(before);
+    expect(await first.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+    });
+    await expect(wrapper.waitForClose()).resolves.toBe(1000);
+    expect(await second.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+    });
+    expect((await readState(stub)).kind).toBe('connected');
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it.each(['silent', 'malformed', 'heartbeat'] as const)(
+    'expires %s candidates from attachment deadlines after reconstruction even while stopped',
+    async mode => {
+      const provider = createFakeProvider();
+      const stub = await startAllocation(provider);
+      await awaitStarting(provider, stub);
+      const { credential } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+      const deadline = await runInDurableObject(stub, (_instance, state) => {
+        const socket = state.getWebSockets()[0];
+        const attachment = socket.deserializeAttachment();
+        expect(attachment.helloDeadlineAt).toBeGreaterThan(Date.now());
+        expect(attachment.helloDeadlineAt).toBeLessThanOrEqual(Date.now() + 30_000);
+        return attachment.helloDeadlineAt as number;
+      });
+      expect(await readAlarm(stub)).toBe(deadline);
+      if (mode === 'malformed') wrapper.sendRaw('{bad');
+      if (mode === 'heartbeat') wrapper.heartbeat(true);
+      await stub.reportProviderGone();
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(await readAlarm(stub)).toBe(deadline);
+      await runInDurableObject(stub, (_instance, state) => {
+        const socket = state.getWebSockets()[0];
+        socket.serializeAttachment({
+          ...socket.deserializeAttachment(),
+          helloDeadlineAt: Date.now() - 1,
+        });
+      });
+      await evictAllDurableObjects();
+      await runAlarm(stub);
+      await expect(wrapper.waitForClose()).resolves.toBe(1008);
+      expect((await readState(stub)).kind).toBe('stopped');
+      expect(await readAlarm(stub)).toBeNull();
+      expect(provider.createCalls).toBe(1);
+      expect(provider.stopCalls).toEqual([]);
+      expect(provider.leaseCalls).toEqual([]);
+    }
+  );
+
+  it('rejects a signed retired allocation before retaining a candidate on the production route', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential } = launchIdentity(provider);
+    await stub.reportProviderGone();
+    await startAllocation(provider);
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+    const current = await readState(stub);
+    const stale = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      path: `/sandbox-control/${SANDBOX_ID}`,
+    });
+    expect(await stale.next()).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(stale.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(current);
+    expect(await runInDurableObject(stub, (_instance, state) => state.getWebSockets().length)).toBe(
+      0
+    );
+    expect(provider.createCalls).toBe(2);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
+  it('keeps the DO credential hash authoritative for a correctly signed current allocation', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { allocationId } = launchIdentity(provider);
+    const secret = await resolveSecret((env as Env).NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Test signing secret unavailable');
+    const credential = mintSandboxLaunchCredential(
+      { sandboxId: SANDBOX_ID, allocationId, credential: 'f'.repeat(64) },
+      secret
+    );
+    expect(verifySandboxLaunchCredential(credential, secret)).not.toBeNull();
+    const before = await readState(stub);
+    const rejected = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      path: `/sandbox-control/${SANDBOX_ID}`,
+    });
+    expect(await rejected.next()).toEqual({ type: 'shutdown', reason: 'hello_rejected' });
+    await expect(rejected.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect(await runInDurableObject(stub, (_instance, state) => state.getWebSockets().length)).toBe(
+      0
+    );
+  });
+
+  it('does not accept a late hello after its deadline or move allocation and route state', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await insertPreparingRoute(stub, {
+      sessionId: 'waiting',
+      attemptDeadlineAt: Date.now() + 12 * MINUTE,
+    });
+    const before = await readState(stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await runInDurableObject(stub, (_instance, state) => {
+      const socket = state.getWebSockets()[0];
+      socket.serializeAttachment({
+        ...socket.deserializeAttachment(),
+        helloDeadlineAt: Date.now() - 1,
+      });
+    });
+    expect(await candidate.hello({ wrapperId: 'wr_late', allocationId })).toBeNull();
+    await expect(candidate.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect((await stub.status({ sessionId: 'waiting' })).view.state).toBe('preparing');
+    expect(provider.stopCalls).toEqual([]);
+    expect(provider.leaseCalls).toEqual([]);
+  });
+
+  it('ignores unbound control-result frames instead of settling a bound wrapper request', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential } = await connectAndHello(provider, stub);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    let settled = false;
+    const pending = stub
+      .worktreeCapture({
+        operation: 'summary',
+        session: {
+          sessionId: 'workspace_test',
+          kiloSessionId: 'ses_test',
+          directory: '/workspace/test',
+        },
+        payload: { revision: 1 },
+      })
+      .then(result => {
+        settled = true;
+        return result;
+      });
+    const frame = await wrapper.next();
+    if (frame?.type !== 'worktree.summary') throw new Error('Missing bound request');
+    candidate.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { source: 'unbound' },
+    });
+    await candidate.hello({ wrapperId: 'invalid', allocationId: 'stale' });
+    expect(settled).toBe(false);
+    wrapper.send({
+      type: 'worktree.result',
+      requestId: frame.requestId,
+      ok: true,
+      result: { source: 'bound' },
+    });
+    expect(await pending).toEqual({ ok: true, result: { source: 'bound' } });
+  });
+
+  it('expires a candidate while keeping the healthy bound connection and its alarm unchanged', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { wrapper, credential } = await connectAndHello(provider, stub);
+    const before = await readState(stub);
+    const candidate = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await runInDurableObject(stub, (_instance, state) => {
+      const socket = state
+        .getWebSockets()
+        .find(ws => ws.deserializeAttachment().helloDeadlineAt !== undefined);
+      if (!socket) throw new Error('Missing candidate');
+      socket.serializeAttachment({
+        ...socket.deserializeAttachment(),
+        helloDeadlineAt: Date.now() - 1,
+      });
+    });
+    await evictAllDurableObjects();
+    await runAlarm(stub);
+    await expect(candidate.waitForClose()).resolves.toBe(1008);
+    expect(await readState(stub)).toEqual(before);
+    expect(await readAlarm(stub)).toBe((before.lastFrameAt ?? 0) + TIMERS.heartbeatMs);
+    wrapper.heartbeat(false);
+    await waitFor(async () =>
+      expect((await readState(stub)).lastFrameAt).toBeGreaterThan(before.lastFrameAt ?? 0)
+    );
+    expect((await readState(stub)).connectionId).toBe(before.connectionId);
+    expect(provider.stopCalls).toEqual([]);
+  });
+
   it('creates, launches and accepts a hello as connected', async () => {
     const provider = createFakeProvider();
     const stub = await startAllocation(provider);
@@ -1198,28 +1477,36 @@ describe('SandboxControlV2 allocation lifecycle', () => {
         )
       ).toBe(false)
     );
+    const generation = await runInDurableObject(stub, (_instance, state) =>
+      getBillingContext(state.storage)
+    );
+    if (generation === undefined) throw new Error('Expected an uncertain billing generation');
+    expect(generation.measurementStarted).toBe(false);
+    expect(provider.createCalls).toBe(0);
     meterUnavailable = false;
-    if (stops === 0) {
-      const generation = await runInDurableObject(stub, (_instance, state) =>
+    await runInDurableObject(stub, async (instance, state) => {
+      const current = await getBillingContext(state.storage);
+      if (current?.generation !== generation.generation) return;
+      await (
+        instance as unknown as {
+          billingSchedule: {
+            schedule(callback: string, at: number, generation: string): Promise<void>;
+          };
+        }
+      ).billingSchedule.schedule(
+        VERCEL_BILLING_SETTLEMENT_CALLBACK,
+        Date.now() - 1,
+        generation.generation
+      );
+    });
+    await runAlarm(stub);
+    await waitFor(() => expect(stops).toBeGreaterThanOrEqual(1));
+    await waitFor(async () => {
+      const current = await runInDurableObject(stub, (_instance, state) =>
         getBillingContext(state.storage)
       );
-      if (generation === undefined) throw new Error('Expected an uncertain billing generation');
-      await runInDurableObject(stub, instance =>
-        (
-          instance as unknown as {
-            billingSchedule: {
-              schedule(callback: string, at: number, generation: string): Promise<void>;
-            };
-          }
-        ).billingSchedule.schedule(
-          VERCEL_BILLING_SETTLEMENT_CALLBACK,
-          Date.now() - 1,
-          generation.generation
-        )
-      );
-      await runAlarm(stub);
-    }
-    await waitFor(() => expect(stops).toBeGreaterThanOrEqual(1));
+      expect(current?.generation).not.toBe(generation.generation);
+    });
     if (provider.createCalls === 0) {
       await setDeadline(stub, { create_deadline_at: Date.now() - 1 });
       await runAlarm(stub);

@@ -57,6 +57,7 @@ function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
     ensure: async () => client,
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
+    isRetiredClient: () => false,
     isSuspected: () => false,
     isRestarting: () => false,
     isUnavailable: () => false,

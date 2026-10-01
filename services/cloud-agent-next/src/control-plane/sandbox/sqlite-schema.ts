@@ -29,6 +29,7 @@ export const allocation = sqliteTable('allocation', {
 export const routes = sqliteTable('routes', {
   session_id: text('session_id').primaryKey(),
   spec: text('spec').notNull(),
+  // A reference to scope_grants.id, not a credential snapshot.
   grant: text('grant'),
   credential_source: text('credential_source'),
   state: text('state').notNull(),
@@ -36,4 +37,9 @@ export const routes = sqliteTable('routes', {
   attempt_deadline_at: integer('attempt_deadline_at'),
   reason: text('reason'),
   updated_at: integer('updated_at').notNull(),
+});
+
+export const scopeGrants = sqliteTable('scope_grants', {
+  id: text('id').primaryKey(),
+  grant: text('grant').notNull(),
 });

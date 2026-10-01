@@ -236,6 +236,7 @@ export function createControlPlaneConnection(
       return;
     }
     if (frame.type === 'shutdown') {
+      close();
       options.onShutdown?.(frame.reason);
       return;
     }

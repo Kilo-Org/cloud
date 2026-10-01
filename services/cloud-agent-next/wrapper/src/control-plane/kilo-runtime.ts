@@ -269,12 +269,12 @@ export type KiloRuntime = {
   readonly client: WrapperKiloClient;
   ensure(): Promise<WrapperKiloClient>;
   /**
-   * Stores the env immediately. Restarts the Kilo process only when no turn is
-   * busy and no PTY is open (spec §6: the old grant stays valid below 1 h).
+   * Stores the env immediately; the turn owner authorizes an idle restart.
    */
   installCredentials(env: Record<string, string>): Promise<void>;
   /** Restarts with the pending credentials when the runtime is idle. B8 calls this. */
-  applyPendingCredentials(): Promise<boolean>;
+  applyPendingCredentials(canRestart: () => boolean): Promise<boolean>;
+  isRetiredClient(client: WrapperKiloClient): boolean;
   isSuspected(): boolean;
   isRestarting(): boolean;
   isUnavailable(): boolean;
@@ -397,6 +397,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
   const restarts: number[] = [];
   /** Spec §7: at most `sseReconnectLimit` stream reconnects per `sseReconnectWindowMs`. */
   const reconnects: number[] = [];
+  const retiredClients = new WeakSet<WrapperKiloClient>();
 
   function onActivity(): void {
     lastActivityAt = scheduler.now();
@@ -589,6 +590,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const current = kiloProcess;
     kiloProcess = undefined;
     // L3: never let `ensure` hand out the dead server's client.
+    if (client !== undefined) retiredClients.add(client);
     client = undefined;
     probeHealth = undefined;
     const currentPidfile = pidfilePath;
@@ -759,7 +761,7 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     return true;
   }
 
-  async function applyPendingCredentials(): Promise<boolean> {
+  async function applyPendingCredentials(canRestart: () => boolean): Promise<boolean> {
     const applyPhase = currentPhase();
     if (
       !pendingCredentials ||
@@ -784,9 +786,13 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
     const phaseAfterIdle = currentPhase();
     if (
       !idle ||
+      !pendingCredentials ||
+      client !== current ||
+      starting !== undefined ||
       phaseAfterIdle === 'stopped' ||
       phaseAfterIdle === 'unavailable' ||
-      phaseAfterIdle === 'restarting'
+      phaseAfterIdle === 'restarting' ||
+      !canRestart()
     ) {
       return false;
     }
@@ -803,12 +809,12 @@ export function createKiloRuntime(options: KiloRuntimeOptions): KiloRuntime {
       return client;
     },
     ensure,
+    isRetiredClient: candidate => retiredClients.has(candidate),
     async installCredentials(env: Record<string, string>): Promise<void> {
       // Store the refreshed env immediately; the running process keeps the old
       // grant (valid below 1 h) until an idle restart applies the new one.
       options.env = env;
       pendingCredentials = true;
-      await applyPendingCredentials();
     },
     applyPendingCredentials,
     isSuspected: isSuspectedPhase,

@@ -8,6 +8,7 @@ import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/verce
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -2597,6 +2598,31 @@ describe('server control log routes', () => {
 });
 
 describe('server /sandbox-control', () => {
+  it.each([
+    undefined,
+    '',
+    'Basic secret',
+    'Bearer',
+    'Bearer one two',
+    `Bearer ${'x'.repeat(4097)}`,
+  ])(
+    'rejects missing or malformed authorization before resolving a stub (case %#)',
+    async authorization => {
+      const env = createEnv();
+      const headers = new Headers({ Upgrade: 'websocket' });
+      if (authorization !== undefined) headers.set('Authorization', authorization);
+      env.SANDBOX_CONTROL.getByName.mockReturnValue({
+        fetch: vi.fn().mockResolvedValue(new Response()),
+      });
+      const response = await fetchWorker(
+        new Request('http://worker.test/sandbox-control/sbx_test', { headers }),
+        env
+      );
+      expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+      expect(response.status).toBe(401);
+    }
+  );
+
   it('rejects non-websocket requests', async () => {
     const env = createEnv();
     const response = await fetchWorker(
@@ -2626,7 +2652,17 @@ describe('server /sandbox-control', () => {
     env.SANDBOX_CONTROL.getByName.mockReturnValue({ fetch });
 
     const request = new Request('http://worker.test/sandbox-control/sbx_test', {
-      headers: { Upgrade: 'websocket', Authorization: 'Bearer secret' },
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${mintSandboxLaunchCredential(
+          {
+            sandboxId: 'sbx_test',
+            allocationId: crypto.randomUUID(),
+            credential: 'a'.repeat(64),
+          },
+          secret
+        )}`,
+      },
     });
     const response = await fetchWorker(request, env);
 

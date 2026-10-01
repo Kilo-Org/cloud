@@ -1,10 +1,22 @@
 import { env, evictAllDurableObjects, reset, runInDurableObject, SELF } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
+import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
-import { routes as routesTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
+import migrations from '../../src/control-plane/sandbox/drizzle/migrations.js';
+import {
+  allocation as allocationTable,
+  routes as routesTable,
+  scopeGrants,
+} from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
+import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { CallbackJob } from '../../src/callbacks/types.js';
+import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
+import { ProviderCreationError } from '../../src/sandbox-control/provider.js';
+import { VercelSandboxRestError } from '../../src/agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
   acceptMessages,
   QUEUED_MESSAGE_LIMIT,
@@ -21,6 +33,7 @@ import type {
 import type {
   ControlPlanePromptPayload,
   ControlPlaneRouteSpec,
+  ControlPlaneRouteUpdate,
 } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import type { MessageResultRPCResponse } from '../../src/session/message-result.js';
@@ -127,11 +140,13 @@ async function setGrantExpiry(
   await runInDurableObject(stub, async (_instance, state) => {
     const db = drizzle(state.storage, { logger: false });
     const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
-    const grant = JSON.parse(rows[0]?.grant ?? '{}') as Record<string, unknown>;
+    const id = rows[0]?.grant;
+    if (id == null) throw new Error('missing scope reference');
+    const grant = readScopeGrant(db, id);
     await db
-      .update(routesTable)
+      .update(scopeGrants)
       .set({ grant: JSON.stringify({ ...grant, expiresAt }) })
-      .where(eq(routesTable.session_id, sessionId));
+      .where(eq(scopeGrants.id, id));
   });
 }
 
@@ -142,8 +157,8 @@ async function readGrantAlias(
   return runInDurableObject(stub, async (_instance, state) => {
     const db = drizzle(state.storage, { logger: false });
     const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
-    const grant = JSON.parse(rows[0]?.grant ?? '{}') as { kilo?: { alias?: string } };
-    return grant.kilo?.alias ?? null;
+    const id = rows[0]?.grant;
+    return id == null ? null : (readScopeGrant(db, id)?.kilo.alias ?? null);
   });
 }
 
@@ -273,6 +288,7 @@ type FakeProvider = {
   refs: string[];
   launchEnvs: Record<string, string>[];
   stopCalls: (string | null)[];
+  failure?: unknown;
 };
 
 function createFakeProvider(): FakeProvider {
@@ -290,6 +306,7 @@ function createFakeProvider(): FakeProvider {
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       provider.createCalls += 1;
+      if (provider.failure !== undefined) throw provider.failure;
       const ref = `mem_${intent.intentId}`;
       provider.refs.push(ref);
       return { providerRef: ref };
@@ -464,6 +481,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.send(promptPayload('m2'));
     expect(await messageStatus(stub, 'm2')).toBe('queued');
 
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+    };
     await stub.onRoute({
       state: 'failed',
       attemptId: peer.attemptId,
@@ -485,7 +507,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.send(promptPayload('m2'));
     const preparesBefore = peer.prepareCalls.length;
 
-    await stub.onRoute({ state: 'lost', attemptId: peer.attemptId, reason: 'connection_lost' });
+    const oldAttempt = peer.attemptId;
+    peer.status = async input => ({ sessionId: input.sessionId, view: { state: 'unknown' } });
+    peer.attemptId = crypto.randomUUID();
+    peer.prepareView = peer.view('preparing');
+    await stub.onRoute({ state: 'lost', attemptId: oldAttempt, reason: 'connection_lost' });
     expect(await messageStatus(stub, 'm1')).toBe('failed');
     expect(await messageStatus(stub, 'm2')).toBe('queued');
     expect(peer.prepareCalls.length).toBeGreaterThan(preparesBefore);
@@ -591,6 +617,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await messageStatus(stub, 'm1')).toBe('queued');
     expect(await messageStatus(stub, 'm2')).toBe('queued');
 
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+    };
     await stub.onRoute({
       state: 'failed',
       attemptId: peer.attemptId,
@@ -607,6 +638,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(await messageStatus(stub, 'm1')).toBe('queued');
     expect(await messageStatus(stub, 'm2')).toBe('queued');
 
+    peer.prepareView = peer.view('ready');
     await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
     await waitFor(async () => expect(await messageStatus(stub, 'm2')).toBe('running'));
     expect(await messageStatus(stub, 'm1')).toBe('running');
@@ -614,7 +646,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     expect(peer.deliverCalls[0]?.messages.map(message => message.messageId)).toEqual(['m1', 'm2']);
   });
 
-  it('accepts a message when deliver outlives the old 2 s deadline', async () => {
+  it('keeps queued intent when deliver outlives the 2 s transport deadline', async () => {
     const { stub, peer } = await setup();
     peer.prepareView = peer.view('ready');
     peer.deliverDelayMs = 2_500;
@@ -622,9 +654,9 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     const started = Date.now();
     await stub.send(promptPayload('m1'));
 
-    // The old bounded deadline would have given up at 2 s and left it queued.
     expect(Date.now() - started).toBeGreaterThanOrEqual(2_000);
-    expect(await messageStatus(stub, 'm1')).toBe('running');
+    expect(Date.now() - started).toBeLessThan(2_400);
+    expect(await messageStatus(stub, 'm1')).toBe('queued');
     expect(peer.deliverCalls).toHaveLength(1);
   });
 
@@ -684,6 +716,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
     await stub.onRoute({ state: 'preparing', step: 'clone', attemptId: peer.attemptId });
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+    };
     await stub.onRoute({
       state: 'failed',
       attemptId: peer.attemptId,
@@ -809,6 +846,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 
     // A ready route after eviction still closes the persisted row: the stored
     // previous route named the attempt, not the lost in-memory recorder map.
+    peer.prepareView = peer.view('ready');
     await revived.onRoute({ state: 'ready', attemptId: peer.attemptId });
     const closed = preparingRows(await drainStream(stream));
     expect(closed.some(row => row.action === 'attempt_completed')).toBe(true);
@@ -823,7 +861,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 
     // The route becomes ready but the socket cannot take the write.
     peer.deliverResult = 'not_ready';
-    peer.prepareView = peer.view('reconnecting');
+    peer.prepareView = peer.view('ready');
+    peer.prepare = async input => {
+      peer.prepareCalls.push(input);
+      return peer.view('reconnecting');
+    };
     await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
 
     expect(peer.deliverCalls).toHaveLength(1);
@@ -847,6 +889,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
     await stub.onRoute({ state: 'preparing', step: 'clone', attemptId: peer.attemptId });
+    peer.prepareView = peer.view('ready');
     await stub.onRoute({ state: 'ready', attemptId: peer.attemptId });
     await waitFor(async () => expect(await messageStatus(stub, 'm1')).toBe('running'));
     await stub.onEvents({ events: [{ type: 'wrapper_finalizing', properties: {} }] });
@@ -910,6 +953,11 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     const { sessionId, stub, peer } = await setup();
     peer.prepareView = peer.view('preparing');
     await stub.send(promptPayload('m1'));
+    peer.prepareView = {
+      state: 'failed',
+      attemptId: peer.attemptId,
+      reason: 'workspace_setup_failed',
+    };
     await stub.onRoute({
       state: 'failed',
       attemptId: peer.attemptId,
@@ -972,6 +1020,658 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
 });
 
 describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', () => {
+  it.each(['ready', 'preparing'] as const)(
+    'preserves message ownership when pre-B %s retirement arrives after a fresh send',
+    async oldState => {
+      const sessionId = newSessionId();
+      const sandboxId = unique('sbx__retirement_order');
+      const provider = createFakeProvider();
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+        });
+      });
+      const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+      expect(
+        await sessionStub.registerSessionFromMetadata({
+          metadata: parseSessionMetadata({
+            metadataSchemaVersion: 2,
+            identity: { sessionId, userId: SESSION_OWNER_ID, orgId: 'org_123' },
+            auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
+            agent: { mode: 'code', model: 'test/model' },
+            repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+            workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+            callback: { target: { url: 'https://callback.test/hook' } },
+            lifecycle: { version: 1, timestamp: 1 },
+          }),
+          sandboxSelection: { provider: 'cloudflare' },
+        })
+      ).toEqual({ success: true });
+      const reports: CloudAgentQueueReport[] = [];
+      const callbacks: CallbackJob[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+          send: async (report: CloudAgentQueueReport) => {
+            reports.push(report);
+          },
+        } as never;
+        instance.env.CALLBACK_QUEUE = {
+          send: async (job: CallbackJob) => {
+            callbacks.push(job);
+          },
+        } as never;
+      });
+      await sessionStub.send(promptPayload('old-A'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapperA = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      await wrapperA.hello({
+        wrapperId: 'wr_before_retirement',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+      });
+      expect(await wrapperA.next()).toMatchObject({ type: 'session.prepare' });
+      if (oldState === 'ready') {
+        wrapperA.send({ type: 'session.ready', sessionId });
+        expect(await wrapperA.next()).toMatchObject({
+          type: 'session.prompt',
+          payload: { messageId: 'old-A' },
+        });
+        await waitFor(async () =>
+          expect(await messageStatus(sessionStub, 'old-A')).toBe('running')
+        );
+      }
+      const attemptA = (await sandboxStub.status({ sessionId })).view;
+      if (attemptA.state !== oldState) throw new Error('Missing old attempt fixture');
+      const retirementUpdates: ControlPlaneRouteUpdate[] = [];
+      let releaseNotification!: () => void;
+      let releaseResponse!: () => void;
+      const notification = new Promise<void>(resolve => {
+        releaseNotification = resolve;
+      });
+      const response = new Promise<void>(resolve => {
+        releaseResponse = resolve;
+      });
+      await runInDurableObject(sandboxStub, async (instance, state) => {
+        const db = drizzle(state.storage);
+        const route = db.select().from(routesTable).get();
+        const allocation = db.select().from(allocationTable).get();
+        const grant = route?.grant == null ? null : readScopeGrant(db, route.grant);
+        if (route === undefined || allocation === undefined || grant === null)
+          throw new Error('Missing pre-B fixture');
+        const retained = await state.storage.list();
+        await state.storage.deleteAll();
+        const first = migrations.journal.entries[0];
+        if (first === undefined) throw new Error('Missing first migration');
+        await migrate(db, {
+          journal: { entries: [first] },
+          migrations: { m0000: migrations.migrations.m0000 },
+        });
+        for (const [key, value] of retained) await state.storage.put(key, value);
+        expect(await state.storage.get('control_plane_generation')).toBe(2);
+        db.insert(allocationTable).values(allocation).run();
+        db.insert(routesTable)
+          .values({ ...route, grant: JSON.stringify(grant) })
+          .run();
+        const originalPeerFor = instance.sessionPeerFor;
+        let reconstructed: SandboxControlV2 | undefined;
+        const restore = () => {
+          if (reconstructed !== undefined) return reconstructed;
+          reconstructed = new SandboxControlV2(state, instance.env);
+          Object.assign(reconstructed, {
+            createProviderAdapter: () => provider.adapter,
+            provider: provider.adapter,
+            sessionPeerFor: (ownerId: string, id: string) => {
+              const peer = originalPeerFor(ownerId, id);
+              if (peer === null) throw new Error('Missing real Session peer');
+              return new Proxy(peer, {
+                get(target, key) {
+                  if (key === 'onRoute')
+                    return async (update: ControlPlaneRouteUpdate) => {
+                      if (
+                        'reason' in update &&
+                        update.reason === 'agent_restarted' &&
+                        update.attemptId === attemptA.attemptId
+                      ) {
+                        retirementUpdates.push(update);
+                        await notification;
+                      }
+                      return target.onRoute(update);
+                    };
+                  return Reflect.get(target, key);
+                },
+              });
+            },
+          });
+          return reconstructed;
+        };
+        Object.setPrototypeOf(
+          instance,
+          Object.assign(Object.create(Object.getPrototypeOf(instance)), {
+            deliver: (input: Parameters<SandboxControlV2['deliver']>[0]) =>
+              restore().deliver(input),
+            prepare: (input: Parameters<SandboxControlV2['prepare']>[0]) =>
+              restore().prepare(input),
+            status: (input: Parameters<SandboxControlV2['status']>[0]) => restore().status(input),
+            alarm: () => restore().alarm(),
+            fetch: (request: Request) => restore().fetch(request),
+            getAllocationState: () => restore().getAllocationState(),
+            webSocketMessage: (...args: Parameters<SandboxControlV2['webSocketMessage']>) =>
+              restore().webSocketMessage(...args),
+            webSocketClose: (...args: Parameters<SandboxControlV2['webSocketClose']>) =>
+              restore().webSocketClose(...args),
+            webSocketError: (...args: Parameters<SandboxControlV2['webSocketError']>) =>
+              restore().webSocketError(...args),
+          })
+        );
+      });
+      if (oldState === 'preparing') {
+        await runInDurableObject(sessionStub, instance => {
+          const peer = instance.sandboxPeerFor(sandboxId);
+          if (peer === null) throw new Error('Missing real Sandbox peer');
+          instance.sandboxPeerFor = () =>
+            new Proxy(peer, {
+              get(target, key) {
+                if (key === 'prepare')
+                  return async (input: Parameters<typeof peer.prepare>[0]) => {
+                    const view = await target.prepare(input);
+                    await response;
+                    return view;
+                  };
+                return Reflect.get(target, key);
+              },
+            });
+        });
+      }
+      let wrapperB: FakeWrapper | undefined;
+      try {
+        await sessionStub.send(promptPayload('new-B'));
+        const attemptB = (await sandboxStub.status({ sessionId })).view;
+        if (attemptB.state !== 'preparing') throw new Error('Missing new attempt');
+        expect(attemptB.attemptId).not.toBe(attemptA.attemptId);
+        if (oldState === 'ready') {
+          await expect(sessionStub.getSession()).resolves.toMatchObject({
+            route: { attemptId: attemptB.attemptId },
+          });
+        } else {
+          const recoveryAt = await runInDurableObject(sessionStub, (_instance, state) =>
+            state.storage.get('control_plane_transport_recovery_at')
+          );
+          expect(recoveryAt).toEqual(expect.any(Number));
+        }
+        await waitFor(() => expect(retirementUpdates).toHaveLength(1));
+        expect(retirementUpdates[0]).toEqual({
+          state: oldState === 'ready' ? 'lost' : 'failed',
+          attemptId: attemptA.attemptId,
+          reason: 'agent_restarted',
+        });
+        releaseNotification();
+        await sessionStub.onRoute(retirementUpdates[0]);
+        expect(await messageStatus(sessionStub, 'new-B')).toBe('queued');
+        await expect(sessionStub.getSession()).resolves.toMatchObject({
+          route: { state: 'preparing', attemptId: attemptB.attemptId },
+        });
+        await runInDurableObject(sandboxStub, instance => instance.alarm());
+        await waitFor(() => expect(provider.launchEnvs).toHaveLength(2));
+        const replacement = provider.launchEnvs[1];
+        wrapperB = await FakeWrapper.connect({
+          sandboxId,
+          credential: replacement.SANDBOX_CONTROL_CREDENTIAL,
+        });
+        await wrapperB.hello({
+          wrapperId: 'wr_after_retirement',
+          allocationId: replacement.CONTROL_PLANE_ALLOCATION_ID,
+        });
+        expect(await wrapperB.next()).toMatchObject({
+          type: 'session.prepare',
+          spec: { attemptId: attemptB.attemptId },
+        });
+        wrapperB.send({ type: 'session.ready', sessionId });
+        expect(await wrapperB.next()).toMatchObject({
+          type: 'session.prompt',
+          payload: { messageId: 'new-B' },
+        });
+        wrapperB.send({
+          type: 'session.outcome',
+          sessionId,
+          status: 'completed',
+          lastMessageId: 'new-B',
+        });
+        await waitFor(async () =>
+          expect(await messageStatus(sessionStub, 'new-B')).toBe('completed')
+        );
+        await runSessionAlarm(sessionStub);
+        expect(await messageStatus(sessionStub, 'old-A')).toBe('failed');
+        expect(await readMessageReason(sessionStub, 'old-A')).toBe('agent_restarted');
+        expect(reports.filter(report => report.run.messageId === 'old-A')).toHaveLength(1);
+        expect(reports.find(report => report.run.messageId === 'old-A')?.run).toMatchObject({
+          status: 'failed',
+          failureCode: 'wrapper_disconnected',
+        });
+        expect(reports.filter(report => report.run.messageId === 'new-B')).toHaveLength(1);
+        expect(reports.find(report => report.run.messageId === 'new-B')?.run.status).toBe(
+          'completed'
+        );
+        expect(callbacks.at(-1)?.payload).toMatchObject({
+          messageId: 'new-B',
+          status: 'completed',
+        });
+        const counts = [reports.length, callbacks.length];
+        await sessionStub.send(promptPayload('old-A'));
+        await sessionStub.onRoute(retirementUpdates[0]);
+        await runSessionAlarm(sessionStub);
+        expect([reports.length, callbacks.length]).toEqual(counts);
+        for (let index = 0; index < 5; index++) {
+          const frame = await wrapperB.next(50);
+          if (frame === null) break;
+          expect(frame.type).not.toBe('session.prompt');
+          expect(frame.type).not.toBe('session.prepare');
+        }
+      } finally {
+        releaseNotification();
+        releaseResponse();
+        wrapperA.close();
+        wrapperB?.close();
+      }
+    },
+    15_000
+  );
+
+  it.each(['progress', 'failed'] as const)(
+    'preserves new-attempt %s notification facts when the real passive view omits them',
+    async notification => {
+      const sessionId = newSessionId();
+      const sandboxId = unique('sbx__notification_facts');
+      const provider = createFakeProvider();
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+        });
+      });
+      const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
+      const sessionStub = sessions.getByName(sessionName);
+      const registered = await sessionStub.registerSessionFromMetadata({
+        metadata: parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: SESSION_OWNER_ID, orgId: 'org_123' },
+          auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
+          agent: { mode: 'code', model: 'test/model' },
+          repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+          callback: { target: { url: 'https://callback.test/hook' } },
+          lifecycle: { version: 1, timestamp: 1 },
+        }),
+        sandboxSelection: { provider: 'cloudflare' },
+      });
+      expect(registered).toEqual({ success: true });
+      const reports: CloudAgentQueueReport[] = [];
+      const callbacks: CallbackJob[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+          send: async (report: CloudAgentQueueReport) => {
+            reports.push(report);
+          },
+        } as never;
+        instance.env.CALLBACK_QUEUE = {
+          send: async (job: CallbackJob) => {
+            callbacks.push(job);
+          },
+        } as never;
+      });
+      await sessionStub.send(promptPayload('old-A'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      await wrapper.hello({
+        wrapperId: 'wr_notification_facts',
+        allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+      });
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prepare', spec: { sessionId } });
+      const attemptA = (await sandboxStub.status({ sessionId })).view;
+      if (attemptA.state !== 'preparing') throw new Error('Expected preparing attempt A');
+      wrapper.send({ type: 'session.failed', sessionId, reason: 'workspace_setup_failed' });
+      await waitFor(async () => expect(await messageStatus(sessionStub, 'old-A')).toBe('failed'));
+      await runSessionAlarm(sessionStub);
+      expect(reports).toHaveLength(1);
+      expect(callbacks).toHaveLength(1);
+      let releaseResponse!: () => void;
+      const response = new Promise<void>(resolve => {
+        releaseResponse = resolve;
+      });
+      await runInDurableObject(sessionStub, instance => {
+        const peer = instance.sandboxPeerFor(sandboxId);
+        if (peer === null) throw new Error('Missing real Sandbox peer');
+        instance.sandboxPeerFor = () =>
+          new Proxy(peer, {
+            get(target, key) {
+              if (key === 'prepare')
+                return async (input: Parameters<typeof peer.prepare>[0]) => {
+                  const view = await target.prepare(input);
+                  await response;
+                  return view;
+                };
+              return Reflect.get(target, key);
+            },
+          });
+      });
+      const stream = await connectStream(sessionName);
+      try {
+        const sentAt = Date.now();
+        await sessionStub.send(promptPayload('retry-B'));
+        expect(Date.now() - sentAt).toBeGreaterThanOrEqual(2_000);
+        expect(Date.now() - sentAt).toBeLessThan(2_400);
+        expect(await wrapper.next()).toMatchObject({
+          type: 'session.prepare',
+          spec: { sessionId },
+        });
+        const attemptB = (await sandboxStub.status({ sessionId })).view;
+        if (attemptB.state !== 'preparing') throw new Error('Expected preparing attempt B');
+        expect(attemptB.attemptId).not.toBe(attemptA.attemptId);
+        expect(attemptB).toEqual({ state: 'preparing', attemptId: attemptB.attemptId });
+        await expect(sessionStub.getSession()).resolves.toMatchObject({
+          route: { state: 'failed', attemptId: attemptA.attemptId },
+        });
+        if (notification === 'progress') {
+          wrapper.send({ type: 'session.progress', sessionId, step: 'clone' });
+          await waitFor(async () => {
+            const session = await sessionStub.getSession();
+            expect(session).toMatchObject({ route: { attemptId: attemptB.attemptId } });
+          });
+          expect((await sandboxStub.status({ sessionId })).view).toEqual({
+            state: 'preparing',
+            attemptId: attemptB.attemptId,
+          });
+          await expect(sessionStub.getSession()).resolves.toMatchObject({
+            route: { state: 'preparing', attemptId: attemptB.attemptId, step: 'clone' },
+          });
+          expect(await messageStatus(sessionStub, 'retry-B')).toBe('queued');
+          const progress = preparingRows(await drainStream(stream));
+          expect(progress).toEqual(
+            expect.arrayContaining([
+              expect.objectContaining({ attemptId: attemptB.attemptId, step: 'cloning' }),
+            ])
+          );
+        }
+        wrapper.send({
+          type: 'session.failed',
+          sessionId,
+          step: 'clone',
+          reason: 'workspace_setup_failed',
+          subtype: 'git_authentication_failed',
+        });
+        await waitFor(async () =>
+          expect(await messageStatus(sessionStub, 'retry-B')).toBe('failed')
+        );
+        await runSessionAlarm(sessionStub);
+        expect((await sandboxStub.status({ sessionId })).view).toEqual({
+          state: 'failed',
+          attemptId: attemptB.attemptId,
+          reason: 'workspace_setup_failed',
+        });
+        expect(await readMessageReason(sessionStub, 'retry-B')).toBe('workspace_setup_failed');
+        const retryReports = reports.filter(report => report.run.messageId === 'retry-B');
+        expect(retryReports).toHaveLength(1);
+        expect(retryReports[0]?.run.failureReason).toBe('source_control_authentication');
+        expect(retryReports[0]?.run).toMatchObject({
+          status: 'failed',
+          failureStage: 'pre_dispatch',
+          failureCode: 'workspace_setup_failed',
+          workspaceFailureSubtype: 'git_authentication_failed',
+          failureResponsibility: 'user',
+          failureReason: 'source_control_authentication',
+          diagnostic: { errorMessageRedacted: 'Repository authentication failed' },
+        });
+        await expect(sessionStub.getSession()).resolves.toMatchObject({
+          route: {
+            state: 'failed',
+            attemptId: attemptB.attemptId,
+            subtype: 'git_authentication_failed',
+          },
+        });
+        expect(callbacks.filter(job => job.payload.messageId === 'retry-B')).toHaveLength(1);
+        expect(callbacks.find(job => job.payload.messageId === 'retry-B')?.payload).toMatchObject({
+          status: 'failed',
+          errorMessage: 'Workspace setup failed',
+        });
+        await sessionStub.onRoute({ state: 'ready', attemptId: attemptA.attemptId });
+        await sessionStub.onRoute({
+          state: 'failed',
+          attemptId: attemptA.attemptId,
+          reason: 'workspace_setup_failed',
+          subtype: 'git_network_failed',
+        });
+        await sessionStub.onRoute({
+          state: 'failed',
+          attemptId: attemptB.attemptId,
+          reason: 'workspace_setup_failed',
+          subtype: 'git_authentication_failed',
+        });
+        await runSessionAlarm(sessionStub);
+        expect(reports).toHaveLength(2);
+        expect(callbacks).toHaveLength(2);
+        expect(await messageStatus(sessionStub, 'old-A')).toBe('failed');
+        expect(await messageStatus(sessionStub, 'retry-B')).toBe('failed');
+      } finally {
+        releaseResponse();
+        stream.close();
+        wrapper.close();
+      }
+    },
+    15_000
+  );
+
+  it.each([
+    ['insufficient_credits', 'billing_blocked', 'payment_required'],
+    ['invalid_configuration', 'invalid_configuration', 'sandbox_connect_failed'],
+  ] as const)(
+    'settles known permanent %s promptly and recovers the next message',
+    async (cause, reason, code) => {
+      const sessionId = newSessionId();
+      const sandboxId = unique('sbx__permanent');
+      const provider = createFakeProvider();
+      provider.failure = new ProviderCreationError(cause);
+      const sandboxStub = sandboxes.getByName(sandboxId);
+      await runInDurableObject(sandboxStub, async instance => {
+        await instance.getAllocationState();
+        installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+        Object.assign(instance, {
+          createProviderAdapter: () => provider.adapter,
+          provider: provider.adapter,
+        });
+      });
+      const sessionName = sessionDoName(SESSION_OWNER_ID, sessionId);
+      const sessionStub = sessions.getByName(sessionName);
+      await sessionStub.registerSessionFromMetadata({
+        metadata: parseSessionMetadata({
+          metadataSchemaVersion: 2,
+          identity: { sessionId, userId: SESSION_OWNER_ID, orgId: 'org_123' },
+          auth: { kiloSessionId: kiloSessionId(), kilocodeToken: NATIVE_KILO_TOKEN },
+          agent: { mode: 'code', model: 'test/model' },
+          repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
+          workspace: { sandboxId, sandboxProvider: 'cloudflare' },
+          callback: { target: { url: 'https://callback.test/hook' } },
+          lifecycle: { version: 1, timestamp: 1 },
+        }),
+        sandboxSelection: { provider: 'cloudflare' },
+      });
+      const reports: CloudAgentQueueReport[] = [];
+      const callbacks: CallbackJob[] = [];
+      await runInDurableObject(sessionStub, instance => {
+        instance.env.CLOUD_AGENT_REPORT_QUEUE = {
+          send: async (report: CloudAgentQueueReport) => {
+            reports.push(report);
+          },
+        } as never;
+        instance.env.CALLBACK_QUEUE = {
+          send: async (job: CallbackJob) => {
+            callbacks.push(job);
+          },
+        } as never;
+      });
+      const stream = await connectStream(sessionName);
+      const sentAt = Date.now();
+      await sessionStub.send(promptPayload('m1'));
+      await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('failed'), {
+        timeout: 1_000,
+      });
+      expect(Date.now() - sentAt).toBeLessThan(2_000);
+      expect(await readMessageReason(sessionStub, 'm1')).toBe(reason);
+      const failedRoute = (await sandboxStub.status({ sessionId })).view;
+      expect(failedRoute).toMatchObject({ state: 'failed', reason });
+      const failed = await waitForStreamEvent(stream, 'cloud.message.failed');
+      expect(failed.data).toMatchObject({
+        messageId: 'm1',
+        status: 'failed',
+        reason,
+        error: reason,
+        accepted: false,
+      });
+      await runSessionAlarm(sessionStub);
+      expect(reports).toHaveLength(1);
+      expect(reports[0]?.run).toMatchObject({
+        status: 'failed',
+        failureStage: 'pre_dispatch',
+        failureCode: code,
+      });
+      expect(callbacks).toHaveLength(1);
+      expect(callbacks[0]?.payload.status).toBe('failed');
+      expect(callbacks[0]?.payload.errorMessage).toBe(
+        cause === 'insufficient_credits'
+          ? 'Sandbox billing requires additional credits'
+          : 'Sandbox configuration is invalid or unsupported'
+      );
+      expect(provider.createCalls).toBe(1);
+      await waitFor(async () =>
+        expect((await sandboxStub.getAllocationState()).kind).toBe('stopped')
+      );
+
+      provider.failure = undefined;
+      await sessionStub.send(promptPayload('m2'));
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const launch = provider.launchEnvs[0];
+      const wrapper = await FakeWrapper.connect({
+        sandboxId,
+        credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+      });
+      expect(
+        await wrapper.hello({
+          wrapperId: 'wr_recovered',
+          allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: 2 });
+      expect(await wrapper.next()).toMatchObject({ type: 'session.prepare', spec: { sessionId } });
+      const recoveredRoute = (await sandboxStub.status({ sessionId })).view;
+      if (failedRoute.state !== 'failed' || recoveredRoute.state !== 'preparing')
+        throw new Error('Expected failed and recovered attempts');
+      expect(recoveredRoute.attemptId).not.toBe(failedRoute.attemptId);
+      wrapper.send({ type: 'session.ready', sessionId });
+      expect(await wrapper.next()).toMatchObject({
+        type: 'session.prompt',
+        payload: { messageId: 'm2' },
+      });
+      wrapper.send({
+        type: 'session.outcome',
+        sessionId,
+        status: 'completed',
+        lastMessageId: 'm2',
+      });
+      await waitFor(async () => expect(await messageStatus(sessionStub, 'm2')).toBe('completed'));
+      await runSessionAlarm(sessionStub);
+      expect(await messageStatus(sessionStub, 'm1')).toBe('failed');
+      expect(reports).toHaveLength(2);
+      expect(callbacks).toHaveLength(2);
+      expect(callbacks[1]?.payload.status).toBe('completed');
+      stream.close();
+      wrapper.close();
+    }
+  );
+
+  it.each([
+    new ProviderCreationError('stopping'),
+    new ProviderCreationError('meter_unavailable'),
+    new Error('insufficient credits invalid configuration'),
+    ...[400, 402, 409, 429, 500, 503].map(
+      status => new VercelSandboxRestError('request_failed', 'create', status)
+    ),
+  ])('retains queued work and its attempt across transient %s', async failure => {
+    const sessionId = newSessionId();
+    const sandboxId = unique('sbx__transient');
+    const provider = createFakeProvider();
+    provider.failure = failure;
+    const sandboxStub = sandboxes.getByName(sandboxId);
+    await runInDurableObject(sandboxStub, async instance => {
+      await instance.getAllocationState();
+      installFakeCredentialEnv(instance.env, createFakeCredentialBroker());
+      Object.assign(instance, {
+        createProviderAdapter: () => provider.adapter,
+        provider: provider.adapter,
+      });
+    });
+    const sessionStub = sessions.getByName(sessionDoName(SESSION_OWNER_ID, sessionId));
+    await sessionStub.registerSession(registration(sandboxId, sessionId));
+    const sentAt = Date.now();
+    await sessionStub.send(promptPayload('m1'));
+    const retryBy = Date.now() + CONTROL_PLANE_TIMERS.sandbox.providerCreateRetryMs;
+    await waitFor(async () => {
+      const allocation = await sandboxStub.getAllocationState();
+      expect(allocation.kind).toBe('creating');
+      expect(allocation.createDeadlineAt).toBeGreaterThanOrEqual(sentAt + 10_000);
+      expect(allocation.createDeadlineAt).toBeLessThanOrEqual(retryBy);
+    });
+    const before = await runInDurableObject(sandboxStub, (_instance, state) =>
+      drizzle(state.storage).select().from(routesTable).get()
+    );
+    expect(await messageStatus(sessionStub, 'm1')).toBe('queued');
+    expect(provider.createCalls).toBe(1);
+    provider.failure = undefined;
+    await runInDurableObject(sandboxStub, async (instance, state) => {
+      drizzle(state.storage)
+        .update(allocationTable)
+        .set({ create_deadline_at: Date.now() - 1 })
+        .where(eq(allocationTable.id, 'current'))
+        .run();
+      await instance.alarm();
+    });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const after = await runInDurableObject(sandboxStub, (_instance, state) =>
+      drizzle(state.storage).select().from(routesTable).get()
+    );
+    expect(after?.attempt_id).toBe(before?.attempt_id);
+    expect(after?.attempt_deadline_at).toBe(before?.attempt_deadline_at);
+    const launch = provider.launchEnvs[0];
+    const wrapper = await FakeWrapper.connect({
+      sandboxId,
+      credential: launch.SANDBOX_CONTROL_CREDENTIAL,
+    });
+    await wrapper.hello({
+      wrapperId: 'wr_transient',
+      allocationId: launch.CONTROL_PLANE_ALLOCATION_ID,
+    });
+    expect(await wrapper.next()).toMatchObject({ type: 'session.prepare' });
+    wrapper.send({ type: 'session.ready', sessionId });
+    expect(await wrapper.next()).toMatchObject({
+      type: 'session.prompt',
+      payload: { messageId: 'm1' },
+    });
+    wrapper.send({ type: 'session.outcome', sessionId, status: 'completed', lastMessageId: 'm1' });
+    await waitFor(async () => expect(await messageStatus(sessionStub, 'm1')).toBe('completed'));
+    expect(provider.createCalls).toBe(2);
+    wrapper.close();
+  });
+
   it('completes a cold message and streams queued, sent, and completed', async () => {
     const sessionId = newSessionId();
     const sandboxId = unique('sbx__session_v2');
@@ -1100,7 +1800,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
     await sessionStub.send(promptPayload('m3'));
     await waitFor(async () => expect(await messageStatus(sessionStub, 'm3')).toBe('running'));
     expect((await wrapper.next())?.type).toBe('session.credentials');
-    expect(await readGrantAlias(sandboxStub, sessionId)).not.toBe(aliasBefore);
+    expect((await readGrantAlias(sandboxStub, sessionId)) === aliasBefore).toBe(true);
     expect(await wrapper.next()).toMatchObject({ type: 'session.prompt', sessionId });
   });
 

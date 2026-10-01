@@ -1,4 +1,4 @@
-import { env, reset, runInDurableObject } from 'cloudflare:test';
+import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudflare:test';
 import { generateKeyPairSync } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -16,6 +16,7 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
+import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
@@ -135,6 +136,13 @@ function readState(stub: DurableObjectStub<SandboxControlV2>) {
   return stub.getAllocationState();
 }
 
+type NotificationOwner = { notifications: ReturnType<typeof createSandboxNotificationDispatcher> };
+function notificationSnapshot(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, instance =>
+    (instance as unknown as NotificationOwner).notifications.snapshot()
+  );
+}
+
 function readRouteRow(stub: DurableObjectStub<SandboxControlV2>, sessionId: string) {
   return runInDurableObject(stub, async (_instance, state) => {
     const db = drizzle(state.storage, { logger: false });
@@ -227,6 +235,357 @@ afterEach(async () => {
 });
 
 describe('SandboxControlV2 routes and forwarding', () => {
+  it('reconstruction restores no notification backlog or replay and leaves durable route state unchanged', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise(() => undefined);
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'in-memory',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    const routeBefore = await readRouteRow(stub, SESSION);
+    const allocationBefore = await readState(stub);
+    await evictAllDurableObjects();
+    expect(await notificationSnapshot(stub)).toMatchObject({
+      pending: 0,
+      retained: 0,
+      bytes: 0,
+      active: 0,
+      lanes: 0,
+      losses: [],
+    });
+    expect(await readRouteRow(stub, SESSION)).toEqual(routeBefore);
+    expect(await readState(stub)).toEqual(allocationBefore);
+    const deliveredBeforeReconstruction = peer.outcomes.length;
+    expect(deliveredBeforeReconstruction).toBeLessThanOrEqual(1);
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => peer.forSession(sessionId);
+    });
+    await stub.status({ sessionId: SESSION });
+    expect(peer.outcomes).toHaveLength(deliveredBeforeReconstruction);
+    wrapper.close();
+  });
+
+  it('bounds flood retention while heartbeat, reconnect, alarm and physical stop bypass a held peer', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider);
+    await wrapper.next();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      )
+    );
+    let release: (() => void) | undefined;
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise<void>(resolve => {
+            release = resolve;
+          });
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    await runInDurableObject(stub, instance => {
+      const dispatcher = (instance as unknown as NotificationOwner).notifications;
+      for (let index = 0; index < 1_100; index++) {
+        dispatcher.enqueue(SESSION, {
+          kind: 'events',
+          payload: { events: [{ type: 'text', properties: { text: 'x'.repeat(20_000) } }] },
+        });
+        dispatcher.enqueue(SESSION, {
+          kind: 'route',
+          payload: { state: 'ready', attemptId: `attempt-${index}` },
+        });
+        expect(dispatcher.snapshot().retained).toBeLessThanOrEqual(1_000);
+        expect(dispatcher.snapshot().bytes).toBeLessThanOrEqual(8 * 1024 * 1024);
+      }
+    });
+    const before = await readState(stub);
+    wrapper.heartbeat(true);
+    await waitFor(
+      async () =>
+        expect((await readState(stub)).lastFrameAt).toBeGreaterThan(before.lastFrameAt ?? 0),
+      { timeout: 500 }
+    );
+    const reconnect = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    expect(await reconnect.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+      type: 'welcome',
+      protocolVersion: 2,
+    });
+    expect((await readState(stub)).kind).toBe('connected');
+    await setAllocationField(stub, { last_activity_at: Date.now() - TIMERS.idleMs - 1 });
+    await runAlarm(stub);
+    await waitFor(() => expect(provider.stopCalls).toHaveLength(1), { timeout: 500 });
+    expect((await readState(stub)).kind).toBe('stopped');
+    await releaseGate(stub, () => release?.());
+    await waitFor(async () =>
+      expect(await notificationSnapshot(stub)).toMatchObject({
+        retained: 0,
+        bytes: 0,
+        active: 0,
+        lanes: 0,
+      })
+    );
+    wrapper.close();
+    reconnect.close();
+  });
+
+  it('keeps surviving events before outcome and uses only enqueue budget through retries', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let release: (() => void) | undefined;
+    const entered: number[] = [];
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => {
+        const target = peer.forSession(sessionId);
+        return {
+          ...target,
+          onEvents: async notification => {
+            entered.push(Date.now());
+            if (entered.length === 1)
+              await new Promise<void>(resolve => {
+                release = resolve;
+              });
+            if (notification.events[0]?.properties.text === 'retry')
+              throw Object.assign(new Error('transient transport'), { retryable: true });
+            await target.onEvents(notification);
+          },
+        };
+      };
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toHaveLength(1));
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'a' } }],
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'b' } }],
+    });
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'msg-order',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(2));
+    await releaseGate(stub, () => release?.());
+    await waitFor(() => expect(peer.outcomes).toHaveLength(1));
+    expect(
+      peer.events.flatMap(entry => entry.notification.events.map(event => event.properties.text))
+    ).toEqual(['held', 'a', 'b']);
+    expect(peer.received.slice(-3).map(entry => entry.kind)).toEqual([
+      'events',
+      'events',
+      'outcome',
+    ]);
+
+    entered.length = 0;
+    release = undefined;
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toHaveLength(1));
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'retry' } }],
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    const enqueuedBy = Date.now();
+    await runInDurableObject(stub, async () => {
+      await new Promise(resolve => setTimeout(resolve, 1_850));
+      release?.();
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).retained).toBe(0), {
+      timeout: 500,
+    });
+    expect(entered.length).toBeGreaterThanOrEqual(2);
+    expect(entered.every(at => at <= enqueuedBy + 2_000)).toBe(true);
+    expect(Date.now() - enqueuedBy).toBeLessThan(2_400);
+    wrapper.close();
+  });
+
+  it('release retires queued notifications and reconstruction restores no in-memory backlog', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => ({
+        ...peer.forSession(sessionId),
+        onEvents: async () => {
+          entered = true;
+          await new Promise(() => undefined);
+        },
+      });
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    wrapper.send({
+      type: 'session.outcome',
+      sessionId: SESSION,
+      status: 'completed',
+      lastMessageId: 'discarded',
+    });
+    await waitFor(async () => expect((await notificationSnapshot(stub)).pending).toBe(1));
+    await stub.release({ sessionId: SESSION });
+    await waitFor(async () =>
+      expect(await notificationSnapshot(stub)).toMatchObject({
+        retained: 0,
+        bytes: 0,
+        active: 0,
+        lanes: 0,
+      })
+    );
+    expect(peer.outcomes).toEqual([]);
+    const before = await readState(stub);
+    await evictAllDurableObjects();
+    expect(await notificationSnapshot(stub)).toMatchObject({
+      pending: 0,
+      retained: 0,
+      bytes: 0,
+      active: 0,
+      lanes: 0,
+      losses: [],
+    });
+    expect(await readState(stub)).toEqual(before);
+    expect(await readRouteRow(stub, SESSION)).toBeNull();
+    wrapper.close();
+  });
+
+  it('accounts for wrapper events_dropped internally without forwarding a public marker', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    const before = peer.received.length;
+    wrapper.send({ type: 'events_dropped', dropped: 321 });
+    await waitFor(
+      async () => {
+        const snapshot = await notificationSnapshot(stub);
+        expect(snapshot.losses).toContainEqual({
+          cause: 'wrapper',
+          droppedCount: 321,
+          droppedBytes: 0,
+          maxQueueAgeMs: 0,
+        });
+      },
+      { timeout: 500 }
+    );
+    expect(peer.received).toHaveLength(before);
+    wrapper.close();
+  });
+
+  it('delivers a healthy sibling outcome while another session notification is held', async () => {
+    const provider = createFakeProvider();
+    const { stub, peer } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    const { wrapper } = await connectAndHello(provider);
+    await wrapper.next();
+    await stub.prepare(prepareInput(SESSION_NEXT));
+    await wrapper.next();
+    let release: (() => void) | undefined;
+    let entered = false;
+    await runInDurableObject(stub, instance => {
+      instance.sessionPeerFor = (_owner, sessionId) => {
+        const target = peer.forSession(sessionId);
+        return sessionId !== SESSION
+          ? target
+          : {
+              ...target,
+              onEvents: async notification => {
+                entered = true;
+                await new Promise<void>(resolve => {
+                  release = resolve;
+                });
+                await target.onEvents(notification);
+              },
+            };
+      };
+    });
+    wrapper.send({
+      type: 'session.events',
+      sessionId: SESSION,
+      events: [{ type: 'text', properties: { text: 'held' } }],
+    });
+    await waitFor(() => expect(entered).toBe(true));
+    try {
+      wrapper.send({ type: 'session.ready', sessionId: SESSION_NEXT });
+      wrapper.send({
+        type: 'session.outcome',
+        sessionId: SESSION_NEXT,
+        status: 'completed',
+        lastMessageId: 'msg-next',
+      });
+      await waitFor(
+        () =>
+          expect(peer.outcomes).toContainEqual(
+            expect.objectContaining({ sessionId: SESSION_NEXT })
+          ),
+        { timeout: 500 }
+      );
+      expect(peer.routeUpdatesFor(SESSION_NEXT)).toContainEqual(
+        expect.objectContaining({ state: 'ready' })
+      );
+    } finally {
+      await releaseGate(stub, () => release?.());
+      wrapper.close();
+    }
+  });
+
   it('prepares a route and forwards progress and ready notifications', async () => {
     const provider = createFakeProvider();
     const { stub, peer } = await setup(provider);
@@ -365,7 +724,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       };
       // A route row left from an earlier prepare must not survive the guard.
       const db = drizzle(state.storage, { logger: false });
-      await writeRoute(db, {
+      writeRoute(db, {
         sessionId: SESSION,
         spec: routeSpec(SESSION),
         grant: null,

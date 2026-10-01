@@ -13,6 +13,7 @@ import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
+import { ProviderCreationError } from './provider.js';
 import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
@@ -103,7 +104,7 @@ export function createVercelProviderAdapter(deps: {
   const config = deps.config;
   if (!config) {
     const unavailable = async (): Promise<never> => {
-      throw new Error('Vercel sandbox runtime configuration is unavailable');
+      throw new ProviderCreationError('invalid_configuration');
     };
     return {
       resumable: false,
@@ -162,23 +163,33 @@ export function createVercelProviderAdapter(deps: {
     destroysOnStop: false,
     ensureBillingAdmission,
     async create(intent: ProviderCreateIntent) {
-      const created = await restClient.createSandbox({
-        name: intent.allocationName ?? deps.sandboxName,
-        operationId: intent.intentId,
-        runtimeBuildId: config.runtimeBuildId,
-        snapshotId: config.snapshotId,
-        runtime: config.runtime,
-        timeoutMs: config.initialTimeoutMs,
-        ...(config.resources === undefined ? {} : { resources: config.resources }),
-        ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
-      });
+      const created = await restClient
+        .createSandbox({
+          name: intent.allocationName ?? deps.sandboxName,
+          operationId: intent.intentId,
+          runtimeBuildId: config.runtimeBuildId,
+          snapshotId: config.snapshotId,
+          runtime: config.runtime,
+          timeoutMs: config.initialTimeoutMs,
+          ...(config.resources === undefined ? {} : { resources: config.resources }),
+          ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
+        })
+        .catch((error: unknown) => {
+          if (
+            error instanceof VercelSandboxRestError &&
+            (error.kind === 'invalid_configuration' || error.kind === 'invalid_request')
+          ) {
+            throw new ProviderCreationError('invalid_configuration');
+          }
+          throw error;
+        });
       const providerRef = encodeVercelProviderRef(created.runtime);
       await recordBillingLifetime(providerRef, created.session);
       return { providerRef };
     },
     async launch(ref, env) {
       const parsed = decodeOwnedProviderRef(ref);
-      if (!parsed) throw new Error('Invalid Vercel sandbox allocation');
+      if (!parsed) throw new ProviderCreationError('invalid_configuration');
       await restClient.executeCommand(parsed.sessionId, {
         command: 'sh',
         args: ['-lc', `exec ${CONTROL_SUPERVISOR_PATH}`],

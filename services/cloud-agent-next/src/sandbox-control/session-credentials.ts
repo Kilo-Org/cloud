@@ -87,7 +87,6 @@ const targetsSchema = z
 const runtimeProxySchema = z
   .object({
     targets: targetsSchema,
-    /** Exact root capabilities substituted only by the Vercel policy. */
     members: z
       .array(
         memberSchema.extend({
@@ -228,12 +227,12 @@ export const sessionCredentialGrantSchema = z
     }
     if (grant.containmentEnabled === false) {
       if (
-        grant.kilo.alias !== undefined ||
-        grant.kilo.runtimeProxy !== undefined ||
+        (grant.kilo.alias !== undefined && grant.kilo.runtimeProxy === undefined) ||
         Object.keys(grant.kilo.capabilities).length > 0
       )
         reject();
-    } else {
+    }
+    if (grant.containmentEnabled !== false || grant.kilo.runtimeProxy !== undefined) {
       const kiloAlias = grant.kilo.alias && parseControlPlaneCredential(grant.kilo.alias);
       if (!kiloAlias || kiloAlias.sandboxId !== grant.sandboxId || kiloAlias.purpose !== 'kilo') {
         reject();
@@ -259,6 +258,25 @@ export const sessionCredentialGrantSchema = z
         !grant.members.some(member => member.sessionId === sessionId) ||
         !capability.credential.startsWith('kka1.') ||
         !providerUsesOutboundCredentialProxy(grant.provider)
+      ) {
+        reject();
+      }
+    }
+    if (grant.kilo.runtimeProxy) {
+      const members = grant.kilo.runtimeProxy.members;
+      if (
+        !deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets) ||
+        Object.keys(grant.kilo.capabilities).length > 0 ||
+        new Set(members.map(member => member.sessionId)).size !== members.length ||
+        new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
+        members.some(
+          member =>
+            !grant.members.some(
+              expected =>
+                expected.sessionId === member.sessionId &&
+                expected.kiloSessionId === member.kiloSessionId
+            )
+        )
       ) {
         reject();
       }
@@ -293,25 +311,6 @@ export const sessionCredentialGrantSchema = z
         grant.scm.gitlab
       ) {
         reject();
-      }
-      if (grant.kilo.runtimeProxy) {
-        const targets = deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets);
-        const members = grant.kilo.runtimeProxy.members;
-        if (
-          !targets ||
-          new Set(members.map(member => member.sessionId)).size !== members.length ||
-          new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
-          members.some(
-            member =>
-              !grant.members.some(
-                expected =>
-                  expected.sessionId === member.sessionId &&
-                  expected.kiloSessionId === member.kiloSessionId
-              )
-          )
-        ) {
-          reject();
-        }
       }
     } else {
       const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
@@ -598,7 +597,8 @@ async function refreshScmCapability(
   env: CredentialEnv,
   grant: SessionCredentialGrant,
   outboundContainerId: string,
-  now: number
+  now: number,
+  refresh = false
 ): Promise<SessionCredentialGrant> {
   const repository = grant.repository;
   if (!repository || repository.type === 'git') return grant;
@@ -613,7 +613,8 @@ async function refreshScmCapability(
     });
     if (!authorized.success) throw new Error('GitHub credential is unavailable');
   }
-  if (isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now)) return grant;
+  if (!refresh && isCapabilityCurrent(grant.scm?.capability, outboundContainerId, now))
+    return grant;
   const common = {
     userId: grant.userId,
     ...(grant.orgId ? { orgId: grant.orgId } : {}),
@@ -748,7 +749,10 @@ function preparedPayload(input: {
   // token. The emitted `git` comes only from the issued grant below (B3 review 2, N3).
   const { git: _inputGit, ...payloadWithoutGit } = payload;
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken = contained ? grant.kilo.alias : grant.kilo.token;
+  const kiloToken =
+    contained || grant.kilo.runtimeProxy
+      ? (grant.kilo.alias ?? invalidCredentials())
+      : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   const replacements: Array<[string, string]> = [[grant.kilo.token, kiloToken]];
   replacements.push([input.nativeKiloToken, kiloToken]);
@@ -936,7 +940,7 @@ function repositoryTokenOf(
  * token, so the V2 Sandbox DO derives the same flag from the credential source
  * without needing session metadata.
  */
-function kiloTokenHasRuntimeAuthorization(token: string): boolean {
+export function kiloTokenHasRuntimeAuthorization(token: string): boolean {
   const decoded = jwt.decode(token);
   return (
     typeof decoded === 'object' &&
@@ -945,6 +949,23 @@ function kiloTokenHasRuntimeAuthorization(token: string): boolean {
     typeof decoded.runtimeAuthorization === 'object' &&
     decoded.runtimeAuthorization !== null
   );
+}
+
+function sameKiloBackingAuthorization(first: string, second: string): boolean {
+  if (first === second) return true;
+  const authorization = (token: string) => {
+    const decoded = jwt.decode(token);
+    if (decoded === null || typeof decoded !== 'object') return null;
+    return JSON.stringify(
+      Object.fromEntries(
+        Object.entries(decoded)
+          .filter(([key]) => key !== 'iat' && key !== 'exp')
+          .sort(([a], [b]) => a.localeCompare(b))
+      )
+    );
+  };
+  const firstAuthorization = authorization(first);
+  return firstAuthorization !== null && firstAuthorization === authorization(second);
 }
 
 /**
@@ -967,11 +988,7 @@ export type CredentialGrantPreparation = {
   outboundContainerId?: string;
   /** Grant duration; V2 passes the named `credentialGrantMs` timer. */
   leaseMs?: number;
-  /**
-   * Runtime-proxy members to carry into a re-issued grant. Re-issue rotates the
-   * aliases, so the caller passes the prior grant's bound handles explicitly.
-   */
-  runtimeProxyMembers?: ReadonlyArray<{ sessionId: string; kiloSessionId: string; handle: string }>;
+  refreshBacking?: boolean;
   existing?: SessionCredentialGrant;
   now?: number;
 };
@@ -1036,21 +1053,21 @@ export async function prepareCredentialGrant(
     invalidCredentials();
   }
   const modernRuntimeAuthorization = kiloTokenHasRuntimeAuthorization(token.data);
-  const modernRuntimeProxy =
-    provider === 'vercel' && containmentEnabled && modernRuntimeAuthorization
-      ? runtimeProxyTargets(env)
-      : null;
   if (
-    provider === 'vercel' &&
-    containmentEnabled &&
-    modernRuntimeAuthorization &&
-    !modernRuntimeProxy
-  ) {
+    existing &&
+    ((existing.kilo.runtimeProxy !== undefined) !== modernRuntimeAuthorization ||
+      (!modernRuntimeAuthorization &&
+        !sameKiloBackingAuthorization(existing.kilo.token, token.data)))
+  )
+    invalidCredentials();
+  const modernRuntimeProxy = modernRuntimeAuthorization ? runtimeProxyTargets(env) : null;
+  if (modernRuntimeAuthorization && !modernRuntimeProxy) {
     invalidCredentials();
   }
-  const kiloToken = containmentEnabled
-    ? token.data
-    : await selectDirectKiloToken(env, token.data, existing, now);
+  const kiloToken =
+    containmentEnabled || modernRuntimeProxy
+      ? token.data
+      : await selectDirectKiloToken(env, token.data, existing, now);
   let grant: SessionCredentialGrant = {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
@@ -1066,7 +1083,7 @@ export async function prepareCredentialGrant(
       : [...members, member.data],
     ...(repository ? { repository } : {}),
     kilo: {
-      ...(containmentEnabled
+      ...(containmentEnabled || modernRuntimeProxy
         ? { alias: existing?.kilo.alias ?? createControlPlaneCredential(sandboxId, 'kilo') }
         : {}),
       token: kiloToken,
@@ -1083,13 +1100,14 @@ export async function prepareCredentialGrant(
         ? {
             runtimeProxy: {
               targets: modernRuntimeProxy,
-              members: existing?.kilo.runtimeProxy?.members ?? [
-                ...(input.runtimeProxyMembers ?? []),
-              ],
+              members: existing?.kilo.runtimeProxy?.members ?? [],
             },
           }
         : {}),
-      capabilities: existing?.kilo.token === kiloToken ? existing.kilo.capabilities : {},
+      capabilities:
+        !input.refreshBacking && !modernRuntimeProxy && existing?.kilo.token === kiloToken
+          ? existing.kilo.capabilities
+          : {},
     },
     ...(existing?.scm ? { scm: existing.scm } : {}),
     preparedAt: now,
@@ -1103,8 +1121,9 @@ export async function prepareCredentialGrant(
   } else if (providerUsesOutboundCredentialProxy(provider)) {
     const outboundContainerId = input.outboundContainerId;
     if (!outboundContainerId) invalidCredentials();
-    grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
-    grant = await refreshScmCapability(env, grant, outboundContainerId, now);
+    if (!modernRuntimeProxy)
+      grant = await refreshKiloCapability(env, grant, member.data, outboundContainerId, now);
+    grant = await refreshScmCapability(env, grant, outboundContainerId, now, input.refreshBacking);
   } else if (repository?.type === 'github') {
     let nativeToken = repositoryToken;
     let author: { name: string; email: string } | undefined;
@@ -1314,7 +1333,10 @@ export function sessionCredentialsPayloadFromGrant(
   };
 } {
   const contained = isContainedSessionCredentialGrant(grant);
-  const kiloToken = contained ? grant.kilo.alias : grant.kilo.token;
+  const kiloToken =
+    contained || grant.kilo.runtimeProxy
+      ? (grant.kilo.alias ?? invalidCredentials())
+      : grant.kilo.token;
   const scmToken = contained ? grant.scm?.alias : grant.scm?.nativeToken;
   // The runtime credential proxy facade and the per-session handle (minted by
   // the Session DO and bound to the route grant) are projected here, never into
@@ -1459,6 +1481,7 @@ export async function resolveSessionCredential(input: {
       grant = await refreshScmCapability(input.env, grant, input.outboundContainerId, now);
       return grant.scm?.capability ? { grant, credential: grant.scm.capability.credential } : null;
     }
+    if (grant.kilo.runtimeProxy) return null;
     if (!Object.values(grant.kilo.targets).some(target => new URL(target).origin === url.origin)) {
       return null;
     }

@@ -14,11 +14,14 @@ export type ControlPlaneTimers = {
   session: {
     queuedBackstopMs: number;
     acceptedBackstopMs: number;
+    sandboxRpcDeadlineMs: number;
+    transportRecoveryMs: number;
   };
   sandbox: {
     providerCreateMs: number;
     providerCreateRetryMs: number;
     wrapperFirstConnectMs: number;
+    wrapperHelloMs: number;
     heartbeatMs: number;
     reconnectMs: number;
     routePreparationMs: number;
@@ -65,6 +68,7 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerCreateMs: 2 * MINUTE_MS,
     providerCreateRetryMs: 10_000,
     wrapperFirstConnectMs: 5 * MINUTE_MS,
+    wrapperHelloMs: 30_000,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(5 * MINUTE_MS),
     routePreparationMs: 12 * MINUTE_MS,
@@ -104,6 +108,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   };
   return {
     session: {
+      sandboxRpcDeadlineMs: 2_000,
+      transportRecoveryMs: ms(15_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
       acceptedBackstopMs: wrapper.turnHardCapMs + ACCEPTED_BACKSTOP_MARGIN_MS,

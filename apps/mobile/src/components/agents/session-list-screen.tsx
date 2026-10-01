@@ -218,19 +218,18 @@ export function AgentSessionListScreen() {
   // slot while the row can still hold a readable 30px title: the heading keeps
   // `min-w-0 flex-1`, so the title tail-ellipsizes and the controls keep their
   // full width instead of the old `headerRight` half-row cap wrapping them. The
-  // row is a section header, not a bare action — its label owns the row start
-  // and grows, so the controls keep the row end, the same shape the Home
-  // live-sessions header uses (a row holding only the trailing 'See all' read as
-  // a section header whose label was missing). It reflows onto its own full-width
-  // row when the labels cannot share the title's row: the Croatian catalog made
-  // the row as wide as the title's readable minimum, so `Agenti` broke mid-word
-  // into "Age" / "nti" (owner capture, agents-header-hr-20260929). The estimate
-  // below reserves the row's laid-out width for that decision; on its own row the
+  // row holds only the two trailing controls — the history link and the filter
+  // button — packed to the row end, so the live count beside the title is the
+  // row's only label and nothing sits between the title and the controls. It
+  // reflows onto its own full-width row when the controls cannot share the
+  // title's row: the Croatian catalog made the row as wide as the title's
+  // readable minimum on a narrow phone, so `Agenti` broke mid-word into
+  // "Age" / "nti" (owner capture, agents-header-hr-20260929). The estimate below
+  // reserves the row's laid-out width for that decision; on its own row the
   // controls keep the header's full width at every display size, and the box can
-  // shrink so an extreme accessibility scale ellipsizes the label instead of
+  // shrink so an extreme accessibility scale ellipsizes the link instead of
   // wrapping it to a second line.
   const inlineActionsWidth = estimateSessionListHeaderActionsWidth({
-    sectionLabel: t('home.agentSessions'),
     historyLabel,
     showFilter: query.canFilter,
     fontScale,
@@ -272,7 +271,6 @@ export function AgentSessionListScreen() {
   const viewHistoryAction = historyControl(viewHistoryLabel);
   const headerActions = (
     <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
-      <Eyebrow className="min-w-0 grow">{t('home.agentSessions')}</Eyebrow>
       {historyControl(historyLabel)}
       {query.canFilter ? (
         <SessionFilterButton
@@ -505,11 +503,10 @@ export function AgentSessionListScreen() {
           size="large"
           showBackButton={false}
           className="px-[22px] pb-1"
-          // An accepted empty live list must not advertise a live section: the
-          // `Live now` label names sessions that do not exist. The whole row is
-          // withheld, so the accepted-empty state renders no live-sessions row
-          // at all, and the body below carries the history route instead
-          // (`LiveSessionListEmptyState`'s `historyAction`). Rows, pending, and
+          // An accepted empty live list carries the history route in its body
+          // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
+          // is withheld there: the empty state renders exactly one history
+          // control instead of a duplicate in the header. Rows, pending, and
           // error keep the full row byte-identical, and the search/filter
           // no-match body is a `rows` state
           // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.

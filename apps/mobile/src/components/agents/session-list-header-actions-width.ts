@@ -9,11 +9,9 @@ const HEADER_MONO_ADVANCE_EM = 0.6;
  * scripts the catalogs cover (and merely over-counts accented Latin).
  */
 const HEADER_WIDE_ADVANCE_EM = 1;
-/** The section label is the `Eyebrow` variant's `text-[10px]`. */
-const HEADER_SECTION_LABEL_FONT_SIZE = 10;
-/** The history link overrides the variant to `text-[11px]`. */
+/** The history link overrides the `Eyebrow` variant to `text-[11px]`. */
 const HEADER_HISTORY_LABEL_FONT_SIZE = 11;
-/** The labels' `tracking-[1.5px]`. `Text` draws it for Latin copy in either
+/** The label's `tracking-[1.5px]`. `Text` draws it for Latin copy in either
  * direction and resets it for the scripts it cannot hold (see
  * {@link headerLabelTracking}), so it is applied per label. */
 const HEADER_LABEL_TRACKING = 1.5;
@@ -60,12 +58,13 @@ function headerLabelWidth(params: {
  * `shouldStackHeaderActions`): when the 30px title cannot keep its readable
  * minimum beside the row, the row drops beneath the title instead of squeezing
  * it into a mid-word break — the Croatian capture rendered "Agenti" as
- * "Age" / "nti" beside the section label, history link, and filter button.
+ * "Age" / "nti" beside the history link and the filter button on a narrow
+ * phone.
  *
- * The row is the section label, the history link, and (when the list can be
- * filtered) the 36dp filter button, `gap-4` apart. The label widths are an
- * upper bound, so the row reflows a hair early rather than leaving the title
- * squeezed; the estimate scales with the system font because the labels do.
+ * The row holds the history link and (when the list can be filtered) the 36dp
+ * filter button, `gap-4` apart. The label width is an upper bound, so the row
+ * reflows a hair early rather than leaving the title squeezed; the estimate
+ * scales with the system font because the label does.
  *
  * Kept apart from `session-list-helpers.ts`: this module reaches
  * `@/lib/rtl-text`, which imports `react-native`, while `session-list-helpers`
@@ -73,20 +72,13 @@ function headerLabelWidth(params: {
  * modules (see `start-agent-runtime.ts`).
  */
 export function estimateSessionListHeaderActionsWidth(params: {
-  sectionLabel: string;
   historyLabel: string;
   showFilter: boolean;
   fontScale?: number;
   isRTL?: boolean;
 }): number {
-  const { sectionLabel, historyLabel, showFilter, fontScale = 1, isRTL = false } = params;
+  const { historyLabel, showFilter, fontScale = 1, isRTL = false } = params;
   const segments = [
-    headerLabelWidth({
-      label: sectionLabel,
-      fontSize: HEADER_SECTION_LABEL_FONT_SIZE,
-      fontScale,
-      tracking: headerLabelTracking(sectionLabel, isRTL),
-    }),
     headerLabelWidth({
       label: historyLabel,
       fontSize: HEADER_HISTORY_LABEL_FONT_SIZE,

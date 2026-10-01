@@ -394,19 +394,11 @@ function headerRowChildren() {
   const children = inlineActions.props.children;
   return Array.isArray(children) ? children : [children];
 }
-/** The row's controls, in order: the section label leads the row and is not one. */
+/** The row's controls, in order: the history link, then the filter button. */
 function headerActions() {
   return headerRowChildren().filter(
     (child): child is HeaderElement => child !== null && typeof child.props.testID === 'string'
   );
-}
-/** The section label that owns the row start (see `headerActions`). */
-function headerRowLabel() {
-  const label = headerRowChildren()[0];
-  if (!label) {
-    throw new Error('Missing header row label');
-  }
-  return label as unknown as { props: { className: string; children: string } };
 }
 function headerAction(testID = 'agents-view-history') {
   const fromRow = headerActions().find(child => child.props.testID === testID);
@@ -629,10 +621,9 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(surface.props.bottomInset).toBe(expectedInset);
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     if (test.empty) {
-      // An accepted empty live list advertises no live section — the `Live now`
-      // label names sessions that do not exist — so the whole header row is
-      // withheld and the body carries the history route instead.
-      expect(text()).not.toContain(i18n.t('home.agentSessions'));
+      // An accepted empty live list carries the history route in its body, so
+      // the controls row is withheld there and the empty state draws exactly one
+      // history control instead of a duplicate in the header.
       expect(header().props.inlineActions).toBeUndefined();
       // The accepted-empty snapshot names no live sessions, so the count is
       // withheld exactly as the tab badge hides at zero.
@@ -651,11 +642,10 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
-  it('an accepted empty live list withholds the live label but keeps the history route', async () => {
+  it('an accepted empty live list withholds the controls row but keeps the history route', async () => {
     await renderScreen();
-    // No live section to name, so the `Live now` label is withheld and the whole
-    // header row is gone: the empty list advertises no live-sessions row at all.
-    expect(text()).not.toContain(i18n.t('home.agentSessions'));
+    // The body carries the history route there, so the header withholds its
+    // controls row: the empty list draws no live-sessions row at all.
     expect(header().props.inlineActions).toBeUndefined();
     // The accepted-empty snapshot withholds the count as well: the count
     // names live sessions, and there are none.
@@ -1444,13 +1434,13 @@ describe('AgentSessionListScreen header and admission', () => {
 
   it('reflows the live controls under the title on a phone that cannot hold them beside it', async () => {
     state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
-    state.windowWidth = 390;
+    state.windowWidth = 320;
     await renderScreen();
     // The screen declares the controls row's laid-out width, which ScreenHeader
-    // reserves before deciding to reflow: on a phone the Croatian row would
-    // leave the 30px title 1dp and break "Agenti" mid-word (owner capture,
-    // agents-header-hr-20260929).
-    expect(header().props.inlineActionsWidth).toBeGreaterThan(214);
+    // reserves before deciding to reflow: on the narrowest phone the row would
+    // leave the 30px title below its readable minimum and break "Agenti"
+    // mid-word (owner capture, agents-header-hr-20260929).
+    expect(header().props.inlineActionsWidth).toBeGreaterThan(144);
     const history = action(i18n.t('agents.sessionList.pastSessions'));
     const actionsRow = history.parent;
     const stackedRow = actionsRow?.parent;
@@ -1847,21 +1837,22 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(header().props.eyebrow).toBe('2 LIVE');
   });
 
-  it('leads the controls row with the section label so section headers share one alignment', async () => {
-    state.live.activeSessions = [row];
+  it('packs the controls to the row end with no label between them and the title', async () => {
+    state.live.activeSessions = [{ ...row, gitUrl: 'https://github.com/kilo/cloud.git' }];
     await renderScreen();
 
-    const label = headerRowLabel();
-    // The label owns the row start and grows, so the controls keep the row end —
-    // the Home live-sessions header's shape. A row holding only the trailing
-    // 'See all' read as a section header whose label was missing (e2, agents).
+    // The row holds the history link and the filter button only, packed to the
+    // row end: the live count beside the title is the header's one label, so
+    // nothing sits between the title and the controls.
     expect(headerRow().props.className).toContain('justify-end');
-    expect(label.props.className).toContain('grow');
-    expect(label.props.children).toBe(i18n.t('home.agentSessions'));
-    expect(headerActions().map(control => control.props.testID)).toEqual(['agents-view-history']);
+    expect(headerActions().map(control => control.props.testID)).toEqual([
+      'agents-view-history',
+      'agents-open-filters',
+    ]);
+    expect(text()).not.toContain(i18n.t('home.agentSessions'));
   });
 
-  it('keeps the header right to See-all alone while nothing is filterable', async () => {
+  it('keeps the controls row to the history link while nothing is filterable', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
 

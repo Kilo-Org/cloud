@@ -9,18 +9,25 @@ import { estimateSessionListHeaderActionsWidth } from './session-list-header-act
 vi.mock('react-native', () => ({ I18nManager: { isRTL: false } }));
 
 describe('estimateSessionListHeaderActionsWidth', () => {
-  const english = { sectionLabel: 'LIVE NOW', historyLabel: 'PAST SESSIONS', showFilter: true };
-  const croatian = {
-    sectionLabel: 'TRENUTAČNO AKTIVNO',
-    historyLabel: 'PRETHODNE SESIJE',
-    showFilter: true,
-  };
+  const english = { historyLabel: 'PAST SESSIONS', showFilter: true };
+  const croatian = { historyLabel: 'PRETHODNE SESIJE', showFilter: true };
 
-  it('reserves enough width for the Croatian Agents row to reflow on a phone', () => {
-    // `shouldStackHeaderActions` reserves this against the 44dp gutter and the
-    // 12dp heading gap: 390 - 44 - 12 - estimate < 120 drops the row beneath the
-    // title instead of breaking "Agenti" mid-word (agents-header-hr-20260929).
-    expect(estimateSessionListHeaderActionsWidth(croatian)).toBeGreaterThan(214);
+  it('reflows the Croatian controls row on the narrowest phone', () => {
+    // 320dp is the narrowest supported phone width, and
+    // `shouldStackHeaderActions` drops the row beneath the title when
+    // `width - 44dp gutter - 12dp heading gap - estimate` falls under the 120dp
+    // readable title minimum. The Croatian history link plus the filter button
+    // must leave the 30px title below it there, so the row reflows instead of
+    // breaking "Agenti" mid-word (agents-header-hr-20260929).
+    expect(320 - 44 - 12 - estimateSessionListHeaderActionsWidth(croatian)).toBeLessThan(120);
+  });
+
+  it('keeps the English controls row beside the title on a common phone', () => {
+    // The row holds two controls, so the shorter English catalog shares the
+    // title's row at 390dp instead of reflowing a row that fits.
+    expect(390 - 44 - 12 - estimateSessionListHeaderActionsWidth(english)).toBeGreaterThanOrEqual(
+      120
+    );
   });
 
   it('grows with a longer catalog and with the system font scale', () => {
@@ -41,9 +48,9 @@ describe('estimateSessionListHeaderActionsWidth', () => {
 
   it('drops the letterspacing the RTL display treatment drops, per label script', () => {
     // `Text` resets tracking for RTL-script copy in an RTL interface, so a
-    // Hebrew section label narrows the estimate there; the Latin history label
-    // keeps its tracking in either direction (see the next case).
-    const hebrew = { sectionLabel: 'סוכנים', historyLabel: 'PAST SESSIONS', showFilter: true };
+    // Hebrew history link narrows the estimate there; the Latin link keeps its
+    // tracking in either direction (see the next case).
+    const hebrew = { historyLabel: 'היסטוריה', showFilter: true };
     expect(estimateSessionListHeaderActionsWidth({ ...hebrew, isRTL: true })).toBeLessThan(
       estimateSessionListHeaderActionsWidth(hebrew)
     );
@@ -59,7 +66,7 @@ describe('estimateSessionListHeaderActionsWidth', () => {
   });
 
   it('drops the letterspacing for a joined script in either direction', () => {
-    const joined = { sectionLabel: 'الجلسات', historyLabel: 'الجلسات', showFilter: true };
+    const joined = { historyLabel: 'الجلسات', showFilter: true };
     expect(estimateSessionListHeaderActionsWidth(joined)).toBe(
       estimateSessionListHeaderActionsWidth({ ...joined, isRTL: true })
     );

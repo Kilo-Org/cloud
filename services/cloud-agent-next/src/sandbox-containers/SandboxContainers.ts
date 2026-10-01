@@ -12,7 +12,7 @@ import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
-import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { DEADLINE_MS, leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import {
   ContainersBilling,
@@ -37,6 +37,11 @@ export type ContainersLaunchInput = {
   env: Record<string, string>;
   instance: ContainerInstanceSize;
   containment?: boolean;
+  /**
+   * The managed outbound identity contained credentials are bound to. It is
+   * the logical sandbox's, not this per-allocation container's id.
+   */
+  outboundContainerId?: string;
 };
 
 export type ContainersObservation = {
@@ -79,6 +84,10 @@ type DelayedSchedule<T> = {
 };
 
 const RECORD_KEY = 'containers:record:v1';
+/** Scheduler callback that destroys a container whose lease lapsed unrenewed. */
+const LEASE_EXPIRY_CALLBACK = 'leaseExpired';
+/** Grace after a lapsed lease before the orphan backstop destroys the container. */
+const LEASE_EXPIRY_MARGIN_MS = 60_000;
 const CONTAINER_IMAGE = 'app';
 
 function containedProcessEnv(env: Record<string, string>): Record<string, string> {
@@ -153,6 +162,12 @@ function stopPath(
   return result;
 }
 
+function readLeaseExpiryRef(payload: unknown): string | null {
+  if (typeof payload !== 'object' || payload === null) return null;
+  const ref = (payload as { allocationRef?: unknown }).allocationRef;
+  return typeof ref === 'string' && ref.length > 0 ? ref : null;
+}
+
 export class SandboxContainers extends DurableObject<Env> {
   private queue: Promise<unknown> = Promise.resolve();
   private billing: ContainersBilling | undefined;
@@ -208,7 +223,8 @@ export class SandboxContainers extends DurableObject<Env> {
           ref,
           input.env,
           input.instance,
-          input.containment === true
+          input.containment === true,
+          input.outboundContainerId
         );
       }
       if (phase === 'exec_pending' || phase === 'missing') {
@@ -216,7 +232,8 @@ export class SandboxContainers extends DurableObject<Env> {
           stored,
           ref,
           input.containment === true,
-          phase === 'missing'
+          phase === 'missing',
+          input.outboundContainerId
         );
       }
       throw new Error('Container wrapper attempt phase is unknown');
@@ -236,7 +253,9 @@ export class SandboxContainers extends DurableObject<Env> {
     // Persist the accepted physical instance before any early return or physical
     // operation, so a resumed launch whose exec fails still records its size.
     const record = await this.installLaunchInstance(stored, input.instance);
-    if (input.containment) await this.installContainmentProxy(container);
+    if (input.containment) {
+      await this.installContainmentProxy(container, input.outboundContainerId);
+    }
     // Ownership is retained before start: an ambiguous start that takes effect must not release the allocation.
     await this.writeRecord({
       ...record,
@@ -245,6 +264,8 @@ export class SandboxContainers extends DurableObject<Env> {
       stopOpId: null,
       wrapperAttempt: 'not_started',
     });
+    // Bound the container even if the launch fails before its owner sets a lease.
+    await this.scheduleLeaseExpiry(ref, leaseAtLeastMs());
     await this.startContainerAndActivateBilling(
       container,
       record,
@@ -308,6 +329,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // re-dispatch it with its original generation.
     const due = await scheduler.dueSchedules();
     await this.ensureBillingForPersistedRecord();
+    await this.ensureLeaseExpiryScheduled();
     let failure: unknown;
     for (const entry of due) {
       const callback = (
@@ -347,9 +369,14 @@ export class SandboxContainers extends DurableObject<Env> {
       };
     }
     const billing = this.billingForRecord(prepared.record);
-    return billing
-      ? billing.ensureBillingAdmission(input)
-      : unavailableContainersBillingAdmission(input);
+    if (!billing) return unavailableContainersBillingAdmission(input);
+    const admission = await billing.ensureBillingAdmission(input);
+    // Admission can leave a generation open before any launch, also after an
+    // uncertain meter answer; bound it in case no launch or stop follows.
+    if (prepared.record.allocationRef === null && (await billing.hasUnsettledGeneration())) {
+      await this.scheduleLeaseExpiry(null, leaseAtLeastMs());
+    }
+    return admission;
   }
 
   async isBillingBlocked(): Promise<boolean> {
@@ -386,7 +413,10 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.runExclusive(async () => {
       const ref = allocationRef;
       const record = await this.readRecord();
-      if (record.allocationRef === null) return stopPath('no_allocation', 'terminal');
+      if (record.allocationRef === null) {
+        await this.settleUnlaunchedBilling(record);
+        return stopPath('no_allocation', 'terminal');
+      }
       if (record.allocationRef !== ref && record.state !== 'stopping') {
         return stopPath('other_allocation', 'terminal');
       }
@@ -415,6 +445,29 @@ export class SandboxContainers extends DurableObject<Env> {
       CONTAINER_CALL_TIMEOUT_MS,
       'container lease update timed out'
     );
+    await this.scheduleLeaseExpiry(allocationRef, ms);
+  }
+
+  /**
+   * Scheduler callback, the orphan backstop: the owner renews the lease while
+   * the allocation is active and stops it otherwise, so a lease that lapsed
+   * unrenewed means nobody owns this container any more. The scheduler alarm
+   * may keep this DO active, so the native inactivity timeout alone cannot be
+   * trusted to stop it.
+   */
+  async leaseExpired(payload?: unknown): Promise<void> {
+    const record = await this.readRecord();
+    if (record.allocationRef === null) {
+      await this.settleUnlaunchedBilling(record);
+      return;
+    }
+    if (readLeaseExpiryRef(payload) !== record.allocationRef) return;
+    const ref = record.allocationRef;
+    logControlDiagnostic('container_lease_expired', { state: record.state }, 'warn');
+    // Throwing keeps the entry for the alarm retry; the platform bounds those retries.
+    if ((await this.stop(ref)) === 'retryable') {
+      throw new Error('Container lease expiry stop remained retryable');
+    }
   }
 
   async readLog(allocationRef: string, path: string, maxBytes: number): Promise<string> {
@@ -454,10 +507,11 @@ export class SandboxContainers extends DurableObject<Env> {
     ref: string,
     env: Record<string, string>,
     instance: ContainerInstanceSize,
-    containment: boolean
+    containment: boolean,
+    outboundContainerId: string | undefined
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
-    if (containment) await this.installContainmentProxy(container);
+    if (containment) await this.installContainmentProxy(container, outboundContainerId);
     // A stopped container is started and metered before the probe. An already
     // running container is probed first, and billing is activated by outcome.
     if (!container.running) {
@@ -492,13 +546,14 @@ export class SandboxContainers extends DurableObject<Env> {
     stored: ContainersRecord,
     ref: string,
     containment: boolean,
-    stampLegacy: boolean
+    stampLegacy: boolean,
+    outboundContainerId: string | undefined
   ): Promise<{ started: boolean }> {
     const container = this.requiredContainer();
     if (container.running !== true) {
       throw new Error('Container wrapper start is pending and the container is not running');
     }
-    if (containment) await this.installContainmentProxy(container);
+    if (containment) await this.installContainmentProxy(container, outboundContainerId);
     const probe = await this.probeWrapper(container);
     await this.activateBillingIfRunning(container, stored);
     if (probe === 'found') {
@@ -693,9 +748,13 @@ export class SandboxContainers extends DurableObject<Env> {
     }
   }
 
-  private async installContainmentProxy(container: Container): Promise<void> {
+  private async installContainmentProxy(
+    container: Container,
+    outboundContainerId: string | undefined
+  ): Promise<void> {
     const outbound = this.ctx.exports.ContainersOutbound;
-    const worker = outbound({ props: { containerId: this.ctx.id.toString() } });
+    const containerId = outboundContainerId ?? this.ctx.id.toString();
+    const worker = outbound({ props: { containerId } });
     await container.interceptOutboundHttps('*', worker);
     await container.interceptAllOutboundHttp(worker);
   }
@@ -763,6 +822,41 @@ export class SandboxContainers extends DurableObject<Env> {
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
+  /**
+   * Replace the lease check: it fires `ms` plus a margin after this renewal.
+   * A check without a ref covers a generation admitted before any launch.
+   */
+  private async scheduleLeaseExpiry(allocationRef: string | null, ms: number): Promise<void> {
+    await this.billingScheduler().schedule(
+      (ms + LEASE_EXPIRY_MARGIN_MS) / 1_000,
+      LEASE_EXPIRY_CALLBACK,
+      allocationRef === null ? {} : { allocationRef }
+    );
+  }
+
+  /**
+   * Admission opens a billing generation before the launch. A container DO
+   * whose allocation was abandoned before launching settles it here, so no
+   * interval stays open; a running container settles through its own stop.
+   */
+  private async settleUnlaunchedBilling(record: ContainersRecord): Promise<void> {
+    if (this.ctx.container?.running === true) return;
+    const billing = this.billingForRecord(record);
+    if (!billing || !(await billing.hasUnsettledGeneration())) return;
+    await billing.initiateSettlement();
+  }
+
+  /**
+   * A running container owned by a ref but without a lease check predates the
+   * backstop (a stuck shared container); give it the default lease from now.
+   */
+  private async ensureLeaseExpiryScheduled(): Promise<void> {
+    if (this.ctx.container?.running !== true) return;
+    const record = await this.readRecord();
+    if (record.allocationRef === null) return;
+    if (await this.billingScheduler().isScheduled(LEASE_EXPIRY_CALLBACK)) return;
+    await this.scheduleLeaseExpiry(record.allocationRef, leaseAtLeastMs());
+  }
   private billingScheduler(): ContainersBillingScheduler {
     if (this.schedules === undefined) {
       this.schedules = new ContainersBillingScheduler({

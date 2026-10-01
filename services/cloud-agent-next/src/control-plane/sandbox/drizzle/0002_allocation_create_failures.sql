@@ -1,0 +1,1 @@
+ALTER TABLE `allocation` ADD `create_failures` integer DEFAULT 0 NOT NULL;

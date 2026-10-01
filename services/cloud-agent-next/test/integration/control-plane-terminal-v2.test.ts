@@ -82,6 +82,7 @@ function createFakeProvider(): FakeProvider {
     resumable: false,
     persistentWorkspace: false,
     destroysOnStop: true,
+    allocationScopedStop: false,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };

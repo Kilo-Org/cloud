@@ -112,6 +112,11 @@ export type ProviderAdapter = {
   readonly persistentWorkspace: boolean;
   /** `stop` destroys the container rather than only stopping it. */
   readonly destroysOnStop: boolean;
+  /**
+   * `stop(ref)` reaches only that ref's allocation, so an abandoned ref can be
+   * stopped while a replacement allocation is created or running.
+   */
+  readonly allocationScopedStop: boolean;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
   launch(ref: string, env: Record<string, string>): Promise<void>;
@@ -144,6 +149,7 @@ export function createMemoryProviderAdapter(options?: {
     resumable: options?.resumable ?? false,
     persistentWorkspace: false,
     destroysOnStop: false,
+    allocationScopedStop: true,
     get lastLeaseMs() {
       return lastLeaseMs;
     },

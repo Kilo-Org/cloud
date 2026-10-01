@@ -36,6 +36,11 @@ export type AllocationState = {
   lastActivityAt: number | null;
   createDeadlineAt: number | null;
   firstConnectDeadlineAt: number | null;
+  /**
+   * Consecutive transient create failures since `ensure`. It sizes the retry
+   * pause (10 s doubling to 60 s); it does not decide the state.
+   */
+  createFailures: number;
   /** Id of the current stop attempt; results for other ids are ignored (N1). */
   stopAttempt: number;
   /** True when the next attempt is scheduled but its stop call is not issued yet. */
@@ -64,6 +69,7 @@ export function initialAllocationState(): AllocationState {
     lastActivityAt: null,
     createDeadlineAt: null,
     firstConnectDeadlineAt: null,
+    createFailures: 0,
     stopAttempt: 0,
     stopPending: false,
     stopAt: null,
@@ -129,6 +135,11 @@ export type AllocationEvent =
 
 export type AllocationEffect =
   | { type: 'create'; allocationId: string }
+  /**
+   * A create attempt was abandoned after its provider ref was known. The owner
+   * stops that ref best effort; the replacement does not wait for it.
+   */
+  | { type: 'cleanup'; allocationId: string | null; providerRef: string }
   | { type: 'stop'; stopAttempt: number }
   | { type: 'close-socket' }
   | { type: 'lease' };
@@ -144,6 +155,22 @@ export type AllocationReduction = {
 };
 
 const NO_EFFECTS: AllocationEffect[] = [];
+
+/** Pause before the next create after `failures` consecutive transient failures. */
+export function createRetryPauseMs(timers: SandboxTimers, failures: number): number {
+  const doublings = Math.max(0, failures - 1);
+  return Math.min(
+    timers.providerCreateRetryMaxMs,
+    timers.providerCreateRetryMs * 2 ** Math.min(doublings, 16)
+  );
+}
+
+/** The effect that retires an abandoned attempt's known provider ref, if any. */
+function cleanupEffects(state: AllocationState): AllocationEffect[] {
+  return state.providerRef === null
+    ? NO_EFFECTS
+    : [{ type: 'cleanup', allocationId: state.allocationId, providerRef: state.providerRef }];
+}
 
 function maxStopAttempts(timers: SandboxTimers): number {
   return timers.providerStopLadderMs.length + 1;
@@ -284,12 +311,15 @@ export function reduceAllocation(
       if (event.retryAllowed) {
         // Nothing is in flight now, so the deadline is the retry pause; the tick
         // that reaches it starts the next attempt with a full create deadline.
+        // The failed attempt cleaned up its own ref before reporting.
+        const createFailures = state.createFailures + 1;
         return {
           state: {
             ...state,
             allocationId: event.nextAllocationId,
             providerRef: null,
-            createDeadlineAt: event.at + timers.providerCreateRetryMs,
+            createFailures,
+            createDeadlineAt: event.at + createRetryPauseMs(timers, createFailures),
           },
           effects: NO_EFFECTS,
         };
@@ -381,6 +411,8 @@ function reduceTick(
       if (state.createDeadlineAt === null || event.at < state.createDeadlineAt) {
         return { state, effects: NO_EFFECTS };
       }
+      // No create is in flight here (the in-flight attempt owns its deadline),
+      // so a known ref belongs to an attempt that will never report: retire it.
       if (event.retryAllowed) {
         return {
           state: {
@@ -389,10 +421,13 @@ function reduceTick(
             providerRef: null,
             createDeadlineAt: event.at + timers.providerCreateMs,
           },
-          effects: [{ type: 'create', allocationId: event.nextAllocationId }],
+          effects: [
+            ...cleanupEffects(state),
+            { type: 'create', allocationId: event.nextAllocationId },
+          ],
         };
       }
-      return { state: initialAllocationState(), effects: NO_EFFECTS };
+      return { state: initialAllocationState(), effects: cleanupEffects(state) };
     }
 
     case 'starting': {

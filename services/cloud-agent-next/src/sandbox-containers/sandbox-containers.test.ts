@@ -28,6 +28,9 @@ import {
   type ContainersObservation,
 } from './SandboxContainers.js';
 import type { Env } from '../types.js';
+import { createCloudflareContainersProviderAdapter } from '../sandbox-control/cloudflare-containers-provider.js';
+import { encodeCloudflareProviderRef } from '../sandbox-control/cloudflare-provider.js';
+import { leaseAtLeastMs } from '../sandbox-control/deadlines.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
@@ -1609,5 +1612,180 @@ describe('containment trust ownership', () => {
   it('keeps the container entrypoint to PID 1 only', () => {
     expect(dockerfileSource).not.toContain('update-ca-certificates');
     expect(dockerfileSource).toContain('exec sleep infinity');
+  });
+});
+
+const SCHEDULES_KEY = 'containers:billing-schedules:v1';
+const LEASE_MARGIN_MS = 60_000;
+
+function leaseCheck(storage: { map: Map<string, unknown> }) {
+  const table = storage.map.get(SCHEDULES_KEY) as
+    | Record<string, { dueAtMs: number; payload?: unknown }>
+    | undefined;
+  return table?.leaseExpired;
+}
+
+describe('SandboxContainers orphan lease backstop', () => {
+  it('schedules a lease check on a fresh launch and moves it on every renewal', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const { instance, storage } = setup();
+
+    await launch(instance, REF_A);
+    expect(leaseCheck(storage)).toEqual({
+      dueAtMs: 1_000_000 + leaseAtLeastMs() + LEASE_MARGIN_MS,
+      payload: { allocationRef: REF_A },
+    });
+
+    vi.setSystemTime(2_000_000);
+    await instance.ensureLeaseAtLeast(REF_A, 90_000);
+    expect(leaseCheck(storage)?.dueAtMs).toBe(2_000_000 + 90_000 + LEASE_MARGIN_MS);
+
+    await instance.ensureLeaseAtLeast(REF_B, 5_000);
+    expect(leaseCheck(storage)?.dueAtMs).toBe(2_000_000 + 90_000 + LEASE_MARGIN_MS);
+  });
+
+  it('destroys the container when its lease lapses unrenewed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const { instance, storage, container, readRecord } = setup();
+    await launch(instance, REF_A);
+    await instance.ensureLeaseAtLeast(REF_A, 90_000);
+
+    vi.setSystemTime(1_000_000 + 90_000 + LEASE_MARGIN_MS - 1);
+    await instance.alarm();
+    expect(container.destroyCalls).toBe(0);
+
+    vi.setSystemTime(1_000_000 + 90_000 + LEASE_MARGIN_MS);
+    await instance.alarm();
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+    expect(leaseCheck(storage)).toBeUndefined();
+  });
+
+  it('never destroys a container another ref owns now', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_B },
+    });
+    container.running = true;
+
+    await instance.leaseExpired({ allocationRef: REF_A });
+    await instance.leaseExpired(undefined);
+
+    expect(container.destroyCalls).toBe(0);
+    expect(readRecord().allocationRef).toBe(REF_B);
+  });
+
+  it('gives a stuck running container without a lease check one from its next alarm', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(5_000_000);
+    const { instance, storage, container } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    });
+    container.running = true;
+
+    await instance.alarm();
+    const due = 5_000_000 + leaseAtLeastMs() + LEASE_MARGIN_MS;
+    expect(leaseCheck(storage)).toEqual({ dueAtMs: due, payload: { allocationRef: REF_A } });
+
+    vi.setSystemTime(due);
+    await instance.alarm();
+    expect(container.destroyCalls).toBe(1);
+  });
+
+  it('keeps the lease check for the alarm retry while the stop stays retryable', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    const { instance, storage, container } = setup();
+    await launch(instance, REF_A);
+    container.destroyBehavior = 'reject';
+
+    vi.setSystemTime(1_000_000 + leaseAtLeastMs() + LEASE_MARGIN_MS);
+    await expect(instance.alarm()).rejects.toThrow('remained retryable');
+    expect(leaseCheck(storage)).toBeDefined();
+  });
+});
+
+describe('SandboxContainers outbound identity', () => {
+  it('binds contained credentials to the outbound identity it is given', async () => {
+    const { instance } = setup();
+    const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+    (
+      instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
+    ).ctx.exports = { ContainersOutbound: outbound };
+
+    await instance.launchWrapper({
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-2',
+      containment: true,
+      outboundContainerId: 'logical-outbound-id',
+    });
+
+    expect(outbound).toHaveBeenCalledWith({ props: { containerId: 'logical-outbound-id' } });
+  });
+});
+
+describe('per-allocation containers through the provider adapter', () => {
+  const SANDBOX = 'ses-incident';
+  // A ref from before per-allocation containers, still held by the shared container.
+  const LEGACY_REF = encodeCloudflareProviderRef({
+    sandboxId: SANDBOX,
+    containment: false,
+    instanceId: 'alloc-1',
+  });
+
+  function adapterWithContainers() {
+    const stuck = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: LEGACY_REF },
+    });
+    const containers = new Map<string, ReturnType<typeof setup>>([[SANDBOX, stuck]]);
+    const names: string[] = [];
+    const adapter = createCloudflareContainersProviderAdapter({
+      logicalSandboxId: SANDBOX,
+      allocationName: SANDBOX,
+      getContainer: name => {
+        names.push(name);
+        let entry = containers.get(name);
+        if (entry === undefined) {
+          entry = setup();
+          containers.set(name, entry);
+        }
+        return entry.instance as unknown as DurableObjectStub<SandboxContainers>;
+      },
+    });
+    return { adapter, containers, names, stuck };
+  }
+
+  it('launches a new allocation even when the shared container holds a stale allocation', async () => {
+    const { adapter, containers, names, stuck } = adapterWithContainers();
+
+    const created = await adapter.create({ intentId: 'alloc-2', createdAt: 0 });
+    expect('providerRef' in created).toBe(true);
+    const ref = (created as { providerRef: string }).providerRef;
+    await adapter.launch(ref, {});
+
+    expect(names).not.toContain(SANDBOX);
+    const fresh = containers.get(`${SANDBOX}:alloc-2`);
+    expect(fresh?.readRecord()).toMatchObject({ state: 'running', allocationRef: ref });
+    expect(fresh?.container.startCalls).toHaveLength(1);
+    expect(stuck.container.startCalls).toHaveLength(0);
+    expect(stuck.readRecord().allocationRef).toBe(LEGACY_REF);
+
+    await expect(adapter.stop(ref, null)).resolves.toBe('terminal');
+    expect(fresh?.container.destroyCalls).toBe(1);
+    expect(stuck.container.destroyCalls).toBe(0);
+  });
+
+  it('keeps a ref from before per-allocation containers on the shared container', async () => {
+    const { adapter, names, stuck } = adapterWithContainers();
+
+    await adapter.ensureLeaseAtLeast(LEGACY_REF, 1_000);
+    await expect(adapter.stop(LEGACY_REF, null)).resolves.toBe('terminal');
+
+    expect(new Set(names)).toEqual(new Set([SANDBOX]));
+    expect(stuck.container.leaseCalls).toEqual([1_000]);
+    expect(stuck.container.destroyCalls).toBe(1);
+    expect(stuck.readRecord().allocationRef).toBeNull();
   });
 });

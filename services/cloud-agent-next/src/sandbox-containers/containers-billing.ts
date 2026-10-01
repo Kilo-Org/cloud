@@ -161,6 +161,12 @@ export class ContainersBillingScheduler {
     });
   }
 
+  /** Reads the in-memory table like `dueSchedules`, so a pending write never blocks it. */
+  async isScheduled(callback: string): Promise<boolean> {
+    if (this.table !== undefined) return callback in this.table;
+    return this.run(async () => callback in (await this.load()));
+  }
+
   deleteSchedules(callback: string): void {
     this.removeFromMemory(callback);
     this.deps.waitUntil(

@@ -599,7 +599,11 @@ describe('SandboxControlV2 routes and forwarding', () => {
     const { stub, peer } = await setup(provider);
 
     const view = await stub.prepare(prepareInput(SESSION));
-    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toEqual({
+      state: 'preparing',
+      attemptId: expect.any(String),
+      step: 'sandbox_create',
+    });
 
     const { wrapper } = await connectAndHello(provider);
     const prepareFrame = await wrapper.next();
@@ -608,11 +612,34 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(prepareFrame.spec.attemptId).not.toBe(routeSpec(SESSION).attemptId);
 
     wrapper.send({ type: 'session.progress', sessionId: SESSION, step: 'clone' });
+    wrapper.send({
+      type: 'session.progress',
+      sessionId: SESSION,
+      step: 'clone',
+      detail: 'Cloning repository... Receiving objects: 45%',
+    });
     await waitFor(() =>
       expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
-        expect.objectContaining({ state: 'preparing', step: 'clone' })
+        expect.objectContaining({
+          state: 'preparing',
+          step: 'clone',
+          detail: 'Cloning repository... Receiving objects: 45%',
+        })
       )
     );
+    // Until the wrapper connects, the allocation reports its own steps.
+    expect(
+      peer
+        .routeUpdatesFor(SESSION)
+        .flatMap(update =>
+          update.state === 'preparing' ? [[update.step, update.detail ?? null]] : []
+        )
+    ).toEqual([
+      ['sandbox_create', null],
+      ['sandbox_start', null],
+      ['clone', null],
+      ['clone', 'Cloning repository... Receiving objects: 45%'],
+    ]);
 
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(() =>
@@ -663,7 +690,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       },
     };
     const view = await stub.prepare(input);
-    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
 
     const { wrapper } = await connectAndHello(provider);
     const frame = await wrapper.next();
@@ -876,7 +903,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       };
       try {
         writeRoute(db, route);
-        await onRouteProgress(ctx, SESSION, 'setup', true);
+        await onRouteProgress(ctx, SESSION, { step: 'setup' }, true);
         await onRouteReady(ctx, SESSION, true);
         writeRoute(db, {
           ...route,
@@ -1153,6 +1180,8 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(await stub.prepare(prepareInput(SESSION))).toEqual({
       state: 'preparing',
       attemptId: expect.any(String),
+      step: 'sandbox_create',
+      detail: 'Waiting for the previous sandbox to stop',
     });
     expect((await readState(stub)).kind).toBe('stopping');
     const created = await readRouteRow(stub, SESSION);
@@ -1298,6 +1327,13 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await stub.prepare(prepareInput(SESSION));
     const { wrapper } = await connectAndHello(provider);
     await wrapper.next();
+    // The sandbox create/start progress precedes the wrapper's notifications.
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual(
+        expect.objectContaining({ state: 'preparing', step: 'sandbox_start' })
+      )
+    );
+    const before = peer.received.length;
 
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     wrapper.send({
@@ -1312,8 +1348,12 @@ describe('SandboxControlV2 routes and forwarding', () => {
       lastMessageId: 'm1',
     });
 
-    await waitFor(() => expect(peer.received).toHaveLength(3));
-    expect(peer.received.map(entry => entry.kind)).toEqual(['route', 'events', 'outcome']);
+    await waitFor(() => expect(peer.received).toHaveLength(before + 3));
+    expect(peer.received.slice(before).map(entry => entry.kind)).toEqual([
+      'route',
+      'events',
+      'outcome',
+    ]);
   });
 
   it('does not block prepare on a hanging events notification', async () => {

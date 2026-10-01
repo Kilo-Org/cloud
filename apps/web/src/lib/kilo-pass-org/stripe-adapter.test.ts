@@ -656,9 +656,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
         schedulePhase(PERIOD_END, NEXT_PERIOD_END, RETAINED_ITEMS),
       ],
     });
-    retrieve
-      .mockResolvedValueOnce(subscription({ items: seatOnlyItems, schedule: staleSchedule }))
-      .mockResolvedValueOnce(subscription({ items: seatOnlyItems }));
+    retrieve.mockResolvedValue(subscription({ items: seatOnlyItems, schedule: staleSchedule }));
     scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
     createPendingAgreement.mockResolvedValue({ agreementId: 'agreement_1', created: true });
     update.mockResolvedValue({ ...subscription(), latest_invoice: null });
@@ -672,7 +670,6 @@ describe('organization Kilo Pass Stripe adapter', () => {
     });
 
     expect(scheduleRelease).toHaveBeenCalledWith('sched_cancel');
-    expect(retrieve).toHaveBeenCalledTimes(2);
     expect(scheduleRelease.mock.invocationCallOrder[0]).toBeLessThan(
       update.mock.invocationCallOrder[0]!
     );
@@ -731,14 +728,13 @@ describe('organization Kilo Pass Stripe adapter', () => {
         tier: 'tier_19',
         allocations: [],
       })
-    ).rejects.toMatchObject({ reason: 'schedule_inspection_failed' });
+    ).rejects.toMatchObject({ reason: 'schedule_unavailable' });
 
     const expectedDetails = expect.objectContaining({
       event: 'checkout',
-      reason: 'schedule_inspection_read_failed',
+      reason: 'schedule_read_failed',
       organizationId: 'org_1',
       subscriptionId: 'sub_1',
-      scheduleId: 'sched_unreadable',
       failure: { name: 'Error', type: 'StripeConnectionError', code: 'connection_error' },
     });
     expect(captureMessage).toHaveBeenCalledWith(expect.any(String), {
@@ -746,7 +742,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       tags: {
         source: 'kilo_pass_org_schedule',
         event: 'checkout',
-        reason: 'schedule_inspection_read_failed',
+        reason: 'schedule_read_failed',
       },
       extra: expectedDetails,
     });
@@ -757,15 +753,16 @@ describe('organization Kilo Pass Stripe adapter', () => {
     expect(update).not.toHaveBeenCalled();
   });
 
-  test('fails checkout closed with a typed, reported error when release cannot be verified', async () => {
+  test('fails checkout closed with a typed, reported error when release fails', async () => {
     const seatOnlyItems = { ...subscription().items, data: [subscription().items.data[0]!] };
     const staleSchedule = schedule({
       phases: [schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS)],
     });
-    retrieve
-      .mockResolvedValueOnce(subscription({ items: seatOnlyItems, schedule: staleSchedule }))
-      .mockRejectedValueOnce(Object.assign(new Error('timeout'), { type: 'StripeAPIError' }));
-    scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
+    retrieve.mockResolvedValue(subscription({ items: seatOnlyItems, schedule: staleSchedule }));
+    scheduleRelease.mockRejectedValue(
+      Object.assign(new Error('timeout'), { type: 'StripeAPIError' })
+    );
+    scheduleRetrieve.mockResolvedValue(staleSchedule);
     const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
 
     await expect(
@@ -775,12 +772,12 @@ describe('organization Kilo Pass Stripe adapter', () => {
         tier: 'tier_19',
         allocations: [],
       })
-    ).rejects.toMatchObject({ reason: 'schedule_inspection_failed' });
+    ).rejects.toMatchObject({ reason: 'schedule_unavailable' });
 
     expect(captureMessage).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        tags: expect.objectContaining({ reason: 'post_release_verification_read_failed' }),
+        tags: expect.objectContaining({ reason: 'schedule_release_failed' }),
         extra: expect.objectContaining({
           organizationId: 'org_1',
           subscriptionId: 'sub_1',
@@ -796,27 +793,6 @@ describe('organization Kilo Pass Stripe adapter', () => {
         }),
       })
     );
-    expect(createPendingAgreement).not.toHaveBeenCalled();
-    expect(update).not.toHaveBeenCalled();
-  });
-
-  test('refuses checkout when a released schedule is still attached', async () => {
-    const seatOnlyItems = { ...subscription().items, data: [subscription().items.data[0]!] };
-    const staleSchedule = schedule({
-      phases: [schedulePhase(PERIOD_START, PERIOD_END, RETAINED_ITEMS)],
-    });
-    retrieve.mockResolvedValue(subscription({ items: seatOnlyItems, schedule: staleSchedule }));
-    scheduleRelease.mockResolvedValue({ ...staleSchedule, status: 'released' });
-    const { createOrganizationKiloPassCheckout } = await import('./stripe-adapter');
-
-    await expect(
-      createOrganizationKiloPassCheckout({
-        organizationId: 'org_1',
-        actorUserId: 'user_1',
-        tier: 'tier_19',
-        allocations: [],
-      })
-    ).rejects.toMatchObject({ reason: 'schedule_release_failed' });
     expect(createPendingAgreement).not.toHaveBeenCalled();
     expect(update).not.toHaveBeenCalled();
   });
@@ -1010,6 +986,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1031,6 +1008,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1070,6 +1048,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1103,6 +1082,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1137,6 +1117,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1157,6 +1138,48 @@ describe('organization Kilo Pass Stripe adapter', () => {
     );
   });
 
+  test('keeps explicitly empty discounts and tax rates so a rewrite cannot inherit defaults', async () => {
+    retrieve.mockResolvedValue(
+      subscription({
+        schedule: schedule({
+          phases: [
+            schedulePhase(
+              PERIOD_START,
+              PERIOD_END,
+              CURRENT_ITEMS.map(item => ({ ...item, discounts: [], tax_rates: [] })),
+              { discounts: [], default_tax_rates: [] }
+            ),
+          ],
+        }),
+      })
+    );
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await scheduleOrganizationKiloPassCancellation({
+      providerSubscriptionId: 'sub_1',
+      providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
+      agreementId: 'agreement_1',
+    });
+
+    const clearedItem = { discounts: '', tax_rates: '' };
+    const clearedPhase = { discounts: '', default_tax_rates: '' };
+    expect(scheduleUpdate).toHaveBeenCalledWith(
+      'sched_cancel',
+      expect.objectContaining({
+        phases: [
+          {
+            start_date: PERIOD_START,
+            end_date: PERIOD_END,
+            items: CURRENT_ITEMS.map(item => ({ ...item, ...clearedItem })),
+            ...clearedPhase,
+          },
+          { items: RETAINED_ITEMS.map(item => ({ ...item, ...clearedItem })), ...clearedPhase },
+        ],
+      })
+    );
+  });
+
   test('adopts a safe orphaned from-subscription schedule after an update failure', async () => {
     retrieve.mockResolvedValue(
       subscription({ schedule: schedule({ id: 'sched_orphaned', metadata: {} }) })
@@ -1166,6 +1189,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
@@ -1185,30 +1209,12 @@ describe('organization Kilo Pass Stripe adapter', () => {
     await scheduleOrganizationKiloPassCancellation({
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     });
 
     expect(scheduleCreate).not.toHaveBeenCalled();
     expect(scheduleUpdate).not.toHaveBeenCalled();
-  });
-
-  test('records the agreement on a pending removal created before agreement tracking', async () => {
-    retrieve.mockResolvedValue(
-      subscription({
-        schedule: removalPendingSchedule({ metadata: { origin: 'kilo-pass-org-cancellation' } }),
-      })
-    );
-    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
-
-    await scheduleOrganizationKiloPassCancellation({
-      providerSubscriptionId: 'sub_1',
-      providerSeatAddOnItemId: 'si_pass',
-      agreementId: 'agreement_1',
-    });
-
-    expect(scheduleUpdate).toHaveBeenCalledWith('sched_cancel', {
-      metadata: { origin: 'kilo-pass-org-cancellation', agreementId: 'agreement_1' },
-    });
   });
 
   test('rejects and reports a matching single-phase schedule with foreign metadata', async () => {
@@ -1223,8 +1229,8 @@ describe('organization Kilo Pass Stripe adapter', () => {
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
-        agreementId: 'agreement_1',
         organizationId: 'org_1',
+        agreementId: 'agreement_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
     expect(scheduleUpdate).not.toHaveBeenCalled();
@@ -1233,7 +1239,6 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect.objectContaining({
         tags: expect.objectContaining({ event: 'cancel', reason: 'unowned_schedule' }),
         extra: expect.objectContaining({
-          organizationId: 'org_1',
           subscriptionId: 'sub_1',
           scheduleId: 'sched_foreign',
         }),
@@ -1258,6 +1263,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
         agreementId: 'agreement_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
@@ -1286,6 +1292,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
         agreementId: 'agreement_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
@@ -1313,6 +1320,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       scheduleOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
         agreementId: 'agreement_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
@@ -1326,6 +1334,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
     const input = {
       providerSubscriptionId: 'sub_1',
       providerSeatAddOnItemId: 'si_pass',
+      organizationId: 'org_1',
       agreementId: 'agreement_1',
     };
 
@@ -1363,6 +1372,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       resumeOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
       })
     ).resolves.toBeUndefined();
   });
@@ -1377,6 +1387,7 @@ describe('organization Kilo Pass Stripe adapter', () => {
       resumeOrganizationKiloPassCancellation({
         providerSubscriptionId: 'sub_1',
         providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
       })
     ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
     expect(scheduleRelease).not.toHaveBeenCalled();

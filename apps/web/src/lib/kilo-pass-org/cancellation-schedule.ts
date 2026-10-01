@@ -16,7 +16,7 @@ type PhaseItemParams = Stripe.SubscriptionScheduleUpdateParams.Phase.Item;
 export type ScheduleItem = { price: string; quantity: number };
 
 export type OrganizationKiloPassScheduleShape =
-  | { kind: 'idle'; activePhase: Phase | null }
+  | { kind: 'idle'; activePhase: Phase }
   | { kind: 'removal_pending'; activePhase: Phase; removalPhase: Phase }
   | { kind: 'unsafe'; reason: string };
 
@@ -27,10 +27,11 @@ export type OrganizationKiloPassScheduleEvent =
   | 'seat_update'
   | 'pass_item_removed';
 
+export const KILO_PASS_ORG_CANCELLATION_PENDING = 'KILO_PASS_ORG_CANCELLATION_PENDING';
+
 export type OrganizationKiloPassCheckoutScheduleErrorReason =
   | 'schedule_conflict'
-  | 'schedule_release_failed'
-  | 'schedule_inspection_failed';
+  | 'schedule_unavailable';
 
 export class OrganizationKiloPassCheckoutScheduleError extends Error {
   readonly reason: OrganizationKiloPassCheckoutScheduleErrorReason;
@@ -68,31 +69,19 @@ export function phaseItemPriceId(item: Pick<PhaseItem, 'price'>): string {
   return referenceId(item.price);
 }
 
-export function subscriptionScheduleItems(
-  subscription: Stripe.Subscription,
-  quantities: ReadonlyMap<string, number> = new Map()
-): ScheduleItem[] {
-  return subscription.items.data.map(item => ({
-    price: item.price.id,
-    quantity: quantities.get(item.id) ?? item.quantity ?? 1,
-  }));
+function scheduleItem(item: Stripe.SubscriptionItem): ScheduleItem {
+  return { price: item.price.id, quantity: item.quantity ?? 1 };
+}
+
+export function subscriptionScheduleItems(subscription: Stripe.Subscription): ScheduleItem[] {
+  return subscription.items.data.map(scheduleItem);
 }
 
 export function subscriptionScheduleItemsWithout(
   subscription: Stripe.Subscription,
-  removedItemId: string,
-  quantities: ReadonlyMap<string, number> = new Map()
+  removedItemId: string
 ): ScheduleItem[] {
-  return subscriptionScheduleItems(
-    {
-      ...subscription,
-      items: {
-        ...subscription.items,
-        data: subscription.items.data.filter(item => item.id !== removedItemId),
-      },
-    },
-    quantities
-  );
+  return subscription.items.data.filter(item => item.id !== removedItemId).map(scheduleItem);
 }
 
 function itemKeys(items: readonly ScheduleItem[]): string[] {
@@ -123,36 +112,21 @@ export async function retrieveAttachedSchedule(
  * Stripe keeps ended phases in `phases`; only the current phase and later
  * phases constrain what a rewrite or release can change.
  */
-export function activeAndFuturePhases(
-  schedule: Stripe.SubscriptionSchedule,
-  now: Date = new Date()
-): { activePhase: Phase | null; futurePhases: Phase[] } {
-  const current = schedule.current_phase;
-  const nowSeconds = Math.floor(now.getTime() / 1000);
-  const activePhase =
-    (current
-      ? (schedule.phases.find(
-          phase => phase.start_date === current.start_date && phase.end_date === current.end_date
-        ) ??
-        schedule.phases.find(
-          phase => phase.start_date <= current.start_date && current.start_date < phase.end_date
-        ))
-      : schedule.phases.find(
-          phase => phase.start_date <= nowSeconds && nowSeconds < phase.end_date
-        )) ?? null;
-  const boundary = activePhase?.end_date ?? current?.end_date ?? nowSeconds;
-  const futurePhases = schedule.phases.filter(
-    phase => phase !== activePhase && phase.start_date >= boundary
-  );
+export function activeAndFuturePhases(schedule: Stripe.SubscriptionSchedule): {
+  activePhase: Phase | null;
+  futurePhases: Phase[];
+} {
+  const currentStart = schedule.current_phase?.start_date;
+  const activePhase = schedule.phases.find(phase => phase.start_date === currentStart) ?? null;
+  const futurePhases = activePhase
+    ? schedule.phases.filter(phase => phase.start_date >= activePhase.end_date)
+    : [];
   return { activePhase, futurePhases };
 }
 
 function unsupportedPhaseSetting(phase: Phase): string | null {
   if ((phase.add_invoice_items ?? []).length > 0) return 'phase_add_invoice_items';
-  if (isPresent(phase.application_fee_percent)) return 'phase_application_fee_percent';
   if (isPresent(phase.billing_thresholds)) return 'phase_billing_thresholds';
-  if (isPresent(phase.on_behalf_of)) return 'phase_on_behalf_of';
-  if (isPresent(phase.transfer_data)) return 'phase_transfer_data';
   if (isPresent(phase.trial_end)) return 'phase_trial_end';
   if (phase.billing_cycle_anchor === 'phase_start') return 'phase_billing_cycle_anchor';
   if ((phase.discounts ?? []).some(discount => !discount.discount)) {
@@ -178,16 +152,14 @@ export function classifyCancellationSchedule(input: {
   currentItems: readonly ScheduleItem[];
   retainedItems: readonly ScheduleItem[];
   periodEnd: number;
-  now?: Date;
 }): OrganizationKiloPassScheduleShape {
   if (input.schedule.default_settings?.billing_cycle_anchor === 'phase_start') {
     return { kind: 'unsafe', reason: 'default_billing_cycle_anchor' };
   }
-  const { activePhase, futurePhases } = activeAndFuturePhases(input.schedule, input.now);
-  const relevant = activePhase ? [activePhase, ...futurePhases] : futurePhases;
-  if (relevant.length === 0) return { kind: 'unsafe', reason: 'no_active_or_future_phase' };
+  const { activePhase, futurePhases } = activeAndFuturePhases(input.schedule);
+  if (!activePhase) return { kind: 'unsafe', reason: 'no_active_phase' };
   const labels: ('current' | 'retained')[] = [];
-  for (const phase of relevant) {
+  for (const phase of [activePhase, ...futurePhases]) {
     const unsupported = unsupportedPhaseSetting(phase);
     if (unsupported) return { kind: 'unsafe', reason: unsupported };
     if (phaseItemsMatch(phase, input.currentItems)) labels.push('current');
@@ -197,7 +169,6 @@ export function classifyCancellationSchedule(input: {
   if (labels.every(label => label === 'current')) return { kind: 'idle', activePhase };
   const [removalPhase] = futurePhases;
   if (
-    activePhase &&
     removalPhase &&
     futurePhases.length === 1 &&
     labels[0] === 'current' &&
@@ -321,8 +292,8 @@ export function phaseUpdateParams(
   };
 }
 
-function scheduleDiagnostics(schedule: Stripe.SubscriptionSchedule | null, scheduleId?: string) {
-  if (!schedule) return { scheduleId: scheduleId ?? null };
+function scheduleDiagnostics(schedule: Stripe.SubscriptionSchedule | null) {
+  if (!schedule) return { scheduleId: null };
   return {
     scheduleId: schedule.id,
     scheduleStatus: schedule.status,
@@ -368,7 +339,6 @@ export function reportOrganizationKiloPassScheduleProblem(input: {
   organizationId: string | null;
   subscriptionId: string;
   schedule: Stripe.SubscriptionSchedule | null;
-  scheduleId?: string;
   error?: unknown;
 }): void {
   const message = 'Organization Kilo Pass subscription schedule cannot be changed safely';
@@ -377,7 +347,7 @@ export function reportOrganizationKiloPassScheduleProblem(input: {
     reason: input.reason,
     organizationId: input.organizationId,
     subscriptionId: input.subscriptionId,
-    ...scheduleDiagnostics(input.schedule, input.scheduleId),
+    ...scheduleDiagnostics(input.schedule),
     ...(input.error === undefined ? {} : { failure: safeFailureDetails(input.error) }),
   };
   warnExceptInTest(message, details);
@@ -399,28 +369,22 @@ export function throwUnsafeOrganizationKiloPassSchedule(
   throw new Error(SCHEDULE_REWRITE_UNSAFE);
 }
 
-export type SeatUpdateSchedulePlan =
-  | { kind: 'subscription_update' }
-  | { kind: 'release_then_subscription_update'; scheduleId: string }
-  | { kind: 'schedule_update'; scheduleId: string; phases: PhaseParams[] };
-
 /**
- * Seat changes on a subscription attached to an owned cancellation schedule
- * go through the schedule so the pending pass removal keeps its boundary and
- * the new seat quantity. Subscriptions without a pass keep their existing
+ * Returns the owned schedule to release before a direct seat update. Seat
+ * changes are refused while a Kilo Pass removal is pending, so the removal
+ * keeps its boundary. Subscriptions without a pass keep their existing
  * behavior unless the attached schedule is ours.
  */
-export async function planSeatUpdateForCancellationSchedule(input: {
+export async function scheduleToReleaseBeforeSeatUpdate(input: {
   subscription: Stripe.Subscription;
   paidSeatItem: Stripe.SubscriptionItem;
   passItem: Stripe.SubscriptionItem | undefined;
-  paidSeatQuantity: number;
-}): Promise<SeatUpdateSchedulePlan> {
+}): Promise<string | null> {
   const { subscription, paidSeatItem, passItem } = input;
   const schedule = await retrieveAttachedSchedule(subscription);
-  if (!schedule) return { kind: 'subscription_update' };
+  if (!schedule) return null;
   const owned = isOwnedCancellationSchedule(schedule);
-  if (!owned && !passItem) return { kind: 'subscription_update' };
+  if (!owned && !passItem) return null;
   const organizationId = subscription.metadata?.organizationId;
   const unsafe = (reason: string): never =>
     throwUnsafeOrganizationKiloPassSchedule({
@@ -441,29 +405,8 @@ export async function planSeatUpdateForCancellationSchedule(input: {
     periodEnd: paidSeatItem.current_period_end,
   });
   if (shape.kind === 'unsafe') return unsafe(shape.reason);
-  if (shape.kind === 'idle') {
-    return { kind: 'release_then_subscription_update', scheduleId: schedule.id };
-  }
-  if (!passItem) return unsafe('removal_without_pass_item');
-  const quantities = new Map([
-    [paidSeatItem.id, input.paidSeatQuantity],
-    [passItem.id, input.paidSeatQuantity],
-  ]);
-  return {
-    kind: 'schedule_update',
-    scheduleId: schedule.id,
-    phases: [
-      phaseUpdateParams(shape.activePhase, subscriptionScheduleItems(subscription, quantities), {
-        start_date: shape.activePhase.start_date,
-        end_date: shape.activePhase.end_date,
-      }),
-      phaseUpdateParams(
-        shape.removalPhase,
-        subscriptionScheduleItemsWithout(subscription, passItem.id, quantities),
-        { end_date: shape.removalPhase.end_date }
-      ),
-    ],
-  };
+  if (shape.kind === 'removal_pending') throw new Error(KILO_PASS_ORG_CANCELLATION_PENDING);
+  return schedule.id;
 }
 
 export type ScheduleReleaseResult = {

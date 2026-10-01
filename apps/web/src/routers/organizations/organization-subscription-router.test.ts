@@ -346,7 +346,46 @@ describe('organizations subscription trpc router', () => {
       ).rejects.toThrow();
     });
 
-    it('maps an unsafe attached schedule to PRECONDITION_FAILED', async () => {
+    const periodStart = 1_775_001_600;
+    const periodEnd = 1_777_593_600;
+    it.each([
+      [
+        'an unsafe attached schedule',
+        (_seatPriceId: string, _passPriceId: string) => ({
+          id: 'sub_sched_foreign',
+          status: 'active',
+          metadata: { origin: 'billing-cycle-change' },
+          current_phase: null,
+          phases: [],
+        }),
+        'scheduled change',
+      ],
+      [
+        'a pending Kilo Pass removal',
+        (seatPriceId: string, passPriceId: string) => ({
+          id: 'sub_sched_cancel',
+          status: 'active',
+          metadata: { origin: 'kilo-pass-org-cancellation' },
+          current_phase: { start_date: periodStart, end_date: periodEnd },
+          phases: [
+            {
+              start_date: periodStart,
+              end_date: periodEnd,
+              items: [
+                { price: seatPriceId, quantity: 5 },
+                { price: passPriceId, quantity: 5 },
+              ],
+            },
+            {
+              start_date: periodEnd,
+              end_date: periodEnd + 2_592_000,
+              items: [{ price: seatPriceId, quantity: 5 }],
+            },
+          ],
+        }),
+        'Kilo Pass is scheduled to end',
+      ],
+    ])('maps %s to PRECONDITION_FAILED', async (_case, attachedSchedule, message) => {
       const { KNOWN_SEAT_PRICE_IDS } = await import('@/lib/stripe');
       const passPriceId =
         process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ??
@@ -370,8 +409,8 @@ describe('organizations subscription trpc router', () => {
         id,
         quantity: 5,
         price: { id: price, recurring: { interval: 'month' } },
-        current_period_start: 1_775_001_600,
-        current_period_end: 1_777_593_600,
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
       });
       stripeMock.subscriptions.retrieve.mockResolvedValue({
         id: 'sub_router_unsafe_schedule',
@@ -380,13 +419,7 @@ describe('organizations subscription trpc router', () => {
         items: {
           data: [item('si_seat', seatPriceId), item('si_pass', passPriceId)],
         },
-        schedule: {
-          id: 'sub_sched_foreign',
-          status: 'active',
-          metadata: { origin: 'billing-cycle-change' },
-          current_phase: null,
-          phases: [],
-        },
+        schedule: attachedSchedule(seatPriceId, passPriceId),
       });
 
       try {
@@ -398,7 +431,7 @@ describe('organizations subscription trpc router', () => {
           })
         ).rejects.toMatchObject({
           code: 'PRECONDITION_FAILED',
-          message: expect.stringContaining('scheduled change'),
+          message: expect.stringContaining(message),
         });
       } finally {
         KNOWN_SEAT_PRICE_IDS.delete(seatPriceId);

@@ -258,8 +258,7 @@ describe('organization Kilo Pass router', () => {
 
   it.each([
     ['schedule_conflict', 'PRECONDITION_FAILED', 'another scheduled change'],
-    ['schedule_release_failed', 'CONFLICT', 'could not prepare'],
-    ['schedule_inspection_failed', 'CONFLICT', 'could not check'],
+    ['schedule_unavailable', 'CONFLICT', 'could not prepare'],
   ] as const)(
     'maps a checkout %s to tRPC %s with a specific message',
     async (reason, code, message) => {

@@ -4679,143 +4679,25 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
       ]);
     }
 
-    test('keeps a pending pass removal and its boundary when seats increase', async () => {
-      const store = memoryStore();
+    test.each([
+      ['increase', 10],
+      ['decrease', 3],
+    ])('refuses a seat %s while a Kilo Pass removal is pending', async (_change, seats) => {
       jest
         .spyOn(client.subscriptions, 'retrieve')
         .mockResolvedValue(orgSubscription({ schedule: removalPendingSchedule() }) as never);
-      jest.spyOn(client.invoices, 'createPreview').mockResolvedValue(previewInvoice() as never);
-      const scheduleUpdate = jest.spyOn(client.subscriptionSchedules, 'update').mockResolvedValue({
-        ...removalPendingSchedule(),
-        subscription: { ...orgSubscription(), latest_invoice: draftInvoice() },
-      } as never);
-      const subscriptionUpdate = jest.spyOn(client.subscriptions, 'update');
-      jest.spyOn(client.invoiceItems, 'create').mockResolvedValue({
-        id: 'ii_fee',
-        amount: 150,
-      } as never);
-      const finalize = jest.spyOn(client.invoices, 'finalizeInvoice').mockResolvedValue({
-        ...draftInvoice(),
-        status: 'open',
-      } as never);
-      jest.spyOn(client.invoices, 'pay').mockResolvedValue({
-        ...draftInvoice(),
-        status: 'paid',
-      } as never);
+      const preview = jest.spyOn(client.invoices, 'createPreview');
+      const scheduleUpdate = jest.spyOn(client.subscriptionSchedules, 'update');
+      const release = jest.spyOn(client.subscriptionSchedules, 'release');
+      const update = jest.spyOn(client.subscriptions, 'update');
 
-      await expect(
-        handleUpdateSeatCount(subscriptionId, 10, 5, {
-          now,
-          store,
-          getOrganizationPurchaseChannel: async () => 'self_serve',
-          resolveTaxInput: async () => ({ source: 'price', taxBehavior: 'exclusive' }),
-          sendAlert: async () => undefined,
-        })
-      ).resolves.toEqual(expect.objectContaining({ success: true }));
-
-      expect(subscriptionUpdate).not.toHaveBeenCalled();
-      expect(scheduleUpdate).toHaveBeenCalledWith(
-        'sub_sched_cancel',
-        {
-          proration_behavior: 'always_invoice',
-          phases: [
-            { items: currentItems(10), start_date: prorationDate, end_date: periodEnd },
-            { items: [{ price: seatPriceId, quantity: 10 }], end_date: nextPeriodEnd },
-          ],
-          expand: ['subscription.latest_invoice.lines'],
-        },
-        { idempotencyKey: expect.stringMatching(/^sub-update-/) }
+      await expect(handleUpdateSeatCount(subscriptionId, seats, 5, { now })).rejects.toThrow(
+        'KILO_PASS_ORG_CANCELLATION_PENDING'
       );
-      expect(finalize).toHaveBeenCalledWith('in_actual');
-    });
-
-    test('rewrites the pending removal without invoicing when seats decrease', async () => {
-      jest
-        .spyOn(client.subscriptions, 'retrieve')
-        .mockResolvedValue(orgSubscription({ schedule: removalPendingSchedule() }) as never);
-      const scheduleUpdate = jest.spyOn(client.subscriptionSchedules, 'update').mockResolvedValue({
-        ...removalPendingSchedule(),
-        subscription: { ...orgSubscription(), latest_invoice: draftInvoice() },
-      } as never);
-      const pay = jest.spyOn(client.invoices, 'pay');
-
-      await expect(handleUpdateSeatCount(subscriptionId, 3, 5, { now })).resolves.toEqual(
-        expect.objectContaining({ success: true })
-      );
-
-      expect(scheduleUpdate).toHaveBeenCalledWith(
-        'sub_sched_cancel',
-        expect.objectContaining({
-          proration_behavior: 'none',
-          phases: [
-            expect.objectContaining({ items: currentItems(3), end_date: periodEnd }),
-            expect.objectContaining({ items: [{ price: seatPriceId, quantity: 3 }] }),
-          ],
-        }),
-        expect.any(Object)
-      );
-      expect(pay).not.toHaveBeenCalled();
-    });
-
-    test('keeps explicitly empty phase discounts and tax rates when a pending removal is rewritten', async () => {
-      const noDiscountPhase = (
-        start: number,
-        end: number,
-        items: { price: string }[],
-        quantity: number
-      ) => ({
-        start_date: start,
-        end_date: end,
-        discounts: [],
-        default_tax_rates: [],
-        items: items.map(item => ({ ...item, quantity, discounts: [], tax_rates: [] })),
-      });
-      const pending = {
-        ...removalPendingSchedule(),
-        phases: [
-          noDiscountPhase(prorationDate, periodEnd, currentItems(5), 5),
-          noDiscountPhase(periodEnd, nextPeriodEnd, [{ price: seatPriceId }], 5),
-        ],
-      } as unknown as Stripe.SubscriptionSchedule;
-      jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue(
-        orgSubscription({
-          schedule: pending,
-          customer: {
-            id: 'cus_seat_capacity',
-            object: 'customer',
-            discount: { id: 'di_customer_wide', object: 'discount' },
-          } as unknown as Stripe.Customer,
-        }) as never
-      );
-      const scheduleUpdate = jest
-        .spyOn(client.subscriptionSchedules, 'update')
-        .mockResolvedValue({ ...pending, subscription: orgSubscription() } as never);
-
-      await handleUpdateSeatCount(subscriptionId, 3, 5, { now });
-
-      const cleared = { discounts: '', tax_rates: '' };
-      expect(scheduleUpdate.mock.calls[0]?.[1]).toEqual({
-        proration_behavior: 'none',
-        phases: [
-          {
-            start_date: prorationDate,
-            end_date: periodEnd,
-            discounts: '',
-            default_tax_rates: '',
-            items: [
-              { price: seatPriceId, quantity: 3, ...cleared },
-              { price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID, quantity: 3, ...cleared },
-            ],
-          },
-          {
-            end_date: nextPeriodEnd,
-            discounts: '',
-            default_tax_rates: '',
-            items: [{ price: seatPriceId, quantity: 3, ...cleared }],
-          },
-        ],
-        expand: ['subscription.latest_invoice.lines'],
-      });
+      expect(preview).not.toHaveBeenCalled();
+      expect(scheduleUpdate).not.toHaveBeenCalled();
+      expect(release).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
     });
 
     test('releases an idle owned schedule before updating seats directly', async () => {

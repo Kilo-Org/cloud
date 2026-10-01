@@ -263,9 +263,7 @@ export const organizationKiloPassRouter = createTRPCRouter({
           throw new TRPCError({
             code: 'CONFLICT',
             message:
-              error.reason === 'schedule_inspection_failed'
-                ? 'We could not check your seat subscription for scheduled changes. Kilo Pass was not added. Try again in a few minutes.'
-                : 'We could not prepare your seat subscription for Kilo Pass. Kilo Pass was not added. Try again in a few minutes.',
+              'We could not prepare your seat subscription for Kilo Pass. Kilo Pass was not added. Try again in a few minutes.',
           });
         }
         throw error;

@@ -2394,6 +2394,26 @@ describe('Google Play bouncer store events', () => {
     });
   });
 
+  it("does not flag the owner when Play revokes an order Kilo never admitted (Kilo's duplicate reversal)", async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const token = `owned-token-${crypto.randomUUID()}`;
+    await subscribe(token, `GPA.${crypto.randomUUID()}`, obfsAccountId);
+    // The revoked order is not the admitted one: Kilo refunded and revoked a duplicate purchase.
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, `GPA.${crypto.randomUUID()}`)
+    );
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'duplicate-revoked-report',
+      }),
+    });
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
+  });
+
   it('skips a sandbox notification', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     const token = `sandbox-token-${crypto.randomUUID()}`;

@@ -7,7 +7,7 @@ import {
   Subtype,
   type ConsumptionRequest,
 } from '@apple/app-store-server-library';
-import { and, eq, inArray, like, lt, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, like, notInArray, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
 
@@ -245,7 +245,8 @@ async function markStoreSubscriptionRenewing(
 /**
  * Undoes the `canceled` state a refund wrote. Only a subscription whose paid period is still
  * running is entitled again, and only an ended row is reopened: a reversal must not overwrite a
- * state another notification already set.
+ * state another notification already set. A user holds at most one Kilo Pass, so a user who bought
+ * another pass after the refund keeps that pass and this row stays ended.
  */
 async function reopenStoreSubscription(
   dbOrTx: DbOrTx,
@@ -254,9 +255,12 @@ async function reopenStoreSubscription(
   if (transaction.expiresDate == null || transaction.expiresDate <= Date.now()) {
     return false;
   }
-  const reopened = await dbOrTx
-    .update(kilo_pass_subscriptions)
-    .set({ status: 'active', ended_at: null })
+  const ended = await dbOrTx
+    .select({
+      id: kilo_pass_subscriptions.id,
+      kiloUserId: kilo_pass_subscriptions.kilo_user_id,
+    })
+    .from(kilo_pass_subscriptions)
     .where(
       and(
         eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.AppStore),
@@ -264,8 +268,28 @@ async function reopenStoreSubscription(
         inArray(kilo_pass_subscriptions.status, ['canceled', 'unpaid', 'incomplete_expired'])
       )
     )
-    .returning({ id: kilo_pass_subscriptions.id });
-  return reopened.length > 0;
+    .limit(1);
+  const row = ended[0];
+  if (!row) return false;
+
+  const otherActive = await dbOrTx
+    .select({ id: kilo_pass_subscriptions.id })
+    .from(kilo_pass_subscriptions)
+    .where(
+      and(
+        eq(kilo_pass_subscriptions.kilo_user_id, row.kiloUserId),
+        sql`${kilo_pass_subscriptions.id} <> ${row.id}`,
+        notInArray(kilo_pass_subscriptions.status, ['canceled', 'unpaid', 'incomplete_expired'])
+      )
+    )
+    .limit(1);
+  if (otherActive.length > 0) return false;
+
+  await dbOrTx
+    .update(kilo_pass_subscriptions)
+    .set({ status: 'active', ended_at: null })
+    .where(eq(kilo_pass_subscriptions.id, row.id));
+  return true;
 }
 
 async function getUserForStoreRenewal(params: {
@@ -404,16 +428,23 @@ async function claimStoreEventForProcessing(params: {
 
 type CreditReversalResult = {
   storePurchaseFound: boolean;
+  /** A newer `REFUND_REVERSED` already settled this transaction, so the refund changed nothing. */
+  superseded: boolean;
   creditTransactionIds: string[];
   totalReversalMicrodollars: number;
   reversedItemKinds: KiloPassIssuanceItemKind[];
 };
 
-async function insertCreditReversal(
+/**
+ * Inserts one refund clawback (negative amount) or refund restoration (positive amount) and moves
+ * `total_microdollars_acquired` by the same amount. The credit category is unique per user, so a
+ * repeated category inserts nothing and returns the existing row.
+ */
+async function insertCreditAdjustment(
   tx: DrizzleTransaction,
   params: {
     kiloUserId: string;
-    amountMicrodollars: number;
+    signedAmountMicrodollars: number;
     isFree: boolean;
     description: string;
     creditCategory: string;
@@ -426,7 +457,7 @@ async function insertCreditReversal(
     .values({
       id: creditTransactionId,
       kilo_user_id: params.kiloUserId,
-      amount_microdollars: -params.amountMicrodollars,
+      amount_microdollars: params.signedAmountMicrodollars,
       is_free: params.isFree,
       description: params.description,
       credit_category: params.creditCategory,
@@ -452,15 +483,118 @@ async function insertCreditReversal(
   await tx
     .update(kilocode_users)
     .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${params.amountMicrodollars}`,
+      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${params.signedAmountMicrodollars}`,
     })
     .where(eq(kilocode_users.id, params.kiloUserId));
 
   return { wasInserted: true, creditTransactionId };
 }
 
+/**
+ * A clawback category is `<clawback prefix><transactionId>:<kind>:<itemId>` for the first refund
+ * of an item and `…:<itemId>:r<n>` for the refund after the n-th reversal. Its restoration has the
+ * same category under the restoration prefix, so each clawback pairs with at most one restoration.
+ */
 const APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX = `kilo-pass-store-refund:${KiloPassPaymentProvider.AppStore}:`;
 const APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX = `kilo-pass-store-refund-reversal:${KiloPassPaymentProvider.AppStore}:`;
+
+type RefundLedgerRow = {
+  creditTransactionId: string;
+  amountMicrodollars: number;
+  isFree: boolean;
+  description: string | null;
+  /** The category without the clawback or restoration prefix: `<transactionId>:<kind>:<itemId>…`. */
+  cycleKey: string;
+};
+
+/** The clawback rows of one transaction, and the cycle keys that a restoration already settled. */
+async function readAppStoreRefundLedger(
+  tx: DrizzleTransaction,
+  kiloUserId: string,
+  transactionId: string
+): Promise<{ clawbacks: RefundLedgerRow[]; restoredCycleKeys: Set<string> }> {
+  const clawbackPrefix = `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${transactionId}:`;
+  const restorationPrefix = `${APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX}${transactionId}:`;
+  const rows = await tx
+    .select({
+      creditTransactionId: credit_transactions.id,
+      amountMicrodollars: credit_transactions.amount_microdollars,
+      isFree: credit_transactions.is_free,
+      description: credit_transactions.description,
+      creditCategory: credit_transactions.credit_category,
+    })
+    .from(credit_transactions)
+    .where(
+      and(
+        eq(credit_transactions.kilo_user_id, kiloUserId),
+        or(
+          like(credit_transactions.credit_category, `${clawbackPrefix}%`),
+          like(credit_transactions.credit_category, `${restorationPrefix}%`)
+        )
+      )
+    );
+
+  const clawbacks: RefundLedgerRow[] = [];
+  const restoredCycleKeys = new Set<string>();
+  for (const row of rows) {
+    const category = row.creditCategory ?? '';
+    if (category.startsWith(APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX)) {
+      clawbacks.push({
+        ...row,
+        cycleKey: category.slice(APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX.length),
+      });
+    } else {
+      restoredCycleKeys.add(category.slice(APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX.length));
+    }
+  }
+  return { clawbacks, restoredCycleKeys };
+}
+
+/** The issuance item kind in a cycle key `<transactionId>:<kind>:<itemId>…`. */
+function getRefundCycleItemKind(cycleKey: string): KiloPassIssuanceItemKind | null {
+  const segment = cycleKey.split(':')[1];
+  const kinds: string[] = Object.values(KiloPassIssuanceItemKind);
+  return segment !== undefined && kinds.includes(segment)
+    ? (segment as KiloPassIssuanceItemKind)
+    : null;
+}
+
+/**
+ * The store time of an App Store event row: its `signedDate`, or its claim time for a row written
+ * before the row kept `signedDate`.
+ */
+const appStoreEventTimeMs = sql<number>`COALESCE(
+  (${kilo_pass_store_events.payload_json}->>'signedDate')::double precision,
+  EXTRACT(EPOCH FROM ${kilo_pass_store_events.created_at}) * 1000
+)`;
+
+/**
+ * True when a processed event of `notificationTypes` for this transaction is newer in store time
+ * than `eventTimeMs`. The newest refund or refund reversal decides the state, so an older event
+ * that arrives late changes nothing.
+ */
+async function hasNewerAppStoreRefundEvent(
+  dbOrTx: DbOrTx,
+  params: { transactionId: string; notificationTypes: readonly string[]; eventTimeMs: number }
+): Promise<boolean> {
+  const rows = await dbOrTx
+    .select({ id: kilo_pass_store_events.id })
+    .from(kilo_pass_store_events)
+    .where(
+      and(
+        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
+        eq(kilo_pass_store_events.provider_transaction_id, params.transactionId),
+        sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
+        sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN (${sql.join(
+          params.notificationTypes.map(type => sql`${type}`),
+          sql`, `
+        )})`,
+        sql`${appStoreEventTimeMs} > ${params.eventTimeMs}`
+      )
+    )
+    .limit(1);
+  return rows.length > 0;
+}
 
 function getRefundReversalDescription(kind: KiloPassIssuanceItemKind): string {
   if (kind === KiloPassIssuanceItemKind.Base) {
@@ -482,7 +616,8 @@ function getAppStoreUpgradeBaseCreditCategory(providerTransactionId: string): st
 
 async function reverseAppStoreRefundCredits(
   tx: DrizzleTransaction,
-  transaction: AppleStoreDecodedTransaction
+  transaction: AppleStoreDecodedTransaction,
+  eventTimeMs: number
 ): Promise<CreditReversalResult> {
   const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
     where: and(
@@ -491,26 +626,41 @@ async function reverseAppStoreRefundCredits(
     ),
   });
 
-  if (!storePurchase) {
+  // The reversal path takes the same user lock first, so the newer-event check below sees a
+  // reversal that committed while this refund waited.
+  const userRows = storePurchase
+    ? await tx
+        .select({ microdollarsUsed: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
+        .for('update')
+        .limit(1)
+    : [];
+  const superseded = await hasNewerAppStoreRefundEvent(tx, {
+    transactionId: transaction.transactionId,
+    notificationTypes: [NotificationTypeV2.REFUND_REVERSED],
+    eventTimeMs,
+  });
+
+  if (!storePurchase || superseded) {
     return {
-      storePurchaseFound: false,
+      storePurchaseFound: storePurchase !== undefined,
+      superseded,
       creditTransactionIds: [],
       totalReversalMicrodollars: 0,
       reversedItemKinds: [],
     };
   }
 
-  const userRows = await tx
-    .select({ microdollarsUsed: kilocode_users.microdollars_used })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
-    .for('update')
-    .limit(1);
   const user = userRows[0];
   if (!user) {
     throw new Error('App Store refund cannot find the subscribed user');
   }
-
+  const ledger = await readAppStoreRefundLedger(
+    tx,
+    storePurchase.kilo_user_id,
+    transaction.transactionId
+  );
   const ownedBaseCreditRows = await tx
     .select({
       creditTransactionId: credit_transactions.id,
@@ -626,12 +776,25 @@ async function reverseAppStoreRefundCredits(
       continue;
     }
 
-    const reversal = await insertCreditReversal(tx, {
+    // An item has one clawback per refund cycle. An open clawback (no restoration yet) means a
+    // redelivered refund, so it is reported and nothing is inserted. After n restored cycles the
+    // next refund writes cycle n under its own category.
+    const itemKey = `${transaction.transactionId}:${item.kind}:${item.itemId}`;
+    const itemClawbacks = ledger.clawbacks.filter(
+      row => row.cycleKey === itemKey || row.cycleKey.startsWith(`${itemKey}:r`)
+    );
+    const openClawback = itemClawbacks.find(row => !ledger.restoredCycleKeys.has(row.cycleKey));
+    if (openClawback) {
+      creditTransactionIds.push(openClawback.creditTransactionId);
+      continue;
+    }
+    const cycle = itemClawbacks.length;
+    const reversal = await insertCreditAdjustment(tx, {
       kiloUserId: storePurchase.kilo_user_id,
-      amountMicrodollars: reversalAmountMicrodollars,
+      signedAmountMicrodollars: -reversalAmountMicrodollars,
       isFree: item.isFree,
       description: getRefundReversalDescription(item.kind),
-      creditCategory: `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${transaction.transactionId}:${item.kind}:${item.itemId}`,
+      creditCategory: `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${itemKey}${cycle === 0 ? '' : `:r${cycle}`}`,
       originalBaselineMicrodollarsUsed: user.microdollarsUsed,
     });
     if (reversal.creditTransactionId) {
@@ -645,6 +808,7 @@ async function reverseAppStoreRefundCredits(
 
   return {
     storePurchaseFound: true,
+    superseded: false,
     creditTransactionIds,
     totalReversalMicrodollars,
     reversedItemKinds,
@@ -653,60 +817,12 @@ async function reverseAppStoreRefundCredits(
 
 type CreditRestorationResult = {
   storePurchaseFound: boolean;
+  /** A newer `REFUND` or `REVOKE` already settled this transaction, so the reversal changed nothing. */
+  superseded: boolean;
   restoredCreditTransactionIds: string[];
   totalRestoredMicrodollars: number;
   restoredItemKinds: KiloPassIssuanceItemKind[];
 };
-
-async function insertCreditRestoration(
-  tx: DrizzleTransaction,
-  params: {
-    kiloUserId: string;
-    amountMicrodollars: number;
-    isFree: boolean;
-    description: string;
-    creditCategory: string;
-    originalBaselineMicrodollarsUsed: number;
-  }
-): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
-  const creditTransactionId = crypto.randomUUID();
-  const insertResult = await tx
-    .insert(credit_transactions)
-    .values({
-      id: creditTransactionId,
-      kilo_user_id: params.kiloUserId,
-      amount_microdollars: params.amountMicrodollars,
-      is_free: params.isFree,
-      description: params.description,
-      credit_category: params.creditCategory,
-      check_category_uniqueness: true,
-      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
-    })
-    .onConflictDoNothing();
-
-  if ((insertResult.rowCount ?? 0) === 0) {
-    const existingRows = await tx
-      .select({ id: credit_transactions.id })
-      .from(credit_transactions)
-      .where(
-        and(
-          eq(credit_transactions.kilo_user_id, params.kiloUserId),
-          eq(credit_transactions.credit_category, params.creditCategory)
-        )
-      )
-      .limit(1);
-    return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
-  }
-
-  await tx
-    .update(kilocode_users)
-    .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${params.amountMicrodollars}`,
-    })
-    .where(eq(kilocode_users.id, params.kiloUserId));
-
-  return { wasInserted: true, creditTransactionId };
-}
 
 function getRefundRestorationDescription(kind: KiloPassIssuanceItemKind | null): string {
   if (kind === KiloPassIssuanceItemKind.Base) {
@@ -719,24 +835,13 @@ function getRefundRestorationDescription(kind: KiloPassIssuanceItemKind | null):
 }
 
 /**
- * The clawback writes `<prefix>:<transactionId>:<kind>:<itemId>` as its credit category, so the
- * reversal recovers the issuance item kind from there.
- */
-function getRefundClawbackItemKind(creditCategory: string | null): KiloPassIssuanceItemKind | null {
-  const segment = creditCategory?.split(':').at(-2);
-  if (segment === undefined) return null;
-  const kinds: string[] = Object.values(KiloPassIssuanceItemKind);
-  return kinds.includes(segment) ? (segment as KiloPassIssuanceItemKind) : null;
-}
-
-/**
- * Puts back exactly the credits `reverseAppStoreRefundCredits` removed, one positive credit
- * transaction per clawback row. A clawback row names its own reversal, so a redelivered
- * `REFUND_REVERSED` inserts nothing a second time.
+ * Puts back exactly the credits each open clawback removed, one positive credit transaction per
+ * clawback row. A restored clawback is closed, so a redelivered `REFUND_REVERSED` inserts nothing.
  */
 async function restoreAppStoreRefundCredits(
   tx: DrizzleTransaction,
-  transaction: AppleStoreDecodedTransaction
+  transaction: AppleStoreDecodedTransaction,
+  eventTimeMs: number
 ): Promise<CreditRestorationResult> {
   const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
     where: and(
@@ -745,63 +850,58 @@ async function restoreAppStoreRefundCredits(
     ),
   });
 
-  if (!storePurchase) {
+  // The refund path takes the same user lock first, so the newer-event check below sees a refund
+  // that committed while this reversal waited.
+  const userRows = storePurchase
+    ? await tx
+        .select({ microdollarsUsed: kilocode_users.microdollars_used })
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
+        .for('update')
+        .limit(1)
+    : [];
+  const superseded = await hasNewerAppStoreRefundEvent(tx, {
+    transactionId: transaction.transactionId,
+    notificationTypes: Array.from(REFUND_TYPES),
+    eventTimeMs,
+  });
+
+  if (!storePurchase || superseded) {
     return {
-      storePurchaseFound: false,
+      storePurchaseFound: storePurchase !== undefined,
+      superseded,
       restoredCreditTransactionIds: [],
       totalRestoredMicrodollars: 0,
       restoredItemKinds: [],
     };
   }
 
-  // The refund path locks the same user row, so a refund processed while this reversal runs
-  // waits here and then sees the reversal. That keeps both orders correct.
-  const userRows = await tx
-    .select({ microdollarsUsed: kilocode_users.microdollars_used })
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, storePurchase.kilo_user_id))
-    .for('update')
-    .limit(1);
   const user = userRows[0];
   if (!user) {
     throw new Error('App Store refund reversal cannot find the subscribed user');
   }
-
-  const clawbackCategoryPrefix = `${APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX}${transaction.transactionId}:`;
-  const clawbackRows = await tx
-    .select({
-      amountMicrodollars: credit_transactions.amount_microdollars,
-      isFree: credit_transactions.is_free,
-      creditCategory: credit_transactions.credit_category,
-    })
-    .from(credit_transactions)
-    .where(
-      and(
-        eq(credit_transactions.kilo_user_id, storePurchase.kilo_user_id),
-        like(credit_transactions.credit_category, `${clawbackCategoryPrefix}%`),
-        lt(credit_transactions.amount_microdollars, 0)
-      )
-    );
+  const ledger = await readAppStoreRefundLedger(
+    tx,
+    storePurchase.kilo_user_id,
+    transaction.transactionId
+  );
 
   const restoredCreditTransactionIds: string[] = [];
   const restoredItemKinds: KiloPassIssuanceItemKind[] = [];
   let totalRestoredMicrodollars = 0;
-  for (const clawback of clawbackRows) {
+  for (const clawback of ledger.clawbacks) {
     const amountMicrodollars = -clawback.amountMicrodollars;
-    if (amountMicrodollars <= 0 || clawback.creditCategory === null) {
+    if (amountMicrodollars <= 0 || ledger.restoredCycleKeys.has(clawback.cycleKey)) {
       continue;
     }
 
-    const itemKind = getRefundClawbackItemKind(clawback.creditCategory);
-    const restoration = await insertCreditRestoration(tx, {
+    const itemKind = getRefundCycleItemKind(clawback.cycleKey);
+    const restoration = await insertCreditAdjustment(tx, {
       kiloUserId: storePurchase.kilo_user_id,
-      amountMicrodollars,
+      signedAmountMicrodollars: amountMicrodollars,
       isFree: clawback.isFree,
       description: getRefundRestorationDescription(itemKind),
-      creditCategory: clawback.creditCategory.replace(
-        APP_STORE_REFUND_CLAWBACK_CATEGORY_PREFIX,
-        APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX
-      ),
+      creditCategory: `${APP_STORE_REFUND_RESTORATION_CATEGORY_PREFIX}${clawback.cycleKey}`,
       originalBaselineMicrodollarsUsed: user.microdollarsUsed,
     });
     if (restoration.creditTransactionId) {
@@ -817,33 +917,11 @@ async function restoreAppStoreRefundCredits(
 
   return {
     storePurchaseFound: true,
+    superseded: false,
     restoredCreditTransactionIds,
     totalRestoredMicrodollars,
     restoredItemKinds,
   };
-}
-
-/**
- * True when a `REFUND_REVERSED` for this transaction finished processing. A reversal that arrives
- * before its refund finds no clawback to put back, so the refund checks here and undoes itself.
- */
-async function hasProcessedAppStoreRefundReversal(
-  dbOrTx: DbOrTx,
-  transactionId: string
-): Promise<boolean> {
-  const rows = await dbOrTx
-    .select({ id: kilo_pass_store_events.id })
-    .from(kilo_pass_store_events)
-    .where(
-      and(
-        eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.AppStore),
-        eq(kilo_pass_store_events.provider_transaction_id, transactionId),
-        sql`${kilo_pass_store_events.processed_at} IS NOT NULL`,
-        sql`${kilo_pass_store_events.payload_json}->>'notificationType' = ${NotificationTypeV2.REFUND_REVERSED}`
-      )
-    )
-    .limit(1);
-  return rows.length > 0;
 }
 
 type TerminalStoreEvent = {
@@ -929,7 +1007,10 @@ function getAppStoreBouncerReport(
   }
 }
 
-/** The Kilo account that owns an App Store transaction, for a report. Never throws. */
+/**
+ * The Kilo account that owns an App Store transaction, for a report. A query failure rejects;
+ * `runAfterResponse` captures it, so it never reaches the store flow.
+ */
 async function resolveAppStoreKiloPassOwner(
   transaction: AppleStoreDecodedTransaction
 ): Promise<string | null> {
@@ -1023,6 +1104,8 @@ export async function processAppStoreKiloPassNotification(params: {
   if (claimedEvent === 'in_flight') {
     return { processed: false, status: 'in_flight' };
   }
+  // Apple always signs `signedDate`; arrival time orders a payload without one, as its row does.
+  const eventTimeMs = notification.signedDate ?? Date.now();
 
   if (transaction && purchase && isImmediateStorePurchaseNotification(notification)) {
     const terminalEvent = await findProcessedTerminalStoreEventForPurchase(purchase);
@@ -1211,7 +1294,7 @@ export async function processAppStoreKiloPassNotification(params: {
     await db.transaction(async tx => {
       let restoration: CreditRestorationResult | null = null;
       try {
-        restoration = await restoreAppStoreRefundCredits(tx, transaction);
+        restoration = await restoreAppStoreRefundCredits(tx, transaction, eventTimeMs);
       } catch (error) {
         captureException(error, {
           tags: { area: 'kilo-pass', operation: 'restore-app-store-refund-credits' },
@@ -1225,7 +1308,10 @@ export async function processAppStoreKiloPassNotification(params: {
         // and the customer's credits would otherwise stay clawed back forever.
         throw error;
       }
-      const subscriptionReopened = await reopenStoreSubscription(tx, transaction);
+      // A newer refund already ended the subscription and took the credits back; keep that state.
+      const subscriptionReopened = restoration.superseded
+        ? false
+        : await reopenStoreSubscription(tx, transaction);
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreNotificationReceived,
         result: KiloPassAuditLogResult.Success,
@@ -1235,6 +1321,7 @@ export async function processAppStoreKiloPassNotification(params: {
           providerSubscriptionId: transaction.originalTransactionId,
           providerTransactionId: transaction.transactionId,
           refundReversal: true,
+          supersededByNewerRefund: restoration.superseded,
           subscriptionReopened,
           storePurchaseFound: restoration.storePurchaseFound,
           restoredCreditTransactionIds: restoration.restoredCreditTransactionIds,
@@ -1273,7 +1360,7 @@ export async function processAppStoreKiloPassNotification(params: {
       // put them. A refund the store signs *after* a reversal is not superseded
       // and claws the pack back again.
       const isCreditPack = Boolean(getStoreCreditProductByAppleProductId(transaction.productId));
-      const superseded =
+      const creditPackSuperseded =
         isCreditPack &&
         (await isStoreRefundDeliverySuperseded(tx, {
           paymentProvider: KiloPassPaymentProvider.AppStore,
@@ -1282,9 +1369,9 @@ export async function processAppStoreKiloPassNotification(params: {
         }));
 
       let reversal: CreditReversalResult | null = null;
-      if (!superseded) {
+      if (!isCreditPack) {
         try {
-          reversal = await reverseAppStoreRefundCredits(tx, transaction);
+          reversal = await reverseAppStoreRefundCredits(tx, transaction, eventTimeMs);
         } catch (error) {
           captureException(sanitizeErrorForTelemetry(error), {
             tags: { area: 'kilo-pass', operation: 'reverse-app-store-refund-credits' },
@@ -1307,7 +1394,7 @@ export async function processAppStoreKiloPassNotification(params: {
       // refunded share; a full refund, a family revoke, or a missing share
       // reverses the whole pack.
       let storeCreditReversal: StoreCreditReversalResult | null = null;
-      if (!superseded && isCreditPack) {
+      if (!creditPackSuperseded && isCreditPack) {
         storeCreditReversal = await reverseStoreCreditPurchase(tx, {
           paymentProvider: KiloPassPaymentProvider.AppStore,
           providerTransactionId: transaction.transactionId,
@@ -1318,32 +1405,14 @@ export async function processAppStoreKiloPassNotification(params: {
               : STORE_FULL_MILLIUNITS,
         });
       }
-      // A reversal processed for this transaction found no clawback to put back at the time, so
-      // this refund is the later fact and the reversal wins: undo the clawback and the ending
-      // here, exactly as the reverse delivery order would have.
-      const reversalAlreadyProcessed =
-        !isCreditPack &&
-        (await hasProcessedAppStoreRefundReversal(tx, transaction.transactionId));
-      let restoration: CreditRestorationResult | null = null;
-      if (reversalAlreadyProcessed) {
-        try {
-          restoration = await restoreAppStoreRefundCredits(tx, transaction);
-        } catch (error) {
-          captureException(error, {
-            tags: { area: 'kilo-pass', operation: 'restore-app-store-refund-credits' },
-            extra: {
-              notificationUuid: notification.notificationUUID,
-              transactionId: transaction.transactionId,
-            },
-          });
-        }
-      }
+      // A newer reversal already restored this Kilo Pass transaction, or the
+      // store signed a reversal after this credit-pack refund: this older
+      // refund changes nothing.
+      const superseded = creditPackSuperseded || (reversal?.superseded ?? false);
       if (!superseded) {
         await endStoreSubscription(tx, transaction);
       }
-      const subscriptionReopened = reversalAlreadyProcessed
-        ? await reopenStoreSubscription(tx, transaction)
-        : false;
+
       await appendKiloPassAuditLog(tx, {
         action: superseded
           ? KiloPassAuditLogAction.StoreNotificationReceived
@@ -1353,17 +1422,13 @@ export async function processAppStoreKiloPassNotification(params: {
           notificationUUID: notification.notificationUUID,
           providerSubscriptionId: transaction.originalTransactionId,
           providerTransactionId: transaction.transactionId,
-          supersededByStoreReversal: superseded,
+          supersededByStoreReversal: creditPackSuperseded,
           storePurchaseFound: reversal?.storePurchaseFound ?? false,
           creditTransactionIds: reversal?.creditTransactionIds ?? [],
           totalReversalMicrodollars: reversal?.totalReversalMicrodollars ?? 0,
           reversedItemKinds: reversal?.reversedItemKinds ?? [],
           storeCreditReversal,
-          refundReversalAlreadyProcessed: reversalAlreadyProcessed,
-          subscriptionReopened,
-          restoredCreditTransactionIds: restoration?.restoredCreditTransactionIds ?? [],
-          totalRestoredMicrodollars: restoration?.totalRestoredMicrodollars ?? 0,
-          restoredItemKinds: restoration?.restoredItemKinds ?? [],
+          supersededByNewerRefundReversal: reversal?.superseded ?? false,
         },
       });
       await tx

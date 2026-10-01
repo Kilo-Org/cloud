@@ -4,7 +4,6 @@ export const proxyErrorTypeSchema = z.enum([
   'invalid_path',
   'invalid_request',
   'temporarily_unavailable',
-  'upgrade_required',
   'usage_limit_exceeded',
   'top_up_in_progress',
   'data_collection_required',

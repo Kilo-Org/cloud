@@ -78,6 +78,7 @@ import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/verc
 import { getManagedOutboundContainerId, getSandboxNamespace } from '../../sandbox-id.js';
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
+import { diagnosticCause, logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import {
   getWorktreeCredentialContainment,
   type CredentialContainmentRequirements,
@@ -2560,6 +2561,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        logControlDiagnostic(
+          'create_failed',
+          {
+            allocationName: this.providerPin?.allocationName ?? this.sandboxId,
+            stage: createdRef === null ? 'create' : 'launch',
+            permanentReason:
+              error instanceof ProviderCreationError ? (error.permanentReason ?? 'none') : 'none',
+            errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+            cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+          },
+          'warn'
+        );
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
@@ -2598,6 +2611,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.sandboxTimers().providerStopAttemptMs,
       'Sandbox cleanup stop timed out'
     ).catch(() => 'retryable' as const);
+    logControlDiagnostic('stop_origin', { origin: 'cleanup', result });
     return result === 'terminal';
   }
 
@@ -2649,6 +2663,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       confirmed = false;
     }
+    logControlDiagnostic('stop_origin', { origin: 'ladder', stopAttempt, confirmed });
     await this.dispatchResult({
       type: 'stop-result',
       at: Date.now(),

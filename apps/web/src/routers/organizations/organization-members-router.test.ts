@@ -4,7 +4,7 @@ import {
   createOrganization,
   addUserToOrganization,
   updateUserRoleInOrganization,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   organization_audit_logs,
   organization_memberships,
@@ -14,10 +14,10 @@ import {
   type User,
   type Organization,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, sql } from 'drizzle-orm';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
-import { sendOrganizationInviteEmail } from '@/lib/email';
+import { sendOrganizationInviteEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchQueuedInviteEmails } from '@/lib/organizations/dispatch-invite-email-outbox';
 import { resetInviteEmailForResend } from '@kilocode/db/external-side-effect-outbox';
 
@@ -29,8 +29,10 @@ jest.mock('@/lib/session-ingest-client', () => ({
 // failure inside the transaction while every other test keeps the real
 // implementation. SWC makes ESM exports non-configurable, so `jest.spyOn` on the
 // named export fails; replace it on the module instead.
-jest.mock('@/lib/organizations/organizations', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/organizations/organizations');
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/organizations/organizations'
+  );
   return {
     ...actual,
     updateUserRoleInOrganization: jest.fn(
@@ -40,7 +42,7 @@ jest.mock('@/lib/organizations/organizations', () => {
 });
 
 // Mock the email service to prevent actual API calls during tests
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendOrganizationInviteEmail: jest.fn().mockResolvedValue({ sent: true }),
   subjects: { orgInvitation: 'Kilo: Teams Invitation' },
   renderTemplate: jest.fn().mockReturnValue('<html></html>'),
@@ -1409,7 +1411,7 @@ describe('organizations members trpc router', () => {
       });
 
       // Get the invitation ID from the database
-      const { db } = await import('@/lib/drizzle');
+      const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
@@ -1483,7 +1485,7 @@ describe('organizations members trpc router', () => {
       });
 
       // Get the invitation ID from the database
-      const { db } = await import('@/lib/drizzle');
+      const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
@@ -1531,7 +1533,7 @@ describe('organizations members trpc router', () => {
       });
 
       // Get the invitation ID from the database
-      const { db } = await import('@/lib/drizzle');
+      const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 
@@ -1570,7 +1572,7 @@ describe('organizations members trpc router', () => {
         role: 'member',
       });
 
-      const { db } = await import('@/lib/drizzle');
+      const { db } = await import('@kilocode/web-shared/lib/drizzle');
       const { organization_invitations } = await import('@kilocode/db/schema');
       const { eq, and } = await import('drizzle-orm');
 

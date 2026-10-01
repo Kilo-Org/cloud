@@ -7,7 +7,7 @@ import {
   device_refresh_tokens,
   native_attested_keys,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { blockUser } from '@/lib/user/block';
 

@@ -14,9 +14,9 @@ import {
   kilocode_users,
   transactional_email_log,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { processTopUp, resolveStripeReceiptUrl } from '@/lib/credits';
+import { processTopUp, resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import {
   KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,
   shouldSendSubscriptionStartedEmailForActivation,
@@ -31,15 +31,15 @@ import {
   subjects,
   sendCreditsTopUpEmail,
   sendKiloClawSubscriptionStartedEmail,
-} from '@/lib/email';
-import { processFirstTopupBonus } from '@/lib/firstTopupBonus';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+} from '@kilocode/web-shared/lib/email';
+import { processFirstTopupBonus } from '@kilocode/web-shared/lib/firstTopupBonus';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 
-jest.mock('@/lib/firstTopupBonus', () => ({
+jest.mock('@kilocode/web-shared/lib/firstTopupBonus', () => ({
   processFirstTopupBonus: jest.fn(),
 }));
 
-jest.mock('@/lib/promotionalCredits', () => ({
+jest.mock('@kilocode/web-shared/lib/promotionalCredits', () => ({
   grantCreditForCategory: jest.fn(async () => ({
     success: true,
     message: 'ok',
@@ -53,7 +53,7 @@ jest.mock('@/lib/kiloclaw/instance-lifecycle', () => ({
   clearTrialInactivityStopAfterTrialTransition: jest.fn(async () => {}),
 }));
 
-jest.mock('@/lib/kilo-pass/usage-triggered-bonus', () => ({
+jest.mock('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus', () => ({
   computeUsageTriggeredMonthlyBonusDecision: jest.fn(() => ({ bonusPercentApplied: 0 })),
   maybeIssueKiloPassBonusFromUsageThreshold: jest.fn(async () => {}),
 }));
@@ -71,16 +71,16 @@ type SendViaMailgunParams = { to: string; subject: string; html: string; replyTo
 const sendViaMailgunMock = jest.fn<Promise<boolean>, [SendViaMailgunParams]>(async () => true);
 const verifyEmailMock = jest.fn<Promise<boolean>, [string]>(async () => true);
 
-jest.mock('@/lib/email-mailgun', () => ({
+jest.mock('@kilocode/web-shared/lib/email-mailgun', () => ({
   getEmailVerificationRecipient: (email: string) => email,
   sendViaMailgun: (params: SendViaMailgunParams) => sendViaMailgunMock(params),
 }));
 
-jest.mock('@/lib/email-neverbounce', () => ({
+jest.mock('@kilocode/web-shared/lib/email-neverbounce', () => ({
   verifyEmail: (email: string) => verifyEmailMock(email),
 }));
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     charges: { retrieve: jest.fn(async () => ({ receipt_url: null })) },
     invoices: { retrieve: jest.fn(async () => ({ hosted_invoice_url: null })) },
@@ -88,7 +88,7 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-import { client as stripeClient } from '@/lib/stripe-client';
+import { client as stripeClient } from '@kilocode/web-shared/lib/stripe-client';
 
 const stripeChargeRetrieveMock = jest.mocked(stripeClient.charges.retrieve);
 const stripeInvoiceRetrieveMock = jest.mocked(stripeClient.invoices.retrieve);

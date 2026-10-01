@@ -1,9 +1,9 @@
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { NextResponse } from 'next/server';
-import { failureResult } from '@/lib/maybe-result';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
 }));
 jest.mock('@/lib/device-auth/device-auth', () => ({
@@ -11,7 +11,7 @@ jest.mock('@/lib/device-auth/device-auth', () => ({
 }));
 
 import { approveDeviceAuthRequest } from '@/lib/device-auth/device-auth';
-import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
+import { getUserFromSessionForCredentialIssuance } from '@kilocode/web-shared/lib/user/server';
 import { POST } from './route';
 
 const mockApprove = jest.mocked(approveDeviceAuthRequest);

@@ -1,4 +1,4 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_connection_attempts,
   kilocode_users,

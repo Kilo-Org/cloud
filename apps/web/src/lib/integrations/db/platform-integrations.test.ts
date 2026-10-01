@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
+import { cleanupDbForTest, db, pool } from '@kilocode/web-shared/lib/drizzle';
 import {
   platform_integrations,
   kilocode_users,

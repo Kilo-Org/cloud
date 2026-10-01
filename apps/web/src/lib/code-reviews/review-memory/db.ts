@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { and, asc, count, desc, eq, gte, inArray, lt, or, type SQL } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   code_review_feedback_events,
   code_review_memory_proposals,

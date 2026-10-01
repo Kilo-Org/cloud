@@ -16,8 +16,8 @@ import {
   toInsertableDbUsageRecord,
   usageTransactionIdleTimeoutQuery,
 } from './processUsage';
-import { reportUsageEvent } from '@/lib/bouncer/client';
-import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
+import { reportUsageEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '@/tests/helpers/approval.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -27,7 +27,7 @@ import {
 import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   microdollar_usage,
   microdollar_usage_daily,
@@ -37,10 +37,10 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, getTableColumns } from 'drizzle-orm';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { Readable } from 'node:stream';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { toMicrodollars } from '@/lib/microdollars';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
@@ -52,8 +52,8 @@ jest.mock('@sentry/nextjs', () => ({
 
 // Bouncer is report-only and its client resolves on any failure; mock it so the
 // usage-event payload can be asserted without a network call.
-jest.mock('@/lib/bouncer/client', () => ({
-  ...(jest.requireActual('@/lib/bouncer/client') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
   reportUsageEvent: jest.fn(async () => undefined),
 }));
 

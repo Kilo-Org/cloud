@@ -1,13 +1,17 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+  KiloPassTier,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 

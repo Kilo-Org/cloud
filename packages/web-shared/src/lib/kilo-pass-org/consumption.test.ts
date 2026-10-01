@@ -9,8 +9,8 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   activatePaidAgreement,
@@ -19,7 +19,7 @@ import {
 } from '@/lib/kilo-pass-org/service';
 import { recordOrganizationConsumption } from './consumption';
 import { repairExpiredOrganizationPassBonuses } from '@/lib/kilo-pass-org/bonus-repair';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 
 const activeWindow = {
   start: new Date('2027-07-01T00:00:00.000Z'),

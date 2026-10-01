@@ -1,12 +1,12 @@
-import { getUserFromAuth } from '@/lib/user/server';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db';
 import { eq } from 'drizzle-orm';
-import { generateOpenRouterDownstreamSafetyIdentifier } from '@/lib/ai-gateway/providerHash';
+import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
 import { GET, POST } from './route';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const originalOpenRouterOrgId = process.env.OPENROUTER_ORG_ID;

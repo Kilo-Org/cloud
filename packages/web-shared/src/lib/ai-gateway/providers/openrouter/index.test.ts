@@ -4,28 +4,31 @@ import {
   getEnhancedOpenRouterModels,
   getOpenRouterTranscriptionModels,
   shouldSuppressOpenRouterModel,
-} from '@/lib/ai-gateway/providers/openrouter';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { createMockResponse, mockOpenRouterModels } from '@/tests/helpers/openrouter-models.helper';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { qwen36_plus_stealth_model } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/kilo-exclusive-models';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   findKiloExclusiveModel,
   isDisabledKiloExclusiveModel,
   kiloExclusiveModels,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
-import { getDataCollectionRequiredModelIds } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { isFableModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { KILO_AUTO_EFFICIENT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
-  getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getDataCollectionRequiredModelIds: jest.fn(() => Promise.resolve(new Set())),
+  })
+);
 
 const originalFetch = global.fetch;
 

@@ -1,4 +1,4 @@
-jest.mock('@/lib/redis', () => ({ redisClient: {} }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {} }));
 jest.mock('@/lib/snowflake', () => ({
   resolveSnowflakeConfig: jest.fn(),
   executeSnowflakeStatement: jest.fn(),

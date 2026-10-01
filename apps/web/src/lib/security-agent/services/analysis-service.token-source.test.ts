@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
@@ -18,7 +18,7 @@ import {
 const shared = { enabled: true };
 const tokenSecret = 'security-agent-token-source-test-secret';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'security-agent-token-source-test-secret',
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   isResourceTokenIssuanceEnabled: () => shared.enabled,
@@ -46,7 +46,7 @@ const mockCreateCloudAgentNextClient = jest.fn<
   cleanupSession: mockCleanupSession,
 }));
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
 
@@ -83,7 +83,7 @@ jest.mock('./auto-dismiss-service', () => ({
   maybeAutoDismissAnalysis: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: () => jest.fn(),
 }));
 

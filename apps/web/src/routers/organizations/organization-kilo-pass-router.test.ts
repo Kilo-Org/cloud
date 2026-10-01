@@ -2,9 +2,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@je
 import type { Organization, User } from '@kilocode/db/schema';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OrganizationKiloPassService } from '@/lib/kilo-pass-org/service';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import type { createCallerForUser as TestCallerFactory } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 

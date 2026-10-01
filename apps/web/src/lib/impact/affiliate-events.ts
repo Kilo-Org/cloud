@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   IMPACT_ACTION_TRACKER_IDS,
   IMPACT_ORDER_ID_MACRO,
@@ -17,7 +17,7 @@ import {
   sendImpactConversionPayload,
 } from '@/lib/impact';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   kilocode_users,
   type AffiliateEventPayloadJson,

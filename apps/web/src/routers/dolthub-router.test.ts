@@ -1,7 +1,9 @@
 // Mock config.server so dolthub-service imports don't fail on missing env vars
-import type * as ConfigServerModule from '@/lib/config.server';
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual<typeof ConfigServerModule>('@/lib/config.server');
+import type * as ConfigServerModule from '@kilocode/web-shared/lib/config.server';
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual = jest.requireActual<typeof ConfigServerModule>(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     DOLTHUB_APP_CLIENT_ID: 'dolthub-client-id-test',
@@ -23,7 +25,7 @@ jest.mock('@sentry/nextjs', () => ({
 
 import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { createCallerForUser } from '@/routers/test-utils';

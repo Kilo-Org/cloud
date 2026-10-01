@@ -1,16 +1,16 @@
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { GET as getCloudAgentBalance } from '@/app/api/cloud-agent-next/balance/route';
 import { GET as getBalance } from '@/app/api/profile/balance/route';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import {
   generateApiToken,
   generateWorkflowGatewayToken,
   generateCloudAgentWorkflowToken,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
 
@@ -25,8 +25,8 @@ jest.mock('next/headers', () => ({
   headers: () => mockHeaders(),
   cookies: jest.fn(),
 }));
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   isResourceTokenIssuanceEnabled: () => true,
 }));
 

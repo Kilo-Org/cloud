@@ -8,7 +8,7 @@ import {
   computeNextExpirationAmount,
   processLocalExpirations,
 } from './creditExpiration';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';

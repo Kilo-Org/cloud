@@ -1,9 +1,9 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only'; // This file imports the database and can therefore only be used on the server side.
 import Stripe from 'stripe';
-import { client } from '@/lib/stripe-client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { captureException } from '@sentry/nextjs';
-import { db, auto_deleted_at } from '@/lib/drizzle';
+import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
 import type { User, PaymentMethod, Organization } from '@kilocode/db/schema';
 import {
   kilo_pass_org_agreements,
@@ -17,23 +17,30 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { toNonNullish } from '@/lib/utils';
-import { logExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
-import { APP_URL } from '@/lib/constants';
+import {
+  logExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
   SYSTEM_AUTO_TOP_UP_USER_ID,
-} from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
-import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
-import { reportCreditEvent, type CreditEvent } from '@/lib/bouncer/client';
-import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
+import { findOrganizationByStripeCustomerId } from '@kilocode/web-shared/lib/organizations/organizations';
+import { reportCreditEvent, type CreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
+import {
+  reportChargeAttempted,
+  type ChargeAttemptContext,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
-import type { StripeConfig } from '@/lib/credits';
-import { processTopUp } from '@/lib/credits';
+import type { StripeConfig } from '@kilocode/web-shared/lib/credits';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
@@ -49,8 +56,8 @@ import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassScheduledChangeStatus,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   KILO_PASS_TERMINAL_SCHEDULE_STATUSES,
   maybeMapStripeScheduleStatusToDb,
@@ -71,7 +78,7 @@ import {
   type OrganizationKiloPassSeatCapacityStripe,
   type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
-import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
+import { getKiloPassMetadataFromStripeMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
   handleKiloClawSubscriptionUpdated,
@@ -93,11 +100,14 @@ import {
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
   STRIPE_ENTERPRISE_MONTHLY_PRICE_ID,
   STRIPE_ENTERPRISE_ANNUAL_PRICE_ID,
-} from '@/lib/config.server';
-import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
+} from '@kilocode/web-shared/lib/config.server';
+import type {
+  OrganizationPlan,
+  BillingCycle,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import { annualTotal, seatPrice } from '@/lib/organizations/constants';
-import { successResult } from '@/lib/maybe-result';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
 import {
@@ -109,11 +119,11 @@ import {
   settleTrustedAutoTopUpInvoice,
   settleTrustedTopUpCharge,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import type { ServiceFeeAssessmentStore } from '@/lib/service-fees/assessments';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import type { ServiceFeeAssessmentStore } from '@kilocode/web-shared/lib/service-fees/assessments';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import { handleKiloPassInvoiceCreated } from '@/lib/service-fees/invoice-created';
-import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
+import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
 import {
   observeServiceFeeChargeRefunded,
   observeServiceFeeCreditNote,

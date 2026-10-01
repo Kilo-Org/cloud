@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { db, pool } from '@/lib/drizzle';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { kilocode_users, security_audit_log } from '@kilocode/db/schema';
 import { SecurityAuditLogAction, SecurityAuditLogActorType } from '@kilocode/db/schema-types';

@@ -5,16 +5,19 @@ import {
   impact_referral_conversions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   getReferralCodeForUser,
   getReferralCodeUsages,
   processReferralTopUp,
 } from '@/lib/referral';
 import { eq, sql } from 'drizzle-orm';
-import { referralRedeemingBonus, referralReferringBonus } from '@/lib/promoCreditCategories';
+import {
+  referralRedeemingBonus,
+  referralReferringBonus,
+} from '@kilocode/web-shared/lib/promoCreditCategories';
 import { ImpactReferralProduct } from '@kilocode/db/schema-types';
-import { REFERRAL_BONUS_AMOUNT } from '@/lib/constants';
+import { REFERRAL_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('referrals', () => {

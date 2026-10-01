@@ -7,13 +7,13 @@ import { randomUUID } from 'crypto';
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { openai_chatgpt_connections, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { getOpenAiChatGptStoredConnection, saveOpenAiChatGptConnection } from './store';
 import { getOpenAiChatGptByokModelIds, isOpenAiChatGptEligible } from './routing';
 import type { OpenAiChatGptConnection } from './types';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 const REQUESTED_MODEL = 'openai/gpt-5-nano';
 const originalPartnerKey = process.env.OPENAI_CHATGPT_API_KEY;

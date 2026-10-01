@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 
 import { kilocode_users, organizations, type Organization, type User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 

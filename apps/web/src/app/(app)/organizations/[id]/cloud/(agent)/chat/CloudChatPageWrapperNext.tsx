@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { CloudChatPage } from '@/components/cloud-agent-next/CloudChatPage';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 type CloudChatPageWrapperNextProps = {
   organizationId: string;

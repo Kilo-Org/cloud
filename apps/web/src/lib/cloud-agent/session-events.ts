@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { z } from 'zod';
-import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
-import { generateBoundedInternalServiceToken } from '@/lib/tokens';
+import { SESSION_INGEST_WORKER_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateBoundedInternalServiceToken } from '@kilocode/web-shared/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const RenameNotifyResponseSchema = z.object({

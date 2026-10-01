@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { userCanViewSessions, userIsSuperadmin } from '@/lib/admin/admin-permissions';
 import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
 import { kilocode_users } from '@kilocode/db/schema';

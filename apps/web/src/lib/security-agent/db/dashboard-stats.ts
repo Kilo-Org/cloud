@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';

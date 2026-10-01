@@ -88,12 +88,12 @@ async function main(): Promise<void> {
   ] = await Promise.all([
     import('drizzle-orm'),
     import('@/lib/balanceCache'),
-    import('@/lib/drizzle'),
-    import('@/lib/kilo-pass/constants'),
-    import('@/lib/kilo-pass/dayjs'),
-    import('@/lib/kilo-pass/enums'),
-    import('@/lib/kilo-pass/issuance'),
-    import('@/lib/kilo-pass/state'),
+    import('@kilocode/web-shared/lib/drizzle'),
+    import('@kilocode/web-shared/lib/kilo-pass/constants'),
+    import('@kilocode/web-shared/lib/kilo-pass/dayjs'),
+    import('@kilocode/web-shared/lib/kilo-pass/enums'),
+    import('@kilocode/web-shared/lib/kilo-pass/issuance'),
+    import('@kilocode/web-shared/lib/kilo-pass/state'),
     import('@kilocode/db/schema'),
   ]);
 

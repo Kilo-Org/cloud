@@ -42,9 +42,12 @@ import {
   parseSignInRedirectContext,
 } from '@/lib/user/next-auth-options';
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
-import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   openai_chatgpt_connections,
   kilocode_users,
@@ -58,8 +61,8 @@ import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
-import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
+import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { and, eq, isNull } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
@@ -71,15 +74,15 @@ import {
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
-import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@/lib/config.server';
+import { NEXTAUTH_SECRET, OPENAI_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 import {
   OPENAI_IDENTITY_SCOPE,
   OPENAI_ISSUER,
   OPENAI_REDIRECT_URI,
   OPENAI_TOKEN_SHARING_SCOPE,
-} from '@/lib/auth/openai/config';
+} from '@kilocode/web-shared/lib/auth/openai/config';
 import { hosted_domain_specials } from '@/lib/auth/constants';
-import { getOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
+import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';

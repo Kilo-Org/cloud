@@ -10,7 +10,10 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Calendar, Repeat } from 'lucide-react';
-import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
+import type {
+  BillingCycle,
+  OrganizationPlan,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { seatPrice } from '@/lib/organizations/constants';
 
 type BillingCycleChangeDialogProps = {

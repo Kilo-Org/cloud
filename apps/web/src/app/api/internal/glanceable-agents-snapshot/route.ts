@@ -2,10 +2,10 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { buildGlanceableSnapshotForUser } from '@/lib/glanceable-agents-snapshot-server';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import type { TRPCContext } from '@/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
 const SECRET_COMPARE_HMAC_KEY = Buffer.from('glanceable-agents-snapshot-secret-compare');
 

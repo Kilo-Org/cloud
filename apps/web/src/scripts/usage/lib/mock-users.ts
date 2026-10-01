@@ -11,7 +11,7 @@
  * re-insert them and hitting the unique-email constraint.
  */
 import { randomUUID } from 'node:crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import { hosted_domain_specials } from '@/lib/auth/constants';

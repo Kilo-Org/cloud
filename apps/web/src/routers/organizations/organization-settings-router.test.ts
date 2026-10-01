@@ -5,11 +5,11 @@ import {
   addUserToOrganization,
   updateOrganizationSettings,
   getOrganizationById,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   type User,
   type Organization,
@@ -21,13 +21,13 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
     buildAutoModelCatalogEntry: jest.fn(model => ({
@@ -43,17 +43,20 @@ jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => {
-  return {
-    getProviderSlugsForModel: jest.fn(),
-  };
-});
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => {
+    return {
+      getProviderSlugsForModel: jest.fn(),
+    };
+  }
+);
 
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@/lib/ai-gateway/latest-model-aliases';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { userHasCustomLlmAccess } from '@/lib/ai-gateway/custom-llm/access';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
 
 function makeTestOpenRouterModel(id: string): OpenRouterModel {
   return {

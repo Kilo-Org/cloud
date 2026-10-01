@@ -16,10 +16,10 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
-import { USER_DELETION_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   deleteOwnedByUserIdPage,
   OWNED_BY_USER_DELETE_PAGE_SIZE,

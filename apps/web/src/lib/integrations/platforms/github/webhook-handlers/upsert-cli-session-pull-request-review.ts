@@ -1,8 +1,8 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { normalizeGitUrl } from '@/lib/integrations/platforms/github/normalize-git-url';
 import type { PullRequestReviewPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import {

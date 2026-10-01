@@ -2,8 +2,8 @@ import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,

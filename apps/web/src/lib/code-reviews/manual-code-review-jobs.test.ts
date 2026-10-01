@@ -10,7 +10,7 @@ const mockAssertCouncilCreationAllowed = jest.fn();
 const mockCreateCodeReview = jest.fn();
 const mockTryDispatchPendingReviews = jest.fn();
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   isLocalCodeReviewDevelopmentEnabled: () => mockIsLocalCodeReviewDevelopmentEnabled(),
 }));
 

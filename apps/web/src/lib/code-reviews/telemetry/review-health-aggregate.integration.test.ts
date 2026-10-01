@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_code_review_attempts,
   cloud_agent_code_reviews,

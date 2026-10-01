@@ -1,4 +1,4 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { getDatabaseClientConfig } from '@kilocode/db';
 import { pg } from '@kilocode/db/client';
 import { drizzle } from 'drizzle-orm/node-postgres';

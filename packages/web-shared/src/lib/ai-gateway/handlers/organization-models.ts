@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { handleTRPCRequest } from '@/lib/organizations/organization-settings-route-handler';
-import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 
 export async function handleOrganizationModelsRequest(
   request: NextRequest,

@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 import { TRPCError } from '@trpc/server';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import { INBOX_SEARCH_QUERY, prLedgerResourceKey } from './github-pr-review-router';
 
@@ -36,7 +36,7 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 // tests that assert the missing-terms rejection override it to resolve [].
 const mockTermsLookup = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: () => ({
       from: () => ({

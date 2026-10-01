@@ -12,7 +12,7 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: (...args: unknown[]) => mockCreateControlTokenForRequest(...args),
 }));
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
 
@@ -27,7 +27,7 @@ jest.mock('@/lib/app-builder/app-builder-service', () => ({
 
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { Owner } from '@/lib/integrations/core/types';

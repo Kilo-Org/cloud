@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import type { MergeRequestPayload } from '../webhook-schemas';
 import { GITLAB_ACTION, PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   cancelActiveCodeReviewsById,
   createCodeReview,
@@ -28,7 +28,7 @@ import {
   getOrCreateProjectAccessToken,
   getValidGitLabToken,
 } from '@/lib/integrations/gitlab-service';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { GitLabCredentialActor } from '../credential-broker-client';
 
 const SUPERSEDED_BY_NEW_PUSH_REASON = 'Superseded by new push';

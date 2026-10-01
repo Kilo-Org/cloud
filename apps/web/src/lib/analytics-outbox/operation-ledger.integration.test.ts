@@ -10,7 +10,7 @@
 import { randomUUID } from 'crypto';
 import { and, eq, sql } from 'drizzle-orm';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { analytics_event_outbox, operation_ledgers } from '@kilocode/db/schema';
 import type { AnalyticsEventMap } from '@kilocode/app-shared/analytics';
 import {

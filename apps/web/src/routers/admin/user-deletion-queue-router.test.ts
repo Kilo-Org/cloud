@@ -14,12 +14,12 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {
   USER_DELETION_CATALOG_VERSION,
   USER_DELETION_ID_ONLY_CATALOG_VERSION,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
 import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { inferRouterInputs } from '@trpc/server';

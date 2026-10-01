@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kilocode_users,
@@ -13,7 +13,7 @@ const mockInfoLogger = jest.fn();
 const mockWarningLogger = jest.fn();
 const mockErrorLogger = jest.fn();
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: (_scope: string, level: string) => {
     if (level === 'error') return mockErrorLogger;
     if (level === 'warning') return mockWarningLogger;

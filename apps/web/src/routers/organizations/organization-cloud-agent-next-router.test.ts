@@ -1,11 +1,11 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { inspect } from 'node:util';
 import { DrizzleQueryError } from 'drizzle-orm';
-import type * as TrpcInitModule from '@/lib/trpc/init';
+import type * as TrpcInitModule from '@kilocode/web-shared/lib/trpc/init';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
-import type * as MinimumVersionModule from '@/lib/trpc/min-version';
-import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
+import type * as MinimumVersionModule from '@kilocode/web-shared/lib/trpc/min-version';
+import type * as OrganizationUtilsModule from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import type * as ZodModule from 'zod';
 import type { z } from 'zod';
@@ -16,7 +16,7 @@ import {
   type Organization,
   type User,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
@@ -209,8 +209,8 @@ jest.mock('@/lib/cloud-agent-next/worktree-chat', () => ({
   createWorktreeChat: mockCreateWorktreeChat,
 }));
 
-jest.mock('@/lib/trpc/min-version', () => ({
-  ...jest.requireActual<typeof MinimumVersionModule>('@/lib/trpc/min-version'),
+jest.mock('@kilocode/web-shared/lib/trpc/min-version', () => ({
+  ...jest.requireActual<typeof MinimumVersionModule>('@kilocode/web-shared/lib/trpc/min-version'),
   getMinimumVersions: jest.fn(async () => ({ ios: '0.0.0', android: '0.0.0' })),
   enforceMinimumVersion: jest.fn(() => ({ pass: true })),
 }));
@@ -219,7 +219,7 @@ jest.mock('@/lib/cloud-agent-next/balance-check-eligibility', () => ({
   computeCloudAgentNextBalanceCheckEligibility: mockComputeCloudAgentNextBalanceCheckEligibility,
 }));
 
-jest.mock('@/lib/posthog-feature-flags', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isFeatureFlagEnabledOrDevelopment: mockIsFeatureFlagEnabledOrDevelopment,
 }));
 
@@ -230,7 +230,7 @@ jest.mock('@/lib/cloud-agent/bitbucket-integration-helpers', () => ({
   fetchBitbucketRepositoriesForOrganization: mockFetchBitbucketRepositoriesForOrganization,
 }));
 
-jest.mock('@/lib/organizations/organization-usage', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceForOrganizationUser: mockGetBalanceForOrganizationUser,
 }));
 
@@ -263,8 +263,8 @@ jest.mock('@/lib/r2/cloud-agent-pending-uploads', () => ({
   releasePendingUploads: jest.fn(),
 }));
 
-jest.mock('@/routers/organizations/utils', () => {
-  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@/lib/trpc/init');
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => {
+  const trpcInit = jest.requireActual<typeof TrpcInitModule>('@kilocode/web-shared/lib/trpc/init');
   const zod = jest.requireActual<typeof ZodModule>('zod');
   const organizationProcedure = trpcInit.baseProcedure
     .input(zod.object({ organizationId: zod.uuid() }))
@@ -392,7 +392,7 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
 };
 
 beforeAll(async () => {
-  const { createCallerFactory } = await import('@/lib/trpc/init');
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const mod = await import('./organization-cloud-agent-next-router');
   createCaller = createCallerFactory(mod.organizationCloudAgentNextRouter);
 });
@@ -510,7 +510,7 @@ describe('organizationCloudAgentNextRouter.getSandboxStatus', () => {
     'sanitizes early membership failures in %s responses and error reporting',
     async nodeEnv => {
       const { ensureOrganizationAccess } = jest.requireActual<typeof OrganizationUtilsModule>(
-        '@/routers/organizations/utils'
+        '@kilocode/web-shared/routers/organizations/utils'
       );
       const { organizationCloudAgentNextRouter } =
         await import('./organization-cloud-agent-next-router');

@@ -1,13 +1,13 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
 import {
   getOrganizationProviderPrivacy,
   creditsBlockedResponse,
@@ -15,22 +15,22 @@ import {
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   systemOneRequestSchema,
   systemOneResponseSchema,
   SYSTEM_ONE_MODEL_PROVIDERS,
-} from '@/lib/ai-gateway/typesafe/schemas';
-import { FEATURE_HEADER, validateFeatureHeader } from '@/lib/feature-detection';
-import { toMicrodollars } from '@/lib/microdollars';
-import { errorExceptInTest } from '@/lib/utils.server';
-import type { ProxyErrorType } from '@/lib/proxy-error-types';
+} from '@kilocode/web-shared/lib/ai-gateway/typesafe/schemas';
+import { FEATURE_HEADER, validateFeatureHeader } from '@kilocode/web-shared/lib/feature-detection';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });

@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
+import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';

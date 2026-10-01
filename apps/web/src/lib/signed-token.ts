@@ -1,6 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 const HMAC_ALGORITHM = 'sha256';
 const NONCE_BYTES = 16;

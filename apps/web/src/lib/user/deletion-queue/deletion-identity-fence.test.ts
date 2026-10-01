@@ -3,7 +3,7 @@ import {
   UserDeletionRequestStatus,
 } from '@kilocode/db/schema-types';
 import { user_deletion_requests } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   authPassesDeletionFence,
   assertNoActiveDeletionFence,

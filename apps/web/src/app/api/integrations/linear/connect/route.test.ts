@@ -1,23 +1,23 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getLinearOAuthUrl } from '@/lib/integrations/linear-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/integrations/linear-service', () => ({
   getLinearOAuthUrl: jest.fn(),
 }));
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   beginProviderOAuthAttempt: jest.fn(async () => undefined),
 }));
-jest.mock('@/routers/organizations/utils', () => ({
+jest.mock('@kilocode/web-shared/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
-jest.mock('@/lib/organizations/trial-middleware', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/trial-middleware', () => ({
   requireActiveSubscriptionOrTrial: jest.fn(),
 }));
 jest.mock('@sentry/nextjs', () => ({

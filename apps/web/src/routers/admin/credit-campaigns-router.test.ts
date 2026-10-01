@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { credit_campaigns, credit_transactions } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';

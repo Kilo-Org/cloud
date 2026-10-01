@@ -4,13 +4,13 @@ const mockGetOrganizationById = jest.fn();
 const mockGetMostRecentSeatPurchase = jest.fn();
 const mockIsLocalCodeReviewDevelopmentEnabled = jest.fn();
 
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   getOrganizationById: (...args: unknown[]) => mockGetOrganizationById(...args),
 }));
-jest.mock('@/lib/organizations/organization-seat-purchases', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-seat-purchases', () => ({
   getMostRecentSeatPurchase: (...args: unknown[]) => mockGetMostRecentSeatPurchase(...args),
 }));
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   isLocalCodeReviewDevelopmentEnabled: () => mockIsLocalCodeReviewDevelopmentEnabled(),
 }));
 

@@ -1,22 +1,22 @@
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
   organizationMemberProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import { GeneratePortalLinkIntent, WorkOS, OrganizationDomainState } from '@workos-inc/node';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_domain_claims, organizations } from '@kilocode/db/schema';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
-import { OrganizationSSODomainSchema } from '@/lib/organizations/organization-types';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { successResult } from '@/lib/maybe-result';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import { OrganizationSSODomainSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 const OrgIdSchema = OrganizationIdInputSchema;
 

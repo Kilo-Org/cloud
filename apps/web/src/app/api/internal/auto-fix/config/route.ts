@@ -19,9 +19,9 @@
 import { timingSafeEqual } from '@kilocode/encryption';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { errorExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getFixConfig } from '@/lib/auto-fix/github/get-fix-config';
 
 export async function POST(req: NextRequest) {

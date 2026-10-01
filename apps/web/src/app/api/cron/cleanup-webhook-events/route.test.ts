@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
 
 jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   createScheduledJobRun: jest.fn(() => ({ runId: 'run-id' })),
@@ -13,7 +13,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
 }));
 
 import { webhook_events } from '@kilocode/db/schema';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { GET, maxDuration } from './route';

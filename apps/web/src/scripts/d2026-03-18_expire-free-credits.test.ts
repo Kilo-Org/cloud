@@ -14,7 +14,7 @@ import { execSync } from 'node:child_process';
 import { writeFileSync, unlinkSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { db, closeAllDrizzleConnections } from '@/lib/drizzle';
+import { db, closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { defineTestUser } from '@/tests/helpers/user.helper';
@@ -561,7 +561,7 @@ async function runAssertions(): Promise<AssertionResult[]> {
   }
 
   // --- Helper: simulate expiration and return total expired amount
-  const { computeExpiration } = await import('@/lib/creditExpiration');
+  const { computeExpiration } = await import('@kilocode/web-shared/lib/creditExpiration');
 
   function simulateExpiration(userId: string): number {
     const credits = creditsFor(userId).filter(c => c.expiry_date != null);

@@ -2,13 +2,13 @@ import { and, eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 
 import { kilo_pass_store_events } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { revokeGooglePlaySubscriptionPurchase } from './google-play-sdk';
 
 export type ReverseDuplicateGooglePlaySubscriptionParams = {

@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   exa_monthly_usage,
   exa_usage_log,
@@ -10,7 +10,7 @@ import {
 import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
-import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
 // Mock next/server's after function which requires request context

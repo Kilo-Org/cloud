@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeAll, beforeEach, jest } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
 import { eq } from 'drizzle-orm';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions, kiloclaw_cli_runs } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User, Organization } from '@kilocode/db/schema';
 import type { createCallerForUser as createCallerForUserType } from '@/routers/test-utils';
 import type { KiloClawApiError as KiloClawApiErrorType } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { UpstreamApiError } from '@/lib/trpc/init';
+import { UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

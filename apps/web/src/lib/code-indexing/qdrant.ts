@@ -1,4 +1,4 @@
-import { QDRANT_API_KEY, QDRANT_HOST } from '@/lib/config.server';
+import { QDRANT_API_KEY, QDRANT_HOST } from '@kilocode/web-shared/lib/config.server';
 import { QdrantClient } from '@qdrant/js-client-rest';
 
 const qdrantHost = QDRANT_HOST;

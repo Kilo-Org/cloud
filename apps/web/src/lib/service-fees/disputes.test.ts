@@ -8,8 +8,8 @@ import {
   settleServiceFeeAssessment,
   upsertServiceFeeAssessment,
   type ServiceFeeAssessmentRecord,
-} from '@/lib/service-fees/assessments';
-import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   observeServiceFeeDisputeClosed,
   observeServiceFeeDisputeFundsWithdrawn,

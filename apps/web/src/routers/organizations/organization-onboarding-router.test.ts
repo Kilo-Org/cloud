@@ -1,6 +1,9 @@
 import { beforeAll, describe, expect, it } from '@jest/globals';
 import type { Organization, User } from '@kilocode/db/schema';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 

@@ -1,5 +1,5 @@
 import { eq, inArray, sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
 import {

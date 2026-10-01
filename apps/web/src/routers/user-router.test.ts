@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   credit_transactions,
@@ -19,17 +19,17 @@ import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
-import { sendSignInCodeEmail } from '@/lib/email';
+import { sendSignInCodeEmail } from '@kilocode/web-shared/lib/email';
 import {
   sendAccountDeletionConfirmationEmail,
   sendAccountDeletionSupportNotification,
-} from '@/lib/email';
+} from '@kilocode/web-shared/lib/email';
 import { performGdprRemoval } from '@/lib/user/gdpr-removal';
 import { assertUserCanBeSoftDeleted, SoftDeletePreconditionError } from '@/lib/user';
-import { refreshGlanceableScope } from '@/lib/notifications-worker-client';
+import { refreshGlanceableScope } from '@kilocode/web-shared/lib/notifications-worker-client';
 
-jest.mock('@/lib/email', () => {
-  const actual = jest.requireActual('@/lib/email');
+jest.mock('@kilocode/web-shared/lib/email', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/email');
   return {
     ...actual,
     sendSignInCodeEmail: jest.fn(),
@@ -54,7 +54,7 @@ jest.mock('@/lib/user', () => {
 // the router asks the notifications worker for a scope refresh so the retired
 // card is ended at registration. Never let that best-effort call reach the
 // network here.
-jest.mock('@/lib/notifications-worker-client', () => ({
+jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   refreshGlanceableScope: jest.fn(),
 }));
 

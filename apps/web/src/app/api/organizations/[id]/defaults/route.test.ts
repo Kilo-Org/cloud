@@ -2,24 +2,27 @@ import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import { GET } from './route';
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   getModelIdToProviderSlugsIndex,
   getProviderSlugsForModel,
-} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 jest.mock('@/lib/organizations/organization-auth');
-jest.mock('@/lib/ai-gateway/providers/openrouter');
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
-  getModelIdToProviderSlugsIndex: jest.fn(),
-  getProviderSlugsForModel: jest.fn(),
-}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => ({
+    getModelIdToProviderSlugsIndex: jest.fn(),
+    getProviderSlugsForModel: jest.fn(),
+  })
+);
 
 const mockedGetAuthorizedOrgContext = jest.mocked(getAuthorizedOrgContext);
 const mockedGetEnhancedOpenRouterModels = jest.mocked(getEnhancedOpenRouterModels);

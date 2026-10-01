@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -10,7 +10,7 @@ jest.mock('@/lib/config.server', () => ({
 // needs more than the default 5s budget.
 jest.setTimeout(30_000);
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,

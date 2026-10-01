@@ -1,12 +1,12 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
 import { UserDeletionStepStatus, type UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import {
   USER_DELETION_USAGE_PREFIX_BATCH_SIZE,
   USER_DELETION_USAGE_PREFIX_STATEMENT_TIMEOUT_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { continueIfLowTime } from '@/lib/user/deletion-queue/handlers/common';
 import type { DeletionHandler } from '@/lib/user/deletion-queue/handlers/common';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';

@@ -1,8 +1,8 @@
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { APP_URL } from '@/lib/constants';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { UsageRecordInsertResult } from './processUsage.types';
 import { UsageRecordResponseSchema, type UsageRecordRequest } from './usage-record-contract';
 

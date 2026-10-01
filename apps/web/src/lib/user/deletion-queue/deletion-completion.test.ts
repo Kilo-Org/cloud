@@ -5,7 +5,7 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
 import {
   advanceDeletionGates,

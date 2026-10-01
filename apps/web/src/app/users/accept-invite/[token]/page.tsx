@@ -1,9 +1,9 @@
 import { authOptions } from '@/lib/user/next-auth-options';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { getServerSession } from 'next-auth';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { acceptOrganizationInvite } from '@/lib/organizations/organizations';
+import { acceptOrganizationInvite } from '@kilocode/web-shared/lib/organizations/organizations';
 import { ensureHasValidStytch } from '@/lib/user';
 
 type AcceptInvitePageProps = {

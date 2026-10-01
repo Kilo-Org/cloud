@@ -2,11 +2,11 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
-  ...jest.requireActual('@/lib/organizations/effective-model-access.server'),
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/organizations/effective-model-access.server'),
   isOrganizationModelUpdateAllowed: jest.fn(async () => true),
 }));
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,

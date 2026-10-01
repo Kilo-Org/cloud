@@ -3,7 +3,7 @@
  */
 
 import crypto from 'crypto';
-import { AI_ATTRIBUTION_ADMIN_SECRET } from '@/lib/config.server';
+import { AI_ATTRIBUTION_ADMIN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import 'server-only';
 import { z } from 'zod';
 

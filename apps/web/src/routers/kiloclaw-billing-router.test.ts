@@ -15,7 +15,7 @@ import {
   afterEach,
   jest,
 } from '@jest/globals';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
   kiloclaw_earlybird_purchases,
   kiloclaw_subscriptions,
@@ -30,11 +30,15 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
-import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassTier,
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { differenceInCalendarMonths } from 'date-fns';
 import { CURRENT_KILOCLAW_PRICE_VERSION, LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 (kiloclaw_subscriptions.kiloclaw_price_version as { defaultFn: () => string }).defaultFn = () =>
@@ -53,7 +57,7 @@ jest.setTimeout(15_000);
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
   const stripeMock = {
@@ -80,7 +84,7 @@ jest.mock('@/lib/stripe-client', () => {
   return { client: stripeMock, __stripeMock: stripeMock };
 });
 
-jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
+jest.mock('@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server', () => ({
   getStripePriceIdForClawPlan: jest.fn(() => 'price_test_kiloclaw'),
   getStripePriceIdForClawPlanIntro: jest.fn((plan: string) =>
     plan === 'standard' ? 'price_standard_intro' : 'price_commit'
@@ -159,7 +163,7 @@ jest.mock('@/lib/kiloclaw/kiloclaw-internal-client', () => {
 
 const posthogCaptureMock = jest.fn();
 
-jest.mock('@/lib/posthog', () => ({
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({
   __esModule: true,
   default: () => ({
     capture: posthogCaptureMock,
@@ -193,7 +197,7 @@ type StripeMockShape = {
 };
 
 const stripeMock = jest.requireMock<{ __stripeMock: StripeMockShape }>(
-  '@/lib/stripe-client'
+  '@kilocode/web-shared/lib/stripe-client'
 ).__stripeMock;
 const stripePriceIdsMock = jest.requireMock<{
   getStripePriceIdForClawPlan: AnyMock;
@@ -202,7 +206,7 @@ const stripePriceIdsMock = jest.requireMock<{
   getClawPlanForStripePriceId: AnyMock;
   getStripePriceIdMetadata: AnyMock;
   isIntroPriceId: AnyMock;
-}>('@/lib/kiloclaw/stripe-price-ids.server');
+}>('@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server');
 const kiloclawInternalClientMock = jest.requireMock<KiloclawInternalClientMockShape>(
   '@/lib/kiloclaw/kiloclaw-internal-client'
 );

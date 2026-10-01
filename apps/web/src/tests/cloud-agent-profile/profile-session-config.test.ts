@@ -4,7 +4,7 @@
  * harness because that's where the Drizzle migrations, seed helpers, and
  * Jest setup already live.
  */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_environment_profiles,
   agent_environment_profile_vars,

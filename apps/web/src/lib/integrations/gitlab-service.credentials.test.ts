@@ -8,7 +8,7 @@ import {
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
 import type { PlatformIntegration } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
@@ -56,7 +56,7 @@ const keyPair = generateKeyPairSync('rsa', {
   privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
 });
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID: KEY_ID,
   BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_PUBLIC_KEY: Buffer.from(keyPair.publicKey).toString('base64'),
 }));

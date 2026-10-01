@@ -8,7 +8,7 @@ import {
   kilo_pass_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
@@ -18,10 +18,13 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
-import { computeMonthlyCadenceBonusPercent, getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@/lib/kilo-pass/constants';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import {
+  computeMonthlyCadenceBonusPercent,
+  getMonthlyPriceUsd,
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { and, eq } from 'drizzle-orm';
 
 beforeEach(async () => {

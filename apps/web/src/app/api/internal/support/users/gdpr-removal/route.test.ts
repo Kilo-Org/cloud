@@ -1,18 +1,24 @@
 import { NextRequest } from 'next/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { getUserFromAuth } from '@/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getUserDeletionRequestById } from '@/lib/user/deletion';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { DeletionRefusalCode } from '@/lib/user/deletion-queue/deletion-intake';
-import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';
+import {
+  setAdminAccessSinkForTest,
+  type AdminAccessEvent,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { defineTestUser } from '@/tests/helpers/user.helper';
 
 const mockSecrets = {
   SUPPORT_API_SECRET: 'mock-support-api-secret',
 };
 
-jest.mock('@/lib/config.server', () => {
-  const actual = jest.requireActual('@/lib/config.server') as Record<string, unknown>;
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual = jest.requireActual('@kilocode/web-shared/lib/config.server') as Record<
+    string,
+    unknown
+  >;
   return {
     ...actual,
     get SUPPORT_API_SECRET() {
@@ -21,11 +27,11 @@ jest.mock('@/lib/config.server', () => {
   };
 });
 
-jest.mock('@/lib/user/find-user-by-id', () => ({
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 

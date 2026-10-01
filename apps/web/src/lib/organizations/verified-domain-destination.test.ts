@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   addUserToOrganization,
   createOrganization,
   getProfileOrganizations,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   kilocode_users,

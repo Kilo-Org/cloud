@@ -1,14 +1,14 @@
 import jwt from 'jsonwebtoken';
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { generateCloudAgentWorkflowToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken } from '@kilocode/web-shared/lib/tokens';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
 
 const issuance = { enabled: true };
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
   isResourceTokenIssuanceEnabled: () => issuance.enabled,
 }));
 

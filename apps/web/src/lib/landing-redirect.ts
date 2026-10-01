@@ -1,4 +1,4 @@
-import { LANDING_URL } from '@/lib/constants';
+import { LANDING_URL } from '@kilocode/web-shared/lib/constants';
 
 export function buildLandingRedirectUrl(path: string, searchParams?: NextAppSearchParams): string {
   const url = new URL(path, LANDING_URL);

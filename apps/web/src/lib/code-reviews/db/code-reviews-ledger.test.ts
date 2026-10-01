@@ -21,7 +21,7 @@ jest.mock('@kilocode/db/operation-ledger', () => {
 });
 
 import { codeReviewTerminalOutcome } from '../code-review-ledger';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_reviews,

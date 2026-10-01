@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { createCallerForUser } from '@/routers/test-utils';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';

@@ -9,11 +9,11 @@ import {
   kilocode_users,
 } from '@kilocode/db/schema';
 
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { blockUser } from '@/lib/user/block';
 import { KiloPassError } from '@/lib/kilo-pass/errors';
 import {
@@ -21,13 +21,13 @@ import {
   applyPendingKiloPassReferralBonusForIssuance,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import {
   getKiloPassMetadataFromStripeMetadata,
   getKiloPassPriceMetadataFromInvoice,
   getKiloPassSubscriptionMetadata,
-} from '@/lib/kilo-pass/stripe-handlers-metadata';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import {
   getInvoiceIssueMonth,
@@ -35,9 +35,9 @@ import {
   resolveSettledInvoicePayment,
   getStripeEndedAtIso,
   type SettledInvoicePaymentResolution,
-} from '@/lib/kilo-pass/stripe-handlers-utils';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import type Stripe from 'stripe';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -45,8 +45,8 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 import { captureException } from '@sentry/nextjs';
 import {
   acquireDuplicateCardSubscriptionLock,
@@ -58,7 +58,7 @@ import {
   type DuplicateCardGateResult,
   type PaymentFingerprintClaimResult,
 } from '@/lib/kilo-pass/card-fingerprint-gate';
-import { processTopUp } from '@/lib/credits';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
@@ -72,12 +72,12 @@ import {
   type KiloPassAffiliateSaleContext,
 } from '@/lib/kilo-pass/affiliate-sale';
 import { processPersonalKiloPassStripePaidConversion } from '@/lib/impact/kilo-pass-referrals';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import {
   settleKiloPassInvoiceServiceFee,
   type KiloPassServiceFeeSettlementResult,
 } from '@/lib/service-fees/settlement';
-import { isServiceFeeInvoiceLine } from '@/lib/service-fees/stripe-lines';
+import { isServiceFeeInvoiceLine } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   runAfterResponse,
   trackKiloPassPurchaseCompleted,

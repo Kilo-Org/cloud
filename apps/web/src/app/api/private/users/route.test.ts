@@ -1,13 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
 import { GET } from './route';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organization_memberships, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { failureResult } from '@/lib/maybe-result';
-import { getUserFromAuth } from '@/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 

@@ -1,12 +1,12 @@
 const mockSendKiloPassDuplicateCardCanceledEmail = jest.fn();
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendKiloPassDuplicateCardCanceledEmail: (...args: unknown[]) =>
     mockSendKiloPassDuplicateCardCanceledEmail(...args),
 }));
 
 import { beforeEach, describe, expect, test } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_audit_log,
   kilo_pass_issuances,
@@ -23,8 +23,8 @@ import {
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassWelcomePromoPaymentFingerprintType,
-} from '@/lib/kilo-pass/enums';
-import type { SettledInvoicePaymentResolution } from '@/lib/kilo-pass/stripe-handlers-utils';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import type { SettledInvoicePaymentResolution } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';

@@ -1,6 +1,6 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_audit_log,
   kilo_pass_store_purchases,
@@ -12,7 +12,7 @@ import {
   KiloPassCadence,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, eq, sql } from 'drizzle-orm';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';

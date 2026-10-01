@@ -37,7 +37,7 @@ jest.mock('@/lib/impact/advocate', () => {
   };
 });
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: {
       update: jest.fn(async () => ({})),
@@ -45,7 +45,7 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import type { isImpactConfigured, sendImpactConversionPayload } from '@/lib/impact';
 import type {
   isImpactAdvocateConfigured,

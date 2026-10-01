@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { createCallerFactory } from '@/lib/trpc/init';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
@@ -9,7 +9,7 @@ import {
 } from '@/lib/github/open-pull-request-counts';
 import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
 import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
-import { setAdminAccessSinkForTest } from '@/lib/admin/admin-access-log';
+import { setAdminAccessSinkForTest } from '@kilocode/web-shared/lib/admin/admin-access-log';
 
 jest.mock('@/lib/github/open-pull-request-counts', () => ({
   getKilocodeRepoOpenPullRequestCounts: jest.fn(),

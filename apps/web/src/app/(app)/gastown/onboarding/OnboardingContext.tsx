@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { ReactNode } from 'react';
 import { useGastownTRPC, getToken } from '@/lib/gastown/trpc';
-import { GASTOWN_URL } from '@/lib/constants';
+import { GASTOWN_URL } from '@kilocode/web-shared/lib/constants';
 import type { ModelPreset, CustomModels } from './onboarding.domain';
 import { presetToConfig } from './onboarding.domain';
 

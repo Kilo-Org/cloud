@@ -1,5 +1,5 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   contributor_champion_contributors,
   contributor_champion_events,
@@ -8,23 +8,23 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { fetchWithBackoff as fetchWithBackoffType } from '@/lib/fetchWithBackoff';
-import type { grantCreditForCategory as grantCreditForCategoryType } from '@/lib/promotionalCredits';
+import type { fetchWithBackoff as fetchWithBackoffType } from '@kilocode/web-shared/lib/fetchWithBackoff';
+import type { grantCreditForCategory as grantCreditForCategoryType } from '@kilocode/web-shared/lib/promotionalCredits';
 import type * as serviceModule from './service';
 
 const mockedFetchWithBackoff = jest.fn() as jest.MockedFunction<typeof fetchWithBackoffType>;
 const mockedGrantCredit = jest.fn() as jest.MockedFunction<typeof grantCreditForCategoryType>;
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CONTRIBUTOR_CHAMPION_TEAM_EMAILS: '',
   GITHUB_ADMIN_STATS_TOKEN: 'test-github-token',
 }));
 
-jest.mock('@/lib/fetchWithBackoff', () => ({
+jest.mock('@kilocode/web-shared/lib/fetchWithBackoff', () => ({
   fetchWithBackoff: mockedFetchWithBackoff,
 }));
 
-jest.mock('@/lib/promotionalCredits', () => ({
+jest.mock('@kilocode/web-shared/lib/promotionalCredits', () => ({
   grantCreditForCategory: mockedGrantCredit,
 }));
 

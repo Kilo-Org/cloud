@@ -1,5 +1,5 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   mcp_gateway_assignments,

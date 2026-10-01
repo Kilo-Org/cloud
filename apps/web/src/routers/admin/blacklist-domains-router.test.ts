@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { cleanupDbForTest } from '@/lib/drizzle';
+import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { computeBlacklistStats, isDomainOnBlacklist } from './blacklist-domains-router';

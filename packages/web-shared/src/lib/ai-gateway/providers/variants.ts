@@ -1,16 +1,16 @@
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { isDeepseekModel } from '@/lib/ai-gateway/providers/deepseek';
-import { isGeminiModel } from '@/lib/ai-gateway/providers/google';
-import { isMuseModel } from '@/lib/ai-gateway/providers/meta';
-import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
-import { isMistralModel } from '@/lib/ai-gateway/providers/mistral';
-import { isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
-import { isLongCatModel } from '@/lib/ai-gateway/providers/longcat';
-import { isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { isQwenModel } from '@/lib/ai-gateway/providers/qwen';
-import { isStepModel } from '@/lib/ai-gateway/providers/stepfun';
-import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
-import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isDeepseekModel } from '@kilocode/web-shared/lib/ai-gateway/providers/deepseek';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { isMinimaxModel } from '@kilocode/web-shared/lib/ai-gateway/providers/minimax';
+import { isMistralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
+import { isKimiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { isLongCatModel } from '@kilocode/web-shared/lib/ai-gateway/providers/longcat';
+import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
+import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
+import { isStepModel } from '@kilocode/web-shared/lib/ai-gateway/providers/stepfun';
+import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
+import { isGlmModel } from '@kilocode/web-shared/lib/ai-gateway/providers/zai';
 import { type OpenCodeSettings, ReasoningEffortSchema } from '@kilocode/db/schema-types';
 
 export const REASONING_VARIANTS_THINKING_ONLY = {

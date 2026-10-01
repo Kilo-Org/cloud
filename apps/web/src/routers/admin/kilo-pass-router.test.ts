@@ -1,21 +1,21 @@
 import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilo_pass_subscriptions,
   kilocode_users,
   user_admin_notes,
   credit_transactions,
 } from '@kilocode/db/schema';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { eq } from 'drizzle-orm';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
   const { errors } = require('stripe').default ?? require('stripe');
   const stripeMock = {
@@ -52,7 +52,9 @@ type StripeMock = {
 };
 
 function getStripeMock(): StripeMock {
-  const mod: { __stripeMock: StripeMock } = jest.requireMock('@/lib/stripe-client');
+  const mod: { __stripeMock: StripeMock } = jest.requireMock(
+    '@kilocode/web-shared/lib/stripe-client'
+  );
   return mod.__stripeMock;
 }
 

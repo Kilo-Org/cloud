@@ -3,11 +3,11 @@ import {
   getProfileOrganizations,
   getSingleUserOrganization,
   getUserOrganizationsWithSeats,
-} from '@/lib/organizations/organizations';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { findLiveSalesDemoForUser } from '@/lib/organizations/sales-demo';
 import { compareOrganizationsForDefault } from '@/lib/organizations/sales-demo-sort';
-import { classifyOrganizationEntitlement } from '@/lib/organizations/trial-utils';
+import { classifyOrganizationEntitlement } from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 
 // Resolve where a user whose personal account is disabled should land by default.

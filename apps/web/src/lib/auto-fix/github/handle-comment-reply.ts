@@ -11,7 +11,7 @@ import {
   formatAutoFixErrorMessage,
   isAutoFixBillingErrorMessage,
 } from '@/lib/auto-fix/core/format-error-message';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
 import {
   replyToReviewComment,

@@ -10,7 +10,7 @@
  */
 
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings } from '@kilocode/db/schema';
 import { eq, and, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
@@ -21,7 +21,7 @@ import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrati
 import { dismissDependabotAlert } from '../github/dependabot-api';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { SecurityFindingAnalysis, SecurityReviewOwner } from '../core/types';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,

@@ -6,7 +6,7 @@ import {
   updateAutoRoutingSettings,
 } from './auto-routing-admin-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   AUTO_ROUTING_WORKER_URL: 'https://auto-routing.example.com',
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));

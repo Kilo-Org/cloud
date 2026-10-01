@@ -1,6 +1,6 @@
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { preferredModels } from '@/lib/ai-gateway/models';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { preferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 
 const preferredSet = new Set(preferredModels);
 

@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, organizations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
@@ -9,7 +9,7 @@ import {
   createCodeReviewAttempt,
   updateCodeReviewStatus,
 } from '@/lib/code-reviews/db/code-reviews';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';

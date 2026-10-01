@@ -19,7 +19,7 @@ import {
   workspaceFolderColorSchema,
   type WorkspaceFolderColor,
 } from '@/lib/cloud-agent/workspace-folders';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { workspaceFoldersRouter } from './workspace-folders-router';
 

@@ -2,12 +2,12 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
-import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
-import { insertUsageRecord } from '@/lib/ai-gateway/processUsage';
+import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
-import type { UsageMetaData } from '@/lib/ai-gateway/processUsage.types';
+import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 
 export async function POST(
   request: NextRequest,

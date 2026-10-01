@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   mcp_gateway_assignments,
   mcp_gateway_configs,
@@ -9,9 +9,9 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createCallerFactory, createTRPCRouter } from '@/lib/trpc/init';
+import { createCallerFactory, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 const createCaller = createCallerFactory(createTRPCRouter({ mcpGateway: mcpGatewayRouter }));
 

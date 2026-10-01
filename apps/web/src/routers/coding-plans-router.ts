@@ -45,10 +45,14 @@ import {
   getCodingPlanPrice,
   isCodingPlanDisabledForNewSignups,
 } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
-import { UserByokProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { UserByokProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { billingHistoryResponseSchema } from '@/lib/subscriptions/subscription-center';
-import { baseProcedure, adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import {
+  baseProcedure,
+  adminProcedure,
+  createTRPCRouter,
+} from '@kilocode/web-shared/lib/trpc/init';
 import {
   coding_plan_subscriptions,
   coding_plan_terms,

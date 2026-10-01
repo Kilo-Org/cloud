@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
   kilocode_users,
@@ -14,18 +14,18 @@ import {
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { KiloPassAuditLogAction } from '@/lib/kilo-pass/enums';
-import { KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceSource } from '@/lib/kilo-pass/enums';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { KiloPassScheduledChangeStatus } from '@/lib/kilo-pass/enums';
+import { KiloPassAuditLogAction } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassAuditLogResult } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassIssuanceSource } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassScheduledChangeStatus } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KiloPassPaymentProvider,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
   KiloPassWelcomePromoPaymentFingerprintType,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
@@ -36,11 +36,11 @@ import {
   markServiceFeeAssessmentCharged,
   prepareServiceFeeAssessmentDecision,
   upsertServiceFeeAssessment,
-} from '@/lib/service-fees/assessments';
-import { createInvoiceServiceFeeAssessmentKey } from '@/lib/service-fees/checkout';
-import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
-import { buildServiceFeeLineMetadata } from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { createInvoiceServiceFeeAssessmentKey } from '@kilocode/web-shared/lib/service-fees/checkout';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@kilocode/web-shared/lib/service-fees/constants';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { buildServiceFeeLineMetadata } from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 
 jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   runAfterResponse: async (work: () => Promise<void>) => {
@@ -76,7 +76,8 @@ async function getKiloPassPriceId(params: {
   cadence: KiloPassCadence;
 }): Promise<string> {
   ensureKiloPassStripePriceIdEnv();
-  const { getStripePriceIdForKiloPass } = await import('@/lib/kilo-pass/stripe-price-ids.server');
+  const { getStripePriceIdForKiloPass } =
+    await import('@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server');
   return getStripePriceIdForKiloPass(params);
 }
 

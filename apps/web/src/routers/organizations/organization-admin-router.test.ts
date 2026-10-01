@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   credit_transactions,
@@ -19,10 +19,10 @@ import {
   createOrganization,
   addUserToOrganization,
   markOrganizationAsDeleted,
-} from '@/lib/organizations/organizations';
-import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { KiloPassOrgBonusMode } from '@kilocode/db/schema-types';
-import { fetchExpiringTransactionsForOrganization } from '@/lib/creditExpiration';
+import { fetchExpiringTransactionsForOrganization } from '@kilocode/web-shared/lib/creditExpiration';
 import type { User, Organization } from '@kilocode/db/schema';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 

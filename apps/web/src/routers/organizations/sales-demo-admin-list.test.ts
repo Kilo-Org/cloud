@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,

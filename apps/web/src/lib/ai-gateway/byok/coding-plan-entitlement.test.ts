@@ -1,8 +1,8 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { getBYOKforUser } from '@/lib/ai-gateway/byok';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { byok_api_keys, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

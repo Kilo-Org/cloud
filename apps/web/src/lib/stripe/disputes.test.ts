@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import type * as StripeDisputesModule from '@/lib/stripe/disputes';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -29,7 +29,7 @@ import {
   StripeDisputeOwnerClassification,
 } from '@kilocode/db/schema-types';
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     disputes: { close: jest.fn(), retrieve: jest.fn() },
     invoices: { list: jest.fn() },
@@ -41,7 +41,7 @@ jest.mock('@/lib/stripe-client', () => ({
   },
 }));
 
-jest.mock('@/lib/web-session-revocation', () => ({
+jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({
   revokeWebSessions: jest.fn(async () => undefined),
 }));
 
@@ -59,14 +59,16 @@ type AnyMock = ReturnType<typeof jest.fn>;
 
 const { acceptStripeDisputeCase, observeStripeDisputeCreated, stripeDisputeDashboardUrl } =
   jest.requireActual<typeof StripeDisputesModule>('@/lib/stripe/disputes');
-const stripeClientMock = jest.requireMock('@/lib/stripe-client') as {
+const stripeClientMock = jest.requireMock('@kilocode/web-shared/lib/stripe-client') as {
   client: {
     disputes: { close: AnyMock; retrieve: AnyMock };
     subscriptions: { cancel: AnyMock; retrieve: AnyMock };
     subscriptionSchedules: { release: AnyMock; retrieve: AnyMock };
   };
 };
-const { revokeWebSessions } = jest.requireMock('@/lib/web-session-revocation') as {
+const { revokeWebSessions } = jest.requireMock(
+  '@kilocode/web-shared/lib/web-session-revocation'
+) as {
   revokeWebSessions: AnyMock;
 };
 const kiloclawClientMock = jest.requireMock('@/lib/kiloclaw/kiloclaw-internal-client') as {

@@ -23,8 +23,8 @@ import {
 } from '@kilocode/db/schema';
 
 import assetLinks from '../../../public/.well-known/assetlinks.json';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * WebAuthn ceremonies for passkey registration and sign-in.

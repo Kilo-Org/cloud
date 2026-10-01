@@ -10,12 +10,12 @@
 
 import 'server-only';
 import type OpenAI from 'openai';
-import { sendProxiedChatCompletion } from '@/lib/ai-gateway/llm-proxy-helpers';
+import { sendProxiedChatCompletion } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingSandboxAnalysis, SandboxSuggestedAction } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
-import { sentryLogger } from '@/lib/utils.server';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_ANALYSIS_MODEL } from '../core/constants';
 import { emitApiMetrics } from './api-metrics.server';
 

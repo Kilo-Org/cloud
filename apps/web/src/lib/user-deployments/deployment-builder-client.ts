@@ -1,6 +1,9 @@
 import 'server-only';
 
-import { USER_DEPLOYMENTS_API_BASE_URL, USER_DEPLOYMENTS_API_AUTH_KEY } from '@/lib/config.server';
+import {
+  USER_DEPLOYMENTS_API_BASE_URL,
+  USER_DEPLOYMENTS_API_AUTH_KEY,
+} from '@kilocode/web-shared/lib/config.server';
 import type { BuildStatus, Provider, CancelBuildResult } from '@/lib/user-deployments/types';
 import type { EncryptedEnvVar } from '@/lib/user-deployments/env-vars-validation';
 import { fetchWithTimeout } from '@/lib/user-deployments/fetch-utils';

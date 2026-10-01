@@ -3,33 +3,33 @@ import {
   mutateOrganizationSettings,
   setOrganizationRecommendationsDigestEnabled,
   updateOrganizationSettings,
-} from '@/lib/organizations/organizations';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationAdminMutationProcedure,
-} from '@/routers/organizations/utils';
-import { listAvailableModelsProcedure } from '@/routers/organizations/organization-available-models-procedure';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
-import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { bumpOrganizationGroupPolicyRevision } from '@/lib/organizations/organization-groups';
+import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
   MAX_ORGANIZATION_AUTO_ROUTES,
   assertOrganizationAutoEligible,
   assertOrganizationAutoWriteEnabled,
   validateOrganizationAutoTarget,
-} from '@/lib/organizations/organization-auto-model';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 
 /**
  * Allowlist of organization IDs that are allowed to modify experimental settings

@@ -1,6 +1,6 @@
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { autoFreeModels } from '@/lib/ai-gateway/models';
-import { db } from '@/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { autoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';

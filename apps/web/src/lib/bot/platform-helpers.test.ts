@@ -1,7 +1,7 @@
 const mockLimit = jest.fn();
 const mockIsOrganizationMember = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -12,7 +12,7 @@ jest.mock('@/lib/drizzle', () => ({
     })),
   },
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: (organizationId: string, kiloUserId: string) =>
     mockIsOrganizationMember(organizationId, kiloUserId),
 }));

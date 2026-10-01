@@ -1,6 +1,6 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { kilocode_users, user_github_app_tokens } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -32,7 +32,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID() {
     return mockTokenEncryptionConfig.keyId;
   },
@@ -41,7 +41,7 @@ jest.mock('@/lib/config.server', () => ({
   },
 }));
 
-jest.mock('@/lib/encryption', () => ({
+jest.mock('@kilocode/web-shared/lib/encryption', () => ({
   encryptKeyedEnvelope: (...args: [string, string, unknown, string]) =>
     mockEncryptKeyedEnvelope(...args),
 }));

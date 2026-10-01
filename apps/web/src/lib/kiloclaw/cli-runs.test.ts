@@ -2,7 +2,7 @@ process.env.KILOCLAW_API_URL ||= 'http://localhost:8795';
 process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cancelCliRun,
   createCliRun,

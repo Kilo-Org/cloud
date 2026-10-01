@@ -1,4 +1,4 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { verifyAndDeleteGitHubOrganizationInstallation } from '@/lib/integrations/platforms/github/adapter';
 import { uninstallGitHubOrganizationInstallation } from './github-installation-uninstall';
 
@@ -26,8 +26,10 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('@/lib/organizations/organization-audit-logs', () => {
-  const actual = jest.requireActual('@/lib/organizations/organization-audit-logs');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => {
+  const actual = jest.requireActual(
+    '@kilocode/web-shared/lib/organizations/organization-audit-logs'
+  );
   return { ...actual, createAuditLog: jest.fn(actual.createAuditLog) };
 });
 
@@ -87,7 +89,8 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     upstream.mockResolvedValue();
     audit.mockReset();
     audit.mockImplementation(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
     sentryCaptureException.mockReset();
     mockBotInitialize.mockResolvedValue();
@@ -340,12 +343,14 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     const org = await createTestOrganization('Uninstall pending org', owner.id, 0);
     const row = await integration({ organizationId: org.id });
     audit.mockImplementationOnce(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
     audit.mockRejectedValueOnce(new Error('final audit private database error'));
     audit.mockRejectedValueOnce(new Error('fallback audit private database error'));
     audit.mockImplementationOnce(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
 
     await expect(
@@ -383,7 +388,8 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     const row = await integration({ organizationId: org.id });
     upstream.mockRejectedValue(new Error('upstream private error'));
     audit.mockImplementationOnce(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
     audit.mockRejectedValueOnce(new Error('fallback audit private database error'));
 
@@ -439,11 +445,13 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     const org = await createTestOrganization('Uninstall webhook reconciliation org', owner.id, 0);
     const row = await integration({ organizationId: org.id }, { github_app_type: null });
     audit.mockImplementationOnce(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
     audit.mockRejectedValueOnce(new Error('final audit private database error'));
     audit.mockImplementationOnce(
-      jest.requireActual('@/lib/organizations/organization-audit-logs').createAuditLog
+      jest.requireActual('@kilocode/web-shared/lib/organizations/organization-audit-logs')
+        .createAuditLog
     );
 
     await expect(

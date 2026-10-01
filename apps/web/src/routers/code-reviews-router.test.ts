@@ -86,10 +86,10 @@ jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
   setCommitStatus: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type { SessionSnapshot } from '@/lib/session-ingest-client';
-import type { SuccessResult } from '@/lib/maybe-result';
+import type { SuccessResult } from '@kilocode/web-shared/lib/maybe-result';
 import type * as BotUserService from '@/lib/bot-users/bot-user-service';
 import { generateBotUserId } from '@/lib/bot-users/types';
 import { BitbucketCodeReviewWebhookConfigurationError } from '@/lib/integrations/platforms/bitbucket/code-review-webhooks';
@@ -97,7 +97,7 @@ import { updateCheckRun } from '@/lib/integrations/platforms/github/adapter';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,

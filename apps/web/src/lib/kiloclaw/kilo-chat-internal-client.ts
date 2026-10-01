@@ -4,7 +4,7 @@ import {
   type PostMessageAsUserParams,
   type PostMessageAsUserResult,
 } from '@kilocode/kilo-chat';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 // 5s is well above kilo-chat's expected p99 for postMessageAsUser
 // (~ a single DO RPC + a sendMessage) and well below Vercel's outer

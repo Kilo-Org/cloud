@@ -7,7 +7,7 @@ import {
   GITLAB_OAUTH_CREDENTIAL_ENVELOPE_SCHEME,
   buildGitLabOAuthCredentialAad,
 } from '@kilocode/worker-utils/gitlab-credential';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   platform_access_token_credentials,
@@ -32,7 +32,7 @@ const mockCredentialEncryptionConfig: {
   publicKey: Buffer.from(testKeyPair.publicKey).toString('base64'),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID() {
     return mockCredentialEncryptionConfig.keyId;
   },

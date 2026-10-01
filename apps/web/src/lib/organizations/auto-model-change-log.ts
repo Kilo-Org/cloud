@@ -2,12 +2,12 @@ import { captureException } from '@sentry/nextjs';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Organization } from '@kilocode/db/schema';
 import { organization_seats_purchases, organizations } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import type { ModelRestrictions } from '@/lib/model-allow.server';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { ModelRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import {
   computeSnapshotDiff,
   type SnapshotDiff,

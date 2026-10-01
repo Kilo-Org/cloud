@@ -6,12 +6,12 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { createAllowPredicateFromRestrictions } from '@/lib/model-allow.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';

@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { user_deletion_provider_credentials } from '@kilocode/db/schema';
 import { UserDeletionProviderScope } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cookieFromCredential,
   deleteSubstackCredential,

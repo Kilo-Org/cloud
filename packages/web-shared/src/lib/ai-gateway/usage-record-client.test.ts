@@ -2,13 +2,13 @@
 // global `jest` that the SWC transform needs in order to hoist these
 // `jest.mock` calls, and the mocks then silently fail to apply. The rest of the
 // repository follows the same convention: import the assertion helpers only.
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<object>('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 
-jest.mock('@/lib/constants', () => ({
-  ...jest.requireActual<object>('@/lib/constants'),
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/constants'),
   APP_URL: 'https://app.example.com',
 }));
 

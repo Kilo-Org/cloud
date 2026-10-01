@@ -15,26 +15,26 @@ import {
   prepareServiceFeeAssessmentDecision,
   settleServiceFeeAssessment,
   upsertServiceFeeAssessment,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   ServiceFeeAssessmentKeyConflictError,
   createOrganizationServiceFeeExemptionStore,
   createServiceFeeAssessmentStore,
   createServiceFeeStores,
-} from '@/lib/service-fees/drizzle-store';
+} from '@kilocode/web-shared/lib/service-fees/drizzle-store';
 import {
   getEffectiveOrganizationServiceFeeExemption,
   getOrganizationServiceFeeExemption,
   organizationServiceFeeExemptionLockKey,
   setOrganizationServiceFeeExemption,
-} from '@/lib/service-fees/organization-exemptions';
-import type { PrepareAssessmentInput } from '@/lib/service-fees/types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import type { PrepareAssessmentInput } from '@kilocode/web-shared/lib/service-fees/types';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const ACTIVATION = new Date(SERVICE_FEE_ACTIVATION_UNIX_SECONDS * 1000);

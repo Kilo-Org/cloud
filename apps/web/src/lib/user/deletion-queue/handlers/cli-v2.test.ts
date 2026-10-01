@@ -1,5 +1,7 @@
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',
@@ -18,9 +20,9 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handleCliV2Sessions } from '@/lib/user/deletion-queue/handlers/cli-v2';
 import { insertTestUser } from '@/tests/helpers/user.helper';

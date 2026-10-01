@@ -1,4 +1,4 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

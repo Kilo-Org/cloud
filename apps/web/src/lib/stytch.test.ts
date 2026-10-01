@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { insertTestUser } from '../tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_campaigns,
   credit_transactions,
@@ -9,7 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import type { FraudFingerprintLookupResponse } from 'stytch';
-import { OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS } from '@/lib/constants';
+import { OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS } from '@kilocode/web-shared/lib/constants';
 
 import {
   saveFingerprints,

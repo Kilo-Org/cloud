@@ -11,8 +11,8 @@ import {
 } from '@kilocode/db/schema';
 import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {

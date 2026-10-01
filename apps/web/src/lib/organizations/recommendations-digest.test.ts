@@ -5,7 +5,7 @@ import {
   dispatchEnterpriseRecommendationsDigests,
   getOrganizationOwnerRecipients,
 } from './recommendations-digest';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kilocode_users,
   organization_memberships,
@@ -19,11 +19,11 @@ jest.mock('./recommendations', () => ({
   getOrganizationRecommendations: jest.fn(),
 }));
 
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendRecommendationsDigestEmail: jest.fn(),
 }));
 
-import { sendRecommendationsDigestEmail } from '@/lib/email';
+import { sendRecommendationsDigestEmail } from '@kilocode/web-shared/lib/email';
 import { getOrganizationRecommendations } from './recommendations';
 
 const mockedGetRecommendations = jest.mocked(getOrganizationRecommendations);

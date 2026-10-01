@@ -1,12 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { getAuthorizedOrgContext } from './organization-auth';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { NextResponse } from 'next/server';
 import { eq, isNotNull } from 'drizzle-orm';
-import type { getUserFromAuth } from '@/lib/user/server';
-import { failureResult } from '@/lib/maybe-result';
+import type { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 describe('getAuthorizedOrgContext', () => {
   let testOrganizationId: string;

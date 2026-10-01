@@ -12,12 +12,19 @@ import {
   kilocode_users,
   operation_ledgers,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceSource, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import {
+  KiloPassCadence,
+  KiloPassIssuanceItemKind,
+  KiloPassTier,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import {
+  KiloPassIssuanceSource,
+  KiloPassPaymentProvider,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import { mapGooglePlayKiloPassPurchase } from './google-play-verifier';
 import {
   completeStoreKiloPassPurchase,
@@ -1426,7 +1433,7 @@ describe('completeStoreKiloPassPurchase', () => {
 
     const { completeStoreKiloPassPurchase: isolatedComplete } =
       await import('./store-subscription-completion');
-    const freshDrizzle = await import('@/lib/drizzle');
+    const freshDrizzle = await import('@kilocode/web-shared/lib/drizzle');
 
     try {
       const result = await isolatedComplete({ user, purchase });

@@ -1,4 +1,4 @@
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { afterEach, describe, expect, test } from '@jest/globals';
 import {
   device_sessions,
@@ -15,18 +15,20 @@ import { POST as organizationResourcePost } from '@/app/api/organizations/[id]/u
 import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 
 const shared = { enabled: true, family: '' };
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'resource-delegation-test-secret',
   isResourceTokenIssuanceEnabled: jest.fn(
     (family: string) => shared.enabled && (!shared.family || shared.family === family)
   ),
 }));
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
   getUserFromAuth: jest.fn(),
 }));
 jest.mock('@/lib/organizations/organization-auth', () => ({ getAuthorizedOrgContext: jest.fn() }));
-jest.mock('@/lib/organizations/organization-audit-logs', () => ({ createAuditLog: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
+  createAuditLog: jest.fn(),
+}));
 jest.mock('../../../../../services/ai-attribution/src/util/logger', () => ({ logger: {} }));
 
 import {
@@ -35,8 +37,11 @@ import {
   createDelegatedResourceToken,
   getResourceDelegationAuthority,
 } from './resource-delegation';
-import { db } from '@/lib/drizzle';
-import { getUserFromAuth, getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getUserFromAuth,
+  getUserFromSessionForCredentialIssuance,
+} from '@kilocode/web-shared/lib/user/server';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const secret = 'resource-delegation-test-secret';

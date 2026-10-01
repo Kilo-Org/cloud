@@ -3,7 +3,7 @@ const mockReport = jest.fn(async () => []);
 const mockClose = jest.fn(async () => {});
 
 jest.mock('@/lib/load-env', () => ({}));
-jest.mock('@/lib/drizzle', () => ({ closeAllDrizzleConnections: mockClose }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ closeAllDrizzleConnections: mockClose }));
 jest.mock('@/lib/integrations/db/github-installations-backfill', () => ({
   backfillGitHubInstallations: mockBackfill,
   reportGitHubConnectionRoleReconciliation: mockReport,

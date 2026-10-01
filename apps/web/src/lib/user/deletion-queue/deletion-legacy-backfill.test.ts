@@ -23,11 +23,11 @@ import {
   UserDeletionStepKey as Step,
   UserDeletionStepStatus as StepStatus,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { sendAccountDeletionCompletedEmail } from '@/lib/email';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { sendAccountDeletionCompletedEmail } from '@kilocode/web-shared/lib/email';
 import { KiloClawInternalClient } from '@/lib/kiloclaw/kiloclaw-internal-client';
-import { findUserById } from '@/lib/user/find-user-by-id';
-import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@/lib/user/deletion-queue/deletion-constants';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
+import { USER_DELETION_ID_ONLY_CATALOG_VERSION } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import { enqueueHistoricalUserDeletion } from '@/lib/user/deletion-queue/deletion-legacy-backfill';
 import { retryAttentionTask } from '@/lib/user/deletion-queue/deletion-outcomes';
@@ -35,8 +35,8 @@ import { claimNextTaskForRequest } from '@/lib/user/deletion-queue/deletion-task
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
 
-jest.mock('@/lib/config.server', () => ({
-  ...jest.requireActual<Record<string, unknown>>('@/lib/config.server'),
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual<Record<string, unknown>>('@kilocode/web-shared/lib/config.server'),
   INTERNAL_API_SECRET: 'backfill-test-secret',
   KILOCLAW_API_URL: 'https://claw.test',
   SESSION_INGEST_WORKER_URL: 'https://ingest.test',
@@ -44,7 +44,9 @@ jest.mock('@/lib/config.server', () => ({
   USER_DELETION_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
 }));
 jest.mock('@/lib/r2/cli-sessions', () => ({ deleteBlobs: jest.fn(async () => undefined) }));
-jest.mock('@/lib/email', () => ({ sendAccountDeletionCompletedEmail: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/email', () => ({
+  sendAccountDeletionCompletedEmail: jest.fn(),
+}));
 
 const code = 'user_id_only_backfill_2026_08_26';
 const userIdSteps = [

@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 
 import { recommendKiloPassTierFromAverageMonthlyUsageUsd } from '@/lib/kilo-pass/recommend-tier';
-import { KiloPassTier } from '@/lib/kilo-pass/enums';
+import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 describe('recommendKiloPassTierFromAverageMonthlyUsageUsd', () => {
   it('recommends the middle tier when average usage is exactly 0 (edge case)', () => {

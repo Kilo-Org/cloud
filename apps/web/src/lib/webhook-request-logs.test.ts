@@ -14,7 +14,9 @@ const mockWhere = jest.fn((_where: SQL) => ({ limit: mockLimit }));
 const mockFrom = jest.fn((_table: typeof cliSessions | typeof cli_sessions_v2) => ({
   where: mockWhere,
 }));
-jest.mock('@/lib/drizzle', () => ({ db: { select: () => ({ from: mockFrom }) } }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
+  db: { select: () => ({ from: mockFrom }) },
+}));
 
 const requestId = '00000000-0000-4000-8000-000000000001';
 const readLogs = () => getWebhookRequestLogs('oauth/owner', undefined, 'trigger', requestId);

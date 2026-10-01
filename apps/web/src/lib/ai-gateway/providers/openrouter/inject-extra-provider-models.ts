@@ -1,12 +1,12 @@
-import { mapResolvedModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { mapResolvedModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
-} from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 
 export function injectExtraProviderModels(

@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';

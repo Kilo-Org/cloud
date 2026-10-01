@@ -1,6 +1,6 @@
 import { describe, test, expect } from '@jest/globals';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
   kilo_pass_issuance_items,
@@ -13,13 +13,13 @@ import {
   KiloPassCadence,
   KiloPassTier,
   KiloPassIssuanceSource,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, eq, inArray } from 'drizzle-orm';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
-import { toMicrodollars } from '@/lib/microdollars';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 
 function stripeSubscriptionFields(): {
   provider_subscription_id: string;

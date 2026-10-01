@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getSecurityAgentRepositorySyncState } from '@kilocode/db';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and, desc, count, sql, max, or, type SQL } from 'drizzle-orm';

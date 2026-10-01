@@ -14,18 +14,20 @@ jest.mock('next-auth', () => ({
 }));
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
-jest.mock('@/lib/redis', () => ({ redisClient: { get: jest.fn(async () => null) } }));
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
+  redisClient: { get: jest.fn(async () => null) },
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addUserByokAvailability: jest.fn(),
   getUserByokProviderIds: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
 
@@ -34,20 +36,25 @@ import jwt from 'jsonwebtoken';
 import { NextRequest } from 'next/server';
 import { GET as gatewayModels } from '@/app/api/gateway/models/route';
 import { GET as gatewayV1Models } from '@/app/api/gateway/v1/models/route';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { JWT_TOKEN_VERSION } from '@/lib/tokens';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,
 } from '@kilocode/worker-utils/internal-service-token-audiences';
 
-const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
-const { getDirectByokModelsForUser } = jest.requireMock('@/lib/ai-gateway/providers/direct-byok');
-const { addUserByokAvailability, getUserByokProviderIds } =
-  jest.requireMock('@/lib/ai-gateway/byok');
+const { getEnhancedOpenRouterModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
+);
+const { getDirectByokModelsForUser } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+);
+const { addUserByokAvailability, getUserByokProviderIds } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/byok'
+);
 const { getAvailableModelsForOrganization } = jest.requireMock(
-  '@/lib/organizations/organization-models'
+  '@kilocode/web-shared/lib/organizations/organization-models'
 );
 
 const publicCatalog = { data: [{ id: 'public/model' }] };

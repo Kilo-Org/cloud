@@ -4,7 +4,7 @@ import { defineTestUser } from '@/tests/helpers/user.helper';
 
 const mockGetUserFromAuthOrRedirect = jest.fn<Promise<User>, []>();
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: () => mockGetUserFromAuthOrRedirect(),
 }));
 

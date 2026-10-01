@@ -7,33 +7,36 @@ import {
   kilo_pass_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { db as defaultDb } from '@/lib/drizzle';
+import { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassCadence,
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBonusCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   KILO_PASS_TIER_CONFIG,
   KILO_PASS_YEARLY_MONTHLY_BONUS_PERCENT,
-} from '@/lib/kilo-pass/constants';
-import { computeMonthlyKiloPassBonusDecision } from '@/lib/kilo-pass/bonus-decision';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
-import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { computeMonthlyKiloPassBonusDecision } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
+import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
   type KiloPassWelcomePromoPolicy,
-} from '@/lib/kilo-pass/welcome-promo-context';
+} from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 import { and, desc, eq, inArray, like, ne } from 'drizzle-orm';
 
 type Db = typeof defaultDb;

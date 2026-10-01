@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>();
 
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   readDb: {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
@@ -15,7 +15,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { StoredModel } from '@kilocode/db';
 
 function storedModel(partial: Partial<StoredModel> & Pick<StoredModel, 'id'>): StoredModel {
@@ -68,7 +68,7 @@ describe('isValidOpenRouterModelId', () => {
       isValidOpenRouterModelId,
       getCachedVercelInferenceProviderIdsForModel,
       resolveOpenRouterModelAlias,
-    } = await import('@/lib/ai-gateway/providers/gateway-models-cache');
+    } = await import('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
     return {
       isValidOpenRouterModelId,
       getCachedVercelInferenceProviderIdsForModel,

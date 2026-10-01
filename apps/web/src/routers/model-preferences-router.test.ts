@@ -1,27 +1,30 @@
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => {
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => {
   return {
     getEnhancedOpenRouterModels: jest.fn(),
   };
 });
 
-jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => {
-  return {
-    getProviderSlugsForModel: jest.fn(),
-  };
-});
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server',
+  () => {
+    return {
+      getProviderSlugsForModel: jest.fn(),
+    };
+  }
+);
 
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, user_model_preferences } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import type { User } from '@kilocode/db/schema';
 import type {
   OpenRouterModel,
   OpenRouterModelsResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 
 const mockedGetEnhancedOpenRouterModels =
   getEnhancedOpenRouterModels as unknown as jest.MockedFunction<typeof getEnhancedOpenRouterModels>;

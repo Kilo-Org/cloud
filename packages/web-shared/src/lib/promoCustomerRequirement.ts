@@ -1,8 +1,13 @@
 import { user_auth_provider } from '@kilocode/db/schema';
-import type { CustomerInfo } from '@/lib/customerInfo';
-import { db } from '@/lib/drizzle';
-import type { OptionalError } from '@/lib/maybe-result';
-import { verifyOrError, whenOkTry, failureResult, successResult } from '@/lib/maybe-result';
+import type { CustomerInfo } from '@kilocode/web-shared/lib/customerInfo';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { OptionalError } from '@kilocode/web-shared/lib/maybe-result';
+import {
+  verifyOrError,
+  whenOkTry,
+  failureResult,
+  successResult,
+} from '@kilocode/web-shared/lib/maybe-result';
 import { and, eq } from 'drizzle-orm';
 import type { Awaitable } from 'next-auth';
 

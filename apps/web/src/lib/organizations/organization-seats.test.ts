@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_seats_purchases,
@@ -11,9 +11,9 @@ import {
   createOrganization,
   addUserToOrganization,
   inviteUserToOrganization,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { getOrganizationSeatUsage } from './organization-seats';
-import { getMostRecentSeatPurchase } from '@/lib/organizations/organization-seat-purchases';
+import { getMostRecentSeatPurchase } from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 
 describe('getUserOrganizationsWithSeats', () => {
   afterEach(async () => {

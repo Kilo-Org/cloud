@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
 import { user_auth_provider, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

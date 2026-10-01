@@ -1,7 +1,10 @@
 import { beforeEach, jest } from '@jest/globals';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organization_seats_purchases } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
@@ -9,7 +12,7 @@ import { eq } from 'drizzle-orm';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMock = jest.Mock<(...args: any[]) => any>;
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   const stripeMock = {
     billingPortal: { sessions: { create: jest.fn() } },
     invoices: { list: jest.fn() },
@@ -34,7 +37,7 @@ type StripeMock = {
 };
 
 const stripeMock = jest.requireMock<{ __stripeMock: StripeMock }>(
-  '@/lib/stripe-client'
+  '@kilocode/web-shared/lib/stripe-client'
 ).__stripeMock;
 
 // Test users and organization will be created dynamically

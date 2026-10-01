@@ -8,16 +8,16 @@ import {
   type BillingCorrelationContext,
 } from '@kilocode/worker-utils/kiloclaw-billing-observability';
 
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
-import { send as sendEmail } from '@/lib/email';
-import { maybePerformAutoTopUp } from '@/lib/autoTopUp';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { send as sendEmail } from '@kilocode/web-shared/lib/email';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 import { ensureAutoIntroSchedule } from '@/lib/kiloclaw/stripe-handlers';
-import { isIntroPriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
-import { client as stripe } from '@/lib/stripe-client';
+import { isIntroPriceId } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { enqueueAffiliateEventForUser } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
 import { projectPendingKiloPassBonusMicrodollars } from '@/lib/kiloclaw/credit-billing';
-import { maybeIssueKiloPassBonusFromUsageThreshold } from '@/lib/kilo-pass/usage-triggered-bonus';
+import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import {
   enforceKiloClawCommitRetirementGuard,
   reportKiloClawCommitRetirementAnomaly,

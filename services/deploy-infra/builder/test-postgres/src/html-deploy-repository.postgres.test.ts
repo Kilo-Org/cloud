@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { deployments, deployments_ephemeral, kilocode_users } from '@kilocode/db/schema';
 import { eq, like } from 'drizzle-orm';

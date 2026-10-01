@@ -1,8 +1,8 @@
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { DEFAULT_AUTO_TRIAGE_CONFIG } from '@/lib/auto-triage/core/defaults';
 import { AUTO_TRIAGE_CONSTANTS } from '@/lib/auto-triage/core/constants';
 import {
@@ -13,7 +13,7 @@ import {
   interruptTriageTicket,
 } from '@/lib/auto-triage/db/triage-tickets';
 import type { Owner } from '@/lib/auto-triage/db/types';
-import { successResult, failureResult } from '@/lib/maybe-result';
+import { successResult, failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { tryDispatchPendingTickets } from '@/lib/auto-triage/dispatch/dispatch-pending-tickets';
 import { ensureBotUserForOrg } from '@/lib/bot-users/bot-user-service';
 

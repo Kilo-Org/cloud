@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings } from '@kilocode/db/schema';
 import type { NewSecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingAnalysis } from '@kilocode/db/schema-types';

@@ -1,12 +1,18 @@
 import fs from 'fs';
 import path from 'path';
 import type { Organization } from '@kilocode/db/schema';
-import { getMagicLinkUrl, type MagicLinkTokenWithPlaintext } from '@/lib/auth/magic-link-tokens';
-import { NEXTAUTH_URL } from '@/lib/config.server';
-import { getEmailVerificationRecipient, sendViaMailgun } from '@/lib/email-mailgun';
-import { verifyEmail } from '@/lib/email-neverbounce';
-import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
-import { USER_DELETION_COMPLETION_HTML } from '@/lib/user/deletion-queue/deletion-constants';
+import {
+  getMagicLinkUrl,
+  type MagicLinkTokenWithPlaintext,
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
+import { NEXTAUTH_URL } from '@kilocode/web-shared/lib/config.server';
+import {
+  getEmailVerificationRecipient,
+  sendViaMailgun,
+} from '@kilocode/web-shared/lib/email-mailgun';
+import { verifyEmail } from '@kilocode/web-shared/lib/email-neverbounce';
+import { logExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { USER_DELETION_COMPLETION_HTML } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 
 // Subject lines for each template — also serves as the canonical list of template names
 export const subjects = {

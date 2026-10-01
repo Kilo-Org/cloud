@@ -9,7 +9,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { afterEach, beforeAll, describe, expect, test } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
@@ -30,7 +30,7 @@ import {
   DOLTHUB_REDIRECT_URI,
   DOLTHUB_SCOPES,
 } from '@/lib/integrations/dolthub-service';
-import { DOLTHUB_APP_CLIENT_ID } from '@/lib/config.server';
+import { DOLTHUB_APP_CLIENT_ID } from '@kilocode/web-shared/lib/config.server';
 
 describe('dolthub-service', () => {
   const originalFetch = globalThis.fetch;

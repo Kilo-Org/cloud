@@ -16,7 +16,7 @@ import {
   platform_integrations,
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';

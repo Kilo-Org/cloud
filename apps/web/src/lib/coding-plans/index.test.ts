@@ -1,8 +1,8 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { eq } from 'drizzle-orm';
 
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   cancelCodingPlanSubscription,
@@ -17,14 +17,14 @@ import {
   isCodingPlanDisabledForNewSignups,
   type CodingPlanId,
 } from '@/lib/coding-plans/pricing';
-import { BYTEPLUS_CODING_MODEL_IDS } from '@/lib/ai-gateway/providers/direct-byok/byteplus-coding';
+import { BYTEPLUS_CODING_MODEL_IDS } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/byteplus-coding';
 import {
   markCredentialManuallyRevoked,
   markCredentialManualRevocationFailed,
   requeueManualCredentialRevocation,
   replaceManualCredentialRevocation,
 } from '@/lib/coding-plans/revocation';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   byok_api_keys,

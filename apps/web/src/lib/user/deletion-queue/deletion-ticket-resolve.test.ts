@@ -1,4 +1,4 @@
-import { USER_DELETION_KILOCODE_APP_EMAIL } from '@/lib/user/deletion-queue/deletion-constants';
+import { USER_DELETION_KILOCODE_APP_EMAIL } from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import {
   customerEmailFromPylonIssue,
   resolveTicketEmail,

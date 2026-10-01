@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { db, pool } from '@/lib/drizzle';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { security_findings, agent_configs } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';

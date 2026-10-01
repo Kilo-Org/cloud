@@ -1,40 +1,43 @@
 import pLimit from 'p-limit';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getRawOpenRouterModels, normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  getRawOpenRouterModels,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
   convertFromKiloExclusiveModel,
   getInferenceProvider,
-} from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
   OpenRouterModel,
   OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { OpenRouterProvidersResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { OpenRouterProvidersResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/ai-gateway/providers/openrouter/fetch-provider-models';
 import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/definitions/vercel';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
 import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter/inject-extra-provider-models';
-import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
-import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
-import { injectVirtualModels } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organization-types';
+import { withWorstProviderDataPolicy } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { injectSupportedFimModels } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
+import { injectVirtualModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import type { OpenRouterModel as CatalogModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent

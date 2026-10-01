@@ -1,7 +1,7 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
 import { generateKeyPairSync } from 'node:crypto';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -30,7 +30,7 @@ const mockBitbucketCredentialEncryptionConfig = {
   publicKey: Buffer.from(testKeyPair.publicKey).toString('base64'),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get BITBUCKET_OAUTH_CREDENTIAL_ACTIVE_KEY_ID() {
     return mockBitbucketCredentialEncryptionConfig.keyId;
   },

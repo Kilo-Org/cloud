@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { captureException } from '@sentry/nextjs';
 import { getCustomerInfo } from './customerInfo';
 import type { User, Organization } from '@kilocode/db/schema';
@@ -6,12 +6,12 @@ import { credit_transactions, kilocode_users, organizations } from '@kilocode/db
 import { and, count, eq, sql } from 'drizzle-orm';
 import { createAuditLog } from './organizations/organization-audit-logs';
 import { promoCreditCategoriesByKey } from './promoCreditCategories';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import type { PromoCreditCategoryConfig } from './PromoCreditCategoryConfig';
-import { toMicrodollars } from '@/lib/microdollars';
-import { logExceptInTest } from '@/lib/utils.server';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { millisecondsInHour } from 'date-fns/constants';
-import { successResult, type CustomResult } from '@/lib/maybe-result';
+import { successResult, type CustomResult } from '@kilocode/web-shared/lib/maybe-result';
 
 export type CreditEntity = { user: User; organization: Organization | null };
 

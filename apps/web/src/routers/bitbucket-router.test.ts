@@ -8,7 +8,7 @@ import {
   platform_integrations,
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type * as BitbucketRepositoryCacheModule from '@/lib/integrations/platforms/bitbucket/repository-cache';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -93,8 +93,8 @@ describe('bitbucketRouter organization ownership', () => {
   beforeAll(async () => {
     const [{ bitbucketRouter }, { createCallerFactory }, { findUserById }] = await Promise.all([
       import('./bitbucket-router'),
-      import('@/lib/trpc/init'),
-      import('@/lib/user/find-user-by-id'),
+      import('@kilocode/web-shared/lib/trpc/init'),
+      import('@kilocode/web-shared/lib/user/find-user-by-id'),
     ]);
     const createDirectCaller = createCallerFactory(bitbucketRouter);
     createCallerForUser = async userId => {

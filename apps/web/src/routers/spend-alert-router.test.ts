@@ -1,13 +1,16 @@
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 

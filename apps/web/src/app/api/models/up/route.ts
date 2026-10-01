@@ -1,4 +1,4 @@
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';

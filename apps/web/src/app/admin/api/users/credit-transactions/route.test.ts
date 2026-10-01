@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { credit_transactions } from '@kilocode/db/schema';
 import { GET } from './route';
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 

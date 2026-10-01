@@ -19,11 +19,11 @@ import {
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
-import { db } from '@/lib/drizzle';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -32,19 +32,19 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   appendKiloPassAuditLog,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from './subscription-accounting';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;

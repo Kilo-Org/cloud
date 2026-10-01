@@ -8,7 +8,7 @@ import {
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CRON_SECRET: 'cron-secret',
 }));
 
@@ -17,7 +17,7 @@ jest.mock('@/lib/organizations/sales-demo', () => ({
   restoreSalesDemoOrganization: jest.fn(),
 }));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   compute_usage_charge,
   credit_transactions,

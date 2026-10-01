@@ -5,8 +5,8 @@ import { createTestOrganization } from '../tests/helpers/organization.helper';
 import {
   getCreditTransactionsForOrganization,
   getCreditTransactionsForOrganizationPage,
-} from '@/lib/creditTransactions';
-import { db, pool } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/creditTransactions';
+import { db, pool } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
 
 function whereClause(text: string): string {

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, openai_chatgpt_connections, type User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {

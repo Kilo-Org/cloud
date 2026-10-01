@@ -1,6 +1,6 @@
 import { submitManualAnalysisStart } from './manual-analysis-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'test-internal-secret',
   SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
 }));

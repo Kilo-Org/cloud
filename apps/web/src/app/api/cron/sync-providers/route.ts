@@ -6,7 +6,7 @@ import {
   createScheduledJobRun,
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
-import { CRON_SECRET } from '@/lib/config.server';
+import { CRON_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { alertIfSyncProvidersStale } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
 

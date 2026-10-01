@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { createCallerForUser } from '@/routers/test-utils';
 import { expectNonExchangeableSystemToken } from '@/tests/helpers/system-token.helper';
@@ -11,7 +11,7 @@ const mockDeleteCloudAgentSession = jest.fn();
 const mockFetchSessionMessagesPage = jest.fn();
 const mockDeleteSessionIngest = jest.fn();
 
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: { get: jest.fn(async () => null) },
 }));
 

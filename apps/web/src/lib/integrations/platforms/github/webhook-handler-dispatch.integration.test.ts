@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { and, eq, inArray } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   github_app_installations,

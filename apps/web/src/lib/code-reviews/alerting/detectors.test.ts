@@ -1,4 +1,4 @@
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { cloud_agent_code_reviews, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

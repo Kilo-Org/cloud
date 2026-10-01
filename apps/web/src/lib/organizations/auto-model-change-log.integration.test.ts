@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
 import { and, eq } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelsByProvider, organization_audit_logs, organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
@@ -9,7 +9,7 @@ import { applySnapshotChangesAndAudit } from '@/lib/ai-gateway/providers/openrou
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 function buildSnapshot(
   providers: Array<{ slug: string; models: string[] }>

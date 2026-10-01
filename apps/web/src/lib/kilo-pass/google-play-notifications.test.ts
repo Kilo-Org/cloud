@@ -12,7 +12,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
@@ -21,9 +21,9 @@ import {
   KiloPassTier,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 
 const mockAcknowledge = jest
   .fn<(...args: unknown[]) => Promise<void>>()
@@ -1009,7 +1009,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         .set({ microdollars_used: paid!.kilo_pass_threshold! })
         .where(eq(kilocode_users.id, user.id));
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({
           kiloUserId: user.id,
@@ -1243,7 +1243,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       .set({ microdollars_used: after!.kilo_pass_threshold! })
       .where(eq(kilocode_users.id, user.id));
     const { maybeIssueKiloPassBonusFromUsageThreshold } =
-      await import('@/lib/kilo-pass/usage-triggered-bonus');
+      await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
     const issue = () =>
       maybeIssueKiloPassBonusFromUsageThreshold({
         kiloUserId: user.id,
@@ -1697,7 +1697,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         expect(pendingCancel?.cancel_at_period_end).toBe(true);
       }
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
       await db

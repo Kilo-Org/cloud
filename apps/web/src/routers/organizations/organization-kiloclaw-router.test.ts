@@ -2,9 +2,9 @@ process.env.KILOCLAW_API_URL ||= 'https://claw.test';
 process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { createCallerForUser as TestUtilsCallerFactory } from '@/routers/test-utils';
 import { LEGACY_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import {
@@ -42,7 +42,7 @@ type KiloClawUserClientMock = {
   __restartMachineMock: AnyMock;
 };
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     subscriptions: { retrieve: jest.fn(), update: jest.fn(), list: jest.fn() },
     subscriptionSchedules: {
@@ -65,9 +65,11 @@ jest.mock('next/headers', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => {
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = jest.requireActual<typeof import('@/lib/config.server')>('@/lib/config.server');
+  const actual = jest.requireActual<typeof import('@kilocode/web-shared/lib/config.server')>(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     KILOCLAW_API_URL: 'https://claw.test',

@@ -18,7 +18,7 @@ import {
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
@@ -26,11 +26,11 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id.
 // Dynamic-import the SUT after the mock (same pattern as stripe-handlers-invoice-paid.test.ts).

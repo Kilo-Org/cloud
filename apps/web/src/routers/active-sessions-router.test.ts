@@ -3,7 +3,7 @@ import jwt from 'jsonwebtoken';
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cli_sessions_v2,
   github_branch_pull_requests,
@@ -166,7 +166,7 @@ describe('active-sessions-router', () => {
           headers: { 'Content-Type': 'application/json' },
         })
       );
-      const { NEXTAUTH_SECRET } = await import('@/lib/config.server');
+      const { NEXTAUTH_SECRET } = await import('@kilocode/web-shared/lib/config.server');
       const caller = await createCallerForUser(regularUser.id);
 
       const result = await invoke(caller);

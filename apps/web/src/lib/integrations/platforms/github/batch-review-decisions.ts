@@ -1,12 +1,12 @@
 import 'server-only';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { github_branch_pull_requests } from '@kilocode/db/schema';
 import { fetchBatchedReviewDecisions } from '@/lib/integrations/platforms/github/adapter';
 import { getIntegrationForOwner } from '@/lib/integrations/db/platform-integrations';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type TenantOwner = {
   userId: string;

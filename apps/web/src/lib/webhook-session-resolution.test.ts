@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
 import { inArray } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';

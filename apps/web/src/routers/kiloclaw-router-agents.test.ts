@@ -3,7 +3,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import type { User } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kiloclaw_instances, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

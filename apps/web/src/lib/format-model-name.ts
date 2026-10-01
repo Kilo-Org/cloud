@@ -1,4 +1,4 @@
-import { KILOCODE_KILO_PROVIDER_PREFIX } from '@/lib/ai-gateway/model-utils';
+import { KILOCODE_KILO_PROVIDER_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 /**
  * Strips provider prefixes from a model slug to produce a short display name.

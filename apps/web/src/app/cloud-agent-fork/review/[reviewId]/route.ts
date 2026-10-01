@@ -4,7 +4,7 @@ import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prom
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { resolveBotModelSlug } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
-import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
+import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';

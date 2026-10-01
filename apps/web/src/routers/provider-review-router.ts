@@ -22,8 +22,12 @@ import * as z from 'zod';
 import { createHash } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
 
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { db } from '@/lib/drizzle';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { OperationLedgerRow } from '@kilocode/db/schema';
 import { PR_OPERATION_SETTLED_EVENT } from '@kilocode/app-shared/analytics';
 import { prIntentFingerprint, type PrLedgerIntent } from '@kilocode/app-shared/pr-review';
@@ -41,7 +45,7 @@ import {
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { assertTermsAccepted } from './github-pr-review-router';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
 import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';

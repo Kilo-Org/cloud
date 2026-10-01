@@ -1,12 +1,12 @@
 import { redirect } from 'next/navigation';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import DeviceAuthPage from './page';
 
 jest.mock('next/navigation', () => ({
   redirect: jest.fn(),
 }));
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuthOrRedirect: jest.fn(),
 }));
 

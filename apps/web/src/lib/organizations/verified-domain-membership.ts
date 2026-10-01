@@ -1,11 +1,11 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import {
   addUserToOrganization,
   lockOrganizationMembershipMutation,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { verifiedDomainEmailIdentity } from '@/lib/organizations/verified-domain';
 import {
   kilocode_users,

@@ -2,8 +2,8 @@ import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   byok_api_keys,
   coding_plan_key_inventory,
@@ -12,8 +12,8 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import type { User, Organization } from '@kilocode/db/schema';
-import { decryptApiKey, encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 
 const VERTEX_CREDENTIALS = JSON.stringify({
   project: 'example-project',

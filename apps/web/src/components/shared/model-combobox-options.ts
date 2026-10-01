@@ -1,4 +1,4 @@
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { preferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 export type ModelOption = {
   id: string; // e.g., "anthropic/claude-sonnet-4.5"

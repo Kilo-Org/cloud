@@ -3,10 +3,14 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull, lt, or, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
-import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  type TRPCContext,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   quick_chat_messages,
   quick_chat_threads,

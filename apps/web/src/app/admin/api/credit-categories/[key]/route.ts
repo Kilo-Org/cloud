@@ -1,18 +1,21 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db, sql } from '@/lib/drizzle';
+import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, credit_transactions } from '@kilocode/db/schema';
 import { asc, count, desc, ilike, eq } from 'drizzle-orm';
-import { describePaymentMethods, getPaymentStatusByUserIds } from '@/lib/admin-utils-serverside';
-import { getUsersWithAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
+import {
+  describePaymentMethods,
+  getPaymentStatusByUserIds,
+} from '@kilocode/web-shared/lib/admin-utils-serverside';
+import { getUsersWithAnyFreeWelcomeCredits } from '@kilocode/web-shared/lib/welcomeCredits';
 import type {
   CreditCategoryUsersApiResponse,
   CreditTransactionWithUser,
-} from '@/lib/PromoCreditCategoryConfig';
-import { toGuiCreditCategory } from '@/lib/PromoCreditCategoryConfig';
-import { promoCreditCategoriesByKey } from '@/lib/promoCreditCategories';
-import { getUserFromAuth } from '@/lib/user/server';
-import type { FailureResult } from '@/lib/maybe-result';
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import { toGuiCreditCategory } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import { promoCreditCategoriesByKey } from '@kilocode/web-shared/lib/promoCreditCategories';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import type { FailureResult } from '@kilocode/web-shared/lib/maybe-result';
 
 export async function GET(
   request: NextRequest,

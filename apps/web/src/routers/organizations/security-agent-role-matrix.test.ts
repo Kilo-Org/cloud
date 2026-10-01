@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { NextRequest } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { connectWithPAT } from '@/lib/integrations/gitlab-service';
 import {
   buildGitLabOAuthUrl,
@@ -19,13 +19,13 @@ import { handleGitLabOAuthCallback } from '@/lib/integrations/oauth/platforms/gi
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { addUserToOrganization } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations, type Organization, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
 
-jest.mock('@/lib/user/server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromAuth: jest.fn(),
 }));
 jest.mock('@/lib/integrations/gitlab-service', () => ({

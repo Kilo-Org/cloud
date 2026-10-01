@@ -12,7 +12,7 @@ import {
   UserDeletionStepStatus,
   type UserDeletionManualEvidence,
 } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { catalogForVersion } from '@/lib/user/deletion-queue/deletion-catalog';
 import {
   cancelPendingDeletionRequest,

@@ -1,5 +1,5 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   credit_transactions,
   kilocode_users,
@@ -14,8 +14,8 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from '@/lib/organizations/organizations';
-import { grantEntityCreditForCategory } from '@/lib/promotionalCredits';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
+import { grantEntityCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import {
   salesDemoMemberId,
   salesDemoMemberEmail,

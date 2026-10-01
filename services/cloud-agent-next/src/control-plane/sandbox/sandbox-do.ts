@@ -2178,7 +2178,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
           reason: error instanceof McpAttachValidationError ? error.reason : 'unknown',
         })
         .warn('MCP materialization failed before session.prepare');
-      this.ctx.waitUntil(this.failPrepareAttempt(route.sessionId, route.attemptId));
+      this.ctx.waitUntil(
+        this.failPrepareAttempt(route.sessionId, route.attemptId).catch(() => {
+          logger
+            .withFields({
+              sandboxId: this.sandboxId,
+              sessionId: route.sessionId,
+              attemptId: route.attemptId,
+            })
+            .warn('Could not persist MCP preparation failure');
+        })
+      );
       return;
     }
     if (route.grant.kilo.runtimeProxy !== undefined) {

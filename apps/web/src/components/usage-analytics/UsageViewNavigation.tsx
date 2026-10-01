@@ -8,18 +8,27 @@ const VIEW_LABELS: Array<{ value: OrganizationUsageView; label: string }> = [
   { value: 'overview', label: 'Overview' },
   { value: 'feature-adoption', label: 'Feature adoption' },
   { value: 'ai-usage', label: 'AI usage' },
+  { value: 'spend-alerts', label: 'Spend alerts' },
 ];
+
+const SALES_DEMO_VIEWS: ReadonlySet<OrganizationUsageView> = new Set(['ai-usage', 'spend-alerts']);
 
 export function UsageViewNavigation({
   value,
   onValueChange,
   isSalesDemo = false,
+  showSpendAlerts,
 }: {
   value: OrganizationUsageView;
   onValueChange: (value: OrganizationUsageView) => void;
   isSalesDemo?: boolean;
+  showSpendAlerts: boolean;
 }) {
-  const views = isSalesDemo ? VIEW_LABELS.filter(view => view.value === 'ai-usage') : VIEW_LABELS;
+  const views = VIEW_LABELS.filter(
+    view =>
+      (!isSalesDemo || SALES_DEMO_VIEWS.has(view.value)) &&
+      (showSpendAlerts || view.value !== 'spend-alerts')
+  );
 
   return (
     <nav

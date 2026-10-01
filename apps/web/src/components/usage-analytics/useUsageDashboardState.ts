@@ -37,7 +37,12 @@ export const ORG_SCOPE_ALL_ORGS = 'all-orgs';
 const VALID_PERIODS: PeriodOption[] = ['today', 'yesterday', '7d', '30d', '1y'];
 const VALID_GRANULARITIES: Granularity[] = ['hour', 'day', 'week', 'month'];
 const VALID_DIMENSIONS: Dimension[] = ['feature', 'model', 'mode', 'user', 'provider', 'project'];
-const VALID_USAGE_VIEWS: OrganizationUsageView[] = ['overview', 'feature-adoption', 'ai-usage'];
+const VALID_USAGE_VIEWS: OrganizationUsageView[] = [
+  'overview',
+  'feature-adoption',
+  'ai-usage',
+  'spend-alerts',
+];
 
 const INCLUDE_DIM_KEYS: (keyof UsageFilters)[] = [
   'features',

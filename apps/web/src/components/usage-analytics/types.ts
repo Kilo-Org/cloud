@@ -7,7 +7,7 @@ export type Granularity = 'hour' | 'day' | 'week' | 'month';
 
 export type CostSource = 'cost' | 'market';
 
-export type OrganizationUsageView = 'overview' | 'feature-adoption' | 'ai-usage';
+export type OrganizationUsageView = 'overview' | 'feature-adoption' | 'ai-usage' | 'spend-alerts';
 
 export type Dimension = 'feature' | 'model' | 'mode' | 'user' | 'provider' | 'project';
 

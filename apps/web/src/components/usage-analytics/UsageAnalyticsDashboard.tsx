@@ -18,7 +18,10 @@ import {
 import { Download, SlidersHorizontal } from 'lucide-react';
 import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
-import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
 import { BreakdownPieChart } from './BreakdownPieChart';
@@ -180,7 +183,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
     groupBy,
     personalView,
     orgScope,
-    usageView,
+    usageView: requestedUsageView,
   } = state;
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const isOrgContext = context === 'organization';
@@ -197,6 +200,11 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   // id those views require, so callers don't re-check the nullable local.
   const enterpriseOrg = org?.organizationPlan === 'enterprise' ? org : null;
   const hasEnterpriseUsageViews = enterpriseOrg !== null;
+  const canManageSpendAlerts = org === null || canManageOrganizationBilling(org.callerRole);
+  const usageView =
+    requestedUsageView === 'spend-alerts' && !canManageSpendAlerts
+      ? 'ai-usage'
+      : requestedUsageView;
   const showDetailedUsage = !hasEnterpriseUsageViews || usageView === 'ai-usage';
 
   // `organizations.list` is always available to the caller and returns the
@@ -760,13 +768,17 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
 
   const pageTitle = title ?? 'Usage Analytics';
 
-  const showUsageControls = !hasEnterpriseUsageViews || usageView === 'ai-usage';
+  const spendAlertsPanel = org ? (
+    <SpendAlertsPanel organizationId={org.organizationId} callerRole={org.callerRole} />
+  ) : (
+    <SpendAlertsPanel />
+  );
 
   return (
     <div className="flex h-[calc(100dvh-3.5rem)] w-full overflow-hidden">
       {typeof pageTitle === 'string' && <SetPageTitle title={pageTitle} />}
 
-      {showUsageControls && (
+      {showDetailedUsage && (
         <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
           <SheetContent side="left" className="w-80 p-0 lg:hidden">
             <SheetHeader className="sr-only">
@@ -777,10 +789,10 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
         </Sheet>
       )}
 
-      {showUsageControls && <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>}
+      {showDetailedUsage && <div className="hidden w-80 shrink-0 border-r lg:block">{sidebar}</div>}
 
       <div className="flex h-full flex-1 flex-col overflow-hidden">
-        {showUsageControls && (
+        {showDetailedUsage && (
           <div className="bg-background/90 flex items-center gap-3 border-b px-4 py-2 backdrop-blur lg:hidden">
             <Button
               variant="outline"
@@ -811,6 +823,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   value={usageView}
                   onValueChange={nextView => setState({ usageView: nextView })}
                   isSalesDemo={isSalesDemo}
+                  showSpendAlerts={canManageSpendAlerts}
                 />
               </div>
             )}
@@ -839,21 +852,15 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   canDismiss={canManageOrganization(callerRole)}
                 />
               </div>
+            ) : enterpriseOrg && usageView === 'spend-alerts' ? (
+              spendAlertsPanel
             ) : (
               <>
                 <UsageWarning />
 
-                {/* Spend-alert settings belong to this spend view's owner and
-                    are independent of the usage queries below: they render
-                    above the summary and stay put when a query fails. */}
-                {org ? (
-                  <SpendAlertsPanel
-                    organizationId={org.organizationId}
-                    callerRole={org.callerRole}
-                  />
-                ) : (
-                  <SpendAlertsPanel />
-                )}
+                {/* Without the enterprise tabs, spend-alert settings sit above
+                    the summary and stay put when a usage query fails. */}
+                {!hasEnterpriseUsageViews && spendAlertsPanel}
 
                 {usageDashboardState === 'error' ? (
                   <UsageDataErrorState onRetry={retryUsageQueries} />

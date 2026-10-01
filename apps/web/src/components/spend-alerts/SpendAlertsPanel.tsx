@@ -92,7 +92,8 @@ export type SpendAlertsPanelProps = {
 };
 
 /**
- * Spend-alert settings, mounted above the usage summary of the spend views.
+ * Spend-alert settings, mounted above the usage summary of the spend views, or
+ * on their own tab in the enterprise organization usage views.
  * Enabling the feature, choosing which alerts fire, at which thresholds, and on
  * which channels all happen here; the mobile app's notification category is the
  * push gate and agrees with the push choices saved here.

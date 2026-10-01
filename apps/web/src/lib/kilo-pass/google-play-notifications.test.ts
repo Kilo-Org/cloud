@@ -23,6 +23,7 @@ import {
   KiloPassPaymentProvider,
 } from '@/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
+import type * as bouncerClientModule from '@/lib/bouncer/client';
 import { toMicrodollars } from '@/lib/microdollars';
 
 const mockAcknowledge = jest
@@ -69,6 +70,25 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   },
   trackKiloPassPurchaseCompleted: jest.fn(),
 }));
+
+// Bouncer is report-only. Capture its calls without any network access.
+jest.mock('@/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+  return {
+    __esModule: true,
+    ...actual,
+    reportCreditEvent: jest.fn(),
+  };
+});
+
+// The mock is registered above; a static import would bind the real module instead.
+type BouncerClientMock = {
+  reportCreditEvent: jest.Mock;
+};
+
+function getBouncerClientMock(): jest.Mock {
+  return (jest.requireMock('@/lib/bouncer/client') as BouncerClientMock).reportCreditEvent;
+}
 
 type PosthogTrackingMock = {
   trackKiloPassPurchaseCompleted: jest.Mock;
@@ -1822,5 +1842,170 @@ describe('processGooglePlayKiloPassNotification', () => {
         where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
       })
     ).toHaveLength(1);
+  });
+});
+
+describe('Google Play bouncer store events', () => {
+  let reportCreditEvent: jest.Mock;
+
+  beforeEach(() => {
+    reportCreditEvent = getBouncerClientMock();
+    reportCreditEvent.mockClear();
+  });
+
+  /** Completes one paid purchase so the subscription resolves to `accountId`. */
+  async function subscribe(token: string, orderId: string, accountId: string) {
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(accountId, orderId));
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: token,
+        messageId: `setup-${token}`,
+      }),
+    });
+    reportCreditEvent.mockClear();
+  }
+
+  function voidedMessage(messageId: string, purchaseToken: string, orderId: string) {
+    return {
+      messageId,
+      data: Buffer.from(
+        JSON.stringify({
+          packageName: 'com.kilocode.kiloapp',
+          eventTimeMillis: String(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+          voidedPurchaseNotification: { purchaseToken, orderId, productType: 1, refundType: 1 },
+        })
+      ).toString('base64'),
+    };
+  }
+
+  it('reports a voided purchase as an other-reason refund', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `void-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, orderId, obfsAccountId);
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken: token,
+      state: 'REFUNDED',
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedMessage('void-report', token, orderId),
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.refund',
+      reason: 'other',
+      provider: 'google',
+      eventId: 'void-report',
+      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
+  it('reports a production purchase with its USD amount in cents', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `purchase-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken: token,
+      state: 'PROCESSED',
+      lineItems: [
+        {
+          productId: 'kilopass_tier19',
+          total: { currencyCode: 'USD', units: '19', nanos: 0 },
+          subscriptionDetails: {
+            servicePeriodStartTime: '2026-05-01T09:00:00.000Z',
+            servicePeriodEndTime: '2100-01-01T00:00:00.000Z',
+          },
+        },
+      ],
+    });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 4,
+        purchaseToken: token,
+        messageId: 'purchase-report',
+      }),
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.purchase',
+      amountCents: 1900,
+      provider: 'google',
+      eventId: 'purchase-report',
+      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
+  it('reports a production revoked subscription', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = `revoked-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    await subscribe(token, orderId, obfsAccountId);
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'revoked-report',
+      }),
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.revoked',
+      provider: 'google',
+      eventId: 'revoked-report',
+      occurredAt: new Date(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS),
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
+  it('skips a sandbox notification', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const token = `sandbox-token-${crypto.randomUUID()}`;
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, orderId, { testPurchase: {} })
+    );
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'sandbox-report',
+      }),
+    });
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
+  });
+
+  it('skips a production notification that resolves no Kilo user', async () => {
+    const token = `orphan-token-${crypto.randomUUID()}`;
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiData());
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        notificationType: 12,
+        purchaseToken: token,
+        messageId: 'orphan-report',
+      }),
+    });
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
   });
 });

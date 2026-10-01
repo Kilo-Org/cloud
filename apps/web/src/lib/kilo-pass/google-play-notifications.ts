@@ -37,6 +37,7 @@ import {
 } from './store-subscription-completion';
 import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
+import { reportCreditEvent, type StoreEventKind } from '@/lib/bouncer/client';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from '@/lib/kilo-pass/dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
@@ -566,6 +567,74 @@ async function findProcessedTerminalStoreEventForGooglePlayPurchase(params: {
   return terminalEvents[0] ?? null;
 }
 
+/** Play `eventTimeMillis` is milliseconds since the epoch, as a string or a number. */
+function googlePlayEventTime(eventTimeMillis: string | number | null): Date | undefined {
+  if (eventTimeMillis === null) return undefined;
+  const millis = Number(eventTimeMillis);
+  return Number.isFinite(millis) ? new Date(millis) : undefined;
+}
+
+/**
+ * The store money event a Play subscription notification maps to. A voided purchase is a
+ * review-level refund the caller reports separately; every other type here reports none.
+ */
+function getGooglePlayBouncerReport(
+  notificationType: number,
+  amountCents: number | undefined
+): StoreEventKind | null {
+  switch (notificationType) {
+    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_PURCHASED:
+    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_RENEWED:
+      return { type: 'store.purchase', amountCents };
+    case GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED:
+      return { type: 'store.revoked' };
+    default:
+      return null;
+  }
+}
+
+/**
+ * The Kilo account that owns a Play subscription, for a report. A provider/user mismatch fails the
+ * purchase path, but it must never fail a report.
+ */
+async function resolveGooglePlayKiloPassOwner(params: {
+  providerSubscriptionId: string;
+  appAccountToken: string | null;
+}): Promise<string | null> {
+  try {
+    return (await getUserForGooglePlayRenewal(params))?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reports one Play money event to bouncer. Production events for a resolved Kilo account only: a
+ * store event carries no card and no client IP. Call it from `after()`, post-commit.
+ */
+async function reportGooglePlayCreditEventToBouncer(params: {
+  environment: string;
+  eventId: string;
+  eventTimeMillis: string | number | null;
+  referenceId: string;
+  /** Null when the notification maps to no store money event. */
+  event: StoreEventKind | null;
+  userId: string | null;
+}): Promise<void> {
+  if (params.environment !== 'Production' || params.userId === null || params.event === null) {
+    return;
+  }
+  await reportCreditEvent({
+    ...params.event,
+    provider: 'google',
+    eventId: params.eventId,
+    occurredAt: googlePlayEventTime(params.eventTimeMillis),
+    userId: params.userId,
+    referenceId: params.referenceId,
+    environment: 'production',
+  });
+}
+
 export async function processGooglePlayKiloPassNotification(params: {
   pubsubMessage: GooglePlayPubSubMessage;
 }): Promise<GooglePlayKiloPassNotificationProcessingResult> {
@@ -641,6 +710,16 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     // A refund can leave the subscription entitled. Lifecycle notifications
     // reconcile access; this event reverses only the exact refunded order.
+    await runAfterResponse(() =>
+      reportGooglePlayCreditEventToBouncer({
+        environment: snapshot.environment,
+        eventId,
+        eventTimeMillis: developerNotification.eventTimeMillis ?? null,
+        referenceId: orderId,
+        event: { type: 'store.refund', reason: 'other' },
+        userId: owner?.id ?? null,
+      })
+    );
     return { processed: true };
   }
 
@@ -858,6 +937,19 @@ export async function processGooglePlayKiloPassNotification(params: {
         });
       });
     }
+    // Play states the amount in its currency's ISO 4217 minor units, so only USD is US cents.
+    const amountCents =
+      purchase.currency === 'USD' ? (purchase.amountChargedMinorUnits ?? undefined) : undefined;
+    await runAfterResponse(() =>
+      reportGooglePlayCreditEventToBouncer({
+        environment: purchase.environment,
+        eventId,
+        eventTimeMillis,
+        referenceId: purchase.providerTransactionId,
+        event: getGooglePlayBouncerReport(notificationType, amountCents),
+        userId: user.id,
+      })
+    );
     return { processed: true };
   }
 
@@ -935,6 +1027,19 @@ export async function processGooglePlayKiloPassNotification(params: {
           )
         );
     });
+    await runAfterResponse(async () =>
+      reportGooglePlayCreditEventToBouncer({
+        environment: decoded.environment,
+        eventId,
+        eventTimeMillis,
+        referenceId: decoded.latestOrderId,
+        event: getGooglePlayBouncerReport(notificationType, undefined),
+        userId: await resolveGooglePlayKiloPassOwner({
+          providerSubscriptionId: purchaseToken,
+          appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
+        }),
+      })
+    );
     return { processed: true };
   }
 

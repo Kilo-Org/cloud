@@ -814,6 +814,8 @@ type CreditRestorationResult = {
   restoredCreditTransactionIds: string[];
   totalRestoredMicrodollars: number;
   restoredItemKinds: KiloPassIssuanceItemKind[];
+  /** Base clawbacks left closed because a same-month repurchase already re-granted the month. */
+  skippedRegrantedBaseCycleKeys: string[];
 };
 
 function getRefundRestorationDescription(kind: KiloPassIssuanceItemKind | null): string {
@@ -865,6 +867,7 @@ async function restoreAppStoreRefundCredits(
       restoredCreditTransactionIds: [],
       totalRestoredMicrodollars: 0,
       restoredItemKinds: [],
+      skippedRegrantedBaseCycleKeys: [],
     };
   }
 
@@ -878,8 +881,30 @@ async function restoreAppStoreRefundCredits(
     transaction.transactionId
   );
 
+  // A same-month repurchase after the refund re-granted this month's base
+  // (store-subscription-completion releases the refunded base item, and the
+  // repurchase issues a new one). Restoring the old base too would grant the
+  // month twice, so a base clawback is skipped while another base item stands.
+  const issueMonth = dayjs(storePurchase.purchased_at).utc().format('YYYY-MM-01');
+  const [currentBaseItem] = await tx
+    .select({ creditTransactionId: kilo_pass_issuance_items.credit_transaction_id })
+    .from(kilo_pass_issuance_items)
+    .innerJoin(
+      kilo_pass_issuances,
+      eq(kilo_pass_issuance_items.kilo_pass_issuance_id, kilo_pass_issuances.id)
+    )
+    .where(
+      and(
+        eq(kilo_pass_issuances.kilo_pass_subscription_id, storePurchase.kilo_pass_subscription_id),
+        eq(kilo_pass_issuances.issue_month, issueMonth),
+        eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
+      )
+    )
+    .limit(1);
+
   const restoredCreditTransactionIds: string[] = [];
   const restoredItemKinds: KiloPassIssuanceItemKind[] = [];
+  const skippedRegrantedBaseCycleKeys: string[] = [];
   let totalRestoredMicrodollars = 0;
   for (const clawback of ledger.clawbacks) {
     const amountMicrodollars = -clawback.amountMicrodollars;
@@ -888,6 +913,16 @@ async function restoreAppStoreRefundCredits(
     }
 
     const itemKind = getRefundCycleItemKind(clawback.cycleKey);
+    // Cycle key `<tx>:base:<baseCreditTransactionId>[:r<n>]`.
+    const clawedBaseCreditTransactionId = clawback.cycleKey.split(':')[2];
+    if (
+      itemKind === KiloPassIssuanceItemKind.Base &&
+      currentBaseItem &&
+      currentBaseItem.creditTransactionId !== clawedBaseCreditTransactionId
+    ) {
+      skippedRegrantedBaseCycleKeys.push(clawback.cycleKey);
+      continue;
+    }
     const restoration = await insertCreditAdjustment(tx, {
       kiloUserId: storePurchase.kilo_user_id,
       signedAmountMicrodollars: amountMicrodollars,
@@ -913,6 +948,7 @@ async function restoreAppStoreRefundCredits(
     restoredCreditTransactionIds,
     totalRestoredMicrodollars,
     restoredItemKinds,
+    skippedRegrantedBaseCycleKeys,
   };
 }
 
@@ -1332,6 +1368,7 @@ export async function processAppStoreKiloPassNotification(params: {
           restoredCreditTransactionIds: restoration.restoredCreditTransactionIds,
           totalRestoredMicrodollars: restoration.totalRestoredMicrodollars,
           restoredItemKinds: restoration.restoredItemKinds,
+          skippedRegrantedBaseCycleKeys: restoration.skippedRegrantedBaseCycleKeys,
         },
       });
       await tx

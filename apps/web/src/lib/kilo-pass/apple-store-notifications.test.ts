@@ -3411,6 +3411,28 @@ describe('App Store bouncer store events', () => {
     expect(await readSubscription(decodedTransaction.originalTransactionId)).toMatchObject({
       status: 'active',
     });
+    const releaseAudit = (
+      await db.query.kilo_pass_audit_log.findMany({
+        where: eq(kilo_pass_audit_log.kilo_user_id, user.id),
+      })
+    ).find(row => row.payload_json.kind === 'store_refunded_base_item_released');
+    expect(releaseAudit?.payload_json).toMatchObject({
+      repurchaseProviderTransactionId: resubscribe.transactionId,
+    });
+
+    // A later reversal of the refunded transaction must not grant the month twice:
+    // the repurchase already re-granted the base. Bonus and promo still come back.
+    await processAppStoreKiloPassNotification(
+      refundReversed(
+        'same-month-late-reversal',
+        appStoreTransaction(decodedTransaction, {
+          appAccountToken: user.app_store_account_token,
+        }),
+        'Sandbox',
+        SIGNED_DATE_MS + 2 * 60 * 60_000
+      )
+    );
+    expect(await readTotal(user.id)).toBe(toMicrodollars(19 + 9.5 + 4.75));
   });
 
   it('does not re-grant a month whose refund Apple reversed', async () => {

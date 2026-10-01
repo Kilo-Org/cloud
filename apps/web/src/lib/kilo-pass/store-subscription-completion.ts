@@ -264,7 +264,12 @@ function getUpgradeBonusReversalDescription(kind: KiloPassIssuanceItemKind): str
  */
 async function releaseRefundedBaseIssuanceItem(
   tx: DrizzleTransaction,
-  params: { issuanceId: string; kiloUserId: string }
+  params: {
+    issuanceId: string;
+    subscriptionId: string;
+    kiloUserId: string;
+    purchase: ValidatedStoreKiloPassPurchase;
+  }
 ): Promise<void> {
   const [baseItem] = await tx
     .select({
@@ -306,6 +311,21 @@ async function releaseRefundedBaseIssuanceItem(
   if (clawbacks <= restorations) return;
 
   await tx.delete(kilo_pass_issuance_items).where(eq(kilo_pass_issuance_items.id, baseItem.itemId));
+  await appendKiloPassAuditLog(tx, {
+    action: KiloPassAuditLogAction.BaseCreditsIssued,
+    result: KiloPassAuditLogResult.Success,
+    kiloUserId: params.kiloUserId,
+    kiloPassSubscriptionId: params.subscriptionId,
+    relatedCreditTransactionId: baseItem.creditTransactionId,
+    relatedMonthlyIssuanceId: params.issuanceId,
+    payload: {
+      kind: 'store_refunded_base_item_released',
+      releasedIssuanceItemId: baseItem.itemId,
+      refundedBaseCreditTransactionId: baseItem.creditTransactionId,
+      providerSubscriptionId: params.purchase.providerSubscriptionId,
+      repurchaseProviderTransactionId: params.purchase.providerTransactionId,
+    },
+  });
 }
 
 async function resetIssuanceItemsForStoreUpgrade(
@@ -912,7 +932,9 @@ export async function completeStoreKiloPassPurchase(params: {
     if (!isAppStoreSamePeriodUpgrade) {
       await releaseRefundedBaseIssuanceItem(tx, {
         issuanceId: issuanceHeader.issuanceId,
+        subscriptionId,
         kiloUserId: user.id,
+        purchase,
       });
     }
     const baseCreditsResult = isAppStoreSamePeriodUpgrade

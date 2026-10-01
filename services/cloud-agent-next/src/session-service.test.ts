@@ -1006,6 +1006,15 @@ describe('writeGlobalRules', () => {
   });
 });
 
+describe('buildCloudAgentRules', () => {
+  it('bounds commands and sleeps to the shell-tool timeout', () => {
+    const rules = buildCloudAgentRules(240_000);
+
+    expect(rules).toContain('no more than 3 minutes 30 seconds');
+    expect(rules).toContain('never sleep longer than this limit');
+  });
+});
+
 describe('SessionService.prepareWorkspace', () => {
   beforeEach(() => {
     vi.clearAllMocks();

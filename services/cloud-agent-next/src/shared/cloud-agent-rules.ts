@@ -27,6 +27,7 @@ export function buildCloudAgentRules(bashDefaultTimeoutMs?: string | number | nu
     '## Command Execution',
     '',
     `Always set a timeout of no more than ${formatDuration(commandTimeoutMs)} for each command.`,
+    'This also applies to `sleep`: never sleep longer than this limit.',
     'Avoid commands that are likely to exceed this limit, especially repository-wide lint, typecheck, or type-generation commands in large repositories. Prefer focused commands scoped to the changed files or relevant package.',
     'If a command cannot finish within this limit or its failure cannot be fixed quickly, stop retrying the command and continue without it.',
     'Report any validation that you could not run or complete.',

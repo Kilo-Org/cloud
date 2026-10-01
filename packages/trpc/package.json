@@ -31,6 +31,7 @@
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
+    "@kilocode/web-shared": "workspace:*",
     "@sentry/nextjs": "10.69.0",
     "@typescript/native-preview": "catalog:",
     "rollup": "4.59.1",

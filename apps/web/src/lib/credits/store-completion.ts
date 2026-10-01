@@ -6,7 +6,12 @@ import { reportCreditEvent } from '@/lib/bouncer/client';
 import { runAfterResponse } from '@/lib/after-response';
 import { processTopUp } from '@/lib/credits';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+  KiloPassPaymentProvider,
+} from '@/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 
 import {
   findEffectiveStoreCreditRefundEvent,
@@ -131,6 +136,22 @@ export async function completeStoreCreditPurchase(params: {
     );
 
     if (didGrant) {
+      // The store purchase audit trail shared with Kilo Pass. A credit pack has
+      // no subscription, so only the user and the granted credit row are linked.
+      await appendKiloPassAuditLog(tx, {
+        action: KiloPassAuditLogAction.StorePurchaseCompleted,
+        result: KiloPassAuditLogResult.Success,
+        kiloUserId: user.id,
+        relatedCreditTransactionId: attemptedCreditTransactionId,
+        payload: {
+          kind: 'store_credit_pack',
+          paymentProvider: purchase.paymentProvider,
+          productId: purchase.productId,
+          providerTransactionId: purchase.providerTransactionId,
+          environment: purchase.environment,
+          amountUsd,
+        },
+      });
       return {
         alreadyProcessed: false,
         amountUsd,

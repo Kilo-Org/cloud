@@ -2,7 +2,12 @@ import { NotificationTypeV2 } from '@apple/app-store-server-library';
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { and, eq, sql } from 'drizzle-orm';
 
-import { credit_transactions, kilo_pass_store_events, kilocode_users } from '@kilocode/db/schema';
+import {
+  credit_transactions,
+  kilo_pass_audit_log,
+  kilo_pass_store_events,
+  kilocode_users,
+} from '@kilocode/db/schema';
 import type * as Credits from '@/lib/credits';
 import { db } from '@/lib/drizzle';
 import { toMicrodollars } from '@/lib/microdollars';
@@ -175,6 +180,21 @@ describe('completeStoreCreditPurchase', () => {
       }),
     ]);
     expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+    const audit = await db.query.kilo_pass_audit_log.findMany({
+      where: eq(kilo_pass_audit_log.kilo_user_id, user.id),
+    });
+    expect(audit).toEqual([
+      expect.objectContaining({
+        action: 'store_purchase_completed',
+        result: 'success',
+        related_credit_transaction_id: result.creditTransactionId,
+        payload_json: expect.objectContaining({
+          kind: 'store_credit_pack',
+          providerTransactionId,
+          amountUsd: 10,
+        }),
+      }),
+    ]);
   });
 
   it('describes a Google Play grant as such', async () => {
@@ -212,6 +232,12 @@ describe('completeStoreCreditPurchase', () => {
       )
     ).toHaveLength(1);
     expect(await balanceOf(user.id)).toBe(toMicrodollars(10));
+    // A replay grants nothing, so it audits nothing.
+    expect(
+      await db.query.kilo_pass_audit_log.findMany({
+        where: eq(kilo_pass_audit_log.kilo_user_id, user.id),
+      })
+    ).toHaveLength(1);
   });
 
   it('rejects a replay whose transaction belongs to another user', async () => {

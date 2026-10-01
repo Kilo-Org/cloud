@@ -13,6 +13,7 @@ import {
   CONTROL_WRAPPER_LOG_PATH,
 } from '../sandbox-control/container-paths.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
+import { diagnosticCause, logControlDiagnostic } from '../sandbox-control/diagnostics.js';
 import {
   ContainersBilling,
   ContainersBillingScheduler,
@@ -135,6 +136,20 @@ function readWrapperAttempt(record: ContainersRecord): WrapperAttemptRead {
   if (value === undefined) return 'missing';
   if (value === 'not_started' || value === 'exec_pending') return value;
   return 'unknown';
+}
+
+/** Name the branch that decided a stop: every 'retryable' used to look the same in the logs. */
+function stopPath(
+  path: string,
+  result: 'terminal' | 'retryable',
+  fields: Record<string, string | number | boolean | undefined> = {}
+): 'terminal' | 'retryable' {
+  logControlDiagnostic(
+    'container_stop',
+    { path, result, ...fields },
+    result === 'retryable' ? 'warn' : 'info'
+  );
+  return result;
 }
 
 export class SandboxContainers extends DurableObject<Env> {
@@ -370,9 +385,11 @@ export class SandboxContainers extends DurableObject<Env> {
     return this.runExclusive(async () => {
       const ref = allocationRef;
       const record = await this.readRecord();
-      if (record.allocationRef === null) return 'terminal';
-      if (record.allocationRef !== ref && record.state !== 'stopping') return 'terminal';
-      if (record.allocationRef !== ref) return 'retryable';
+      if (record.allocationRef === null) return stopPath('no_allocation', 'terminal');
+      if (record.allocationRef !== ref && record.state !== 'stopping') {
+        return stopPath('other_allocation', 'terminal');
+      }
+      if (record.allocationRef !== ref) return stopPath('other_allocation_stopping', 'retryable');
       if (record.state === 'stopping') {
         const stopOpId = record.stopOpId ?? crypto.randomUUID();
         if (record.stopOpId === null) {
@@ -736,23 +753,33 @@ export class SandboxContainers extends DurableObject<Env> {
       // A missing container only proves cleanup for a record that never reached
       // a bun exec. Pending or unclassified phases stay stopping so a later stop
       // can observe the destroy resolve; destroying nothing must not clear them.
-      if (readWrapperAttempt(record) !== 'not_started') return 'retryable';
+      if (readWrapperAttempt(record) !== 'not_started') {
+        return stopPath('no_container_unfenced', 'retryable', {
+          wrapperAttempt: readWrapperAttempt(record),
+        });
+      }
       await this.writeRecord(this.terminalRecord(record));
       await this.settleBillingAtStop(record);
-      return 'terminal';
+      return stopPath('no_container_not_started', 'terminal');
     }
     await this.snapshotBeforeDestroy(container, ref, stopOpId);
+    const destroyStartedAt = Date.now();
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
-    } catch {
+    } catch (error) {
       // A timed-out destroy has no late callback; the phase is cleared only by a
       // later stop that observes the destroy resolve.
-      return 'retryable';
+      return stopPath('destroy_failed', 'retryable', {
+        destroyMs: Date.now() - destroyStartedAt,
+        running: container.running,
+        errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+        cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+      });
     }
     const current = await this.readRecord();
     await this.writeRecord(this.terminalRecord(current));
     await this.settleBillingAtStop(current);
-    return 'terminal';
+    return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
   }
 
   private async snapshotBeforeDestroy(
@@ -768,7 +795,16 @@ export class SandboxContainers extends DurableObject<Env> {
         'container snapshot timed out'
       );
       await this.publishSnapshot(snapshot.id, ref, stopOpId);
-    } catch {
+    } catch (error) {
+      logControlDiagnostic(
+        'container_snapshot',
+        {
+          result: 'failed',
+          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
+          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
+        },
+        'warn'
+      );
       void attempt.then(
         snapshot => this.runExclusive(() => this.publishSnapshot(snapshot.id, ref, stopOpId)),
         () => undefined

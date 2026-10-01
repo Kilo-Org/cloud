@@ -7,7 +7,7 @@ import {
 import type { Env } from '../../src/types.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   clearBillingContext,
   getBillingContext,
@@ -32,6 +32,7 @@ import {
   type BillingScheduleEntries,
 } from '../../src/sandbox-control/billing-schedule.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { logger } from '../../src/logger.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
 import { waitFor } from './wait-for.js';
 
@@ -516,6 +517,119 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     expect(await runInDurableObject(stub, (_instance, state) => state.getWebSockets().length)).toBe(
       0
     );
+  });
+
+  it('records a distinct hello admission reason for each rejection at the validator', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { credential, allocationId } = launchIdentity(provider);
+    const secret = await resolveSecret((env as unknown as Env).NEXTAUTH_SECRET);
+    if (!secret) throw new Error('Test signing secret unavailable');
+    const rawCredential = verifySandboxLaunchCredential(credential, secret)?.credential;
+    if (!rawCredential) throw new Error('Launch credential did not verify');
+    const records = await runInDurableObject(stub, async (instance, state) => {
+      const validate = (id: string, presented: string | null) =>
+        (
+          instance as unknown as {
+            validateAllocationCredential(a: string, c: string | null): Promise<boolean>;
+          }
+        ).validateAllocationCredential(id, presented);
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'hello_admission') captured.push(bounded);
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      try {
+        await validate(allocationId, rawCredential);
+        await validate('00000000-0000-4000-8000-0000000000ff', rawCredential);
+        await validate(allocationId, null);
+        await validate(allocationId, 'f'.repeat(64));
+        const hash = await state.storage.get<string>('wrapper_credential_hash');
+        await state.storage.delete('wrapper_credential_hash');
+        await validate(allocationId, rawCredential);
+        if (typeof hash === 'string') await state.storage.put('wrapper_credential_hash', hash);
+        const db = drizzle(state.storage, { logger: false });
+        await db
+          .update(allocationTable)
+          .set({ state: 'stopping' })
+          .where(eq(allocationTable.id, 'current'));
+        await validate(allocationId, rawCredential);
+        await db
+          .update(allocationTable)
+          .set({ state: 'stopped' })
+          .where(eq(allocationTable.id, 'current'));
+        await validate(allocationId, rawCredential);
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+      }
+      return captured;
+    });
+
+    expect(records.map(record => record.reason)).toEqual([
+      'accepted',
+      'allocation_mismatch',
+      'missing_credential',
+      'credential_mismatch',
+      'missing_credential_hash',
+      'allocation_stopping',
+      'allocation_stopped',
+    ]);
+    expect(records[1]).toMatchObject({
+      allocationKind: 'starting',
+      expectedAllocationId: allocationId,
+      receivedAllocationId: '00000000-0000-4000-8000-0000000000ff',
+      credentialPresent: true,
+      accepted: false,
+    });
+    expect(records[2]).toMatchObject({ credentialPresent: false });
+    expect(records[4]).toMatchObject({ credentialHashPresent: false });
+    expect(records[5]).toMatchObject({ allocationKind: 'stopping' });
+    expect(JSON.stringify(records)).not.toContain(credential);
+    expect(JSON.stringify(records)).not.toContain(rawCredential);
+  });
+
+  it('records the old and new allocation ids on an allocation transition', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    const { allocationId } = launchIdentity(provider);
+    const records = await runInDurableObject(stub, async instance => {
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (bounded.diagnosticEvent === 'allocation_transition') captured.push(bounded);
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      try {
+        await instance.reportProviderGone();
+        await instance.ensureAllocation();
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+      }
+      return captured;
+    });
+    const reset = records.find(record => record.event === 'provider-gone');
+    expect(reset).toMatchObject({
+      from: 'starting',
+      to: 'stopped',
+      fromAllocationId: allocationId,
+      toAllocationId: null,
+    });
+    const replacement = records.find(record => record.event === 'ensure');
+    const current = await readState(stub);
+    expect(replacement).toMatchObject({
+      from: 'stopped',
+      to: 'creating',
+      fromAllocationId: null,
+      toAllocationId: current.allocationId,
+    });
+    expect(current.allocationId).not.toBe(allocationId);
   });
 
   it('does not accept a late hello after its deadline or move allocation and route state', async () => {

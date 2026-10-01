@@ -162,6 +162,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
       const diagnostic = {
         provider: 'cloudflare-containers',
         allocationName: deps.logicalSandboxId,
+        intentId: intent?.intentId,
       };
       if (resolved === null || decodeOwnedProviderRef(resolved) === null) {
         logControlDiagnostic('native_stop', { ...diagnostic, result: 'invalid_reference' });

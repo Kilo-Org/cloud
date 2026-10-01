@@ -2,13 +2,20 @@ import { env, evictAllDurableObjects, reset, runInDurableObject } from 'cloudfla
 import { generateKeyPairSync } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import {
   allocation as allocationTable,
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
-import { writeRoute } from '../../src/control-plane/sandbox/routes.js';
+import {
+  failExpiredRoutes,
+  onRouteFailed,
+  onRouteProgress,
+  onRouteReady,
+  writeRoute,
+  type RouteContext,
+} from '../../src/control-plane/sandbox/routes.js';
 import { WORKTREE_DELETION_PREFIX } from '../../src/control-plane/sandbox/worktree-deletion.js';
 import type {
   ProviderAdapter,
@@ -18,6 +25,7 @@ import type {
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
 import type { createSandboxNotificationDispatcher } from '../../src/control-plane/sandbox/notifications.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import {
   createFakeCredentialBroker,
@@ -818,6 +826,109 @@ describe('SandboxControlV2 routes and forwarding', () => {
       })
     );
     expect((await readRouteRow(stub, SESSION))?.state).toBe('failed');
+  });
+
+  it('records route lifecycle diagnostics at the route decision owner', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(prepareInput(SESSION));
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+    const attemptId = (await readRouteRow(stub, SESSION))?.attempt_id;
+    if (!attemptId) throw new Error('route attempt was not created');
+
+    const records = await runInDurableObject(stub, async (_instance, state) => {
+      const db = drizzle(state.storage, { logger: false });
+      const ctx = {
+        db,
+        now: () => 5_000,
+        routePreparationMs: 1_000,
+        sendPrepare: () => {},
+        notify: async () => {},
+        issueGrant: async () => {
+          throw new Error('unused');
+        },
+        applyPolicy: async () => true,
+        publishGrant: () => {},
+      } as unknown as RouteContext;
+      const captured: Record<string, unknown>[] = [];
+      const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+        const bounded = fields as unknown as Record<string, unknown>;
+        if (
+          typeof bounded.diagnosticEvent === 'string' &&
+          bounded.diagnosticEvent.startsWith('route_')
+        ) {
+          captured.push(bounded);
+        }
+        return logger;
+      });
+      const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const route = {
+        sessionId: SESSION,
+        spec: routeSpec(SESSION),
+        grant: null,
+        credentialSource: null,
+        state: 'preparing' as const,
+        attemptId,
+        attemptDeadlineAt: 5_000,
+        reason: null,
+      };
+      try {
+        writeRoute(db, route);
+        await onRouteProgress(ctx, SESSION, 'setup', true);
+        await onRouteReady(ctx, SESSION, true);
+        writeRoute(db, {
+          ...route,
+          attemptId: `${attemptId}-timeout`,
+          attemptDeadlineAt: 5_000,
+        });
+        await failExpiredRoutes(ctx);
+        writeRoute(db, {
+          ...route,
+          attemptId: `${attemptId}-reported`,
+          attemptDeadlineAt: 10_000,
+        });
+        await onRouteFailed(ctx, SESSION, 'workspace_setup_failed', 'git_clone_timeout', true);
+      } finally {
+        withFields.mockRestore();
+        info.mockRestore();
+        warn.mockRestore();
+        error.mockRestore();
+      }
+      return captured;
+    });
+
+    expect(records).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          diagnosticEvent: 'route_progress',
+          sessionId: SESSION,
+          attemptId,
+          step: 'setup',
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_ready',
+          sessionId: SESSION,
+          attemptId,
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_failed',
+          sessionId: SESSION,
+          attemptId: `${attemptId}-timeout`,
+          reason: 'preparation_timeout',
+          stage: 'attempt_deadline',
+        }),
+        expect.objectContaining({
+          diagnosticEvent: 'route_failed',
+          sessionId: SESSION,
+          attemptId: `${attemptId}-reported`,
+          reason: 'workspace_setup_failed',
+          stage: 'wrapper_reported',
+          subtype: 'git_clone_timeout',
+        }),
+      ])
+    );
   });
 
   it('fails an expired route immediately when the allocation stops', async () => {

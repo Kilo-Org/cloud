@@ -71,6 +71,10 @@ import {
   type OrganizationKiloPassSeatCapacityStripe,
   type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import {
+  releaseCancellationSchedule,
+  scheduleToReleaseBeforeSeatUpdate,
+} from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
@@ -2336,6 +2340,11 @@ export async function handleUpdateSeatCount(
   }
   const paidSeatQuantity = rawPaidQuantity;
   const organizationPassItem = resolveSeatUpdateOrganizationPassItem(subscription);
+  const scheduleToRelease = await scheduleToReleaseBeforeSeatUpdate({
+    subscription,
+    paidSeatItem,
+    passItem: organizationPassItem,
+  });
 
   let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
     prorationDate,
@@ -2391,6 +2400,7 @@ export async function handleUpdateSeatCount(
   try {
     const locked = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+      if (scheduleToRelease) await releaseCancellationSchedule(scheduleToRelease);
       const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {

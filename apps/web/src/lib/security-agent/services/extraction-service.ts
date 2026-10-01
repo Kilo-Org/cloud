@@ -356,14 +356,12 @@ export async function extractSandboxAnalysis(options: {
           return createFallbackExtraction(rawMarkdown, `API error: ${result.status}`);
         }
 
-        // Set token usage on span
         const usage = result.data.usage;
         if (usage) {
           span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
         }
 
-        // Emit API metrics (only if o11y client secret is configured)
         if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
           const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
           const toolsUsed = responseToolCalls

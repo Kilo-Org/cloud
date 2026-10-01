@@ -2189,6 +2189,8 @@
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
+      "selectRepositoryToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດ.",
+      "connectProviderToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
       "prefillRepoAndModelUnavailable": "ຄັງໂຄດແລະໂມເດວຂອງເຊດຊັນເດີມໃຊ້ບໍ່ໄດ້ແລ້ວ. ເລືອກໃໝ່ຂ້າງລຸ່ມ.",

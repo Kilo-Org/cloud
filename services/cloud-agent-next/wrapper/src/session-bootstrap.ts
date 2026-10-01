@@ -683,7 +683,7 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   await fs.mkdir(rulesDir, { recursive: true });
   await fs.writeFile(
     path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(request.agentSessionId)
+    buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
   );
 }
 
@@ -1375,7 +1375,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       const incomplete = restoreTelemetry
         ? await reportRestoreIncomplete({
             diffs: restoreTelemetry.diffs ?? { applied: 0, skipped: 0, total: 0 },
-            sessionHome: request.workspace.sessionHome,
             identity: `kiloSessionId=${request.kiloSessionId} wrapperRunId=${request.session.wrapperRunId} wrapperGeneration=${request.session.wrapperGeneration}`,
             log: logToFile,
             step: {

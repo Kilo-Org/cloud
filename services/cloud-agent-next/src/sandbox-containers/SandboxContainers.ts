@@ -8,8 +8,9 @@ import {
   SANDBOX_INTERCEPT_HTTPS_ENV,
 } from '../shared/container-intercept.js';
 import {
+  CONTROL_PROCESS_MATCH,
+  CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
-  CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
@@ -518,7 +519,7 @@ export class SandboxContainers extends DurableObject<Env> {
         throw new WrapperExecTimeoutError();
       }
       const proc = await this.awaitProbeCall(
-        container.exec(['pgrep', '-f', CONTROL_WRAPPER_PATH]),
+        container.exec(['pgrep', '-f', CONTROL_PROCESS_MATCH]),
         deadlineAt
       );
       const exitCode = await this.awaitProbeCall(proc.exitCode, deadlineAt);
@@ -643,7 +644,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // after expiry.
     if (Date.now() >= deadlineAt) throw new WrapperExecTimeoutError();
     return this.awaitContainerCall(
-      container.exec(['bun', 'run', CONTROL_WRAPPER_PATH], {
+      container.exec(['/bin/sh', CONTROL_SUPERVISOR_PATH], {
         env: containment ? containedProcessEnv(env) : env,
         cwd: '/',
       }),

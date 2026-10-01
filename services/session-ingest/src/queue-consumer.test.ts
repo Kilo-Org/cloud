@@ -66,7 +66,10 @@ function mockIngestWithR2(ingest: ReturnType<typeof vi.fn>) {
     env =>
       ({
         ingest,
-        stageR2Object: async (params: { key: string }, body: ReadableStream<Uint8Array>) => {
+        stageR2Object: async (
+          params: { key: string },
+          body: ReadableStream<Uint8Array> | Uint8Array
+        ) => {
           await env.SESSION_INGEST_R2.put(params.key, body);
           return true;
         },
@@ -269,7 +272,7 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_compacted/ses_compacted/message/msg_compacted/456';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(ReadableStream));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
     expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(data));
     expect(ingest).toHaveBeenCalledWith(
       [{ type: 'message', data: { id: 'msg_compacted' } }],
@@ -331,7 +334,7 @@ describe('queue', () => {
     );
 
     const expectedR2Key = 'items/usr_duplicate/ses_duplicate/message/msg_same/1';
-    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(ReadableStream));
+    expect(put).toHaveBeenCalledWith(expectedR2Key, expect.any(Uint8Array));
     expect(await new Response(put.mock.calls[0][1]).text()).toBe(JSON.stringify(oversizedData));
     expect(ingest).toHaveBeenCalledTimes(2);
     expect(ingest).toHaveBeenNthCalledWith(

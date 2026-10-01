@@ -2189,6 +2189,8 @@
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
+      "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",

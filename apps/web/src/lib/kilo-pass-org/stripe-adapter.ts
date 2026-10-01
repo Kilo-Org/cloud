@@ -77,13 +77,13 @@ import {
 import {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
-} from './stripe-metadata';
+} from '@/lib/kilo-pass-org/stripe-metadata';
 import { monthlyWindowContaining, type IssuanceWindow } from './calculations';
 
 export {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
-} from './stripe-metadata';
+} from '@/lib/kilo-pass-org/stripe-metadata';
 
 const ORGANIZATION_KILO_PASS_CANCELLATION_ORIGIN = 'kilo-pass-org-cancellation';
 

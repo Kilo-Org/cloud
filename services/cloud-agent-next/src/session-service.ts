@@ -61,7 +61,7 @@ import {
   requiresContainmentSandbox,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
-import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { resolveLegacySessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
 import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
@@ -870,7 +870,7 @@ async function cleanupRestoreTokenFile(
 export async function writeGlobalRules(
   sandbox: SandboxInstance,
   sessionHome: string,
-  sessionId: string
+  bashDefaultTimeoutMs?: string | number | null
 ): Promise<void> {
   const rulesDir = `${sessionHome}/.kilocode/rules`;
   const rulesPath = `${rulesDir}/cloud-agent.md`;
@@ -1332,14 +1332,7 @@ export class SessionService {
     }
 
     const permission: Record<string, unknown> = {
-      external_directory: {
-        '*': 'deny',
-        [`/tmp/${sessionId}/**`]: 'allow',
-        [`/tmp/attachments/${sessionId}/**`]: 'allow',
-        [`${workspacePath}/**`]: 'allow',
-        [`${sessionHome}/.kilocode/skills/**`]: 'allow',
-        ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
-      },
+      external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
@@ -1356,6 +1349,11 @@ export class SessionService {
       todowrite: 'allow',
       todoread: 'allow',
       suggest: 'deny',
+      schedule_wakeup: 'deny',
+      cancel_wakeup: 'deny',
+      cron_create: 'deny',
+      cron_list: 'deny',
+      cron_delete: 'deny',
     };
 
     if (commandGuardPolicy) {
@@ -1469,6 +1467,7 @@ export class SessionService {
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
+    envVars.KILO_DISABLE_CODEBASE_INDEXING = 'vscode-no-workspace';
     if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
@@ -1995,7 +1994,7 @@ export class SessionService {
       // The session-owned RPC checks the current persisted runtime fence. It is
       // deliberately called only after this delivery plan carries every fence field.
       const handle = await withDORetry(
-        () => resolveSessionStub(env, userId, sessionId),
+        () => resolveLegacySessionStub(env, userId, sessionId),
         stub => stub.issueRuntimeCredentialProxyGrant(plan.wrapper.fence),
         'issueRuntimeCredentialProxyGrant'
       );
@@ -2471,7 +2470,7 @@ export class SessionService {
       await this.sanitizeGitRemote(session, workspacePath, metadata, resolvedTokens);
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
-      await writeGlobalRules(sandbox, sessionHome, sessionId);
+      await writeGlobalRules(sandbox, sessionHome, env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS);
 
       const detectedDevcontainer = metadata.workspace?.devcontainerRequested
         ? await detectDevContainer(session, workspacePath)

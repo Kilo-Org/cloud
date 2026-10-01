@@ -1676,6 +1676,8 @@
       "leaveChanges": "Änderungen beibehalten",
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
+      "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
+      "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
       "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle unten ein anderes Repository und ein anderes Modell aus.",

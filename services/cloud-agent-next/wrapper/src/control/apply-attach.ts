@@ -684,11 +684,10 @@ async function executeSessionAttach(
           sessionResolution = 'restored';
           // A runtime replacement restores the worktree from the session
           // snapshot. A skipped diff must be a named outcome here too — not only
-          // in the cold/backup bootstrap — so report it, write the agent rules
-          // file, and carry the telemetry back to the worker.
+          // in the cold/backup bootstrap — so report it and carry the telemetry
+          // back to the worker.
           const incomplete = await reportRestoreIncomplete({
             diffs: restored.diffs,
-            sessionHome: env.HOME ?? directory,
             identity: `kiloSessionId=${kiloSessionId}`,
             log: logToFile,
             step: {

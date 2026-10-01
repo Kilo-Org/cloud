@@ -29,7 +29,7 @@ function isMissingDrizzleConfigError(error: unknown): boolean {
 
 async function closeAllDrizzleConnectionsIfConfigured(): Promise<void> {
   try {
-    const { closeAllDrizzleConnections } = await import('../lib/drizzle');
+    const { closeAllDrizzleConnections } = await import('@/lib/drizzle');
     await closeAllDrizzleConnections();
   } catch (error) {
     if (isMissingDrizzleConfigError(error)) {

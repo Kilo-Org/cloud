@@ -2189,6 +2189,8 @@
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
+      "selectRepositoryToStart": "ಪ್ರಾರಂಭಿಸಲು ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
+      "connectProviderToStart": "ಪ್ರಾರಂಭಿಸಲು ಸೇವಾ ಪೂರೈಕೆದಾರರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "promptPlaceholder": "ಯಾವ ಕೆಲಸ ಮಾಡಲು ಬಯಸುತ್ತೀರಿ?",
       "couldNotLoadModels": "ಮಾದರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "prefillRepoAndModelUnavailable": "ಮೂಲ ಸೆಶನ್‌ನ ರೆಪೊಸಿಟರಿ ಮತ್ತು ಮಾದರಿ ಇನ್ನು ಲಭ್ಯವಿಲ್ಲ. ಕೆಳಗೆ ಅವುಗಳನ್ನು ಆಯ್ಕೆಮಾಡಿ.",

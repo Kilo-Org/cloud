@@ -2189,6 +2189,8 @@
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
+      "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",

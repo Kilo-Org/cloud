@@ -46,7 +46,7 @@ jest.mock('@kilocode/db/operation-ledger', () => ({
 jest.mock('@/lib/drizzle', () => ({ db: {} }));
 
 const mockEnsureOrganizationAccess = jest.fn();
-jest.mock('./organizations/utils', () => ({
+jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: (...args: unknown[]) => mockEnsureOrganizationAccess(...args),
 }));
 

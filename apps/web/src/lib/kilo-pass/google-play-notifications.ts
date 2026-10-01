@@ -26,6 +26,7 @@ import {
 import {
   acknowledgeGooglePlaySubscriptionPurchase,
   GOOGLE_PLAY_PACKAGE_NAME,
+  getGooglePlayProductPurchase,
   getGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder,
 } from './google-play-sdk';
@@ -863,16 +864,20 @@ export async function processGooglePlayKiloPassNotification(params: {
         );
     });
     // Only a pack Kilo granted and clawed back is a customer refund to report.
-    await runAfterResponse(() =>
-      reportGooglePlayCreditEventToBouncer({
-        environment: 'Production',
+    // The order carries no test flag, so a license-tester refund is told apart
+    // by the purchase's `purchaseType` (0 = test), as the grant path does.
+    await runAfterResponse(async () => {
+      if (!refundedUserId) return;
+      const productPurchase = await getGooglePlayProductPurchase(productId, purchaseToken);
+      await reportGooglePlayCreditEventToBouncer({
+        environment: productPurchase.purchaseType === 0 ? 'Sandbox' : 'Production',
         eventId,
         eventTimeMillis: developerNotification.eventTimeMillis ?? null,
         referenceId: orderId,
         event: { type: 'store.refund', reason: 'other' },
         userId: refundedUserId,
-      })
-    );
+      });
+    });
     return { processed: true };
   }
 

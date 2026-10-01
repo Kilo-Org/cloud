@@ -57,8 +57,13 @@ const mockGetGooglePlaySubscriptionOrder = jest.fn(
   }
 );
 
+const mockGetGooglePlayProductPurchase = jest.fn(
+  async (): Promise<androidpublisher_v3.Schema$ProductPurchase> => ({ purchaseType: undefined })
+);
+
 jest.mock('./google-play-sdk', () => ({
   acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledge,
+  getGooglePlayProductPurchase: mockGetGooglePlayProductPurchase,
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
   revokeGooglePlaySubscriptionPurchase: mockRevoke,
@@ -2498,6 +2503,43 @@ describe('Google Play bouncer store events', () => {
       referenceId: orderId,
       environment: 'production',
     });
+  });
+
+  it('reports nothing for a refunded license-tester credit pack', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce({ purchaseType: 0 });
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage('credit-pack-void-tester', purchaseToken, orderId),
+    });
+
+    const clawback = await db.query.credit_transactions.findFirst({
+      where: eq(
+        credit_transactions.credit_category,
+        `store-credit-refund:${KiloPassPaymentProvider.GooglePlay}:${orderId}`
+      ),
+    });
+    expect(clawback?.amount_microdollars).toBe(-toMicrodollars(10));
+    expect(reportCreditEvent).not.toHaveBeenCalled();
   });
 
   it('reports nothing for a refunded credit pack Kilo never granted', async () => {

@@ -22,10 +22,11 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
-  getProviderSlugsForModel,
-  getSystemOneModelIds,
-} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+  getOpenRouterSystemOneModelsFromDatabase,
+  resolveOpenRouterModelAlias,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -43,7 +44,10 @@ jest.mock('@/lib/utils.server', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
   getProviderSlugsForModel: jest.fn(),
-  getSystemOneModelIds: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn(),
 }));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@/lib/organizations/organization-usage', () => ({
@@ -78,7 +82,8 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
-const SNAPSHOT_SYSTEM_ONE_MODEL = 'typesafe/jev-2.0';
+const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
+const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
 const user = {
   id: 'oauth/test-user',
   google_user_email: 'test@example.com',
@@ -169,8 +174,13 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
     jest
-      .mocked(getSystemOneModelIds)
-      .mockResolvedValue(new Set([TYPESAFE_MODEL, SNAPSHOT_SYSTEM_ONE_MODEL]));
+      .mocked(getOpenRouterSystemOneModelsFromDatabase)
+      .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+    jest
+      .mocked(resolveOpenRouterModelAlias)
+      .mockImplementation(async modelId =>
+        modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
+      );
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
       fraudHeaders: EmptyFraudDetectionHeaders,
@@ -484,27 +494,28 @@ describe('handleSystemOneRequest', () => {
     expect(mockedFetch).not.toHaveBeenCalled();
   });
 
-  it('forwards another System One model from the provider snapshot unchanged', async () => {
+  it.each([
+    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL },
+    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL },
+  ])('forwards OpenRouter System One model $model unchanged', async ({ model, policyModel }) => {
     setAuth('org-123');
 
-    const response = await handleSystemOneRequest(
-      makeRequest({ ...requestBody, model: SNAPSHOT_SYSTEM_ONE_MODEL })
-    );
+    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
     expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe(SNAPSHOT_SYSTEM_ONE_MODEL);
+    expect(upstreamRequest().body.model).toBe(model);
     expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ modelId: SNAPSHOT_SYSTEM_ONE_MODEL })
+      expect.objectContaining({ modelId: policyModel })
     );
     await runAfter();
     expect(logMicrodollarUsage).toHaveBeenCalledWith(
       expect.anything(),
-      expect.objectContaining({ requested_model: SNAPSHOT_SYSTEM_ONE_MODEL })
+      expect.objectContaining({ requested_model: model })
     );
   });
 
-  it.each(['openai/gpt-4o', 'jev-latest', '~typesafe/jev-latest', 'jev-2.0'])(
-    'rejects %s when it is not a System One model in the provider snapshot',
+  it.each(['openai/gpt-4o', 'jev-latest', 'respan/span-01-lite', 'jev-2.0'])(
+    'rejects %s when it is not an OpenRouter System One model',
     async model => {
       const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
 
@@ -516,15 +527,15 @@ describe('handleSystemOneRequest', () => {
     }
   );
 
-  it('leaves model validation to OpenRouter when the snapshot has no System One models', async () => {
-    jest.mocked(getSystemOneModelIds).mockResolvedValue(new Set());
+  it('leaves model validation to OpenRouter without System One model metadata', async () => {
+    jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
 
     const response = await handleSystemOneRequest(
-      makeRequest({ ...requestBody, model: SNAPSHOT_SYSTEM_ONE_MODEL })
+      makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })
     );
 
     expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe(SNAPSHOT_SYSTEM_ONE_MODEL);
+    expect(upstreamRequest().body.model).toBe('vendor/unlisted-decide');
   });
 
   it.each([

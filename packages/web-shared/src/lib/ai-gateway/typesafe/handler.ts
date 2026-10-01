@@ -29,20 +29,21 @@ import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 import type { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
-  getProviderSlugsForModel,
-  getSystemOneModelIds,
-} from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+  getOpenRouterSystemOneModelsFromDatabase,
+  resolveOpenRouterModelAlias,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
 }
 
 async function isSystemOneModel(modelId: string) {
-  const systemOneModelIds = await getSystemOneModelIds();
+  const systemOneModelIds = await getOpenRouterSystemOneModelsFromDatabase();
   if (systemOneModelIds.size === 0) {
     // OpenRouter's System One endpoint still rejects models it cannot serve.
-    warnExceptInTest('[isSystemOneModel] no System One models in the snapshot, assuming valid');
+    warnExceptInTest('[isSystemOneModel] no System One model metadata, assuming id is valid');
     return true;
   }
   return systemOneModelIds.has(modelId);
@@ -101,7 +102,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
-      modelId: requestedModel,
+      modelId: await resolveOpenRouterModelAlias(requestedModel),
       providerLookup: getProviderSlugsForModel,
     });
     if (!decision.allowed) return modelNotAllowedResponse();

@@ -15,6 +15,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
+  getSystemOneModelIds,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { StoredModel } from '@kilocode/db';
 
@@ -41,6 +42,47 @@ describe('getLanguageModelIds', () => {
         'vendor/image': storedModel({ id: 'vendor/image', type: 'image' }),
       })
     ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints', 'vendor/untyped']);
+  });
+
+  it('excludes System One models', () => {
+    expect(
+      getLanguageModelIds({
+        'vendor/text': storedModel({
+          id: 'vendor/text',
+          architecture: { output_modalities: ['text'] },
+        }),
+        'vendor/decide': storedModel({
+          id: 'vendor/decide',
+          architecture: { output_modalities: ['decisions'] },
+        }),
+      })
+    ).toEqual(['vendor/text']);
+  });
+});
+
+describe('getSystemOneModelIds', () => {
+  it('includes free variants and aliases of models that output decisions', () => {
+    const decisions = { output_modalities: ['decisions'] };
+    expect(
+      getSystemOneModelIds({
+        'typesafe/jev-1.13': storedModel({ id: 'typesafe/jev-1.13', architecture: decisions }),
+        '~typesafe/jev-latest': storedModel({
+          id: '~typesafe/jev-latest',
+          alias_target: { slug: 'typesafe/jev-1.13' },
+          architecture: decisions,
+          endpoints: [],
+        }),
+        'respan/span-01-lite:free': storedModel({
+          id: 'respan/span-01-lite:free',
+          architecture: decisions,
+        }),
+        'typesafe/jev-router': storedModel({
+          id: 'typesafe/jev-router',
+          architecture: { output_modalities: ['text'] },
+        }),
+        'vendor/untyped': storedModel({ id: 'vendor/untyped' }),
+      })
+    ).toEqual(['typesafe/jev-1.13', '~typesafe/jev-latest', 'respan/span-01-lite:free']);
   });
 });
 
@@ -124,6 +166,23 @@ describe('isValidOpenRouterModelId', () => {
     ]);
 
     await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(false);
+  });
+
+  it('rejects System One models stored alongside language models', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      {
+        models: {
+          'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }),
+          'typesafe/jev-1.13': storedModel({
+            id: 'typesafe/jev-1.13',
+            architecture: { output_modalities: ['decisions'] },
+          }),
+        },
+      },
+    ]);
+
+    await expect(isValidOpenRouterModelId('typesafe/jev-1.13')).resolves.toBe(false);
   });
 
   it('fails open when the database has no model ids', async () => {

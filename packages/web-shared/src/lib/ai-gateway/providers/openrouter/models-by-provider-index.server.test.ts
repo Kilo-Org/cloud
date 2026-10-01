@@ -7,7 +7,6 @@ import type {
 import {
   buildDataCollectionRequiredModelIds,
   buildModelIdToProviderSlugsIndex,
-  buildSystemOneModelIds,
   createModelsByProviderIndexLoader,
   getEndpointProviderSlugs,
   getSnapshotModelVariantId,
@@ -126,31 +125,6 @@ describe('buildDataCollectionRequiredModelIds', () => {
     ];
 
     expect(buildDataCollectionRequiredModelIds(snapshot)).toEqual(new Set([FREE_MODEL]));
-  });
-});
-
-describe('buildSystemOneModelIds', () => {
-  it('includes only exact model variants that output decisions', () => {
-    const snapshot = makeSnapshot();
-    const decisions = (slug: string, variant: string) => ({
-      ...snapshotModel(slug, variant),
-      output_modalities: ['decisions'],
-    });
-    snapshot.providers = [
-      {
-        ...snapshot.providers[0],
-        slug: 'typesafe',
-        models: [
-          decisions('typesafe/jev-1.13', 'standard'),
-          decisions('typesafe/jev-2.0', 'free'),
-          snapshotModel('typesafe/jev-router', 'standard'),
-        ],
-      },
-    ];
-
-    expect(buildSystemOneModelIds(snapshot)).toEqual(
-      new Set(['typesafe/jev-1.13', 'typesafe/jev-2.0:free'])
-    );
   });
 });
 

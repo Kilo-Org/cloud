@@ -49,10 +49,22 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
   return models[modelId]?.alias_target?.slug ?? modelId;
 }
 
+/** System One models answer typed questions with `decisions` instead of generating text. */
+function isSystemOneModel(model: StoredModel): boolean {
+  return model.architecture?.output_modalities.includes('decisions') ?? false;
+}
+
 /** The ids of language models, including those with no endpoints. */
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(model => (model.type ?? 'language') === 'language')
+    .filter(model => (model.type ?? 'language') === 'language' && !isSystemOneModel(model))
+    .map(model => model.id);
+}
+
+/** The ids of System One models, including `:free` variants and `~` aliases. */
+export function getSystemOneModelIds(models: StoredModelMap): string[] {
+  return Object.values(models)
+    .filter(isSystemOneModel)
     .map(model => model.id);
 }
 
@@ -100,6 +112,12 @@ export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
 
 export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
   getOpenRouterModelsMetadataFromDatabase
+);
+
+export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
+  async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
+  TTL_MS,
+  new Set<string>()
 );
 
 // Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.

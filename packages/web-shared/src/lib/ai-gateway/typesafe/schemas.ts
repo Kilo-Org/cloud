@@ -10,7 +10,7 @@ import { providerPrivacySchema } from '../provider-privacy';
 
 export const TYPESAFE_MODEL = 'typesafe/jev-1.13';
 
-// Bare TypeSafe ids accepted before the model list came from the provider snapshot.
+// Bare TypeSafe ids accepted before System One models came from OpenRouter's model list.
 const SYSTEM_ONE_MODEL_ALIASES: ReadonlyMap<string, string> = new Map([
   ['jev-1.13', TYPESAFE_MODEL],
 ]);

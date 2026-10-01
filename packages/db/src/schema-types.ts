@@ -2304,6 +2304,12 @@ export const ModelSchema = z.object({
     })
     .optional()
     .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
+    })
+    .optional()
+    .catch(undefined),
   reasoning: z
     .object({
       mandatory: z.boolean(),

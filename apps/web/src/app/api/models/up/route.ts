@@ -47,18 +47,6 @@ const MIN_UNIQUE_USERS_FOR_ALERT = 20;
 // open (report healthy) since a timeout is not evidence of a model being down.
 const QUERY_TIMEOUT_MS = 10_000;
 
-// Models excluded from the top-level health status. They still get their
-// per-model health evaluated and returned, but can't trigger 503 responses.
-// Useful for preview models with inconsistent traffic that cause false alerts,
-// or third-party models that can be retracted without notice.
-const HEALTH_CHECK_EXCLUSIONS = new Set([
-  'google/gemini-3.1-pro-preview',
-  // We don't control when this model may be retracted by OpenRouter.
-  'openrouter/elephant-alpha',
-  'openai/gpt-5.4',
-  'openai/gpt-5.5',
-]);
-
 const MINUTE_MS = 60 * 1000;
 const CURRENT_WINDOW_MS = 15 * MINUTE_MS;
 const PREVIOUS_WINDOW_MS = 30 * MINUTE_MS;
@@ -162,7 +150,7 @@ async function queryModelStats(
   return statsByModel;
 }
 
-function evaluateModelHealth(stats: ModelStats, monitored: boolean): ModelHealthMetrics {
+function evaluateModelHealth(stats: ModelStats): ModelHealthMetrics {
   const currentRequests = Math.round(stats.current.requests);
   const previousRequests = Math.round(stats.previous.requests);
   const baselineRequests = Math.round(stats.baseline.requests / BASELINE_WINDOW_COUNT);
@@ -176,8 +164,6 @@ function evaluateModelHealth(stats: ModelStats, monitored: boolean): ModelHealth
 
   // Per-model health: unhealthy when the baseline had enough distinct organic
   // users AND the model shows a significant traffic drop.
-  // Non-monitored models still get their real health status — they just
-  // don't affect the top-level healthy flag or trigger 503.
   const healthy = !(
     uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
     ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
@@ -189,7 +175,7 @@ function evaluateModelHealth(stats: ModelStats, monitored: boolean): ModelHealth
 
   return {
     healthy,
-    monitored,
+    monitored: true,
     currentRequests,
     previousRequests,
     baselineRequests,
@@ -226,9 +212,6 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const alertingModels = monitoredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
-  const excludedModels = monitoredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
-
   try {
     const queryStartTime = Date.now();
     const anchor = anchorTime ?? new Date(queryStartTime);
@@ -241,19 +224,17 @@ export async function GET(
     const models: Record<string, ModelHealthMetrics> = {};
     for (const model of monitoredModels) {
       models[model] = evaluateModelHealth(
-        statsByModel.get(toAnalyticsEngineModelId(model)) ?? emptyModelStats(),
-        !HEALTH_CHECK_EXCLUSIONS.has(model)
+        statsByModel.get(toAnalyticsEngineModelId(model)) ?? emptyModelStats()
       );
     }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;
-    // Only monitored models affect the top-level health status
-    const hasSignificantDrop = Object.values(models).some(m => m.monitored && !m.healthy);
+    const hasSignificantDrop = Object.values(models).some(m => !m.healthy);
     const status = hasSignificantDrop ? 503 : 200;
 
     if (hasSignificantDrop) {
       const unhealthy = Object.entries(models)
-        .filter(([, m]) => m.monitored && !m.healthy)
+        .filter(([, m]) => !m.healthy)
         .map(([model, m]) => ({
           model,
           currentRequests: m.currentRequests,
@@ -282,7 +263,7 @@ export async function GET(
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'models/up', source: 'model_health_check' },
-      extra: { monitoredModels: alertingModels, nonMonitoredModels: excludedModels },
+      extra: { monitoredModels },
     });
 
     // Fail open: a query timeout or Analytics Engine error is not evidence of a model being down.

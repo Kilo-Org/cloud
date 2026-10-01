@@ -1,5 +1,6 @@
 import { after, type NextResponse } from 'next/server';
 
+import { getToolsAvailable, getToolsUsed } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@/lib/ai-gateway/openai-chatgpt/provider-id';
 import {
   clearOpenAiChatGptUsageLimit,
@@ -36,6 +37,8 @@ type SendUpstreamAttemptResult =
   | {
       type: 'success';
       response: Response;
+      toolsAvailable: string[];
+      toolsUsed: string[];
     };
 
 /** Sends one upstream attempt and mutates the request with provider-specific transforms. */
@@ -94,6 +97,8 @@ export async function sendUpstreamAttempt({
   return {
     type: 'success',
     response: result.response,
+    toolsAvailable: getToolsAvailable(request),
+    toolsUsed: getToolsUsed(request),
   };
 }
 

@@ -52,7 +52,7 @@ function getKiloChatBaseUrl(): string {
   // environment that has not provisioned the new var yet keeps working rather
   // than repeating a wrong-config outage; a follow-up removes the fallback once
   // KILO_CHAT_INTERNAL_URL is confirmed on every project. Read process.env
-  // directly rather than importing from `@/lib/constants`: those constants are
+  // directly rather than importing from `@kilocode/web-shared/lib/constants`: those constants are
   // marked required at import time, which crashes test setups if a var is
   // unset. This server-only client should fail loudly only when actually called.
   let raw = process.env.KILO_CHAT_INTERNAL_URL;

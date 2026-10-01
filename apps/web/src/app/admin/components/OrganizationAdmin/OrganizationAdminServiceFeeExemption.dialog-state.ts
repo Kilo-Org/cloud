@@ -5,7 +5,7 @@
  */
 
 // Mirrors ORGANIZATION_SERVICE_FEE_EXEMPTION_REASON_* in
-// @/lib/service-fees/organization-exemptions, which is server-only and cannot
+// @kilocode/web-shared/lib/service-fees/organization-exemptions, which is server-only and cannot
 // be imported from a client component. The router remains the enforcement
 // boundary; these only drive client-side enablement and hints.
 export const SERVICE_FEE_EXEMPTION_REASON_MIN_LENGTH = 3;

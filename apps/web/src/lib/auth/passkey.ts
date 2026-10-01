@@ -37,7 +37,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
  * can satisfy the associated-domain/credential binding the browser or platform
  * authenticator created against `app.kilo.ai`.
  *
- * Resolved per ceremony rather than at module load: `@/lib/user/server` imports
+ * Resolved per ceremony rather than at module load: `@kilocode/web-shared/lib/user/server` imports
  * this module for the sign-in provider, so importing it must not require a
  * WebAuthn configuration. A process without a relying party still loads the
  * route graph and only fails when a ceremony actually runs.

@@ -14,7 +14,7 @@ jest.mock('@/lib/integrations/platforms/github/user-token-client', () => ({
 
 // P1-A-08c: the PR operation ledger. The router admits / settles /
 // marks-reconcile-pending through `@kilocode/db/operation-ledger`. Both it and
-// `@/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
+// `@kilocode/web-shared/lib/drizzle` are mocked so the ledger tests can assert admission, settle,
 // replay, and reconcile orchestration without a database. The analytics
 // identity comes from `ctx.user`, which carries no email here, so it falls
 // back to the user id.

@@ -240,10 +240,10 @@ export function emitSupportServiceAccessEvent(params: {
 /**
  * The audit-relevant slice of a tRPC context. Declared structurally rather than
  * importing `TRPCContext` so this module stays free of a dependency cycle with
- * `@/lib/trpc/init` (which imports from here).
+ * `@kilocode/web-shared/lib/trpc/init` (which imports from here).
  *
  * `trpcPath`/`trpcType` are populated for every `baseProcedure` descendant by a
- * middleware in `@/lib/trpc/init`; the remaining fields come from
+ * middleware in `@kilocode/web-shared/lib/trpc/init`; the remaining fields come from
  * `createTRPCContext`. All are optional because the many hand-rolled `{ user }`
  * contexts in REST route handlers, tests, and scripts do not set them, which is
  * also what {@link recordKiloAdminElevation} uses to pick its attribution source.

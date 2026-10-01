@@ -23,12 +23,12 @@ import type { createCallerForUser as CreateCallerForUser } from '@/routers/test-
 // `.env.test` sets SESSION_INGEST_WORKER_URL to '' (shared fixture used by
 // other test files too — do not change it here). `createCallerForUser`'s
 // import chain (test-utils -> trpc/init -> ...) transitively loads
-// `@/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
+// `@kilocode/web-shared/lib/config.server`, whose `SESSION_INGEST_WORKER_URL` export is a plain
 // `const` computed once, the first time that module is evaluated. Static
 // ES `import` statements are always hoisted above every other statement by
 // the transform, so a statically-imported `createCallerForUser` would pull
 // in the real ('') value before any `process.env` assignment written below
-// it could run — and a `jest.mock('@/lib/config.server', ...)` registered
+// it could run — and a `jest.mock('@kilocode/web-shared/lib/config.server', ...)` registered
 // after that first (real) load cannot retroactively change the value
 // active-sessions-router.ts already captured. A dynamic `import()` executes
 // exactly where it is awaited (not hoisted), so resolving it in `beforeAll`

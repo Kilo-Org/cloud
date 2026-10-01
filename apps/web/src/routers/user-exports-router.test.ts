@@ -19,7 +19,7 @@ import { __test__, userExportsRouter } from '@/routers/user-exports-router';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
-// Partial mocks: `@/lib/email` also exports the template registry that sibling
+// Partial mocks: `@kilocode/web-shared/lib/email` also exports the template registry that sibling
 // routers read at import time, so the real module must stay intact.
 jest.mock('@kilocode/web-shared/lib/email', () => {
   const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/email');

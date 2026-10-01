@@ -5,6 +5,11 @@ Server code shared by `apps/web` and `apps/ai-gateway`. The code was moved out o
 
 ## Module resolution
 
+- Import modules from this package as `@kilocode/web-shared/<path>`, which maps
+  to `src/<path>`, both from consumers and inside this package. Every consumer
+  tsconfig, the web Jest config, the `@kilocode/trpc` rollup resolver, and the
+  Storybook webpack alias map that specifier. Consumers still reach these
+  modules through the `@/` fallback below until their imports move over.
 - Consumers map `@/*` to their own `src/*` first and to `packages/web-shared/src/*`
   second. Keep both entries in sync in every tsconfig, the web Jest config, the
   `@kilocode/trpc` rollup resolver, and the Storybook webpack alias.

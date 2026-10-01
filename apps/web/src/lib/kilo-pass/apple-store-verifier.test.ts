@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
+import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from '@/lib/kilo-pass/enums';
 import { mapAppleKiloPassTransaction } from './apple-store-verifier';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
 

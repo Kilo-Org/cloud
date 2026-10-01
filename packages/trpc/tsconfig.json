@@ -16,7 +16,7 @@
     "jsx": "react-jsx",
     "resolveJsonModule": true,
     "paths": {
-      "@/*": ["../../apps/web/src/*"],
+      "@/*": ["../../apps/web/src/*", "../web-shared/src/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],
       "@kilocode/encryption": ["../encryption/src/index.ts"]
@@ -24,8 +24,8 @@
   },
   "include": [
     "src/**/*",
-    "../../apps/web/src/types/next-auth.d.ts",
-    "../../apps/web/src/types/next-page.d.ts",
+    "../web-shared/src/types/next-auth.d.ts",
+    "../web-shared/src/types/next-page.d.ts",
     "../../packages/db/src/**/*"
   ]
 }

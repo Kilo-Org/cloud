@@ -36,6 +36,12 @@ export type RouteRecord = {
   spec: ControlPlaneRouteSpec;
   grant: RouteGrant | null;
   credentialSource: ControlPlaneCredentialSource | null;
+  /**
+   * Names the repository snapshot this route may start from and capture. Computed
+   * from the input spec when the route is first prepared and kept across
+   * attempts, because the stored spec no longer has the input env.
+   */
+  repoKey: string | null;
   state: RouteState;
   attemptId: string;
   attemptDeadlineAt: number;
@@ -96,6 +102,7 @@ export function routeFromRow(db: RouteDatabase, row: RouteRow): RouteRecord {
       row.credential_source === null || row.credential_source === undefined
         ? null
         : controlPlaneCredentialSourceSchema.parse(JSON.parse(row.credential_source)),
+    repoKey: row.repo_key ?? null,
     state: parseRouteState(row.state),
     attemptId: row.attempt_id,
     attemptDeadlineAt: row.attempt_deadline_at ?? 0,
@@ -110,6 +117,7 @@ function routeToRow(route: RouteRecord): typeof routesTable.$inferInsert {
     grant: route.grant === null ? null : scopeGrantId(route.grant),
     credential_source:
       route.credentialSource === null ? null : JSON.stringify(route.credentialSource),
+    repo_key: route.repoKey,
     state: route.state,
     attempt_id: route.attemptId,
     attempt_deadline_at: route.attemptDeadlineAt,
@@ -123,13 +131,15 @@ export function newPreparingRoute(
   attemptId: string,
   attemptDeadlineAt: number,
   grant: RouteGrant | null,
-  credentialSource: ControlPlaneCredentialSource | null
+  credentialSource: ControlPlaneCredentialSource | null,
+  repoKey: string | null
 ): RouteRecord {
   return {
     sessionId: spec.sessionId,
     spec,
     grant,
     credentialSource,
+    repoKey,
     state: 'preparing',
     attemptId,
     attemptDeadlineAt,
@@ -244,6 +254,7 @@ export async function failRoute(
     spec: redactRouteSpec(spec),
     grant: existing?.grant ?? null,
     credentialSource: existing?.credentialSource ?? null,
+    repoKey: null,
     state: 'failed',
     attemptId,
     attemptDeadlineAt: 0,
@@ -309,7 +320,8 @@ const ATTEMPT_POLICY_ATTEMPTS = 2;
 export async function startAttempt(
   ctx: RouteContext,
   spec: ControlPlaneRouteSpec,
-  source: ControlPlaneCredentialSource | null
+  source: ControlPlaneCredentialSource | null,
+  repoKey: string | null
 ): Promise<RouteRecord> {
   const attemptId = crypto.randomUUID();
   const attemptSpec: ControlPlaneRouteSpec = { ...spec, attemptId };
@@ -344,7 +356,8 @@ export async function startAttempt(
     attemptId,
     ctx.now() + ctx.routePreparationMs,
     issued.grant,
-    source
+    source,
+    repoKey
   );
   for (let attempt = 1; attempt <= ATTEMPT_POLICY_ATTEMPTS; attempt += 1) {
     if (await ctx.applyPolicy(issued.grant)) {
@@ -370,13 +383,14 @@ export async function startAttempt(
 export async function ensureRoute(
   ctx: RouteContext,
   spec: ControlPlaneRouteSpec,
-  source: ControlPlaneCredentialSource | null
+  source: ControlPlaneCredentialSource | null,
+  repoKey: string | null
 ): Promise<{ route: RouteRecord; started: boolean }> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   if (existing !== null && existing.state !== 'failed') {
     return { route: existing, started: false };
   }
-  return { route: await startAttempt(ctx, spec, source), started: true };
+  return { route: await startAttempt(ctx, spec, source, repoKey), started: true };
 }
 
 /** Ready routes after `hello`: a restart starts a new attempt, else re-notify. */
@@ -389,7 +403,7 @@ export async function onWrapperConnected(ctx: RouteContext, restarted: boolean):
         attemptId: route.attemptId,
         reason: 'agent_restarted',
       });
-      await startAttempt(ctx, route.spec, route.credentialSource);
+      await startAttempt(ctx, route.spec, route.credentialSource, route.repoKey);
       continue;
     }
     if (route.state === 'ready') {

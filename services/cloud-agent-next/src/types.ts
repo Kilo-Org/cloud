@@ -545,6 +545,8 @@ export type Env = {
   E2E_CALLBACK_SINK?: DurableObjectNamespace<E2eCallbackSink>;
   /** One-way shared sandbox failover overrides keyed by shared identity */
   SHARED_SANDBOX_OVERRIDES: KVNamespace;
+  /** Repository snapshot index for control-plane container starts; absent disables snapshots. */
+  REPO_SNAPSHOTS?: KVNamespace;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;
   /** Record-only container lifecycle usage meter. */
@@ -609,6 +611,8 @@ export type Env = {
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
   /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
   REPO_SNAPSHOT_ORG_IDS?: string;
+  /** Comma-separated org IDs whose isolated control-plane containers start from repository snapshots, or '*' for all */
+  CONTAINER_REPO_SNAPSHOT_ORG_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).

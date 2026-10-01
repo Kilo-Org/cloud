@@ -177,6 +177,7 @@ export function createCloudflareProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
+      return { startSource: 'image' };
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);

@@ -109,6 +109,7 @@ function createFakeProvider(options: FakeProviderOptions = {}): FakeProvider {
           provider.launchGates.push(error => (error === undefined ? resolve() : reject(error)));
         });
       }
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };

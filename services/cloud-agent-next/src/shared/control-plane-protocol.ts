@@ -26,8 +26,10 @@ export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[numbe
 
 export const CONTROL_PLANE_PREPARATION_STEPS = [
   'clone',
+  'restore',
   'checkout',
   'setup',
+  'snapshot',
   'kilo_runtime',
   'kilo_session',
 ] as const;
@@ -163,6 +165,14 @@ export const controlPlaneRouteKiloSchema = z
   })
   .strict();
 
+/**
+ * How `session.prepare` left the workspace: cloned from scratch, already this
+ * allocation's (a sibling session or a wrapper restart), or adopted from a
+ * repository snapshot of another allocation.
+ */
+export const CONTROL_PLANE_WORKSPACE_OUTCOMES = ['cloned', 'same', 'adopted'] as const;
+export type ControlPlaneWorkspaceOutcome = (typeof CONTROL_PLANE_WORKSPACE_OUTCOMES)[number];
+
 export const controlPlaneRouteSpecSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -183,6 +193,12 @@ export const controlPlaneRouteSpecSchema = z
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
     runtimeIsolation: z.enum(['per-session']).optional(),
     attemptId: z.string().min(1).max(128),
+    /**
+     * Only the Sandbox DO adds this to the `session.prepare` frame, like `mcp`: the
+     * wrapper may save the workspace as a repository snapshot after setup. It is
+     * never stored in a route spec.
+     */
+    capture: z.literal(true).optional(),
   })
   .strict();
 
@@ -288,6 +304,13 @@ export const controlPlanePrepareInputSchema = z
         code: 'custom',
         path: ['spec', 'mcp'],
         message: 'prepare spec must not carry materialized MCP servers',
+      });
+    }
+    if (value.spec.capture !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['spec', 'capture'],
+        message: 'prepare spec must not carry a snapshot capture request',
       });
     }
   });
@@ -571,6 +594,28 @@ const controlPlaneSessionReadyFrameSchema = z
   .object({
     type: z.literal('session.ready'),
     sessionId: z.string().min(1),
+    workspace: z.enum(CONTROL_PLANE_WORKSPACE_OUTCOMES).optional().catch(undefined),
+  })
+  .strict();
+
+/**
+ * Wrapper to Sandbox DO: the workspace is prepared and holds no credential, so the
+ * DO may snapshot the container. `commit` is diagnostic only.
+ */
+const controlPlaneWorkspaceCaptureFrameSchema = z
+  .object({
+    type: z.literal('workspace.capture'),
+    sessionId: z.string().min(1),
+    commit: z.string().min(1).max(64).optional(),
+  })
+  .strict();
+
+/** Sandbox DO to wrapper: the capture finished; `ok` is false when nothing was saved. */
+const controlPlaneWorkspaceCapturedFrameSchema = z
+  .object({
+    type: z.literal('workspace.captured'),
+    sessionId: z.string().min(1),
+    ok: z.boolean(),
   })
   .strict();
 
@@ -856,6 +901,8 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneSessionPrepareFrameSchema,
   controlPlaneSessionProgressFrameSchema,
   controlPlaneSessionReadyFrameSchema,
+  controlPlaneWorkspaceCaptureFrameSchema,
+  controlPlaneWorkspaceCapturedFrameSchema,
   controlPlaneSessionFailedFrameSchema,
   controlPlaneSessionCredentialsFrameSchema,
   controlPlaneSessionPromptFrameSchema,
@@ -906,6 +953,12 @@ export type ControlPlaneSessionProgressFrame = z.infer<
   typeof controlPlaneSessionProgressFrameSchema
 >;
 export type ControlPlaneSessionReadyFrame = z.infer<typeof controlPlaneSessionReadyFrameSchema>;
+export type ControlPlaneWorkspaceCaptureFrame = z.infer<
+  typeof controlPlaneWorkspaceCaptureFrameSchema
+>;
+export type ControlPlaneWorkspaceCapturedFrame = z.infer<
+  typeof controlPlaneWorkspaceCapturedFrameSchema
+>;
 export type ControlPlaneSessionFailedFrame = z.infer<typeof controlPlaneSessionFailedFrameSchema>;
 export type ControlPlaneSessionCredentialsFrame = z.infer<
   typeof controlPlaneSessionCredentialsFrameSchema

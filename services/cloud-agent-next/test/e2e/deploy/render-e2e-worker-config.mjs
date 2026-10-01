@@ -181,11 +181,15 @@ export function buildE2eWorkerConfig(sourceConfig, overrides) {
     });
   }
 
-  config.kv_namespaces = (config.kv_namespaces ?? []).map(kvNamespace =>
-    kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
-      ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
-      : kvNamespace
-  );
+  // The e2e Worker keeps no `SandboxContainers` class, so it has no repository
+  // snapshots and must not provision a namespace for them.
+  config.kv_namespaces = (config.kv_namespaces ?? [])
+    .filter(kvNamespace => kvNamespace.binding !== 'REPO_SNAPSHOTS')
+    .map(kvNamespace =>
+      kvNamespace.binding === 'SHARED_SANDBOX_OVERRIDES'
+        ? { ...kvNamespace, id: SHARED_SANDBOX_OVERRIDES_KV_ID_E2E }
+        : kvNamespace
+    );
 
   config.queues = {
     ...config.queues,

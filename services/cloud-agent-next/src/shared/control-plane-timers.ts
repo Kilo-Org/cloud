@@ -36,6 +36,10 @@ export type ControlPlaneTimers = {
   wrapper: {
     heartbeatIntervalMs: number;
     cloneMs: number;
+    /** Budget to adopt a repository snapshot before falling back to a clone. */
+    restoreMs: number;
+    /** Backstop over the Sandbox DO's own capture timeout. */
+    captureMs: number;
     kiloRuntimeStartMs: number;
     kiloSessionMs: number;
     sseSilenceMs: number;
@@ -84,6 +88,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const wrapper = {
     heartbeatIntervalMs: ms(15_000),
     cloneMs: 6 * MINUTE_MS,
+    restoreMs: 2 * MINUTE_MS,
+    captureMs: 3 * MINUTE_MS + 10_000,
     kiloRuntimeStartMs: 2 * MINUTE_MS,
     kiloSessionMs: 2 * MINUTE_MS,
     sseSilenceMs: 30_000,

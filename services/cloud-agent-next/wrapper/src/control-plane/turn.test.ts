@@ -24,6 +24,8 @@ const SESSION_ID = 'workspace_test';
 const SESSION_TIMERS = {
   heartbeatIntervalMs: 1000,
   cloneMs: 1000,
+  restoreMs: 1000,
+  captureMs: 1000,
   kiloRuntimeStartMs: 1000,
   kiloSessionMs: 1000,
   sseSilenceMs: 1000,

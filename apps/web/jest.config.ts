@@ -31,6 +31,7 @@ const config: Config = {
     '^@kilocode/worker-utils/(.*)$': '<rootDir>/../../packages/worker-utils/src/$1',
     '^@kilocode/worker-utils$': '<rootDir>/../../packages/worker-utils/src/index.ts',
     '^@kilocode/app-shared/(.*)$': '<rootDir>/../../packages/app-shared/src/$1',
+    '^@kilocode/web-shared/(.*)$': '<rootDir>/../../packages/web-shared/src/$1',
     '^(\\.{1,2}/.+)\\.js$': '$1',
     '^@/(.*)$': ['<rootDir>/src/$1', '<rootDir>/../../packages/web-shared/src/$1'],
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',

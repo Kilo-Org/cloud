@@ -30,6 +30,8 @@ const external = [
   '@kilocode/kilo-chat',
 ];
 
+const webSharedPrefix = '@kilocode/web-shared/';
+
 const plugins = [
   {
     name: 'resolve-aliases',
@@ -40,6 +42,10 @@ const plugins = [
         const webDts = resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
         if (existsSync(webDts)) return webDts;
         return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', source.slice(2)));
+      }
+      if (source.startsWith(webSharedPrefix)) {
+        const subpath = source.slice(webSharedPrefix.length);
+        return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', subpath));
       }
       // Resolve @kilocode/db sub-path imports
       if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {

@@ -4,6 +4,7 @@
     "types": ["node"],
     "paths": {
       "@/*": ["./src/*"],
+      "@kilocode/web-shared/*": ["./src/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],
       "@kilocode/encryption": ["../encryption/src/index.ts"],

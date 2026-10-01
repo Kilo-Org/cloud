@@ -22,7 +22,6 @@ import {
   GitPullRequest,
   UserX,
   Upload,
-  Bell,
   Network,
   KeyRound,
   Copy,
@@ -270,11 +269,6 @@ const analyticsObservabilityItems: MenuItem[] = [
     title: () => 'Free Model Usage',
     url: '/admin/free-model-usage',
     icon: () => <UserX />,
-  },
-  {
-    title: () => 'Alerting',
-    url: '/admin/alerting',
-    icon: () => <Bell />,
   },
 ];
 

@@ -67,7 +67,6 @@ import { adminStripeDisputesRouter } from '@/routers/admin/stripe-disputes-route
 import { adminStripeEarlyFraudWarningsRouter } from '@/routers/admin/stripe-early-fraud-warnings-router';
 import { adminShellSecurityContentRouter } from '@/routers/admin/shell-security-content-router';
 import { adminWebhookTriggersRouter } from '@/routers/admin-webhook-triggers-router';
-import { adminAlertingRouter } from '@/routers/admin-alerting-router';
 import { adminBotRequestsRouter } from '@/routers/admin-bot-requests-router';
 import { adminFreeModelUsageRouter } from '@/routers/admin/free-model-usage-router';
 import { adminModelEvalIngestRouter } from '@/routers/admin-model-eval-ingest-router';
@@ -2324,8 +2323,6 @@ export const adminRouter = createTRPCRouter({
   }),
 
   deployments: adminDeploymentsRouter,
-
-  alerting: adminAlertingRouter,
 
   featureInterest: adminFeatureInterestRouter,
 

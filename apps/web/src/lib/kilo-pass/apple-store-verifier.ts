@@ -17,6 +17,8 @@ export type AppleStoreDecodedTransaction = {
   expiresDate?: number;
   appAccountToken?: string;
   revocationDate?: number;
+  /** `RevocationReason.REFUNDED_DUE_TO_ISSUE` (1) or `REFUNDED_FOR_OTHER_REASON` (0). */
+  revocationReason?: number;
   currency?: string;
   price?: number;
   environment: AppleStoreEnvironment;
@@ -33,6 +35,7 @@ const AppleStoreTransactionPayloadSchema = z
     expiresDate: z.number().optional(),
     appAccountToken: z.string().uuid().optional(),
     revocationDate: z.number().optional(),
+    revocationReason: z.number().optional(),
     currency: z.string().optional(),
     price: z.number().optional(),
     environment: z.string().optional(),
@@ -62,6 +65,7 @@ function decodeAppleStoreTransactionPayload(
     expiresDate: payload.expiresDate,
     appAccountToken: payload.appAccountToken,
     revocationDate: payload.revocationDate,
+    revocationReason: payload.revocationReason,
     currency: payload.currency,
     price: payload.price,
     environment: normalizeEnvironment(payload.environment),

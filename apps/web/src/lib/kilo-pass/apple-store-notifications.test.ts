@@ -30,6 +30,7 @@ import {
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
+import type * as bouncerClientModule from '@/lib/bouncer/client';
 import { toMicrodollars } from '@/lib/microdollars';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id.
@@ -40,6 +41,25 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
   },
   trackKiloPassPurchaseCompleted: jest.fn(),
 }));
+
+// Bouncer is report-only. Capture its calls without any network access.
+jest.mock('@/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+  return {
+    __esModule: true,
+    ...actual,
+    reportCreditEvent: jest.fn(),
+  };
+});
+
+// The mock is registered above; a static import would bind the real module instead.
+type BouncerClientMock = {
+  reportCreditEvent: jest.Mock;
+};
+
+function getBouncerClientMock(): jest.Mock {
+  return (jest.requireMock('@/lib/bouncer/client') as BouncerClientMock).reportCreditEvent;
+}
 
 type PosthogTrackingMock = {
   trackKiloPassPurchaseCompleted: jest.Mock;
@@ -2066,5 +2086,421 @@ describe('processAppStoreKiloPassNotification', () => {
         }),
       ])
     );
+  });
+});
+
+describe('App Store bouncer store events', () => {
+  const SIGNED_DATE_MS = 1_777_700_000_000;
+  let reportCreditEvent: jest.Mock;
+
+  beforeEach(() => {
+    reportCreditEvent = getBouncerClientMock();
+    reportCreditEvent.mockClear();
+  });
+
+  /**
+   * Completes an initial buy for `decodedTransaction`, then adds the bonus and promo credits an
+   * issuance carries, so a refund has more than the base credit to claw back.
+   */
+  async function subscribeWithIssuedCredits(decodedTransaction: AppleStoreDecodedTransaction) {
+    const user = await insertTestUser();
+    const subscribeTransaction = {
+      ...decodedTransaction,
+      appAccountToken: user.app_store_account_token,
+    };
+    await processAppStoreKiloPassNotification({
+      signedPayload: `subscribe-${subscribeTransaction.transactionId}`,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID: `subscribe-${subscribeTransaction.transactionId}`,
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+        }),
+      decodeTransaction: async () => subscribeTransaction,
+    });
+
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(
+        kilo_pass_subscriptions.provider_subscription_id,
+        subscribeTransaction.originalTransactionId
+      ),
+    });
+    const issuance = await db.query.kilo_pass_issuances.findFirst({
+      where: eq(kilo_pass_issuances.kilo_pass_subscription_id, subscription?.id ?? ''),
+    });
+
+    const [bonusTransaction, promoTransaction] = await Promise.all([
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(9.5),
+          is_free: true,
+          description: 'test Kilo Pass bonus credits',
+          credit_category: `test-kilo-pass-bonus-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+      db
+        .insert(credit_transactions)
+        .values({
+          kilo_user_id: user.id,
+          amount_microdollars: toMicrodollars(4.75),
+          is_free: true,
+          description: 'test Kilo Pass promo credits',
+          credit_category: `test-kilo-pass-promo-${crypto.randomUUID()}`,
+        })
+        .returning({ id: credit_transactions.id }),
+    ]);
+
+    await db
+      .update(kilocode_users)
+      .set({
+        total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} + ${toMicrodollars(
+          14.25
+        )}`,
+      })
+      .where(eq(kilocode_users.id, user.id));
+
+    await db.insert(kilo_pass_issuance_items).values([
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.Bonus,
+        credit_transaction_id: bonusTransaction[0]?.id ?? '',
+        amount_usd: 9.5,
+        bonus_percent_applied: 0.5,
+      },
+      {
+        kilo_pass_issuance_id: issuance?.id ?? '',
+        kind: KiloPassIssuanceItemKind.PromoFirstMonth50Pct,
+        credit_transaction_id: promoTransaction[0]?.id ?? '',
+        amount_usd: 4.75,
+        bonus_percent_applied: 0.25,
+      },
+    ]);
+
+    const purchased = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    return { user, totalAfterPurchase: purchased?.total_microdollars_acquired ?? 0 };
+  }
+
+  function appStoreTransaction(
+    decodedTransaction: AppleStoreDecodedTransaction,
+    overrides: Partial<AppleStoreDecodedTransaction> = {}
+  ): AppleStoreDecodedTransaction {
+    return {
+      ...decodedTransaction,
+      revocationDate: 1_777_700_000_000,
+      currency: 'USD',
+      price: 24700,
+      ...overrides,
+    };
+  }
+
+  const refund = (
+    notificationUUID: string,
+    transactionForRefund: AppleStoreDecodedTransaction,
+    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox'
+  ) => ({
+    signedPayload: notificationUUID,
+    decodeNotification: async () =>
+      notification({
+        notificationUUID,
+        notificationType: NotificationTypeV2.REFUND,
+        environment,
+        signedDate: SIGNED_DATE_MS,
+      }),
+    decodeTransaction: async () => transactionForRefund,
+  });
+
+  const refundReversed = (
+    notificationUUID: string,
+    transactionForReversal: AppleStoreDecodedTransaction,
+    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox'
+  ) => ({
+    signedPayload: notificationUUID,
+    decodeNotification: async () =>
+      notification({
+        notificationUUID,
+        notificationType: NotificationTypeV2.REFUND_REVERSED,
+        environment,
+        signedDate: SIGNED_DATE_MS,
+      }),
+    decodeTransaction: async () => transactionForReversal,
+  });
+
+  it.each<[number | undefined, string]>([
+    [1, 'issue'],
+    [0, 'other'],
+    [undefined, 'other'],
+  ])(
+    'reports a production refund with revocationReason %s as %s',
+    async (revocationReason, reason) => {
+      const user = await insertTestUser();
+      const notificationUUID = `bouncer-refund-${crypto.randomUUID()}`;
+      const decodedTransaction = transaction({
+        appAccountToken: user.app_store_account_token,
+        revocationReason,
+      });
+
+      await processAppStoreKiloPassNotification(
+        refund(notificationUUID, decodedTransaction, 'Production')
+      );
+
+      expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+      expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+        type: 'store.refund',
+        reason,
+        provider: 'apple',
+        eventId: notificationUUID,
+        occurredAt: new Date(SIGNED_DATE_MS),
+        userId: user.id,
+        storeAccountKey: decodedTransaction.originalTransactionId,
+        referenceId: decodedTransaction.transactionId,
+        environment: 'production',
+      });
+    }
+  );
+
+  it('reports a consumption request as a requested refund', async () => {
+    const user = await insertTestUser();
+    const notificationUUID = `bouncer-consumption-${crypto.randomUUID()}`;
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+    const sendConsumptionInformation = jest.fn(async () => undefined);
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: notificationUUID,
+      sendConsumptionInformation,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID,
+          notificationType: NotificationTypeV2.CONSUMPTION_REQUEST,
+          environment: 'Production',
+          signedDate: SIGNED_DATE_MS,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(sendConsumptionInformation).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.refund',
+      reason: 'requested',
+      provider: 'apple',
+      eventId: notificationUUID,
+      occurredAt: new Date(SIGNED_DATE_MS),
+      userId: user.id,
+      storeAccountKey: decodedTransaction.originalTransactionId,
+      referenceId: decodedTransaction.transactionId,
+      environment: 'production',
+    });
+  });
+
+  it('reports a production purchase with its USD amount in cents', async () => {
+    const user = await insertTestUser();
+    const notificationUUID = `bouncer-subscribed-${crypto.randomUUID()}`;
+    const decodedTransaction = transaction({
+      appAccountToken: user.app_store_account_token,
+      currency: 'USD',
+      price: 24700,
+    });
+
+    await processAppStoreKiloPassNotification({
+      signedPayload: notificationUUID,
+      decodeNotification: async () =>
+        notification({
+          notificationUUID,
+          notificationType: NotificationTypeV2.SUBSCRIBED,
+          subtype: Subtype.INITIAL_BUY,
+          environment: 'Production',
+          signedDate: SIGNED_DATE_MS,
+        }),
+      decodeTransaction: async () => decodedTransaction,
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.purchase',
+      amountCents: 2470,
+      provider: 'apple',
+      eventId: notificationUUID,
+      occurredAt: new Date(SIGNED_DATE_MS),
+      userId: user.id,
+      storeAccountKey: decodedTransaction.originalTransactionId,
+      referenceId: decodedTransaction.transactionId,
+      environment: 'production',
+    });
+  });
+
+  it('reports a production refund reversal', async () => {
+    const user = await insertTestUser();
+    const notificationUUID = `bouncer-reversed-${crypto.randomUUID()}`;
+    const decodedTransaction = transaction({ appAccountToken: user.app_store_account_token });
+
+    await processAppStoreKiloPassNotification(
+      refundReversed(notificationUUID, decodedTransaction, 'Production')
+    );
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toEqual({
+      type: 'store.refund_reversed',
+      provider: 'apple',
+      eventId: notificationUUID,
+      occurredAt: new Date(SIGNED_DATE_MS),
+      userId: user.id,
+      storeAccountKey: decodedTransaction.originalTransactionId,
+      referenceId: decodedTransaction.transactionId,
+      environment: 'production',
+    });
+  });
+
+  it('skips a sandbox notification', async () => {
+    const user = await insertTestUser();
+    const decodedTransaction = transaction({
+      appAccountToken: user.app_store_account_token,
+      revocationReason: 1,
+    });
+
+    await processAppStoreKiloPassNotification(
+      refund(`bouncer-sandbox-${crypto.randomUUID()}`, decodedTransaction, 'Sandbox')
+    );
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
+  });
+
+  it('skips a production notification that resolves no Kilo user', async () => {
+    const decodedTransaction = transaction({ revocationReason: 1 });
+
+    await processAppStoreKiloPassNotification(
+      refund(`bouncer-orphan-${crypto.randomUUID()}`, decodedTransaction, 'Production')
+    );
+
+    expect(reportCreditEvent).not.toHaveBeenCalled();
+  });
+
+  it('restores the clawed-back credits and reopens the subscription on a refund reversal', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+      revocationReason: 1,
+    });
+
+    await processAppStoreKiloPassNotification(refund('reversal-refund', refundTransaction));
+
+    const refundedUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(refundedUser?.total_microdollars_acquired).toBe(0);
+    expect(
+      await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(
+          kilo_pass_subscriptions.provider_subscription_id,
+          decodedTransaction.originalTransactionId
+        ),
+      })
+    ).toMatchObject({ status: 'canceled' });
+
+    const result = await processAppStoreKiloPassNotification(
+      refundReversed('reversal', refundTransaction)
+    );
+    expect(result).toEqual({ processed: true });
+
+    const restoredUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(restoredUser?.total_microdollars_acquired).toBe(totalAfterPurchase);
+    expect(
+      await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(
+          kilo_pass_subscriptions.provider_subscription_id,
+          decodedTransaction.originalTransactionId
+        ),
+      })
+    ).toMatchObject({ status: 'active', ended_at: null });
+
+    const rows = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    const clawbacks = rows.filter(row => row.description?.endsWith('refund clawback'));
+    const restorations = rows.filter(row => row.description?.endsWith('refund reversal'));
+    expect(clawbacks).toHaveLength(3);
+    expect(restorations.map(row => row.amountMicrodollars).sort((a, b) => a - b)).toEqual(
+      [19, 9.5, 4.75].map(toMicrodollars).sort((a, b) => a - b)
+    );
+  });
+
+  it('restores the credits once when a refund reversal is redelivered', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+      revocationReason: 0,
+    });
+
+    await processAppStoreKiloPassNotification(refund('replay-refund', refundTransaction));
+    await processAppStoreKiloPassNotification(refundReversed('replay', refundTransaction));
+
+    const replayed = await processAppStoreKiloPassNotification(
+      refundReversed('replay', refundTransaction)
+    );
+    expect(replayed).toEqual({ processed: true, status: 'already_processed' });
+
+    // A reversal with a new notification id must not restore the same credits twice either.
+    await processAppStoreKiloPassNotification(
+      refundReversed(`replay-second-${crypto.randomUUID()}`, refundTransaction)
+    );
+
+    const restoredUser = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(restoredUser?.total_microdollars_acquired).toBe(totalAfterPurchase);
+
+    const rows = await db
+      .select({
+        amountMicrodollars: credit_transactions.amount_microdollars,
+        description: credit_transactions.description,
+      })
+      .from(credit_transactions)
+      .where(eq(credit_transactions.kilo_user_id, user.id));
+    expect(rows.filter(row => row.description?.endsWith('refund reversal'))).toHaveLength(3);
+  });
+
+  it('undoes a refund that arrives after its reversal', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+      revocationReason: 1,
+    });
+
+    const reversalResult = await processAppStoreKiloPassNotification(
+      refundReversed('out-of-order-reversal', refundTransaction)
+    );
+    expect(reversalResult).toEqual({ processed: true });
+
+    const afterReversal = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterReversal?.total_microdollars_acquired).toBe(totalAfterPurchase);
+
+    await processAppStoreKiloPassNotification(refund('out-of-order-refund', refundTransaction));
+
+    const afterRefund = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(afterRefund?.total_microdollars_acquired).toBe(totalAfterPurchase);
+    expect(
+      await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(
+          kilo_pass_subscriptions.provider_subscription_id,
+          decodedTransaction.originalTransactionId
+        ),
+      })
+    ).toMatchObject({ status: 'active', ended_at: null });
   });
 });

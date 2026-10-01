@@ -12,5 +12,5 @@
       "@kilocode/worker-utils/*": ["../worker-utils/src/*"]
     }
   },
-  "exclude": ["node_modules", "src/**/*.test.ts", "src/**/*.test.tsx"]
+  "exclude": ["node_modules", "src/**/*.test.ts", "src/**/*.test.tsx", "src/tests/**"]
 }

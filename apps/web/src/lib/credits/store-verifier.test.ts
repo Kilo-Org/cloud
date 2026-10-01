@@ -6,7 +6,11 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import type { AppleStoreDecodedTransaction } from '@/lib/kilo-pass/apple-store-verifier';
 import type * as AppleStoreVerifier from '@/lib/kilo-pass/apple-store-verifier';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { StoreVerificationError } from './store-purchase-errors';
+import {
+  STORE_PURCHASE_PENDING_MESSAGE,
+  StorePurchasePendingError,
+  StoreVerificationError,
+} from './store-purchase-errors';
 import type * as StoreVerifier from './store-verifier';
 
 const mockGetGooglePlayProductPurchase =
@@ -228,16 +232,47 @@ describe('verifyGooglePlayCreditPurchase', () => {
     });
   });
 
-  it.each([1, 2])('rejects purchaseState %s', async purchaseState => {
+  it('rejects a canceled purchaseState as a terminal verification failure', async () => {
     const { verifyGooglePlayCreditPurchase } = loadVerifier();
-    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ purchaseState }));
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ purchaseState: 1 }));
 
-    await expect(
-      verifyGooglePlayCreditPurchase({
-        productId: 'credits_usd10',
-        purchaseToken: 'purchase-token',
-      })
-    ).rejects.toThrow('Google Play purchase is not in a purchased state');
+    const verification = verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10',
+      purchaseToken: 'purchase-token',
+    });
+
+    await expect(verification).rejects.toBeInstanceOf(StoreVerificationError);
+    await expect(verification).rejects.toThrow('Google Play purchase is not in a purchased state');
+  });
+
+  // Play reports 2 while it finishes the charge, and the very same token turns
+  // into 0 once it does. A pending response must not be a terminal receipt
+  // defect: the mobile client would remember the refusal and never credit the
+  // later-approved purchase.
+  it('reports purchaseState 2 as pending, then verifies the same token once it becomes 0', async () => {
+    const { verifyGooglePlayCreditPurchase } = loadVerifier();
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ purchaseState: 2 }));
+
+    const pending = verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10',
+      purchaseToken: 'purchase-token',
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(StorePurchasePendingError);
+    await expect(pending).rejects.toThrow(STORE_PURCHASE_PENDING_MESSAGE);
+
+    mockGetGooglePlayProductPurchase.mockResolvedValueOnce(productPurchase({ purchaseState: 0 }));
+    const result = await verifyGooglePlayCreditPurchase({
+      productId: 'credits_usd10',
+      purchaseToken: 'purchase-token',
+    });
+
+    expect(result).toMatchObject({
+      providerTransactionId: 'GPA.1234',
+      quantity: 1,
+      amountUsd: 10,
+      amountMicrodollars: 10_000_000,
+    });
   });
 
   it('rejects an unknown product id', async () => {

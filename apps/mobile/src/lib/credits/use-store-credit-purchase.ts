@@ -32,6 +32,15 @@ const alreadyOwnedPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.AlreadyOwned),
 });
 
+// A store purchase the store has accepted but not finished: Play reports
+// `pending` for a payment awaiting approval, and StoreKit reports an
+// ask-to-buy/deferred payment with the same code. Nothing is wrong with the
+// receipt — the very same token becomes a purchased one once the store
+// completes the charge — so it must never read as a failure.
+const pendingPurchaseErrorSchema = z.object({
+  code: z.union([z.literal(ErrorCode.Pending), z.literal(ErrorCode.DeferredPayment)]),
+});
+
 const errorMessageSchema = z.object({
   message: z.string(),
 });
@@ -51,6 +60,12 @@ const GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
   "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again.";
 const STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
   'This purchase is already linked to another Kilo account.';
+// The credit-pack completion's retryable pending refusal
+// (`apps/web/src/routers/credits-router.ts`, `STORE_PURCHASE_PENDING_MESSAGE`).
+// Play has accepted the charge but not finished it — or the completion reached
+// Play's API before the store finished the charge — so the same token verifies
+// later. Matched, never shown, and never remembered as a terminal refusal.
+export const STORE_PURCHASE_PENDING_MESSAGE = 'This Google Play purchase is still pending.';
 const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
 
 type StoreCreditPurchaseRequest =
@@ -284,6 +299,17 @@ export function getStoreCreditPurchaseErrorMessageKey(
     return null;
   }
 
+  // The store has not finished the purchase (Play's pending state, StoreKit's
+  // deferred payment) and the backend's pending refusal both name a state to
+  // wait out, not a failure: no copy, and the purchase stays queued for the
+  // later delivery.
+  if (pendingPurchaseErrorSchema.safeParse(error).success) {
+    return null;
+  }
+  if (readTrpcErrorField(error, 'message') === STORE_PURCHASE_PENDING_MESSAGE) {
+    return null;
+  }
+
   const ownedByAnotherAccountKey =
     storefront === 'play'
       ? CREDIT_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_PLAY_KEY
@@ -333,6 +359,16 @@ export function createStoreCreditPurchaseActions(deps: StoreCreditPurchaseAction
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
   ): Promise<PurchaseCompletionResult> {
+    // The store has accepted the charge but not finished it (Play's `pending`
+    // state, StoreKit's ask-to-buy/deferred payment). Posting the token now can
+    // only fail — the store has not made it purchasable yet — and that refusal
+    // would be remembered as terminal, stranding a charge that is approved a
+    // moment later. Leave the store transaction queued: the store re-delivers
+    // it once it completes the charge, and that delivery completes it once.
+    if (purchase.purchaseState === 'pending') {
+      return { completed: false, errorMessageKey: null };
+    }
+
     const token = purchase.purchaseToken;
     if (!token) {
       return { completed: false, errorMessageKey: missingTokenKey(purchase) };

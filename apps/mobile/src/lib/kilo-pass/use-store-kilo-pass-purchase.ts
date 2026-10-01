@@ -21,6 +21,15 @@ const billingUnavailableErrorSchema = z.object({
   code: z.literal(ErrorCode.BillingUnavailable),
 });
 
+// A store purchase the store has accepted but not finished: Play reports
+// `pending` for a payment awaiting approval, and StoreKit reports an
+// ask-to-buy/deferred payment with the same code. Nothing is wrong with the
+// receipt — the very same token becomes a purchased one once the store
+// completes the charge — so it must never read as a failure.
+const pendingPurchaseErrorSchema = z.object({
+  code: z.union([z.literal(ErrorCode.Pending), z.literal(ErrorCode.DeferredPayment)]),
+});
+
 const errorMessageSchema = z.object({
   message: z.string(),
 });
@@ -278,6 +287,14 @@ export function getKiloPassPurchaseErrorMessage(
     return null;
   }
 
+  // The store has not finished the purchase (Play's pending state, StoreKit's
+  // deferred payment). It is a state to wait out, not a failure: the store
+  // re-delivers the transaction once it completes the charge, and that delivery
+  // carries the same token.
+  if (pendingPurchaseErrorSchema.safeParse(error).success) {
+    return null;
+  }
+
   if (isAlreadyOwnedPurchaseError(error)) {
     return i18n.t(
       storefront === 'play'
@@ -333,6 +350,16 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     purchase: Purchase,
     options: PurchaseCompletionOptions = {}
   ): Promise<PurchaseCompletionResult> {
+    // The store has accepted the charge but not finished it (Play's `pending`
+    // state, StoreKit's ask-to-buy/deferred payment). Posting the token now can
+    // only fail — the store has not made it purchasable yet — and that refusal
+    // would be remembered as terminal, stranding a charge that is approved a
+    // moment later. Leave the store transaction queued: the store re-delivers
+    // it once it completes the charge, and that delivery completes it once.
+    if (purchase.purchaseState === 'pending') {
+      return { completed: false, stale: false, errorMessage: null };
+    }
+
     // The account can change between this completion being queued and reaching
     // the backend (a recovery pass started under the old session, or a delivery
     // that waited behind another await). Never post the receipt under the new

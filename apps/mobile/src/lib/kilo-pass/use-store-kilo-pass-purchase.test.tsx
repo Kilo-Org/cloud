@@ -64,6 +64,8 @@ vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
+    DeferredPayment: 'deferred-payment',
+    Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
   fetchProducts: mockedIap.fetchProducts,
@@ -518,6 +520,50 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     await actions.handlePurchaseSuccess(createPurchase());
 
     expect(finishTransaction).not.toHaveBeenCalled();
+  });
+
+  it('keeps a pending purchase queued and completes the later approval once', async () => {
+    // Play delivers a slow test card's purchase as `pending` immediately and
+    // again as `purchased` once it is approved. The first delivery must not
+    // reach the backend, finish the transaction, announce, or report a failure.
+    const pending = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier19',
+      purchaseState: 'pending',
+    });
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+      showError: message => {
+        showError(message);
+      },
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+
+    expect(await actions.handlePurchaseSuccess(pending)).toBe(false);
+    expect(completePlayPurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+
+    // The store approves the same transaction and re-delivers it as purchased:
+    // exactly one grant, one finish and one announcement.
+    const approved = { ...pending, purchaseState: 'purchased' as const };
+    expect(await actions.handlePurchaseSuccess(approved)).toBe(true);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(1);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
   it('finishes the transaction and invalidates Kilo Pass state after backend success', async () => {
@@ -1529,6 +1575,18 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     );
     expect(getKiloPassPurchaseErrorMessage(error, 'fallback', 'app_store')).toBe(error.message);
   });
+
+  it.each(['pending', 'deferred-payment'])(
+    'maps a store %s purchase state to no copy, not a failure',
+    code => {
+      expect(
+        getKiloPassPurchaseErrorMessage({ code, message: 'not finished' }, 'fallback', 'play')
+      ).toBeNull();
+      expect(
+        getKiloPassPurchaseErrorMessage({ code, message: 'not finished' }, 'fallback', 'app_store')
+      ).toBeNull();
+    }
+  );
 
   it('maps Google Play account mismatch strings to Play-specific copy', () => {
     expect(

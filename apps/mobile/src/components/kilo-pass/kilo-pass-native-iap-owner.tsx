@@ -234,23 +234,16 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       }
     },
     onPurchaseSuccess: purchase => {
-      if (
-        !isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
-      ) {
-        releasePurchaseRequest();
-        return;
-      }
-
-      if (
-        activePurchaseRequestRef.current?.sku !== purchase.productId &&
-        activePurchaseRequestRef.current?.replacedSku !== purchase.productId
-      ) {
-        // The store answered the in-flight request with a transaction for another
-        // SKU (an upgrade it refused re-delivers the current subscription), and no
-        // purchase error follows. Release the request or the screen keeps its
-        // "Completing purchase" state forever. The recovery effect below still
-        // completes this transaction if it is not yet linked.
-        releasePurchaseRequest();
+      const request = activePurchaseRequestRef.current;
+      if (request?.sku !== purchase.productId && request?.replacedSku !== purchase.productId) {
+        // The delivery is not an answer to the in-flight request: a re-delivered
+        // transaction, the later approval of a purchase first delivered as
+        // pending, or another tier's. Never release the request here — it belongs
+        // to a different delivery, and clearing it would drop a newer request's
+        // state and its completion callback. Complete the transaction in-session
+        // instead: the recovery effect only runs when the store connects. A
+        // delivery the store has not finished (still pending) is filtered inside.
+        void completeStorePurchaseInSession(purchase);
         return;
       }
 
@@ -266,6 +259,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const {
     connected,
     finishTransaction,
+    reconnect: reconnectStore,
     requestPurchase,
     restorePurchases: restoreStorePurchases,
   } = actionsRef;
@@ -279,6 +273,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   const productsQuery = useStoreKiloPassProducts({
     connected,
     fetchStoreProducts: fetchAppStoreSubscriptions,
+    reconnectStore,
   });
   const enabledAppleProductIds = useMemo(
     () =>
@@ -410,6 +405,47 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
       serverProductsQuery.data?.appAccountToken,
       trpc,
     ]
+  );
+
+  // Completes one transaction the store delivered outside a request this owner
+  // started (a re-delivered, deferred or later-approved purchase). The recovery
+  // effect runs only when the store connects, so the purchase callback must
+  // complete it in-session or the user stays charged and unentitled until the
+  // route remounts.
+  const completeStorePurchaseInSession = useCallback(
+    async (purchase: Purchase) => {
+      if (
+        !isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
+      ) {
+        return;
+      }
+      const id = getPurchaseCompletionId(purchase);
+      if (
+        recoveredPurchaseIdsRef.current.has(id) ||
+        recoveryInFlightPurchaseIdsRef.current.has(id)
+      ) {
+        return;
+      }
+      recoveryInFlightPurchaseIdsRef.current.add(id);
+      try {
+        // The store delivered this transaction on its own; a failure stays silent
+        // because the recovery pass retries it on the next connect. It announces
+        // nothing: the completion callback belongs to a live purchase sheet, and
+        // this delivery may be a different transaction arriving while a newer
+        // request (and its callback) is in flight, so consuming it here would
+        // close that sheet for a purchase the backend has not granted.
+        const completed = await actions.handlePurchaseSuccess(purchase, {
+          notifyCompletion: false,
+          notifyErrors: false,
+        });
+        if (completed) {
+          recoveredPurchaseIdsRef.current.add(id);
+        }
+      } finally {
+        recoveryInFlightPurchaseIdsRef.current.delete(id);
+      }
+    },
+    [actions, enabledAppleProductIds, enabledGoogleProductIds]
   );
 
   const startPurchase = useCallback(

@@ -10,6 +10,7 @@ import type { ValidatedStoreCreditPurchase } from '@/lib/credits/store-verifier'
 import { STORE_CREDIT_PRODUCTS } from '@/lib/credits/store-products';
 import {
   StoreCreditPurchaseOwnedByAnotherAccountError,
+  StorePurchasePendingError,
   StoreVerificationError,
 } from '@/lib/credits/store-purchase-errors';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
@@ -59,6 +60,10 @@ const ACCOUNT_TOKEN = 'account-token-1';
 // rather than imported from the constant it is produced from.
 const STORE_PURCHASE_REFUNDED_MESSAGE =
   'This store purchase has been refunded, so Kilo cannot credit it.';
+
+// Pinned for the same reason: the mobile client matches this exact message (and
+// must treat it as retryable) rather than the terminal receipt refusal.
+const STORE_PURCHASE_PENDING_MESSAGE = 'This Google Play purchase is still pending.';
 
 function captureExceptionMock() {
   return jest.mocked(jest.requireMock<typeof Sentry>('@sentry/nextjs').captureException);
@@ -326,6 +331,30 @@ describe('creditsRouter.completePlayPurchase', () => {
       })
     ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
     expect(mockCompleteStoreCreditPurchase).toHaveBeenCalledTimes(1);
+  });
+
+  // Play has accepted the charge but not finished it; the same token verifies
+  // once it does. Classifying this as the terminal receipt refusal would make
+  // the mobile client remember the purchase for the process and never recover a
+  // charge that is approved a moment later.
+  it('reports a pending purchase as retryable and never grants or consumes it', async () => {
+    mockVerifyGooglePlayCreditPurchase.mockRejectedValue(
+      new StorePurchasePendingError(STORE_PURCHASE_PENDING_MESSAGE)
+    );
+
+    await expect(
+      callerForUser().completePlayPurchase({
+        productId: 'credits_usd10',
+        purchaseToken: 'play-purchase-token',
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: STORE_PURCHASE_PENDING_MESSAGE,
+    });
+    expect(mockCompleteStoreCreditPurchase).not.toHaveBeenCalled();
+    expect(mockAcknowledgeGooglePlayCreditPurchase).not.toHaveBeenCalled();
+    // A purchase that is merely pending is an expected outcome, not an incident.
+    expect(captureExceptionMock()).not.toHaveBeenCalled();
   });
 
   it('surfaces a completion that belongs to another user as non-retryable', async () => {

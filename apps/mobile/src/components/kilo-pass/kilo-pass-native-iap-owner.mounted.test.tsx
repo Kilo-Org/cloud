@@ -4,6 +4,7 @@ import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import {
   type KiloPassNativeIapContextValue,
   KiloPassNativeIapOwner,
@@ -11,7 +12,33 @@ import {
 } from './kilo-pass-native-iap-owner';
 
 const KILO_PASS_PRODUCT_ID = 'kilo_pass_monthly_v1';
+const OTHER_PASS_PRODUCT_ID = 'kilo_pass_yearly_v1';
 const OTHER_ACCOUNT_TOKEN = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee';
+
+function createPassProduct(
+  appleProductId: string,
+  googleProductId: string
+): AppStoreKiloPassProduct {
+  return {
+    appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+    appleProductId,
+    cadence: 'monthly',
+    description: 'Kilo Pass',
+    displayPrice: '$24.99',
+    googleBasePlanId: 'monthly-v1',
+    googleProductId,
+    storeProduct: {
+      id: appleProductId,
+      displayPrice: '$24.99',
+      title: 'Kilo Pass',
+      description: 'Kilo Pass',
+    },
+    suggestedStoreMonthlyPriceUsd: 24.7,
+    tier: 'tier_19',
+    title: 'Kilo Pass',
+    webMonthlyPriceUsd: 19,
+  };
+}
 
 const mockedIap = vi.hoisted(() => ({
   connected: false,
@@ -19,6 +46,10 @@ const mockedIap = vi.hoisted(() => ({
   finishTransaction: vi.fn(),
   // The SDK's value-returning lookup, used by the owner.
   getAvailablePurchases: vi.fn(),
+  handlers: null as {
+    onPurchaseError: (error: Error) => void;
+    onPurchaseSuccess: (purchase: Purchase) => void;
+  } | null,
   // The hook's lookup. It logs every failure to the dev LogBox, so the owner
   // must never call it: a raw library message survived on the Buy credits
   // screen after the Kilo Pass route had used it.
@@ -48,8 +79,12 @@ vi.mock('expo-iap', () => ({
   },
   fetchProducts: mockedIap.fetchProducts,
   getAvailablePurchases: mockedIap.getAvailablePurchases,
-  useIAP: (handlers: unknown) => {
+  useIAP: (handlers: {
+    onPurchaseError: (error: Error) => void;
+    onPurchaseSuccess: (purchase: Purchase) => void;
+  }) => {
     mockedIap.useIAP(handlers);
+    mockedIap.handlers = handlers;
     return {
       availablePurchases: [],
       connected: mockedIap.connected,
@@ -204,6 +239,7 @@ beforeEach(() => {
   mockedIap.connected = false;
   mockedIap.finishTransaction.mockResolvedValue(undefined);
   mockedIap.getAvailablePurchases.mockResolvedValue([]);
+  mockedIap.handlers = null;
   mockedIap.hookGetAvailablePurchases.mockResolvedValue([]);
   mockedIap.requestPurchase.mockResolvedValue(null);
   mockedIap.restorePurchases.mockResolvedValue(undefined);
@@ -249,6 +285,85 @@ describe('KiloPassNativeIapOwner', () => {
     expect(handle.value?.ownershipChecked).toBe(false);
     expect(handle.value?.ownershipCheckFailed).toBe(true);
     expect(handle.value?.errorMessage).toBe('kiloPass.couldNotConnectToAppStore');
+  });
+
+  it('completes the later approval of a pending pass in-session', async () => {
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [{ appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_monthly' }],
+    };
+    const { handle } = await mountOwner();
+    await flushPromises();
+
+    // Play delivers a slow test card's subscription as `pending` first. It must
+    // release the request without a failure or a completion, leaving the store
+    // transaction for the later approval.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ purchaseState: 'pending' }));
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(handle.value?.errorMessage).toBeNull();
+
+    // The store approves the same transaction and re-delivers it as purchased.
+    // The recovery effect only runs when the store connects, so the owner must
+    // complete it here: one grant, one acknowledgement.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ purchaseState: 'purchased' }));
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: expect.objectContaining({ productId: KILO_PASS_PRODUCT_ID }),
+      isConsumable: false,
+    });
+    expect(handle.value?.errorMessage).toBeNull();
+  });
+
+  it('does not clear a newer request when an older approval is delivered', async () => {
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      products: [
+        { appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_monthly' },
+        { appleProductId: OTHER_PASS_PRODUCT_ID, googleProductId: 'kilo_pass_yearly' },
+      ],
+    };
+    const { handle } = await mountOwner();
+    await flushPromises();
+
+    const onCompleted = vi.fn();
+    await act(async () => {
+      await handle.value?.purchase(createPassProduct(KILO_PASS_PRODUCT_ID, 'kilo_pass_monthly'), {
+        onCompleted: () => {
+          onCompleted();
+        },
+      });
+    });
+    await flushPromises();
+    expect(handle.value?.isPending).toBe(true);
+
+    // The later approval of an older, different-tier purchase arrives while the
+    // new request is still in flight. It must be completed, but it must not
+    // release the newer request, drop its completion callback, or announce into
+    // it — that would strand the purchase the user is actually waiting on.
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({ productId: OTHER_PASS_PRODUCT_ID, transactionId: 'tx-old' })
+    );
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(onCompleted).not.toHaveBeenCalled();
+    expect(handle.value?.isPending).toBe(true);
+
+    // The newer request's own delivery still completes and fires its callback.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase());
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(2);
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(handle.value?.isPending).toBe(false);
   });
 
   it('feeds the store answer into the ownership preflight and the owned ids', async () => {

@@ -44,6 +44,8 @@ vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
+    DeferredPayment: 'deferred-payment',
+    Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
   fetchProducts: mockedIap.fetchProducts,
@@ -229,6 +231,60 @@ describe('CreditNativeIapOwner', () => {
       isConsumable: true,
     });
     expect(handle.value?.completingProductId).toBeNull();
+  });
+
+  it('keeps a pending delivery queued and completes the later approval once', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+    expect(handle.value?.completingProductId).toBe(APPLE_PRODUCT_ID);
+
+    // Play delivers the slow test card's purchase as `pending` first. It must
+    // release the request without a failure, leaving the store transaction for
+    // the later approval, and must not post the token or finish it.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ purchaseState: 'pending' }));
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
+    expect(mockedIap.finishTransaction).not.toHaveBeenCalled();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completedPurchaseCount).toBe(0);
+
+    // The store approves the same transaction and re-delivers it as purchased:
+    // exactly one grant and one announcement.
+    mockedIap.handlers?.onPurchaseSuccess(createPurchase({ purchaseState: 'purchased' }));
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledTimes(1);
+    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+    expect(handle.value?.completedPurchaseCount).toBe(1);
+    expect(handle.value?.errorMessageKey).toBeNull();
+  });
+
+  it('does not report a pending store error as a purchase failure', async () => {
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+    };
+    const { handle } = await mountOwner();
+
+    expect(await handle.value?.purchase(creditPack)).toBe(true);
+    await flushPromises();
+
+    // The SDK reports a deferred/pending payment through the error channel; it
+    // is a state to wait out, so the request is released with no copy.
+    mockedIap.handlers?.onPurchaseError({ code: 'pending', message: 'Purchase is pending' });
+    await flushPromises();
+
+    expect(handle.value?.errorMessageKey).toBeNull();
+    expect(handle.value?.completingProductId).toBeNull();
+    expect(mockedQuery.completePurchase).not.toHaveBeenCalled();
   });
 
   it('recovers an unfinished purchase once per transaction', async () => {

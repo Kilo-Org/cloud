@@ -102,6 +102,10 @@ export function useStoreCreditProducts(options: StoreCreditProductsOptions) {
     },
     enabled: options.connected && userId != null,
     staleTime: STORE_CREDIT_PRODUCTS_STALE_TIME_MS,
+    // One attempt: the loader already bounds the store call at 15 s, so a retry
+    // would only multiply the wait for a store that is hung rather than failing,
+    // and the screen offers its own Try again for the user to choose.
+    retry: false,
   });
 
   // Bounded wait for the store connection — without this, a stuck connection

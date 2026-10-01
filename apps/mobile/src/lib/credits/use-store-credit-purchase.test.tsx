@@ -14,12 +14,15 @@ import {
   resetInlinePurchaseErrorOwnership,
   resetPurchaseErrorToastDedup,
   resetTerminalPurchaseRejections,
+  STORE_PURCHASE_PENDING_MESSAGE,
 } from './use-store-credit-purchase';
 
 vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
+    DeferredPayment: 'deferred-payment',
+    Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
 }));
@@ -232,6 +235,102 @@ describe('createStoreCreditPurchaseActions completion', () => {
       purchaseToken: 'play-token',
     });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: true });
+  });
+
+  it('keeps a pending purchase queued and completes the later approval once', async () => {
+    // Play delivers a slow test card's purchase as `pending` immediately and
+    // again as `purchased` once it is approved. The first delivery must not
+    // reach the backend, finish the transaction, announce, or report a failure.
+    const pending = createPurchase({
+      store: 'google',
+      productId: GOOGLE_PRODUCT_ID,
+      purchaseToken: 'play-token',
+      purchaseState: 'pending',
+    });
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn();
+    const onPurchaseCompleted = vi.fn();
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      onPurchaseCompleted: () => {
+        onPurchaseCompleted();
+      },
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(pending)).toBe(false);
+    expect(completePlayPurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(onPurchaseCompleted).not.toHaveBeenCalled();
+    expect(showError).not.toHaveBeenCalled();
+
+    // The store approves the same transaction and re-delivers it as purchased:
+    // exactly one grant, one finish and one announcement.
+    const approved = { ...pending, purchaseState: 'purchased' as const };
+    expect(await actions.handlePurchaseSuccess(approved)).toBe(true);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(1);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onPurchaseCompleted).toHaveBeenCalledTimes(1);
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not remember a pending purchase as terminally refused', async () => {
+    const pending = createPurchase({ purchaseState: 'pending' });
+    const completeAppStorePurchase = vi.fn().mockResolvedValue({ alreadyProcessed: false });
+    const actions = createActions({ completeAppStorePurchase });
+
+    await actions.handlePurchaseSuccess(pending);
+
+    // The approved delivery of the same transaction id is still posted: a
+    // pending purchase must never enter the terminal-refusal memory, or the
+    // charge approved a moment later would be skipped forever.
+    const approved = { ...pending, purchaseState: 'purchased' as const };
+    expect(await actions.recoverPurchases([approved])).toEqual([approved]);
+    expect(completeAppStorePurchase).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a still-pending Play refusal as retryable, not a failure', async () => {
+    // A delivered purchase whose client state already reads purchased can still
+    // meet Play's API before the store finishes the charge; the backend answers
+    // a retryable pending refusal. It must stay queued and silent, never a
+    // failure and never remembered.
+    const purchase = createPurchase({
+      store: 'google',
+      productId: GOOGLE_PRODUCT_ID,
+      purchaseToken: 'play-token',
+    });
+    const completePlayPurchase = vi
+      .fn()
+      .mockRejectedValueOnce({
+        data: { code: 'CONFLICT', message: STORE_PURCHASE_PENDING_MESSAGE },
+      })
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const showError = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      showError: message => {
+        showError(message);
+      },
+    });
+
+    expect(await actions.handlePurchaseSuccess(purchase)).toBe(false);
+    expect(showError).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+
+    // The store finishes the charge and the same token now verifies.
+    expect(await actions.handlePurchaseSuccess(purchase)).toBe(true);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
   });
 
   it('does not finish the transaction when backend completion fails', async () => {
@@ -598,6 +697,31 @@ describe('getStoreCreditPurchaseErrorMessageKey', () => {
     expect(getStoreCreditPurchaseErrorMessageKey(new Error('StoreKit failed'), 'app_store')).toBe(
       CREDIT_PURCHASE_FAILED_KEY
     );
+  });
+
+  it.each(['pending', 'deferred-payment'])(
+    'maps a store %s purchase state to null, not a failure',
+    code => {
+      expect(getStoreCreditPurchaseErrorMessageKey({ code, message: 'not finished' }, 'play')).toBe(
+        null
+      );
+      expect(
+        getStoreCreditPurchaseErrorMessageKey({ code, message: 'not finished' }, 'app_store')
+      ).toBeNull();
+    }
+  );
+
+  it('maps the backend pending refusal to null, not a failure', () => {
+    expect(
+      getStoreCreditPurchaseErrorMessageKey(
+        { data: { code: 'CONFLICT', message: STORE_PURCHASE_PENDING_MESSAGE } },
+        'play'
+      )
+    ).toBeNull();
+    // The client sees the server message as the error's own message too.
+    expect(
+      getStoreCreditPurchaseErrorMessageKey(new Error(STORE_PURCHASE_PENDING_MESSAGE), 'play')
+    ).toBeNull();
   });
 
   it('surfaces the Play account-mismatch key on an Android completion failure', async () => {

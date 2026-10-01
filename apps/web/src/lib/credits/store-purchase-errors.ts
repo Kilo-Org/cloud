@@ -13,14 +13,38 @@
 
 /**
  * A receipt the store will never let succeed: a revoked or wrong-bundle Apple
- * transaction, a Play purchase that is not in a purchased state, a product that
- * is not a credit pack, a quantity Kilo cannot refund correctly. Replaying it
+ * transaction, a canceled (or unknown-state) Play purchase, a product that is
+ * not a credit pack, a quantity Kilo cannot refund correctly. Replaying it
  * cannot change the answer.
  */
 export class StoreVerificationError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'StoreVerificationError';
+  }
+}
+
+/**
+ * The backend contract string for a Play purchase the store has accepted but not
+ * finished (`purchaseState` 2, e.g. a cash payment awaiting approval). Nothing is
+ * wrong with the receipt: the same token becomes purchased (`purchaseState` 0)
+ * once the store completes the charge, so the client must keep it queued instead
+ * of forgetting it. The mobile error mapping matches this exact message.
+ */
+export const STORE_PURCHASE_PENDING_MESSAGE = 'This Google Play purchase is still pending.';
+
+/**
+ * A purchase that is not done yet, and not wrong: Play reports `purchaseState`
+ * 2 (pending) while it finishes the charge. Unlike `StoreVerificationError` this
+ * is retryable — the very same token is expected to verify once Play reports
+ * state 0 — so the completion router must not answer with the terminal receipt
+ * refusal, which the mobile client would remember for the rest of the process
+ * and never recover the later-approved purchase.
+ */
+export class StorePurchasePendingError extends Error {
+  constructor(message = STORE_PURCHASE_PENDING_MESSAGE) {
+    super(message);
+    this.name = 'StorePurchasePendingError';
   }
 }
 

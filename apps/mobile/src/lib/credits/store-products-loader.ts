@@ -1,3 +1,5 @@
+import { withStoreDeadline } from '@/lib/iap/store-call-deadline';
+
 import {
   type BackendStoreCreditProductsResponse,
   joinStoreCreditProducts,
@@ -82,7 +84,13 @@ export async function loadStoreCreditProducts(params: {
 
   let storeProducts: readonly StoreCreditProductListing[] = [];
   try {
-    storeProducts = await params.fetchStoreProducts(productSkus);
+    // A store that never answers is worse than one that fails: the screen would
+    // stay on its placeholders and offer no retry. The same deadline the rest of
+    // the flow uses bounds this call, so a hung SDK reads as unavailable.
+    storeProducts = await withStoreDeadline(
+      params.fetchStoreProducts(productSkus),
+      'the credit pack price lookup'
+    );
   } catch {
     // The store SDK's wording is not for the screen: surface a catalog key.
     throw new StoreCreditProductsError(noMatchingProductsKey(params.storefront));

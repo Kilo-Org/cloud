@@ -11,6 +11,20 @@
 const STORE_CALL_DEADLINE_MS = 15_000;
 
 /**
+ * The store did not answer inside the deadline. Distinct from a store that
+ * answered with a failure: a hung SDK stays hung for every further call, so a
+ * caller must not follow a deadline with more calls to the same store (the
+ * Kilo Pass loader would otherwise spend another deadline per product id).
+ * Carries only the label; the message never reaches the screen.
+ */
+export class StoreDeadlineError extends Error {
+  constructor(label: string) {
+    super(`${label} did not answer within ${STORE_CALL_DEADLINE_MS} ms`);
+    this.name = 'StoreDeadlineError';
+  }
+}
+
+/**
  * Bounds a store call so a hung SDK never holds a recovery pass open.
  *
  * The underlying call keeps running — the store SDK has no cancellation — but
@@ -20,7 +34,7 @@ const STORE_CALL_DEADLINE_MS = 15_000;
 export async function withStoreDeadline<T>(work: Promise<T>, label: string): Promise<T> {
   const { promise: deadline, reject: failDeadline } = Promise.withResolvers<never>();
   const timer = setTimeout(() => {
-    failDeadline(new Error(`${label} did not answer within ${STORE_CALL_DEADLINE_MS} ms`));
+    failDeadline(new StoreDeadlineError(label));
   }, STORE_CALL_DEADLINE_MS);
   try {
     return await Promise.race([work, deadline]);

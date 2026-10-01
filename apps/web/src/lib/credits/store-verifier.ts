@@ -15,7 +15,7 @@ import {
   getGooglePlayProductPurchase,
 } from '@/lib/kilo-pass/google-play-sdk';
 
-import { StoreVerificationError } from './store-purchase-errors';
+import { StorePurchasePendingError, StoreVerificationError } from './store-purchase-errors';
 import {
   getStoreCreditProductByAppleProductId,
   getStoreCreditProductByGoogleProductId,
@@ -184,6 +184,17 @@ export async function verifyGooglePlayCreditPurchase(params: {
     throw new StoreVerificationError('Google Play purchase product is not a credit pack');
   }
   // ProductPurchase.purchaseState: 0 purchased, 1 canceled, 2 pending.
+  //
+  // A pending purchase (2) is not a defect in the receipt: Play has accepted the
+  // charge but not finished it — a cash or otherwise deferred payment awaiting
+  // approval — and the *same token* verifies once Play reports state 0. It is
+  // thrown as its own retryable type so the router does not answer with the
+  // terminal receipt refusal the mobile client remembers for the process, which
+  // would strand a charge that is approved a moment later. A canceled (1) or
+  // unknown state is a receipt the store will never let succeed.
+  if (apiData.purchaseState === 2) {
+    throw new StorePurchasePendingError();
+  }
   if (apiData.purchaseState !== 0) {
     throw new StoreVerificationError('Google Play purchase is not in a purchased state');
   }

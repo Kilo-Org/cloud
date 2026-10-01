@@ -10,7 +10,9 @@ import {
 } from '@/lib/credits/store-account-token';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
 import {
+  STORE_PURCHASE_PENDING_MESSAGE,
   StoreCreditPurchaseOwnedByAnotherAccountError,
+  StorePurchasePendingError,
   StoreVerificationError,
 } from '@/lib/credits/store-purchase-errors';
 import { STORE_PURCHASE_REFUNDED_MESSAGE } from '@/lib/credits/store-refund';
@@ -62,12 +64,15 @@ const STORE_PURCHASE_OWNED_BY_ANOTHER_ACCOUNT_MESSAGE =
 /**
  * A store transaction that belongs to another account is terminal — retrying
  * cannot succeed. A receipt the store will never let succeed (a revoked or
- * wrong-bundle Apple transaction, a Play purchase that is not in a purchased
+ * wrong-bundle Apple transaction, a Play purchase in a canceled or unknown
  * state, a product that is not a credit pack) is terminal too, and is reported
  * as such so a caller does not replay it forever — this mirrors the Kilo Pass
- * completion routers. Every other failure (a store or API failure, including a
- * consume that did not complete, and any database failure) is retryable: the
- * grant is idempotent, so the client can safely replay the purchase.
+ * completion routers. A Play purchase that is merely pending is *not* such a
+ * receipt — it is expected to verify once the store finishes the charge — so it
+ * is reported as retryable. Every other failure (a store or API failure,
+ * including a consume that did not complete, and any database failure) is
+ * retryable: the grant is idempotent, so the client can safely replay the
+ * purchase.
  *
  * Terminal versus retryable is decided by the error *type*. Classifying by
  * message text made a transient database error whose SQL happens to name
@@ -83,6 +88,18 @@ function mapCreditCompletionError(
 ): TRPCError {
   if (error instanceof TRPCError) {
     return error;
+  }
+
+  // A Play purchase that is still pending is not a refusal: Play has accepted
+  // the charge and will finish it, so the client must keep the purchase queued
+  // and post it again. `CONFLICT` marks it retryable — never the terminal
+  // receipt refusal the mobile client remembers for the process. It is an
+  // expected outcome, not an incident, so it is not reported to Sentry.
+  if (error instanceof StorePurchasePendingError) {
+    return new TRPCError({
+      code: 'CONFLICT',
+      message: STORE_PURCHASE_PENDING_MESSAGE,
+    });
   }
 
   // A purchase the store refunded is an expected outcome, not an incident: the

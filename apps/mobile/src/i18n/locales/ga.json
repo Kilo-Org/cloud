@@ -2273,6 +2273,8 @@
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
+      "selectRepositoryToStart": "Roghnaigh stór chun tosú.",
+      "connectProviderToStart": "Ceangail soláthraí chun tosú.",
       "promptPlaceholder": "Cad ar mhaith leat oibriú air?",
       "couldNotLoadModels": "Níorbh fhéidir na samhlacha a lódáil.",
       "prefillRepoAndModelUnavailable": "Níl stór ná samhail an tseisiúin bhunaidh ar fáil a thuilleadh. Roghnaigh stór agus samhail thíos.",

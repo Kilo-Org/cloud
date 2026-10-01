@@ -2245,6 +2245,8 @@
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
+      "selectRepositoryToStart": "Vyberte repozitář, abyste mohli začít.",
+      "connectProviderToStart": "Připojte poskytovatele, abyste mohli začít.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",

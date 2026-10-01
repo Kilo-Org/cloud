@@ -2189,6 +2189,8 @@
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
+      "selectRepositoryToStart": "শুরু করতে একটি রিপোজিটরি বেছে নিন।",
+      "connectProviderToStart": "শুরু করতে একটি প্রোভাইডার সংযুক্ত করুন।",
       "promptPlaceholder": "আপনি কী নিয়ে কাজ করতে চান?",
       "couldNotLoadModels": "মডেল লোড করা যায়নি।",
       "prefillRepoAndModelUnavailable": "মূল সেশনের রিপোজিটরি ও মডেল আর ব্যবহার করা যাচ্ছে না। নিচে অন্য রিপোজিটরি ও মডেল বেছে নিন।",

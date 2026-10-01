@@ -2189,6 +2189,8 @@
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
+      "selectRepositoryToStart": "Valitse repositorio aloittaaksesi.",
+      "connectProviderToStart": "Yhdistä palveluntarjoaja aloittaaksesi.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon repositorio ja malli eivät ole enää käytettävissä. Valitse uudet alta.",

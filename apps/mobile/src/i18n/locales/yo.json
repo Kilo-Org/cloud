@@ -2189,6 +2189,8 @@
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
+      "selectRepositoryToStart": "Yan ibi ìpamọ́ kóòdù láti bẹ̀rẹ̀.",
+      "connectProviderToStart": "So olùpèsè kan pọ̀ láti bẹ̀rẹ̀.",
       "promptPlaceholder": "Kí ni o fẹ́ ṣiṣẹ́ lórí?",
       "couldNotLoadModels": "A kò lè gbé àwọn àwòṣe wọlé.",
       "prefillRepoAndModelUnavailable": "Ibi ìpamọ́ kóòdù àti àwòṣe ìgbà iṣẹ́ ìpilẹ̀ṣẹ̀ kò sí mọ́. Yan àwọn mìíràn ní ìsàlẹ̀.",

@@ -2189,6 +2189,8 @@
       "leaveChanges": "جێهێشتنی گۆڕانکارییەکان",
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
+      "selectRepositoryToStart": "بۆ دەستپێکردن کۆگایەک هەڵبژێرە.",
+      "connectProviderToStart": "بۆ دەستپێکردن پەیوەندی بە دابینکەرێک بکە.",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن.",
       "prefillRepoAndModelUnavailable": "کۆگا و مۆدێلی سێشنی سەرەکی چیتر بەردەست نیین. لە خوارەوە هەڵیانبژێرە.",

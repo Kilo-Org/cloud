@@ -2245,6 +2245,8 @@
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
+      "selectRepositoryToStart": "Izberi skladišče za začetek.",
+      "connectProviderToStart": "Poveži ponudnika za začetek.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",

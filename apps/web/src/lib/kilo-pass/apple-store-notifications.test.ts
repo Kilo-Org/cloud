@@ -303,6 +303,56 @@ describe('processAppStoreKiloPassNotification', () => {
       );
     });
 
+    it('grants a DID_RENEW that arrives after its renewal period ended', async () => {
+      const user = await insertTestUser();
+      const providerSubscriptionId = `orig-${crypto.randomUUID()}`;
+
+      await processAppStoreKiloPassNotification({
+        signedPayload: 'late-renewal-initial',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.SUBSCRIBED,
+            subtype: Subtype.INITIAL_BUY,
+          }),
+        decodeTransaction: async () =>
+          transaction({
+            originalTransactionId: providerSubscriptionId,
+            appAccountToken: user.app_store_account_token,
+            purchaseDate: Date.parse('2026-04-01T09:00:00.000Z'),
+            expiresDate: Date.parse('2026-05-01T09:00:00.000Z'),
+          }),
+      });
+
+      // The clock is 2026-05-15. The May renewal period ended before its
+      // notification arrived.
+      const lateRenewal = transaction({
+        originalTransactionId: providerSubscriptionId,
+        transactionId: `tx-${crypto.randomUUID()}`,
+        appAccountToken: user.app_store_account_token,
+        purchaseDate: Date.parse('2026-05-01T09:00:00.000Z'),
+        expiresDate: APP_STORE_NOTIFICATION_TEST_NOW_MS - 60_000,
+      });
+      const result = await processAppStoreKiloPassNotification({
+        signedPayload: 'late-renewal',
+        decodeNotification: async () =>
+          notification({
+            notificationUUID: `note-${crypto.randomUUID()}`,
+            notificationType: NotificationTypeV2.DID_RENEW,
+          }),
+        decodeTransaction: async () => lateRenewal,
+      });
+
+      expect(result).toEqual({ processed: true });
+      const renewalGrant = await db.query.credit_transactions.findFirst({
+        where: eq(
+          credit_transactions.stripe_payment_id,
+          `kilo-pass:${KiloPassPaymentProvider.AppStore}:${lateRenewal.transactionId}`
+        ),
+      });
+      expect(renewalGrant?.amount_microdollars).toBe(toMicrodollars(19));
+    });
+
     it('tracks SUBSCRIBED with a resolved user and new transaction as initial', async () => {
       const trackingMock = getPosthogTrackingMock();
       const user = await insertTestUser();

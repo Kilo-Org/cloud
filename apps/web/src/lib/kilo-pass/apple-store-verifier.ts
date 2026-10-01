@@ -100,11 +100,6 @@ export function mapAppleKiloPassTransaction(
   if (transaction.expiresDate == null) {
     throw new Error('Apple subscription transaction is missing an expiration date');
   }
-  // Called only from the tRPC purchase-completion path; renewals and refunds enter via
-  // the webhook handler in apple-store-notifications.ts, which intentionally allows expired transactions.
-  if (transaction.expiresDate <= Date.now()) {
-    throw new Error('Apple subscription transaction has expired');
-  }
 
   const product = getMobileStoreKiloPassProductByAppleProductId(transaction.productId);
   if (!product) {
@@ -128,9 +123,23 @@ export function mapAppleKiloPassTransaction(
   };
 }
 
+/**
+ * Only the app-completion path rejects an ended period. Notifications can
+ * arrive late, and a late renewal must still grant its credits.
+ */
+export function mapActiveAppleKiloPassTransaction(
+  transaction: AppleStoreDecodedTransaction
+): ValidatedStoreKiloPassPurchase {
+  if (transaction.expiresDate != null && transaction.expiresDate <= Date.now()) {
+    throw new Error('Apple subscription transaction has expired');
+  }
+  return mapAppleKiloPassTransaction(transaction);
+}
+
 export async function verifyAppleKiloPassTransactionJws(
   signedTransactionJws: string
 ): Promise<ValidatedStoreKiloPassPurchase> {
-  const transaction = await decodeAppleStoreTransactionJws(signedTransactionJws);
-  return mapAppleKiloPassTransaction(transaction);
+  return mapActiveAppleKiloPassTransaction(
+    await decodeAppleStoreTransactionJws(signedTransactionJws)
+  );
 }

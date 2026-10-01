@@ -82,7 +82,7 @@ export type ControlPlaneWorkspaceFile =
   | { unavailable?: false; exists: boolean; contents?: string; dirty: boolean; head: string };
 
 type ControlPlaneKiloOperation = {
-  action: 'discover' | 'completion' | 'file' | 'exclusive';
+  action: 'discover' | 'completion' | 'file' | 'exclusive' | 'message-parts' | 'summary-count';
   kiloSessionId: string;
   serverUrl?: string;
   directory?: string;
@@ -405,6 +405,67 @@ async function run() {
     };
   }
 
+  if (request.action === 'message-parts') {
+    if (typeof request.userMessageId !== 'string' || request.userMessageId.length === 0) {
+      return { ok: false, reason: 'message-parts requires userMessageId' };
+    }
+    const endpoint = new URL(
+      '/session/' + encodeURIComponent(root.id) + '/message',
+      request.serverUrl
+    );
+    endpoint.searchParams.set('directory', root.directory);
+    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
+    if (!response.ok) {
+      return { ok: false, reason: 'Kilo messages returned HTTP ' + response.status };
+    }
+    const entries = await response.json();
+    if (!Array.isArray(entries)) {
+      return { ok: false, reason: 'Kilo messages response was not an array' };
+    }
+    const entry = entries.find(
+      candidate =>
+        candidate?.info?.role === 'user' &&
+        candidate.info.id === request.userMessageId &&
+        candidate.info.sessionID === root.id
+    );
+    if (!entry) return { ok: true, found: false, textParts: 0, text: '' };
+    const textParts = Array.isArray(entry.parts)
+      ? entry.parts.filter(
+          part =>
+            part?.type === 'text' &&
+            typeof part.text === 'string' &&
+            // A synthetic (Kilo reminder) text part is not the user's message
+            // content; counting it would make the scenario-19 single-copy check
+            // fail on a correct plane.
+            part.synthetic !== true
+        )
+      : [];
+    return {
+      ok: true,
+      found: true,
+      textParts: textParts.length,
+      text: textParts.map(part => part.text).join(''),
+    };
+  }
+
+  if (request.action === 'summary-count') {
+    const endpoint = new URL(
+      '/session/' + encodeURIComponent(root.id) + '/message',
+      request.serverUrl
+    );
+    endpoint.searchParams.set('directory', root.directory);
+    const response = await fetch(endpoint, { signal: AbortSignal.timeout(5_000) });
+    if (!response.ok) {
+      return { ok: false, reason: 'Kilo messages returned HTTP ' + response.status };
+    }
+    const entries = await response.json();
+    if (!Array.isArray(entries)) {
+      return { ok: false, reason: 'Kilo messages response was not an array' };
+    }
+    const summaries = entries.filter(entry => entry?.info?.summary === true);
+    return { ok: true, summaryCount: summaries.length };
+  }
+
   return { ok: false, reason: 'unsupported Kilo operation' };
 }
 
@@ -443,11 +504,15 @@ const RETRYABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> 
   'completion',
   'file',
   'exclusive',
+  'message-parts',
+  'summary-count',
 ]);
 
 const REANCHORABLE_PROBE_ACTIONS: ReadonlySet<ControlPlaneKiloOperation['action']> = new Set([
   'completion',
   'file',
+  'message-parts',
+  'summary-count',
 ]);
 
 const PROBE_RETRY_DELAY_MS = 250;
@@ -752,9 +817,13 @@ export type KiloServerProcessHandle = {
 };
 
 /**
- * Send a signal to the exact Kilo server process captured earlier. Never
- * rediscover the process: a STOPPED Kilo server cannot answer a discovery
- * request, so the captured identity is the only safe handle for `CONT`.
+ * Send a signal to the exact process captured earlier. Never rediscover the
+ * process: a STOPPED process cannot answer a discovery request, so the captured
+ * identity is the only safe handle for `CONT`.
+ *
+ * `KILL` is a real `SIGKILL` for the Kilo and wrapper process-kill faults;
+ * `STOP`/`CONT` freeze and resume for the hang fault. Names are mapped to the
+ * `kill -<SIGNAL>` argument verbatim.
  *
  * A `docker exec` that cannot reach the container or the process throws, so a
  * caller that must not leak a stopped process has to run `CONT` in `finally`
@@ -762,7 +831,7 @@ export type KiloServerProcessHandle = {
  */
 export async function signalKiloServerProcess(
   handle: KiloServerProcessHandle,
-  signal: 'STOP' | 'CONT',
+  signal: 'STOP' | 'CONT' | 'KILL',
   executeDocker: DockerCommandExecutor = executeDockerCommand
 ): Promise<void> {
   await executeDocker(['exec', handle.containerId, 'kill', `-${signal}`, String(handle.processId)]);
@@ -783,25 +852,50 @@ export async function recycleControlConnection(
 }
 
 /**
- * The control wrapper is launched as
- * `bun run /usr/local/bin/kilocode-control-wrapper.js`
- * (`src/sandbox-control/cloudflare-provider.ts`). Its basename differs from the
- * per-worktree agent wrapper (`kilocode-wrapper.js`), so requiring both a Bun
- * argv element and the exact control-wrapper basename selects the control
- * wrapper's Bun process and never the Kilo server (`kilo serve`).
+ * Legacy control wrapper: `bun run /usr/local/bin/kilocode-control-wrapper.js`
+ * (`src/sandbox-control/cloudflare-provider.ts`).
  */
-const CONTROL_WRAPPER_PROCESS_SCRIPT = String.raw`
+export const LEGACY_CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
+
+/**
+ * New-plane control wrapper: the control-plane supervisor runs
+ * `bun run /usr/local/bin/kilocode-control-plane-wrapper.js` (`Dockerfile`).
+ * Its basename differs from the legacy wrapper, so a new-plane capture must
+ * match this exact basename; the legacy capture finds zero processes in a
+ * new-plane container (and vice versa).
+ */
+export const CONTROL_PLANE_WRAPPER_BASENAME = 'kilocode-control-plane-wrapper.js';
+
+/**
+ * Pure argv matcher for a control wrapper's Bun process. This is the single
+ * source of truth: the container discovery script embeds this function's source
+ * and the harness unit test calls it directly. `basenameOf` is injected so the
+ * embedded copy can pass `path.basename` while the host test passes a plain
+ * wrapper.
+ */
+export function isControlWrapperArgv(
+  argv: readonly string[],
+  basenameOf: (value: string) => string,
+  wrapperBasename: string
+): boolean {
+  return (
+    argv.some(arg => basenameOf(arg) === 'bun') &&
+    argv.some(arg => basenameOf(arg) === wrapperBasename)
+  );
+}
+
+/**
+ * The in-container discovery program. It requires a Bun argv element and the
+ * exact wrapper basename, so it selects the control wrapper's Bun process and
+ * never the Kilo server (`kilo serve`) or the wrapper's own child processes.
+ */
+function controlWrapperProcessScript(wrapperBasename: string): string {
+  return String.raw`
 import fs from 'node:fs';
 import path from 'node:path';
 
-const CONTROL_WRAPPER_BASENAME = 'kilocode-control-wrapper.js';
-
-function isControlWrapperArgv(argv) {
-  return (
-    argv.some(arg => path.basename(arg) === 'bun') &&
-    argv.some(arg => path.basename(arg) === CONTROL_WRAPPER_BASENAME)
-  );
-}
+const WRAPPER_BASENAME = ${JSON.stringify(wrapperBasename)};
+const isControlWrapperArgv = ${isControlWrapperArgv.toString()};
 
 const pids = [];
 for (const pid of fs.readdirSync('/proc')) {
@@ -812,27 +906,91 @@ for (const pid of fs.readdirSync('/proc')) {
   } catch {
     continue;
   }
-  if (isControlWrapperArgv(argv)) pids.push(Number(pid));
+  if (isControlWrapperArgv(argv, value => path.basename(value), WRAPPER_BASENAME)) pids.push(Number(pid));
 }
 process.stdout.write(JSON.stringify({ pids }));
 `;
+}
 
 /**
- * Capture the control-wrapper Bun process for one container in a single
- * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
- * a frozen process cannot answer a discovery request. Exactly one match is
- * required; zero or several matches is an ambiguous identity and throws.
+ * Bun program: parse `/proc/<pid>/environ` (NUL-separated `NAME=value`) into a
+ * JSON object. `missing: true` when the pid no longer exists.
  */
-export async function captureControlWrapperProcess(
+const CONTAINER_PROCESS_ENV_SCRIPT = String.raw`
+import fs from 'node:fs';
+const pid = Number(process.argv[1]);
+let raw;
+try {
+  raw = fs.readFileSync('/proc/' + pid + '/environ', 'utf8');
+} catch {
+  process.stdout.write(JSON.stringify({ missing: true }));
+  process.exit(0);
+}
+const environment = {};
+for (const entry of raw.split('\0')) {
+  const separator = entry.indexOf('=');
+  if (separator <= 0) continue;
+  environment[entry.slice(0, separator)] = entry.slice(separator + 1);
+}
+process.stdout.write(JSON.stringify({ environment }));
+`;
+
+/**
+ * Parse the state character from a `/proc/<pid>/stat` line. The comm field is
+ * parenthesised and may itself contain spaces and `)`, so the state is the first
+ * token after the LAST `)`. Returns null when the line is unparseable.
+ *
+ * Single source: the container liveness script embeds this function, and the
+ * harness unit test calls it directly.
+ */
+export function processStateFromStat(stat: string): string | null {
+  const close = stat.lastIndexOf(')');
+  if (close < 0) return null;
+  const state = stat.slice(close + 2).split(' ')[0];
+  return state !== undefined && state.length > 0 ? state : null;
+}
+
+/**
+ * Whether a `/proc/<pid>/stat` state means the process is still running. `Z`
+ * (zombie) and `X` (dead) are not: they are what a killed process looks like
+ * after it exits, and `kill -0` would still succeed on them. Null (absent or
+ * unparseable) is not live.
+ */
+export function isLiveProcessState(state: string | null): boolean {
+  return state !== null && state !== 'Z' && state !== 'X';
+}
+
+/**
+ * Bun program: report whether `/proc/<pid>` is a live process. It reads the
+ * state char from `/proc/<pid>/stat`; `Z` (zombie) and `X` (dead) are not live,
+ * and an absent file is not live. `kill -0` would report a zombie as alive.
+ */
+const CONTAINER_PROCESS_LIVE_SCRIPT = String.raw`
+import fs from 'node:fs';
+const processStateFromStat = ${processStateFromStat.toString()};
+const isLiveProcessState = ${isLiveProcessState.toString()};
+const pid = Number(process.argv[1]);
+let live = false;
+try {
+  const stat = fs.readFileSync('/proc/' + pid + '/stat', 'utf8');
+  live = isLiveProcessState(processStateFromStat(stat));
+} catch {
+  live = false;
+}
+process.stdout.write(JSON.stringify({ live }));
+`;
+
+async function captureWrapperProcess(
   containerId: string,
-  executeDocker: DockerCommandExecutor = executeDockerCommand
+  wrapperBasename: string,
+  executeDocker: DockerCommandExecutor
 ): Promise<KiloServerProcessHandle> {
   const { stdout } = await executeDocker([
     'exec',
     containerId,
     'bun',
     '-e',
-    CONTROL_WRAPPER_PROCESS_SCRIPT,
+    controlWrapperProcessScript(wrapperBasename),
   ]);
   let parsed: unknown;
   try {
@@ -849,10 +1007,124 @@ export async function captureControlWrapperProcess(
   const [processId] = pids;
   if (pids.length !== 1 || processId === undefined) {
     throw new Error(
-      `control-wrapper capture for ${containerId} expected exactly one process, found ${pids.length}`
+      `control-wrapper capture for ${containerId} (${wrapperBasename}) expected exactly one process, found ${pids.length}`
     );
   }
   return { containerId, processId };
+}
+
+/**
+ * Capture the legacy control-wrapper Bun process for one container in a single
+ * `docker exec`. The captured identity is the only safe handle for `STOP`/`CONT`:
+ * a frozen process cannot answer a discovery request. Exactly one match is
+ * required; zero or several matches is an ambiguous identity and throws.
+ */
+export async function captureControlWrapperProcess(
+  containerId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<KiloServerProcessHandle> {
+  return captureWrapperProcess(containerId, LEGACY_CONTROL_WRAPPER_BASENAME, executeDocker);
+}
+
+/**
+ * Capture the new-plane control-wrapper Bun process. A unique match is positive
+ * evidence the container runs the new plane; zero matches (a legacy container)
+ * throws rather than silently falling back.
+ */
+export async function captureControlPlaneWrapperProcess(
+  containerId: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<KiloServerProcessHandle> {
+  return captureWrapperProcess(containerId, CONTROL_PLANE_WRAPPER_BASENAME, executeDocker);
+}
+
+/**
+ * Read a specific in-container process's environment from
+ * `/proc/<pid>/environ`, returning the parsed `NAME=value` entries. This is the
+ * session's real environment: a per-session credential is injected into the
+ * wrapper/Kilo process environment, not the base container environment that
+ * `docker exec printenv` reports, so a base-env read can never fail the
+ * containment negative check.
+ */
+export async function containerProcessEnvironment(
+  containerId: string,
+  processId: number,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<Record<string, string>> {
+  const { stdout } = await executeDocker([
+    'exec',
+    containerId,
+    'bun',
+    '-e',
+    CONTAINER_PROCESS_ENV_SCRIPT,
+    String(processId),
+  ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim());
+  } catch {
+    throw new Error(`process environment read for pid ${processId} returned unreadable output`);
+  }
+  if (!isRecord(parsed) || !isRecord(parsed.environment)) {
+    throw new Error(`process environment read for pid ${processId} returned an invalid shape`);
+  }
+  const environment: Record<string, string> = {};
+  for (const [name, value] of Object.entries(parsed.environment)) {
+    if (typeof value === 'string') environment[name] = value;
+  }
+  return environment;
+}
+
+/**
+ * Read the `origin` remote URL of a checkout inside the container, or `null`
+ * when the directory has no `origin`. The URL is the raw configured value, so a
+ * caller can assert that containment did not embed a raw credential.
+ */
+export async function containerGitRemoteUrl(
+  containerId: string,
+  directory: string,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<string | null> {
+  const { stdout } = await executeDocker([
+    'exec',
+    containerId,
+    'git',
+    '-C',
+    directory,
+    'remote',
+    'get-url',
+    'origin',
+  ]);
+  const url = stdout.trim();
+  return url.length > 0 ? url : null;
+}
+
+/**
+ * Whether `pid` is a live (non-zombie, non-reaped) process in the container.
+ * `kill -0` succeeds on a zombie, so a killed wrapper whose Kilo was not
+ * re-parented away would look alive; `/proc/<pid>/stat` reports the state, and
+ * `Z`/`X` mean the process is no longer running.
+ */
+export async function containerProcessIsLive(
+  containerId: string,
+  processId: number,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<boolean> {
+  const { stdout } = await executeDocker([
+    'exec',
+    containerId,
+    'bun',
+    '-e',
+    CONTAINER_PROCESS_LIVE_SCRIPT,
+    String(processId),
+  ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stdout.trim());
+  } catch {
+    throw new Error(`process liveness read for pid ${processId} returned unreadable output`);
+  }
+  return isRecord(parsed) && parsed.live === true;
 }
 
 export async function inspectControlPlaneWorkspaceFile(
@@ -901,6 +1173,73 @@ export async function inspectControlPlaneWorkspaceFile(
     ...(typeof result.contents === 'string' ? { contents: result.contents } : {}),
     dirty: result.dirty,
     head: result.head,
+  };
+}
+
+export type ControlPlaneUserMessageParts = {
+  found: boolean;
+  textParts: number;
+  text: string;
+};
+
+/**
+ * Count the text parts of one user message in the live Kilo history. Spec §11
+ * scenario 19 requires the replayed user turn to appear once; the B8
+ * duplicate-parts behaviour appends a second text part, which this observes.
+ */
+export async function inspectControlPlaneUserMessageParts(
+  runtime: ControlPlaneKiloRuntime,
+  input: { kiloSessionId: string; userMessageId: string },
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<ControlPlaneUserMessageParts> {
+  const result = await runControlPlaneKiloOperation(
+    runtime.container.id,
+    {
+      action: 'message-parts',
+      kiloSessionId: input.kiloSessionId,
+      serverUrl: runtime.serverUrl,
+      directory: runtime.directory,
+      home: runtime.home,
+      processId: runtime.processId,
+      ownerKiloSessionId: runtime.kiloSessionId,
+      userMessageId: input.userMessageId,
+    },
+    executeDocker
+  );
+  return {
+    found: result.found === true,
+    textParts: typeof result.textParts === 'number' ? result.textParts : 0,
+    text: typeof result.text === 'string' ? result.text : '',
+  };
+}
+
+export type ControlPlaneSummaryInspection = { summaryCount: number };
+
+/**
+ * Count summary (compaction) messages in the live Kilo history. A `/compact`
+ * command that ran produces at least one; the command scenario uses this to
+ * assert summarization actually happened instead of only that the turn
+ * completed.
+ */
+export async function inspectControlPlaneSummaryCount(
+  runtime: ControlPlaneKiloRuntime,
+  executeDocker: DockerCommandExecutor = executeDockerCommand
+): Promise<ControlPlaneSummaryInspection> {
+  const result = await runControlPlaneKiloOperation(
+    runtime.container.id,
+    {
+      action: 'summary-count',
+      kiloSessionId: runtime.kiloSessionId,
+      serverUrl: runtime.serverUrl,
+      directory: runtime.directory,
+      home: runtime.home,
+      processId: runtime.processId,
+      ownerKiloSessionId: runtime.kiloSessionId,
+    },
+    executeDocker
+  );
+  return {
+    summaryCount: typeof result.summaryCount === 'number' ? result.summaryCount : 0,
   };
 }
 
@@ -1148,6 +1487,18 @@ export async function killSandboxFamily(
     killed.push(container.name);
   }
   return killed;
+}
+
+/**
+ * A primary that stopped on its own (idle stop, a fault) leaves its `-proxy`
+ * sidecar running. These are only reported: a proxy can belong to a test that is
+ * still running or to another worktree's stack.
+ */
+export function findOrphanProxies(containers: SandboxContainer[]): SandboxContainer[] {
+  const running = new Set(containers.map(container => container.name));
+  return containers.filter(
+    container => container.isProxy && !running.has(container.name.replace(/-proxy$/, ''))
+  );
 }
 
 /** Block until a sandbox container and its proxy sibling are gone. */

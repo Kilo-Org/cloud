@@ -1,7 +1,7 @@
 import type { SandboxId, SessionId, SessionContext, ExecutionSession } from '../types.js';
 import type { Sandbox } from '@cloudflare/sandbox';
 import type { CloudAgentSession } from './CloudAgentSession.js';
-import type { SandboxSession } from '../sandbox-session/SandboxSession.js';
+import type { SandboxSessionV2 as SandboxSession } from '../control-plane/session/session-do.js';
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
 import type { SessionIngestBinding } from '../session-ingest-binding.js';

@@ -64,6 +64,57 @@ describe('control diagnostic schema compatibility', () => {
       socketBufferedBytes: 1024,
     });
   });
+  it('preserves terminal control socket decision fields through the accepted batch schema', () => {
+    const record = createControlDiagnosticRecord(
+      'control.socket',
+      {
+        phase: 'reconnect_exhausted',
+        attempt: 7,
+        elapsedMs: 90_000,
+        deadlineAt: 1_700_000_090_000,
+        reason: 'reconnect_budget_exhausted',
+        wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+        connectionId: 'connection_1',
+      },
+      1
+    );
+    expect(record).toBeDefined();
+    expect(record?.fields).toMatchObject({
+      phase: 'reconnect_exhausted',
+      attempt: 7,
+      elapsedMs: 90_000,
+      deadlineAt: 1_700_000_090_000,
+      reason: 'reconnect_budget_exhausted',
+      wrapperInstanceId: '11111111-1111-4111-8111-111111111111',
+      connectionId: 'connection_1',
+    });
+    expect(
+      controlLogBatchSchema.safeParse({
+        version: 1,
+        sequence: 1,
+        droppedRecords: 0,
+        records: [record],
+      }).success
+    ).toBe(true);
+  });
+
+  it('drops free-text prompts and unknown secret fields from a diagnostic record', () => {
+    const prompt = 'Summarize the private customer contract';
+    const record = createControlDiagnosticRecord(
+      'control.socket',
+      {
+        phase: 'hello_rejected',
+        reason: 'permanent_hello_rejection',
+        prompt,
+        authorization: 'Bearer super-secret-token',
+      },
+      1
+    );
+    expect(record?.fields).not.toHaveProperty('prompt');
+    expect(record?.fields).not.toHaveProperty('authorization');
+    expect(JSON.stringify(record)).not.toContain(prompt);
+    expect(JSON.stringify(record)).not.toContain('super-secret-token');
+  });
 });
 
 describe('classifyRetirementCause', () => {

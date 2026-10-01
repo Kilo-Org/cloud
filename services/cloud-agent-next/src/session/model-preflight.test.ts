@@ -9,7 +9,10 @@ import {
   preflightPreparedInitialPromptModel,
 } from './model-preflight.js';
 
-vi.mock('../sandbox-session/session-stub.js', () => ({ resolveSessionStub: vi.fn() }));
+vi.mock('../sandbox-session/session-stub.js', () => ({
+  resolveSessionStub: vi.fn(),
+  getSandboxSessionStub: vi.fn(),
+}));
 vi.mock('../session-service.js', () => ({ fetchSessionMetadata: vi.fn() }));
 vi.mock('../model-validation.js', () => ({ assertKiloModelAvailable: vi.fn() }));
 

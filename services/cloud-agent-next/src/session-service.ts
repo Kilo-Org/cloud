@@ -61,7 +61,7 @@ import {
   requiresContainmentSandbox,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
-import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { resolveLegacySessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
 import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
 import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
@@ -1467,6 +1467,7 @@ export class SessionService {
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
+    envVars.KILO_DISABLE_CODEBASE_INDEXING = 'vscode-no-workspace';
     if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
@@ -1993,7 +1994,7 @@ export class SessionService {
       // The session-owned RPC checks the current persisted runtime fence. It is
       // deliberately called only after this delivery plan carries every fence field.
       const handle = await withDORetry(
-        () => resolveSessionStub(env, userId, sessionId),
+        () => resolveLegacySessionStub(env, userId, sessionId),
         stub => stub.issueRuntimeCredentialProxyGrant(plan.wrapper.fence),
         'issueRuntimeCredentialProxyGrant'
       );

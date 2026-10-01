@@ -5,21 +5,20 @@
  * returns only three fields: the logical sandbox id, the physical provider
  * reference and the persisted physical control-plane state.
  *
- * It deliberately never calls the freshness probes (`getExecutions`,
- * `isInterrupted`), never serializes raw session metadata, and distinguishes the
- * logical `sandboxId` from the physical `providerRef`.
+ * It deliberately never calls freshness probes, never serializes raw session
+ * metadata, and distinguishes the logical `sandboxId` from the physical
+ * `providerRef`. It reads the control-plane Sandbox DO's stored allocation
+ * state, not a liveness probe.
  */
 
 import type { Context } from 'hono';
 import { generateSandboxId } from '../sandbox-id.js';
 import { projectSessionAccessHttpError, requireCurrentSessionAccess } from '../session-access.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
-import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
+import { resolveSessionStub, type SessionStub } from '../sandbox-session/session-stub.js';
 import type { CloudAgentSessionState } from '../persistence/types.js';
 import type { HonoContext } from '../hono-context.js';
-import type { AllocationRecord } from '../sandbox-state/model/allocation.js';
-import { legacyPhysicalState } from '../sandbox-state/project/physical-label.js';
+import type { AllocationView } from '../control-plane/sandbox/allocation.js';
 import type { SandboxId, SessionId } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -36,29 +35,23 @@ export type AllocationInspection = {
   physicalState: string | null;
 };
 
+/** Projects the control-plane allocation state onto the legacy flat label. */
 export function projectAllocationInspection(
   logicalSandboxId: string,
-  record: AllocationRecord
+  state: AllocationView
 ): AllocationInspection {
-  const state = record.state;
+  const physicalProviderRef = state.providerRef ?? state.unconfirmedProviderRef ?? null;
   if (state.kind === 'stopped') {
-    if (state.summary === null) {
-      return { logicalSandboxId, physicalProviderRef: null, physicalState: null };
-    }
+    const ownsAllocation = state.allocationId !== null || physicalProviderRef !== null;
     return {
       logicalSandboxId,
-      physicalProviderRef: null,
-      physicalState: 'stopped',
+      physicalProviderRef: ownsAllocation ? physicalProviderRef : null,
+      physicalState: !ownsAllocation ? null : physicalProviderRef !== null ? 'unknown' : 'stopped',
     };
   }
-
-  const physicalProviderRef = state.target?.providerRef ?? null;
-  const ownsAllocation = state.createIntent !== null || physicalProviderRef !== null;
-  return {
-    logicalSandboxId,
-    physicalProviderRef,
-    physicalState: ownsAllocation ? legacyPhysicalState(record) : null,
-  };
+  const physicalState =
+    state.kind === 'starting' ? 'creating' : state.kind === 'stopping' ? 'stopping' : 'running';
+  return { logicalSandboxId, physicalProviderRef, physicalState };
 }
 
 export async function handleAllocationInspect(c: Context<HonoContext>): Promise<Response> {
@@ -81,10 +74,11 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
   }
 
   const getStub = () => resolveSessionStub(env, userId, sessionId);
-  const metadata = await withDORetry<
-    DurableObjectStub<CloudAgentSession>,
-    CloudAgentSessionState | null
-  >(getStub, stub => stub.getMetadata(), 'getMetadata');
+  const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
+    getStub,
+    stub => stub.getMetadata(),
+    'getMetadata'
+  );
   if (!metadata) {
     return new Response('Session not found', { status: 404 });
   }
@@ -100,6 +94,10 @@ export async function handleAllocationInspect(c: Context<HonoContext>): Promise<
       { createdOnPlatform: metadata.identity.createdOnPlatform }
     ));
 
-  const record = await getSandboxControlStub(env, logicalSandboxId).getAllocationRecord();
-  return Response.json(projectAllocationInspection(logicalSandboxId, record));
+  const state = await withDORetry(
+    () => getSandboxControlStub(env, logicalSandboxId),
+    stub => stub.getAllocationState(),
+    'getAllocationState'
+  );
+  return Response.json(projectAllocationInspection(logicalSandboxId, state));
 }

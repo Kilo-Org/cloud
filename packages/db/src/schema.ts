@@ -6689,6 +6689,7 @@ export type CloudAgentSessionRunFailureStage =
   | 'unknown';
 export type CloudAgentSessionRunFailureCode =
   | 'sandbox_connect_failed'
+  | 'admission_billing_unavailable'
   | 'workspace_setup_failed'
   | 'kilo_server_failed'
   | 'wrapper_start_failed'

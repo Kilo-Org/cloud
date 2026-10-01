@@ -8,6 +8,7 @@ import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/verce
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -121,14 +122,6 @@ vi.mock('./session-access.js', () => ({
 
 vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
-}));
-
-vi.mock('./persistence/SandboxControl.js', () => ({
-  SandboxControl: class SandboxControl {},
-}));
-
-vi.mock('./sandbox-session/SandboxSession.js', () => ({
-  SandboxSession: class SandboxSession {},
 }));
 
 vi.mock('./db/pg.js', () => ({
@@ -577,31 +570,6 @@ describe('server /terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
-  });
-
-  it('rejects a control-plane browser upgrade during runtime authorization recovery', async () => {
-    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-    const env = createEnv();
-    const consume = installTerminalNonceConsumer(env);
-    const sessionFetch = vi.fn();
-    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      fetch: sessionFetch,
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
-    });
-
-    const response = await fetchWorker(
-      new Request(
-        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(signTerminalTicket(sessionId))}`,
-        { headers: { Upgrade: 'websocket' } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(503);
-    await expect(response.text()).resolves.toBe('Runtime authorization recovery is in progress');
-    expect(consume).toHaveBeenCalledOnce();
-    expect(sessionFetch).not.toHaveBeenCalled();
   });
 
   it('rejects revoked control-plane access before consuming the browser ticket nonce', async () => {
@@ -2437,46 +2405,6 @@ describe('server /internal/streams/close', () => {
   });
 });
 
-describe('server /internal/sandbox-control/seed', () => {
-  it('rejects without the internal API key', async () => {
-    const env = createEnv();
-    const response = await fetchWorker(
-      new Request('http://worker.test/internal/sandbox-control/seed', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sandboxId: 'sbx_test' }),
-      }),
-      env
-    );
-    expect(response.status).toBe(401);
-    expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
-  });
-
-  it('stores the credential hash on the sandbox Durable Object', async () => {
-    const env = createEnv();
-    const setWrapperCredentialHash = vi.fn().mockResolvedValue(undefined);
-    env.SANDBOX_CONTROL.getByName.mockReturnValue({ setWrapperCredentialHash });
-    const response = await fetchWorker(
-      new Request('http://worker.test/internal/sandbox-control/seed', {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          'x-internal-api-key': 'test-internal-secret',
-        },
-        body: JSON.stringify({ sandboxId: 'sbx_test' }),
-      }),
-      env
-    );
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { sandboxId: string; credential: string };
-    expect(body.sandboxId).toBe('sbx_test');
-    expect(body.credential).toMatch(/^[0-9a-f]{64}$/);
-    expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
-    expect(setWrapperCredentialHash).toHaveBeenCalledOnce();
-    expect(setWrapperCredentialHash.mock.calls[0]?.[0]).toMatch(/^[0-9a-f]{64}$/);
-  });
-});
-
 describe('server /sandbox-terminal', () => {
   const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 
@@ -2614,27 +2542,6 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
   });
-
-  it('rejects a valid producer WebSocket before forwarding during runtime authorization recovery', async () => {
-    const env = createEnv();
-    const sessionFetch = vi.fn();
-    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({
-      fetch: sessionFetch,
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
-    });
-
-    const response = await fetchWorker(
-      new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, {
-        headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(503);
-    await expect(response.text()).resolves.toBe('Runtime authorization recovery in progress');
-    expect(sessionFetch).not.toHaveBeenCalled();
-  });
 });
 
 describe('server control log routes', () => {
@@ -2691,6 +2598,31 @@ describe('server control log routes', () => {
 });
 
 describe('server /sandbox-control', () => {
+  it.each([
+    undefined,
+    '',
+    'Basic secret',
+    'Bearer',
+    'Bearer one two',
+    `Bearer ${'x'.repeat(4097)}`,
+  ])(
+    'rejects missing or malformed authorization before resolving a stub (case %#)',
+    async authorization => {
+      const env = createEnv();
+      const headers = new Headers({ Upgrade: 'websocket' });
+      if (authorization !== undefined) headers.set('Authorization', authorization);
+      env.SANDBOX_CONTROL.getByName.mockReturnValue({
+        fetch: vi.fn().mockResolvedValue(new Response()),
+      });
+      const response = await fetchWorker(
+        new Request('http://worker.test/sandbox-control/sbx_test', { headers }),
+        env
+      );
+      expect(env.SANDBOX_CONTROL.getByName).not.toHaveBeenCalled();
+      expect(response.status).toBe(401);
+    }
+  );
+
   it('rejects non-websocket requests', async () => {
     const env = createEnv();
     const response = await fetchWorker(
@@ -2720,7 +2652,17 @@ describe('server /sandbox-control', () => {
     env.SANDBOX_CONTROL.getByName.mockReturnValue({ fetch });
 
     const request = new Request('http://worker.test/sandbox-control/sbx_test', {
-      headers: { Upgrade: 'websocket', Authorization: 'Bearer secret' },
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${mintSandboxLaunchCredential(
+          {
+            sandboxId: 'sbx_test',
+            allocationId: crypto.randomUUID(),
+            credential: 'a'.repeat(64),
+          },
+          secret
+        )}`,
+      },
     });
     const response = await fetchWorker(request, env);
 

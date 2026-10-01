@@ -40,15 +40,15 @@ import {
   KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
-import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
-import { getSandboxSessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
-import { sessionPlaneFromId } from './session-plane.js';
-import { withDORetry } from './utils/do-retry.js';
 import {
-  generateSandboxCredential,
-  hashSandboxCredential,
-  parseBearerCredential,
-} from './sandbox-control/credential.js';
+  getSandboxSessionStub,
+  resolveLegacySessionStub,
+  resolveSessionStub,
+} from './sandbox-session/session-stub.js';
+import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
+import { withDORetry } from './utils/do-retry.js';
+import { parseBearerCredential } from './sandbox-control/credential.js';
+import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
@@ -198,29 +198,29 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
-  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
-    const stub = getSandboxSessionStub(env, userId, cloudAgentSessionId);
-    if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-      return new Response('Runtime authorization recovery is in progress', { status: 503 });
+  return sessionFor(
+    cloudAgentSessionId,
+    () =>
+      getSandboxSessionStub(env, userId, cloudAgentSessionId).fetch(
+        createTerminalForwardRequest(request, '/terminal/browser', ptyId)
+      ),
+    async () => {
+      const stub = resolveLegacySessionStub(env, userId, cloudAgentSessionId);
+      if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+        return new Response('Runtime authorization recovery is in progress', { status: 503 });
+      }
+      const metadata = await stub.getMetadata();
+      const terminal = await resolveTerminalWrapperClient({
+        env,
+        metadata,
+        sessionId: cloudAgentSessionId,
+      });
+      if (!terminal.success || !terminal.data) {
+        return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
+      }
+      return terminal.data.client.connectTerminal(ptyId, request);
     }
-    return stub.fetch(createTerminalForwardRequest(request, '/terminal/browser', ptyId));
-  }
-
-  const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
-  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-    return new Response('Runtime authorization recovery is in progress', { status: 503 });
-  }
-  const metadata = await stub.getMetadata();
-  const terminal = await resolveTerminalWrapperClient({
-    env,
-    metadata,
-    sessionId: cloudAgentSessionId,
-  });
-  if (!terminal.success || !terminal.data) {
-    return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
-  }
-
-  return terminal.data.client.connectTerminal(ptyId, request);
+  );
 }
 
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
@@ -285,35 +285,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 
 registerControlLogRoutes(app);
 
-app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
-  if (unauthorized) return unauthorized;
-
-  const body = (await c.req.json().catch(() => null)) as { sandboxId?: unknown } | null;
-  const sandboxId = body?.sandboxId;
-  if (typeof sandboxId !== 'string' || !isSandboxControlId(sandboxId)) {
-    return c.text('Invalid sandboxId', 400);
-  }
-
-  const credential = generateSandboxCredential();
-  const stub = getSandboxControlStub(c.env, sandboxId);
-  await stub.setWrapperCredentialHash(await hashSandboxCredential(credential));
-  return c.json({ sandboxId, credential });
-});
-
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId || !isSandboxControlId(sandboxId)) {
-    return c.text('Invalid sandboxId', 400);
-  }
-
-  const stub = getSandboxControlStub(c.env, sandboxId);
-  return stub.fetch(c.req.raw);
+  return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
@@ -327,11 +300,10 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   if (!ownerId) {
     return c.text('Invalid ownerId', 400);
   }
-  if (
-    !sessionId ||
-    !sessionIdSchema.safeParse(sessionId).success ||
-    sessionPlaneFromId(sessionId) !== 'control'
-  ) {
+  if (!sessionId || !sessionIdSchema.safeParse(sessionId).success) {
+    return c.text('Invalid sessionId', 400);
+  }
+  if (!isControlSession(sessionId)) {
     return c.text('Invalid sessionId', 400);
   }
   if (!ptyId || !PtyIdSchema.safeParse(ptyId).success) {
@@ -344,9 +316,6 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   }
 
   const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
-  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-    return c.text('Runtime authorization recovery in progress', 503);
-  }
   return stub.fetch(
     createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
   );
@@ -610,8 +579,14 @@ async function rejectLegacyWrapperTokenForRuntimeGrant(
   sessionId: string
 ): Promise<Response | null> {
   if (claims.type !== 'legacy_kilo_token') return null;
+  // The legacy wrapper grant check only applies to the legacy plane. A control
+  // session returns not-found before any authorization read, because its
+  // wrapper never presents a legacy Kilo token.
+  if (!isLegacySession(sessionId)) {
+    return new Response('Session not found', { status: 404 });
+  }
   const status = await withDORetry(
-    () => resolveSessionStub(env, userId, sessionId),
+    () => resolveLegacySessionStub(env, userId, sessionId),
     stub => stub.getRuntimeAuthorizationStatus(),
     'getRuntimeAuthorizationStatus'
   );
@@ -755,8 +730,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
-  const stub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
-  return stub.fetch(c.req.raw);
+  return resolveSessionStub(c.env, userId, cloudAgentSessionId).fetch(c.req.raw);
 });
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
@@ -774,7 +748,7 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
   if (!rawUserId || !cloudAgentSessionId) {
     return c.text('Missing route params', 400);
   }
-  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+  if (!isLegacySession(cloudAgentSessionId)) {
     return c.text('Not found', 404);
   }
 
@@ -840,8 +814,14 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return projectSessionAccessHttpError(error);
   }
 
-  const sessionStub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
-  const validation = await sessionStub.validateKiloGlobalFeedProducer({
+  // The Kilo global feed is a legacy-plane producer route; the control wrapper
+  // publishes through the control-plane ingest instead. The guard above already
+  // failed a control session closed, so this always validates a legacy session.
+  const validation = await resolveLegacySessionStub(
+    c.env,
+    userId,
+    cloudAgentSessionId
+  ).validateKiloGlobalFeedProducer({
     kiloSessionId,
     wrapperRunId,
     wrapperGeneration,
@@ -919,7 +899,7 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return projectSessionAccessHttpError(error);
   }
 
-  if (sessionPlaneFromId(sessionId) === 'control') {
+  if (!isLegacySession(sessionId)) {
     return c.text('Not found', 404);
   }
 
@@ -943,7 +923,7 @@ app.put(
     if (!rawUserId || !filename || !sessionId || !executionId) {
       return c.text('Missing route params', 400);
     }
-    if (sessionPlaneFromId(sessionId) === 'control') {
+    if (!isLegacySession(sessionId)) {
       return c.text('Not found', 404);
     }
 
@@ -1058,9 +1038,9 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
     );
 
   for (const row of rows) {
-    if (!row.cloudAgentSessionId) continue;
-    const stub = resolveSessionStub(c.env, userId, row.cloudAgentSessionId);
-    await stub.closeOrgStreams(organizationId);
+    const sessionId = row.cloudAgentSessionId;
+    if (!sessionId) continue;
+    await resolveSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
   }
 
   return c.body(null, 204);

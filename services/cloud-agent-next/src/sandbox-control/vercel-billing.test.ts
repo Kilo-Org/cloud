@@ -13,7 +13,9 @@ import {
   type RecordStartResult,
 } from '@kilocode/container-usage';
 import { MeteredBillingLifecycle, type BillingIdentity } from '../metered-billing-lifecycle.js';
+import type { VercelSandboxSession } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import type { BillingScheduleTable } from './billing-schedule.js';
+import { createVercelProviderAdapter, type VercelControlRestClient } from './vercel-provider.js';
 import {
   loadVercelBillingBinding,
   saveVercelBillingBinding,
@@ -23,6 +25,61 @@ import {
 
 const T0 = 1_000_000;
 const SERVICE = 'cloud-agent-next-sandbox-vercel-small';
+
+describe('Vercel provider lifetime sink', () => {
+  it('records the real adapter create and terminal stop timestamps', async () => {
+    const session = {
+      id: 'vercel-session',
+      status: 'running',
+      createdAt: 1_000,
+    } as VercelSandboxSession;
+    const lifetime = vi.fn(
+      async (_evidence: { providerRef: string; createdAtMs?: number; terminalAtMs?: number }) =>
+        undefined
+    );
+    const provider = createVercelProviderAdapter({
+      sandboxName: 'ses-abc',
+      config: {
+        accessToken: 'test-token',
+        teamId: 'team',
+        projectId: 'project',
+        snapshotId: 'snapshot',
+        runtimeBuildId: 'build',
+        runtime: 'node24',
+        initialTimeoutMs: 60_000,
+        extendDurationMs: 60_000,
+      },
+      restClient: {
+        createSandbox: async () => ({
+          runtime: { sandboxName: 'ses-abc', sessionId: session.id },
+          session,
+        }),
+        getSession: async () => ({ session: { ...session, status: 'stopped', stoppedAt: 3_000 } }),
+        stopSession: async () => ({ ...session, status: 'stopped', stoppedAt: 4_000 }),
+      } as unknown as VercelControlRestClient,
+      billingLifetimeSink: lifetime,
+    });
+    const created = await provider.create({
+      intentId: 'attempt',
+      createdAt: 0,
+      allocationName: 'ses-abc',
+    });
+    if ('unresolved' in created) throw new Error('Expected a Vercel provider reference');
+    expect(lifetime).toHaveBeenCalledWith({ providerRef: created.providerRef, createdAtMs: 1_000 });
+    expect((await provider.observe(created.providerRef)).status).toBe('terminal');
+    expect(lifetime).toHaveBeenLastCalledWith({
+      providerRef: created.providerRef,
+      createdAtMs: 1_000,
+      terminalAtMs: 3_000,
+    });
+    expect(await provider.stop(created.providerRef)).toBe('terminal');
+    expect(lifetime).toHaveBeenLastCalledWith({
+      providerRef: created.providerRef,
+      createdAtMs: 1_000,
+      terminalAtMs: 4_000,
+    });
+  });
+});
 const IDENTITY: BillingIdentity = { sandboxClassName: 'SandboxVercelSmall' };
 const BILLING_INPUT = {
   sandboxId: 'ses-abcdef',

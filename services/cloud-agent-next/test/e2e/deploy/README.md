@@ -327,7 +327,7 @@ touched again.
 pnpm --filter cloud-agent-next run e2e:deployed
 ```
 
-`e2e:deployed` is the serial reference runner. `smoke-deployed.ts` runs every
+`e2e:deployed` is the serial run of `matrix.ts --profile deployed`. It runs every
 entry of `SHARED_SCENARIOS` through the shared gate against the deployed Worker.
 A scenario
 whose declared capability the deployed environment does not provide is reported
@@ -338,15 +338,13 @@ deployed gaps: they need local fault injection the deployed profile does not
 provide. `auth-reject` is not a gap—the deployed profile supplies the
 `deployedHttpAuthBoundary` capability, so it runs there and is instead the local
 profile's expected unsupported. The summary separates passed / failed / unsupported, and the exit policy is
-`1` if any scenario failed, else `2` if any unsupported is outside the derived
-expected set, else `0`; an expected capability gap is a reported skip, not a
-failure.
+`1` if any scenario failed, else `0`; a capability gap is filtered out before
+spawn and reported as a skip, not a failure.
 
 The `workflow_dispatch`-only `Cloud Agent E2E tests` workflow
 (`.github/workflows/cloud-agent-e2e-tests.yml`) runs the parallel runner
-(`e2e:parallel`) as ONE job with `E2E_PARALLEL=4`; it does not run
-`smoke-deployed.ts`. See
-[`../README.md`](../README.md#deployed-matrix-runner) for the scenario matrix
+(`e2e:parallel`) as ONE job with `E2E_PARALLEL=4`. See
+[`../README.md`](../README.md#the-matrix-runner) for the scenario matrix
 and the env contract.
 
 Under the deployed profile the shared gate owns session teardown, so a scenario

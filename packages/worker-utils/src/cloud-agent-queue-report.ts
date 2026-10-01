@@ -24,6 +24,7 @@ export const CloudAgentRunFailureClassifications = [
   { failureStage: 'pre_dispatch', failureCode: 'session_metadata_missing' },
   { failureStage: 'pre_dispatch', failureCode: 'model_missing' },
   { failureStage: 'pre_dispatch', failureCode: 'payment_required' },
+  { failureStage: 'pre_dispatch', failureCode: 'admission_billing_unavailable' },
   { failureStage: 'pre_dispatch', failureCode: 'delivery_failure_unknown' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_disconnected' },
   { failureStage: 'post_dispatch_no_activity', failureCode: 'wrapper_no_output' },

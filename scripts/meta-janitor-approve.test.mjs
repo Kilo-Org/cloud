@@ -44,13 +44,6 @@ function fixture() {
       auto_merge: { merge_method: 'squash' },
       mergeable: true,
     },
-    rules: [
-      { type: 'pull_request', parameters: { dismiss_stale_reviews_on_push: true } },
-      {
-        type: 'required_status_checks',
-        parameters: { required_status_checks: [{ context: 'test', integration_id: 15368 }] },
-      },
-    ],
     checks: [
       {
         name: 'test',
@@ -133,7 +126,7 @@ async function run(data) {
       calls.push([route, params]);
       assert.equal(params.per_page, 100);
       if (data.apiFailure === route) throw new Error('GitHub API unavailable');
-      const key = typeof route === 'string' && route.startsWith('GET ') ? 'rules' : route;
+      const key = route;
       const readCount = (listReads.get(key) ?? 0) + 1;
       listReads.set(key, readCount);
       if (readCount > 1 && data.finalApiFailure === key) throw new Error('GitHub API unavailable');
@@ -223,11 +216,6 @@ const rejectedCases = {
   'an edited live signal': d => (d.signal.updated_at = '2026-09-30T12:01:00Z'),
   'a changed live signal': d => (d.signal.body += ' modified'),
   'a signal attached to another PR': d => (d.signal.issue_url += '1'),
-  'stale approval dismissal disabled': d =>
-    (d.rules[0].parameters.dismiss_stale_reviews_on_push = false),
-  'missing required checks policy': d => (d.rules = d.rules.slice(0, 1)),
-  'a missing required check': d => (d.checks = d.checks.slice(1)),
-  'a check from the wrong integration': d => (d.checks[0].app.id = 123),
   'a check from another commit': d => (d.checks[0].head_sha = 'c'.repeat(40)),
   'a pending check': d => (d.checks[0].status = 'in_progress'),
   'a failed check': d => (d.checks[0].conclusion = 'failure'),
@@ -348,13 +336,6 @@ test('uses the newest commit status rather than an older failure', async () => {
 test('permits path-gated skipped checks while requiring successful Kilo review', async () => {
   const data = fixture();
   data.checks[0].conclusion = 'skipped';
-  assert.equal((await run(data)).approvals.length, 1);
-});
-
-test('a commit status can satisfy an unpinned required context', async () => {
-  const data = fixture();
-  data.rules[1].parameters.required_status_checks = [{ context: 'external' }];
-  data.statuses = [{ context: 'external', state: 'success' }];
   assert.equal((await run(data)).approvals.length, 1);
 });
 

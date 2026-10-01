@@ -18,6 +18,7 @@ import {
   timedExec,
 } from './sandbox-timeout-logging.js';
 import { isSandboxInternalServerError } from './sandbox-recovery.js';
+import { classifySandboxId } from './sandbox-id.js';
 import { shellQuote } from './kilo/utils.js';
 import {
   isSandboxFilesystemUnusableError,
@@ -117,6 +118,8 @@ function extractStderr(err: unknown): string {
   }
   return '';
 }
+
+export const ISOLATED_CONTAINER_WORKSPACE_PATH = '/workspace/app';
 
 const SESSION_HOME_ROOT = `/home`;
 const KILOCODE_DIR = `.kilocode`;
@@ -218,6 +221,28 @@ export function getWorktreeWorkspacePath(
     throw invalidSegment('worktree id');
   }
   return `${getBaseWorkspacePath(kilocodeOrganizationId, userId)}/worktrees/${parsed.data}`;
+}
+
+function isIsolatedSingleSessionSandbox(sandboxId: string | undefined): boolean {
+  if (sandboxId === undefined || sandboxId.length === 0) return false;
+  const kind = classifySandboxId(sandboxId);
+  return kind === 'isolated-small' || kind === 'isolated-standard';
+}
+
+export function getControlPlaneSessionDirectory(input: {
+  workspacePath: string | null | undefined;
+  sandboxId: string | undefined;
+  orgId: string | undefined;
+  userId: string;
+  sessionId: string;
+}): string {
+  if (isIsolatedSingleSessionSandbox(input.sandboxId)) {
+    return ISOLATED_CONTAINER_WORKSPACE_PATH;
+  }
+  if (input.workspacePath !== undefined && input.workspacePath !== null) {
+    return input.workspacePath;
+  }
+  return getSessionWorkspacePath(input.orgId, input.userId, input.sessionId);
 }
 
 export function getSessionHomePath(sessionId: string): string {

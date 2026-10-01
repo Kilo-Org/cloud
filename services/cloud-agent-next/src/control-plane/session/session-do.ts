@@ -1486,11 +1486,12 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }): Promise<{
     location: CloudAgentWorktreeLocation | null;
     children: CloudAgentChildSessionLineage[];
+    directory: string | null;
   }> {
     await this.initialized;
     const worktreeId = cloudAgentWorktreeIdSchema.parse(input.worktreeId);
     const metadata = this.metadata;
-    if (metadata === null) return { location: null, children: [] };
+    if (metadata === null) return { location: null, children: [], directory: null };
     if (
       metadata.workspace?.worktreeId !== worktreeId ||
       metadata.auth.kiloSessionId !== input.kiloSessionId ||
@@ -1514,6 +1515,7 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     return {
       location: location === null ? null : cloudAgentWorktreeLocationSchema.parse(location),
       children,
+      directory: registration?.spec.directory ?? null,
     };
   }
 

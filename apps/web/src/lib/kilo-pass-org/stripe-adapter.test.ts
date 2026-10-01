@@ -1239,9 +1239,31 @@ describe('organization Kilo Pass Stripe adapter', () => {
       expect.objectContaining({
         tags: expect.objectContaining({ event: 'cancel', reason: 'unowned_schedule' }),
         extra: expect.objectContaining({
+          organizationId: 'org_1',
           subscriptionId: 'sub_1',
           scheduleId: 'sched_foreign',
         }),
+      })
+    );
+  });
+
+  test('rejects an owned schedule without a current phase', async () => {
+    retrieve.mockResolvedValue(subscription({ schedule: schedule({ current_phase: null }) }));
+    const { scheduleOrganizationKiloPassCancellation } = await import('./stripe-adapter');
+
+    await expect(
+      scheduleOrganizationKiloPassCancellation({
+        providerSubscriptionId: 'sub_1',
+        providerSeatAddOnItemId: 'si_pass',
+        organizationId: 'org_1',
+        agreementId: 'agreement_1',
+      })
+    ).rejects.toThrow('SCHEDULE_REWRITE_UNSAFE');
+    expect(scheduleUpdate).not.toHaveBeenCalled();
+    expect(captureMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        tags: expect.objectContaining({ event: 'cancel', reason: 'no_active_phase' }),
       })
     );
   });

@@ -116,11 +116,11 @@ export function activeAndFuturePhases(schedule: Stripe.SubscriptionSchedule): {
   activePhase: Phase | null;
   futurePhases: Phase[];
 } {
-  const currentStart = schedule.current_phase?.start_date;
-  const activePhase = schedule.phases.find(phase => phase.start_date === currentStart) ?? null;
-  const futurePhases = activePhase
-    ? schedule.phases.filter(phase => phase.start_date >= activePhase.end_date)
-    : [];
+  const current = schedule.current_phase;
+  if (!current) return { activePhase: null, futurePhases: [] };
+  const activePhase = schedule.phases.find(phase => phase.start_date === current.start_date);
+  if (!activePhase) return { activePhase: null, futurePhases: [] };
+  const futurePhases = schedule.phases.filter(phase => phase.start_date >= activePhase.end_date);
   return { activePhase, futurePhases };
 }
 

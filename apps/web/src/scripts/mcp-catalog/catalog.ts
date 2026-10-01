@@ -417,6 +417,8 @@ export function buildCatalogJson(rows: CatalogRow[]): string {
 
 const SCRIPTS_DIR = join(__dirname, '..'); // apps/web/src/scripts
 const SRC_DIR = join(SCRIPTS_DIR, '..'); // apps/web/src
+const WEB_SHARED_SPECIFIER_PREFIX = '@kilocode/web-shared/';
+const WEB_SHARED_SRC_DIR = join(REPO_ROOT, 'packages', 'web-shared', 'src');
 
 type RouterFileMap = Map<string, string>; // top-level segment → absolute router file path
 
@@ -425,6 +427,8 @@ function resolveImportSpecifier(specifier: string, fromDir: string): string | nu
   let candidate: string;
   if (withoutQuery.startsWith('@/')) {
     candidate = join(SRC_DIR, withoutQuery.slice(2));
+  } else if (withoutQuery.startsWith(WEB_SHARED_SPECIFIER_PREFIX)) {
+    candidate = join(WEB_SHARED_SRC_DIR, withoutQuery.slice(WEB_SHARED_SPECIFIER_PREFIX.length));
   } else if (withoutQuery.startsWith('./') || withoutQuery.startsWith('../')) {
     candidate = resolve(fromDir, withoutQuery);
   } else {

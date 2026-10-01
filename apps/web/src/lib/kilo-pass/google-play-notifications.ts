@@ -865,12 +865,17 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     // Only a pack Kilo granted and clawed back is a customer refund to report.
     // The order carries no test flag, so a license-tester refund is told apart
-    // by the purchase's `purchaseType` (0 = test), as the grant path does.
+    // by the purchase's `purchaseType` (0 = test), as the grant path does. The
+    // event is already processed, so a failed lookup must not drop a real
+    // refund: an unknown type reports as production.
     await runAfterResponse(async () => {
       if (!refundedUserId) return;
-      const productPurchase = await getGooglePlayProductPurchase(productId, purchaseToken);
+      const purchaseType = await getGooglePlayProductPurchase(productId, purchaseToken).then(
+        purchase => purchase.purchaseType,
+        () => undefined
+      );
       await reportGooglePlayCreditEventToBouncer({
-        environment: productPurchase.purchaseType === 0 ? 'Sandbox' : 'Production',
+        environment: purchaseType === 0 ? 'Sandbox' : 'Production',
         eventId,
         eventTimeMillis: developerNotification.eventTimeMillis ?? null,
         referenceId: orderId,

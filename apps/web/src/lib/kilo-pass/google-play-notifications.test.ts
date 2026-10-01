@@ -2579,6 +2579,46 @@ describe('Google Play bouncer store events', () => {
     expect(reportCreditEvent).not.toHaveBeenCalled();
   });
 
+  it('still reports a credit-pack refund when the purchase lookup fails', async () => {
+    const { user } = await insertGooglePlayUser();
+    const orderId = `GPA.${crypto.randomUUID()}`;
+    const purchaseToken = crypto.randomUUID();
+    await db.insert(credit_transactions).values({
+      kilo_user_id: user.id,
+      amount_microdollars: toMicrodollars(10),
+      is_free: false,
+      description: 'Credit purchase via Google Play',
+      stripe_payment_id: storeCreditPaymentId(KiloPassPaymentProvider.GooglePlay, orderId),
+    });
+    await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: toMicrodollars(10) })
+      .where(eq(kilocode_users.id, user.id));
+    mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+      orderId,
+      purchaseToken,
+      state: 'REFUNDED',
+      lineItems: [{ productId: 'credits_usd10' }],
+    });
+    mockGetGooglePlayProductPurchase.mockRejectedValueOnce(new Error('404 purchase not found'));
+
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: voidedCreditPackMessage(
+        'credit-pack-void-lookup-fail',
+        purchaseToken,
+        orderId
+      ),
+    });
+
+    expect(reportCreditEvent).toHaveBeenCalledTimes(1);
+    expect(reportCreditEvent.mock.calls[0][0]).toMatchObject({
+      type: 'store.refund',
+      userId: user.id,
+      referenceId: orderId,
+      environment: 'production',
+    });
+  });
+
   it('reports nothing for a refunded credit pack Kilo never granted', async () => {
     const orderId = `GPA.${crypto.randomUUID()}`;
     const purchaseToken = crypto.randomUUID();

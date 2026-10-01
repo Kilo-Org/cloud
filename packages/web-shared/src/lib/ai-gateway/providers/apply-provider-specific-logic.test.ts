@@ -1,0 +1,463 @@
+import { describe, expect, it, jest } from '@jest/globals';
+import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@/lib/ai-gateway/providers/anthropic.constants';
+import {
+  applyGatewayModelsFallback,
+  applyPreferredProvider,
+  applyProviderSpecificLogic,
+  applyReasoningDetailsTransform,
+  removeUnsupportedRequestServiceTier,
+} from '@/lib/ai-gateway/providers/apply-provider-specific-logic';
+import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/google';
+import {
+  ReasoningDetailsTransform,
+  type Provider,
+  type ProviderId,
+} from '@/lib/ai-gateway/providers/types';
+import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+
+const nonFlexExclusiveModel: KiloExclusiveModel = {
+  public_id: 'test/non-flex-exclusive',
+  internal_id: 'test/non-flex',
+  display_name: 'Non-Flex test model',
+  description: 'Test model',
+  status: 'public',
+  context_length: 8_192,
+  max_completion_tokens: 4_096,
+  provider: OPENROUTER,
+  flags: [],
+  pricing: null,
+  inference_provider_restriction: [],
+};
+
+const flexExclusiveModel: KiloExclusiveModel = {
+  ...nonFlexExclusiveModel,
+  public_id: 'test/flex-exclusive',
+  internal_id: 'test/flex',
+  display_name: 'Flex test model',
+  flags: ['flex'],
+};
+
+function makeRequest(
+  model: string,
+  models?: string[]
+): Extract<GatewayRequest, { kind: 'chat_completions' }> {
+  return {
+    kind: 'chat_completions',
+    body: {
+      model,
+      models,
+      messages: [{ role: 'user', content: 'hello' }],
+    },
+  };
+}
+
+function makeProvider(responseTransforms: Provider['responseTransforms']): Provider {
+  return {
+    id: 'openrouter',
+    apiUrl: 'https://example.com/v1',
+    apiUrlOverrides: {},
+    disableUrlSuffix: false,
+    apiKey: 'test-key',
+    apiKeyHeader: null,
+    supportedChatApis: ['chat_completions'],
+    responseTransforms,
+    async transformRequest() {},
+  };
+}
+
+function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'messages' }> {
+  return {
+    kind: 'messages',
+    body: {
+      model,
+      max_tokens: 2_048,
+      messages: [{ role: 'user', content: 'hello' }],
+    },
+  };
+}
+
+describe('removeUnsupportedRequestServiceTier', () => {
+  it.each([
+    {
+      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      kiloExclusiveModel: null,
+      reason: 'non-fallback custom pricing',
+    },
+    {
+      model: nonFlexExclusiveModel.public_id,
+      kiloExclusiveModel: nonFlexExclusiveModel,
+      reason: 'non-Flex Kilo-exclusive model',
+    },
+  ])(
+    'removes and logs the request-level tier for $reason',
+    ({ model, kiloExclusiveModel, reason }) => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        {
+          model,
+          requestKind: 'chat_completions',
+          serviceTier: 'priority',
+          reason,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([
+    ['moonshotai/kimi-k3', null],
+    [flexExclusiveModel.public_id, flexExclusiveModel],
+    ['vendor/standard-model', null],
+  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+
+    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+
+    expect(request.body.service_tier).toBe('priority');
+  });
+});
+
+describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
+  async function applyToToolResult(model: string, content: string) {
+    const request = makeRequest(model);
+    request.body.messages = [
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [
+          {
+            id: 'call-1',
+            type: 'function',
+            function: { name: 'lookup', arguments: '{}' },
+          },
+        ],
+      },
+      { role: 'tool', tool_call_id: 'call-1', content },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null
+    );
+
+    return request.body.messages.find(message => message.role === 'tool')?.content;
+  }
+
+  it('sanitizes JSON ref fields for Gemini models', async () => {
+    const content = await applyToToolResult(
+      'google/gemini-3.1-pro-preview:free',
+      '{"$ref":"#/$defs/result"}'
+    );
+
+    expect(content).toBe('{"_ref":"#/$defs/result"}');
+  });
+
+  it('preserves JSON ref fields for non-Gemini models', async () => {
+    const content = await applyToToolResult('vendor/model:free', '{"$ref":"#/$defs/result"}');
+
+    expect(content).toBe('{"$ref":"#/$defs/result"}');
+  });
+});
+
+describe('applyReasoningDetailsTransform', () => {
+  function makeReasoningRequest(): Extract<GatewayRequest, { kind: 'chat_completions' }> {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          { role: 'user', content: 'hello' },
+          {
+            role: 'assistant',
+            content: 'hi',
+            reasoning_details: [
+              { type: 'reasoning.text' as const, text: 'thinking ', signature: null },
+              { type: 'reasoning.encrypted' as const, data: 'opaque-blob' },
+              { type: 'reasoning.text' as const, text: 'hard' },
+            ],
+          } as never,
+        ],
+      },
+    };
+  }
+
+  it('folds reasoning_details into reasoning_content when the transform is enabled', () => {
+    const request = makeReasoningRequest();
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect('reasoning_details' in assistant).toBe(false);
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('leaves reasoning_details untouched without a transform', () => {
+    const request = makeReasoningRequest();
+
+    applyReasoningDetailsTransform(makeProvider(null), request);
+
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect(assistant.reasoning_details).toBeDefined();
+    expect(assistant.reasoning_content).toBeUndefined();
+  });
+
+  it('maps Gemini encrypted details to matching tool-call signatures', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        reasoning_effort: 'high',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'opaque-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body).toMatchObject({
+      google: { thinking_config: { thinking_level: 'high', include_thoughts: true } },
+      messages: [
+        {
+          tool_calls: [
+            {
+              id: 'call-1',
+              extra_content: { google: { thought_signature: 'opaque-signature' } },
+            },
+          ],
+        },
+      ],
+    });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+    expect(request.body.messages[0]).not.toHaveProperty('reasoning_details');
+  });
+
+  it('keeps id-less Gemini signatures on the message when tool calls are present', () => {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model: 'vendor/model',
+        messages: [
+          {
+            role: 'assistant',
+            content: null,
+            tool_calls: [
+              {
+                id: 'call-1',
+                type: 'function',
+                function: { name: 'lookup', arguments: '{}' },
+              },
+            ],
+            reasoning_details: [
+              {
+                type: 'reasoning.encrypted',
+                data: 'message-signature',
+                format: 'google-gemini-v1',
+              },
+              {
+                type: 'reasoning.encrypted',
+                data: 'tool-signature',
+                id: 'call-1',
+                format: 'google-gemini-v1',
+              },
+            ],
+          } as never,
+        ],
+      },
+    };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(request.body.messages[0]).toMatchObject({
+      extra_content: { google: { thought_signature: 'message-signature' } },
+      tool_calls: [
+        {
+          id: 'call-1',
+          extra_content: { google: { thought_signature: 'tool-signature' } },
+        },
+      ],
+    });
+  });
+
+  it('does not touch Messages requests', () => {
+    const request = makeMessagesRequest('vendor/model');
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(request.body.messages).toEqual([{ role: 'user', content: 'hello' }]);
+  });
+});
+
+describe('applyGatewayModelsFallback', () => {
+  it.each([
+    ['openrouter', 'anthropic/claude-fable-5'],
+    ['vercel', 'anthropic/claude-fable-5'],
+    ['openrouter', 'anthropic/claude-opus-5'],
+    ['vercel', 'anthropic/claude-opus-5'],
+  ] satisfies [ProviderId, string][])(
+    'sets Opus 4.8 as the fallback for %s requests to %s',
+    async (providerId, requestedModel) => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
+
+      await applyGatewayModelsFallback(providerId, requestedModel, request);
+
+      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
+    }
+  );
+
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
+    'removes caller-provided fallbacks for %s on other providers',
+    async requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
+
+      await applyGatewayModelsFallback('martian', requestedModel, request);
+
+      expect(request.body.models).toBeUndefined();
+    }
+  );
+
+  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
+    'removes caller-provided fallbacks for other model %s',
+    async requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
+
+      await applyGatewayModelsFallback('openrouter', requestedModel, request);
+
+      expect(request.body.models).toBeUndefined();
+    }
+  );
+});
+
+describe('applyPreferredProvider', () => {
+  it.each(['openai/gpt-5.6-terra', 'openai/o3', 'gpt-5.5'])(
+    'prefers OpenAI for OpenAI model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['openai'] });
+    }
+  );
+
+  it('does not set a provider order for GPT-OSS', () => {
+    const model = 'openai/gpt-oss-120b';
+    const request = makeRequest(model);
+
+    applyPreferredProvider(model, request.body);
+
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('applies the Claude provider order to Fable', () => {
+    const request = makeRequest('anthropic/claude-fable-5');
+
+    applyPreferredProvider('anthropic/claude-fable-5', request.body);
+
+    expect(request.body.provider).toEqual({
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+    });
+  });
+
+  it('preserves valid provider options when adding order', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    request.body.provider = { zdr: true };
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({
+      zdr: true,
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+    });
+  });
+
+  it('prefers Novita for DeepSeek models', () => {
+    const request = makeRequest('deepseek/deepseek-v4-pro');
+
+    applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['novita'] });
+  });
+
+  it.each(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast', 'kimi-k3', 'moonshotai/kimi-k2.5'])(
+    'prefers Bedrock then Alibaba for Kimi model %s',
+    model => {
+      const request = makeRequest(model);
+
+      applyPreferredProvider(model, request.body);
+
+      expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
+    }
+  );
+
+  it('preserves explicit Kimi provider order and allowed providers', () => {
+    const request = makeRequest('moonshotai/kimi-k3');
+    request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
+
+    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+
+    expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
+  });
+
+  it('prefers Friendli then Novita for GLM models', () => {
+    const request = makeRequest('z-ai/glm-5.2');
+
+    applyPreferredProvider('z-ai/glm-5.2', request.body);
+
+    expect(request.body.provider).toEqual({ order: ['friendli', 'novita'] });
+  });
+
+  it('overwrites a malformed provider value', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    Object.assign(request.body, { provider: 'lmstudio' });
+
+    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+
+    expect(request.body.provider).toEqual({
+      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+    });
+  });
+});

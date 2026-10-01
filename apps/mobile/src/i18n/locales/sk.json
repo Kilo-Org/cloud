@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Späť",
     "idle": "V nečinnosti",
+    "scheduled": "Naplánované",
     "keepEditing": "Pokračovať v úpravách",
     "keepRunning": "Nechať bežať",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Pridať prístupový kľúč",
     "passkeyDefaultName": "Prístupový kľúč",
     "passkeyAddedOn": "Pridaný {{date}}",
+    "passkeyLastUsedOn": "Naposledy použité {{date}}",
     "passkeyAdded": "Prístupový kľúč pridaný.",
     "passkeyAddFailed": "Prístupový kľúč sa nepodarilo pridať. Skúste to znova.",
     "passkeyAddUnsupported": "Toto zariadenie nedokáže vytvárať prístupové kľúče.",
@@ -588,7 +590,14 @@
       "moreLinesAbove_one": "… ďalšie riadky vyššie: {{displayCount}}",
       "moreLinesAbove_other": "… ďalšie riadky vyššie: {{displayCount}}",
       "moreLinesAbove_few": "… ďalšie riadky vyššie: {{displayCount}}",
-      "moreLinesAbove_many": "… ďalšie riadky vyššie: {{displayCount}}"
+      "moreLinesAbove_many": "… ďalšie riadky vyššie: {{displayCount}}",
+      "deleteComment": "Odstrániť komentár",
+      "deleteCommentTitle": "Odstrániť komentár?",
+      "deleteCommentMessage": "Tento komentár sa vymaže zo žiadosti o zlúčenie.",
+      "commentEditFailed": "Tvoj komentár sa nepodarilo uložiť. Skontroluj pripojenie a skús to znova.",
+      "commentEditUnavailable": "Tento komentár sa nedá upraviť. Možno bol odstránený.",
+      "commentDeleteFailed": "Tvoj komentár sa nepodarilo odstrániť. Skontroluj pripojenie a skús to znova.",
+      "commentDeleteUnavailable": "Tento komentár sa nedá odstrániť."
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
@@ -779,6 +788,8 @@
     "linkPasteNotAPullRequest": "Nie je to odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentár bol odoslaný",
+      "commentUpdated": "Komentár aktualizovaný",
+      "commentDeleted": "Komentár odstránený",
       "reviewSubmitted": "Kontrola kódu bola odoslaná",
       "autoMergeEnabled": "Automatické zlúčenie je zapnuté"
     },
@@ -2067,12 +2078,14 @@
       "couldNotLoadActive": "Aktívne relácie sa nepodarilo načítať.",
       "couldNotRefresh": "Obnovenie sa nepodarilo",
       "noSessionsYetDescription": "Začni programovaciu úlohu z telefónu. Tvoje relácie sa zobrazia tu.",
+      "viewHistory": "História relácií",
       "noMatches": "Žiadne zodpovedajúce relácie",
       "tryDifferentSearch": "Skús iný vyhľadávací výraz.",
       "tryAdjustFilters": "Skús upraviť alebo zrušiť filtre.",
       "couldNotSearch": "Relácie sa nepodarilo vyhľadať.",
       "completedWillAppear": "Tu sa zobrazia dokončené relácie.",
       "noPastSessions": "Žiadne predchádzajúce relácie",
+      "pastSessions": "Predchádzajúce relácie",
       "live": "NAŽIVO",
       "updating": "Aktualizuje sa"
     },
@@ -2141,6 +2154,7 @@
       "renamePlaceholder": "Názov relácie",
       "transcriptAccessibility": "Prepis relácie",
       "readOnly": "Táto relácia je iba na čítanie.",
+      "continueInNewSession": "Pokračovať v novej relácii",
       "emptyDescription": "Začni odoslaním správy v poli nižšie.",
       "scrollToBottom": "Posunúť na koniec",
       "emptyTitle": "Zatiaľ žiadne správy",
@@ -2231,6 +2245,8 @@
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",
+      "selectRepositoryToStart": "Vyberte repozitár, aby ste mohli začať.",
+      "connectProviderToStart": "Pripojte poskytovateľa, aby ste mohli začať.",
       "promptPlaceholder": "Na čom chceš pracovať?",
       "couldNotLoadModels": "Modely sa nepodarilo načítať.",
       "prefillRepoAndModelUnavailable": "Repozitár a model pôvodnej relácie už nie sú dostupné. Nižšie vyber nové.",
@@ -2842,7 +2858,8 @@
     "optionsExpiredDescription": "Vráť sa na predchádzajúcu obrazovku a znova otvor tento výber."
   },
   "sessionRow": {
-    "needsInput": "ČAKÁ NA ODPOVEĎ"
+    "needsInput": "ČAKÁ NA ODPOVEĎ",
+    "scheduled": "NAPLÁNOVANÉ"
   },
   "voiceInput": {
     "listening": "Počúva sa…",
@@ -3252,6 +3269,7 @@
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
     "revoke": "Zrušiť dôveru serveru {{host}}",
+    "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {
@@ -3281,7 +3299,8 @@
     "activityKitDisabledBody": "Zapni v nastaveniach živé aktivity, aby sa aktívne agenty zobrazovali na zamknutej obrazovke.",
     "openSession": "Otvoriť",
     "approveFailed": "Schválenie sa nepodarilo. Klepnutím na $t(common.approve) to skús znova.",
-    "newestResult": "Najnovší výsledok"
+    "newestResult": "Najnovší výsledok",
+    "scheduledWakes": "prebudí sa {{time}}"
   },
   "transcriptionModel": {
     "title": "Model prepisu",

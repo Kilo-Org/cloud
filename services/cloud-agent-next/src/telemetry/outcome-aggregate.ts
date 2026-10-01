@@ -1,6 +1,7 @@
 import { and, eq, gt, gte, lt, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import type { WorkerDb } from '@kilocode/db/client';
 import {
+  cli_sessions_v2,
   cloud_agent_session_runs,
   cloud_agent_sessions,
   type CloudAgentSessionRunStatus,
@@ -9,96 +10,89 @@ import { getPgDb } from '../db/pg.js';
 import type { Env } from '../types.js';
 import { logger } from '../logger.js';
 import { CONTROL_PLANE_SESSION_PREFIX } from '../session-plane.js';
-import { CLOUD_AGENT_REPORT_RETENTION_DAYS, retentionCutoff } from './report-store.js';
+import { retentionCutoff } from './report-store.js';
 
-export const OUTCOME_WINDOW_MINUTES = [5, 15, 60] as const;
 // Provisional: not yet measured against production reporting lag.
 export const REPORTING_DELAY_ALLOWANCE_MS = 2 * 60 * 1000;
-export const COVERAGE_LABEL = `retained_reporting_population_${CLOUD_AGENT_REPORT_RETENTION_DAYS}d`;
-export const AGGREGATE_CONTRACT_VERSION = 1;
-export const AGGREGATE_METRIC = 'cloud_agent_outcome_aggregate';
-export const EXPECTED_GENERATIONS = ['legacy', 'control'] as const;
-export const OUTCOME_AGGREGATE_LIMITATIONS = [
-  'reported_categories_only',
-  'pre_dispatch_not_proof_of_model_reach',
-  'post_dispatch_no_activity_does_not_establish_prior_activity',
-  'unknown_includes_wrapper_reasons',
-  'provider_includes_user_model_selection_errors',
-  'no_provider_or_region',
-] as const;
+export const OUTCOME_BUCKET_MINUTES = 5;
+const OUTCOME_BUCKET_MS = OUTCOME_BUCKET_MINUTES * 60 * 1000;
 
-const AGGREGATE_SERVICE = 'cloud-agent-next';
+export const EXPECTED_GENERATIONS = ['legacy', 'control'] as const;
+export const EXPECTED_ROLES = ['initial', 'follow_up'] as const;
+export const PRODUCT_ORIGINS = ['code-review', 'other', 'unknown'] as const;
+
+export const AGENT_EXECUTION_METRIC = 'agent_execution';
+export const AGENT_FAILURE_METRIC = 'agent_failure';
+export const AGENT_SETUP_FAILURE_METRIC = 'agent_setup_failure';
+export const AGENT_OPEN_METRIC = 'agent_open';
+export const COLLECTION_METRIC = 'collection';
 
 export type OutcomeGeneration = (typeof EXPECTED_GENERATIONS)[number];
-export type OutcomeRole = 'initial' | 'follow_up';
+export type OutcomeRole = (typeof EXPECTED_ROLES)[number];
+export type ProductOrigin = (typeof PRODUCT_ORIGINS)[number];
+export type FailureResponsibility = 'platform' | 'provider' | 'user' | 'unknown';
 
-export type FailureStageCount = { stage: string; count: number };
-export type FailureStageCodeCount = {
-  stage: string;
-  code: string;
-  responsibility: string;
-  reason: string;
-  count: number;
-};
-export type SessionSetupFailureCount = { stage: string; code: string; count: number };
+export type OutcomeWindow = { start: string; end: string };
 
-export type RoleOutcome = {
-  completed: number;
-  platformFailed: number;
-  providerFailed: number;
-  userFailed: number;
-  unknownFailed: number;
-  interrupted: number;
-  settled: number;
-  allFailed: number;
-  platformFailureShare: number | null;
-  unknownClassificationShare: number | null;
-  unknownSettledShare: number | null;
-  failureStages: FailureStageCount[];
-  failureStageCodes: FailureStageCodeCount[];
-};
-
-export type GenerationOutcome = {
-  generation: OutcomeGeneration;
-  runRowsObserved: boolean;
-  initial: RoleOutcome;
-  followUp: RoleOutcome;
-  totals: RoleOutcome;
-  distinctPlatformAffectedSessions: number;
-  distinctProviderAffectedSessions: number;
-  distinctUnknownAffectedSessions: number;
-  sessionSetupFailures: SessionSetupFailureCount[];
-  sessionSetupFailureCount: number;
-};
-
-export type OutcomeWindow = { windowMinutes: number; start: string; end: string };
-
-type RunCountRow = {
+export type RunCountRow = {
   generation: OutcomeGeneration;
   role: OutcomeRole;
+  origin: ProductOrigin;
   status: CloudAgentSessionRunStatus;
-  responsibility: string;
+  responsibility: FailureResponsibility;
   failureStage: string;
   failureCode: string;
   failureReason: string;
   runCount: number;
 };
 
-type DistinctAffectedRow = {
+export type SessionSetupFailureRow = {
   generation: OutcomeGeneration;
-  distinctPlatformAffectedSessions: number;
-  distinctProviderAffectedSessions: number;
-  distinctUnknownAffectedSessions: number;
-};
-
-type SessionSetupFailureRow = {
-  generation: OutcomeGeneration;
+  origin: ProductOrigin;
   failureStage: string;
   failureCode: string;
   failureCount: number;
 };
 
+export type OutcomeAggregate = {
+  runCounts: RunCountRow[];
+  sessionSetupFailures: SessionSetupFailureRow[];
+};
+
+export type AgentExecutionHeadline = {
+  generation: OutcomeGeneration;
+  role: OutcomeRole;
+  productOrigin: ProductOrigin;
+  completed: number;
+  platformFailed: number;
+  providerFailed: number;
+  userFailed: number;
+  unknownFailed: number;
+  interrupted: number;
+};
+
+export type AgentFailureRow = {
+  generation: OutcomeGeneration;
+  role: OutcomeRole;
+  productOrigin: ProductOrigin;
+  responsibility: FailureResponsibility;
+  stage: string;
+  code: string;
+  reason: string;
+  count: number;
+};
+
+export type AgentSetupFailureRecord = {
+  generation: OutcomeGeneration;
+  productOrigin: ProductOrigin;
+  stage: string;
+  code: string;
+  count: number;
+};
+
 type DatabaseTransaction = Parameters<Parameters<WorkerDb['transaction']>[0]>[0];
+
+export const originBucketExpression: SQL<ProductOrigin> = sql<ProductOrigin>`case when ${cli_sessions_v2.created_on_platform} = 'code-review' then 'code-review' when ${cli_sessions_v2.created_on_platform} is null or ${cli_sessions_v2.created_on_platform} = 'unknown' then 'unknown' else 'other' end`;
 
 const unknownResponsibilityCondition: SQL = sql`(${cloud_agent_session_runs.failure_responsibility} is null or ${cloud_agent_session_runs.failure_responsibility} not in ('platform', 'provider', 'user'))`;
 
@@ -108,7 +102,7 @@ export function generationExpression(sessionId: AnyColumn): SQL<OutcomeGeneratio
 
 const roleExpression: SQL<OutcomeRole> = sql<OutcomeRole>`case when ${cloud_agent_session_runs.message_id} = ${cloud_agent_sessions.initial_message_id} then 'initial' else 'follow_up' end`;
 
-const responsibilityBucketExpression: SQL<string> = sql<string>`case when ${unknownResponsibilityCondition} then 'unknown' else ${cloud_agent_session_runs.failure_responsibility} end`;
+const responsibilityBucketExpression: SQL<FailureResponsibility> = sql<FailureResponsibility>`case when ${unknownResponsibilityCondition} then 'unknown' else ${cloud_agent_session_runs.failure_responsibility} end`;
 
 const runFailureStageExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_stage}, 'unknown')`;
 const runFailureCodeExpression: SQL<string> = sql<string>`coalesce(${cloud_agent_session_runs.failure_code}, 'unclassified')`;
@@ -130,16 +124,16 @@ function retainedWindow(
   );
 }
 
-async function readRunCounts(
+function readRunCounts(
   tx: DatabaseTransaction,
   window: OutcomeWindow,
   retentionCutoffIso: string
 ): Promise<RunCountRow[]> {
-  const generation = generationExpression(cloud_agent_session_runs.cloud_agent_session_id);
   return tx
     .select({
-      generation,
+      generation: generationExpression(cloud_agent_session_runs.cloud_agent_session_id),
       role: roleExpression,
+      origin: originBucketExpression,
       status: cloud_agent_session_runs.status,
       responsibility: responsibilityBucketExpression,
       failureStage: runFailureStageExpression,
@@ -155,268 +149,221 @@ async function readRunCounts(
         cloud_agent_session_runs.cloud_agent_session_id
       )
     )
+    .leftJoin(
+      cli_sessions_v2,
+      eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
+    )
     .where(retainedWindow(cloud_agent_session_runs.terminal_at, window, retentionCutoffIso))
-    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`);
+    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`, sql`5`, sql`6`, sql`7`, sql`8`);
 }
 
-async function readDistinctAffectedSessions(
-  tx: DatabaseTransaction,
-  window: OutcomeWindow,
-  retentionCutoffIso: string
-): Promise<DistinctAffectedRow[]> {
-  return tx
-    .select({
-      generation: generationExpression(cloud_agent_session_runs.cloud_agent_session_id),
-      distinctPlatformAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${cloud_agent_session_runs.failure_responsibility} = 'platform'))::int`,
-      distinctProviderAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${cloud_agent_session_runs.failure_responsibility} = 'provider'))::int`,
-      distinctUnknownAffectedSessions: sql<number>`(count(distinct ${cloud_agent_session_runs.cloud_agent_session_id}) filter (where ${unknownResponsibilityCondition}))::int`,
-    })
-    .from(cloud_agent_session_runs)
-    .innerJoin(
-      cloud_agent_sessions,
-      eq(
-        cloud_agent_sessions.cloud_agent_session_id,
-        cloud_agent_session_runs.cloud_agent_session_id
-      )
-    )
-    .where(
-      and(
-        eq(cloud_agent_session_runs.status, 'failed'),
-        retainedWindow(cloud_agent_session_runs.terminal_at, window, retentionCutoffIso)
-      )
-    )
-    .groupBy(sql`1`);
-}
-
-async function readSessionSetupFailures(
+function readSessionSetupFailures(
   tx: DatabaseTransaction,
   window: OutcomeWindow,
   retentionCutoffIso: string
 ): Promise<SessionSetupFailureRow[]> {
-  const generation = generationExpression(cloud_agent_sessions.cloud_agent_session_id);
   return tx
     .select({
-      generation,
+      generation: generationExpression(cloud_agent_sessions.cloud_agent_session_id),
+      origin: originBucketExpression,
       failureStage: sessionFailureStageExpression,
       failureCode: sessionFailureCodeExpression,
       failureCount: sql<number>`count(*)::int`,
     })
     .from(cloud_agent_sessions)
+    .leftJoin(
+      cli_sessions_v2,
+      eq(cli_sessions_v2.cloud_agent_session_id, cloud_agent_sessions.cloud_agent_session_id)
+    )
     .where(retainedWindow(cloud_agent_sessions.failure_at, window, retentionCutoffIso))
-    .groupBy(sql`1`, sql`2`, sql`3`);
+    .groupBy(sql`1`, sql`2`, sql`3`, sql`4`);
 }
 
-function compareByStage(left: { stage: string }, right: { stage: string }): number {
-  return left.stage < right.stage ? -1 : left.stage > right.stage ? 1 : 0;
-}
-
-function compareByStageCode(
-  left: { stage: string; code: string },
-  right: { stage: string; code: string }
-): number {
-  const byStage = compareByStage(left, right);
-  if (byStage !== 0) return byStage;
-  return left.code < right.code ? -1 : left.code > right.code ? 1 : 0;
-}
-
-function compareByStageCodeResponsibility(
-  left: FailureStageCodeCount,
-  right: FailureStageCodeCount
-): number {
-  const byStageCode = compareByStageCode(left, right);
-  if (byStageCode !== 0) return byStageCode;
-  if (left.responsibility !== right.responsibility) {
-    return left.responsibility < right.responsibility ? -1 : 1;
-  }
-  return left.reason < right.reason ? -1 : left.reason > right.reason ? 1 : 0;
-}
-
-function roleOutcome(rows: RunCountRow[]): RoleOutcome {
-  let completed = 0;
-  let interrupted = 0;
-  let platformFailed = 0;
-  let providerFailed = 0;
-  let userFailed = 0;
-  let unknownFailed = 0;
-  const stageTotals = new Map<string, number>();
-  const stageCodes = new Map<string, FailureStageCodeCount>();
-
-  for (const row of rows) {
-    if (row.status === 'completed') {
-      completed += row.runCount;
-      continue;
-    }
-    if (row.status === 'interrupted') {
-      interrupted += row.runCount;
-      continue;
-    }
-    if (row.status !== 'failed') continue;
-
-    if (row.responsibility === 'platform') platformFailed += row.runCount;
-    else if (row.responsibility === 'provider') providerFailed += row.runCount;
-    else if (row.responsibility === 'user') userFailed += row.runCount;
-    else unknownFailed += row.runCount;
-
-    stageTotals.set(row.failureStage, (stageTotals.get(row.failureStage) ?? 0) + row.runCount);
-    const key = `${row.failureStage}\u0000${row.failureCode}\u0000${row.responsibility}\u0000${row.failureReason}`;
-    const existing = stageCodes.get(key);
-    if (existing) existing.count += row.runCount;
-    else
-      stageCodes.set(key, {
-        stage: row.failureStage,
-        code: row.failureCode,
-        responsibility: row.responsibility,
-        reason: row.failureReason,
-        count: row.runCount,
-      });
-  }
-
-  const allFailed = platformFailed + providerFailed + userFailed + unknownFailed;
-  const settled = completed + allFailed;
-
+export function executionOutcomeWindow(now: Date): OutcomeWindow {
+  const endMs =
+    Math.floor((now.getTime() - REPORTING_DELAY_ALLOWANCE_MS) / OUTCOME_BUCKET_MS) *
+    OUTCOME_BUCKET_MS;
   return {
-    completed,
-    platformFailed,
-    providerFailed,
-    userFailed,
-    unknownFailed,
-    interrupted,
-    settled,
-    allFailed,
-    platformFailureShare: settled > 0 ? platformFailed / settled : null,
-    unknownClassificationShare: allFailed > 0 ? unknownFailed / allFailed : null,
-    unknownSettledShare: settled > 0 ? unknownFailed / settled : null,
-    failureStages: [...stageTotals]
-      .map(([stage, count]) => ({ stage, count }))
-      .sort(compareByStage),
-    failureStageCodes: [...stageCodes.values()].sort(compareByStageCodeResponsibility),
+    start: new Date(endMs - OUTCOME_BUCKET_MS).toISOString(),
+    end: new Date(endMs).toISOString(),
   };
 }
 
-export function assembleGenerationAggregates(
-  runCounts: RunCountRow[],
-  distinctAffectedSessions: DistinctAffectedRow[],
-  sessionSetupFailures: SessionSetupFailureRow[]
-): GenerationOutcome[] {
-  return EXPECTED_GENERATIONS.map(generation => {
-    const generationRuns = runCounts.filter(row => row.generation === generation);
-    const distinct = distinctAffectedSessions.find(row => row.generation === generation);
-    const setupFailures = sessionSetupFailures
-      .filter(row => row.generation === generation)
-      .map(row => ({ stage: row.failureStage, code: row.failureCode, count: row.failureCount }))
-      .sort(compareByStageCode);
-    return {
-      generation,
-      runRowsObserved: generationRuns.length > 0,
-      initial: roleOutcome(generationRuns.filter(row => row.role === 'initial')),
-      followUp: roleOutcome(generationRuns.filter(row => row.role === 'follow_up')),
-      totals: roleOutcome(generationRuns),
-      distinctPlatformAffectedSessions: distinct?.distinctPlatformAffectedSessions ?? 0,
-      distinctProviderAffectedSessions: distinct?.distinctProviderAffectedSessions ?? 0,
-      distinctUnknownAffectedSessions: distinct?.distinctUnknownAffectedSessions ?? 0,
-      sessionSetupFailures: setupFailures,
-      sessionSetupFailureCount: setupFailures.reduce((sum, row) => sum + row.count, 0),
-    };
-  });
+export function assembleExecutionHeadlines(runCounts: RunCountRow[]): AgentExecutionHeadline[] {
+  const headlines: AgentExecutionHeadline[] = [];
+  for (const generation of EXPECTED_GENERATIONS) {
+    for (const role of EXPECTED_ROLES) {
+      for (const productOrigin of PRODUCT_ORIGINS) {
+        const headline: AgentExecutionHeadline = {
+          generation,
+          role,
+          productOrigin,
+          completed: 0,
+          platformFailed: 0,
+          providerFailed: 0,
+          userFailed: 0,
+          unknownFailed: 0,
+          interrupted: 0,
+        };
+        for (const row of runCounts) {
+          if (row.generation !== generation || row.role !== role || row.origin !== productOrigin) {
+            continue;
+          }
+          if (row.status === 'completed') headline.completed += row.runCount;
+          else if (row.status === 'interrupted') headline.interrupted += row.runCount;
+          else if (row.status === 'failed') {
+            if (row.responsibility === 'platform') headline.platformFailed += row.runCount;
+            else if (row.responsibility === 'provider') headline.providerFailed += row.runCount;
+            else if (row.responsibility === 'user') headline.userFailed += row.runCount;
+            else headline.unknownFailed += row.runCount;
+          }
+        }
+        headlines.push(headline);
+      }
+    }
+  }
+  return headlines;
 }
 
-export async function readOutcomeAggregate(
+function compareByOrigin(
+  left: { generation: string; productOrigin: string },
+  right: { generation: string; productOrigin: string }
+): number {
+  const byGeneration =
+    left.generation < right.generation ? -1 : left.generation > right.generation ? 1 : 0;
+  if (byGeneration !== 0) return byGeneration;
+  const leftOrigin = PRODUCT_ORIGINS.indexOf(left.productOrigin as ProductOrigin);
+  const rightOrigin = PRODUCT_ORIGINS.indexOf(right.productOrigin as ProductOrigin);
+  return leftOrigin - rightOrigin;
+}
+
+export function assembleFailureRows(runCounts: RunCountRow[]): AgentFailureRow[] {
+  return runCounts
+    .filter(row => row.status === 'failed' && row.runCount > 0)
+    .map(row => ({
+      generation: row.generation,
+      role: row.role,
+      productOrigin: row.origin,
+      responsibility: row.responsibility,
+      stage: row.failureStage,
+      code: row.failureCode,
+      reason: row.failureReason,
+      count: row.runCount,
+    }))
+    .sort((left, right) => {
+      const byOrigin = compareByOrigin(left, right);
+      if (byOrigin !== 0) return byOrigin;
+      if (left.role !== right.role) return left.role < right.role ? -1 : 1;
+      if (left.responsibility !== right.responsibility) {
+        return left.responsibility < right.responsibility ? -1 : 1;
+      }
+      if (left.stage !== right.stage) return left.stage < right.stage ? -1 : 1;
+      if (left.code !== right.code) return left.code < right.code ? -1 : 1;
+      return left.reason < right.reason ? -1 : left.reason > right.reason ? 1 : 0;
+    });
+}
+
+export function assembleSetupFailureRows(
+  rows: SessionSetupFailureRow[]
+): AgentSetupFailureRecord[] {
+  return rows
+    .filter(row => row.failureCount > 0)
+    .map(row => ({
+      generation: row.generation,
+      productOrigin: row.origin,
+      stage: row.failureStage,
+      code: row.failureCode,
+      count: row.failureCount,
+    }))
+    .sort((left, right) => {
+      const byOrigin = compareByOrigin(left, right);
+      if (byOrigin !== 0) return byOrigin;
+      if (left.stage !== right.stage) return left.stage < right.stage ? -1 : 1;
+      return left.code < right.code ? -1 : left.code > right.code ? 1 : 0;
+    });
+}
+
+export function readOutcomeAggregate(
   db: WorkerDb,
   input: { window: OutcomeWindow; retentionCutoff: string }
-): Promise<GenerationOutcome[]> {
+): Promise<OutcomeAggregate> {
   return db.transaction(
     async tx => {
       const runCounts = await readRunCounts(tx, input.window, input.retentionCutoff);
-      const distinctAffectedSessions = await readDistinctAffectedSessions(
-        tx,
-        input.window,
-        input.retentionCutoff
-      );
       const sessionSetupFailures = await readSessionSetupFailures(
         tx,
         input.window,
         input.retentionCutoff
       );
-      return assembleGenerationAggregates(
-        runCounts,
-        distinctAffectedSessions,
-        sessionSetupFailures
-      );
+      return { runCounts, sessionSetupFailures };
     },
     { isolationLevel: 'repeatable read', accessMode: 'read only' }
   );
 }
 
-function evaluationEnvelope(input: {
-  window: OutcomeWindow;
-  collectionTimestamp: string;
-  queryElapsedMs: number;
-  retentionCutoff: string;
-}): Record<string, unknown> {
-  return {
-    metric: AGGREGATE_METRIC,
-    logTag: AGGREGATE_METRIC,
-    contractVersion: AGGREGATE_CONTRACT_VERSION,
-    service: AGGREGATE_SERVICE,
-    environment: null,
-    evaluationId: `${AGGREGATE_METRIC}:${input.window.windowMinutes}:${input.window.end}`,
-    collectionTimestamp: input.collectionTimestamp,
-    queryElapsedMs: input.queryElapsedMs,
-    windowStart: input.window.start,
-    windowEnd: input.window.end,
-    windowMinutes: input.window.windowMinutes,
-    reportingDelayMs: REPORTING_DELAY_ALLOWANCE_MS,
-    coverage: COVERAGE_LABEL,
-    retentionCutoff: input.retentionCutoff,
-    expectedGenerations: [...EXPECTED_GENERATIONS],
-    limitations: [...OUTCOME_AGGREGATE_LIMITATIONS],
-  };
+function emitExecutionAggregate(
+  aggregate: OutcomeAggregate,
+  observedAt: string,
+  window: OutcomeWindow
+): void {
+  for (const headline of assembleExecutionHeadlines(aggregate.runCounts)) {
+    logger
+      .withFields({
+        metric: AGENT_EXECUTION_METRIC,
+        observedAt,
+        windowStart: window.start,
+        windowEnd: window.end,
+        ...headline,
+      })
+      .info('Cloud Agent execution outcome');
+  }
+  for (const row of assembleFailureRows(aggregate.runCounts)) {
+    logger
+      .withFields({
+        metric: AGENT_FAILURE_METRIC,
+        observedAt,
+        windowStart: window.start,
+        windowEnd: window.end,
+        ...row,
+      })
+      .info('Cloud Agent execution failure');
+  }
+  for (const row of assembleSetupFailureRows(aggregate.sessionSetupFailures)) {
+    logger
+      .withFields({
+        metric: AGENT_SETUP_FAILURE_METRIC,
+        observedAt,
+        windowStart: window.start,
+        windowEnd: window.end,
+        ...row,
+      })
+      .info('Cloud Agent session setup failure');
+  }
 }
 
-export async function runCloudAgentOutcomeCollection(env: Env, now = new Date()): Promise<void> {
-  const db = getPgDb(env);
-  const collectionTimestamp = now.toISOString();
-  const retentionCutoffIso = retentionCutoff(collectionTimestamp);
-  const windowEnd = new Date(now.getTime() - REPORTING_DELAY_ALLOWANCE_MS).toISOString();
+export async function runCloudAgentOutcomeCollection(
+  env: Env,
+  now = new Date(),
+  scheduledTime?: number
+): Promise<void> {
+  const observedAt = now.toISOString();
+  const retentionCutoffIso = retentionCutoff(observedAt);
+  const window = executionOutcomeWindow(new Date(scheduledTime ?? now.getTime()));
 
-  for (const windowMinutes of OUTCOME_WINDOW_MINUTES) {
-    const window: OutcomeWindow = {
-      windowMinutes,
-      start: new Date(Date.parse(windowEnd) - windowMinutes * 60_000).toISOString(),
-      end: windowEnd,
-    };
-    const evaluatedAt = Date.now();
-    try {
-      const generations = await readOutcomeAggregate(db, {
-        window,
-        retentionCutoff: retentionCutoffIso,
-      });
-      logger
-        .withFields({
-          ...evaluationEnvelope({
-            window,
-            collectionTimestamp,
-            queryElapsedMs: Date.now() - evaluatedAt,
-            retentionCutoff: retentionCutoffIso,
-          }),
-          collectionStatus: 'complete',
-          generations,
-        })
-        .info('Cloud Agent outcome aggregate');
-    } catch {
-      logger
-        .withFields({
-          ...evaluationEnvelope({
-            window,
-            collectionTimestamp,
-            queryElapsedMs: Date.now() - evaluatedAt,
-            retentionCutoff: retentionCutoffIso,
-          }),
-          collectionStatus: 'failed',
-          failureKind: 'db_query_failed',
-        })
-        .error('Cloud Agent outcome aggregate failed');
-      return;
-    }
+  try {
+    const aggregate = await readOutcomeAggregate(getPgDb(env), {
+      window,
+      retentionCutoff: retentionCutoffIso,
+    });
+    emitExecutionAggregate(aggregate, observedAt, window);
+  } catch {
+    logger
+      .withFields({
+        metric: COLLECTION_METRIC,
+        collector: AGENT_EXECUTION_METRIC,
+        observedAt,
+        status: 'failed',
+      })
+      .error('Cloud Agent execution outcome collection failed');
   }
 }

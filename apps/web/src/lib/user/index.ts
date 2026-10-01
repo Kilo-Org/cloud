@@ -4,6 +4,7 @@ import { createTimer } from '@/lib/timer';
 import PostHogClient from '@/lib/posthog';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { WORKOS_API_KEY } from '@/lib/config.server';
 import { clearOpenAiChatGptConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
 import { WorkOS } from '@workos-inc/node';
@@ -12,7 +13,6 @@ import {
   createSoftDeletedBlockedReason,
   isSoftDeletedBlockedReason,
 } from '@kilocode/db/user-soft-delete';
-import { reportAuthEvent, reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   payment_methods,
   kilocode_users,
@@ -31,7 +31,6 @@ import {
   code_indexing_search,
   code_indexing_manifest,
   referral_codes,
-  organizations,
   organization_memberships,
   organization_groups,
   organization_group_memberships,
@@ -153,7 +152,7 @@ import { failureResult, successResult, trpcFailure } from '@/lib/maybe-result';
 import type { TRPCError } from '@trpc/server';
 import type { UUID } from 'node:crypto';
 import { checkDiscordGuildMembership } from '@/lib/integrations/discord-guild-membership';
-import type { AuthProviderId } from '@/lib/auth/provider-metadata';
+import type { AuthProviderId } from '@kilocode/db/schema-types';
 import { hosted_domain_specials } from '@/lib/auth/constants';
 import * as z from 'zod';
 import {
@@ -161,7 +160,7 @@ import {
   generateOpenRouterUpstreamSafetyIdentifier,
   generateVercelDownstreamSafetyIdentifier,
 } from '@/lib/ai-gateway/providerHash';
-import { normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/email-address';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
 import {
   deleteAllOwnedByUserIdPages,
@@ -190,18 +189,6 @@ import {
 } from '@/lib/user/deletion-queue/deletion-constants';
 
 const workos = new WorkOS(WORKOS_API_KEY);
-
-/**
- * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
- */
-export async function findUserById(
-  userId: string,
-  fromDb: typeof db = db
-): Promise<User | undefined> {
-  return await fromDb.query.kilocode_users.findFirst({
-    where: eq(kilocode_users.id, userId),
-  });
-}
 
 export async function findUsersByIds(userIds: string[]): Promise<Map<string, User>> {
   if (userIds.length === 0) return new Map();
@@ -406,92 +393,6 @@ export async function findUserByNormalizedEmail(email: string): Promise<User | u
   });
 }
 
-async function fireAuthEvent(
-  user: Pick<
-    User,
-    | 'id'
-    | 'google_user_email'
-    | 'created_at'
-    | 'hosted_domain'
-    | 'signup_ip'
-    | 'is_admin'
-    | 'is_bot'
-    | 'blocked_at'
-    | 'completed_welcome_form'
-    | 'linkedin_url'
-    | 'github_url'
-    | 'discord_server_membership_verified_at'
-    | 'customer_source'
-    | 'cohorts'
-    | 'has_validation_stytch'
-    | 'has_validation_novel_card_with_hold'
-  >,
-  eventType: 'signup' | 'signin',
-  provider: AuthProviderId,
-  requestHeaders?: Headers
-) {
-  if (!requestHeaders) return;
-
-  const enrichmentResult = await Promise.all([
-    db
-      .select({ provider: user_auth_provider.provider })
-      .from(user_auth_provider)
-      .where(eq(user_auth_provider.kilo_user_id, user.id)),
-    db
-      .select({
-        organization_id: organization_memberships.organization_id,
-        role: organization_memberships.role,
-        plan: organizations.plan,
-        sso_domain: organizations.sso_domain,
-        free_trial_end_at: organizations.free_trial_end_at,
-      })
-      .from(organization_memberships)
-      .innerJoin(organizations, eq(organization_memberships.organization_id, organizations.id))
-      .where(
-        and(eq(organization_memberships.kilo_user_id, user.id), isNull(organizations.deleted_at))
-      ),
-  ]).catch(() => null);
-
-  // DB enrichment failures must not abort auth telemetry; fall through with empty arrays
-  const authProviderRows = enrichmentResult?.[0] ?? [];
-  const membershipRows = enrichmentResult?.[1] ?? [];
-
-  void reportAuthEvent({
-    kilo_user_id: user.id,
-    event_type: eventType,
-    email: user.google_user_email,
-    account_created_at: user.created_at,
-    ip_address: requestHeaders.get('x-forwarded-for'),
-    geo_city: requestHeaders.get('x-vercel-ip-city'),
-    geo_country: requestHeaders.get('x-vercel-ip-country'),
-    ja4_digest: requestHeaders.get('x-vercel-ja4-digest'),
-    user_agent: requestHeaders.get('user-agent'),
-    auth_method: provider,
-    hosted_domain: user.hosted_domain,
-    signup_ip: user.signup_ip,
-    signup_geo_country: null, // not stored on user; set at signup time only via request headers
-    is_admin: user.is_admin,
-    is_bot: user.is_bot,
-    is_blocked: user.blocked_at != null,
-    completed_welcome_form: user.completed_welcome_form,
-    has_linkedin_url: user.linkedin_url != null,
-    has_github_url: user.github_url != null,
-    has_discord_verified: user.discord_server_membership_verified_at != null,
-    customer_source: user.customer_source,
-    cohorts: Object.keys(user.cohorts),
-    has_validation_stytch: user.has_validation_stytch,
-    has_validation_novel_card_with_hold: user.has_validation_novel_card_with_hold,
-    auth_providers: authProviderRows.map(r => r.provider),
-    org_memberships: membershipRows.map(m => ({
-      organization_id: m.organization_id,
-      role: m.role,
-      plan: m.plan,
-      has_sso: m.sso_domain != null,
-      in_free_trial: m.free_trial_end_at != null && new Date(m.free_trial_end_at) > new Date(),
-    })),
-  });
-}
-
 async function recordSignupImpactTracking(args: {
   user: User;
   affiliateTrackingId?: string | null;
@@ -599,8 +500,6 @@ export async function createOrUpdateUser(
 > {
   const existingUser = await findAndSyncExistingUser(args);
   if (existingUser) {
-    void fireAuthEvent(existingUser, 'signin', args.provider, requestHeaders);
-
     if (deferSignInAnalytics) {
       return successResult({
         user: existingUser,
@@ -685,7 +584,6 @@ export async function createOrUpdateUser(
           return { success: false, error: linkResult.error };
         }
       }
-      void fireAuthEvent(linkedUser, 'signin', args.provider, requestHeaders);
       // Successfully linked account, return the existing user
       if (deferSignInAnalytics) {
         return successResult({
@@ -842,8 +740,6 @@ export async function createOrUpdateUser(
     affiliateTrackingId,
     trackingContext,
   });
-
-  void fireAuthEvent(savedUser, 'signup', args.provider, requestHeaders);
 
   // User created event in PostHog
   posthogClient.capture({
@@ -2041,8 +1937,6 @@ export async function softDeleteUser(userId: string) {
   await db.transaction(async tx => {
     await anonymizeCloudUserData(tx, userId);
   });
-
-  void reportEvents({ events: [{ type: 'user.deleted', data: { kilo_user_id: userId } }] });
 }
 
 // We always stytch approve users who accept organization invites

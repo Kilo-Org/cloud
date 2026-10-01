@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "شاته لاړ شئ",
     "idle": "وزګار",
+    "scheduled": "مهال ویش شوی",
     "keepEditing": "سمون ته دوام ورکړئ",
     "keepRunning": "روان یې پرېږدئ",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "د ننوتلو کیلي اضافه کړئ",
     "passkeyDefaultName": "د ننوتلو کیلي",
     "passkeyAddedOn": "{{date}} اضافه شوه",
+    "passkeyLastUsedOn": "وروستی کارول {{date}}",
     "passkeyAdded": "د ننوتلو کیلي اضافه شوه.",
     "passkeyAddFailed": "د ننوتلو کیلي اضافه نشو. بیا هڅه وکړئ.",
     "passkeyAddUnsupported": "دا وسیله د ننوتلو کیلي جوړولی نشي.",
@@ -566,7 +568,14 @@
       "deletedUser": "ړنګ شوی کارن",
       "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
       "moreLinesAbove_one": "… پورته {{displayCount}} نورې کرښې شته.",
-      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته."
+      "moreLinesAbove_other": "… پورته {{displayCount}} نورې کرښې شته.",
+      "deleteComment": "تبصره ړنګه کړئ",
+      "deleteCommentTitle": "تبصره ړنګه شي؟",
+      "deleteCommentMessage": "دا تبصره به له پل ریکویسټ څخه ړنګه شي.",
+      "commentEditFailed": "ستاسو تبصره خوندي نشوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "commentEditUnavailable": "دا تبصره سمون نه شي کول کېدای. ممکن ړنګه شوې وي.",
+      "commentDeleteFailed": "ستاسو تبصره ړنګه نشوه. خپله اړیکه وګورئ او بیا هڅه وکړئ.",
+      "commentDeleteUnavailable": "دا تبصره ړنګه نه شي کول کېدای."
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ امستنې پرانیستل نه شوې.",
     "installKiloGitHubApp": "د Kilo د GitHub اپلیکیشن نصب کړئ",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
+      "commentUpdated": "تبصره تازه شوه",
+      "commentDeleted": "تبصره ړنګه شوه",
       "reviewSubmitted": "بیاکتنه وسپارل شوه",
       "autoMergeEnabled": "خپلکار یوځای کول فعال شول"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "فعالې ناستې بار نه شوې.",
       "couldNotRefresh": "تازه نه شو",
       "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
+      "viewHistory": "د ناستو تاریخچه",
       "noMatches": "هېڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "د لټون لپاره بله کلیمه وکاروئ.",
       "tryAdjustFilters": "د چاڼ د شرطونو د بدلولو یا پاکولو هڅه وکړئ.",
       "couldNotSearch": "د ناستو لټون ناکام شو.",
       "completedWillAppear": "بشپړې شوې ناستې به دلته ښکاره شي.",
       "noPastSessions": "هېڅ پخوانۍ ناسته نشته",
+      "pastSessions": "پخوانې ناستې",
       "live": "ژوندی",
       "updating": "تازه کېږي"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "د ناستې نوم",
       "transcriptAccessibility": "د ناستې متن",
       "readOnly": "دا ناسته یوازې لوستلی شئ.",
+      "continueInNewSession": "په نوي ناسته کې دوام ورکړئ",
       "emptyDescription": "د پیل لپاره لاندې یو پیغام واستوئ.",
       "scrollToBottom": "د پاڼې پای ته ورشئ",
       "emptyTitle": "تر اوسه پیغامونه نشته",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
+      "selectRepositoryToStart": "د پیل لپاره یو زېرمتون وټاکئ.",
+      "connectProviderToStart": "د پیل لپاره د خدمت چمتو کوونکی ونښلوئ.",
       "promptPlaceholder": "غواړئ پر څه کار وکړئ؟",
       "couldNotLoadModels": "ماډلونه بار نه شول.",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې زېرمتون او ماډل نور د لاسرسي وړ نه دي. لاندې یې غوره کړئ.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "بېرته لاړ شئ او له مخکیني سکرین څخه د غوره کولو دا کړکۍ بیا پرانیزئ."
   },
   "sessionRow": {
-    "needsInput": "ځواب ته اړتیا لري"
+    "needsInput": "ځواب ته اړتیا لري",
+    "scheduled": "مهال ویش شوی"
   },
   "voiceInput": {
     "listening": "اورېدل کېږي...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "هېڅ باوري کوربه نشته",
     "emptyDescription": "که د لینک پر کوربه باور وکړئ، د هغه لینکونه به بیا له پوښتنې پرته پرانیستل کېږي.",
     "revoke": "پر {{host}} باور لغوه کړئ",
+    "revokeMessage": "د دې کوربه لینکونه به بیا د تایید غوښتنه وکړي.",
     "backToPreferences": "بېرته تنظیماتو ته ورشئ"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې روان فعالیتونه فعال کړئ.",
     "openSession": "پرانیستل",
     "approveFailed": "منظور نه شو. د بیا هڅې لپاره $t(common.approve) ته ټک ووهئ.",
-    "newestResult": "تر ټولو نوې پایله"
+    "newestResult": "تر ټولو نوې پایله",
+    "scheduledWakes": "{{time}} بیداریږي"
   },
   "transcriptionModel": {
     "title": "د غږ د متن ته بدلولو ماډل",

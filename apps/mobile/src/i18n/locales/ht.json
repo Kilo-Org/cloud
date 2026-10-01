@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Tounen",
     "idle": "San aktivite",
+    "scheduled": "Pwograme",
     "keepEditing": "Kontinye modifye",
     "keepRunning": "Kite l kontinye fonksyone",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Ajoute yon kle aksè",
     "passkeyDefaultName": "Kle aksè",
     "passkeyAddedOn": "Ajoute {{date}}",
+    "passkeyLastUsedOn": "Dènye fwa yo te itilize {{date}}",
     "passkeyAdded": "Kle aksè ajoute.",
     "passkeyAddFailed": "Pa t kapab ajoute yon kle aksè. Eseye ankò.",
     "passkeyAddUnsupported": "Aparèy sa a pa ka kreye kle aksè.",
@@ -566,7 +568,14 @@
       "deletedUser": "itilizatè ki efase",
       "replyForbiddenTerm": "Ou pa gen pèmisyon pou reponn {{term}} sa a.",
       "moreLinesAbove_one": "Gen {{displayCount}} liy anplis pi wo a.",
-      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a."
+      "moreLinesAbove_other": "Gen {{displayCount}} liy anplis pi wo a.",
+      "deleteComment": "Efase kòmantè a",
+      "deleteCommentTitle": "Efase kòmantè a?",
+      "deleteCommentMessage": "Kòmantè sa a ap efase nan demann fizyon an.",
+      "commentEditFailed": "Nou pa t ka anrejistre kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentEditUnavailable": "Kòmantè sa a pa ka modifye. Petèt li te efase.",
+      "commentDeleteFailed": "Nou pa t ka efase kòmantè ou. Tcheke koneksyon ou epi eseye ankò.",
+      "commentDeleteUnavailable": "Kòmantè sa a pa ka efase."
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Sa a pa yon lyen demann fizyon ni merge request",
     "announce": {
       "commentPosted": "Kòmantè pibliye",
+      "commentUpdated": "Kòmantè mete ajou",
+      "commentDeleted": "Kòmantè efase",
       "reviewSubmitted": "Revizyon soumèt",
       "autoMergeEnabled": "Fizyon otomatik aktive"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
       "couldNotRefresh": "Pa t ka rafrechi",
       "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
+      "viewHistory": "Istwa sesyon yo",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",
       "tryAdjustFilters": "Eseye ajiste oswa retire filtè ou yo.",
       "couldNotSearch": "Pa t ka chèche sesyon yo.",
       "completedWillAppear": "Sesyon ki fini yo pral parèt isit la.",
       "noPastSessions": "Pa gen ansyen sesyon",
+      "pastSessions": "Ansyen sesyon",
       "live": "AN DIRÈK",
       "updating": "Ap mete ajou"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Non sesyon",
       "transcriptAccessibility": "Transkripsyon sesyon an",
       "readOnly": "Ou ka li sesyon sa a sèlman.",
+      "continueInNewSession": "Kontinye nan yon nouvo sesyon",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
+      "selectRepositoryToStart": "Chwazi yon depo pou kòmanse.",
+      "connectProviderToStart": "Konekte yon founisè pou kòmanse.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",
       "prefillRepoAndModelUnavailable": "Depo ak modèl sesyon orijinal la pa disponib ankò. Chwazi lòt anba a.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Tounen nan ekran anvan an epi relouvri selektè sa a."
   },
   "sessionRow": {
-    "needsInput": "BEZWEN REPONS"
+    "needsInput": "BEZWEN REPONS",
+    "scheduled": "PWOGRAME"
   },
   "voiceInput": {
     "listening": "Ap koute...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Pa gen domèn ou fè konfyans",
     "emptyDescription": "Lè ou fè domèn yon lyen konfyans, lyen an louvri san li pa mande konfimasyon ankò.",
     "revoke": "Retire {{host}}",
+    "revokeMessage": "Lyen pou domèn sa a ap mande konfimasyon ankò.",
     "backToPreferences": "Tounen nan preferans yo"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an.",
     "openSession": "Louvri",
     "approveFailed": "Nou pa t ka apwouve. Peze $t(common.approve) pou eseye ankò.",
-    "newestResult": "Dènye rezilta"
+    "newestResult": "Dènye rezilta",
+    "scheduledWakes": "leve {{time}}"
   },
   "transcriptionModel": {
     "title": "Modèl transkripsyon",

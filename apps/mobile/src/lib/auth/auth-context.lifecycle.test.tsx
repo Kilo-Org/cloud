@@ -453,7 +453,7 @@ type AuthContextValue = {
 };
 
 /** Build a Kilo JWT whose payload carries `kiloUserId` (same shape as
- *  `generateApiToken` in apps/web/src/lib/tokens.ts). */
+ *  `generateApiToken` in packages/web-shared/src/lib/tokens.ts). */
 function base64url(input: string): string {
   return btoa(input).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
 }

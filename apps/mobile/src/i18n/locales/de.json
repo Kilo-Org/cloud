@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Zurück",
     "idle": "Inaktiv",
+    "scheduled": "Geplant",
     "keepEditing": "Weiter bearbeiten",
     "keepRunning": "Weiterlaufen lassen",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Passkey hinzufügen",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Hinzugefügt am {{date}}",
+    "passkeyLastUsedOn": "Zuletzt verwendet {{date}}",
     "passkeyAdded": "Passkey hinzugefügt.",
     "passkeyAddFailed": "Passkey konnte nicht hinzugefügt werden. Versuche es erneut.",
     "passkeyAddUnsupported": "Dieses Gerät kann keine Passkeys erstellen.",
@@ -1513,12 +1515,14 @@
       "couldNotLoadActive": "Die aktiven Sitzungen konnten nicht geladen werden.",
       "couldNotRefresh": "Konnte nicht aktualisiert werden",
       "noSessionsYetDescription": "Starte eine Programmieraufgabe auf deinem Handy. Deine Sitzungen erscheinen hier.",
+      "viewHistory": "Sitzungsverlauf",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
       "tryAdjustFilters": "Passe deine Filter an oder setze sie zurück.",
       "couldNotSearch": "Die Sitzungen konnten nicht durchsucht werden.",
       "completedWillAppear": "Abgeschlossene Sitzungen erscheinen hier.",
       "noPastSessions": "Noch keine früheren Sitzungen",
+      "pastSessions": "Frühere Sitzungen",
       "live": "IN ECHTZEIT",
       "updating": "Wird aktualisiert"
     },
@@ -1581,6 +1585,7 @@
       "renamePlaceholder": "Sitzungsname",
       "transcriptAccessibility": "Sitzungsprotokoll",
       "readOnly": "Diese Sitzung ist schreibgeschützt.",
+      "continueInNewSession": "In einer neuen Sitzung fortsetzen",
       "emptyDescription": "Sende unten eine Nachricht, um zu beginnen.",
       "scrollToBottom": "Nach unten scrollen",
       "emptyTitle": "Noch keine Nachrichten",
@@ -1671,6 +1676,8 @@
       "leaveChanges": "Änderungen beibehalten",
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
+      "selectRepositoryToStart": "Wähle ein Repository aus, um zu starten.",
+      "connectProviderToStart": "Verbinde einen Anbieter, um zu starten.",
       "promptPlaceholder": "Woran möchtest du arbeiten?",
       "couldNotLoadModels": "Die Modelle konnten nicht geladen werden.",
       "prefillRepoAndModelUnavailable": "Das Repository und das Modell der ursprünglichen Sitzung sind nicht mehr verfügbar. Wähle unten ein anderes Repository und ein anderes Modell aus.",
@@ -2256,7 +2263,8 @@
     "optionsExpiredDescription": "Gehe zurück und öffne diese Auswahl erneut über den vorherigen Bildschirm."
   },
   "sessionRow": {
-    "needsInput": "EINGABE ERFORDERLICH"
+    "needsInput": "EINGABE ERFORDERLICH",
+    "scheduled": "GEPLANT"
   },
   "voiceInput": {
     "listening": "Aufnahme läuft …",
@@ -2620,7 +2628,14 @@
       "deletedUser": "gelöschter Benutzer",
       "replyForbiddenTerm": "Du hast keine Berechtigung, auf diesen {{term}} zu antworten.",
       "moreLinesAbove_one": "… darüber stehen weitere Zeilen: {{displayCount}}.",
-      "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}."
+      "moreLinesAbove_other": "… darüber stehen weitere Zeilen: {{displayCount}}.",
+      "deleteComment": "Kommentar löschen",
+      "deleteCommentTitle": "Kommentar löschen?",
+      "deleteCommentMessage": "Dieser Kommentar wird aus dem Pull-Request gelöscht.",
+      "commentEditFailed": "Dein Kommentar konnte nicht gespeichert werden. Prüfe deine Verbindung und versuche es erneut.",
+      "commentEditUnavailable": "Dieser Kommentar kann nicht bearbeitet werden. Möglicherweise wurde er gelöscht.",
+      "commentDeleteFailed": "Dein Kommentar konnte nicht gelöscht werden. Prüfe deine Verbindung und versuche es erneut.",
+      "commentDeleteUnavailable": "Dieser Kommentar kann nicht gelöscht werden."
     },
     "entry": {
       "eyebrow": "Öffne einen Pull-Request oder Merge-Request über seine URL",
@@ -2933,6 +2948,8 @@
     "linkPasteNotAPullRequest": "Dieser Link führt nicht zu einem Pull-Request oder Merge-Request.",
     "announce": {
       "commentPosted": "Kommentar veröffentlicht",
+      "commentUpdated": "Kommentar aktualisiert",
+      "commentDeleted": "Kommentar gelöscht",
       "reviewSubmitted": "Review gesendet",
       "autoMergeEnabled": "Automatisches Zusammenführen aktiviert"
     },
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
     "revoke": "Vertrauen in {{host}} widerrufen",
+    "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen.",
     "openSession": "Öffnen",
     "approveFailed": "Genehmigen fehlgeschlagen. Tippe auf $t(common.approve), um es erneut zu versuchen.",
-    "newestResult": "Neuestes Ergebnis"
+    "newestResult": "Neuestes Ergebnis",
+    "scheduledWakes": "wacht {{time}} auf"
   },
   "transcriptionModel": {
     "title": "Transkriptionsmodell",

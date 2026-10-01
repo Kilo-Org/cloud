@@ -8,7 +8,7 @@ on:
 # Cancel in-progress runs when a new commit is pushed to the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -52,6 +52,15 @@ jobs:
       - name: Test changes-filter retry wiring
         run: node --test scripts/changes-filter-retry.test.mjs
 
+      - name: Test scheduled deployment wiring
+        run: node --test scripts/deployment-workflows.test.mjs
+
+      - name: Test main workflow failure notifications
+        run: node --test scripts/main-workflow-failure.test.mjs
+
+      - name: Test meta-janitor approval gates
+        run: node --test scripts/meta-janitor-approve.test.mjs
+
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -79,12 +88,16 @@ jobs:
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
+              - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Detect changes (retry)
         id: filter_retry
         # Keep the filters byte-identical to the attempt above:
@@ -109,12 +122,16 @@ jobs:
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
+              - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/deploy-infra/builder/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
               - 'services/cloud-agent-next/**'
+              - '.github/workflows/ci.yml'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
       - name: Detect changed workspaces with tests
         id: workspaces
         run: |
@@ -311,11 +328,8 @@ jobs:
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
 
-      - name: Run control-plane ingest Postgres and Durable Object regression
-        env:
-          NODE_ENV: development
-          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: ${{ env.POSTGRES_URL }}
-        run: pnpm --filter cloudflare-session-ingest exec vitest run --config vitest.postgres.config.ts
+      - name: Run Session Ingest Durable Object regressions
+        run: pnpm --filter cloudflare-session-ingest run test:integration
 
   build:
     needs: [changes, typecheck, lint, format-check, drizzle-check]
@@ -414,6 +428,12 @@ jobs:
         working-directory: services/cloud-agent-next/wrapper
         run: bun run build.ts
 
+      - name: Test cloud-agent-next checkers
+        run: pnpm --filter cloud-agent-next test:checkers
+
+      - name: Check cloud-agent-next duplication
+        run: pnpm --filter cloud-agent-next check:duplication
+
       - name: Run cloud-agent-next tests
         run: pnpm --filter cloud-agent-next test:all
 
@@ -453,51 +473,3 @@ jobs:
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts
-
-  notify-main-failure:
-    if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
-    needs:
-      [typecheck, lint, format-check, drizzle-check, test, build, cloud-agent-next, workspace-tests]
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-      - name: Notify Slack
-        continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":red_circle: CI failed on main"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:*\n${{ github.actor }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
-            }

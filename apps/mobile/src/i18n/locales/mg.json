@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Miverena",
     "idle": "Tsy miasa",
+    "scheduled": "Voalahatra",
     "keepEditing": "Tohizo ny fanovana",
     "keepRunning": "Tohizo ny fampandehanana",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Hanampy fanalahidin'ny fidirana",
     "passkeyDefaultName": "Fanalahidin'ny fidirana",
     "passkeyAddedOn": "Nampiana {{date}}",
+    "passkeyLastUsedOn": "Nampiasaina farany {{date}}",
     "passkeyAdded": "Nampiana ny fanalahidin'ny fidirana.",
     "passkeyAddFailed": "Tsy afaka nanampy fanalahidin'ny fidirana. Andramo indray.",
     "passkeyAddUnsupported": "Tsy afaka mamorona fanalahidin'ny fidirana ity fitaovana ity.",
@@ -566,7 +568,14 @@
       "deletedUser": "mpampiasa voafafa",
       "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
       "moreLinesAbove_one": "… mbola misy andalana {{displayCount}} etsy ambony.",
-      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony."
+      "moreLinesAbove_other": "… mbola misy andalana {{displayCount}} etsy ambony.",
+      "deleteComment": "Hamafa ny hevitra",
+      "deleteCommentTitle": "Hamafa ny hevitra?",
+      "deleteCommentMessage": "Ho fafana amin'ny fangatahana fampiraisana ity hevitra ity.",
+      "commentEditFailed": "Tsy afaka nitahiry ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentEditUnavailable": "Tsy azo ovaina ity hevitra ity. Mety voafafa izy.",
+      "commentDeleteFailed": "Tsy afaka namafa ny hevitrao. Jereo ny fifandraisanao ary andramo indray.",
+      "commentDeleteUnavailable": "Tsy azo fafana ity hevitra ity."
     },
     "couldNotOpenGitHubAppSettings": "Tsy voasokatra ny fikirana ho an'ny rindranasa GitHub.",
     "installKiloGitHubApp": "Apetraho ny rindranasa Kilo ho an'ny GitHub",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",
+      "commentUpdated": "Nohavaozina ny hevitra",
+      "commentDeleted": "Voafafa ny hevitra",
       "reviewSubmitted": "Nalefa ny fandinihana",
       "autoMergeEnabled": "Navela ny fampiraisana mandeha ho azy"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Tsy tafiditra ny fotoam-piasana mandeha.",
       "couldNotRefresh": "Tsy vita ny fanavaozana",
       "noSessionsYetDescription": "Manomboha asa fanoratana kaody amin'ny findainao. Hiseho eto ny fotoam-piasanao.",
+      "viewHistory": "Tantaran'ny fotoam-piasana",
       "noMatches": "Tsy misy fotoam-piasana mifanaraka",
       "tryDifferentSearch": "Andramo ny teny fikarohana hafa.",
       "tryAdjustFilters": "Andramo manitsy na manala ny sivanao.",
       "couldNotSearch": "Tsy vita ny fikarohana fotoam-piasana.",
       "completedWillAppear": "Hiseho eto ny fotoam-piasana vita.",
       "noPastSessions": "Tsy misy fotoam-piasana taloha",
+      "pastSessions": "Fotoam-piasana taloha",
       "live": "MIVANTANA",
       "updating": "Manavao"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Anaran'ny fotoam-piasana",
       "transcriptAccessibility": "Rakitsoratry ny fotoam-piasana",
       "readOnly": "Azo vakina ihany ity fotoam-piasana ity.",
+      "continueInNewSession": "Tohizo ao amin'ny fotoam-piasana vaovao",
       "emptyDescription": "Mandefasa hafatra etsy ambany mba hanombohana.",
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
+      "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Miverena amin'ny efijery teo aloha ary sokafy indray ity mpisafidy ity."
   },
   "sessionRow": {
-    "needsInput": "MILA VALINY"
+    "needsInput": "MILA VALINY",
+    "scheduled": "VOALAHATRA"
   },
   "voiceInput": {
     "listening": "Mihaino...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Tsy misy mpampiantrano atokisana",
     "emptyDescription": "Rehefa atokisanao ny mpampiantrano ny rohy iray, dia sokafana tsy mila fanamafisana intsony ny rohy mankany aminy.",
     "revoke": "Foano ny fitokisana ny {{host}}",
+    "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
     "backToPreferences": "Miverena amin'ny safidy"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy.",
     "openSession": "Sokafy",
     "approveFailed": "Tsy nahomby ny fanekena. Tsindrio $t(common.approve) hanandramana indray.",
-    "newestResult": "Vokatra vaovao indrindra"
+    "newestResult": "Vokatra vaovao indrindra",
+    "scheduledWakes": "mifoha {{time}}"
   },
   "transcriptionModel": {
     "title": "Modely fanovana feo ho soratra",

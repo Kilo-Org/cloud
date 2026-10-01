@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Padà sẹ́yìn",
     "idle": "Kò ṣiṣẹ́ lọ́wọ́",
+    "scheduled": "Ti ṣètò",
     "keepEditing": "Tẹ̀síwájú pẹ̀lú àtúnṣe",
     "keepRunning": "Jẹ́ kí ó máa ṣiṣẹ́ nìṣó",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Fi passkey kún",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "A fi kún {{date}}",
+    "passkeyLastUsedOn": "Ìkẹyìn lílo {{date}}",
     "passkeyAdded": "A ti fi passkey kún.",
     "passkeyAddFailed": "A kò lè fi passkey kún. Gbìyànjú lẹ́ẹ̀kan sí i.",
     "passkeyAddUnsupported": "Ẹ̀rọ yìí kò lè dá àwọn passkey.",
@@ -566,7 +568,14 @@
       "deletedUser": "olùlò tí a pa rẹ́",
       "replyForbiddenTerm": "O kò ní àṣẹ láti dáhùn sí {{term}} yìí.",
       "moreLinesAbove_one": "… ìlà {{displayCount}} sí i wà lókè",
-      "moreLinesAbove_other": "… ìlà {{displayCount}} sí i wà lókè"
+      "moreLinesAbove_other": "… ìlà {{displayCount}} sí i wà lókè",
+      "deleteComment": "Pa àsọyé rẹ́",
+      "deleteCommentTitle": "Pa àsọyé rẹ́?",
+      "deleteCommentMessage": "A ó pa àsọyé yìí rẹ́ kúrò nínú ìbéèrè ìṣọ̀kan.",
+      "commentEditFailed": "A kò lè fipamọ́ àsọyé rẹ. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "commentEditUnavailable": "A kò lè ṣàtúnṣe àsọyé yìí. Ó lè ti jẹ́ pípa rẹ́.",
+      "commentDeleteFailed": "A kò lè pa àsọyé rẹ rẹ́. Ṣàyẹ̀wò àsopọ̀ rẹ kí o tún gbìyànjú.",
+      "commentDeleteUnavailable": "A kò lè pa àsọyé yìí rẹ́."
     },
     "couldNotOpenGitHubAppSettings": "A kò lè ṣí àwọn ètò ohun èlò GitHub.",
     "installKiloGitHubApp": "Fi ìṣàfilọ́lẹ̀ Kilo fún GitHub sórí rẹ̀",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Kì í ṣe ọ̀nà àsopọ̀ ìbéèrè àkópọ̀ tàbí ìbéèrè ìṣọ̀kan",
     "announce": {
       "commentPosted": "A ti fi àsọyé ránṣẹ́",
+      "commentUpdated": "A ti ṣe àtúnṣe àsọyé",
+      "commentDeleted": "A ti pa àsọyé rẹ́",
       "reviewSubmitted": "A ti fi àtúnyẹ̀wò ránṣẹ́",
       "autoMergeEnabled": "A ti tan ìdàpọ̀ aládàáṣiṣẹ́"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "A kò lè ṣàkójọ àwọn ìgbà iṣẹ́ tó ń lọ.",
       "couldNotRefresh": "A kò lè sọ di tuntun",
       "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ. Àwọn ìgbà iṣẹ́ rẹ yóò hàn níbí.",
+      "viewHistory": "Ìtàn àwọn ìgbà iṣẹ́",
       "noMatches": "Kò sí ìgbà iṣẹ́ tó bá ohun tí o wá mu",
       "tryDifferentSearch": "Gbìyànjú ọ̀rọ̀ ìwá mìíràn.",
       "tryAdjustFilters": "Gbìyànjú láti ṣàtúnṣe àwọn àlẹ̀ rẹ tàbí yọ wọ́n kúrò.",
       "couldNotSearch": "A kò lè wá àwọn ìgbà iṣẹ́.",
       "completedWillAppear": "Àwọn ìgbà iṣẹ́ tó ti parí yóò hàn níbí.",
       "noPastSessions": "Kò sí ìgbà iṣẹ́ tó ti kọjá",
+      "pastSessions": "Àwọn ìgbà iṣẹ́ tó ti kọjá",
       "live": "LỌ́WỌ́LỌ́WỌ́",
       "updating": "Ń ṣe ìmúdójúìwọ̀n"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Orúkọ ìgbà iṣẹ́",
       "transcriptAccessibility": "Àkọsílẹ̀ ìgbà iṣẹ́",
       "readOnly": "Kíkà nìkan ni o lè ṣe nínú ìgbà iṣẹ́ yìí.",
+      "continueInNewSession": "Tẹ̀síwájú nínú ìgbà iṣẹ́ tuntun",
       "emptyDescription": "Fi ìfiránṣẹ́ ránṣẹ́ ní ìsàlẹ̀ láti bẹ̀rẹ̀.",
       "scrollToBottom": "Yí lọ sí ìsàlẹ̀",
       "emptyTitle": "Kò tíì sí ìfiránṣẹ́",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
+      "selectRepositoryToStart": "Yan ibi ìpamọ́ kóòdù láti bẹ̀rẹ̀.",
+      "connectProviderToStart": "So olùpèsè kan pọ̀ láti bẹ̀rẹ̀.",
       "promptPlaceholder": "Kí ni o fẹ́ ṣiṣẹ́ lórí?",
       "couldNotLoadModels": "A kò lè gbé àwọn àwòṣe wọlé.",
       "prefillRepoAndModelUnavailable": "Ibi ìpamọ́ kóòdù àti àwòṣe ìgbà iṣẹ́ ìpilẹ̀ṣẹ̀ kò sí mọ́. Yan àwọn mìíràn ní ìsàlẹ̀.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Padà sẹ́yìn kí o sì tún ààyè àṣàyàn yìí ṣí láti iboju tó ṣáájú."
   },
   "sessionRow": {
-    "needsInput": "NÍLÒ ÈSÌ RẸ"
+    "needsInput": "NÍLÒ ÈSÌ RẸ",
+    "scheduled": "TI ṢÈTÒ"
   },
   "voiceInput": {
     "listening": "A ń fetí sílẹ̀...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Kò sí ojúlé tí a gbẹ́kẹ̀ lé",
     "emptyDescription": "Tí o bá gbẹ́kẹ̀ lé ojúlé ọ̀nà àsopọ̀ kan, ó máa ṣí láìbéèrè lọ́wọ́ rẹ mọ́.",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
+    "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa.",
     "openSession": "Ṣí",
     "approveFailed": "A kò lè fọwọ́ sí. Tẹ $t(common.approve) láti tún gbìyànjú.",
-    "newestResult": "Àbájáde tuntun jùlọ"
+    "newestResult": "Àbájáde tuntun jùlọ",
+    "scheduledWakes": "yoo ji {{time}}"
   },
   "transcriptionModel": {
     "title": "Àwòṣe ìyípadà ohùn sí ọ̀rọ̀",

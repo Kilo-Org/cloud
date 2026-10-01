@@ -40,7 +40,7 @@ jest.mock('@/lib/stripe-client', () => ({
 }));
 
 import jwt from 'jsonwebtoken';
-import { authOptions } from '@/lib/user/server';
+import { authOptions } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
@@ -304,7 +304,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
       },
       profile: { sub: 'openai-sub', email: 'sso-link@example.com' },
     } as never);
@@ -339,7 +339,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
       },
       profile,
     } as never);
@@ -392,7 +392,7 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
         type: 'oauth',
         access_token: 'access-token',
         refresh_token: 'refresh-token',
-        scope: 'openid profile email offline_access resource.invoke chatpass.enable.request',
+        scope: 'openid profile email offline_access resource.invoke chatgpt.tokens.use.obo',
       },
       profile: { sub: 'openai-shared-services-sub', email: 'shared-services@example.com' },
     } as never);

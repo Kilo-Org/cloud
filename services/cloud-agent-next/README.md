@@ -2,6 +2,8 @@
 
 A Cloudflare Worker that provides a secure, scalable API for running [Kilocode](https://kilo.ai) AI coding tasks in isolated sandbox environments with GitHub integration.
 
+`workspace_*` sessions use the control plane in [`docs/control-plane.md`](docs/control-plane.md): the Session DO (`src/control-plane/session/`), the Sandbox DO (`src/control-plane/sandbox/`), and `wrapper/src/control-plane/`. The Worker exports those DOs as `SandboxSession` and `SandboxControl`. `agent_*` sessions still use `CloudAgentSession` and `wrapper/src/main.ts`. The prepare/initiate API below is that legacy plane.
+
 ## Development Setup
 
 ### Building the Development Docker Image

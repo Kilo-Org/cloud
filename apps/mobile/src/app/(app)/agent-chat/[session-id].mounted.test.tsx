@@ -43,6 +43,8 @@ vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshCont
 const useRouterMock = vi.hoisted(() => vi.fn());
 const useQueryMock = vi.hoisted(() => vi.fn());
 const queryOptionsMock = vi.hoisted(() => vi.fn());
+// The route builds its narrowed foreground key from this session-scoped input.
+const cliSessionGetQueryKeyMock = vi.hoisted(() => vi.fn(() => [['cliSessionsV2', 'get']]));
 const organizations = vi.hoisted(() => [
   { organizationId: 'org-a', organizationName: 'Session organization' },
 ]);
@@ -168,8 +170,11 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
 }));
 
 // Foreground query refresh is separate from route parsing and provider lifetime.
+const useRouteForegroundRefreshMock = vi.hoisted(() =>
+  vi.fn<(queryKeys: readonly (readonly unknown[])[]) => void>()
+);
 vi.mock('@/lib/hooks/use-route-foreground-refresh', () => ({
-  useRouteForegroundRefresh: vi.fn(),
+  useRouteForegroundRefresh: useRouteForegroundRefreshMock,
 }));
 
 vi.mock('@/lib/auth/auth-context', () => ({
@@ -196,7 +201,7 @@ vi.mock('@/lib/trpc', () => ({
     cliSessionsV2: {
       get: {
         queryOptions: queryOptionsMock,
-        queryKey: () => [['cliSessionsV2', 'get']],
+        queryKey: cliSessionGetQueryKeyMock,
       },
     },
   }),
@@ -488,6 +493,8 @@ beforeEach(() => {
   );
   useLocalSearchParamsMock.mockReset();
   useRouterMock.mockReset();
+  useRouteForegroundRefreshMock.mockClear();
+  cliSessionGetQueryKeyMock.mockClear();
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   useRouterMock.mockReturnValue({
     canGoBack: () => navigationRoutes.length > 1,
@@ -935,6 +942,23 @@ describe('SessionDetailScreen valid session-id', () => {
         node => propOf(node, 'accessibilityLabel') === i18n.t('common.copyLink')
       )
     ).toHaveLength(0);
+  });
+});
+
+describe('SessionDetailScreen foreground refresh scope', () => {
+  it('invalidates only the opened session metadata and model preferences', async () => {
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1' });
+    await mountRoute();
+
+    // The key is built from the opened session's own input, not a procedure-wide
+    // prefix and not the empty-id fallback.
+    expect(cliSessionGetQueryKeyMock).toHaveBeenCalledWith({ session_id: 'sess-1' });
+    expect(useRouteForegroundRefreshMock).toHaveBeenCalled();
+    const keys = useRouteForegroundRefreshMock.mock.calls.at(-1)?.[0];
+    expect(keys).toEqual([[['cliSessionsV2', 'get']], [['modelPreferences']]]);
+    // The whole-procedure prefix would refetch every retained `cliSessionsV2`
+    // query — the stored `cliSessionsV2.list` pages behind this pushed route.
+    expect(keys).not.toContainEqual([['cliSessionsV2']]);
   });
 });
 

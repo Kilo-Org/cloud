@@ -454,7 +454,7 @@ const PrepareSessionCloneVariant = z.object({
   prompt: z.undefined().optional(),
   initialMessageId: z.undefined().optional(),
   initialPayload: z.undefined().optional(),
-  cloneFromKiloSessionId: z.string().startsWith('ses_').length(30),
+  cloneFromKiloSessionId: kiloSessionIdSchema,
   autoInitiate: z.literal(true),
   operationKey: z.string().uuid(),
   ...PrepareSessionSharedFields,
@@ -511,7 +511,7 @@ export const organizationPrepareSessionNextSchema = basePrepareSessionNextSchema
 
 // Output schema for prepareSession
 export const basePrepareSessionNextOutputSchema = z.object({
-  kiloSessionId: z.string().startsWith('ses_').length(30),
+  kiloSessionId: kiloSessionIdSchema,
   cloudAgentSessionId: z.string(),
   /** `true` when the response replays an already-settled create for the same `operationKey`. */
   replayed: z.boolean().optional(),
@@ -727,7 +727,7 @@ export const executionStatusNextSchema = z
 export const baseGetSessionNextOutputSchema = z.object({
   // Session identifiers
   sessionId: z.string(),
-  kiloSessionId: z.string().startsWith('ses_').length(30).optional(),
+  kiloSessionId: kiloSessionIdSchema.optional(),
   userId: z.string(),
   orgId: z.string().optional(),
   sandboxId: z.string().optional(),

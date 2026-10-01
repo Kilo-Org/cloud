@@ -55,6 +55,7 @@ export function glanceableLayoutCopy() {
     privacy: i18n.t(GLANCEABLE_STATUS_COPY_KEY.privacy),
     needsInput: i18n.t('glanceable.needsInput'),
     running: i18n.t('common.working'),
+    scheduled: i18n.t('common.scheduled'),
     idle: i18n.t('common.idle'),
     openAgents: i18n.t('glanceable.openAgents'),
     newestResult: i18n.t('glanceable.newestResult'),

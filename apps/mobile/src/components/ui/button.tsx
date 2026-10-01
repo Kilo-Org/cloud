@@ -1,5 +1,5 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { Pressable } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { TextClassContext } from '@/components/ui/text';
@@ -40,6 +40,19 @@ const buttonVariants = cva(
 // sm is 36pt tall; expand the touchable area by 4pt on every edge to reach 44pt
 // without changing the compact visual size.
 const SM_HIT_SLOP = { top: 4, bottom: 4, left: 4, right: 4 };
+
+// The busy spinner is drawn inside a fixed-size slot before the label. The slot
+// is rendered in both states - an empty 20pt box at rest, the spinner while
+// `loading` is on - so flipping `loading` only swaps its contents: no box is
+// added or removed and the label never shifts. An in-flow slot (rather than an
+// absolute overlay pinned to the content edge) keeps the spinner beside a
+// content-sized button's label instead of drawing it on top of the label.
+// `shrink-0` is what makes the reservation hold: a flex child defaults to
+// `flex-shrink: 1`, so a long or large-type label could compress the 20pt slot
+// to a sliver and collapse the spinner inside it while the centered label
+// stayed put (the 2026-09-29 device proof: identical label ink, near-zero busy
+// ink in flight). The slot never gives up its box, in either motion branch.
+export const BUTTON_BUSY_SLOT_CLASS = 'h-[20px] w-[20px] shrink-0 items-center justify-center';
 
 // Spinner color per variant, matching that variant's text color (see
 // buttonTextVariants below). accent-soft's foreground isn't in useThemeColors
@@ -113,6 +126,15 @@ function Button({
   // keeps the brand fill and its spinner so it still reads as working.
   const isMutedDisabled = isDisabled && !loading && isPrimary;
   const isDimmed = isDisabled && !isPrimary;
+  // Reserve the busy slot whenever the caller opted into `loading` (even when
+  // it is false), so the row has the same geometry before and during a request.
+  // A button that never loads keeps its original layout. The fixed `icon` size
+  // has no label to keep in place, so it shows the indicator inline instead of
+  // reserving a slot that would overflow its 44pt box.
+  const rendersBusySlot = loading !== undefined && size !== 'icon';
+  const busyIndicator = loading ? (
+    <ActivityIndicator size="small" color={spinnerColor(variant, colors)} />
+  ) : null;
   return (
     <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
       <Pressable
@@ -128,8 +150,17 @@ function Button({
         hitSlop={hitSlop ?? (size === 'sm' ? SM_HIT_SLOP : undefined)}
         {...props}
       >
-        {loading ? <ActivityIndicator size="small" color={spinnerColor(variant, colors)} /> : null}
+        {rendersBusySlot ? (
+          <View className={BUTTON_BUSY_SLOT_CLASS}>{busyIndicator}</View>
+        ) : (
+          busyIndicator
+        )}
         {children}
+        {rendersBusySlot ? (
+          // Mirrors the leading slot (and the row's own gap), so the label keeps
+          // the button's centre instead of drifting toward the trailing edge.
+          <View className={BUTTON_BUSY_SLOT_CLASS} />
+        ) : null}
       </Pressable>
     </TextClassContext.Provider>
   );

@@ -6,7 +6,12 @@ import {
   type UsageContext,
 } from '@kilocode/container-usage';
 import { z } from 'zod';
-import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
+import {
+  getSandboxAllocationResources,
+  type CloudflareContainersInstance,
+  type SandboxAllocation,
+  type VercelSandboxResources,
+} from '@kilocode/worker-utils/sandbox-allocation';
 import { logger } from './logger.js';
 import { classifySandboxId, isIsolatedSandboxId, isValidSandboxId } from './sandbox-id.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
@@ -23,6 +28,8 @@ export const SANDBOX_USAGE_SKUS = {
   SandboxCodeReviewContainment: 'cloud-agent-code-review-2026-07',
   SandboxContainersStandard3: 'cloud-agent-containers-standard-3-2026-09',
   SandboxContainersStandard4: 'cloud-agent-containers-standard-4-2026-09',
+  SandboxVercelSmall: 'cloud-agent-vercel-small-2026-09',
+  SandboxVercelLarge: 'cloud-agent-vercel-large-2026-09',
 } as const;
 
 export type SandboxClassName = keyof typeof SANDBOX_USAGE_SKUS;
@@ -33,7 +40,12 @@ export type ContainersBillingClassName =
   | 'SandboxContainersStandard3'
   | 'SandboxContainersStandard4';
 
-export type LegacySandboxClassName = Exclude<SandboxClassName, ContainersBillingClassName>;
+export type VercelBillingClassName = 'SandboxVercelSmall' | 'SandboxVercelLarge';
+
+export type LegacySandboxClassName = Exclude<
+  SandboxClassName,
+  ContainersBillingClassName | VercelBillingClassName
+>;
 
 // Production values mirror this service's top-level wrangler.jsonc entries and
 // apps/web/src/lib/cloudflare/container-capacity.ts. The parity test reads all three sources.
@@ -55,6 +67,26 @@ export const CONTAINERS_BILLING_CAPACITIES: Record<ContainersBillingClassName, S
   SandboxContainersStandard4: { vcpu: 4, memoryMiB: 12_288, diskMB: 20_000 },
 };
 
+/** Vercel presets have no disk; the session schema carries `vcpus` and `memory` only. */
+export type VercelBillingCapacity = { vcpu: number; memoryMiB: number };
+
+/** The Vercel preset each billing class measures; `sandbox-allocation` owns the dimensions. */
+const VERCEL_ALLOCATION_BY_CLASS: Record<VercelBillingClassName, SandboxAllocation> = {
+  SandboxVercelSmall: 'vercel-small',
+  SandboxVercelLarge: 'vercel-large',
+};
+
+export const VERCEL_BILLING_CAPACITIES: Record<VercelBillingClassName, VercelBillingCapacity> =
+  Object.fromEntries(
+    Object.entries(VERCEL_ALLOCATION_BY_CLASS).map(([className, allocation]) => {
+      const resources = getSandboxAllocationResources(allocation);
+      if (resources === undefined) {
+        throw new Error(`Vercel billing allocation has no resources: ${allocation}`);
+      }
+      return [className, { vcpu: resources.vcpus, memoryMiB: resources.memory }];
+    })
+  ) as Record<VercelBillingClassName, VercelBillingCapacity>;
+
 const USAGE_SERVICE_ROOT = 'cloud-agent-next';
 
 export function usageServiceForSandboxClass(sandboxClassName: SandboxClassName): string {
@@ -68,12 +100,22 @@ export function isContainersBillingClassName(
   return Object.hasOwn(CONTAINERS_BILLING_CAPACITIES, sandboxClassName);
 }
 
+export function isVercelBillingClassName(
+  sandboxClassName: SandboxClassName
+): sandboxClassName is VercelBillingClassName {
+  return Object.hasOwn(VERCEL_BILLING_CAPACITIES, sandboxClassName);
+}
+
 export function billingCapacityForSandboxClass(
   sandboxClassName: SandboxClassName
-): SandboxCapacity {
-  return isContainersBillingClassName(sandboxClassName)
-    ? CONTAINERS_BILLING_CAPACITIES[sandboxClassName]
-    : SANDBOX_CAPACITIES[sandboxClassName];
+): SandboxCapacity | VercelBillingCapacity {
+  if (isVercelBillingClassName(sandboxClassName)) {
+    return VERCEL_BILLING_CAPACITIES[sandboxClassName];
+  }
+  if (isContainersBillingClassName(sandboxClassName)) {
+    return CONTAINERS_BILLING_CAPACITIES[sandboxClassName];
+  }
+  return SANDBOX_CAPACITIES[sandboxClassName];
 }
 
 export type ContainersBillingIdentity = {
@@ -100,6 +142,32 @@ export function containersBillingIdentity(instance: string): ContainersBillingId
     service: usageServiceForSandboxClass(className),
     sku: SANDBOX_USAGE_SKUS[className],
     capacity: CONTAINERS_BILLING_CAPACITIES[className],
+  };
+}
+
+export type VercelBillingIdentity = {
+  className: VercelBillingClassName;
+  service: string;
+  sku: string;
+  capacity: VercelBillingCapacity;
+};
+
+export function vercelBillingIdentity(resources: VercelSandboxResources): VercelBillingIdentity {
+  const matchingClass = (Object.keys(VERCEL_BILLING_CAPACITIES) as VercelBillingClassName[]).find(
+    className =>
+      VERCEL_BILLING_CAPACITIES[className].vcpu === resources.vcpus &&
+      VERCEL_BILLING_CAPACITIES[className].memoryMiB === resources.memory
+  );
+  if (matchingClass === undefined) {
+    throw new Error(
+      `Vercel billing is unsupported for resources: ${resources.vcpus}:${resources.memory}`
+    );
+  }
+  return {
+    className: matchingClass,
+    service: usageServiceForSandboxClass(matchingClass),
+    sku: SANDBOX_USAGE_SKUS[matchingClass],
+    capacity: VERCEL_BILLING_CAPACITIES[matchingClass],
   };
 }
 
@@ -135,7 +203,7 @@ type BillingRuntimeStatusCapability = {
   getBillingRuntimeStatus?: MeteredSandboxInstance['getBillingRuntimeStatus'];
 };
 
-const sandboxBillingInputEnvelopeSchema = z
+export const sandboxBillingInputEnvelopeSchema = z
   .object({
     sandboxId: z
       .string()
@@ -244,6 +312,7 @@ export function assertSandboxBillingAllocation(
   const expectedSandboxIdClass = standardClass
     ? 'isolated-standard'
     : isContainersBillingClassName(sandboxClassName) ||
+        isVercelBillingClassName(sandboxClassName) ||
         sandboxClassName === 'SandboxSmall' ||
         sandboxClassName === 'SandboxSmallContainment'
       ? 'isolated-small'

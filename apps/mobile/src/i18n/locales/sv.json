@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gå tillbaka",
     "idle": "Väntar",
+    "scheduled": "Schemalagd",
     "keepEditing": "Fortsätt redigera",
     "keepRunning": "Fortsätt köra",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Lägg till en passnyckel",
     "passkeyDefaultName": "Passnyckel",
     "passkeyAddedOn": "Tillagd {{date}}",
+    "passkeyLastUsedOn": "Senast använd {{date}}",
     "passkeyAdded": "Passnyckel tillagd.",
     "passkeyAddFailed": "Det gick inte att lägga till en passnyckel. Försök igen.",
     "passkeyAddUnsupported": "Den här enheten kan inte skapa passnycklar.",
@@ -566,7 +568,14 @@
       "deletedUser": "borttagen användare",
       "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
       "moreLinesAbove_one": "… fler rader ovanför: {{displayCount}}",
-      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}"
+      "moreLinesAbove_other": "… fler rader ovanför: {{displayCount}}",
+      "deleteComment": "Ta bort kommentar",
+      "deleteCommentTitle": "Ta bort kommentaren?",
+      "deleteCommentMessage": "Den här kommentaren tas bort från PR:en.",
+      "commentEditFailed": "Det gick inte att spara din kommentar. Kontrollera anslutningen och försök igen.",
+      "commentEditUnavailable": "Den här kommentaren kan inte redigeras. Den kan ha tagits bort.",
+      "commentDeleteFailed": "Det gick inte att ta bort din kommentar. Kontrollera anslutningen och försök igen.",
+      "commentDeleteUnavailable": "Den här kommentaren kan inte tas bort."
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
+      "commentUpdated": "Kommentar uppdaterad",
+      "commentDeleted": "Kommentar borttagen",
       "reviewSubmitted": "Granskning skickad",
       "autoMergeEnabled": "Automatisk sammanslagning aktiverad"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
       "couldNotRefresh": "Kunde inte uppdatera",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
+      "viewHistory": "Sessionshistorik",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",
       "tryAdjustFilters": "Prova att ändra eller rensa filtren.",
       "couldNotSearch": "Kunde inte söka bland sessionerna.",
       "completedWillAppear": "Slutförda sessioner visas här.",
       "noPastSessions": "Inga tidigare sessioner",
+      "pastSessions": "Tidigare sessioner",
       "live": "I REALTID",
       "updating": "Uppdaterar"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",
       "readOnly": "Den här sessionen är skrivskyddad.",
+      "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
+      "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Gå tillbaka och öppna väljaren igen från föregående skärm."
   },
   "sessionRow": {
-    "needsInput": "VÄNTAR PÅ SVAR"
+    "needsInput": "VÄNTAR PÅ SVAR",
+    "scheduled": "SCHEMALAGD"
   },
   "voiceInput": {
     "listening": "Lyssnar…",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Inga betrodda webbplatser",
     "emptyDescription": "Om du anger att du litar på en webbplats öppnas länkar dit utan att du behöver bekräfta igen.",
     "revoke": "Sluta lita på {{host}}",
+    "revokeMessage": "Länkar till den här webbplatsen kommer att be om bekräftelse igen.",
     "backToPreferences": "Tillbaka till inställningarna"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen.",
     "openSession": "Öppna",
     "approveFailed": "Det gick inte att godkänna. Tryck på $t(common.approve) för att försöka igen.",
-    "newestResult": "Nyaste resultatet"
+    "newestResult": "Nyaste resultatet",
+    "scheduledWakes": "vaknar {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkriberingsmodell",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Deebi'i",
     "idle": "Hojii malee",
+    "scheduled": "Karoorfame",
     "keepEditing": "Gulaaluu itti fufi",
     "keepRunning": "Hojii irra tursi",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Furtuu seenii dabali",
     "passkeyDefaultName": "Furtuu seenii",
     "passkeyAddedOn": "{{date}} dabalaman",
+    "passkeyLastUsedOn": "Yeroo dhumaa itti fayyadame {{date}}",
     "passkeyAdded": "Furtuu seenii dabalaman.",
     "passkeyAddFailed": "Furtuu seenii dabaluun hin danda'amne. Irra deebi'ii yaali.",
     "passkeyAddUnsupported": "Meeshaan kun furtuu seenii uumuu hin danda'u.",
@@ -566,7 +568,14 @@
       "deletedUser": "fayyadamaa haqame",
       "replyForbiddenTerm": "{{term}} kanaaf deebii kennuuf hayyama hin qabdu.",
       "moreLinesAbove_one": "… Sararoonni dabalataa {{displayCount}} ol jiru.",
-      "moreLinesAbove_other": "… Sararoonni dabalataa {{displayCount}} ol jiru."
+      "moreLinesAbove_other": "… Sararoonni dabalataa {{displayCount}} ol jiru.",
+      "deleteComment": "Yaada haqi",
+      "deleteCommentTitle": "Yaada haquu?",
+      "deleteCommentMessage": "Yaadni kun gaaffii walitti makuu keessaa haqama.",
+      "commentEditFailed": "Yaada kee kuusuu hin dandeenye. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "commentEditUnavailable": "Yaadni kun gulaalamuu hin danda'u. Haqameera ta'a.",
+      "commentDeleteFailed": "Yaada kee haquu hin dandeenye. Walqunnamtii kee ilaaliitii irra deebi'ii yaali.",
+      "commentDeleteUnavailable": "Yaadni kun haqamuu hin danda'u."
     },
     "couldNotOpenGitHubAppSettings": "Qindaa'ina appii GitHub banuun hin danda'amne.",
     "installKiloGitHubApp": "Appii Kilo GitHub fe'i",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Liinkii gaaffii walitti makuu miti",
     "announce": {
       "commentPosted": "Yaadni maxxanfameera",
+      "commentUpdated": "Yaadni haaromfameera",
+      "commentDeleted": "Yaadni haqameera",
       "reviewSubmitted": "Gamaaggamni dhiheeffameera",
       "autoMergeEnabled": "Ofumaan walitti makuun hojii irra ooleera"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
       "couldNotRefresh": "Haaromsuun hin danda'amne",
       "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
+      "viewHistory": "Seenaa turtiiwwanii",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",
       "tryAdjustFilters": "Calaltuuwwan kee jijjiiruu ykn haquuf yaali.",
       "couldNotSearch": "Turtiiwwan barbaaduun hin danda'amne.",
       "completedWillAppear": "Turtiiwwan xumuraman asitti mul'atu.",
       "noPastSessions": "Turtiin darbe hin jiru",
+      "pastSessions": "Turtiiwwan darbe",
       "live": "KALLATTIIN",
       "updating": "Haaromsaa jira"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Maqaa turtii",
       "transcriptAccessibility": "Galmee marii turtii",
       "readOnly": "Turtii kana dubbisuu qofa dandeessa.",
+      "continueInNewSession": "Turtii haaraa keessatti itti fufi",
       "emptyDescription": "Jalqabuuf gadiitti ergaa ergi.",
       "scrollToBottom": "Gara jalaatti siqsi",
       "emptyTitle": "Hanga ammaatti ergaan hin jiru",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",
+      "selectRepositoryToStart": "Jalqabuuf kuusaa koodii filadhu.",
+      "connectProviderToStart": "Jalqabuuf waltajjii walqabsiisi.",
       "promptPlaceholder": "Maal irratti hojjechuu barbaadda?",
       "couldNotLoadModels": "Moodeloota fe'uu hin danda'amne.",
       "prefillRepoAndModelUnavailable": "Kuusaan koodii fi moodeli turtii jalqabaa kana booda hin argaman. Gadiitti isaan filadhu.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Gara fuula duraatti deebi'iitii filattoo kana deebi'ii bani."
   },
   "sessionRow": {
-    "needsInput": "DEEBII BARBAADA"
+    "needsInput": "DEEBII BARBAADA",
+    "scheduled": "KAROORFAME"
   },
   "voiceInput": {
     "listening": "Dhaggeeffachaa jira...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Keessummeessitoonni amanaman hin jiran",
     "emptyDescription": "Keessummeessaa geessituu tokko yoo amante, deebi'ee osoo hin gaafatin bana.",
     "revoke": "Amanamummaa {{host}} haqi",
+    "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi.",
     "openSession": "Bani",
     "approveFailed": "Raggaasisuun hin danda'amne. Deebi'anii yaaluuf $t(common.approve) tuqi.",
-    "newestResult": "Bu'aa haaraa"
+    "newestResult": "Bu'aa haaraa",
+    "scheduledWakes": "{{time}} dammaqaa"
   },
   "transcriptionModel": {
     "title": "Moodeela sagalee gara barreeffamaatti jijjiiru",

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "بازگشت",
     "idle": "بیکار",
+    "scheduled": "زمانبندیشده",
     "keepEditing": "ادامه ویرایش",
     "keepRunning": "ادامه اجرا",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "افزودن کلید عبور",
     "passkeyDefaultName": "کلید عبور",
     "passkeyAddedOn": "افزوده‌شده در {{date}}",
+    "passkeyLastUsedOn": "آخرین استفاده {{date}}",
     "passkeyAdded": "کلید عبور افزوده شد.",
     "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
     "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
@@ -566,7 +568,14 @@
       "deletedUser": "کاربر حذف‌شده",
       "replyForbiddenTerm": "اجازهٔ پاسخ دادن در این {{term}} را ندارید.",
       "moreLinesAbove_one": "… {{displayCount}} خط دیگر در بالا",
-      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا"
+      "moreLinesAbove_other": "… {{displayCount}} خط دیگر در بالا",
+      "deleteComment": "حذف نظر",
+      "deleteCommentTitle": "نظر حذف شود؟",
+      "deleteCommentMessage": "این نظر از درخواست ادغام حذف می‌شود.",
+      "commentEditFailed": "ذخیرهٔ نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentEditUnavailable": "این نظر قابل ویرایش نیست. ممکن است حذف شده باشد.",
+      "commentDeleteFailed": "حذف نظر شما ممکن نشد. اتصال خود را بررسی کنید و دوباره تلاش کنید.",
+      "commentDeleteUnavailable": "این نظر قابل حذف نیست."
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "این پیوند مربوط به پول ریکوئست یا درخواست ادغام نیست.",
     "announce": {
       "commentPosted": "نظر ارسال شد",
+      "commentUpdated": "نظر به‌روزرسانی شد",
+      "commentDeleted": "نظر حذف شد",
       "reviewSubmitted": "بازبینی ارسال شد",
       "autoMergeEnabled": "ادغام خودکار فعال شد"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
       "couldNotRefresh": "بازخوانی ممکن نشد",
       "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
+      "viewHistory": "تاریخچه نشست‌ها",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
       "tryAdjustFilters": "فیلترها را تغییر دهید یا پاک کنید.",
       "couldNotSearch": "جستجوی نشست‌ها ممکن نشد.",
       "completedWillAppear": "نشست‌های پایان‌یافته اینجا نمایش داده می‌شوند.",
       "noPastSessions": "نشست قبلی وجود ندارد",
+      "pastSessions": "نشست‌های قبلی",
       "live": "زنده",
       "updating": "در حال به‌روزرسانی"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "نام نشست",
       "transcriptAccessibility": "متن گفت‌وگوی نشست",
       "readOnly": "این نشست فقط خواندنی است.",
+      "continueInNewSession": "ادامه در یک نشست جدید",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
+      "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "به عقب برگردید و این انتخاب‌گر را از صفحه قبلی دوباره باز کنید."
   },
   "sessionRow": {
-    "needsInput": "در انتظار ورودی"
+    "needsInput": "در انتظار ورودی",
+    "scheduled": "زمانبندیشده"
   },
   "voiceInput": {
     "listening": "در حال گوش دادن...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "میزبان مورد اعتمادی نیست",
     "emptyDescription": "اگر به میزبان یک پیوند اعتماد کنید، پیوندهای آن بدون درخواست تأیید دوباره باز می‌شوند.",
     "revoke": "لغو اعتماد به {{host}}",
+    "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
     "backToPreferences": "بازگشت به تنظیمات"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحهٔ قفل، فعالیت‌های زنده را در تنظیمات فعال کنید.",
     "openSession": "باز کن",
     "approveFailed": "تأیید ممکن نشد. برای تلاش دوباره روی $t(common.approve) ضربه بزنید.",
-    "newestResult": "جدیدترین نتیجه"
+    "newestResult": "جدیدترین نتیجه",
+    "scheduledWakes": "{{time}} بیدار می‌شود"
   },
   "transcriptionModel": {
     "title": "مدل تبدیل گفتار به متن",

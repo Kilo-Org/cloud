@@ -1,5 +1,7 @@
 import {
+  getKiloSandboxAllocation,
   getSandboxAllocationKey,
+  getSandboxAllocationResources,
   type SelectableSandboxAllocationRequest,
   type SandboxDestination,
   type SandboxSelectionCapabilities,
@@ -26,17 +28,19 @@ const cloudflareServices: Partial<Record<SandboxDestination['instanceType'], str
   shared: 'cloud-agent-next-sandbox',
   'isolated-standard': 'cloud-agent-next-sandbox',
   devcontainer: 'cloud-agent-next-sandbox-dind',
+  'standard-3': 'cloud-agent-next-sandbox-containers-standard3',
+  'standard-4': 'cloud-agent-next-sandbox-containers-standard4',
 };
 
 const instanceLabels: Record<SandboxDestination['instanceType'], string> = {
-  single: 'Single',
-  shared: 'Shared',
-  'isolated-standard': 'Dedicated Standard',
-  'standard-3': '2 vCPU / 8 GiB',
-  'standard-4': '4 vCPU / 12 GiB',
+  single: 'Small',
+  shared: 'Large · Shared',
+  'isolated-standard': 'Large',
+  'standard-3': 'Medium',
+  'standard-4': 'Large',
   devcontainer: 'Dev container',
-  small: '2 vCPU / 4 GiB',
-  large: '4 vCPU / 8 GiB',
+  small: 'Small',
+  large: 'Medium',
   default: 'Provider default',
 };
 
@@ -49,20 +53,49 @@ export function formatSandboxProvider(provider: SandboxDestination['provider']):
 }
 
 /**
+ * Formats the fixed Vercel instance resources. Both accounts run the same
+ * hardware, so the Kilo allocation is the existing mapping to the single
+ * resource table in worker-utils.
+ */
+function formatVercelCapacity(instanceType: 'small' | 'large'): string | null {
+  const resources = getSandboxAllocationResources(
+    getKiloSandboxAllocation({ provider: { id: 'vercel', account: 'kilo' }, instanceType })
+  );
+  return resources
+    ? formatContainerCapacity({
+        vcpu: resources.vcpus,
+        memoryBytes: resources.memory * 1024 ** 2,
+      })
+    : null;
+}
+
+function sandboxDestinationCapacity(destination: SandboxDestination): string | null {
+  const service = cloudflareServices[destination.instanceType];
+  if (service) {
+    const capacity = containerCapacityForService(service);
+    return capacity ? formatContainerCapacity(capacity) : null;
+  }
+  const { instanceType } = destination;
+  if (
+    destination.provider.id === 'vercel' &&
+    (instanceType === 'small' || instanceType === 'large')
+  ) {
+    return formatVercelCapacity(instanceType);
+  }
+  return null;
+}
+
+/**
  * Splits an instance into the capacity every provider can be compared by and the
- * tenancy tier only Cloudflare names on top of it. Vercel publishes no container
- * class, so its instance name already states the capacity.
+ * tenancy tier only the provider names on top of it.
  */
 function getSandboxInstanceLabels(destination: SandboxDestination): {
   capacity: string;
   tier?: string;
 } {
   const name = instanceLabels[destination.instanceType];
-  const service = cloudflareServices[destination.instanceType];
-  const capacity = service ? containerCapacityForService(service) : null;
-  return capacity
-    ? { capacity: formatContainerCapacity(capacity), tier: name }
-    : { capacity: name };
+  const capacity = sandboxDestinationCapacity(destination);
+  return capacity ? { capacity, tier: name } : { capacity: name };
 }
 
 export function formatSandboxCapacity(destination: SandboxDestination): string {
@@ -81,8 +114,8 @@ export function formatSandboxDestination(destination: SandboxDestination | undef
 
 /**
  * Trigger label. Capacity is the part users weigh when picking a sandbox, so it
- * stays; the tenancy tier waits for the open menu. Providers that name no tier —
- * every Vercel instance — get the same string as `formatSandboxDestination`.
+ * stays; the tenancy tier waits for the open menu. Instances without a resolved
+ * capacity fall back to the name.
  */
 export function formatSandboxDestinationWithoutTier(
   destination: SandboxDestination | undefined

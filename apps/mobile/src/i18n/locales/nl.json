@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
+    "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Een passkey toevoegen",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Toegevoegd op {{date}}",
+    "passkeyLastUsedOn": "Laatst gebruikt {{date}}",
     "passkeyAdded": "Passkey toegevoegd.",
     "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
     "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",
@@ -1513,12 +1515,14 @@
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
       "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
+      "viewHistory": "Sessiegeschiedenis",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Pas je filters aan of wis ze.",
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
+      "pastSessions": "Eerdere sessies",
       "live": "ACTIEF",
       "updating": "Bijwerken"
     },
@@ -1581,6 +1585,7 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
+      "continueInNewSession": "Doorgaan in een nieuwe sessie",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
@@ -1671,6 +1676,8 @@
       "leaveChanges": "Niet committen",
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
+      "selectRepositoryToStart": "Selecteer een repository om te starten.",
+      "connectProviderToStart": "Koppel een platform om te starten.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",
@@ -2256,7 +2263,8 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "INVOER NODIG"
+    "needsInput": "INVOER NODIG",
+    "scheduled": "GEPLAND"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2620,7 +2628,14 @@
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
       "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
-      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}.",
+      "deleteComment": "Opmerking verwijderen",
+      "deleteCommentTitle": "Opmerking verwijderen?",
+      "deleteCommentMessage": "Deze opmerking wordt uit de PR verwijderd.",
+      "commentEditFailed": "Je opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.",
+      "commentEditUnavailable": "Deze opmerking kan niet worden bewerkt. Mogelijk is deze verwijderd.",
+      "commentDeleteFailed": "Je opmerking kon niet worden verwijderd. Controleer je verbinding en probeer het opnieuw.",
+      "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2933,6 +2948,8 @@
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
+      "commentUpdated": "Opmerking bijgewerkt",
+      "commentDeleted": "Opmerking verwijderd",
       "reviewSubmitted": "Beoordeling verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
     },
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
     "revoke": "Vertrouwen in {{host}} intrekken",
+    "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat"
+    "newestResult": "Nieuwste resultaat",
+    "scheduledWakes": "wordt wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",

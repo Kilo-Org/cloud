@@ -91,7 +91,7 @@ export async function deleteWorktreeResources(
     for (const session of state.manifest.sessions) {
       if (!session.cloudAgentSessionId) continue;
       const cloudAgentSessionId = session.cloudAgentSessionId;
-      const rawLocation = await withDORetry(
+      const rawBegin = await withDORetry(
         () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
         stub =>
           stub.beginWorktreeDeletion({
@@ -102,15 +102,9 @@ export async function deleteWorktreeResources(
           }),
         'beginWorktreeDeletion'
       );
-      const children = z.array(cloudAgentChildSessionLineageSchema).parse(
-        await withDORetry(
-          () => getSandboxSessionStub(ctx.env, ctx.userId, cloudAgentSessionId),
-          stub => stub.getWorktreeChildSessions(params.worktreeId),
-          'getWorktreeChildSessions'
-        )
-      );
+      const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawBegin.location);
+      const children = z.array(cloudAgentChildSessionLineageSchema).parse(rawBegin.children);
       childSessions.push(...children.map(child => ({ ...child, cloudAgentSessionId })));
-      const location = cloudAgentWorktreeLocationSchema.nullable().parse(rawLocation);
       if (
         location &&
         !runtimeLocations.some(

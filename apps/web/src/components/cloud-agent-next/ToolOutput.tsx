@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -15,6 +15,9 @@ type ToolCodeBlockProps = {
   compact?: boolean;
   icon?: ReactNode;
   className?: string;
+  maxHeightClassName?: string;
+  scrollRef?: RefObject<HTMLPreElement | null>;
+  onScroll?: () => void;
 };
 
 export function ToolCodeBlock({
@@ -24,6 +27,9 @@ export function ToolCodeBlock({
   compact = false,
   icon,
   className,
+  maxHeightClassName = 'max-h-80',
+  scrollRef,
+  onScroll,
 }: ToolCodeBlockProps) {
   const copyButton = (
     <CopyMessageButton
@@ -57,12 +63,15 @@ export function ToolCodeBlock({
         </div>
       )}
       <pre
+        ref={scrollRef}
+        onScroll={onScroll}
         role="region"
         tabIndex={0}
         aria-label={label}
         aria-busy={isStreaming || undefined}
         className={cn(
-          'bg-background focus-visible:ring-ring max-h-80 max-w-full overflow-auto rounded-md p-2 font-mono text-xs leading-relaxed focus-visible:ring-2 focus-visible:outline-none',
+          'bg-background focus-visible:ring-ring max-w-full overflow-auto rounded-md p-2 font-mono text-xs leading-relaxed focus-visible:ring-2 focus-visible:outline-none',
+          maxHeightClassName,
           compact && 'min-w-0 flex-1'
         )}
       >

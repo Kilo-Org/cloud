@@ -1,5 +1,6 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import {
   credit_campaigns,
   credit_transactions,
@@ -92,26 +93,6 @@ export type CampaignWithStats = CreditCampaign & {
 
 function toMicrodollars(amount_usd: number): number {
   return Math.round(amount_usd * 1_000_000);
-}
-
-/**
- * Detects a Postgres unique-constraint violation (code 23505). Drizzle
- * wraps the pg error in a DrizzleQueryError so the code lives on the
- * `.cause`; we also check the top-level error in case wrapping changes
- * in a future upgrade.
- */
-function isUniqueViolation(error: unknown): boolean {
-  const pgCodeFrom = (e: unknown): string | undefined =>
-    e && typeof e === 'object' && 'code' in e
-      ? ((e as { code?: unknown }).code as string | undefined)
-      : undefined;
-  if (pgCodeFrom(error) === '23505') return true;
-  const cause =
-    error && typeof error === 'object' && 'cause' in error
-      ? (error as { cause?: unknown }).cause
-      : undefined;
-  if (pgCodeFrom(cause) === '23505') return true;
-  return false;
 }
 
 export const creditCampaignsRouter = createTRPCRouter({

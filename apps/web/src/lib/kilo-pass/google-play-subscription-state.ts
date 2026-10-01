@@ -5,7 +5,7 @@ import {
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
-import { KiloPassPaymentProvider } from './enums';
+import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 
 // A renewal creates a paid order. Grace, hold, pause and restore can change the
 // same order's entitlement without creating another credit grant.

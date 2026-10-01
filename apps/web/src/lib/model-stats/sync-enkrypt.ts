@@ -14,7 +14,7 @@ import type {
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
-import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
+import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
 import { ENKRYPT_MODEL_MAPPINGS, matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';
 
 export { matchEnkryptScores, parseEnkryptScores } from './enkrypt-identity';

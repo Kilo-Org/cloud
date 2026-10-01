@@ -1,4 +1,4 @@
-import { dirname, relative } from 'node:path';
+import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
@@ -178,6 +178,33 @@ describe('SessionService.buildRuntimeEnv', () => {
     expect(runtimeEnv.GIT_CONFIG_VALUE_2).toBeUndefined();
     expect(runtimeEnv.GIT_CONFIG_GLOBAL).toBeUndefined();
     expect(runtimeEnv.GIT_CONFIG_NOSYSTEM).toBeUndefined();
+  });
+
+  it('forces background subagents off and wins over a profile that re-enables them', () => {
+    const service = new SessionService();
+
+    const defaultEnv = service.buildRuntimeEnv({
+      context: service.buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_test',
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+    expect(defaultEnv.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+
+    const overridden = service.buildRuntimeEnv({
+      context: service.buildContext({
+        sandboxId: 'usr-test',
+        userId: 'user_test',
+        sessionId: 'agent_test',
+        envVars: { KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true' },
+      }),
+      env: createEnv(),
+      kiloCapability: 'kilo-token',
+    });
+    expect(overridden.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
   });
 });
 
@@ -966,16 +993,25 @@ describe('SessionService.resolveWorkspaceTokens', () => {
 });
 
 describe('writeGlobalRules', () => {
-  it('writes the shared Cloud Agent rules for the session', async () => {
+  it('writes the shared Cloud Agent rules sized to the shell-tool default timeout', async () => {
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const sandbox = createSandbox(createSession(), false, writeFile);
 
-    await writeGlobalRules(sandbox, '/home/agent_test', 'agent_test');
+    await writeGlobalRules(sandbox, '/home/agent_test', '900000');
 
     expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/.kilocode/rules/cloud-agent.md',
-      buildCloudAgentRules('agent_test')
+      buildCloudAgentRules('900000')
     );
+  });
+});
+
+describe('buildCloudAgentRules', () => {
+  it('bounds commands and sleeps to the shell-tool timeout', () => {
+    const rules = buildCloudAgentRules(240_000);
+
+    expect(rules).toContain('no more than 3 minutes 30 seconds');
+    expect(rules).toContain('never sleep longer than this limit');
   });
 });
 
@@ -1774,6 +1810,116 @@ describe('SessionService.prepareWorkspace', () => {
     expect(restoreCommand).toContain('XDG_CACHE_HOME=');
     expect(restoreCommand).toContain('/home/agent_test/.cache');
     expect(restoreCommand).not.toContain('KILOCODE_TOKEN=');
+  });
+
+  it('cleans up the restore token when devcontainer restore execution fails', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('kilo-restore-session.js')) {
+        throw new Error('devcontainer restore execution failed');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const sandbox = createSandbox(session);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('devcontainer restore execution failed');
+
+    expect(
+      session.exec.mock.calls.some(
+        ([command]) =>
+          typeof command === 'string' &&
+          command.includes('rm -f') &&
+          command.includes('/home/agent_test/.local/share/kilo/session-restore-token')
+      )
+    ).toBe(true);
+  });
+
+  it('cleans up the restore token and preserves a chmod failure after writing it', async () => {
+    const session = createSession(false);
+    session.exec.mockImplementation(async (command: string) => {
+      if (command.includes('chmod 600')) {
+        throw new Error('restore token chmod failed');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const sandbox = createSandbox(session, false, writeFile);
+    const metadata = {
+      ...createMetadata({ preparedAt: 1 }),
+      workspace: {
+        sandboxId: 'dind-abcdef' as const,
+        devcontainerRequested: true,
+      },
+    } satisfies CloudAgentSessionState;
+    const devcontainerHandle = {
+      containerId: 'container-dev',
+      innerWorkspaceFolder: '/workspaces/repo',
+      workspacePath: '/workspace/user/sessions/agent_test',
+      agentSessionId: 'agent_test',
+      overrideConfigPath: '/tmp/devcontainer-override-agent_test/devcontainer.json',
+      teardown: vi.fn().mockResolvedValue(undefined),
+    };
+    devcontainerMocks.detectDevContainer.mockResolvedValue({
+      configPath: '.devcontainer/devcontainer.json',
+    });
+    devcontainerMocks.bringUpDevContainer.mockResolvedValue(devcontainerHandle);
+
+    await expect(
+      new SessionService().prepareWorkspace({
+        sandbox,
+        sandboxId: 'dind-abcdef',
+        userId: 'user_test',
+        sessionId: 'agent_test' as SessionId,
+        env: createEnv(),
+        metadata,
+        kilocodeModel: 'test-model',
+      })
+    ).rejects.toThrow('restore token chmod failed');
+
+    expect(writeFile).toHaveBeenCalledWith(
+      '/home/agent_test/.local/share/kilo/session-restore-token',
+      expect.any(String)
+    );
+    const chmodCall = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('chmod 600')
+    );
+    const cleanupCall = session.exec.mock.calls.findIndex(
+      ([command]) => typeof command === 'string' && command.includes('rm -f')
+    );
+    expect(chmodCall).toBeGreaterThanOrEqual(0);
+    expect(cleanupCall).toBeGreaterThan(chmodCall);
+    expect(session.exec.mock.calls[cleanupCall]?.[0]).toContain(
+      '/home/agent_test/.local/share/kilo/session-restore-token'
+    );
   });
 
   it('replaces a warm Bitbucket review origin with the credential-free canonical URL', async () => {
@@ -3323,21 +3469,25 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('allowlists only the active session attachment directory for Kilo file access', async () => {
+  it('allows every external directory', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+
+    expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
+  });
+
+  it('disables the scheduler and cron tools', async () => {
     const result = await buildPromptWrapperRequests(createMetadata());
     const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
 
     expect(config).toMatchObject({
       permission: {
-        external_directory: {
-          '*': 'deny',
-          '/tmp/agent_test/**': 'allow',
-          '/tmp/attachments/agent_test/**': 'allow',
-        },
+        schedule_wakeup: 'deny',
+        cancel_wakeup: 'deny',
+        cron_create: 'deny',
+        cron_list: 'deny',
+        cron_delete: 'deny',
       },
-    });
-    expect(config).not.toMatchObject({
-      permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
     });
   });
 
@@ -3354,6 +3504,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
       expect(kiloConfig.snapshot).toBe(false);
       expect(opencodeConfig).toEqual(kiloConfig);
+      expect(result.readyRequest.materialized.env.KILO_DISABLE_CODEBASE_INDEXING).toBe(
+        'vscode-no-workspace'
+      );
     }
   );
 
@@ -3406,6 +3559,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config.model).toBe('kilo/test-model');
     expect(config.small_model).toBeUndefined();
     expect(config.agent?.title).toBeUndefined();
+  });
+
+  it('disables snapshots and codebase indexing in the session config', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      snapshot?: boolean;
+      indexing?: { enabled?: boolean };
+    };
+
+    expect(config.snapshot).toBe(false);
+    expect(config.indexing).toEqual({ enabled: false });
   });
 
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
@@ -3959,21 +4123,13 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       permission: {
         bash: Record<string, 'allow' | 'deny'>;
         edit: Record<string, 'allow' | 'deny'>;
-        external_directory: Record<string, 'allow' | 'deny'>;
+        external_directory: string;
         task: string;
         lsp: string;
       };
     };
     const relativeInputPath = relative('/workspace/user/sessions/agent_test', inputPath);
-    expect(
-      resolveCommandGuardBashPermission(
-        config.permission.external_directory,
-        `${dirname(inputPath)}/*`
-      )
-    ).toBe('allow');
-    expect(resolveCommandGuardBashPermission(config.permission.external_directory, '/tmp/*')).toBe(
-      'deny'
-    );
+    expect(config.permission.external_directory).toBe('allow');
     expect(resolveCommandGuardBashPermission(config.permission.edit, relativeInputPath)).toBe(
       'allow'
     );

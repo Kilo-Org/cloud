@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Torna enrere",
     "idle": "En espera",
+    "scheduled": "Programada",
     "keepEditing": "Continua editant",
     "keepRunning": "Mantén l'execució en curs",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Afegeix una clau d'accés",
     "passkeyDefaultName": "Clau d'accés",
     "passkeyAddedOn": "Afegida {{date}}",
+    "passkeyLastUsedOn": "Darrer ús {{date}}",
     "passkeyAdded": "Clau d'accés afegida.",
     "passkeyAddFailed": "No s'ha pogut afegir una clau d'accés. Torna-ho a provar.",
     "passkeyAddUnsupported": "Aquest dispositiu no pot crear claus d'accés.",
@@ -577,7 +579,14 @@
       "replyForbiddenTerm": "No tens permís per respondre a aquesta {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} línia més amunt",
       "moreLinesAbove_other": "… {{displayCount}} línies més amunt",
-      "moreLinesAbove_many": "… {{displayCount}} línies més amunt"
+      "moreLinesAbove_many": "… {{displayCount}} línies més amunt",
+      "deleteComment": "Elimina el comentari",
+      "deleteCommentTitle": "Eliminar el comentari?",
+      "deleteCommentMessage": "Aquest comentari s'eliminarà de la sol·licitud d'integració.",
+      "commentEditFailed": "No s'ha pogut desar el teu comentari. Comprova la connexió i torna-ho a provar.",
+      "commentEditUnavailable": "Aquest comentari no es pot editar. Pot ser que s'hagi eliminat.",
+      "commentDeleteFailed": "No s'ha pogut eliminar el teu comentari. Comprova la connexió i torna-ho a provar.",
+      "commentDeleteUnavailable": "Aquest comentari no es pot eliminar."
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
@@ -763,6 +772,8 @@
     "linkPasteNotAPullRequest": "No és un enllaç a una sol·licitud d'integració o de fusió",
     "announce": {
       "commentPosted": "Comentari publicat",
+      "commentUpdated": "Comentari actualitzat",
+      "commentDeleted": "Comentari eliminat",
       "reviewSubmitted": "Revisió enviada",
       "autoMergeEnabled": "Fusió automàtica activada"
     },
@@ -2042,12 +2053,14 @@
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
       "couldNotRefresh": "No s'ha pogut actualitzar",
       "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
+      "viewHistory": "Historial de sessions",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",
       "tryAdjustFilters": "Prova d'ajustar o esborrar els filtres.",
       "couldNotSearch": "No s'han pogut cercar les sessions.",
       "completedWillAppear": "Les sessions completades apareixeran aquí.",
       "noPastSessions": "Cap sessió anterior",
+      "pastSessions": "Sessions anteriors",
       "live": "EN DIRECTE",
       "updating": "S'està actualitzant"
     },
@@ -2113,6 +2126,7 @@
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",
       "readOnly": "Aquesta sessió és només de lectura.",
+      "continueInNewSession": "Continua en una sessió nova",
       "emptyDescription": "Envia un missatge a continuació per començar.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
@@ -2203,6 +2217,8 @@
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
+      "selectRepositoryToStart": "Selecciona un repositori per començar.",
+      "connectProviderToStart": "Connecta un proveïdor per començar.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",
@@ -2801,7 +2817,8 @@
     "optionsExpiredDescription": "Torna enrere i reobre aquest selector des de la pantalla anterior."
   },
   "sessionRow": {
-    "needsInput": "PENDENT DE RESPOSTA"
+    "needsInput": "PENDENT DE RESPOSTA",
+    "scheduled": "PROGRAMADA"
   },
   "voiceInput": {
     "listening": "S'està escoltant…",
@@ -3209,6 +3226,7 @@
     "emptyTitle": "No hi ha servidors de confiança",
     "emptyDescription": "Quan confies en el servidor d'un enllaç, els seus enllaços s'obren sense tornar a demanar confirmació.",
     "revoke": "Deixa de confiar en {{host}}",
+    "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
     "backToPreferences": "Torna a les preferències"
   },
   "quickChat": {
@@ -3238,7 +3256,8 @@
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig.",
     "openSession": "Obre",
     "approveFailed": "No s'ha pogut aprovar. Toca $t(common.approve) per tornar-ho a provar.",
-    "newestResult": "Resultat més recent"
+    "newestResult": "Resultat més recent",
+    "scheduledWakes": "es desperta {{time}}"
   },
   "transcriptionModel": {
     "title": "Model de transcripció",

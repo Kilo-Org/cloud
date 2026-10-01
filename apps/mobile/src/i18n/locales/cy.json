@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mynd yn ôl",
     "idle": "Segur",
+    "scheduled": "Wedi'i drefnu",
     "keepEditing": "Parhau i olygu",
     "keepRunning": "Parhau i redeg",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Ychwanegu allwedd mynediad",
     "passkeyDefaultName": "Allwedd mynediad",
     "passkeyAddedOn": "Ychwanegwyd {{date}}",
+    "passkeyLastUsedOn": "Defnyddiwyd ddiwethaf {{date}}",
     "passkeyAdded": "Allwedd mynediad wedi'i hychwanegu.",
     "passkeyAddFailed": "Methwyd ychwanegu allwedd mynediad. Rhowch gynnig arall arni.",
     "passkeyAddUnsupported": "Ni all y ddyfais hon greu allweddi mynediad.",
@@ -610,7 +612,14 @@
       "moreLinesAbove_zero": "… {{displayCount}} llinell arall uchod",
       "moreLinesAbove_two": "… {{displayCount}} llinell arall uchod",
       "moreLinesAbove_few": "… {{displayCount}} llinell arall uchod",
-      "moreLinesAbove_many": "… {{displayCount}} llinell arall uchod"
+      "moreLinesAbove_many": "… {{displayCount}} llinell arall uchod",
+      "deleteComment": "Dileu sylw",
+      "deleteCommentTitle": "Dileu'r sylw?",
+      "deleteCommentMessage": "Bydd y sylw hwn yn cael ei ddileu o'r cais tynnu.",
+      "commentEditFailed": "Ni lwyddwyd i gadw eich sylw. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "commentEditUnavailable": "Ni ellir golygu'r sylw hwn. Efallai iddo gael ei ddileu.",
+      "commentDeleteFailed": "Ni lwyddwyd i ddileu eich sylw. Gwiriwch eich cysylltiad a rhowch gynnig eto.",
+      "commentDeleteUnavailable": "Ni ellir dileu'r sylw hwn."
     },
     "couldNotOpenGitHubAppSettings": "Doedd dim modd agor gosodiadau ap GitHub.",
     "installKiloGitHubApp": "Gosod ap GitHub Kilo",
@@ -811,6 +820,8 @@
     "linkPasteNotAPullRequest": "Nid dolen cais tynnu neu gais uno yw hon",
     "announce": {
       "commentPosted": "Sylw wedi'i bostio",
+      "commentUpdated": "Sylw wedi'i ddiweddaru",
+      "commentDeleted": "Sylw wedi'i ddileu",
       "reviewSubmitted": "Adolygiad wedi'i gyflwyno",
       "autoMergeEnabled": "Cyfuno awtomatig wedi'i alluogi"
     },
@@ -2117,12 +2128,14 @@
       "couldNotLoadActive": "Ni lwyddwyd i lwytho'r sesiynau gweithredol.",
       "couldNotRefresh": "Ni lwyddwyd i adnewyddu",
       "noSessionsYetDescription": "Dechreuwch dasg codio o'ch ffôn. Bydd eich sesiynau'n ymddangos yma.",
+      "viewHistory": "Hanes sesiynau",
       "noMatches": "Dim sesiynau'n cyfateb",
       "tryDifferentSearch": "Rho gynnig ar derm chwilio gwahanol.",
       "tryAdjustFilters": "Ceisiwch addasu neu glirio'ch hidlwyr.",
       "couldNotSearch": "Ni lwyddwyd i chwilio'r sesiynau.",
       "completedWillAppear": "Bydd sesiynau wedi'u cwblhau'n ymddangos yma.",
       "noPastSessions": "Dim sesiynau blaenorol",
+      "pastSessions": "Sesiynau blaenorol",
       "live": "BYW",
       "updating": "Yn diweddaru"
     },
@@ -2197,6 +2210,7 @@
       "renamePlaceholder": "Enw sesiwn",
       "transcriptAccessibility": "Trawsgrifiad sesiwn",
       "readOnly": "Sesiwn ddarllen yn unig yw hon.",
+      "continueInNewSession": "Parhau mewn sesiwn newydd",
       "emptyDescription": "Anfonwch neges isod i ddechrau.",
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
@@ -2287,6 +2301,8 @@
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
+      "selectRepositoryToStart": "Dewiswch ystorfa i ddechrau.",
+      "connectProviderToStart": "Cysylltwch â darparwr i ddechrau.",
       "promptPlaceholder": "Ar beth hoffech chi weithio?",
       "couldNotLoadModels": "Methu llwytho'r modelau.",
       "prefillRepoAndModelUnavailable": "Nid yw ystorfa a model y sesiwn wreiddiol ar gael mwyach. Dewiswch rai eraill isod.",
@@ -2924,7 +2940,8 @@
     "optionsExpiredDescription": "Ewch yn ôl ac ailagorwch y dewisydd hwn o'r sgrin flaenorol."
   },
   "sessionRow": {
-    "needsInput": "ANGEN MEWNBWN"
+    "needsInput": "ANGEN MEWNBWN",
+    "scheduled": "WEDI'I DREFNU"
   },
   "voiceInput": {
     "listening": "Yn gwrando...",
@@ -3338,6 +3355,7 @@
     "emptyTitle": "Dim gwesteiwyr dibynadwy",
     "emptyDescription": "Pan fyddwch yn ymddiried yng ngwesteiwr dolen, bydd y ddolen yn agor heb ofyn eto.",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
+    "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
   "quickChat": {
@@ -3367,7 +3385,8 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo.",
     "openSession": "Agor",
     "approveFailed": "Methu cymeradwyo. Tapiwch $t(common.approve) i geisio eto.",
-    "newestResult": "Canlyniad diweddaraf"
+    "newestResult": "Canlyniad diweddaraf",
+    "scheduledWakes": "yn deffro {{time}}"
   },
   "transcriptionModel": {
     "title": "Model trawsgrifio",

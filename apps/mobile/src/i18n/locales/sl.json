@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Nazaj",
     "idle": "Nedejavno",
+    "scheduled": "Načrtovano",
     "keepEditing": "Nadaljuj urejanje",
     "keepRunning": "Nadaljuj izvajanje",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Dodaj ključ za dostop",
     "passkeyDefaultName": "Ključ za dostop",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Nazadnje uporabljeno {{date}}",
     "passkeyAdded": "Ključ za dostop je dodan.",
     "passkeyAddFailed": "Ključa za dostop ni bilo mogoče dodati. Poskusi znova.",
     "passkeyAddUnsupported": "Ta naprava ne more ustvariti ključev za dostop.",
@@ -588,7 +590,14 @@
       "moreLinesAbove_one": "… dodatne vrstice zgoraj: {{displayCount}}",
       "moreLinesAbove_other": "… dodatne vrstice zgoraj: {{displayCount}}",
       "moreLinesAbove_two": "… dodatne vrstice zgoraj: {{displayCount}}",
-      "moreLinesAbove_few": "… dodatne vrstice zgoraj: {{displayCount}}"
+      "moreLinesAbove_few": "… dodatne vrstice zgoraj: {{displayCount}}",
+      "deleteComment": "Izbriši komentar",
+      "deleteCommentTitle": "Izbrisati komentar?",
+      "deleteCommentMessage": "Ta komentar bo izbrisan iz zahtevka za združitev.",
+      "commentEditFailed": "Tvojega komentarja ni bilo mogoče shraniti. Preveri povezavo in poskusi znova.",
+      "commentEditUnavailable": "Tega komentarja ni mogoče urediti. Morda je bil izbrisan.",
+      "commentDeleteFailed": "Tvojega komentarja ni bilo mogoče izbrisati. Preveri povezavo in poskusi znova.",
+      "commentDeleteUnavailable": "Tega komentarja ni mogoče izbrisati."
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti.",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",
@@ -779,6 +788,8 @@
     "linkPasteNotAPullRequest": "To ni povezava do zahtevka za združitev ali merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",
+      "commentUpdated": "Komentar posodobljen",
+      "commentDeleted": "Komentar izbrisan",
       "reviewSubmitted": "Pregled oddan",
       "autoMergeEnabled": "Samodejno združevanje omogočeno"
     },
@@ -2067,12 +2078,14 @@
       "couldNotLoadActive": "Aktivnih sej ni bilo mogoče naložiti.",
       "couldNotRefresh": "Osvežitev ni uspela",
       "noSessionsYetDescription": "Začni programsko nalogo s telefona. Tvoje seje se bodo prikazale tukaj.",
+      "viewHistory": "Zgodovina sej",
       "noMatches": "Ni ustreznih sej",
       "tryDifferentSearch": "Poskusi z drugim iskalnim izrazom.",
       "tryAdjustFilters": "Poskusi spremeniti ali počistiti filtre.",
       "couldNotSearch": "Iskanje sej ni uspelo.",
       "completedWillAppear": "Dokončane seje bodo prikazane tukaj.",
       "noPastSessions": "Ni preteklih sej",
+      "pastSessions": "Pretekle seje",
       "live": "V ŽIVO",
       "updating": "Posodabljanje"
     },
@@ -2141,6 +2154,7 @@
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",
       "readOnly": "Ta seja je samo za branje.",
+      "continueInNewSession": "Nadaljuj v novi seji",
       "emptyDescription": "Za začetek pošlji sporočilo v spodnjem polju.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
@@ -2231,6 +2245,8 @@
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
+      "selectRepositoryToStart": "Izberi skladišče za začetek.",
+      "connectProviderToStart": "Poveži ponudnika za začetek.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",
@@ -2842,7 +2858,8 @@
     "optionsExpiredDescription": "Pojdi nazaj in ponovno odpri ta izbirnik s prejšnjega zaslona."
   },
   "sessionRow": {
-    "needsInput": "ČAKA NA VNOS"
+    "needsInput": "ČAKA NA VNOS",
+    "scheduled": "NAČRTOVANO"
   },
   "voiceInput": {
     "listening": "Poslušanje...",
@@ -3252,6 +3269,7 @@
     "emptyTitle": "Ni zaupanja vrednih gostiteljev",
     "emptyDescription": "Ko gostitelja označiš kot zaupanja vrednega, se njegove povezave odprejo brez ponovne potrditve.",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
+    "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
     "backToPreferences": "Nazaj na nastavitve"
   },
   "quickChat": {
@@ -3281,7 +3299,8 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu.",
     "openSession": "Odpri",
     "approveFailed": "Odobritev ni uspela. Tapni $t(common.approve) za ponovni poskus.",
-    "newestResult": "Najnovejši rezultat"
+    "newestResult": "Najnovejši rezultat",
+    "scheduledWakes": "zbudi se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model za prepisovanje",

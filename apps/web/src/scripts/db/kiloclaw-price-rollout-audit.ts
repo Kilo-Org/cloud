@@ -40,6 +40,7 @@ const LEGACY_AMOUNT_PATTERNS = [
 ];
 const SCAN_ROOTS = [
   'apps/web/src',
+  'packages/web-shared/src',
   'services/kiloclaw-billing/src',
   'services/kiloclaw/src',
   'packages/db/src',

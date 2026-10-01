@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Atpakaļ",
     "idle": "Dīkstāvē",
+    "scheduled": "Ieplānota",
     "keepEditing": "Turpināt rediģēt",
     "keepRunning": "Turpināt izpildi",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Pievienot piekļuves atslēgu",
     "passkeyDefaultName": "Piekļuves atslēga",
     "passkeyAddedOn": "Pievienota {{date}}",
+    "passkeyLastUsedOn": "Pēdējo reizi izmantots {{date}}",
     "passkeyAdded": "Piekļuves atslēga pievienota.",
     "passkeyAddFailed": "Neizdevās pievienot piekļuves atslēgu. Mēģiniet vēlreiz.",
     "passkeyAddUnsupported": "Šī ierīce nevar izveidot piekļuves atslēgas.",
@@ -577,7 +579,14 @@
       "replyForbiddenTerm": "Tev nav atļaujas atbildēt uz {{term}}.",
       "moreLinesAbove_one": "Augstāk ir vēl citas rindas: {{displayCount}}.",
       "moreLinesAbove_other": "Augstāk ir vēl citas rindas: {{displayCount}}.",
-      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}."
+      "moreLinesAbove_zero": "Augstāk ir vēl citas rindas: {{displayCount}}.",
+      "deleteComment": "Dzēst komentāru",
+      "deleteCommentTitle": "Dzēst komentāru?",
+      "deleteCommentMessage": "Šis komentārs tiks dzēsts no izmaiņu pieprasījuma.",
+      "commentEditFailed": "Neizdevās saglabāt tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentEditUnavailable": "Šo komentāru nevar rediģēt. Iespējams, tas ir dzēsts.",
+      "commentDeleteFailed": "Neizdevās dzēst tavu komentāru. Pārbaudi savienojumu un mēģini vēlreiz.",
+      "commentDeleteUnavailable": "Šo komentāru nevar dzēst."
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
@@ -763,6 +772,8 @@
     "linkPasteNotAPullRequest": "Šī nav izmaiņu pieprasījuma vai merge request saite",
     "announce": {
       "commentPosted": "Komentārs publicēts",
+      "commentUpdated": "Komentārs atjaunināts",
+      "commentDeleted": "Komentārs dzēsts",
       "reviewSubmitted": "Vērtējums iesniegts",
       "autoMergeEnabled": "Automātiskā apvienošana iespējota"
     },
@@ -2042,12 +2053,14 @@
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
       "couldNotRefresh": "Neizdevās atsvaidzināt",
       "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
+      "viewHistory": "Sesiju vēsture",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",
       "tryAdjustFilters": "Mēģini mainīt vai notīrīt filtrus.",
       "couldNotSearch": "Neizdevās meklēt sesijas.",
       "completedWillAppear": "Pabeigtās sesijas parādīsies šeit.",
       "noPastSessions": "Nav iepriekšējo sesiju",
+      "pastSessions": "Iepriekšējās sesijas",
       "live": "REĀLLAIKĀ",
       "updating": "Notiek atjaunināšana"
     },
@@ -2113,6 +2126,7 @@
       "renamePlaceholder": "Sesijas nosaukums",
       "transcriptAccessibility": "Sesijas sarakste",
       "readOnly": "Šī sesija ir pieejama tikai lasīšanai.",
+      "continueInNewSession": "Turpināt jaunā sesijā",
       "emptyDescription": "Lai sāktu, nosūti ziņojumu zemāk esošajā laukā.",
       "scrollToBottom": "Ritināt līdz apakšai",
       "emptyTitle": "Ziņojumu vēl nav",
@@ -2203,6 +2217,8 @@
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
+      "selectRepositoryToStart": "Lai sāktu, izvēlies repozitoriju.",
+      "connectProviderToStart": "Lai sāktu, pievieno pakalpojuma sniedzēju.",
       "promptPlaceholder": "Pie kā vēlētos strādāt?",
       "couldNotLoadModels": "Neizdevās ielādēt modeļus.",
       "prefillRepoAndModelUnavailable": "Sākotnējās sesijas repozitorijs un modelis vairs nav pieejami. Izvēlies tos zemāk.",
@@ -2801,7 +2817,8 @@
     "optionsExpiredDescription": "Atgriezies iepriekšējā ekrānā un vēlreiz atver šo izvēlni."
   },
   "sessionRow": {
-    "needsInput": "GAIDA IEVADI"
+    "needsInput": "GAIDA IEVADI",
+    "scheduled": "IEPLĀNOTA"
   },
   "voiceInput": {
     "listening": "Klausās…",
@@ -3209,6 +3226,7 @@
     "emptyTitle": "Nav uzticamu resursdatoru",
     "emptyDescription": "Ja uzticies saites resursdatoram, tā saites turpmāk atveras bez atkārtota apstiprinājuma.",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
+    "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
   "quickChat": {
@@ -3238,7 +3256,8 @@
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus.",
     "openSession": "Atvērt",
     "approveFailed": "Neizdevās apstiprināt. Pieskaries $t(common.approve), lai mēģinātu vēlreiz.",
-    "newestResult": "Jaunākais rezultāts"
+    "newestResult": "Jaunākais rezultāts",
+    "scheduledWakes": "pamostas {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkripcijas modelis",

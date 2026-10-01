@@ -203,16 +203,13 @@ async function cfAccessDebugMiddleware(c: Context<GastownEnv>, next: () => Promi
   return next();
 }
 
-// ── Timing ──────────────────────────────────────────────────────────────
 // Capture high-resolution start timestamp before any other middleware.
 app.use('*', timingMiddleware);
 
-// ── Structured logging context ──────────────────────────────────────────
 // Establishes AsyncLocalStorage context so all downstream logs are tagged.
 // Cast needed: workers-tagged-logger@1.0.0 was built against an older Hono.
 app.use('*', useWorkersLogger('gastown-worker') as unknown as MiddlewareHandler);
 
-// ── Per-route logger tagging ────────────────────────────────────────
 // Use Hono path matching (not regex) so tags are sourced from
 // c.req.param() once the route is matched. Each handler runs only
 // when its prefix matches; if a request hits /api/towns/:townId/rigs/:rigId,
@@ -273,7 +270,6 @@ app.use('/api/mayor/:townId/tools/rigs/:rigId/agents/:agentId/*', async (c, next
   await next();
 });
 
-// ── CORS ────────────────────────────────────────────────────────────────
 // Allow browser requests from the main Kilo app. In development, allow
 // localhost and LAN origins for the Next.js dev server.
 
@@ -299,14 +295,11 @@ const corsMiddleware = cors({
 app.use('/api/*', corsMiddleware);
 app.use('/trpc/*', corsMiddleware);
 
-// ── Health ──────────────────────────────────────────────────────────────
-
 app.get('/', c => c.json({ service: 'gastown', status: 'ok' }));
 app.get('/health', c => c.json({ status: 'ok' }));
 
 app.use('/debug/*', cfAccessDebugMiddleware);
 
-// ── DEBUG: CF Access-protected town introspection — REMOVE after debugging ──
 app.get('/debug/towns/:townId/status', async c => {
   const townId = c.req.param('townId');
   const town = getTownDOStub(c.env, townId);
@@ -521,7 +514,6 @@ app.get('/debug/towns/:townId/convoys', async c => {
   return c.json({ convoys });
 });
 
-// ── Town ID + Auth ──────────────────────────────────────────────────────
 // All rig routes live under /api/towns/:townId/rigs/:rigId so the townId
 // is always available from the URL path.
 // townIdMiddleware always runs (even in dev) so c.get('townId') is
@@ -531,8 +523,6 @@ app.use('/api/towns/:townId/rigs/:rigId/*', townIdMiddleware);
 app.use('/api/towns/:townId/rigs/:rigId/*', async (c: Context<GastownEnv, string>, next) =>
   c.env.ENVIRONMENT === 'development' ? next() : authMiddleware(c, next)
 );
-
-// ── Beads ───────────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/beads', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/beads', () =>
@@ -569,8 +559,6 @@ app.delete('/api/towns/:townId/rigs/:rigId/beads/:beadId', c =>
     handleDeleteBead(c, c.req.param())
   )
 );
-
-// ── Agents ──────────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/agents', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agents', () =>
@@ -682,7 +670,6 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/nudge-delivered', c =>
 // Agent-to-agent nudge: any authenticated agent can nudge another agent in the rig
 app.post('/api/towns/:townId/rigs/:rigId/nudge', c => handleNudge(c, c.req.param()));
 
-// ── Refresh Git Token ──────────────────────────────────────────────────
 // Called by the container when a GIT_TOKEN (GitHub App installation token,
 // 1h TTL) expires mid-task. Returns a fresh token resolved via the
 // standard chain. Authenticated with the container-scoped JWT.
@@ -692,23 +679,17 @@ app.post('/api/towns/:townId/rigs/:rigId/refresh-git-token', c =>
   )
 );
 
-// ── Agent Events ─────────────────────────────────────────────────────────
-
 app.post('/api/towns/:townId/rigs/:rigId/agent-events', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/agent-events', () =>
     handleAppendAgentEvent(c, c.req.param())
   )
 );
 
-// ── Mail ────────────────────────────────────────────────────────────────
-
 app.post('/api/towns/:townId/rigs/:rigId/mail', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/mail', () =>
     handleSendMail(c, c.req.param())
   )
 );
-
-// ── Review Queue ────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/review-queue', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/review-queue', () =>
@@ -721,15 +702,11 @@ app.post('/api/towns/:townId/rigs/:rigId/review-queue/:entryId/complete', c =>
   )
 );
 
-// ── Bead Events ─────────────────────────────────────────────────────────
-
 app.get('/api/towns/:townId/rigs/:rigId/events', c =>
   instrumented(c, 'GET /api/towns/:townId/rigs/:rigId/events', () =>
     handleListBeadEvents(c, c.req.param())
   )
 );
-
-// ── Molecules ────────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/molecules', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/molecules', () =>
@@ -747,15 +724,11 @@ app.post('/api/towns/:townId/rigs/:rigId/agents/:agentId/molecule/advance', c =>
   )
 );
 
-// ── Escalations ─────────────────────────────────────────────────────────
-
 app.post('/api/towns/:townId/rigs/:rigId/escalations', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/escalations', () =>
     handleCreateEscalation(c, c.req.param())
   )
 );
-
-// ── Triage ──────────────────────────────────────────────────────────────
 
 app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
   instrumented(c, 'POST /api/towns/:townId/rigs/:rigId/triage/resolve', () =>
@@ -763,7 +736,6 @@ app.post('/api/towns/:townId/rigs/:rigId/triage/resolve', c =>
   )
 );
 
-// ── Container Eviction ──────────────────────────────────────────────────
 // Called by the container on SIGTERM. Uses container JWT auth (not kilo
 // user auth), so it must be registered before the kiloAuthMiddleware
 // wildcard below.
@@ -790,7 +762,6 @@ app.get('/api/towns/:townId/drain-status', c =>
   instrumented(c, 'GET /api/towns/:townId/drain-status', () => handleDrainStatus(c, c.req.param()))
 );
 
-// ── Container Registry ─────────────────────────────────────────────────
 // Simple pass-through to TownContainerDO registry.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
 
@@ -815,7 +786,6 @@ app.post('/api/towns/:townId/container-registry', async c => {
   return c.json({ success: true });
 });
 
-// ── Agent DB Snapshot ───────────────────────────────────────────────────
 // Stored in the AGENT_DB_SNAPSHOTS_KV namespace keyed by agentId.
 // Protected by authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
 // Registered after authMiddleware but before kiloAuthMiddleware wildcard.
@@ -842,7 +812,6 @@ app.delete('/api/towns/:townId/rigs/:rigId/agents/:agentId/db-snapshot', async c
   return c.json({ success: true });
 });
 
-// ── Mayor Agent ID ──────────────────────────────────────────────────────
 // Returns the mayor's agent ID for a town so the container can prewarm
 // the mayor's SDK server during bootHydration. Protected by authMiddleware
 // (accepts container JWTs), not kiloAuthMiddleware.
@@ -870,7 +839,6 @@ app.get('/api/towns/:townId/mayor-id', async c => {
   return c.json({ success: true, ...ctx });
 });
 
-// ── Container Events ─────────────────────────────────────────────────────
 // Container-to-worker event proxy. The container can't call writeEvent
 // directly (it's worker-side), so it POSTs events here. Protected by
 // authMiddleware (accepts container JWTs), not kiloAuthMiddleware.
@@ -904,7 +872,6 @@ app.post('/api/towns/:townId/container-events', async c => {
   return c.json({ success: true });
 });
 
-// ── Kilo User Auth ──────────────────────────────────────────────────────
 // Validate Kilo user JWT (signed with NEXTAUTH_SECRET) for dashboard/user
 // routes. Container→worker routes use the agent JWT middleware instead
 // (authMiddleware above).
@@ -931,7 +898,6 @@ app.use('/api/towns/:townId/*', async (c: Context<GastownEnv, string>, next) => 
   });
 });
 
-// ── Org Auth ────────────────────────────────────────────────────────────
 // Kilo user auth + org membership check for all org routes.
 
 app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
@@ -941,7 +907,6 @@ app.use('/api/orgs/:orgId/*', async (c: Context<GastownEnv, string>, next) =>
   orgAuthMiddleware(c, next)
 );
 
-// ── Org Towns & Rigs ─────────────────────────────────────────────────────
 // GastownOrgDO instances are keyed by orgId. One DO instance per org stores
 // all towns and rigs the org owns.
 
@@ -974,7 +939,6 @@ app.delete('/api/orgs/:orgId/rigs/:rigId', c =>
   instrumented(c, 'DELETE /api/orgs/:orgId/rigs/:rigId', () => handleDeleteOrgRig(c, c.req.param()))
 );
 
-// ── Towns & Rigs ────────────────────────────────────────────────────────
 // Town DO instances are keyed by owner_user_id. The userId path param routes
 // to the correct DO instance so each user's towns are isolated.
 
@@ -1007,8 +971,6 @@ app.delete('/api/users/:userId/rigs/:rigId', c =>
   instrumented(c, 'DELETE /api/users/:userId/rigs/:rigId', () => handleDeleteRig(c, c.req.param()))
 );
 
-// ── Town Convoys ─────────────────────────────────────────────────────────
-
 app.post('/api/towns/:townId/convoys', c =>
   instrumented(c, 'POST /api/towns/:townId/convoys', () => handleCreateConvoy(c, c.req.param()))
 );
@@ -1017,8 +979,6 @@ app.post('/api/towns/:townId/convoys/bead-closed', c =>
     handleOnBeadClosed(c, c.req.param())
   )
 );
-
-// ── Town Escalations ─────────────────────────────────────────────────────
 
 app.get('/api/towns/:townId/escalations', c =>
   instrumented(c, 'GET /api/towns/:townId/escalations', () =>
@@ -1031,8 +991,6 @@ app.post('/api/towns/:townId/escalations/:escalationId/acknowledge', c =>
   )
 );
 
-// ── Town Configuration ──────────────────────────────────────────────────
-
 app.get('/api/towns/:townId/config', c =>
   instrumented(c, 'GET /api/towns/:townId/config', () => handleGetTownConfig(c, c.req.param()))
 );
@@ -1040,7 +998,6 @@ app.patch('/api/towns/:townId/config', c =>
   instrumented(c, 'PATCH /api/towns/:townId/config', () => handleUpdateTownConfig(c, c.req.param()))
 );
 
-// ── Cloudflare Debug ────────────────────────────────────────────────
 // Returns DO IDs and namespace IDs for constructing Cloudflare dashboard URLs.
 // containerDoId is only returned when the container is actually running,
 // so the UI correctly shows a disabled state when the container is stopped.
@@ -1066,8 +1023,6 @@ app.get('/api/towns/:townId/cloudflare-debug', async c => {
   });
 });
 
-// ── Town Events ─────────────────────────────────────────────────────────
-
 app.use('/api/users/:userId/towns/:townId/events', async (c: Context<GastownEnv, string>, next) =>
   townAuthMiddleware(c, next)
 );
@@ -1077,7 +1032,6 @@ app.get('/api/users/:userId/towns/:townId/events', c =>
   )
 );
 
-// ── Town Container ──────────────────────────────────────────────────────
 // These routes proxy commands to the container's control server via DO.fetch().
 // Protected by Cloudflare Access at the perimeter; no additional auth required.
 
@@ -1145,7 +1099,6 @@ app.delete('/api/towns/:townId/container/agents/:agentId/pty/:ptyId', c =>
 // Note: GET /agents/:agentId/pty/:ptyId/connect (WebSocket) is handled
 // in the default export's fetch handler, bypassing Hono.
 
-// ── Mayor ────────────────────────────────────────────────────────────────
 // MayorDO endpoints — town-level conversational agent with persistent session.
 
 app.post('/api/towns/:townId/mayor/configure', c =>
@@ -1187,7 +1140,6 @@ app.post('/api/towns/:townId/mayor/ui-action', c =>
   )
 );
 
-// ── Mayor Tools ──────────────────────────────────────────────────────────
 // Tool endpoints called by the mayor's kilo serve session via the Gastown plugin.
 // Authenticated via mayor JWT (townId-scoped, no rigId restriction).
 
@@ -1300,7 +1252,6 @@ app.post('/api/mayor/:townId/tools/convoys/:convoyId/remove-bead', c =>
   )
 );
 
-// ── Wasteland Tools ──────────────────────────────────────────────────────
 // Mayor tools for interacting with hosted Wastelands. The wasteland is
 // auto-resolved from the town's connection — mayor never supplies it.
 // Auth is handled by the `/api/mayor/:townId/tools/*` wildcard middleware.
@@ -1348,7 +1299,6 @@ app.post('/api/mayor/:townId/tools/wasteland/:legacyWastelandId/done', c =>
     handleWastelandDone(c, c.req.param())
   )
 );
-// ── tRPC ────────────────────────────────────────────────────────────────
 // Serve the gastown tRPC router directly. The frontend tRPC client
 // connects here instead of going through the Next.js proxy layer.
 
@@ -1376,8 +1326,6 @@ app.use(
   })
 );
 
-// ── Error handling ──────────────────────────────────────────────────────
-
 app.notFound(c => c.json(resError('Not found'), 404));
 
 app.onError((err, c) => {
@@ -1386,7 +1334,6 @@ app.onError((err, c) => {
   return c.json(resError('Internal server error'), 500);
 });
 
-// ── Export with WebSocket interception ───────────────────────────────────
 // WebSocket upgrade requests for agent streaming must bypass Hono and go
 // directly to the TownContainerDO.fetch(). Hono cannot relay a 101
 // WebSocket response — the DO must return the WebSocketPair client end

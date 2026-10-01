@@ -9,6 +9,7 @@ import { EditToolCard } from './EditToolCard';
 import { WriteToolCard } from './WriteToolCard';
 import { BashToolCard } from './BashToolCard';
 import { BackgroundProcessToolCard } from './BackgroundProcessToolCard';
+import { ScheduledTaskToolCard } from './ScheduledTaskToolCard';
 import { ApplyPatchToolCard } from './ApplyPatchToolCard';
 import { WebFetchToolCard } from './WebFetchToolCard';
 import { ToolErrorCard } from './ToolErrorCard';
@@ -133,8 +134,15 @@ function hasRequiredInput(part: Extract<Part, { type: 'tool' }>): boolean {
     case 'question':
     case 'suggest':
     case 'skill':
+    case 'cancel_wakeup':
+    case 'cron_list':
       // These tools can render without specific input or handle empty arrays gracefully
       return true;
+    case 'schedule_wakeup':
+    case 'cron_create':
+      return typeof input.prompt === 'string' && input.prompt.length > 0;
+    case 'cron_delete':
+      return typeof input.id === 'string' && input.id.length > 0;
     default:
       // For unknown tools, assume they can render if they have any input
       return Object.keys(input).length > 0;
@@ -214,6 +222,12 @@ function ToolPartRenderer({
       return <BashToolCard toolPart={part} />;
     case 'background_process':
       return <BackgroundProcessToolCard toolPart={part} />;
+    case 'schedule_wakeup':
+    case 'cancel_wakeup':
+    case 'cron_create':
+    case 'cron_list':
+    case 'cron_delete':
+      return <ScheduledTaskToolCard toolPart={part} />;
     case 'glob':
       return <GlobToolCard toolPart={part} />;
     case 'grep':

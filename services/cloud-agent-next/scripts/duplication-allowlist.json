@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "scanner": "jscpd@5.0.16",
+  "exceptions": [
+    {
+      "files": ["src/control-plane/session/session-do.ts", "src/persistence/CloudAgentSession.ts"],
+      "fingerprint": "c8c8b96d3ab5d15d",
+      "owner": "session runtime authorization adapters",
+      "reason": "Control-plane and legacy Session DOs call the same renewal owner through storage adapters with different metadata serialization and lifecycle rules.",
+      "kind": "intentional",
+      "maxMatches": 1,
+      "maxTokens": 105
+    },
+    {
+      "files": ["src/session-service.ts", "src/session-service.ts"],
+      "fingerprint": "a3bbedbe1e52f04e",
+      "owner": "session-service workspace preparation",
+      "reason": "Legacy sandbox preparation and control-plane attachment intentionally project the same workspace execution context while retaining distinct lifecycle flows.",
+      "kind": "intentional",
+      "maxMatches": 1,
+      "maxTokens": 101
+    },
+    {
+      "files": ["src/shared/control-plane-protocol.ts", "src/shared/sandbox-control-protocol.ts"],
+      "fingerprint": "2b43effa481ce883",
+      "owner": "pre-rewrite workspace prompt payload cleanup",
+      "reason": "The pre-rewrite workspace protocol retains orphaned attachment and finalization validators. Bound this existing copy until obsolete protocol consumers are removed; it is not the live agent_* legacy path.",
+      "kind": "legacy",
+      "maxMatches": 1,
+      "maxTokens": 150
+    },
+    {
+      "files": ["src/shared/control-plane-protocol.ts", "src/shared/sandbox-control-protocol.ts"],
+      "fingerprint": "712040449443897d",
+      "owner": "pre-rewrite workspace question protocol cleanup",
+      "reason": "The orphaned pre-rewrite question reply validator mirrors the new control-plane reply union. Retain this exact legacy finding pending obsolete protocol cleanup, without allowing growth or reviving old wrapper support.",
+      "kind": "legacy",
+      "maxMatches": 1,
+      "maxTokens": 104
+    },
+    {
+      "files": ["src/shared/control-plane-protocol.ts", "src/shared/sandbox-control-protocol.ts"],
+      "fingerprint": "dd9daa2882ffec5b",
+      "owner": "pre-rewrite workspace turn protocol cleanup",
+      "reason": "The orphaned pre-rewrite protocol retains the native Kilo prompt and command validators now used by the control plane. Bound the existing copy pending removal of obsolete protocol consumers rather than treat it as a live compatibility contract.",
+      "kind": "legacy",
+      "maxMatches": 1,
+      "maxTokens": 201
+    },
+    {
+      "files": ["wrapper/src/control-plane/prepare.ts", "wrapper/src/control/apply-attach.ts"],
+      "fingerprint": "1d796ba34bafa83b",
+      "owner": "pre-rewrite workspace attachment cleanup",
+      "reason": "The orphaned pre-rewrite attachment module retains a Kilo session probe also used by current preparation. Bound this existing copy until that module and its remaining type and test consumers are removed; the agent_* wrapper does not use it.",
+      "kind": "legacy",
+      "maxMatches": 1,
+      "maxTokens": 102
+    }
+  ]
+}

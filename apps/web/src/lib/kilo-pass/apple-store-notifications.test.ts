@@ -26,11 +26,11 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from './enums';
+} from '@/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id.
 // Dynamic-import the SUT after the mock (same pattern as stripe-handlers-invoice-paid.test.ts).

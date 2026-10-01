@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Буцах",
     "idle": "Хүлээж байна",
+    "scheduled": "Товлосон",
     "keepEditing": "Үргэлжлүүлэн засварлах",
     "keepRunning": "Үргэлжлүүлэн ажиллуулах",
     "kiloclaw": "KiloClaw",
@@ -240,6 +241,7 @@
     "addPasskey": "Нэвтрэх түлхүүр нэмэх",
     "passkeyDefaultName": "Нэвтрэх түлхүүр",
     "passkeyAddedOn": "{{date}}-нд нэмсэн",
+    "passkeyLastUsedOn": "Сүүлд ашигласан {{date}}",
     "passkeyAdded": "Нэвтрэх түлхүүр нэмэгдлээ.",
     "passkeyAddFailed": "Нэвтрэх түлхүүр нэмж чадсангүй. Дахин оролдоно уу.",
     "passkeyAddUnsupported": "Энэ төхөөрөмж нэвтрэх түлхүүр үүсгэж чадахгүй.",
@@ -566,7 +568,14 @@
       "deletedUser": "устгагдсан хэрэглэгч",
       "replyForbiddenTerm": "Танд энэ {{term}}эд хариу бичих эрх байхгүй.",
       "moreLinesAbove_one": "… дээр нь дахиад {{displayCount}} мөр байна.",
-      "moreLinesAbove_other": "… дээр нь дахиад {{displayCount}} мөр байна."
+      "moreLinesAbove_other": "… дээр нь дахиад {{displayCount}} мөр байна.",
+      "deleteComment": "Сэтгэгдэл устгах",
+      "deleteCommentTitle": "Сэтгэгдлийг устгах уу?",
+      "deleteCommentMessage": "Энэ сэтгэгдэл нэгтгэх хүсэлтээс устах болно.",
+      "commentEditFailed": "Таны сэтгэгдлийг хадгалж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "commentEditUnavailable": "Энэ сэтгэгдлийг засах боломжгүй. Магадгүй устгагдсан байж болно.",
+      "commentDeleteFailed": "Таны сэтгэгдлийг устгаж чадсангүй. Холболтоо шалгаад дахин оролдоно уу.",
+      "commentDeleteUnavailable": "Энэ сэтгэгдлийг устгах боломжгүй."
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
@@ -747,6 +756,8 @@
     "linkPasteNotAPullRequest": "Энэ татах эсвэл нэгтгэх хүсэлтийн холбоос биш байна.",
     "announce": {
       "commentPosted": "Сэтгэгдэл нийтлэгдсэн",
+      "commentUpdated": "Сэтгэгдэл шинэчлэгдсэн",
+      "commentDeleted": "Сэтгэгдэл устгагдсан",
       "reviewSubmitted": "Хяналтыг илгээсэн",
       "autoMergeEnabled": "Автоматаар нэгтгэхийг идэвхжүүлсэн"
     },
@@ -2017,12 +2028,14 @@
       "couldNotLoadActive": "Идэвхтэй сессүүдийг ачаалж чадсангүй.",
       "couldNotRefresh": "Сэргээж чадсангүй",
       "noSessionsYetDescription": "Утаснаасаа код бичих даалгавар эхлүүлнэ үү. Таны сессүүд энд харагдана.",
+      "viewHistory": "Сессийн түүх",
       "noMatches": "Тохирох сесс олдсонгүй",
       "tryDifferentSearch": "Өөр үгээр хайж үзнэ үү.",
       "tryAdjustFilters": "Шүүлтүүрүүдээ өөрчлөх эсвэл арилгаж үзнэ үү.",
       "couldNotSearch": "Сессүүдийг хайж чадсангүй.",
       "completedWillAppear": "Дууссан сессүүд энд гарч ирнэ.",
       "noPastSessions": "Өмнөх сесс байхгүй",
+      "pastSessions": "Өмнөх сессүүд",
       "live": "ШУУД",
       "updating": "Шинэчилж байна"
     },
@@ -2085,6 +2098,7 @@
       "renamePlaceholder": "Сессийн нэр",
       "transcriptAccessibility": "Сессийн ярианы бичвэр",
       "readOnly": "Энэ сессийг зөвхөн унших боломжтой.",
+      "continueInNewSession": "Шинэ сессэд үргэлжлүүлэх",
       "emptyDescription": "Эхлэхийн тулд доор мессеж илгээнэ үү.",
       "scrollToBottom": "Хамгийн доош гүйлгэх",
       "emptyTitle": "Мессеж хараахан алга",
@@ -2175,6 +2189,8 @@
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
+      "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",
@@ -2760,7 +2776,8 @@
     "optionsExpiredDescription": "Өмнөх дэлгэц рүү буцаад энэ сонгох цонхыг дахин нээнэ үү."
   },
   "sessionRow": {
-    "needsInput": "ХАРИУ ХҮЛЭЭЖ БАЙНА"
+    "needsInput": "ХАРИУ ХҮЛЭЭЖ БАЙНА",
+    "scheduled": "ТОВЛОСОН"
   },
   "voiceInput": {
     "listening": "Сонсож байна...",
@@ -3166,6 +3183,7 @@
     "emptyTitle": "Итгэмжлэгдсэн хостууд байхгүй",
     "emptyDescription": "Холбоосын хостыг итгэмжилбэл тухайн хостын холбоосуудыг дахин асуулгүй нээнэ.",
     "revoke": "{{host}} хостын итгэмжлэлийг цуцлах",
+    "revokeMessage": "Энэ хост руу очих холбоосууд дахин баталгаажуулалт асууна.",
     "backToPreferences": "Тохиргоо руу буцах"
   },
   "quickChat": {
@@ -3195,7 +3213,8 @@
     "activityKitDisabledBody": "Түгжээтэй дэлгэц дээр идэвхтэй агентуудыг харахын тулд тохиргооноос шууд үйл ажиллагааг идэвхжүүлнэ үү.",
     "openSession": "Нээх",
     "approveFailed": "Зөвшөөрч чадсангүй. Дахин оролдохын тулд $t(common.approve)-г товшино уу.",
-    "newestResult": "Хамгийн сүүлийн үр дүн"
+    "newestResult": "Хамгийн сүүлийн үр дүн",
+    "scheduledWakes": "{{time}} сэрнэ"
   },
   "transcriptionModel": {
     "title": "Яриаг бичвэр болгох загвар",

@@ -3,6 +3,7 @@ import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { SESSION_INGEST_WORKER_URL } from '@/lib/config.server';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { SESSION_INGEST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
@@ -102,7 +103,10 @@ async function mintWebTicket(userId: string): Promise<{ token: string; expiresAt
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    // Bounded: a worker that never answers rejects inside the budget with
+    // `ServiceFetchTimeoutError`, which the catch below maps to the existing
+    // PRECONDITION_FAILED exactly as any other transport failure.
+    response = await fetchWithinBudget(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -187,7 +191,10 @@ export const activeSessionsRouter = createTRPCRouter({
 
     let response: Response;
     try {
-      response = await fetch(url, {
+      // Bounded: a worker that never answers rejects inside the budget with
+      // `ServiceFetchTimeoutError`, which the catch below maps to the existing
+      // INTERNAL_SERVER_ERROR exactly as any other transport failure.
+      response = await fetchWithinBudget(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
     } catch (error) {

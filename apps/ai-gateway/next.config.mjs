@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs';
 import { resolve } from 'path';
 
 const monorepoRoot = resolve(import.meta.dirname, '../..');
@@ -17,4 +18,18 @@ const nextConfig = {
   skipTrailingSlashRedirect: true,
 };
 
-export default nextConfig;
+/** @type {import('@sentry/nextjs').SentryBuildOptions} */
+const sentryConfig = {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+  silent: !process.env.CI,
+  bundleSizeOptimizations: {
+    excludeDebugStatements: true,
+  },
+  telemetry: false,
+};
+
+export default process.env.NODE_ENV === 'development'
+  ? nextConfig
+  : withSentryConfig(nextConfig, sentryConfig);

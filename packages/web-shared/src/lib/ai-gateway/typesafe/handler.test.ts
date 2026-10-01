@@ -24,6 +24,7 @@ import {
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { handleSystemOneRequest } from './handler';
@@ -61,6 +62,9 @@ jest.mock('@/lib/ai-gateway/providers/definitions/openrouter', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providerHash', () => ({ generateProviderSpecificHash: jest.fn() }));
 jest.mock('@/lib/ai-gateway/processUsage', () => ({ logMicrodollarUsage: jest.fn() }));
+jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+  emitGatewayApiMetrics: jest.fn(),
+}));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
 const user = {
@@ -317,6 +321,24 @@ describe('handleSystemOneRequest', () => {
         ttfb_ms: expect.any(Number),
       })
     );
+    expect(emitGatewayApiMetrics).toHaveBeenCalledTimes(1);
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith({
+      kiloUserId: user.id,
+      organizationId: 'org-123',
+      isAnonymous: false,
+      isStreaming: false,
+      userByok: false,
+      mode: 'code',
+      provider: 'openrouter',
+      inferenceProvider: 'TypeSafe upstream',
+      requestedModel: TYPESAFE_MODEL,
+      resolvedModel: TYPESAFE_MODEL,
+      toolsAvailable: [],
+      toolsUsed: [],
+      ttfbMs: expect.any(Number),
+      completeRequestMs: expect.any(Number),
+      statusCode: 200,
+    });
   });
 
   it.each([
@@ -658,6 +680,9 @@ describe('handleSystemOneRequest', () => {
       expect(wrapInSafeNextResponse).toHaveBeenCalledWith(upstream);
       expect(after).not.toHaveBeenCalled();
       expect(logMicrodollarUsage).not.toHaveBeenCalled();
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: status, inferenceProvider: undefined })
+      );
     }
   );
 

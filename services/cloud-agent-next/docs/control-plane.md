@@ -255,7 +255,7 @@ notification, so a lost notification never leaves it waiting.
 | `prepare`, route `failed` | New attempt with a new deadline. |
 | `prepare`, route `preparing` or `ready` | No change; return the current view. |
 | Wrapper progress | Forward to the session. |
-| Allocation enters `creating`, `starting` or `stopping` | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while no wrapper is connected. |
+| Allocation enters `creating`, `starting` or `stopping` | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while the allocation is in one of those states (`creating`, `starting`, `stopping`, `stopped`). |
 | Wrapper `session.ready` | `ready`; notify. |
 | Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify. |
 | Deadline while `preparing` | `failed` (`preparation_timeout`); notify. |

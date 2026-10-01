@@ -65,6 +65,7 @@ import {
 } from '../../session/preparation-history.js';
 import type { CommandsAvailableData } from '../../shared/protocol.js';
 import {
+  CONTROL_PLANE_SETUP_EVENTS,
   CONTROL_PLANE_WRAPPER_FINALIZING_EVENT,
   controlPlaneAnswerPayloadSchema,
   controlPlaneCredentialSourceSchema,
@@ -166,6 +167,13 @@ const ROUTE_KEY = 'control_plane_route';
 const TRANSPORT_RECOVERY_KEY = 'control_plane_transport_recovery_at';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
 const AVAILABLE_COMMANDS_KEY = 'available_commands';
+
+/** Wrapper setup-command lifecycle events the Session DO renders itself. */
+const SETUP_EVENT_TYPES: ReadonlySet<string> = new Set([
+  CONTROL_PLANE_SETUP_EVENTS.started,
+  CONTROL_PLANE_SETUP_EVENTS.output,
+  CONTROL_PLANE_SETUP_EVENTS.finished,
+]);
 
 /** Public `PreparingStep` for a control-plane route preparation step (spec §10). */
 const PREPARING_STEP_PUBLIC: Record<ControlPlanePreparationStep, string> = {
@@ -1129,8 +1137,8 @@ export class SandboxSessionV2 extends DurableObject<Env> {
           // Spec §10 "Finalization running".
           this.emitCloudStatus({ type: 'finalizing' });
         }
-        if (event.type === 'session.setup.output' && this.recordSetupOutput(event.properties)) {
-          // Rendered as a `preparing` step output; the raw event is not broadcast.
+        if (SETUP_EVENT_TYPES.has(event.type) && this.recordSetupEvent(event)) {
+          // Rendered as per-command `preparing` steps; the raw event is not broadcast.
           continue;
         }
         const next = applyPendingInteractionEvent(this.pendingInteractions, event);
@@ -2053,37 +2061,88 @@ export class SandboxSessionV2 extends DurableObject<Env> {
   }
 
   /**
-   * Render a wrapper setup-command output line into the active preparation
-   * attempt's setup phase step, which is what the preparation UI shows. The
-   * step id mirrors `createPreparationProgressRecorder`'s `phase:<key>`.
-   * Returns false when no attempt or step exists yet; the caller then keeps the
-   * raw event so it is not lost.
+   * Render a wrapper setup-command lifecycle event into the active preparation
+   * attempt. Each command is its own `setup_command` step under the
+   * `setup_commands` phase (mirroring the legacy bootstrap), so the preparation
+   * UI shows the running command, its output, and its terminal state. Returns
+   * false when no attempt exists; the caller then keeps the raw event.
    */
-  private recordSetupOutput(properties: Record<string, unknown>): boolean {
-    const output = typeof properties.output === 'string' ? properties.output : '';
-    if (output.length === 0) return false;
+  private recordSetupEvent(event: { type: string; properties: Record<string, unknown> }): boolean {
     const attemptId = this.currentAttemptId();
     if (attemptId === null) return false;
     const attempt = readPreparationAttempt(this.eventQueries, attemptId);
     if (attempt === null) return false;
-    const command = typeof properties.command === 'number' ? properties.command : undefined;
-    return applyControlPlanePreparingEvent({
-      sessionId: this.sessionId,
-      data: {
-        version: 2,
-        attemptId,
-        triggerMessageId: attempt.triggerMessageId,
-        revision: attempt.revision + 1,
-        timestamp: Date.now(),
-        step: 'setup_commands',
+    const command =
+      typeof event.properties.command === 'number' ? event.properties.command : undefined;
+    const stepId = command === undefined ? 'phase:setup_commands' : `setup_command:${command - 1}`;
+    const base = {
+      version: 2 as const,
+      attemptId,
+      triggerMessageId: attempt.triggerMessageId,
+      revision: attempt.revision + 1,
+      timestamp: Date.now(),
+      step: 'setup_commands' as const,
+    };
+    const apply = (data: Record<string, unknown>): boolean =>
+      applyControlPlanePreparingEvent({
+        sessionId: this.sessionId,
+        data,
+        eventQueries: this.eventQueries,
+        broadcast: stored => this.broadcast(stored),
+      });
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.started) {
+      const text = typeof event.properties.text === 'string' ? event.properties.text : undefined;
+      const commandCount =
+        typeof event.properties.commandCount === 'number'
+          ? event.properties.commandCount
+          : undefined;
+      const label = command === undefined ? 'Setup command' : `Setup command ${command}`;
+      return apply({
+        ...base,
+        message: label,
+        action: 'step_started',
+        stepId,
+        kind: 'setup_command',
+        label,
+        ...(text === undefined ? {} : { command: text }),
+        ...(command === undefined ? {} : { commandIndex: command - 1 }),
+        ...(commandCount === undefined ? {} : { commandCount }),
+      });
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.output) {
+      const output = typeof event.properties.output === 'string' ? event.properties.output : '';
+      if (output.length === 0) return false;
+      return apply({
+        ...base,
         message: command === undefined ? 'Setup command output' : `Setup command ${command} output`,
         action: 'step_output',
-        stepId: 'phase:setup_commands',
+        stepId,
         output,
-      },
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcast(event),
-    });
+      });
+    }
+
+    if (event.type === CONTROL_PLANE_SETUP_EVENTS.finished) {
+      const exitCode =
+        typeof event.properties.exitCode === 'number' ? event.properties.exitCode : undefined;
+      const safeError =
+        typeof event.properties.safeError === 'string' ? event.properties.safeError : undefined;
+      const failed = safeError !== undefined || (exitCode !== undefined && exitCode !== 0);
+      const failedMessage =
+        safeError ??
+        (command === undefined ? 'Setup command failed' : `Setup command ${command} failed`);
+      return apply({
+        ...base,
+        message: failed ? failedMessage : 'Setup command finished',
+        action: failed ? 'step_failed' : 'step_completed',
+        stepId,
+        ...(failed ? { safeError: failedMessage } : {}),
+        ...(exitCode === undefined ? {} : { exitCode }),
+      });
+    }
+
+    return false;
   }
 
   /** Close one route attempt's open row by persisted identity, never by a scan. */

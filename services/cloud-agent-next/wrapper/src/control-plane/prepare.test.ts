@@ -586,7 +586,7 @@ describe('createPreparationManager', () => {
     const harness = createHarness();
     harness.setGit(args => {
       if (args[0] === 'show-ref') return result(1);
-      if (args[0] === 'checkout' && args[1] === '-B') {
+      if (args[0] === 'checkout' && args.includes('-B')) {
         return result(128, 'fatal: invalid reference: origin/session/scope-1');
       }
       return result(0);
@@ -603,6 +603,7 @@ describe('createPreparationManager', () => {
     expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);
     expect(harness.gitCalls).not.toContainEqual([
       'checkout',
+      '--progress',
       '-B',
       'session/scope-1',
       'origin/session/scope-1',

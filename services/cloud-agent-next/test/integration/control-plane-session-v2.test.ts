@@ -946,7 +946,7 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     stream.close();
   });
 
-  it('renders wrapper setup output as a preparing step_output', async () => {
+  it('renders the wrapper setup-command lifecycle as per-command preparing steps', async () => {
     const { sessionId, stub, peer } = await setup();
     const stream = await connectStream(sessionId);
     peer.prepareView = peer.view('preparing');
@@ -954,22 +954,30 @@ describe('SandboxSessionV2 message flow (fake sandbox peer)', () => {
     await stub.onRoute({ state: 'preparing', step: 'setup', attemptId: peer.attemptId });
     await stub.onEvents({
       events: [
+        {
+          type: 'session.setup.started',
+          properties: { command: 1, commandCount: 1, text: 'npm install' },
+        },
         { type: 'session.setup.output', properties: { command: 1, output: 'npm install\n' } },
+        { type: 'session.setup.finished', properties: { command: 1, exitCode: 0 } },
       ],
     });
 
     const messages = await drainStream(stream);
-    const output = messages.find(
-      message =>
-        message.streamEventType === 'preparing' &&
-        (message.data as { action?: string }).action === 'step_output'
-    );
-    expect(output?.data).toMatchObject({
-      action: 'step_output',
-      step: 'setup_commands',
-      output: 'npm install\n',
-    });
-    // The rendered preparing row replaces the raw wrapper event.
+    const commandRows = messages
+      .filter(message => message.streamEventType === 'preparing')
+      .map(
+        message =>
+          message.data as { action?: string; step?: string; stepId?: string; output?: string }
+      )
+      .filter(data => data.stepId === 'setup_command:0');
+    expect(commandRows.map(data => data.action)).toEqual([
+      'step_started',
+      'step_output',
+      'step_completed',
+    ]);
+    expect(commandRows[1]).toMatchObject({ step: 'setup_commands', output: 'npm install\n' });
+    // The rendered preparing rows replace the raw wrapper events.
     expect(messages.some(message => message.streamEventType === 'kilocode')).toBe(false);
     stream.close();
   });

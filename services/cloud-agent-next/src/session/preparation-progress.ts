@@ -90,7 +90,7 @@ export function createPreparationProgressRecorder(options: {
         if (running.id === stepId) {
           activeStep = { id: stepId, key, detail: running.latestDetail };
         } else {
-          emit(running.key, message, { action: 'step_completed', stepId: running.id });
+          emit(running.key, running.label, { action: 'step_completed', stepId: running.id });
         }
       }
     }

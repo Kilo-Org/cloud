@@ -5,8 +5,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Input, INPUT_BOX_CLASS, INPUT_MULTILINE_INSET_CLASS } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 import { compiledLengthDp } from '@/test/native-dimensions';
+import { darkColors, lightColors } from '@/lib/hooks/theme-colors.generated';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
+// Mutable so a suite can prove the placeholder follows the active palette. The
+// inset is palette-independent; every suite resets the mock to the light tokens.
+const appearance = vi.hoisted((): { colors: Record<string, string> } => ({ colors: {} }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   TextInput: 'TextInput',
@@ -17,13 +21,16 @@ vi.mock('react-native', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => appearance.colors,
 }));
+
+appearance.colors = lightColors;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
   rtl.isRTL = false;
+  appearance.colors = lightColors;
   act(() => {
     renderer?.unmount();
   });
@@ -71,7 +78,7 @@ describe('Input single-line box', () => {
     // min-h, never a fixed height, so Dynamic Type can still grow the field.
     expect(input.props.className).not.toMatch(/(?:^|\s)h-/);
     expect(input.props.textAlignVertical).toBe('center');
-    expect(input.props.placeholderTextColor).toBe('#888888');
+    expect(input.props.placeholderTextColor).toBe(lightColors.mutedForeground);
     expect(input.props.style).toBeUndefined();
   });
 
@@ -170,19 +177,39 @@ describe('Input multiline', () => {
     expect(await compiledLengthDp(INPUT_MULTILINE_INSET_CLASS, 'paddingBlock')).toBe(8.75);
   });
 
-  it('compiles the profile description field to the inset without dropping its own box', async () => {
-    const input = mountInput({
-      multiline: true,
-      textAlignVertical: 'top',
-      className: 'min-h-20 leading-5',
-    });
-    const className = input.props.className as string;
+  // The profile description field (`components/profiles/profile-overview-screen.tsx`)
+  // renders exactly this call: `multiline`, top-aligned, `min-h-20 leading-5`.
+  // The token assertions above pin intent; this compiles the merged className
+  // through the app's NativeWind compiler — the rules Metro emits and RN's
+  // Fabric text input turns into its text-container inset — so the native box
+  // the value and placeholder are drawn in is asserted, not just the tokens.
+  // The values are palette-independent; the placeholder colour is the active
+  // palette's `mutedForeground`. Padding is static, so focus and an open
+  // keyboard do not change it.
+  it.each([
+    ['light', lightColors],
+    ['dark', darkColors],
+  ] as const)(
+    'lays out the profile description inset and palette in %s mode',
+    async (_mode, colors) => {
+      appearance.colors = colors;
+      const input = mountInput({
+        multiline: true,
+        textAlignVertical: 'top',
+        className: 'min-h-20 leading-5',
+      });
+      const className = input.props.className as string;
 
-    expect(await compiledLengthDp(className, 'paddingInline')).toBe(10.5);
-    expect(await compiledLengthDp(className, 'paddingBlock')).toBe(8.75);
-    // The caller's `min-h-20` survives the inset merge as the field's native floor.
-    expect(await compiledLengthDp(className, 'minHeight')).toBe(70);
-  });
+      // `px-3` is 10.5pt and `py-2.5` is 8.75pt at the app's 14pt rem, so the
+      // value and the placeholder clear the border instead of hugging it.
+      expect(await compiledLengthDp(className, 'paddingInline')).toBe(10.5);
+      expect(await compiledLengthDp(className, 'paddingBlock')).toBe(8.75);
+      // The caller's `min-h-20` floor survives the inset merge.
+      expect(await compiledLengthDp(className, 'minHeight')).toBe(70);
+      expect(input.props.textAlignVertical).toBe('top');
+      expect(input.props.placeholderTextColor).toBe(colors.mutedForeground);
+    }
+  );
 
   it('compiles a caller padding override instead of the shared inset', async () => {
     const input = mountInput({ multiline: true, className: 'px-4 py-3 leading-5' });

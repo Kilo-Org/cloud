@@ -467,7 +467,7 @@ If `CF_AE_TOKEN` is missing, Grafana will still boot — only dashboard queries 
 
 ### Limitations in local dev
 
-- **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started (for example, session-ingest -> o11y requires the `observability` group).
+- **Service bindings** resolve locally for Workers launched together by `pnpm dev:start` when the bound target is running. Bindings to optional services remain unavailable unless their owning group is started.
 - **Webhook → KiloClaw Chat** triggers require the KiloClaw worker running on port 8795. The webhook worker calls it via `KILOCLAW_API_URL` (HTTP, not a service binding) to deliver messages to Stream Chat. Stream Chat credentials (`STREAM_CHAT_API_KEY`, `STREAM_CHAT_API_SECRET`) must be in `kiloclaw/.dev.vars`.
 - **Cloudflare Containers** (used by Cloud Agent Next and App Builder) always run on Cloudflare's remote infrastructure, even in dev mode. Purely local execution is not possible.
 - **Analytics Engine writes** are no-ops in `wrangler dev` — there is no local AE simulator. Reads against the real prod datasets still work via the local Grafana above. **Pipelines** and **dispatch namespaces** don't work locally.

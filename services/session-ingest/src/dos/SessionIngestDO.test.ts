@@ -384,18 +384,13 @@ describe('SessionIngestDO session-ready push', () => {
   });
 });
 
-describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
-  /**
-   * Pins: Postgres total_cost_microdollars persist runs before the unguarded
-   * O11Y.ingestSessionMetrics RPC. An O11Y rejection must not skip the persist.
-   */
-  function makeAlarmHarness(options: { totalCostDollars: number; o11yImpl: () => Promise<void> }) {
+describe('SessionIngestDO persistSessionTotalCost', () => {
+  function makeAlarmHarness(options: { totalCostDollars: number }) {
     const operations: string[] = [];
     const meta = new Map<string, string | null>([
       ['kiloUserId', 'usr_cost'],
       ['sessionId', 'ses_cost'],
       ['closeReason', 'completed'],
-      ['ingestVersion', '3'],
     ]);
 
     const itemData = JSON.stringify({
@@ -442,9 +437,6 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
           const value = meta.get('metricsEmitted');
           return value === undefined ? undefined : { value };
         }
-        if (key === 'model') {
-          return undefined;
-        }
         // alarm() loads meta via select().from().where(inArray(...)).all()
         // — handled by all() below. get() for other keys:
         if (key !== undefined && meta.has(key)) {
@@ -454,7 +446,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       }),
       all: vi.fn(() => {
         // alarm meta load: returns rows with key/value
-        // emitSessionMetrics item load: returns item_type/item_data rows
+        // persistSessionTotalCost item load: returns item_type/item_data rows
         // Distinguish by whether the last where bound a single eq key used for items.
         // Simpler: track call site via select columns shape.
         return (selectQuery as { _allKind?: 'meta' | 'items' })._allKind === 'items'
@@ -470,14 +462,6 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
         'item_type' in (columns as Record<string, unknown>)
       ) {
         (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = 'items';
-      } else if (
-        columns &&
-        typeof columns === 'object' &&
-        'item_data' in (columns as Record<string, unknown>) &&
-        !('item_type' in (columns as Record<string, unknown>))
-      ) {
-        // model lookup: select({ item_data }).from().where(eq item_id 'model').get()
-        (selectQuery as { _allKind?: 'meta' | 'items' })._allKind = undefined;
       } else if (
         columns &&
         typeof columns === 'object' &&
@@ -538,11 +522,6 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     dbClientMocks.getWorkerDb.mockReset();
     dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
 
-    const ingestSessionMetrics = vi.fn(async () => {
-      operations.push('o11y:ingestSessionMetrics');
-      return options.o11yImpl();
-    });
-
     const deleteAlarm = vi.fn(async () => {
       operations.push('deleteAlarm');
     });
@@ -554,13 +533,11 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     const env = {
       SESSION_INGEST_R2: { delete: vi.fn() },
       HYPERDRIVE: { connectionString: 'postgres://test' },
-      O11Y: { ingestSessionMetrics },
     } as never;
 
     return {
       durableObject: new SessionIngestDO(state, env),
       operations,
-      ingestSessionMetrics,
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
@@ -578,16 +555,10 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     };
   }
 
-  it('persists total_cost_microdollars via persistLiveSessionColumns before O11Y when O11Y rejects', async () => {
-    const o11yError = new Error('o11y unavailable');
-    const harness = makeAlarmHarness({
-      totalCostDollars: 0.15,
-      o11yImpl: async () => {
-        throw o11yError;
-      },
-    });
+  it('persists total_cost_microdollars via persistLiveSessionColumns on alarm', async () => {
+    const harness = makeAlarmHarness({ totalCostDollars: 0.15 });
 
-    await expect(harness.durableObject.alarm()).rejects.toThrow('o11y unavailable');
+    await harness.durableObject.alarm();
 
     expect(harness.getWorkerDb).toHaveBeenCalledWith('postgres://test');
     expect(harness.pgSet).toHaveBeenCalledTimes(1);
@@ -602,28 +573,12 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
     expect(harness.pgWhere).toHaveBeenCalledTimes(1);
     // where() must bind both session_id and kilo_user_id (and(...) nests eq chunks).
     expect(harness.pgWhereBoundParams).toEqual(expect.arrayContaining(['ses_cost', 'usr_cost']));
-    expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
-    expect(harness.ingestSessionMetrics).toHaveBeenCalledWith(
-      expect.objectContaining({
-        kiloUserId: 'usr_cost',
-        sessionId: 'ses_cost',
-        ingestVersion: 3,
-        totalCost: 0.15,
-        terminationReason: 'completed',
-      })
-    );
-
-    // Ordering: persist must precede the unguarded O11Y RPC.
     const persistIdx = harness.operations.indexOf('persist:live_session_columns');
-    const o11yIdx = harness.operations.indexOf('o11y:ingestSessionMetrics');
+    const emittedIdx = harness.operations.indexOf('meta:metricsEmitted:true');
     expect(persistIdx).toBeGreaterThanOrEqual(0);
-    expect(o11yIdx).toBeGreaterThanOrEqual(0);
-    expect(persistIdx).toBeLessThan(o11yIdx);
-
-    // Rejection propagates out of alarm(); metricsEmitted must not be marked.
-    expect(harness.operations).not.toContain('meta:metricsEmitted:true');
-    expect(harness.operations).not.toContain('deleteAlarm');
-    expect(harness.meta.get('metricsEmitted')).toBeUndefined();
+    expect(persistIdx).toBeLessThan(emittedIdx);
+    expect(harness.operations).toContain('deleteAlarm');
+    expect(harness.meta.get('metricsEmitted')).toBe('true');
   });
 });
 

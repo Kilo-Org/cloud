@@ -14,9 +14,7 @@ import type { SecurityFinding } from '@kilocode/db/schema';
 import type { SecurityFindingTriage } from '../core/types';
 import { addBreadcrumb, captureException, startSpan } from '@sentry/nextjs';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET } from '@/lib/config.server';
 import { DEFAULT_SECURITY_AGENT_TRIAGE_MODEL } from '../core/constants';
-import { emitApiMetrics } from './api-metrics.server';
 
 const log = sentryLogger('security-agent:triage', 'info');
 const logError = sentryLogger('security-agent:triage', 'error');
@@ -200,7 +198,6 @@ function createFallbackTriage(reason: string): SecurityFindingTriage {
  * @param options.authToken - Auth token for the LLM proxy
  * @param options.model - Model to use for triage (defaults to DEFAULT_SECURITY_AGENT_TRIAGE_MODEL)
  * @param options.correlationId - Correlation ID for tracing across the analysis pipeline
- * @param options.userId - User ID for metrics tracking
  * @param options.organizationId - Optional organization ID for usage tracking
  */
 export async function triageSecurityFinding(options: {
@@ -208,7 +205,6 @@ export async function triageSecurityFinding(options: {
   authToken: string;
   model?: string;
   correlationId?: string;
-  userId?: string;
   organizationId?: string;
 }): Promise<SecurityFindingTriage> {
   const {
@@ -216,7 +212,6 @@ export async function triageSecurityFinding(options: {
     authToken,
     model = DEFAULT_SECURITY_AGENT_TRIAGE_MODEL,
     correlationId = '',
-    userId = '',
     organizationId,
   } = options;
   log('Starting triage', { correlationId, findingId: finding.id });
@@ -333,36 +328,6 @@ export async function triageSecurityFinding(options: {
         if (usage) {
           span.setAttribute('security_agent.input_tokens', usage.prompt_tokens);
           span.setAttribute('security_agent.output_tokens', usage.completion_tokens);
-        }
-
-        if (usage && userId && O11Y_KILO_GATEWAY_CLIENT_SECRET) {
-          const responseToolCalls = result.data.choices?.[0]?.message?.tool_calls ?? [];
-          const toolsUsed = responseToolCalls
-            .filter(tc => tc.type === 'function')
-            .map(tc => `function:${tc.function.name}`);
-
-          emitApiMetrics({
-            clientSecret: O11Y_KILO_GATEWAY_CLIENT_SECRET,
-            kiloUserId: userId,
-            organizationId,
-            isAnonymous: false,
-            isStreaming: false,
-            userByok: false,
-            mode: 'security-agent-triage',
-            provider: 'anthropic',
-            requestedModel: model,
-            resolvedModel: model,
-            toolsAvailable: ['function:submit_triage_result'],
-            toolsUsed,
-            ttfbMs: durationMs,
-            completeRequestMs: durationMs,
-            statusCode: 200,
-            tokens: {
-              inputTokens: usage.prompt_tokens,
-              outputTokens: usage.completion_tokens,
-              totalTokens: usage.total_tokens,
-            },
-          });
         }
 
         const choice = result.data.choices?.[0];

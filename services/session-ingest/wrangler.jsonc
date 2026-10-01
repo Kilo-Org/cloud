@@ -107,10 +107,6 @@
   },
   "services": [
     {
-      "binding": "O11Y",
-      "service": "o11y",
-    },
-    {
       "binding": "NOTIFICATIONS",
       "service": "notifications",
       "entrypoint": "NotificationsService",

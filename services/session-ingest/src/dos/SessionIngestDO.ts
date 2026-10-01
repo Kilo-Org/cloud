@@ -159,7 +159,7 @@ function writeCloneMeta(db: DrizzleSqliteDODatabase, key: CloneMetaKey, value: s
 /**
  * Monotonic live-column write for cost and/or last_activity_at.
  * Per-column CASE guards so concurrent waitUntil tasks commute.
- * Used by live ingest persists and the close-path emitSessionMetrics write.
+ * Used by live ingest persists and the close-path persistSessionTotalCost write.
  */
 export async function persistLiveSessionColumns(
   connectionString: string,
@@ -998,14 +998,13 @@ export class SessionIngestDO extends DurableObject<Env> {
   }
 
   /**
-   * Compute and emit session metrics to the o11y worker.
-   * Returns true if metrics were emitted, false if already emitted.
+   * Persist the final session total cost once per close.
+   * Returns true if the cost was persisted, false if already persisted.
    */
-  private async emitSessionMetrics(
+  private async persistSessionTotalCost(
     kiloUserId: string,
     sessionId: string,
-    closeReason: TerminationReason,
-    ingestVersion: number
+    closeReason: TerminationReason
   ): Promise<boolean> {
     const emittedRow = this.db
       .select({ value: ingestMeta.value })
@@ -1036,29 +1035,8 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
-    const modelRow = this.db
-      .select({ item_data: ingestItems.item_data })
-      .from(ingestItems)
-      .where(eq(ingestItems.item_id, 'model'))
-      .get();
-    let model: string | undefined;
-    if (modelRow) {
-      try {
-        const arr = JSON.parse(modelRow.item_data) as Extract<
-          SessionDataItem,
-          { type: 'model' }
-        >['data'];
-        if (arr.length > 0) {
-          model = arr[arr.length - 1].id;
-        }
-      } catch {
-        // Best-effort: skip model on parse errors.
-      }
-    }
-
     // Best-effort persist the per-session total cost to Postgres so the session
-    // list can surface it. Runs before the O11Y RPC so an analytics failure cannot
-    // skip it. Failures are logged and swallowed — must never break metrics emission.
+    // list can surface it. Failures are logged and swallowed.
     // Same helper + CASE guard as live cost persist (D20).
     try {
       if (Number.isFinite(metrics.totalCost)) {
@@ -1078,15 +1056,6 @@ export class SessionIngestDO extends DurableObject<Env> {
         stack: error instanceof Error ? error.stack : undefined,
       });
     }
-
-    if (this.isDeleted()) return false;
-    await this.env.O11Y.ingestSessionMetrics({
-      kiloUserId,
-      sessionId,
-      ingestVersion,
-      model,
-      ...metrics,
-    });
 
     if (this.isDeleted()) return false;
     this.db
@@ -1114,7 +1083,6 @@ export class SessionIngestDO extends DurableObject<Env> {
           'kiloUserId',
           'sessionId',
           'closeReason',
-          'ingestVersion',
           'deleted',
         ])
       )
@@ -1130,18 +1098,16 @@ export class SessionIngestDO extends DurableObject<Env> {
     if (!kiloUserId || !sessionId) return;
 
     const closeReason = (meta['closeReason'] ?? 'abandoned') as TerminationReason;
-    const ingestVersion = Number(meta['ingestVersion'] ?? '0') || 0;
 
     // DO alarm exceptions don't populate the Exceptions array in logpush traces,
     // so without this catch we get outcome=exception with zero diagnostics.
     try {
-      await this.emitSessionMetrics(kiloUserId, sessionId, closeReason, ingestVersion);
+      await this.persistSessionTotalCost(kiloUserId, sessionId, closeReason);
     } catch (error) {
       console.error('SessionIngestDO alarm failed', {
         sessionId,
         kiloUserId,
         closeReason,
-        ingestVersion,
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });

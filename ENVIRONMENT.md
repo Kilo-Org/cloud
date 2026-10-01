@@ -268,8 +268,6 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GASTOWN_BILLING_ENABLED` - Enables Gastown container usage billing _enforcement_: admission checks and low-balance stops. Does not control metering — usage is always reported to the meter whenever the `CONTAINER_USAGE` binding is present. Enabled in the Gastown Wrangler development environment and defaults to `false` in production. [SERVER]
 - `GASTOWN_BILLING_ANNOUNCEMENT_ENABLED` - Set to exactly `true` to show the upcoming usage-based container billing announcement on Gastown town overview pages. Always enabled when Next.js runs in development and defaults to off otherwise. [SERVER]
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
-- `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
-- `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
 - `BOUNCER_URL` - URL of the bouncer worker (report-only fraud, distillation, and rate verdicts). Defaults to https://bouncer.kiloapps.io in production. Usage reports and decide transport requests have 30-second trial budgets; gateway decide runs through `after()` and never delays inference. Credit reports keep their 5-second budget because Stripe webhooks await them. [SERVER]
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]

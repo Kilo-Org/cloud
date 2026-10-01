@@ -292,11 +292,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/kilo-chat',
   },
   // observability
-  'cloudflare-o11y': {
-    group: 'observability',
-    dependsOn: ['nextjs'],
-    dir: 'services/o11y',
-  },
   'cloudflare-model-eval-ingest': {
     group: 'observability',
     dependsOn: ['postgres'],

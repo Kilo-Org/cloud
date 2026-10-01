@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, spyOn } from 'bun:test';
 import {
   CONTROL_PLANE_TIMERS,
   type ControlPlaneTimers,
@@ -11,6 +11,7 @@ import type {
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import type { ExecResult, ProcessOutputStream } from '../utils.js';
+import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
 
@@ -651,6 +652,85 @@ describe('createPreparationManager', () => {
       step: 'setup',
       subtype: 'setup_command_failed',
     });
+  });
+
+  it('bounds setup commands with the 5-minute inactivity and 8-minute hard timeout', async () => {
+    const runProcess = spyOn(processUtils, 'runProcess').mockImplementation(async () => result(0));
+    try {
+      const manager = createPreparationManager({
+        timers: FAST_TIMERS,
+        emit: () => undefined,
+        runtimes: {
+          ensure: async () =>
+            ({
+              serverUrl: 'http://127.0.0.1:1',
+              ensureSession: async () => undefined,
+            }) as unknown as WrapperKiloClient,
+          installCredentials: async () => undefined,
+          isUnavailable: () => false,
+          remove: () => undefined,
+          release: () => undefined,
+        },
+        inheritedEnv: {},
+        homeRoot: '/tmp/prepare-test-homes',
+        hasGit: async () => false,
+        hasBootstrapMarker: async () => false,
+        writeBootstrapMarker: async () => undefined,
+        mkdir: async () => undefined,
+        configureGitAuthor: async () => undefined,
+        seedRegistration: async () => undefined,
+        sessionExists: async () => true,
+      });
+
+      await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
+
+      expect(runProcess).toHaveBeenCalledWith(
+        'sh',
+        ['-c', 'pnpm install'],
+        expect.objectContaining({
+          inactivityTimeoutMs: 300_000,
+          hardTimeoutMs: 480_000,
+        })
+      );
+    } finally {
+      runProcess.mockRestore();
+    }
+  });
+
+  it('logs distinct setup failure diagnostics with the configured limits', async () => {
+    const cases = [
+      { terminationReason: 'hard_timeout', subtype: 'setup_command_timeout', code: 124 },
+      { terminationReason: 'inactivity_timeout', subtype: 'setup_command_timeout', code: 124 },
+      { terminationReason: 'abort', subtype: 'setup_command_timeout', code: 124 },
+      { terminationReason: undefined, subtype: 'setup_command_failed', code: 1 },
+    ] as const;
+
+    for (const testCase of cases) {
+      const harness = createHarness();
+      harness.setSetupResult({
+        stdout: 'STDOUT_LEAK_CANARY',
+        stderr: 'STDERR_LEAK_CANARY',
+        exitCode: testCase.code,
+        terminationReason: testCase.terminationReason,
+      });
+
+      await harness.manager.prepare(routeSpec({ setupCommands: ['secret-command'] }));
+
+      const failureLog =
+        harness.logs.find(line => line.includes('control-plane setup command failed')) ?? '';
+      expect(failureLog).toContain(`terminationReason=${testCase.terminationReason ?? 'nonzero'}`);
+      expect(failureLog).toContain('attemptId=attempt-1');
+      expect(failureLog).toContain('index=1 count=1');
+      expect(failureLog).toContain('inactivityTimeoutMs=300000 hardTimeoutMs=480000');
+      expect(failureLog).not.toContain('secret-command');
+      expect(failureLog).not.toContain('STDOUT_LEAK_CANARY');
+      expect(failureLog).not.toContain('STDERR_LEAK_CANARY');
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.failed',
+        step: 'setup',
+        subtype: testCase.subtype,
+      });
+    }
   });
 
   it('creates the Kilo session when the ingest export is missing', async () => {

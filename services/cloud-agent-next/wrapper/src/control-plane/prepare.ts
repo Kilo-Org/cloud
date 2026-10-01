@@ -37,8 +37,8 @@ import type { ControlWorkload } from '../control/workload-cgroup.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 /** Spec §7 "Setup commands": current per-command limits. */
-const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
-const SETUP_COMMAND_HARD_TIMEOUT_MS = 300_000;
+const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 5 * 60_000;
+const SETUP_COMMAND_HARD_TIMEOUT_MS = 8 * 60_000;
 /** Spec §7 "Clone or fetch": network errors get 3 attempts with backoff. */
 const CLONE_RETRY_ATTEMPTS = 3;
 const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
@@ -457,10 +457,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           });
         }
       );
+      const startedAt = Date.now();
       const result = await runSetup(command, directory, env, output.onOutput, signal);
       output.flush();
       if (result.exitCode !== 0) {
         const timedOut = result.terminationReason !== undefined;
+        log(
+          `control-plane setup command failed sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} index=${index + 1} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${Date.now() - startedAt} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
+        );
         throw new WrapperBootstrapError({
           code: 'WORKSPACE_SETUP_FAILED',
           subtype: timedOut ? 'setup_command_timeout' : 'setup_command_failed',

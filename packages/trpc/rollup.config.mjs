@@ -34,12 +34,9 @@ const plugins = [
   {
     name: 'resolve-aliases',
     resolveId(source) {
-      // Resolve @/* path aliases to the tsc output, mirroring the tsconfig
-      // fallback from apps/web/src to packages/web-shared/src.
+      // Resolve @/* path aliases to the tsc output (apps/web/src after monorepo restructure)
       if (source.startsWith('@/')) {
-        const webDts = resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
-        if (existsSync(webDts)) return webDts;
-        return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', source.slice(2)));
+        return resolveDts(path.resolve(tscOut, 'apps/web/src', source.slice(2)));
       }
       // Resolve @kilocode/db sub-path imports
       if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {

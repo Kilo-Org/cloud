@@ -1,10 +1,7 @@
 import 'server-only';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import * as z from 'zod';
-import {
-  organizationMemberProcedure,
-  organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+import { organizationMemberProcedure, organizationMemberMutationProcedure } from './utils';
 import { branchSchema, repoNameSchema, slugSchema } from '@/lib/user-deployments/validation';
 import * as deploymentsService from '@/lib/user-deployments/deployments-service';
 import * as envVarsService from '@/lib/user-deployments/env-vars-service';

@@ -1,6 +1,6 @@
 import { captureException } from '@sentry/nextjs';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { upstreamRequest } from '../lib/ai-gateway/providers/upstream-request';
+import { OPENROUTER } from '../lib/ai-gateway/providers/definitions/openrouter';
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

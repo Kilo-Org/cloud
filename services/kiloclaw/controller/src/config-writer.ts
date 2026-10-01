@@ -987,7 +987,7 @@ export function generateBaseConfig(
       apiKey: env.KILOCODE_API_KEY || '',
       headers: {
         // Feature attribution for embedding calls — mirrors FEATURE_VALUES in
-        // packages/web-shared/src/lib/feature-detection.ts. Hardcoded because the controller
+        // apps/web/src/lib/feature-detection.ts. Hardcoded because the controller
         // bundle is built from an isolated COPY and cannot import from the worker tree.
         'x-kilocode-feature': 'kiloclaw-embedding',
         ...(env.KILOCODE_ORGANIZATION_ID

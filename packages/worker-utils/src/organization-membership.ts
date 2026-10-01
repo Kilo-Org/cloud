@@ -11,7 +11,7 @@ type OrganizationMembershipDb = Pick<WorkerDb, 'select'>;
  *
  * Deliberately excluded:
  * - Parent-organization inherited roles — honoured only by the tRPC path
- *   (`packages/web-shared/src/routers/organizations/utils.ts`), restricted to
+ *   (`apps/web/src/routers/organizations/utils.ts`), restricted to
  *   owner/billing_manager. No worker-side check considers them; adding
  *   inheritance here would make this the single most permissive worker check in
  *   the repo, in a security fix. The pre-existing gap is uniform across every

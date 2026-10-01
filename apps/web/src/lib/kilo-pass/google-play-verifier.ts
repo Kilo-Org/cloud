@@ -1,7 +1,7 @@
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
 import type { ValidatedStoreKiloPassPurchase } from './store-subscription-completion';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
+import { KiloPassPaymentProvider } from './enums';
 import { getMobileStoreKiloPassProductByGoogleProductId } from './mobile-store-products';
 import {
   getGooglePlaySubscriptionOrder,

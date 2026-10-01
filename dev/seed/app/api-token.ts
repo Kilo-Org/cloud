@@ -10,7 +10,7 @@ import type { SeedResult } from '../index';
 export const usage = '<email> [options]';
 
 // Five years, matching generateApiToken()'s default in
-// packages/web-shared/src/lib/tokens.ts (TOKEN_EXPIRY.default / FIVE_YEARS_IN_SECONDS).
+// apps/web/src/lib/tokens.ts (TOKEN_EXPIRY.default / FIVE_YEARS_IN_SECONDS).
 // The resource-delegation policy (createControlTokenForRequest →
 // isKiloCredentialExchangeEligible, LEGACY_API_TOKEN_LIFETIMES_SECONDS in
 // @kilocode/worker-utils) only accepts legacy five-year API tokens for

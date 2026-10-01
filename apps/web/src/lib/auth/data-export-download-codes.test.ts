@@ -10,7 +10,7 @@ import {
   reserveDataExportDownloadCode,
   __test__,
 } from './data-export-download-codes';
-import { createSignInCode, reserveSignInCode } from '@/lib/auth/magic-link-tokens';
+import { createSignInCode, reserveSignInCode } from './magic-link-tokens';
 
 const testEmail = 'data-export-code@example.com';
 const exportId = '11111111-1111-4111-8111-111111111111';

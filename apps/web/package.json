@@ -59,7 +59,6 @@
     "@kilocode/notifications": "workspace:*",
     "@kilocode/organization-entitlement": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
-    "@kilocode/web-shared": "workspace:*",
     "@kilocode/worker-utils": "workspace:*",
     "@linear/sdk": "76.0.0",
     "@lottiefiles/dotlottie-react": "0.17.15",

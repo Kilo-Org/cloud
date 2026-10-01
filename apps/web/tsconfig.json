@@ -9,7 +9,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*", "../../packages/web-shared/src/*"],
+      "@/*": ["./src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
       "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],
@@ -41,7 +41,6 @@
   "include": [
     "next-env.d.ts",
     "src/**/*",
-    "../../packages/web-shared/src/**/*",
     "tests/**/*",
     ".next/types/**/*.ts",
     "jest.config.ts",

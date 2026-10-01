@@ -18,7 +18,7 @@ import {
   getOrganizationById,
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
-import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
+import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
 import { getLowerDomainFromEmail } from '@/lib/email-address';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';

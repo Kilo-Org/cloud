@@ -6,7 +6,7 @@ import {
   getCreditTransactionsForOrganization,
   getCreditTransactionsForOrganizationPage,
 } from '@/lib/creditTransactions';
-import { db, pool } from '@/lib/drizzle';
+import { db, pool } from './drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
 
 function whereClause(text: string): string {

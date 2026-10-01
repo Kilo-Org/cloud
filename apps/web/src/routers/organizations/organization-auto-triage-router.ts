@@ -3,7 +3,7 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
   organizationBillingMutationProcedure,
-} from '@/routers/organizations/utils';
+} from './utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import { getPrimaryGitHubIntegrationForOrganization } from '@/lib/integrations/db/platform-integrations';
 import {

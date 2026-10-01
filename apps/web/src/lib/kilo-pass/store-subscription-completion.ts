@@ -22,8 +22,8 @@ import {
 import { db } from '@/lib/drizzle';
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { toMicrodollars } from '@/lib/microdollars';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { getMonthlyPriceUsd } from './bonus';
+import { dayjs } from './dayjs';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -32,19 +32,19 @@ import {
   KiloPassIssuanceSource,
   KiloPassPaymentProvider,
   type KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from './enums';
 import {
   appendKiloPassAuditLog,
   computeIssueMonth,
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
-} from '@/lib/kilo-pass/issuance';
+} from './issuance';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
 } from './subscription-accounting';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
+import { isStripeSubscriptionEnded } from './stripe-subscription-status';
 
 export type ValidatedStoreKiloPassPurchase = {
   paymentProvider: KiloPassPaymentProvider.AppStore | KiloPassPaymentProvider.GooglePlay;

@@ -8,9 +8,9 @@ import { eq } from 'drizzle-orm';
 import { blockUser } from '@/lib/user/block';
 import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { captureException } from '@sentry/nextjs';
-import { updateStytchValidation } from '@/lib/customerInfo';
+import { updateStytchValidation } from './customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { grantCreditForCategory } from './promotionalCredits';
 import PostHogClient from '@/lib/posthog';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 

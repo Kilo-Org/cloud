@@ -9,7 +9,7 @@ import type { ModelStats } from '@kilocode/db/schema';
 import type { EnkryptFailureCategory, EnkryptSyncCounts } from '@kilocode/db/schema-types';
 import { eq, inArray, sql } from 'drizzle-orm';
 import { EnkryptSyncError } from './enkrypt-errors';
-import { fingerprintEnkryptScore } from '@/lib/model-stats/enkrypt-fingerprint';
+import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 import { ENKRYPT_REQUIRED_MODEL_IDS, matchEnkryptScores } from './enkrypt-identity';
 import type * as EnkryptIdentity from './enkrypt-identity';
 import { getEnkryptSyncHealth } from './enkrypt-status';

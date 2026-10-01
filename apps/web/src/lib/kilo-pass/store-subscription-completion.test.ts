@@ -14,10 +14,10 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { defineTestUser, insertTestUser } from '@/tests/helpers/user.helper';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceSource, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { getEffectiveKiloPassThreshold } from '@/lib/kilo-pass/threshold';
+import { getMonthlyPriceUsd } from './bonus';
+import { KiloPassCadence, KiloPassIssuanceItemKind, KiloPassTier } from './enums';
+import { KiloPassIssuanceSource, KiloPassPaymentProvider } from './enums';
+import { getEffectiveKiloPassThreshold } from './threshold';
 import { mapGooglePlayKiloPassPurchase } from './google-play-verifier';
 import {
   completeStoreKiloPassPurchase,

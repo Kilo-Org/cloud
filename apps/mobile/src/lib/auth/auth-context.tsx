@@ -125,7 +125,7 @@ const jwtPayloadSchema = z.object({ kiloUserId: z.string().optional() });
 /**
  * Best-effort read of the signed-in user id from a Kilo bearer token. The
  * token is a JWT whose payload carries `kiloUserId` (see `generateApiToken`
- * in packages/web-shared/src/lib/tokens.ts). Decode-only: the server already accepted
+ * in apps/web/src/lib/tokens.ts). Decode-only: the server already accepted
  * the token, so the id is read without verifying the signature (the app has
  * no signing secret). Returns null for a non-JWT or malformed token so a
  * decode failure can never break sign-in.

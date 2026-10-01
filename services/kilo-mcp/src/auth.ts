@@ -2,8 +2,8 @@ import type { ForwardedAuth, GrantProps } from './types';
 
 /**
  * Organization header name. Mirrors ORGANIZATION_ID_HEADER in
- * packages/web-shared/src/lib/constants.ts:19 — apps/web reads it to scope identity to an
- * org (packages/web-shared/src/lib/user/server.ts). Keep in sync if the web constant ever
+ * apps/web/src/lib/constants.ts:19 — apps/web reads it to scope identity to an
+ * org (apps/web/src/lib/user/server.ts). Keep in sync if the web constant ever
  * changes.
  */
 export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';

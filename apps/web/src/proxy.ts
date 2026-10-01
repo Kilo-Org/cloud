@@ -1,7 +1,7 @@
 import type { NextRequestWithAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
-import { withBlockedClients } from '@/middleware/withBlockedClients';
+import { withBlockedClients } from './middleware/withBlockedClients';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
 import {
   buildContentSecurityPolicy,

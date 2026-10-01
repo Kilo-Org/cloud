@@ -11,7 +11,7 @@ const mockDeleteObjectCommand = jest.fn<(input: unknown) => { input: unknown; na
   input => ({ input, name: 'DeleteObjectCommand' })
 );
 
-jest.mock('@/lib/r2/client', () => ({
+jest.mock('./client', () => ({
   r2Client: { send: mockSend },
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
 }));

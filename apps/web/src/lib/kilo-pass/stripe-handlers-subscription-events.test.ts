@@ -6,9 +6,9 @@ import {
   kilo_pass_pause_events,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { KiloPassAuditLogAction } from '@/lib/kilo-pass/enums';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { KiloPassAuditLogResult } from './enums';
+import { KiloPassAuditLogAction } from './enums';
+import { KiloPassCadence } from './enums';
 import { KiloPassTier } from '@/lib/kilo-pass/enums';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { and, eq } from 'drizzle-orm';

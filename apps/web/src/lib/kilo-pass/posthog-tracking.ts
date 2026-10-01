@@ -10,7 +10,7 @@ import 'server-only';
 import { captureException } from '@sentry/nextjs';
 
 import PostHogClient from '@/lib/posthog';
-import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
+import type { KiloPassCadence, KiloPassTier } from './enums';
 
 export type KiloPassPurchaseKind = 'initial' | 'renewal' | 'upgrade' | 'unknown';
 

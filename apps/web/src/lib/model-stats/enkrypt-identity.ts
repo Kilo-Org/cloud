@@ -6,7 +6,7 @@ import {
   KILO_AUTO_MODEL_PREFIX,
   KILOCLAW_KILO_PROVIDER_PREFIX,
   KILOCODE_KILO_PROVIDER_PREFIX,
-} from '@/lib/ai-gateway/model-utils';
+} from '../ai-gateway/model-utils';
 import { EnkryptSyncError } from './enkrypt-errors';
 
 export type EnkryptIdentity = Pick<EnkryptScore, 'model_name' | 'provider' | 'source'>;

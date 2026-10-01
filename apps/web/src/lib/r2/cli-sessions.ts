@@ -7,7 +7,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Readable } from 'node:stream';
-import { r2Client, r2CliSessionsBucketName } from '@/lib/r2/client';
+import { r2Client, r2CliSessionsBucketName } from './client';
 import type { CliSession } from '@kilocode/db/schema';
 
 export type FolderName = 'sessions' | 'shared-sessions';

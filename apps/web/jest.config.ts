@@ -32,10 +32,9 @@ const config: Config = {
     '^@kilocode/worker-utils$': '<rootDir>/../../packages/worker-utils/src/index.ts',
     '^@kilocode/app-shared/(.*)$': '<rootDir>/../../packages/app-shared/src/$1',
     '^(\\.{1,2}/.+)\\.js$': '$1',
-    '^@/(.*)$': ['<rootDir>/src/$1', '<rootDir>/../../packages/web-shared/src/$1'],
+    '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
-  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared'],
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',

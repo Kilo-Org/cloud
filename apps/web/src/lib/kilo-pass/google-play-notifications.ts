@@ -12,13 +12,9 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
-import {
-  KiloPassAuditLogAction,
-  KiloPassAuditLogResult,
-  KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+import { KiloPassAuditLogAction, KiloPassAuditLogResult, KiloPassPaymentProvider } from './enums';
+import { KiloPassIssuanceItemKind } from './enums';
+import { appendKiloPassAuditLog } from './issuance';
 import {
   decodeGooglePlaySubscriptionPurchase,
   mapGooglePlayKiloPassPurchase,
@@ -38,7 +34,7 @@ import {
 import { reverseDuplicateGooglePlaySubscription } from './google-play-duplicate-subscription';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from './dayjs';
 import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
 type DbOrTx = DrizzleTransaction | typeof db;

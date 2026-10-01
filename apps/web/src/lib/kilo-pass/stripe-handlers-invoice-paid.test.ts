@@ -14,12 +14,12 @@ import {
   user_affiliate_attributions,
   user_affiliate_events,
 } from '@kilocode/db/schema';
-import { KiloPassAuditLogAction } from '@/lib/kilo-pass/enums';
-import { KiloPassAuditLogResult } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceSource } from '@/lib/kilo-pass/enums';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
-import { KiloPassScheduledChangeStatus } from '@/lib/kilo-pass/enums';
+import { KiloPassAuditLogAction } from './enums';
+import { KiloPassAuditLogResult } from './enums';
+import { KiloPassIssuanceItemKind } from './enums';
+import { KiloPassIssuanceSource } from './enums';
+import { KiloPassCadence } from './enums';
+import { KiloPassScheduledChangeStatus } from './enums';
 import {
   KiloPassPaymentProvider,
   KiloPassTier,

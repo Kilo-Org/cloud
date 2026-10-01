@@ -2,10 +2,10 @@
  * Provider ids whose models route to the user's own API key (direct BYOK) and
  * never bill Kilo credits. A model id is `<providerId>/<model...>` — see
  * `formatDirectByokModelId` in
- * packages/web-shared/src/lib/ai-gateway/providers/direct-byok/index.ts.
+ * apps/web/src/lib/ai-gateway/providers/direct-byok/index.ts.
  *
  * Source of truth is `DIRECT_BYOK_PROVIDERS_META` in
- * packages/web-shared/src/lib/ai-gateway/providers/direct-byok/direct-byok-meta.ts.
+ * apps/web/src/lib/ai-gateway/providers/direct-byok/direct-byok-meta.ts.
  * This copy exists because Cloudflare Workers cannot import from apps/web.
  * A drift-guard test keeps the two lists equal.
  */

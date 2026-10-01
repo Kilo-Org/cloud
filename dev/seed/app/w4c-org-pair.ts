@@ -85,7 +85,7 @@ async function lookupUserId(email: string): Promise<string> {
  * settings marker naming the pair's owner, or a legacy `[seed:w4c-org-pair] `
  * name carrying it. Nothing else qualifies. The creator column is never read:
  * the app fills it for real organizations too
- * (`packages/web-shared/src/lib/organizations/organizations.ts`), so it cannot tell a
+ * (`apps/web/src/lib/organizations/organizations.ts`), so it cannot tell a
  * fixture row from one the owner created through the app. Neither is the
  * generic `Acme Corp` name plus a membership: an owner can create a real
  * organization with that name, and deleting it would destroy the owner's own

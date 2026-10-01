@@ -9,7 +9,6 @@
   },
   "include": [
     "../web/src/**/*",
-    "../../packages/web-shared/src/**/*",
     "../web/.next/types/**/*.ts",
     ".storybook/**/*",
     "stories/**/*",
@@ -20,7 +19,6 @@
     "storybook-static",
     "../web/src/**/*.test.ts",
     "../web/src/**/*.test.tsx",
-    "../../packages/web-shared/src/**/*.test.ts",
     "../web/src/tests/**",
     "../web/src/**/*test-utils*",
     "../web/tests/**"

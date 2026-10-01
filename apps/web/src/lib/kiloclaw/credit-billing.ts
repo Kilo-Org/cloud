@@ -1107,7 +1107,7 @@ function planDisplayName(plan: 'commit' | 'standard'): string {
  * email per activation, not one per instance lifetime.
  *
  * Known gaps shared with every other insert-before-send email path in this
- * codebase (`maybeSendTopUpConfirmationEmail` in `packages/web-shared/src/lib/credits.ts`,
+ * codebase (`maybeSendTopUpConfirmationEmail` in `apps/web/src/lib/credits.ts`,
  * `services/kiloclaw-billing/src/lifecycle.ts` ~L850, and the
  * `kiloclaw_email_log`-gated sends in `apps/web/src/app/api/internal/kiloclaw/`):
  * 1. A crash between the marker insert and the provider send permanently

@@ -749,9 +749,7 @@ function computePlan(
 
   // --- .env.development.local changes ---
   const envDevLocalChanges: EnvDevLocalChange[] = [];
-  // apps/ai-gateway runs with the web app's env files (see its scripts/dev.sh).
-  const processEnvDevLocal =
-    !serviceFilter || serviceFilter.has('nextjs') || serviceFilter.has('ai-gateway');
+  const processEnvDevLocal = !serviceFilter || serviceFilter.has('nextjs');
 
   const envDevLocalExamplePath = path.join(repoRoot, 'apps/web/.env.development.local.example');
   if (processEnvDevLocal && fs.existsSync(envDevLocalExamplePath)) {

@@ -63,7 +63,6 @@ const groups: ServiceGroup[] = [
   { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
-  { id: 'ai-gateway', label: 'AI Gateway', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
   { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
@@ -113,13 +112,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
-  },
-  // The standalone AI gateway app (apps/ai-gateway). It serves the gateway
-  // routes the web app also serves, from the same database and Redis.
-  'ai-gateway': {
-    group: 'ai-gateway',
-    dependsOn: ['postgres', 'redis', 'redis-http'],
-    dir: 'apps/ai-gateway',
   },
   // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
@@ -683,8 +675,6 @@ function workerEnvPrefix(): string[] {
   return vars.length > 0 ? ['env', ...vars] : [];
 }
 
-const AI_GATEWAY_BASE_PORT = 3010;
-
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = REPO_ROOT;
   const defs: ServiceDef[] = [];
@@ -700,23 +690,6 @@ function buildServiceDefs(): ServiceDef[] {
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
         command: ['pnpm', 'run', 'dev'],
-        group: meta.group,
-      });
-      continue;
-    }
-
-    if (name === 'ai-gateway') {
-      // Clear of the 3000-3009 range the web app's dev script probes. The port
-      // is passed as AI_GATEWAY_PORT because the session exports PORT for the
-      // web app.
-      const port = AI_GATEWAY_BASE_PORT + portOffset;
-      defs.push({
-        name,
-        type: 'nextjs',
-        dir: meta.dir ?? name,
-        port,
-        dependsOn: meta.dependsOn,
-        command: ['env', `AI_GATEWAY_PORT=${port}`, 'pnpm', 'run', 'dev'],
         group: meta.group,
       });
       continue;

@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'crypto';
 import { createDrizzleClient } from '@kilocode/db/client';
-import { agent_configs, kilocode_users } from '@kilocode/db/schema';
+import { agent_configs, kilocode_users, platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   advanceOwnerSyncFreshness,
@@ -121,23 +121,102 @@ describe('security sync owner lease in PostgreSQL', () => {
     }
   });
 
-  it('takes over an expired lease with a fresh skeleton and no cursor copy', async () => {
+  it('takes over an expired lease and adopts the previous run progress', async () => {
     await resetRuntimeState({
-      sync_lease: { runId: 'old-run', chunkIndex: 0, expiresAt: '2000-01-01T00:00:00.000Z' },
-      sync_run: progress('old-run', ['old-repo'], 0),
+      sync_lease: { runId: 'old-run', chunkIndex: 6, expiresAt: '2000-01-01T00:00:00.000Z' },
+      sync_run: {
+        ...progress('old-run', ['old-repo'], 6),
+        staleRepos: ['gone-repo'],
+        synced: 3,
+        noProgressChunks: 1,
+      },
     });
 
     const claimed = await claimOwnerSyncLease(client.db as never, owner, 'new-run', 0);
     expect(claimed).not.toBeNull();
 
     const state = await readRuntimeState();
-    expect(state.sync_run).toMatchObject({ runId: 'new-run', completedRepos: [] });
-    expect(JSON.stringify(state.sync_run)).not.toContain('old-repo');
+    expect(state.sync_run).toEqual({
+      ...progress('new-run', ['old-repo'], 0),
+      staleRepos: ['gone-repo'],
+      synced: 3,
+      chunkIndex: undefined,
+    });
     expect(state.sync_run).not.toHaveProperty('chunkIndex');
     expect(state.sync_lease).toMatchObject({ runId: 'new-run', chunkIndex: 0 });
 
+    // The adopted cursor carries no chunk fence, so the new run's chunk 0 can write and complete.
+    await expect(
+      writeSyncRunProgress(client.db as never, owner, progress('new-run', ['new-repo'], 0))
+    ).resolves.toEqual({ written: true });
+    expect((await readRuntimeState()).sync_run).toMatchObject({
+      completedRepos: expect.arrayContaining(['old-repo', 'new-repo']),
+    });
+    await expect(
+      advanceOwnerSyncFreshness(client.db as never, owner, 'new-run', 0)
+    ).resolves.toEqual({ advanced: true });
+
     // The displaced run cannot reclaim the lease, even at a higher chunk index.
-    await expect(claimOwnerSyncLease(client.db as never, owner, 'old-run', 5)).resolves.toBeNull();
+    await expect(claimOwnerSyncLease(client.db as never, owner, 'old-run', 7)).resolves.toBeNull();
+  });
+
+  it('continues an abandoned run from its checkpoint and completes the owner', async () => {
+    const integrationId = randomUUID();
+    await client.db.insert(platform_integrations).values({
+      id: integrationId,
+      owned_by_user_id: testUserId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: `security-sync-lease-${randomUUID()}`,
+      permissions: { vulnerability_alerts: 'read' },
+      repositories: [
+        { id: 1, name: 'a', full_name: 'acme/a', private: true },
+        { id: 2, name: 'b', full_name: 'acme/b', private: true },
+        { id: 3, name: 'c', full_name: 'acme/c', private: true },
+      ],
+      integration_status: 'active',
+      github_connection_role: 'workflow',
+    });
+    try {
+      await resetRuntimeState({
+        sync_lease: { runId: 'dead-run', chunkIndex: 3, expiresAt: '2000-01-01T00:00:00.000Z' },
+        sync_run: progress('dead-run', ['acme/a', 'acme/b'], 3),
+      });
+      const fetchStub = vi.fn(async () => new Response(JSON.stringify([]), { status: 200 }));
+      vi.stubGlobal('fetch', fetchStub);
+
+      const result = await syncOwner({
+        db: client.db as never,
+        gitTokenService: { getToken: vi.fn(async () => 'github-token') } as never,
+        owner,
+        runId: 'next-run',
+        chunkIndex: 0,
+        budgetMs: 60_000,
+      });
+
+      expect(result).toMatchObject({ exhaustedBudget: false, remainingRepoCount: 0, errors: 0 });
+      const fetchedUrls = fetchStub.mock.calls.map(call => String((call as unknown[])[0]));
+      expect(fetchedUrls).toHaveLength(1);
+      expect(fetchedUrls[0]).toContain('/repos/acme/c/dependabot/alerts');
+
+      const state = await readRuntimeState();
+      expect(typeof state.last_synced_at).toBe('string');
+      expect(state.last_completed_run_id).toBe('next-run');
+      expect(state.sync_run).toBeUndefined();
+      expect(state.sync_lease).toBeUndefined();
+    } finally {
+      await client.db
+        .delete(platform_integrations)
+        .where(eq(platform_integrations.id, integrationId));
+    }
+  });
+
+  it('starts a fresh cursor when a new run claims an owner without progress', async () => {
+    const claimed = await claimOwnerSyncLease(client.db as never, owner, 'first-run', 0);
+    expect(claimed).not.toBeNull();
+
+    const state = await readRuntimeState();
+    expect(state.sync_run).toEqual({ ...progress('first-run', [], 0), chunkIndex: undefined });
   });
 
   it('rejects foreign write, clear, and freshness mutations', async () => {

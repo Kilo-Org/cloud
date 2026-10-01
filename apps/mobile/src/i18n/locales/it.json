@@ -2146,7 +2146,10 @@
     "markdownImage": {
       "load": "Carica",
       "loadWithHost": "Carica {{host}}",
-      "httpsOnly": "Sono supportate solo le immagini HTTPS."
+      "httpsOnly": "Sono supportate solo le immagini HTTPS.",
+      "trustTitle": "Caricare l'immagine da {{host}}?",
+      "trustMessage": "Se consideri attendibile {{host}}, le sue immagini verranno caricate senza chiedere ogni volta. Puoi revocarlo in seguito in Siti attendibili.",
+      "loadOnce": "Carica una volta"
     },
     "markdownLink": {
       "invalidLink": "Questo link non può essere aperto.",
@@ -3222,8 +3225,12 @@
     "subtitle": "Siti che puoi aprire senza conferma",
     "emptyTitle": "Nessun sito attendibile",
     "emptyDescription": "Quando consideri attendibile un sito, i suoi link si aprono senza chiedere di nuovo conferma.",
+    "imagesSectionTitle": "Siti attendibili delle immagini",
+    "imagesSectionDescription": "Le immagini di questi siti si caricano senza chiedere di nuovo.",
+    "imagesSectionEmpty": "Nessun sito attendibile delle immagini",
     "revoke": "Revoca l'attendibilità di {{host}}",
     "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
+    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma.",
     "backToPreferences": "Torna alle preferenze"
   },
   "quickChat": {

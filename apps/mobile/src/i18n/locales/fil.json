@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "I-load",
       "loadWithHost": "I-load ang {{host}}",
-      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan."
+      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan.",
+      "trustTitle": "I-load ang larawan mula sa {{host}}?",
+      "trustMessage": "Kapag pinagkatiwalaan mo ang {{host}}, maglo-load ang mga larawan nito nang hindi na nagtatanong bawat oras. Maaari mong bawiin ito mamaya sa Mga pinagkakatiwalaang host.",
+      "loadOnce": "I-load nang isang beses"
     },
     "markdownLink": {
       "invalidLink": "Hindi mabubuksan ang link na ito.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Mga host na pinapayagan mong buksan nang hindi na nagtatanong",
     "emptyTitle": "Walang pinagkakatiwalaang host",
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
+    "imagesSectionTitle": "Mga pinagkakatiwalaang host ng larawan",
+    "imagesSectionDescription": "Naglo-load ang mga larawan mula sa mga host na ito nang hindi na nagtatanong.",
+    "imagesSectionEmpty": "Walang pinagkakatiwalaang host ng larawan",
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
+    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito.",
     "backToPreferences": "Bumalik sa mga setting"
   },
   "quickChat": {

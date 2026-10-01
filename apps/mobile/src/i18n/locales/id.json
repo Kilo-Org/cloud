@@ -2153,7 +2153,10 @@
     "markdownImage": {
       "load": "Muat",
       "loadWithHost": "Muat {{host}}",
-      "httpsOnly": "Hanya gambar melalui HTTPS yang dapat dimuat."
+      "httpsOnly": "Hanya gambar melalui HTTPS yang dapat dimuat.",
+      "trustTitle": "Muat gambar dari {{host}}?",
+      "trustMessage": "Mempercayai {{host}} akan memuat gambarnya tanpa bertanya setiap saat. Anda dapat mencabutnya nanti di Host tepercaya.",
+      "loadOnce": "Muat sekali"
     },
     "markdownLink": {
       "invalidLink": "Tautan ini tidak dapat dibuka.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Host tepercaya yang dapat dibuka tanpa konfirmasi",
     "emptyTitle": "Tidak ada host tepercaya",
     "emptyDescription": "Tautan dari host yang kamu percayai akan terbuka tanpa meminta konfirmasi lagi.",
+    "imagesSectionTitle": "Host gambar tepercaya",
+    "imagesSectionDescription": "Gambar dari host ini dimuat tanpa bertanya lagi.",
+    "imagesSectionEmpty": "Tidak ada host gambar tepercaya",
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
+    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi.",
     "backToPreferences": "Kembali ke preferensi"
   },
   "quickChat": {

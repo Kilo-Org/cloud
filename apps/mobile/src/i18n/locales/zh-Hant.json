@@ -2153,7 +2153,10 @@
     "markdownImage": {
       "load": "載入",
       "loadWithHost": "載入 {{host}}",
-      "httpsOnly": "僅支援 HTTPS 圖片。"
+      "httpsOnly": "僅支援 HTTPS 圖片。",
+      "trustTitle": "從 {{host}} 載入圖片？",
+      "trustMessage": "信任 {{host}} 後，其圖片將不再每次詢問即可載入。你可以稍後在信任的主機中撤銷。",
+      "loadOnce": "僅載入一次"
     },
     "markdownLink": {
       "invalidLink": "此連結無法開啟。",
@@ -3179,8 +3182,12 @@
     "subtitle": "已信任的主機，開啟連結時不再詢問",
     "emptyTitle": "沒有信任的主機",
     "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
+    "imagesSectionTitle": "信任的圖片主機",
+    "imagesSectionDescription": "來自這些主機的圖片將不再詢問即可載入。",
+    "imagesSectionEmpty": "沒有信任的圖片主機",
     "revoke": "撤銷對 {{host}} 的信任",
     "revokeMessage": "前往此主機的連結將再次要求確認。",
+    "revokeImageMessage": "來自此主機的圖片將再次要求確認。",
     "backToPreferences": "返回偏好設定"
   },
   "quickChat": {

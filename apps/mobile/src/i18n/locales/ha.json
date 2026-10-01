@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Loda",
       "loadWithHost": "Loda {{host}}",
-      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa."
+      "httpsOnly": "Hotunan HTTPS ne kawai ake karɓa.",
+      "trustTitle": "Loda hoto daga {{host}}?",
+      "trustMessage": "Amincewa da {{host}} na loda hotunansa ba tare da tambaya kowane lokaci ba. Za ka iya soke shi daga baya a cikin Rukunonin yanar gizo da aka amince da su.",
+      "loadOnce": "Loda sau ɗaya"
     },
     "markdownLink": {
       "invalidLink": "Ba za a iya buɗe wannan mahaɗin ba.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Rukunonin yanar gizo da ka amince a buɗe ba tare da tambaya ba",
     "emptyTitle": "Babu rukunin yanar gizo da aka amince da shi",
     "emptyDescription": "Idan ka amince da rukunin yanar gizon mahaɗi, za a buɗe shi ba tare da sake tambaya ba.",
+    "imagesSectionTitle": "Rukunonin yanar gizo na hoto da aka amince da su",
+    "imagesSectionDescription": "Hotuna daga waɗannan rukunoni suna lodawa ba tare da sake tambaya ba.",
+    "imagesSectionEmpty": "Babu rukunin yanar gizo na hoto da aka amince da shi",
     "revoke": "Soke amincewa da {{host}}",
     "revokeMessage": "Hanyoyin shiga wannan rukunin yanar gizo za su sake neman tabbaci.",
+    "revokeImageMessage": "Hotuna daga wannan rukunin yanar gizo za su sake neman tabbaci.",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
   },
   "quickChat": {

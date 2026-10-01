@@ -2177,7 +2177,10 @@
     "markdownImage": {
       "load": "Cargar",
       "loadWithHost": "Cargar {{host}}",
-      "httpsOnly": "Solo se admiten imágenes con HTTPS."
+      "httpsOnly": "Solo se admiten imágenes con HTTPS.",
+      "trustTitle": "¿Cargar imagen de {{host}}?",
+      "trustMessage": "Si confías en {{host}}, sus imágenes se cargarán sin preguntar cada vez. Puedes revocarlo más tarde en Dominios de confianza.",
+      "loadOnce": "Cargar una vez"
     },
     "markdownLink": {
       "invalidLink": "Este enlace no se puede abrir.",
@@ -3222,8 +3225,12 @@
     "subtitle": "Dominios cuyos enlaces se abren sin pedir confirmación",
     "emptyTitle": "No hay dominios de confianza",
     "emptyDescription": "Si marcas un dominio como de confianza, sus enlaces se abrirán sin volver a pedir confirmación.",
+    "imagesSectionTitle": "Dominios de imágenes de confianza",
+    "imagesSectionDescription": "Las imágenes de estos dominios se cargan sin volver a preguntar.",
+    "imagesSectionEmpty": "No hay dominios de imágenes de confianza",
     "revoke": "Dejar de confiar en {{host}}",
     "revokeMessage": "Los enlaces a este dominio volverán a pedir confirmación.",
+    "revokeImageMessage": "Las imágenes de este dominio volverán a pedir confirmación.",
     "backToPreferences": "Volver a preferencias"
   },
   "quickChat": {

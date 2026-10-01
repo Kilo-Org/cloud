@@ -2746,7 +2746,10 @@
     "markdownImage": {
       "load": "Naloži",
       "loadWithHost": "Naloži {{host}}",
-      "httpsOnly": "Podprte so samo slike prek HTTPS."
+      "httpsOnly": "Podprte so samo slike prek HTTPS.",
+      "trustTitle": "Naložiti sliko z {{host}}?",
+      "trustMessage": "Če zaupaš gostitelju {{host}}, se njegove slike naložijo brez vsakokratnega vprašanja. To lahko pozneje prekličeš v Zaupanja vredni gostitelji.",
+      "loadOnce": "Naloži enkrat"
     },
     "markdownLink": {
       "invalidLink": "Te povezave ni mogoče odpreti.",
@@ -3265,8 +3268,12 @@
     "subtitle": "Gostitelji, katerih povezave se odprejo brez potrditve",
     "emptyTitle": "Ni zaupanja vrednih gostiteljev",
     "emptyDescription": "Ko gostitelja označiš kot zaupanja vrednega, se njegove povezave odprejo brez ponovne potrditve.",
+    "imagesSectionTitle": "Zaupanja vredni gostitelji slik",
+    "imagesSectionDescription": "Slike s teh gostiteljev se naložijo brez ponovnega vprašanja.",
+    "imagesSectionEmpty": "Ni zaupanja vrednih gostiteljev slik",
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "revokeMessage": "Povezave do tega gostitelja bodo znova zahtevale potrditev.",
+    "revokeImageMessage": "Slike s tega gostitelja bodo znova zahtevale potrditev.",
     "backToPreferences": "Nazaj na nastavitve"
   },
   "quickChat": {

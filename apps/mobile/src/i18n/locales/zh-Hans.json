@@ -2153,7 +2153,10 @@
     "markdownImage": {
       "load": "加载",
       "loadWithHost": "加载 {{host}}",
-      "httpsOnly": "仅支持通过 HTTPS 加载图片。"
+      "httpsOnly": "仅支持通过 HTTPS 加载图片。",
+      "trustTitle": "从 {{host}} 加载图片？",
+      "trustMessage": "信任 {{host}} 后，其图片将不再每次询问即可加载。你可以稍后在受信任的网站中撤销。",
+      "loadOnce": "仅加载一次"
     },
     "markdownLink": {
       "invalidLink": "此链接无法打开。",
@@ -3179,8 +3182,12 @@
     "subtitle": "打开链接时无需再次确认的网站",
     "emptyTitle": "暂无受信任的网站",
     "emptyDescription": "信任某个网站后，打开该网站的链接时将不再询问。",
+    "imagesSectionTitle": "受信任的图片网站",
+    "imagesSectionDescription": "来自这些网站的图片将不再询问即可加载。",
+    "imagesSectionEmpty": "暂无受信任的图片网站",
     "revoke": "撤销对 {{host}} 的信任",
     "revokeMessage": "指向此网站的链接将再次请求确认。",
+    "revokeImageMessage": "来自此网站的图片将再次请求确认。",
     "backToPreferences": "返回偏好设置"
   },
   "quickChat": {

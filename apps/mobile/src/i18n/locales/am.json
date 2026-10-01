@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "ይጫኑ",
       "loadWithHost": "{{host}}ን ይጫኑ",
-      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።"
+      "httpsOnly": "በHTTPS የሚጫኑ ምስሎች ብቻ ይፈቀዳሉ።",
+      "trustTitle": "ከ{{host}} ምስል ይጫኑ?",
+      "trustMessage": "{{host}}ን ማመን ምስሎቹን በየጊዜው ሳይጠይቅ ይጭናል። በኋላ ከታመኑ አስተናጋጆች ላይ ሊያስወግዱት ይችላሉ።",
+      "loadOnce": "አንድ ጊዜ ጫን"
     },
     "markdownLink": {
       "invalidLink": "ይህ አገናኝ ሊከፈት አይችልም።",
@@ -3179,8 +3182,12 @@
     "subtitle": "እንደገና ሳይጠይቁዎት እንዲከፈቱ የፈቀዱላቸው አስተናጋጆች",
     "emptyTitle": "የታመኑ አስተናጋጆች የሉም",
     "emptyDescription": "የአገናኝ አስተናጋጅን እንደታመነ ካደረጉት፣ አገናኞቹ እንደገና ሳይጠይቁዎት ይከፈታሉ።",
+    "imagesSectionTitle": "የታመኑ የምስል አስተናጋጆች",
+    "imagesSectionDescription": "ከእነዚህ አስተናጋጆች የሚመጡ ምስሎች እንደገና ሳይጠይቁ ይጫናሉ።",
+    "imagesSectionEmpty": "የታመኑ የምስል አስተናጋጆች የሉም",
     "revoke": "{{host}}ን ከታመኑ አስተናጋጆች ያስወግዱ",
     "revokeMessage": "ወደዚህ አስተናጋጅ የሚወስዱ አገናኞች እንደገና ማረጋገጫ ይጠይባሉ።",
+    "revokeImageMessage": "ከዚህ አስተናጋጅ የሚመጡ ምስሎች እንደገና ማረጋገጫ ይጠይባሉ።",
     "backToPreferences": "ወደ ምርጫዎች ይመለሱ"
   },
   "quickChat": {

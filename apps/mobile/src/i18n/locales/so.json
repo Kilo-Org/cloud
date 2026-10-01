@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Soo shub",
       "loadWithHost": "Soo shub {{host}}",
-      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay."
+      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay.",
+      "trustTitle": "Soo shub sawirka ka yimid {{host}}?",
+      "trustMessage": "Aaminka {{host}} wuxuu soo shubaa sawirradiisa adigoon mar walba weydiin. Waxaad mar dambe ka noqon kartaa Martigeliyeyaasha la aaminay.",
+      "loadOnce": "Soo shub hal mar"
     },
     "markdownLink": {
       "invalidLink": "Xiriiriyahan lama furi karo.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Martigeliyeyaasha aad oggolaatay in la furo adigoon la weydiin",
     "emptyTitle": "Ma jiraan martigeliyeyaal la aaminay",
     "emptyDescription": "Markaad aaminto martigeliyaha xiriiriyaha, xiriiriyuhu wuu furmaa adigoon mar kale la weydiin.",
+    "imagesSectionTitle": "Martigeliyeyaasha sawirka la aaminay",
+    "imagesSectionDescription": "Sawirrada martigeliyeyaashan waxaa la soo shubaa adigoon mar kale weydiin.",
+    "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
     "backToPreferences": "Ku noqo doorashooyinka"
   },
   "quickChat": {

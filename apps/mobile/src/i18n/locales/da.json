@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Indlæs",
       "loadWithHost": "Indlæs {{host}}",
-      "httpsOnly": "Kun billeder via HTTPS kan indlæses."
+      "httpsOnly": "Kun billeder via HTTPS kan indlæses.",
+      "trustTitle": "Indlæs billede fra {{host}}?",
+      "trustMessage": "Når du betror {{host}}, indlæses billederne uden at spørge hver gang. Du kan trække det tilbage senere under Betroede domæner.",
+      "loadOnce": "Indlæs én gang"
     },
     "markdownLink": {
       "invalidLink": "Dette link kan ikke åbnes.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Domæner, der kan åbnes uden at spørge dig først",
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
+    "imagesSectionTitle": "Betroede billeddomæner",
+    "imagesSectionDescription": "Billeder fra disse domæner indlæses uden at spørge igen.",
+    "imagesSectionEmpty": "Ingen betroede billeddomæner",
     "revoke": "Fjern tillid til {{host}}",
     "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
+    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {

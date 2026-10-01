@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Gbé wọlé",
       "loadWithHost": "Gbé {{host}} wọlé",
-      "httpsOnly": "Àwọn àwòrán HTTPS nìkan ni a gbà."
+      "httpsOnly": "Àwọn àwòrán HTTPS nìkan ni a gbà.",
+      "trustTitle": "Gbé àwòrán wọlé láti {{host}}?",
+      "trustMessage": "Gbẹ́kẹ̀ lé {{host}} yóò gbé àwọn àwòrán rẹ̀ wọlé láìbéèrè ní gbogbo ìgbà. O lè fagilé rẹ̀ lẹ́yìn náà nínú Àwọn ojúlé tí a gbẹ́kẹ̀ lé.",
+      "loadOnce": "Gbé wọlé lẹ́ẹ̀kan"
     },
     "markdownLink": {
       "invalidLink": "Ọ̀nà àsopọ̀ yìí kò ṣeé ṣí.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Àwọn ojúlé tí o gbẹ́kẹ̀ lé láti ṣí láìbéèrè",
     "emptyTitle": "Kò sí ojúlé tí a gbẹ́kẹ̀ lé",
     "emptyDescription": "Tí o bá gbẹ́kẹ̀ lé ojúlé ọ̀nà àsopọ̀ kan, ó máa ṣí láìbéèrè lọ́wọ́ rẹ mọ́.",
+    "imagesSectionTitle": "Àwọn ojúlé àwòrán tí a gbẹ́kẹ̀ lé",
+    "imagesSectionDescription": "Àwọn àwòrán láti àwọn ojúlé wọ̀nyí ni a gbé wọlé láìbéèrè mọ́.",
+    "imagesSectionEmpty": "Kò sí àwọn ojúlé àwòrán tí a gbẹ́kẹ̀ lé",
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
     "revokeMessage": "Àwọn ọ̀nà àsopọ̀ sí ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
+    "revokeImageMessage": "Àwọn àwòrán láti ojúlé yìí yóò tún béèrè fún ìjẹ́rìí.",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
   "quickChat": {

@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Budata",
       "loadWithHost": "Budata {{host}}",
-      "httpsOnly": "A na-anabata naanị onyonyo HTTPS."
+      "httpsOnly": "A na-anabata naanị onyonyo HTTPS.",
+      "trustTitle": "Budata onyonyo site na {{host}}?",
+      "trustMessage": "Ịtụkwasị {{host}} obi na-ebudata onyonyo ya na-enweghị ịjụ ajụjụ oge ọ bụla. Ị nwere ike ịkagbu ya ma emesịa na Saịtị a tụkwasịrị obi.",
+      "loadOnce": "Budata otu ugboro"
     },
     "markdownLink": {
       "invalidLink": "Enweghị ike imeghe njikọ a.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Saịtị ị tụkwasịrị obi ka ha mepee na-enweghị ịjụ gị",
     "emptyTitle": "Enweghị saịtị a tụkwasịrị obi",
     "emptyDescription": "Mgbe ị tụkwasịrị saịtị njikọ obi, njikọ ya na-emeghe na-enweghị ịjụ gị ọzọ.",
+    "imagesSectionTitle": "Saịtị onyonyo a tụkwasịrị obi",
+    "imagesSectionDescription": "Onyonyo sitere na saịtị ndị a na-ebudata na-enweghị ịjụ ọzọ.",
+    "imagesSectionEmpty": "Enweghị saịtị onyonyo a tụkwasịrị obi",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
+    "revokeImageMessage": "Onyonyo sitere na saịtị a ga-arịọ nkwenye ọzọ.",
     "backToPreferences": "Laghachi na nhọrọ"
   },
   "quickChat": {

@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Last inn",
       "loadWithHost": "Last inn {{host}}",
-      "httpsOnly": "Bare bilder via HTTPS er tillatt."
+      "httpsOnly": "Bare bilder via HTTPS er tillatt.",
+      "trustTitle": "Last inn bilde fra {{host}}?",
+      "trustMessage": "Hvis du godkjenner {{host}}, lastes bildene inn uten å spørre hver gang. Du kan trekke det tilbake senere under Godkjente verter.",
+      "loadOnce": "Last inn én gang"
     },
     "markdownLink": {
       "invalidLink": "Denne lenken kan ikke åpnes.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Verter du har godkjent for åpning uten bekreftelse",
     "emptyTitle": "Ingen godkjente verter",
     "emptyDescription": "Når du godkjenner verten til en lenke, åpnes lenker til denne verten uten ny bekreftelse.",
+    "imagesSectionTitle": "Godkjente bildeverter",
+    "imagesSectionDescription": "Bilder fra disse vertene lastes inn uten å spørre igjen.",
+    "imagesSectionEmpty": "Ingen godkjente bildeverter",
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "revokeMessage": "Lenker til denne verten vil igjen be om bekreftelse.",
+    "revokeImageMessage": "Bilder fra denne verten vil igjen be om bekreftelse.",
     "backToPreferences": "Tilbake til innstillinger"
   },
   "quickChat": {

@@ -2826,7 +2826,10 @@
     "markdownImage": {
       "load": "Llwytho",
       "loadWithHost": "Llwytho {{host}}",
-      "httpsOnly": "Dim ond delweddau HTTPS a ganiateir."
+      "httpsOnly": "Dim ond delweddau HTTPS a ganiateir.",
+      "trustTitle": "Llwytho delwedd o {{host}}?",
+      "trustMessage": "Mae ymddiried yn {{host}} yn llwytho ei ddelweddau heb ofyn bob tro. Gallwch ei ddirymu'n ddiweddarach o dan Gwesteiwyr dibynadwy.",
+      "loadOnce": "Llwytho unwaith"
     },
     "markdownLink": {
       "invalidLink": "Ni ellir agor y ddolen hon.",
@@ -3351,8 +3354,12 @@
     "subtitle": "Gwesteiwyr y gall eu dolenni agor heb ofyn",
     "emptyTitle": "Dim gwesteiwyr dibynadwy",
     "emptyDescription": "Pan fyddwch yn ymddiried yng ngwesteiwr dolen, bydd y ddolen yn agor heb ofyn eto.",
+    "imagesSectionTitle": "Gwesteiwyr delwedd dibynadwy",
+    "imagesSectionDescription": "Mae delweddau o'r gwesteiwyr hyn yn llwytho heb ofyn eto.",
+    "imagesSectionEmpty": "Dim gwesteiwyr delwedd dibynadwy",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
+    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
   "quickChat": {

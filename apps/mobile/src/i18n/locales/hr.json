@@ -2706,7 +2706,10 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dopuštene su samo slike dostupne putem HTTPS-a."
+      "httpsOnly": "Dopuštene su samo slike dostupne putem HTTPS-a.",
+      "trustTitle": "Učitati sliku s {{host}}?",
+      "trustMessage": "Ako povjeruješ poslužitelju {{host}}, njegove slike učitavat će se bez svakog pitanja. Kasnije to možeš opozvati u odjeljku Pouzdani poslužitelji.",
+      "loadOnce": "Učitaj jednom"
     },
     "markdownLink": {
       "invalidLink": "Ovu poveznicu nije moguće otvoriti.",
@@ -3222,8 +3225,12 @@
     "subtitle": "Poslužitelji čije se poveznice otvaraju bez potvrde",
     "emptyTitle": "Nema pouzdanih poslužitelja",
     "emptyDescription": "Kad označiš poslužitelj pouzdanim, njegove se poveznice otvaraju bez ponovne potvrde.",
+    "imagesSectionTitle": "Pouzdani poslužitelji za slike",
+    "imagesSectionDescription": "Slike s ovih poslužitelja učitavaju se bez ponovnog pitanja.",
+    "imagesSectionEmpty": "Nema pouzdanih poslužitelja za slike",
     "revoke": "Opozovi povjerenje za {{host}}",
     "revokeMessage": "Poveznice na ovaj poslužitelj ponovno će tražiti potvrdu.",
+    "revokeImageMessage": "Slike s ovog poslužitelja ponovno će tražiti potvrdu.",
     "backToPreferences": "Natrag na postavke"
   },
   "quickChat": {

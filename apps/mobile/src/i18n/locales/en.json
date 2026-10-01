@@ -2408,7 +2408,10 @@
     "markdownImage": {
       "load": "Load",
       "loadWithHost": "Load {{host}}",
-      "httpsOnly": "HTTPS images only"
+      "httpsOnly": "HTTPS images only",
+      "trustTitle": "Load image from {{host}}?",
+      "trustMessage": "Trusting {{host}} loads its images without asking each time. You can revoke it later under Trusted hosts.",
+      "loadOnce": "Load once"
     },
     "preparation": {
       "exitCode": "Exit code: {{code}}",
@@ -2736,8 +2739,12 @@
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
     "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "imagesSectionTitle": "Trusted image hosts",
+    "imagesSectionDescription": "Images from these hosts load without asking again.",
+    "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
+    "revokeImageMessage": "Images from this host will ask for confirmation again.",
     "backToPreferences": "Back to preferences"
   },
   "forceUpdate": {

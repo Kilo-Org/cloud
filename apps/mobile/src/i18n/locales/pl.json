@@ -2201,7 +2201,10 @@
     "markdownImage": {
       "load": "Wczytaj",
       "loadWithHost": "Wczytaj {{host}}",
-      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS."
+      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS.",
+      "trustTitle": "Wczytać obraz z {{host}}?",
+      "trustMessage": "Zaufanie hostowi {{host}} spowoduje, że jego obrazy będą wczytywane bez pytania za każdym razem. Możesz to później cofnąć w sekcji Zaufane hosty.",
+      "loadOnce": "Wczytaj raz"
     },
     "markdownLink": {
       "invalidLink": "Tego linku nie można otworzyć.",
@@ -3265,8 +3268,12 @@
     "subtitle": "Hosty, których linki otwierasz bez potwierdzenia",
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
+    "imagesSectionTitle": "Zaufane hosty obrazów",
+    "imagesSectionDescription": "Obrazy z tych hostów są wczytywane bez ponownego pytania.",
+    "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {

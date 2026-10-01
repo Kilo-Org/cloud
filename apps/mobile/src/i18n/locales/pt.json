@@ -2706,7 +2706,10 @@
     "markdownImage": {
       "load": "Carregar",
       "loadWithHost": "Carregar {{host}}",
-      "httpsOnly": "Só são permitidas imagens via HTTPS."
+      "httpsOnly": "Só são permitidas imagens via HTTPS.",
+      "trustTitle": "Carregar a imagem de {{host}}?",
+      "trustMessage": "Ao confiar em {{host}}, as imagens deste são carregadas sem perguntar sempre. Pode revogar mais tarde em Servidores de confiança.",
+      "loadOnce": "Carregar uma vez"
     },
     "markdownLink": {
       "invalidLink": "Não é possível abrir esta ligação.",
@@ -3222,8 +3225,12 @@
     "subtitle": "Servidores cujas ligações pode abrir sem confirmação",
     "emptyTitle": "Sem servidores de confiança",
     "emptyDescription": "Ao confiar no servidor de uma ligação, pode abrir as ligações desse servidor sem nova confirmação.",
+    "imagesSectionTitle": "Servidores de imagens de confiança",
+    "imagesSectionDescription": "As imagens destes servidores são carregadas sem voltar a perguntar.",
+    "imagesSectionEmpty": "Sem servidores de imagens de confiança",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "As ligações para este servidor voltarão a pedir confirmação.",
+    "revokeImageMessage": "As imagens deste servidor voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {

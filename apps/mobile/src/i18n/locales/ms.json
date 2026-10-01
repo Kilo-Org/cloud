@@ -2666,7 +2666,10 @@
     "markdownImage": {
       "load": "Muatkan",
       "loadWithHost": "Muatkan {{host}}",
-      "httpsOnly": "Hanya imej HTTPS dibenarkan."
+      "httpsOnly": "Hanya imej HTTPS dibenarkan.",
+      "trustTitle": "Muatkan imej daripada {{host}}?",
+      "trustMessage": "Mempercayai {{host}} akan memuatkan imejnya tanpa bertanya setiap kali. Anda boleh menarik baliknya kemudian dalam Hos yang dipercayai.",
+      "loadOnce": "Muatkan sekali"
     },
     "markdownLink": {
       "invalidLink": "Pautan ini tidak boleh dibuka.",
@@ -3179,8 +3182,12 @@
     "subtitle": "Hos yang anda benarkan untuk dibuka tanpa pengesahan",
     "emptyTitle": "Tiada hos yang dipercayai",
     "emptyDescription": "Jika anda mempercayai hos sesuatu pautan, pautan ke hos itu akan dibuka tanpa meminta pengesahan lagi.",
+    "imagesSectionTitle": "Hos imej yang dipercayai",
+    "imagesSectionDescription": "Imej daripada hos ini dimuatkan tanpa bertanya lagi.",
+    "imagesSectionEmpty": "Tiada hos imej yang dipercayai",
     "revoke": "Tarik balik kepercayaan terhadap {{host}}",
     "revokeMessage": "Pautan ke hos ini akan meminta pengesahan lagi.",
+    "revokeImageMessage": "Imej daripada hos ini akan meminta pengesahan lagi.",
     "backToPreferences": "Kembali ke keutamaan"
   },
   "quickChat": {

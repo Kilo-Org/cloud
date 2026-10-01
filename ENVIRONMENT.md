@@ -50,7 +50,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs`. `[SECRET]`
-- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `apps/web/sentry.server.config.ts`. `[PUBLIC]`
+- `NEXT_PUBLIC_SENTRY_DSN` - Sentry DSN for server and Edge runtime error reporting; used in `apps/web/sentry.edge.config.ts` and `packages/web-shared/src/lib/observability/sentry-server.ts`. `[PUBLIC]`
 
 ### Marketing Tags
 

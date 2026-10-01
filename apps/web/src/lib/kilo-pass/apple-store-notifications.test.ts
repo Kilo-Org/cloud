@@ -2200,7 +2200,8 @@ describe('App Store bouncer store events', () => {
   const refund = (
     notificationUUID: string,
     transactionForRefund: AppleStoreDecodedTransaction,
-    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox'
+    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox',
+    signedDate = SIGNED_DATE_MS
   ) => ({
     signedPayload: notificationUUID,
     decodeNotification: async () =>
@@ -2208,7 +2209,7 @@ describe('App Store bouncer store events', () => {
         notificationUUID,
         notificationType: NotificationTypeV2.REFUND,
         environment,
-        signedDate: SIGNED_DATE_MS,
+        signedDate,
       }),
     decodeTransaction: async () => transactionForRefund,
   });
@@ -2216,7 +2217,8 @@ describe('App Store bouncer store events', () => {
   const refundReversed = (
     notificationUUID: string,
     transactionForReversal: AppleStoreDecodedTransaction,
-    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox'
+    environment: AppleStoreDecodedNotification['environment'] = 'Sandbox',
+    signedDate = SIGNED_DATE_MS
   ) => ({
     signedPayload: notificationUUID,
     decodeNotification: async () =>
@@ -2224,7 +2226,7 @@ describe('App Store bouncer store events', () => {
         notificationUUID,
         notificationType: NotificationTypeV2.REFUND_REVERSED,
         environment,
-        signedDate: SIGNED_DATE_MS,
+        signedDate,
       }),
     decodeTransaction: async () => transactionForReversal,
   });
@@ -2470,7 +2472,7 @@ describe('App Store bouncer store events', () => {
     expect(rows.filter(row => row.description?.endsWith('refund reversal'))).toHaveLength(3);
   });
 
-  it('undoes a refund that arrives after its reversal', async () => {
+  it('undoes an older refund that arrives after its newer reversal', async () => {
     const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
     const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
     const refundTransaction = appStoreTransaction(decodedTransaction, {
@@ -2479,7 +2481,7 @@ describe('App Store bouncer store events', () => {
     });
 
     const reversalResult = await processAppStoreKiloPassNotification(
-      refundReversed('out-of-order-reversal', refundTransaction)
+      refundReversed('out-of-order-reversal', refundTransaction, 'Sandbox', SIGNED_DATE_MS + 1_000)
     );
     expect(reversalResult).toEqual({ processed: true });
 
@@ -2502,5 +2504,84 @@ describe('App Store bouncer store events', () => {
         ),
       })
     ).toMatchObject({ status: 'active', ended_at: null });
+  });
+
+  async function readSubscription(originalTransactionId: string) {
+    return db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.provider_subscription_id, originalTransactionId),
+    });
+  }
+
+  async function readTotal(userId: string) {
+    const row = await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, userId) });
+    return row?.total_microdollars_acquired;
+  }
+
+  it('claws back again and ends the pass when Apple refunds after a reversal', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+    });
+
+    await processAppStoreKiloPassNotification(refund('re-refund-1', refundTransaction));
+    await processAppStoreKiloPassNotification(
+      refundReversed('re-reversal', refundTransaction, 'Sandbox', SIGNED_DATE_MS + 1_000)
+    );
+    await processAppStoreKiloPassNotification(
+      refund('re-refund-2', refundTransaction, 'Sandbox', SIGNED_DATE_MS + 2_000)
+    );
+
+    expect(await readTotal(user.id)).toBe(0);
+    expect(await readSubscription(decodedTransaction.originalTransactionId)).toMatchObject({
+      status: 'canceled',
+    });
+  });
+
+  it('keeps the pass refunded when a reversal older than the refund arrives last', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+    });
+
+    await processAppStoreKiloPassNotification(
+      refund('late-reversal-refund', refundTransaction, 'Sandbox', SIGNED_DATE_MS + 2_000)
+    );
+    await processAppStoreKiloPassNotification(
+      refundReversed('late-reversal', refundTransaction, 'Sandbox', SIGNED_DATE_MS + 1_000)
+    );
+
+    expect(await readTotal(user.id)).toBe(0);
+    expect(await readSubscription(decodedTransaction.originalTransactionId)).toMatchObject({
+      status: 'canceled',
+    });
+  });
+
+  it('restores credits but keeps the pass ended when the user bought another pass meanwhile', async () => {
+    const decodedTransaction = transaction({ currency: 'USD', price: 24700 });
+    const { user, totalAfterPurchase } = await subscribeWithIssuedCredits(decodedTransaction);
+    const refundTransaction = appStoreTransaction(decodedTransaction, {
+      appAccountToken: user.app_store_account_token,
+    });
+    await processAppStoreKiloPassNotification(refund('second-pass-refund', refundTransaction));
+    const refunded = await readSubscription(decodedTransaction.originalTransactionId);
+    await db.insert(kilo_pass_subscriptions).values({
+      kilo_user_id: user.id,
+      payment_provider: KiloPassPaymentProvider.AppStore,
+      provider_subscription_id: `other-original-${crypto.randomUUID()}`,
+      tier: refunded?.tier ?? KiloPassTier.Tier19,
+      cadence: refunded?.cadence ?? KiloPassCadence.Monthly,
+      status: 'active',
+    });
+
+    await processAppStoreKiloPassNotification(
+      refundReversed('second-pass-reversal', refundTransaction)
+    );
+
+    expect(await readTotal(user.id)).toBe(totalAfterPurchase);
+    expect(await readSubscription(decodedTransaction.originalTransactionId)).toMatchObject({
+      status: 'canceled',
+    });
   });
 });

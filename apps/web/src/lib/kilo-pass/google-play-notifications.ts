@@ -684,6 +684,7 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     if (claim === 'already_processed') return { processed: true, status: 'already_processed' };
     if (claim === 'in_flight') return { processed: false, status: 'in_flight' };
+    let storePurchaseFound = false;
     await db.transaction(async tx => {
       // Serialize with purchase completion and usage bonuses before reading the ledger.
       if (owner)
@@ -693,6 +694,7 @@ export async function processGooglePlayKiloPassNotification(params: {
           .where(eq(kilocode_users.id, owner.id))
           .for('update');
       const reversal = await reverseGooglePlayRefundCredits(tx, purchaseToken, orderId);
+      storePurchaseFound = reversal.storePurchaseFound;
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
         result: KiloPassAuditLogResult.Success,
@@ -710,13 +712,15 @@ export async function processGooglePlayKiloPassNotification(params: {
     });
     // A refund can leave the subscription entitled. Lifecycle notifications
     // reconcile access; this event reverses only the exact refunded order.
+    // An order Kilo never admitted is a duplicate purchase that Kilo refunded
+    // itself (`reverseDuplicateGooglePlaySubscription`), not a customer refund.
     await runAfterResponse(() =>
       reportGooglePlayCreditEventToBouncer({
         environment: snapshot.environment,
         eventId,
         eventTimeMillis: developerNotification.eventTimeMillis ?? null,
         referenceId: orderId,
-        event: { type: 'store.refund', reason: 'other' },
+        event: storePurchaseFound ? { type: 'store.refund', reason: 'other' } : null,
         userId: owner?.id ?? null,
       })
     );
@@ -988,6 +992,7 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_REVOKED) {
+    let storePurchaseFound = false;
     await db.transaction(async tx => {
       let reversal: CreditReversalResult;
       try {
@@ -1003,6 +1008,7 @@ export async function processGooglePlayKiloPassNotification(params: {
         // throw rolls this transaction back so Pub/Sub redelivers and retries.
         throw error;
       }
+      storePurchaseFound = reversal.storePurchaseFound;
       await markGooglePlaySubscriptionEnded(tx, purchaseToken);
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRefunded,
@@ -1027,13 +1033,15 @@ export async function processGooglePlayKiloPassNotification(params: {
           )
         );
     });
+    // `store.revoked` opens a bouncer fraud flag. Kilo's own duplicate-purchase
+    // reversal revokes an order it never admitted, so only an admitted order reports.
     await runAfterResponse(async () =>
       reportGooglePlayCreditEventToBouncer({
         environment: decoded.environment,
         eventId,
         eventTimeMillis,
         referenceId: decoded.latestOrderId,
-        event: getGooglePlayBouncerReport(notificationType, undefined),
+        event: storePurchaseFound ? getGooglePlayBouncerReport(notificationType, undefined) : null,
         userId: await resolveGooglePlayKiloPassOwner({
           providerSubscriptionId: purchaseToken,
           appAccountToken: decoded.obfuscatedExternalAccountId ?? null,

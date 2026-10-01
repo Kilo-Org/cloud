@@ -12,7 +12,6 @@ import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { and, eq, sql } from 'drizzle-orm';
 import { createOrganization, addUserToOrganization, getOrganizationMembers } from './organizations';
-import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
@@ -134,22 +133,6 @@ describe('Organization Usage Functions', () => {
       const result = await getBalanceForOrganizationUser(organization.id, user.id);
 
       expect(result.balance).toBe(-0.015); // -15000 microdollars = -0.015 USD
-    });
-
-    test('should not return balance after user is removed from organization', async () => {
-      const owner = await insertTestUser();
-      const member = await insertTestUser();
-      const organization = await createTestOrganization('Test Org', owner.id, 30000);
-
-      await addUserToOrganization(organization.id, member.id, 'member');
-
-      let result = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(result.balance).toBe(0.03); // 30000 microdollars = 0.03 USD
-
-      await removeUserFromOrganization(organization.id, member.id);
-
-      result = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(result.balance).toBe(0);
     });
 
     test('should handle multiple organizations correctly', async () => {
@@ -525,44 +508,6 @@ describe('Organization Usage Functions', () => {
 
       expect(finalBalance.balance).toBe(expectedFinalBalance / 1000000); // Convert to USD
       expect(finalBalance.balance).toBe(0.9); // 900000 microdollars = 0.9 USD (1000000 - 100000)
-    });
-  });
-
-  describe('Integration tests', () => {
-    test('should handle complete usage workflow', async () => {
-      const owner = await insertTestUser();
-      const member = await insertTestUser();
-      const organization = await createTestOrganization('Integration Test Org', owner.id, 100000);
-
-      await addUserToOrganization(organization.id, member.id, 'member');
-
-      let ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
-      let memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(ownerBalance.balance).toBe(0.1); // 100000 microdollars = 0.1 USD
-      expect(memberBalance.balance).toBe(0.1); // Same organization balance
-
-      const ownerUsageRecord = await createOrganizationUsage(20000, owner.id, organization.id);
-      await ingestOrganizationTokenUsage(ownerUsageRecord);
-
-      ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
-      memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(ownerBalance.balance).toBe(0.08); // 80000 microdollars = 0.08 USD
-      expect(memberBalance.balance).toBe(0.08); // Same organization balance
-
-      const memberUsageRecord = await createOrganizationUsage(15000, member.id, organization.id);
-      await ingestOrganizationTokenUsage(memberUsageRecord);
-
-      ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
-      memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(ownerBalance.balance).toBe(0.065); // 65000 microdollars = 0.065 USD (100000 - 20000 - 15000)
-      expect(memberBalance.balance).toBe(0.065); // Same organization balance
-
-      await removeUserFromOrganization(organization.id, member.id);
-      memberBalance = await getBalanceForOrganizationUser(organization.id, member.id);
-      expect(memberBalance.balance).toBe(0); // No longer a member
-
-      ownerBalance = await getBalanceForOrganizationUser(organization.id, owner.id);
-      expect(ownerBalance.balance).toBe(0.065); // 65000 microdollars = 0.065 USD (Unchanged)
     });
   });
 

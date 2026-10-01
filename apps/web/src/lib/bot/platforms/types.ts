@@ -64,12 +64,13 @@ export type BotPlatform = {
     displayName: string;
   }): Promise<RequesterInfo>;
   /**
-   * Signal that the bot is processing the user's message. Slack/Linear use
-   * the platform-native typing indicator. GitHub has no typing concept and
-   * reacts to the triggering comment instead: 👀 on start, then 👍 added
-   * by the stop callback. Both the initial bot run and the cloud-agent
-   * callback go through this same start/stop lifecycle, with `handedOff`
-   * suppressing the 👍 when more work is still in flight.
+   * Signal that the bot is processing the user's message. Linear uses the
+   * platform-native typing indicator. Slack and GitHub react to the
+   * triggering message instead — hourglass/👀 on start, swapped for a
+   * completion reaction by the stop callback. Both the initial bot run and
+   * the cloud-agent callback go through this same start/stop lifecycle, with
+   * `handedOff` suppressing the completion reaction when more work is still
+   * in flight.
    */
   startProcessingIndicator(params: {
     thread: Thread;

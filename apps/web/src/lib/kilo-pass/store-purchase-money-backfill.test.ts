@@ -13,7 +13,7 @@ import {
   KiloPassTier,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import { backfillGooglePlayPurchaseAmounts } from './store-purchase-money-backfill';
 

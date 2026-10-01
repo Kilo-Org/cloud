@@ -8,7 +8,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq, and } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { removeUserFromOrganization } from '@/lib/organizations/organization-member-removal';

@@ -25,7 +25,7 @@ import { POST } from './route';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 const credentials = {

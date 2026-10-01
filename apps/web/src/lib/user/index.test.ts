@@ -159,10 +159,13 @@ import {
 } from '@/lib/user';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { generateOpenRouterDownstreamSafetyIdentifier } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
-import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
-import { insertTestUser, insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
-import { hosted_domain_specials } from '@/lib/auth/constants';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
+import {
+  insertTestUser,
+  insertTestUserAndGoogleAuth,
+} from '@kilocode/web-shared/tests/helpers/user.helper';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { randomUUID } from 'crypto';
 import {

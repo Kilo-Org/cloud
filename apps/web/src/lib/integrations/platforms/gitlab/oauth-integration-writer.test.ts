@@ -15,7 +15,7 @@ import {
   platform_oauth_credentials,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { storeGitLabOAuthIntegration } from './oauth-integration-writer';
 
 const testKeyPair = generateKeyPairSync('rsa', {

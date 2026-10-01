@@ -5,7 +5,11 @@ import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { DEV_ORG_ID, DEV_ORG_NAME, hosted_domain_specials } from '@/lib/auth/constants';
+import {
+  DEV_ORG_ID,
+  DEV_ORG_NAME,
+  hosted_domain_specials,
+} from '@kilocode/web-shared/lib/auth/constants';
 import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import { captureException } from '@sentry/nextjs';

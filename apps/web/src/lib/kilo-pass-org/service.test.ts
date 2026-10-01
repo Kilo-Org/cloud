@@ -13,7 +13,7 @@ import { KiloPassOrgAgreementState } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { monthlyWindowFromOriginalAnchor } from './calculations';
 import {
   activatePaidAgreement,

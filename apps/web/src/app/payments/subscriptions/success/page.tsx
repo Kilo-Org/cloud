@@ -1,5 +1,5 @@
 import { StripeSessionStatusChecker } from '@/components/payment/StripeSessionStatusChecker';
-import { STRIPE_SUB_QUERY_STRING_KEY } from '@/lib/organizations/constants';
+import { STRIPE_SUB_QUERY_STRING_KEY } from '@kilocode/web-shared/lib/organizations/constants';
 import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import assert from 'assert';
 

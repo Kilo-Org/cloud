@@ -25,7 +25,7 @@ import {
   replaceManualCredentialRevocation,
 } from '@/lib/coding-plans/revocation';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
   coding_plan_availability_intents,

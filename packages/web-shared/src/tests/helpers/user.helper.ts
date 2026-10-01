@@ -1,7 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { User } from '@kilocode/db/schema';
 import { kilocode_users, user_auth_provider } from '@kilocode/db/schema';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 
 export function defineTestUser(userData: Partial<User> = {}): User {
   const randomUserId = `test-user-${Math.random()}`;

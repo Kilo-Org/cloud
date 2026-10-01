@@ -12,7 +12,7 @@ import {
   addUserToOrganization,
   createOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   connectVerifiedGitHubInstallation,
   disconnectGitHubInstallation,

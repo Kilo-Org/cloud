@@ -11,7 +11,7 @@ import {
 } from '@kilocode/db/schema';
 import { CURRENT_UGC_TERMS_VERSION } from '@kilocode/app-shared/moderation';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 
 let user: User;

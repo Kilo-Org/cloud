@@ -25,7 +25,7 @@ import { scrubControlPlanePii } from '@/lib/user/deletion-queue/deletion-enqueue
 import type { inferRouterInputs } from '@trpc/server';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { RootRouter } from '@/routers/root-router';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 type DeletionQueueInputs = inferRouterInputs<RootRouter>['admin']['userDeletionQueue'];
 type _AssertNoSetPaused = 'setPaused' extends keyof DeletionQueueInputs ? never : true;

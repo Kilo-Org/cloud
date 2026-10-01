@@ -6,7 +6,7 @@ import {
 } from '@kilocode/db/schema';
 import { recomputeOrganizationBalances } from './recomputeOrganizationBalances';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';

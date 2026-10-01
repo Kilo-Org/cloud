@@ -42,7 +42,7 @@ import {
   getUserFromAuth,
   getUserFromSessionForCredentialIssuance,
 } from '@kilocode/web-shared/lib/user/server';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const secret = 'resource-delegation-test-secret';
 const cleanups: string[] = [];

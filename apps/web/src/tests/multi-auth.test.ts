@@ -9,7 +9,7 @@ import {
   unlinkAuthProviderFromUser,
   findUserIdByAuthProvider,
 } from '@/lib/user';
-import { insertTestUserAndGoogleAuth } from '@/tests/helpers/user.helper';
+import { insertTestUserAndGoogleAuth } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { assertNotNullish } from '@/lib/utils';
 
 describe('Multi-Auth System', () => {

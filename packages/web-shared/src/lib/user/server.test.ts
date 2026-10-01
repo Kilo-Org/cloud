@@ -58,8 +58,8 @@ import {
   user_auth_provider,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -81,7 +81,7 @@ import {
   OPENAI_REDIRECT_URI,
   OPENAI_TOKEN_SHARING_SCOPE,
 } from '@kilocode/web-shared/lib/auth/openai/config';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { getOpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 
 // Same namespace UUID used in user.server.ts

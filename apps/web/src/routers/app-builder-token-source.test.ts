@@ -29,7 +29,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { User } from '@kilocode/db/schema';
 

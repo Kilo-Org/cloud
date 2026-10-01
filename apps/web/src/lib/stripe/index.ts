@@ -45,7 +45,7 @@ import { processTopupForOrganization } from '@/lib/organizations/organization-bi
 import {
   STRIPE_SUB_QUERY_STRING_KEY,
   TOPUP_CANCELED_QUERY_STRING_KEY,
-} from '@/lib/organizations/constants';
+} from '@kilocode/web-shared/lib/organizations/constants';
 import type { SubscriptionMetadata } from '@/lib/organizations/organization-seats';
 import { handleSubscriptionEvent } from '@/lib/organizations/organization-seats';
 import {
@@ -106,7 +106,7 @@ import type {
   BillingCycle,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
-import { annualTotal, seatPrice } from '@/lib/organizations/constants';
+import { annualTotal, seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';

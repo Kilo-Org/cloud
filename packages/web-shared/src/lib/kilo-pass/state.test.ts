@@ -9,7 +9,7 @@ import {
 import { KiloPassCadence, KiloPassPaymentProvider } from './enums';
 import { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
 

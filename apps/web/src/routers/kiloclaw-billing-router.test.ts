@@ -31,7 +31,7 @@ import {
 import { eq } from 'drizzle-orm';
 import { sandboxIdFromUserId } from '@kilocode/worker-utils/sandbox-id';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import type Stripe from 'stripe';
 import {

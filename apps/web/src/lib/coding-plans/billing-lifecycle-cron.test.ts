@@ -12,7 +12,7 @@ import { subscribeToCodingPlan, uploadKeysToInventory } from '@/lib/coding-plans
 import type { CodingPlanId } from '@/lib/coding-plans/pricing';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   byok_api_keys,
   coding_plan_key_inventory,

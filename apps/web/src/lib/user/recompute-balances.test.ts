@@ -7,7 +7,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { recomputeUserBalances, computeUserBalanceUpdates } from './recompute-balances';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('recomputeUserBalances', () => {
   beforeEach(async () => {

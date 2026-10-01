@@ -38,7 +38,7 @@ import { GET as gatewayModels } from '@/app/api/gateway/models/route';
 import { GET as gatewayV1Models } from '@/app/api/gateway/v1/models/route';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,

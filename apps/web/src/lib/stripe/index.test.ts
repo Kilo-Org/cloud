@@ -106,9 +106,9 @@ import {
   stripe_service_fee_assessments,
 } from '@kilocode/db/schema';
 import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { softDeleteUser } from '@/lib/user';
-import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
+import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';

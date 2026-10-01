@@ -14,7 +14,7 @@ import {
   SecurityFindingNotificationKind,
   SecurityFindingNotificationStatus,
 } from '@kilocode/db/schema-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'security-notification-secret',

@@ -10,7 +10,7 @@ import {
   replaceSubstackCredential,
   testSubstackCredentialMaterial,
 } from '@/lib/user/deletion-queue/deletion-substack-credential';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('cookieFromCredential', () => {
   it('builds a sid cookie from JSON sid material', () => {

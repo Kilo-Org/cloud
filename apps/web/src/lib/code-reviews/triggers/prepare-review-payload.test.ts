@@ -65,7 +65,7 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cloud_agent_code_reviews,
   kilocode_users,

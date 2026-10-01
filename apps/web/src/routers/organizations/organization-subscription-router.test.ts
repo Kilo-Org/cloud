@@ -1,5 +1,5 @@
 import { beforeEach, jest } from '@jest/globals';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
   addUserToOrganization,

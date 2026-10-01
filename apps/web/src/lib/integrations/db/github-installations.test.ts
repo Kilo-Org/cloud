@@ -20,7 +20,7 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, sql } from 'drizzle-orm';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
   createCodeReview,

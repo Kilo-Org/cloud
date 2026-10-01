@@ -16,7 +16,7 @@ import {
   sales_demo_spend_ledger,
 } from '@kilocode/db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSalesDemoOrganization, salesDemoMemberId } from '@/lib/organizations/sales-demo';
 import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { User } from '@kilocode/db/schema';

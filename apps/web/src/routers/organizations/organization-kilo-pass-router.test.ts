@@ -9,7 +9,7 @@ import {
   addUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import type { createCallerForUser as TestCallerFactory } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const getSummary = jest.fn<OrganizationKiloPassService['getSummary']>();
 const getSetup = jest.fn<OrganizationKiloPassService['getSetup']>();

@@ -6,7 +6,7 @@ import { USER_DELETION_PYLON_DELETE_COMPLETE_TAG } from '@kilocode/web-shared/li
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handlePylonFinalize } from '@/lib/user/deletion-queue/handlers/pylon-finalize';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const ISSUE_ID = 'iss-finalize';
 const TARGET_EMAIL = 'user@example.com';

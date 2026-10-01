@@ -24,7 +24,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { disconnectGitHubInstallation } from './github-installations';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;

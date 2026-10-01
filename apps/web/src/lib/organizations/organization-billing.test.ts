@@ -10,7 +10,7 @@ import {
   findOrganizationByStripeCustomerId,
   inviteUserToOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,

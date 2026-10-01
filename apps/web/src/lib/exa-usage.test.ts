@@ -8,10 +8,10 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { getExaMonthlyUsage, getExaFreeAllowanceMicrodollars, recordExaUsage } from './exa-usage';
 import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 
 // Mock next/server's after function which requires request context
 jest.mock('next/server', () => ({

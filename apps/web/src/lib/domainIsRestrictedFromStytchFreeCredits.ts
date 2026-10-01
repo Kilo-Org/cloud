@@ -1,6 +1,6 @@
 import type { User } from '@kilocode/db/schema';
 import { kilocode_users } from '@kilocode/db/schema';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { count, eq } from 'drizzle-orm';

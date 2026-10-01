@@ -1,7 +1,7 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { payment_methods } from '@kilocode/db/schema';
 import { hasPaymentMethod } from './admin-utils-serverside';
-import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
+import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 
 describe('admin-utils-serverside', () => {
   describe('hasPaymentMethod', () => {

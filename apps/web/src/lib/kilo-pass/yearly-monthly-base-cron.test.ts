@@ -16,7 +16,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { runKiloPassYearlyMonthlyBaseCron } from '@/lib/kilo-pass/yearly-monthly-base-cron';
 import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';

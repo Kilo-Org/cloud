@@ -13,8 +13,8 @@ import {
   resolveOrganizationMemberModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 /**
  * Deployment guard for organizations that predate groups: legacy model/provider

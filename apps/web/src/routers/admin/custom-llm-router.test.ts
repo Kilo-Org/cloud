@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { custom_llm2, type User } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';

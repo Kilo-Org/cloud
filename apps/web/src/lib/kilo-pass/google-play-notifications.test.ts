@@ -13,7 +13,7 @@ import {
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,

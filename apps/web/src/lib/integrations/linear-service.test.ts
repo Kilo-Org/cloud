@@ -3,7 +3,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';

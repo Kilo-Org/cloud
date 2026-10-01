@@ -31,7 +31,7 @@ import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcom
 import { runClaimedDeletionTask } from '@/lib/user/deletion-queue/deletion-task-runner';
 import { handleAnonymize } from '@/lib/user/deletion-queue/handlers/anonymize';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@/lib/user', () => ({
   anonymizeCloudUserData: jest.fn(async () => undefined),

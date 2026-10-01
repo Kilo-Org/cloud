@@ -8,7 +8,7 @@ import {
   native_attested_keys,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { blockUser } from '@/lib/user/block';
 
 async function getUser(id: string) {

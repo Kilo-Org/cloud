@@ -5,7 +5,7 @@ jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   isResourceTokenIssuanceEnabled: () => true,
 }));
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';

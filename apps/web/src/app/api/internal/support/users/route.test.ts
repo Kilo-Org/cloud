@@ -10,7 +10,7 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createSoftDeletedBlockedReason } from '@kilocode/db/user-soft-delete';
 
 const mockSecrets = {

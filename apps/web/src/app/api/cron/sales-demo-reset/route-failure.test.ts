@@ -28,7 +28,7 @@ import {
   organizations,
 } from '@kilocode/db/schema';
 import { inArray, sql } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import type { User } from '@kilocode/db/schema';
 import { GET } from './route';
 

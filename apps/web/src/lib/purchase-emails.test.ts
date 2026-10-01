@@ -15,7 +15,7 @@ import {
   transactional_email_log,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { processTopUp, resolveStripeReceiptUrl } from '@kilocode/web-shared/lib/credits';
 import {
   KILOCLAW_SUBSCRIPTION_STARTED_EMAIL_TYPE,

@@ -22,8 +22,8 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-reposit
 // pulls in the real gitlab-service. Using global `jest` keeps the mocks hoisted.
 import { afterAll, describe, expect, it } from '@jest/globals';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { getAgentConfig } from '@/lib/agent-config/db/agent-configs';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {

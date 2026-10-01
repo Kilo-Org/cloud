@@ -9,7 +9,7 @@ import {
 } from '@kilocode/db/schema';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { and, eq, isNull } from 'drizzle-orm';
 import { decryptKeyedEnvelope } from '@kilocode/encryption';
 import {

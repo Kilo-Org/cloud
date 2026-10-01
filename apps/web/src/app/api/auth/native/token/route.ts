@@ -13,7 +13,7 @@ import {
   releaseSignInCode,
   consumeSignInCode,
 } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import {

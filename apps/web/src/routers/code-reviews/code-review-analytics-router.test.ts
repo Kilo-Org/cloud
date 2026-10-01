@@ -10,8 +10,8 @@ import {
   updateCodeReviewStatus,
 } from '@/lib/code-reviews/db/code-reviews';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { CodeReviewAnalyticsManifest } from '@/lib/code-reviews/analytics/contracts';
 

@@ -5,7 +5,7 @@ jest.mock('@kilocode/web-shared/lib/email', () => ({
 }));
 
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   agent_configs,
   cloud_agent_code_reviews,

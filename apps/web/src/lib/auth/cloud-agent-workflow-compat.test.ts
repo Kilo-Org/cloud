@@ -11,7 +11,7 @@ import {
   generateWorkflowGatewayToken,
   generateCloudAgentWorkflowToken,
 } from '@kilocode/web-shared/lib/tokens';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { prepareCloudAgentWorkflowUser } from './cloud-agent-workflow-user';
 
 // Request lifecycle scheduling is supplied by Next.js in production.

@@ -2,7 +2,7 @@ import { app_reported_messages } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { generateMessageSignature } from '@/lib/app-reported-messages/messageSignature';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 

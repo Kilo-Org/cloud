@@ -15,7 +15,7 @@ import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organ
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { createAllowPredicateFromRestrictions } from '@kilocode/web-shared/lib/model-allow.server';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';

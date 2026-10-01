@@ -15,7 +15,7 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { and, eq, sql } from 'drizzle-orm';
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { reconcileStoreSubscriptionExpiry } from '@/lib/kilo-pass/store-subscription-reconcile';
 
 type InsertSubscriptionParams = {

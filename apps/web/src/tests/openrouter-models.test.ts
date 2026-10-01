@@ -1,5 +1,8 @@
 import { test, expect, describe, afterEach, beforeEach } from '@jest/globals';
-import { mockOpenRouterModels, createMockResponse } from './helpers/openrouter-models.helper';
+import {
+  mockOpenRouterModels,
+  createMockResponse,
+} from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import { GET } from '../app/api/openrouter/models/route';
 import { GET as gatewayV1ModelsGET } from '../app/api/gateway/v1/models/route';
 import { GET as transcriptionModelsGET } from '../app/api/gateway/transcription-models/route';

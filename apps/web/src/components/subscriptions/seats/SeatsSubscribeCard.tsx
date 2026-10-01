@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { seatPrice } from '@/lib/organizations/constants';
+import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import type {
   BillingCycle,
   OrganizationPlan,

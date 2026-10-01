@@ -2,7 +2,7 @@ import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   createOrganization,
   addUserToOrganization,

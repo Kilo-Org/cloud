@@ -11,13 +11,13 @@ import {
 } from './rewriteModelResponse';
 import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import { KILO_ORGANIZATION_ID } from '@/lib/organizations/constants';
+import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { api_request_log } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import type { FakeR2ClientModule } from '@/tests/helpers/fake-r2.helper';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { eq } from 'drizzle-orm';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 
@@ -25,7 +25,7 @@ jest.mock('@kilocode/web-shared/lib/r2/client', () =>
   jest
     .requireActual<{
       createFakeR2ClientModule: () => FakeR2ClientModule;
-    }>('@/tests/helpers/fake-r2.helper')
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
     .createFakeR2ClientModule()
 );
 

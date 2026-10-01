@@ -58,7 +58,7 @@ import {
   processPersonalKiloPassStripePaidConversion,
 } from '@/lib/impact/kilo-pass-referrals';
 import { dispatchQueuedImpactAdvocateRewardRedemptions } from '@/lib/impact/referral-delivery';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   deleted_user_email_tombstones,
   impact_advocate_participants,

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { organizations, stripe_early_fraud_warning_cases, type User } from '@kilocode/db/schema';
 import {
   StripeEarlyFraudWarningCaseStatus,

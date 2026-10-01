@@ -1,6 +1,6 @@
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { agent_configs } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 

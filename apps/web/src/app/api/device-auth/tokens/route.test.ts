@@ -1,7 +1,7 @@
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { NextResponse } from 'next/server';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),

@@ -10,7 +10,7 @@ import {
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
-import type { AuthErrorType } from '@/lib/auth/constants';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
 
 const MAGIC_LINK_EMAIL_RATE_LIMIT_ID = 'magic-link-email';
 

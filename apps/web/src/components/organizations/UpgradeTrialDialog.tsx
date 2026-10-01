@@ -8,7 +8,7 @@ import type {
   BillingCycle,
   OrganizationPlan,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { seatPrice } from '@/lib/organizations/constants';
+import { seatPrice } from '@kilocode/web-shared/lib/organizations/constants';
 import { ENTERPRISE_FEATURES, TEAMS_FEATURES } from './subscription/plan-features';
 import {
   useOrganizationSubscriptionLink,

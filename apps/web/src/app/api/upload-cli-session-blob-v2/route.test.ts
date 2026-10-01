@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { POST } from './route';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, cliSessions } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { generateSignedUploadUrl } from '@/lib/r2/cli-sessions';

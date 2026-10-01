@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { insertUsageRecord } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import type { MicrodollarUsage } from '@kilocode/db/schema';
 import type { UsageMetaData } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';

@@ -18,7 +18,7 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { updateKiloPassThresholdAfterBaseCredits } from './subscription-accounting';
 

@@ -30,7 +30,7 @@ import {
   ImpactReferralWinningTouchType,
 } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 
 import {
   applyPendingKiloPassReferralBonusForIssuance,

@@ -1,5 +1,5 @@
 export const GITHUB_CLOUD_REVIEW_SKILL_NAME = 'github-cloud-review';
-export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '1';
+export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '2';
 
 const rawMarkdown = `---
 name: github-cloud-review
@@ -75,7 +75,8 @@ gh api repos/<OWNER>/<REPO>/issues/comments/<COMMENT_ID> -X PATCH --input -
 
 ## Fail Safely
 
-- Retry a failed read once; stop without writing after a second failure.
+- A failed or rejected read never blocks publication. Retry it once or use another allowed read, then continue with the evidence you have and note any gaps in the summary.
+- If existing Kilo comments cannot be read, publish the summary with the trusted prompt's create or update command as given.
 - Before retrying an ambiguous write or 422, re-read HEAD and remote comments/reviews to determine whether it succeeded and whether targets are still valid.
 - Retry a write at most once, never blindly, and never loop on secondary rate limits.
 - If publication remains uncertain, stop rather than creating duplicates.
@@ -93,6 +94,7 @@ gh api repos/<OWNER>/<REPO>/issues/comments/<COMMENT_ID> -X PATCH --input -
 - Trusted summary target verified.
 - One atomic inline review prepared.
 - One logical summary write prepared.
+- Summary published by running the summary command, not only written in the final reply.
 `;
 
 export const GITHUB_CLOUD_REVIEW_SKILL = {

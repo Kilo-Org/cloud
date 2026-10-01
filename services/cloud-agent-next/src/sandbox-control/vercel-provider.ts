@@ -235,11 +235,12 @@ export function createVercelProviderAdapter(deps: {
         return { status: parsed && isNotFound(error) ? 'terminal' : 'unknown' };
       }
     },
-    async stop(ref) {
+    async stop(ref, intent) {
       const parsed = decodeOwnedProviderRef(ref);
       const diagnostic = {
         provider: 'vercel',
         allocationName: deps.sandboxName,
+        intentId: intent?.intentId,
         providerSessionId: parsed?.sessionId,
       };
       if (parsed === null) {

@@ -13,6 +13,7 @@ import {
   type ControlPlaneWorkspaceFailureSubtype,
 } from '../../shared/control-plane-protocol.js';
 import type { SessionCredentialGrant } from '../../sandbox-control/session-credentials.js';
+import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import { routes as routesTable } from './sqlite-schema.js';
 import { readScopeGrant, removeScopeMember, scopeGrantId } from './scope-grants.js';
 
@@ -234,7 +235,8 @@ export async function failRoute(
   ctx: RouteContext,
   spec: ControlPlaneRouteSpec,
   attemptId: string,
-  reason: ControlPlaneFailureReason
+  reason: ControlPlaneFailureReason,
+  stage = 'route'
 ): Promise<RouteRecord> {
   const existing = await readRoute(ctx.db, spec.sessionId);
   const route: RouteRecord = {
@@ -248,6 +250,12 @@ export async function failRoute(
     reason,
   };
   writeRoute(ctx.db, route);
+  logControlDiagnostic('route_failed', {
+    sessionId: spec.sessionId,
+    attemptId,
+    reason,
+    stage,
+  });
   await ctx.notify(spec.sessionId, { state: 'failed', attemptId, reason });
   return route;
 }
@@ -272,11 +280,12 @@ export async function failCurrentAttempt(
   ctx: RouteContext,
   sessionId: string,
   attemptId: string,
-  reason: ControlPlaneFailureReason
+  reason: ControlPlaneFailureReason,
+  stage = 'attempt'
 ): Promise<void> {
   const route = await readRoute(ctx.db, sessionId);
   if (!isCurrentPreparingAttempt(route, attemptId)) return;
-  await failRoute(ctx, route.spec, attemptId, reason);
+  await failRoute(ctx, route.spec, attemptId, reason, stage);
 }
 
 /**
@@ -304,12 +313,31 @@ export async function startAttempt(
 ): Promise<RouteRecord> {
   const attemptId = crypto.randomUUID();
   const attemptSpec: ControlPlaneRouteSpec = { ...spec, attemptId };
-  if (source === null) return failRoute(ctx, attemptSpec, attemptId, 'workspace_setup_failed');
+  logControlDiagnostic('route_attempt', {
+    sessionId: spec.sessionId,
+    attemptId,
+    credentialSource: source !== null,
+  });
+  if (source === null) {
+    return failRoute(
+      ctx,
+      attemptSpec,
+      attemptId,
+      'workspace_setup_failed',
+      'credential_source_missing'
+    );
+  }
   let issued: RouteGrantIssue;
   try {
     issued = await ctx.issueGrant(attemptSpec, source);
   } catch {
-    return failRoute(ctx, attemptSpec, attemptId, 'workspace_setup_failed');
+    return failRoute(
+      ctx,
+      attemptSpec,
+      attemptId,
+      'workspace_setup_failed',
+      'credential_grant_failed'
+    );
   }
   const route = newPreparingRoute(
     issued.spec,
@@ -325,7 +353,13 @@ export async function startAttempt(
       return route;
     }
   }
-  return failRoute(ctx, attemptSpec, attemptId, 'workspace_setup_failed');
+  return failRoute(
+    ctx,
+    attemptSpec,
+    attemptId,
+    'workspace_setup_failed',
+    'credential_policy_unavailable'
+  );
 }
 
 /**
@@ -403,6 +437,14 @@ export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
   for (const route of await listRoutes(ctx.db)) {
     if (route.state !== 'preparing' || route.attemptDeadlineAt > now) continue;
     writeRoute(ctx.db, { ...route, state: 'failed', reason: 'preparation_timeout' });
+    logControlDiagnostic('route_failed', {
+      sessionId: route.sessionId,
+      attemptId: route.attemptId,
+      reason: 'preparation_timeout',
+      stage: 'attempt_deadline',
+      deadlineAt: route.attemptDeadlineAt,
+      now,
+    });
     await ctx.notify(route.sessionId, {
       state: 'failed',
       attemptId: route.attemptId,
@@ -426,6 +468,11 @@ export async function onRouteProgress(
   if (!current) return;
   const route = await readRoute(ctx.db, sessionId);
   if (route === null || route.state !== 'preparing') return;
+  logControlDiagnostic('route_progress', {
+    sessionId,
+    attemptId: route.attemptId,
+    step,
+  });
   await ctx.notify(sessionId, { state: 'preparing', attemptId: route.attemptId, step });
 }
 
@@ -438,6 +485,7 @@ export async function onRouteReady(
   const route = await readRoute(ctx.db, sessionId);
   if (route === null || route.state === 'failed') return;
   writeRoute(ctx.db, { ...route, state: 'ready', reason: null });
+  logControlDiagnostic('route_ready', { sessionId, attemptId: route.attemptId });
   await ctx.notify(sessionId, { state: 'ready', attemptId: route.attemptId });
 }
 
@@ -452,6 +500,13 @@ export async function onRouteFailed(
   const route = await readRoute(ctx.db, sessionId);
   if (route === null || route.state === 'failed') return;
   writeRoute(ctx.db, { ...route, state: 'failed', reason });
+  logControlDiagnostic('route_failed', {
+    sessionId,
+    attemptId: route.attemptId,
+    reason,
+    stage: 'wrapper_reported',
+    subtype,
+  });
   await ctx.notify(sessionId, {
     state: 'failed',
     attemptId: route.attemptId,

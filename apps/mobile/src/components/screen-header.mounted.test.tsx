@@ -359,9 +359,10 @@ describe('ScreenHeader mounted', () => {
   });
 
   it('drops inlineActions to their own full-width row when they squeeze the title', () => {
-    // The Croatian Agents row: its two long labels and the filter button lay
-    // out at ~333dp, leaving the 30px title 1dp beside them — "Agenti" broke
-    // mid-word into "Age" / "nti" (owner capture, agents-header-hr-20260929).
+    // A cluster this wide takes its own row: 390 - 44 - 12 - 333 leaves the
+    // 30px title below its 120dp minimum. The Agents header took that shape
+    // while its controls squeezed "Agenti" mid-word (owner capture,
+    // agents-header-hr-20260929).
     const renderer = renderHeader({
       title: 'Agenti',
       size: 'large',

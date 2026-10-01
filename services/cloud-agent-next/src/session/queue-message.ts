@@ -19,8 +19,21 @@ import type { Env } from '../types.js';
 import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { QueueAckResponse } from '../router/schemas.js';
 import { withDORetry } from '../utils/do-retry.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
-import { sessionPlaneFromId } from '../session-plane.js';
+import {
+  resolveLegacySessionStub,
+  getSandboxSessionStub,
+} from '../sandbox-session/session-stub.js';
+import type {
+  ControlPlaneSendResult,
+  SandboxSessionV2,
+} from '../control-plane/session/session-do.js';
+import { QUEUED_MESSAGE_LIMIT } from '../control-plane/session/messages.js';
+import {
+  buildControlPlaneMessagePayload,
+  ControlPlaneMessageInputError,
+} from './control-plane-session-input.js';
+import type { ControlPlanePromptPayload } from '../shared/control-plane-protocol.js';
+import { isControlSession } from '../session-plane.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
 import { createMessageId } from './message-id.js';
@@ -93,6 +106,24 @@ export function throwAdmissionError(
   });
 }
 
+/**
+ * The public queue-full admission failure. One owner for the code and message:
+ * the tRPC paths pass it to `throwAdmissionError` (429 `PENDING_QUEUE_FULL`),
+ * and the Kilo facade returns it directly. The legacy public queue-capacity
+ * limit and error are kept by the execution brief's queue-capacity decision,
+ * recorded in the ledger.
+ */
+export function pendingQueueFullAdmissionFailure(): Extract<
+  SessionMessageAdmissionResult,
+  { success: false }
+> {
+  return {
+    success: false,
+    code: 'PENDING_QUEUE_FULL',
+    error: `Pending message queue is full (${QUEUED_MESSAGE_LIMIT})`,
+  };
+}
+
 export type QueueMessageInput = {
   cloudAgentSessionId: string;
 } & QueueExecutionTurnCommand;
@@ -118,12 +149,18 @@ export async function preflightRuntimeAuthorizationRecovery(
     return;
   }
   const sessionId = cloudAgentSessionId as SessionId;
-  const stub = resolveSessionStub(ctx.env, ctx.userId, sessionId);
-  const state = await withDORetry(
-    () => stub,
-    target => target.getRuntimeAuthorizationRecoveryState(),
-    'getRuntimeAuthorizationRecoveryState'
-  );
+  const isControl = isControlSession(sessionId);
+  const state = isControl
+    ? await withDORetry(
+        () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+        target => target.getRuntimeAuthorizationStatus(),
+        'getRuntimeAuthorizationStatus'
+      )
+    : await withDORetry(
+        () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
+        target => target.getRuntimeAuthorizationRecoveryState(),
+        'getRuntimeAuthorizationRecoveryState'
+      );
   if (state.state === 'legacy' || state.state === 'active') return;
   if (state.state === 'revoked') {
     logRuntimeAuthorizationDiagnostic(
@@ -135,7 +172,6 @@ export async function preflightRuntimeAuthorizationRecovery(
   }
   if (!state.id) return;
   const expectedOldId = state.id;
-  const recoveryId = state.recoveryId ?? crypto.randomUUID();
   const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, cloudAgentSessionId);
   if (!metadata || metadata.identity.userId !== ctx.userId) return;
   const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
@@ -150,18 +186,30 @@ export async function preflightRuntimeAuthorizationRecovery(
     ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
   });
   const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
-  const result = await withDORetry(
-    () => stub,
-    target =>
-      target.recoverExpiredRuntimeAuthorization({
-        ownerId: ctx.userId,
-        expectedOldId,
-        recoveryId,
-        runtimeAuthorizationSeal,
-        runtimeToken: created.token,
-      }),
-    'recoverExpiredRuntimeAuthorization'
-  );
+  const result = isControl
+    ? await withDORetry(
+        () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+        target =>
+          target.recoverExpiredRuntimeAuthorization({
+            ownerId: ctx.userId,
+            expectedOldId,
+            runtimeAuthorizationSeal,
+            runtimeToken: created.token,
+          }),
+        'recoverExpiredRuntimeAuthorization'
+      )
+    : await withDORetry(
+        () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
+        target =>
+          target.recoverExpiredRuntimeAuthorization({
+            ownerId: ctx.userId,
+            expectedOldId,
+            recoveryId: (state as { recoveryId?: string }).recoveryId ?? crypto.randomUUID(),
+            runtimeAuthorizationSeal,
+            runtimeToken: created.token,
+          }),
+        'recoverExpiredRuntimeAuthorization'
+      );
   if (result.status === 'denied') {
     logRuntimeAuthorizationDiagnostic(cloudAgentSessionId, 'preflight', 'recovery_denied');
     throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
@@ -199,7 +247,7 @@ async function hasMessageAdmission(input: QueueMessageInput, ctx: QueueMessageCo
 
   const sessionId = input.cloudAgentSessionId as SessionId;
   return withDORetry<DurableObjectStub<CloudAgentSession>, boolean>(
-    () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
+    () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.hasMessageAdmission(messageId),
     'hasMessageAdmission'
   );
@@ -212,7 +260,18 @@ export async function preflightAndAdmitPromptMessage<T>(
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
   await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
-  if (sessionPlaneFromId(input.cloudAgentSessionId) === 'control') return admit(input, ctx);
+  if (isControlSession(input.cloudAgentSessionId)) {
+    // Model policy (org allow-list, forbidden/unavailable) still gates a
+    // control-plane send; only the legacy message-admission probe is skipped.
+    await preflightExistingPromptModel({
+      env: ctx.env,
+      userId: ctx.userId,
+      cloudAgentSessionId: input.cloudAgentSessionId,
+      requestedModel: input.agent?.model,
+      procedure,
+    });
+    return admit(input, ctx);
+  }
   if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
 
   await preflightExistingPromptModel({
@@ -242,11 +301,69 @@ export async function queueMessage(
   return queueMessageAfterRecoveryPreflight(input, ctx);
 }
 
+/**
+ * Admits a control-plane message through the V2 Session DO `send` RPC. The
+ * Worker owns resolving the effective agent and materializing attachments,
+ * because the V2 protocol admits a fully-resolved intent. The public
+ * acknowledgment keeps its compatibility shape: durable admission is `queued`.
+ */
+async function queueControlPlaneMessage(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext
+): Promise<QueueAckResponse> {
+  const sessionId = input.cloudAgentSessionId as SessionId;
+  const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, sessionId);
+  if (!metadata) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+  }
+  let payload: ControlPlanePromptPayload;
+  try {
+    payload = await buildControlPlaneMessagePayload({
+      env: ctx.env,
+      userId: ctx.userId,
+      sessionId,
+      metadata,
+      turn: input.turn,
+      ...(input.finalization === undefined ? {} : { finalization: input.finalization }),
+      ...(input.agent === undefined ? {} : { agentOverride: input.agent }),
+      ...(input.turn.id === undefined || input.turn.id === null
+        ? {}
+        : { messageId: input.turn.id }),
+    });
+  } catch (error) {
+    if (error instanceof ControlPlaneMessageInputError) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: error.detail });
+    }
+    throw error;
+  }
+  const result = await withDORetry<DurableObjectStub<SandboxSessionV2>, ControlPlaneSendResult>(
+    () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+    stub => stub.send(payload),
+    'send'
+  );
+  if (result.type === 'session-not-found') {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+  }
+  if (result.type === 'queue-full') {
+    throwAdmissionError(pendingQueueFullAdmissionFailure());
+  }
+  return {
+    cloudAgentSessionId: sessionId,
+    status: 'started',
+    streamUrl: `/stream?cloudAgentSessionId=${sessionId}`,
+    messageId: payload.messageId,
+    delivery: 'queued',
+  };
+}
+
 async function queueMessageAfterRecoveryPreflight(
   input: QueueMessageInput,
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
+  if (isControlSession(sessionId)) {
+    return queueControlPlaneMessage(input, ctx);
+  }
   const request: SubmittedSessionMessageRequest = {
     userId: ctx.userId,
     botId: ctx.botId,
@@ -262,7 +379,7 @@ async function queueMessageAfterRecoveryPreflight(
     DurableObjectStub<CloudAgentSession>,
     SessionMessageAdmissionResult
   >(
-    () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
+    () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
     stub => stub.admitSubmittedMessage(request),
     'admitSubmittedMessage'
   );

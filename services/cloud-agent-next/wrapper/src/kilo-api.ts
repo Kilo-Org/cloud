@@ -22,6 +22,7 @@ import {
   type BoundedSlashCommandCatalog,
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
+import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -435,7 +436,7 @@ export function createWrapperKiloClient(
           projectID: project.id,
           slug: sessionId.slice(0, 24),
           title: 'New session - ' + new Date(now).toISOString(),
-          version: '7.8.1',
+          version: KILO_CLI_VERSION,
           timeCreated: now,
           timeUpdated: now,
         },

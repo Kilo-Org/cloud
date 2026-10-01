@@ -529,6 +529,9 @@
         },
       ],
       "containers": [
+        // A local sandbox holds about 1.5 GiB. The small classes the e2e matrix boots
+        // are capped to what a 12 GiB Docker VM holds beside the stack, not to the
+        // deployed e2e Worker's 20.
         {
           "class_name": "Sandbox",
           "image": "./Dockerfile.dev",
@@ -546,7 +549,7 @@
           "image_vars": {
             "KILOCODE_CLI_VERSION": "7.8.1",
           },
-          "max_instances": 2,
+          "max_instances": 6,
           "rollout_active_grace_period": 60,
         },
         {
@@ -590,7 +593,7 @@
           "image_vars": {
             "KILOCODE_CLI_VERSION": "7.8.1",
           },
-          "max_instances": 2,
+          "max_instances": 6,
           "rollout_active_grace_period": 60,
         },
         {

@@ -67,6 +67,7 @@ const FAILURE_CODE_REASONS = {
   assistant_error: 'assistant_failed',
   missing_assistant_reply: 'assistant_no_reply',
   payment_required: 'billing',
+  admission_billing_unavailable: 'sandbox_connection',
   user_interrupt: 'user_cancelled',
   container_shutdown: 'container_shutdown',
   system_interrupt: 'interrupted',

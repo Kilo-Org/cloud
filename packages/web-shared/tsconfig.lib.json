@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@kilocode/db": ["../db/src/index.ts"],
+      "@kilocode/db/*": ["../db/src/*"],
+      "@kilocode/encryption": ["../encryption/src/index.ts"],
+      "@kilocode/worker-utils": ["../worker-utils/src/index.ts"],
+      "@kilocode/worker-utils/*": ["../worker-utils/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "src/**/*.test.ts", "src/**/*.test.tsx"]
+}

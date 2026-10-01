@@ -79,7 +79,7 @@ const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 const MODEL_CAPABILITIES_LOOKUP_BUDGET_MS = 500;
 
 // Keep this in sync with the BytePlus Coding Plan default in
-// apps/web/src/lib/ai-gateway/providers/direct-byok/byteplus-coding.ts.
+// packages/web-shared/src/lib/ai-gateway/providers/direct-byok/byteplus-coding.ts.
 // Direct BYOK models are absent from the OpenRouter model_stats sync, so this
 // narrow fallback lets the recognized Coding Plan default satisfy constraints.
 const BYTEPLUS_CODING_PLAN_DEFAULT_MODEL_ID = 'byteplus-coding/bytedance-seed-code';

@@ -2245,6 +2245,8 @@
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
+      "selectRepositoryToStart": "Выберыце рэпазіторый, каб пачаць.",
+      "connectProviderToStart": "Падключыце платформу, каб пачаць.",
       "promptPlaceholder": "Над чым будзем працаваць?",
       "couldNotLoadModels": "Не ўдалося загрузіць мадэлі.",
       "prefillRepoAndModelUnavailable": "Рэпазіторый і мадэль зыходнага сеанса больш недаступныя. Выберыце іншыя ніжэй.",

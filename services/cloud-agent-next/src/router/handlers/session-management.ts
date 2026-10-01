@@ -13,8 +13,13 @@ import {
   fetchSessionMetadata,
 } from '../../session-service.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { getSandboxSessionStub, resolveSessionStub } from '../../sandbox-session/session-stub.js';
-import { sessionPlaneFromId } from '../../session-plane.js';
+import {
+  getSandboxSessionStub,
+  resolveLegacySessionStub,
+  resolveSessionStub,
+  type SessionStub,
+} from '../../sandbox-session/session-stub.js';
+import { sessionFor } from '../../session-plane.js';
 import { interruptControlSession } from '../control-plane-session.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
@@ -33,14 +38,18 @@ import {
   GetComputeBillingStatusOutput,
 } from '../schemas.js';
 import { readProfileBundle } from '../../session-profile.js';
-import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
 import type { CloudAgentSessionState } from '../../persistence/types.js';
+import type {
+  ControlPlaneSessionSnapshot,
+  SandboxSessionV2,
+} from '../../control-plane/session/session-do.js';
 import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getPgDb } from '../../db/pg.js';
 import { cloud_billing_sku, cli_sessions_v2, container_usage_interval } from '@kilocode/db/schema';
 import { and, desc, eq, like } from 'drizzle-orm';
 import { SANDBOX_USAGE_SKUS } from '../../container-usage-context.js';
+import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
 
 function publicRepositoryFields(metadata: CloudAgentSessionState): {
   githubRepo?: string;
@@ -63,6 +72,22 @@ function publicRepositoryFields(metadata: CloudAgentSessionState): {
 
 function toIso(value: string): string {
   return new Date(value).toISOString();
+}
+
+/** Projects the control-plane sandbox lifecycle onto the public health enum. */
+function sandboxStatusFromLifecycle(
+  status: SandboxLifecycleStatus
+): 'healthy' | 'destroyed' | 'unreachable' | 'unknown' {
+  switch (status) {
+    case 'active':
+      return 'healthy';
+    case 'unreachable':
+      return 'unreachable';
+    case 'error':
+      return 'destroyed';
+    default:
+      return 'unknown';
+  }
 }
 
 type WorktreeOwnership = {
@@ -110,16 +135,12 @@ async function deleteSessionResources(
   logger.info('Starting session deletion');
 
   try {
+    // Resolve the plane before any metadata read; the factory returns a fresh
+    // stub per retry attempt.
+    const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
+
     const metadata = await fetchSessionMetadata(env, userId, sessionId);
-    const retainedRuntime =
-      !metadata && sessionPlaneFromId(sessionId) === 'control'
-        ? await withDORetry(
-            () => getSandboxSessionStub(env, userId, sessionId),
-            stub => stub.getRuntimeLocation(),
-            'getRuntimeLocation'
-          )
-        : null;
-    if (!metadata && !retainedRuntime) {
+    if (!metadata) {
       logger.info('Session not found or already deleted');
       return { success: true, message: 'Session not found or already deleted' };
     }
@@ -127,11 +148,7 @@ async function deleteSessionResources(
     await authorizeExistingSession?.();
 
     try {
-      await withDORetry(
-        () => resolveSessionStub(env, userId, sessionId),
-        stub => stub.deleteSession(),
-        'deleteSession'
-      );
+      await withDORetry(getStub, stub => stub.deleteSession(), 'deleteSession');
       logger.info('Session metadata destroyed');
     } catch (error) {
       logger
@@ -225,29 +242,37 @@ export function createSessionManagementHandlers() {
           });
 
           try {
-            const metadata = await fetchSessionMetadata(env, userId, sessionId);
+            const notFoundResult: InterruptResult = {
+              success: false,
+              message: 'Session not found',
+              processesFound: false,
+            };
+            const readMetadata = () => fetchSessionMetadata(env, userId, sessionId);
 
-            if (!metadata) {
-              logger.info('Session not found');
-              return {
-                success: false,
-                message: 'Session not found',
-                processesFound: false,
-              };
-            }
-
-            const getStub = () => resolveSessionStub(env, userId, sessionId);
-
-            await withDORetry(getStub, stub => stub.markAsInterrupted(), 'markAsInterrupted');
-
-            const interruptResult =
-              sessionPlaneFromId(sessionId) === 'control'
-                ? await interruptControlSession({ env, ownerId: userId, sessionId })
-                : await withDORetry(
-                    getStub,
-                    stub => stub.interruptExecution(),
-                    'interruptExecution'
-                  );
+            const interruptResult = await sessionFor(
+              sessionId,
+              async () => {
+                if (!(await readMetadata())) {
+                  logger.info('Session not found');
+                  return notFoundResult;
+                }
+                return await interruptControlSession({ env, ownerId: userId, sessionId });
+              },
+              async () => {
+                if (!(await readMetadata())) {
+                  logger.info('Session not found');
+                  return notFoundResult;
+                }
+                return withDORetry(
+                  () => resolveLegacySessionStub(env, userId, sessionId),
+                  async stub => {
+                    await stub.markAsInterrupted();
+                    return stub.interruptExecution();
+                  },
+                  'interruptExecution'
+                );
+              }
+            );
 
             const success =
               interruptResult !== undefined &&
@@ -315,10 +340,7 @@ export function createSessionManagementHandlers() {
           });
 
           try {
-            const getStub = () =>
-              sessionPlaneFromId(sessionId) === 'control'
-                ? getSandboxSessionStub(env, userId, sessionId)
-                : resolveSessionStub(env, userId, sessionId);
+            const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
             return await withDORetry(
               getStub,
               stub => stub.cancelQueuedMessage(input.messageId),
@@ -361,14 +383,16 @@ export function createSessionManagementHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          // Get DO stub keyed by userId:sessionId for user isolation
-          const getStub = () => resolveSessionStub(env, userId, sessionId);
+          // Get DO stub keyed by userId:sessionId for user isolation. The
+          // factory returns a fresh stub per retry attempt.
+          const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
 
           // Fetch metadata with retry
-          const metadata = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
+          const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
+            getStub,
+            s => s.getMetadata(),
+            'getMetadata'
+          );
 
           if (!metadata) {
             logger.info('Session not found');
@@ -378,30 +402,72 @@ export function createSessionManagementHandlers() {
             });
           }
 
-          const currentWork = await withDORetry(
-            getStub,
-            s => s.getCurrentMessageWork(),
-            'getCurrentMessageWork'
+          // Current work and the durability watermark come from the control-plane
+          // snapshot for `workspace_*` sessions and the legacy reads otherwise.
+          const { currentWork, latestEventId } = await sessionFor(
+            sessionId,
+            async (): Promise<{
+              currentWork: {
+                messageId: string;
+                status: 'pending' | 'running';
+                health: 'healthy' | 'stale';
+              } | null;
+              latestEventId: number | null;
+            }> => {
+              const snapshot = await withDORetry<
+                DurableObjectStub<SandboxSessionV2>,
+                ControlPlaneSessionSnapshot
+              >(
+                () => getSandboxSessionStub(env, userId, sessionId),
+                s => s.getSession(),
+                'getSession'
+              );
+              if (snapshot.type !== 'found') return { currentWork: null, latestEventId: null };
+              const accepted = snapshot.messages.find(message => message.state === 'accepted');
+              const queued = snapshot.messages.find(message => message.state === 'queued');
+              return {
+                currentWork: accepted
+                  ? { messageId: accepted.messageId, status: 'running', health: 'healthy' }
+                  : queued
+                    ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
+                    : null,
+                latestEventId: snapshot.latestEventId,
+              };
+            },
+            async (): Promise<{
+              currentWork: {
+                messageId: string;
+                status: 'pending' | 'running';
+                health: 'healthy' | 'stale';
+              } | null;
+              latestEventId: number | null;
+            }> => {
+              const legacyStub = () => resolveLegacySessionStub(env, userId, sessionId);
+              const currentWork = await withDORetry(
+                legacyStub,
+                s => s.getCurrentMessageWork(),
+                'getCurrentMessageWork'
+              );
+              // Failures are swallowed so an optional watermark read never blocks
+              // the session response.
+              let latestEventId: number | null = null;
+              try {
+                latestEventId = await withDORetry(
+                  legacyStub,
+                  s => s.getLatestEventId(),
+                  'getLatestEventId'
+                );
+              } catch (error) {
+                logger
+                  .withFields({
+                    sessionId,
+                    error: error instanceof Error ? error.message : String(error),
+                  })
+                  .warn('Failed to fetch latest event ID for getSession');
+              }
+              return { currentWork, latestEventId };
+            }
           );
-
-          // Fetch the latest persisted event ID for the durability watermark.
-          // Failures are swallowed so an optional watermark read never blocks
-          // the session response.
-          let latestEventId: number | null = null;
-          try {
-            latestEventId = await withDORetry(
-              getStub,
-              s => s.getLatestEventId(),
-              'getLatestEventId'
-            );
-          } catch (error) {
-            logger
-              .withFields({
-                sessionId,
-                error: error instanceof Error ? error.message : String(error),
-              })
-              .warn('Failed to fetch latest event ID for getSession');
-          }
 
           const sessionMetadata = metadata;
           const metadataProfile = readProfileBundle(sessionMetadata);
@@ -551,14 +617,9 @@ export function createSessionManagementHandlers() {
           kiloUserId: ctx.userId,
           cloudAgentSessionId: sessionId,
         });
-        const stub = ctx.env.CLOUD_AGENT_SESSION.get(
-          ctx.env.CLOUD_AGENT_SESSION.idFromName(`${ctx.userId}:${sessionId}`)
-        );
-        const metadata = await withDORetry<
-          DurableObjectStub<CloudAgentSession>,
-          CloudAgentSessionState | null
-        >(
-          () => stub,
+        const getStub: () => SessionStub = () => resolveSessionStub(ctx.env, ctx.userId, sessionId);
+        const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
+          getStub,
           value => value.getMetadata(),
           'getMetadata'
         );
@@ -695,12 +756,13 @@ export function createSessionManagementHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const getStub = () => resolveSessionStub(env, userId, sessionId);
+          const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
 
-          const metadata = await withDORetry<
-            ReturnType<typeof getStub>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
+          const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
+            getStub,
+            s => s.getMetadata(),
+            'getMetadata'
+          );
 
           if (!metadata) {
             logger.info('Session not found');
@@ -727,36 +789,81 @@ export function createSessionManagementHandlers() {
 
           // Stranded legacy execution rows from pre-message deployments do not
           // represent resumable current work and must not gate continuation.
-          const activeMessageWork = await withDORetry(
-            getStub,
-            s => s.getCurrentMessageWork(),
-            'getCurrentMessageWork'
+          // The control plane derives it from the session snapshot.
+          const activeMessageWork = await sessionFor(
+            sessionId,
+            async (): Promise<{
+              messageId: string;
+              status: 'pending' | 'running';
+              health: 'healthy' | 'stale';
+            } | null> => {
+              const snapshot = await withDORetry<
+                DurableObjectStub<SandboxSessionV2>,
+                ControlPlaneSessionSnapshot
+              >(
+                () => getSandboxSessionStub(env, userId, sessionId),
+                s => s.getSession(),
+                'getSession'
+              );
+              if (snapshot.type !== 'found') return null;
+              const accepted = snapshot.messages.find(message => message.state === 'accepted');
+              const queued = snapshot.messages.find(message => message.state === 'queued');
+              return accepted
+                ? { messageId: accepted.messageId, status: 'running', health: 'healthy' }
+                : queued
+                  ? { messageId: queued.messageId, status: 'pending', health: 'healthy' }
+                  : null;
+            },
+            () =>
+              withDORetry(
+                () => resolveLegacySessionStub(env, userId, sessionId),
+                s => s.getCurrentMessageWork(),
+                'getCurrentMessageWork'
+              )
           );
           const activeExecutionId = activeMessageWork?.messageId;
           const activeExecutionStatus = activeMessageWork?.status;
           const executionHealth = activeMessageWork?.health ?? 'none';
 
-          const cleanupScheduled = await withDORetry(
-            getStub,
-            s => s.isSandboxCleanupScheduled(),
-            'isSandboxCleanupScheduled'
-          );
-          let sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' | 'unknown' = cleanupScheduled
-            ? 'destroyed'
-            : 'unknown';
-          if (!cleanupScheduled) {
-            try {
-              await createAgentSandbox(env, metadata).probeHealth();
-              sandboxStatus = 'healthy';
-            } catch (error) {
-              if (!(error instanceof AgentSandboxUnavailableError)) {
-                sandboxStatus = 'unreachable';
-                logger
-                  .withFields({ error: error instanceof Error ? error.message : String(error) })
-                  .warn('Sandbox health probe failed');
+          const sandboxStatus: 'healthy' | 'destroyed' | 'unreachable' | 'unknown' =
+            await sessionFor(
+              sessionId,
+              async (): Promise<'healthy' | 'destroyed' | 'unreachable' | 'unknown'> => {
+                // The control plane's Sandbox DO owns status; read its snapshot
+                // instead of probing the legacy agent sandbox abstraction.
+                try {
+                  const snapshot = await withDORetry(
+                    () => getSandboxSessionStub(env, userId, sessionId),
+                    stub => stub.getSandboxStatus(),
+                    'getSandboxStatus'
+                  );
+                  return sandboxStatusFromLifecycle(snapshot.status);
+                } catch (error) {
+                  logger
+                    .withFields({ error: error instanceof Error ? error.message : String(error) })
+                    .warn('Sandbox status read failed');
+                  return 'unknown' as const;
+                }
+              },
+              async (): Promise<'healthy' | 'destroyed' | 'unreachable' | 'unknown'> => {
+                const cleanupScheduled = await withDORetry(
+                  () => resolveLegacySessionStub(env, userId, sessionId),
+                  s => s.isSandboxCleanupScheduled(),
+                  'isSandboxCleanupScheduled'
+                );
+                if (cleanupScheduled) return 'destroyed' as const;
+                try {
+                  await createAgentSandbox(env, metadata).probeHealth();
+                  return 'healthy' as const;
+                } catch (error) {
+                  if (error instanceof AgentSandboxUnavailableError) return 'unknown' as const;
+                  logger
+                    .withFields({ error: error instanceof Error ? error.message : String(error) })
+                    .warn('Sandbox health probe failed');
+                  return 'unreachable' as const;
+                }
               }
-            }
-          }
+            );
 
           logger.info('Session health retrieved successfully', {
             sandboxStatus,
@@ -788,12 +895,9 @@ export function createSessionManagementHandlers() {
             kiloUserId: userId,
             cloudAgentSessionId: sessionId,
           });
-          const getStub = () => resolveSessionStub(env, userId, sessionId);
+          const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
 
-          const response = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            MessageResultRPCResponse
-          >(
+          const response = await withDORetry<SessionStub, MessageResultRPCResponse>(
             getStub,
             async stub => await stub.getMessageResult(input.messageId),
             'getMessageResult'
@@ -831,12 +935,13 @@ export function createSessionManagementHandlers() {
             cloudAgentSessionId: sessionId,
           });
 
-          const getStub = () => resolveSessionStub(env, userId, sessionId);
+          const getStub: () => SessionStub = () => resolveSessionStub(env, userId, sessionId);
 
-          const metadata = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            CloudAgentSessionState | null
-          >(getStub, s => s.getMetadata(), 'getMetadata');
+          const metadata = await withDORetry<SessionStub, CloudAgentSessionState | null>(
+            getStub,
+            s => s.getMetadata(),
+            'getMetadata'
+          );
           if (!metadata) {
             logger.info('Session not found');
             throw new TRPCError({

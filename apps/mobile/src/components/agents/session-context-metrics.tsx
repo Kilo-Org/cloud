@@ -68,7 +68,7 @@ export function SessionContextMetrics({
     info,
     totalCostMicrodollars,
     interactive: pressable,
-    loading,
+    usageUnavailable: content.usageUnavailable,
   });
 
   // Exactly 44pt via h-[44px]. rem-scaled h-11 measured ~38.7pt on device with

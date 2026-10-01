@@ -413,6 +413,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: 80_000,
         interactive: false,
+        usageUnavailable: true,
       })
     ).toBe('Context usage unavailable, cost 8 cents.');
     expect(
@@ -420,6 +421,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: 120_000,
         interactive: false,
+        usageUnavailable: true,
       })
     ).toBe('Context usage unavailable, cost 12 cents.');
   });
@@ -430,7 +432,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: 80_000,
         interactive: false,
-        loading: true,
+        usageUnavailable: false,
       })
     ).toBe('cost 8 cents');
   });
@@ -441,6 +443,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: null,
         interactive: false,
+        usageUnavailable: true,
       })
     ).toBe('Context usage unavailable.');
     expect(
@@ -448,7 +451,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: null,
         interactive: false,
-        loading: true,
+        usageUnavailable: false,
       })
     ).toBe('');
   });
@@ -459,6 +462,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: null,
         interactive: true,
+        usageUnavailable: true,
       })
     ).toBe('Context usage unavailable. Tap to view context details.');
     expect(
@@ -466,7 +470,7 @@ describe('getMetricsAccessibilityLabel', () => {
         info: undefined,
         totalCostMicrodollars: null,
         interactive: true,
-        loading: true,
+        usageUnavailable: false,
       })
     ).toBe('Tap to view context details.');
   });

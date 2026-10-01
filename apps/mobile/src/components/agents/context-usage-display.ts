@@ -213,8 +213,8 @@ export function getContextSheetContent(
  * loading has stopped, unknown usage is named as unavailable instead of
  * reading as an empty, unlabeled control.
  */
-function getUnknownUsageBody(spoken: string | null, loading: boolean): string {
-  if (loading) {
+function getUnknownUsageBody(spoken: string | null, usageUnavailable: boolean): string {
+  if (!usageUnavailable) {
     return spoken ? i18n.t('agents.sessionRow.costSpoken', { cost: spoken }) : '';
   }
   const unavailable = i18n.t('agentChat.contextUsage.usageUnavailable');
@@ -226,18 +226,18 @@ export function getMetricsAccessibilityLabel({
   info,
   totalCostMicrodollars,
   interactive,
-  loading = false,
+  usageUnavailable = false,
 }: {
   info: SessionContextInfo | undefined;
   totalCostMicrodollars: number | null;
   interactive: boolean;
-  loading?: boolean;
+  usageUnavailable?: boolean;
 }): string {
   const spoken = formatSpokenCost(totalCostMicrodollars);
   const tapPart = interactive ? ` ${i18n.t('agentChat.contextUsage.tapToViewDetails')}` : '';
 
   if (!info) {
-    return `${getUnknownUsageBody(spoken, loading)}${tapPart}`.trim();
+    return `${getUnknownUsageBody(spoken, usageUnavailable)}${tapPart}`.trim();
   }
 
   const costPart = spoken ? i18n.t('agentChat.contextUsage.costSuffix', { cost: spoken }) : '';

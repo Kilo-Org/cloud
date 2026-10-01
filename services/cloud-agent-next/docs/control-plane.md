@@ -109,9 +109,9 @@ terminal. Nothing else.
 | Route lost (reason) | All `accepted` → `failed` with the reason. `queued` stay; if any, call `prepare`. |
 | Owner view names a replacement attempt | Before storing the new view, all old `accepted` → `failed` (`agent_restarted`). Never replay them; keep `queued` for the new owner. |
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
-| Stop                                      | All `queued` and `accepted` → `cancelled`; send `abort` (best effort).                                                                       |
-| Cancel one queued message                 | That message → `cancelled`.                                                                                                                  |
-| Backstop alarm                            | `queued` older than 20 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`).               |
+| Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
+| Cancel one queued message | That message → `cancelled`. |
+| Backstop alarm | `queued` older than 20 minutes → `failed` (`preparation_timeout`). `accepted` older than 65 minutes → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -249,19 +249,19 @@ ready and the wrapper is connected, `reconnecting` when the route is ready but t
 otherwise `preparing` or `failed`. The Session DO acts on this return value exactly as on a
 notification, so a lost notification never leaves it waiting.
 
-| Event                                                                         | Effect                                                                                             |
-| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `prepare`, no route                                                           | Add route `preparing`; send `session.prepare` once connected.                                      |
-| `prepare`, route `failed`                                                     | New attempt with a new deadline.                                                                   |
-| `prepare`, route `preparing` or `ready`                                       | No change; return the current view.                                                                |
-| Wrapper progress                                                              | Forward to the session.                                                                            |
-| Wrapper `session.ready`                                                       | `ready`; notify.                                                                                   |
-| Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify.                                                                                  |
-| Deadline while `preparing`                                                    | `failed` (`preparation_timeout`); notify.                                                          |
-| Socket lost                                                                   | Notify `reconnecting`. Route state unchanged.                                                      |
-| `hello`, same `wrapperId`                                                     | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes.          |
-| `hello`, new `wrapperId`                                                      | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
-| `release` (session deleted)                                                   | Remove the route; send `session.release`.                                                          |
+| Event | Effect |
+|---|---|
+| `prepare`, no route | Add route `preparing`; send `session.prepare` once connected. |
+| `prepare`, route `failed` | New attempt with a new deadline. |
+| `prepare`, route `preparing` or `ready` | No change; return the current view. |
+| Wrapper progress | Forward to the session. |
+| Wrapper `session.ready` | `ready`; notify. |
+| Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify. |
+| Deadline while `preparing` | `failed` (`preparation_timeout`); notify. |
+| Socket lost | Notify `reconnecting`. Route state unchanged. |
+| `hello`, same `wrapperId` | Notify `ready` again for ready routes; send `session.prepare` again for preparing routes. |
+| `hello`, new `wrapperId` | Ready routes → `preparing`; notify `route lost` (`agent_restarted`); send `session.prepare` again. |
+| `release` (session deleted) | Remove the route; send `session.release`. |
 
 ### Forwarding
 
@@ -413,15 +413,15 @@ path `/workspace/app`. A snapshot holds one repository at one path, so any other
 
 The wrapper owns the step timeouts and retries:
 
-| Step                                                                                                         | Bound                      | Retry                                                               |
-| ------------------------------------------------------------------------------------------------------------ | -------------------------- | ------------------------------------------------------------------- |
-| Clone or fetch                                                                                               | 6 min total                | Network errors: 3 attempts with backoff                             |
-| Use a prepared repository (`restore`)                                                                        | 2 min                      | Network errors: 3 attempts; any other failure falls back to a clone |
-| Checkout, branch restore                                                                                     | In the clone budget        | No                                                                  |
-| Setup commands                                                                                               | Current per-command limits | No; a failure fails preparation                                     |
-| Save the repository (`snapshot`)                                                                             | 3 min 10 s wait            | No; a failure is logged and preparation continues                   |
-| Kilo runtime start                                                                                           | 2 min                      | 1 retry                                                             |
-| Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min                      | 1 retry                                                             |
+| Step | Bound | Retry |
+|---|---|---|
+| Clone or fetch | 6 min total | Network errors: 3 attempts with backoff |
+| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
+| Checkout, branch restore | In the clone budget | No |
+| Setup commands | Current per-command limits | No; a failure fails preparation |
+| Save the repository (`snapshot`) | 3 min 10 s wait | No; a failure is logged and preparation continues |
+| Kilo runtime start | 2 min | 1 retry |
+| Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
 Each step sends progress. A route already prepared in this process (checkout present, Kilo session
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
@@ -433,12 +433,12 @@ A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit
 generation }`; beside the directory when there is no repository). It replaces the boolean bootstrap marker. At
 `session.prepare` the wrapper decides from the filesystem alone:
 
-| Found                         | Meaning                                | Work                                                     |
-| ----------------------------- | -------------------------------------- | -------------------------------------------------------- |
-| No `.git`                     | Image start                            | Clone, checkout, setup, stamp, then capture when asked   |
-| `.git`, no stamp              | A preparation that did not finish      | Reuse the clone: checkout, setup, stamp. Never captured. |
-| Stamp from this allocation    | A sibling session or a wrapper restart | Nothing                                                  |
-| Stamp from another allocation | A restored repository snapshot         | **Adopt**                                                |
+| Found | Meaning | Work |
+|---|---|---|
+| No `.git` | Image start | Clone, checkout, setup, stamp, then capture when asked |
+| `.git`, no stamp | A preparation that did not finish | Reuse the clone: checkout, setup, stamp. Never captured. |
+| Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
+| Stamp from another allocation | A restored repository snapshot | **Adopt** |
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
@@ -668,17 +668,17 @@ bytes use the existing wrapper-to-Session-DO terminal socket.
 
 New states map onto the current public contracts; no public shape changes.
 
-| New state               | `/stream` (`src/shared/protocol.ts`)                                                                                        | Report `run.status`          | Callback `status` |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------- | ----------------- |
-| Message `queued`        | `cloud.message.queued`                                                                                                      | `queued`                     | —                 |
-| Message `accepted`      | `cloud.message.sent`                                                                                                        | `accepted`                   | —                 |
-| Message `completed`     | `cloud.message.completed`                                                                                                   | `completed`                  | `completed`       |
-| Message `failed`        | `cloud.message.failed`, `status: 'failed'`, reason                                                                          | `failed` with stage and code | `failed`          |
-| Message `cancelled`     | `cloud.message.failed`, `status: 'interrupted'`, reason `interrupted`                                                       | `interrupted`                | `interrupted`     |
-| Route `preparing(step)` | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message) and `cloud.status` `preparing` | —                            | —                 |
-| Route `ready`           | `cloud.status` `ready`                                                                                                      | —                            | —                 |
-| Route `failed`          | `cloud.status` `error`                                                                                                      | —                            | —                 |
-| Finalization running    | `cloud.status` `finalizing`, from a wrapper `finalizing` event; `ready` again on the outcome                                | —                            | —                 |
+| New state | `/stream` (`src/shared/protocol.ts`) | Report `run.status` | Callback `status` |
+|---|---|---|---|
+| Message `queued` | `cloud.message.queued` | `queued` | — |
+| Message `accepted` | `cloud.message.sent` | `accepted` | — |
+| Message `completed` | `cloud.message.completed` | `completed` | `completed` |
+| Message `failed` | `cloud.message.failed`, `status: 'failed'`, reason | `failed` with stage and code | `failed` |
+| Message `cancelled` | `cloud.message.failed`, `status: 'interrupted'`, reason `interrupted` | `interrupted` | `interrupted` |
+| Route `preparing(step)` | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message) and `cloud.status` `preparing` | — | — |
+| Route `ready` | `cloud.status` `ready` | — | — |
+| Route `failed` | `cloud.status` `error` | — | — |
+| Finalization running | `cloud.status` `finalizing`, from a wrapper `finalizing` event; `ready` again on the outcome | — | — |
 
 Reports carry `failureStage` and `failureCode` from the closed pairs in
 `packages/worker-utils/src/cloud-agent-queue-report.ts`. `classifyControlPlaneFailure`

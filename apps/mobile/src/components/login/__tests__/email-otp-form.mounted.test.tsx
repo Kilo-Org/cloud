@@ -165,19 +165,20 @@ describe('EmailOtpForm destination layout', () => {
 
       const verify = mounted.root.findByProps({ accessibilityLabel: 'Verify code' });
       const resend = mounted.root.findByProps({ accessibilityLabel: 'Resend code' });
+      // Button renders the spinner from its `loading` prop, not from a form
+      // child, so the form never mounts an indicator of its own: the label's
+      // reserved row is the same in both states and never shifts.
+      expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
       if (busy === 'otp-verify') {
-        // Verify owns the busy state: the spinner lives inside Button
-        // (`loading`), so the form renders no child indicator of its own.
+        // Verify owns the busy state.
         expect(verify.props.loading).toBe(true);
-        expect(verify.findAllByType('ActivityIndicator')).toHaveLength(0);
-        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(0);
-        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
+        expect(resend.props.loading).toBe(false);
       } else {
-        // Resend keeps its inline spinner; Verify is disabled but not busy, so
-        // it must keep the muted disabled fill, not the brand-filled busy treatment.
+        // Resend owns its own busy state through Button's `loading`; Verify is
+        // disabled but not busy, so it must keep the muted disabled fill, not
+        // the brand-filled busy treatment.
         expect(verify.props.loading).not.toBe(true);
-        expect(resend.findAllByType('ActivityIndicator')).toHaveLength(1);
-        expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+        expect(resend.props.loading).toBe(true);
       }
 
       act(() => {
@@ -300,9 +301,12 @@ describe('EmailOtpForm action labels', () => {
       mounted.update(createElement(EmailOtpForm, { ...props, busy: 'otp-send' }));
     });
 
-    // The inline spinner joins the row; the label keeps its full-width box, so
-    // the row height stays the same between idle and busy.
-    expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(1);
+    // Button owns the busy spinner (from `loading`), so the form adds no child
+    // indicator; the label keeps its full-width box, so the row height stays
+    // the same between idle and busy.
+    const resend = mounted.root.findByProps({ accessibilityLabel: i18n.t('login.resendCode') });
+    expect(resend.props.loading).toBe(true);
+    expect(mounted.root.findAllByType('ActivityIndicator')).toHaveLength(0);
     expect(actionLabel(mounted.root, i18n.t('login.verifyCode')).props.className).toBe(
       idleClasses[0]
     );

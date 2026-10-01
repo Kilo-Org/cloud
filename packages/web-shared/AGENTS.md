@@ -19,3 +19,10 @@ Server code shared by `apps/web` and `apps/ai-gateway`. The code was moved out o
   `apps/web`, including the optional peers that make pnpm resolve the same
   `next` and `@sentry/nextjs` instances as `apps/web`. Two instances of `next`
   break request-scoped APIs such as `headers()`.
+
+## Runtime files
+
+- `src/lib/email.ts` reads `src/emails/*.html` from disk, relative to the app's
+  working directory. Both apps' `next.config.mjs` list those templates in
+  `outputFileTracingIncludes` so Vercel bundles them into every function. Keep
+  any new file read at runtime in that list too.

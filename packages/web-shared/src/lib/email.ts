@@ -91,8 +91,21 @@ export function renderNonAutolinkedText(str: string): RawHtml {
   return new RawHtml(escapeHtml(str).replace(/[/.]/g, '$&&#8203;'));
 }
 
+// Both Next.js apps live at apps/<name> and run with their app directory as the
+// working directory, locally and on Vercel. Each app's next.config.mjs traces
+// these templates into its functions with outputFileTracingIncludes.
+const EMAIL_TEMPLATES_DIR = path.join(
+  process.cwd(),
+  '..',
+  '..',
+  'packages',
+  'web-shared',
+  'src',
+  'emails'
+);
+
 export function renderTemplate(name: string, vars: TemplateVars): string {
-  const templatePath = path.join(process.cwd(), 'src', 'emails', `${name}.html`);
+  const templatePath = path.join(EMAIL_TEMPLATES_DIR, `${name}.html`);
   const html = fs.readFileSync(templatePath, 'utf-8');
   return html.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => {
     if (!(key in vars)) {

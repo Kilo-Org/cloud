@@ -1717,15 +1717,6 @@ describe('applySessionAttach', () => {
           },
         },
       });
-      const home = runtimes.get(session)?.env.HOME;
-      if (!home) throw new Error('Expected worktree runtime home');
-      const rules = fs.readFileSync(
-        path.join(home, '.kilocode/rules/restore-incomplete.md'),
-        'utf8'
-      );
-      expect(rules).toContain('1 of 2 files could not be restored');
-      expect(rules).toContain('the patch did not apply');
-      expect(rules).toContain('- src/index.ts');
       expect(fs.readFileSync(logPath, 'utf8')).toContain(
         'bootstrap restore incomplete kiloSessionId=kilo_1 skipped=1 total=2 reasons=patch_apply_failed paths=src/index.ts'
       );

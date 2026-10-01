@@ -993,15 +993,15 @@ describe('SessionService.resolveWorkspaceTokens', () => {
 });
 
 describe('writeGlobalRules', () => {
-  it('writes the shared Cloud Agent rules for the session', async () => {
+  it('writes the shared Cloud Agent rules sized to the idle timeout', async () => {
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const sandbox = createSandbox(createSession(), false, writeFile);
 
-    await writeGlobalRules(sandbox, '/home/agent_test', 'agent_test');
+    await writeGlobalRules(sandbox, '/home/agent_test', '900000');
 
     expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/.kilocode/rules/cloud-agent.md',
-      buildCloudAgentRules('agent_test')
+      buildCloudAgentRules('900000')
     );
   });
 });

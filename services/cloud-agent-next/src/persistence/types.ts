@@ -147,6 +147,8 @@ export type PersistenceEnv = {
   KILO_OPENROUTER_BASE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
+  /** Kilo server idle timeout override (ms) - defaults to 15 minutes */
+  KILO_SERVER_IDLE_TIMEOUT_MS?: string;
   /** GitHub App slug for git commit attribution (e.g., 'kiloconnect') */
   GITHUB_APP_SLUG?: string;
   /** GitHub App bot user ID for git commit email (e.g., '240665456') */

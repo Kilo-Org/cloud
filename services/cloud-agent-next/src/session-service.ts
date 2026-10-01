@@ -93,6 +93,7 @@ import {
   type WrapperWorkspaceReady,
 } from './shared/wrapper-bootstrap.js';
 import { buildCloudAgentRules } from './shared/cloud-agent-rules.js';
+import { resolveKiloServerIdleTimeoutMs } from './shared/kilo-server-idle-timeout.js';
 import {
   isStrippedGitConfigEnvVar,
   PNPM_STORE_DIR,
@@ -870,14 +871,14 @@ async function cleanupRestoreTokenFile(
 export async function writeGlobalRules(
   sandbox: SandboxInstance,
   sessionHome: string,
-  sessionId: string
+  idleTimeoutMs?: string | number | null
 ): Promise<void> {
   const rulesDir = `${sessionHome}/.kilocode/rules`;
   const rulesPath = `${rulesDir}/cloud-agent.md`;
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(idleTimeoutMs));
 }
 
 function shortHash(input: string): string {
@@ -1281,6 +1282,9 @@ export class SessionService {
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
+      KILO_SERVER_IDLE_TIMEOUT_MS: String(
+        resolveKiloServerIdleTimeoutMs(env.KILO_SERVER_IDLE_TIMEOUT_MS)
+      ),
       // Background subagents let a root session idle before publishing its work,
       // which the platform treats as completion; keep subagents foreground-only.
       KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
@@ -2469,7 +2473,7 @@ export class SessionService {
       await this.sanitizeGitRemote(session, workspacePath, metadata, resolvedTokens);
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
-      await writeGlobalRules(sandbox, sessionHome, sessionId);
+      await writeGlobalRules(sandbox, sessionHome, env.KILO_SERVER_IDLE_TIMEOUT_MS);
 
       const detectedDevcontainer = metadata.workspace?.devcontainerRequested
         ? await detectDevContainer(session, workspacePath)

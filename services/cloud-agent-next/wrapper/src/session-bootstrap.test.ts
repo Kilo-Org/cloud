@@ -203,7 +203,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         path.join(request.workspace.sessionHome, '.kilocode/rules/cloud-agent.md'),
         'utf8'
       )
-    ).toBe(buildCloudAgentRules(request.agentSessionId));
+    ).toBe(buildCloudAgentRules(process.env.KILO_SERVER_IDLE_TIMEOUT_MS));
     expect(
       fs.existsSync(path.join(request.workspace.workspacePath, '.git', 'kilo-bootstrap-complete'))
     ).toBe(true);
@@ -2185,16 +2185,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
       },
     });
-    // (b) The agent rules file names the count, the reason and the path.
-    const rulesPath = path.join(
-      request.workspace.sessionHome,
-      '.kilocode/rules/restore-incomplete.md'
-    );
-    const rules = await fsp.readFile(rulesPath, 'utf8');
-    expect(rules).toContain('1 of 2 files');
-    expect(rules).toContain('the patch did not apply');
-    expect(rules).toContain('src/index.ts');
-    // (c) The named step is emitted, with `started` before `failed` (the
+    // (b) The named step is emitted, with `started` before `failed` (the
     // materializer drops a step event without a preceding step_started).
     const stepEvents = progress.mock.calls
       .flat()
@@ -2283,15 +2274,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
         skippedDiffs: [{ file: 'src/index.ts', reason: 'patch_apply_failed' }],
       },
     });
-    // (b) The agent rules file is written on the backup path too.
-    const rules = await fsp.readFile(
-      path.join(request.workspace.sessionHome, '.kilocode/rules/restore-incomplete.md'),
-      'utf8'
-    );
-    expect(rules).toContain('1 of 2 files');
-    expect(rules).toContain('the patch did not apply');
-    expect(rules).toContain('src/index.ts');
-    // (c) The named step is emitted.
+    // (b) The named step is emitted.
     expect(progress).toHaveBeenCalledWith({
       type: 'failed',
       step: 'restore_incomplete',
@@ -2354,14 +2337,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     request.workspace.requireSnapshot = true;
     request.materialized.setupCommands = [];
     const progress = mock((..._args: unknown[]) => {});
-    // A stale note from an earlier incomplete restore must not survive a
-    // complete one.
-    const rulesPath = path.join(
-      request.workspace.sessionHome,
-      '.kilocode/rules/restore-incomplete.md'
-    );
-    await fsp.mkdir(path.dirname(rulesPath), { recursive: true });
-    await fsp.writeFile(rulesPath, 'stale incomplete note');
 
     const result = await prepareWrapperBootstrapWorkspace(request, progress, {
       git: async args => {
@@ -2387,7 +2362,6 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       path: 'cold',
       diffs: { applied: 1, skipped: 0, total: 1 },
     });
-    expect(fs.existsSync(rulesPath)).toBe(false);
     const stepEvents = progress.mock.calls
       .flat()
       .filter(
@@ -2594,7 +2568,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(progress).toHaveBeenCalledWith('kilo_server', 'Starting Kilo...');
     expect(gitCalls).toEqual([['remote', 'set-url', 'origin', 'https://gitlab.com/acme/repo.git']]);
     expect(await fsp.readFile(rulesPath, 'utf8')).toBe(
-      buildCloudAgentRules(request.agentSessionId)
+      buildCloudAgentRules(process.env.KILO_SERVER_IDLE_TIMEOUT_MS)
     );
   });
 

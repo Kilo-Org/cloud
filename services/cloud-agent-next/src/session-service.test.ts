@@ -3467,6 +3467,21 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
   });
 
+  it('disables the scheduler and cron tools', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+
+    expect(config).toMatchObject({
+      permission: {
+        schedule_wakeup: 'deny',
+        cancel_wakeup: 'deny',
+        cron_create: 'deny',
+        cron_list: 'deny',
+        cron_delete: 'deny',
+      },
+    });
+  });
+
   it.each(['cloud-agent-web', undefined, 'app-builder', 'code-review', 'slack'])(
     'disables Kilo snapshots for %s-origin sessions',
     async createdOnPlatform => {

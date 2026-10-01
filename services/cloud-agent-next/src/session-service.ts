@@ -1349,6 +1349,11 @@ export class SessionService {
       todowrite: 'allow',
       todoread: 'allow',
       suggest: 'deny',
+      schedule_wakeup: 'deny',
+      cancel_wakeup: 'deny',
+      cron_create: 'deny',
+      cron_list: 'deny',
+      cron_delete: 'deny',
     };
 
     if (commandGuardPolicy) {

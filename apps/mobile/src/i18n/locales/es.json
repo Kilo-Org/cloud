@@ -241,6 +241,7 @@
     "addPasskey": "Añadir una clave de acceso",
     "passkeyDefaultName": "Clave de acceso",
     "passkeyAddedOn": "Añadida {{date}}",
+    "passkeyLastUsedOn": "Último uso {{date}}",
     "passkeyAdded": "Clave de acceso añadida.",
     "passkeyAddFailed": "No se pudo añadir una clave de acceso. Inténtalo de nuevo.",
     "passkeyAddUnsupported": "Este dispositivo no puede crear claves de acceso.",

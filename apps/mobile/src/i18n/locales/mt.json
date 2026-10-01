@@ -241,6 +241,7 @@
     "addPasskey": "Żid ċavetta tal-aċċess",
     "passkeyDefaultName": "Ċavetta tal-aċċess",
     "passkeyAddedOn": "Miżjuda {{date}}",
+    "passkeyLastUsedOn": "L-aħħar użu {{date}}",
     "passkeyAdded": "Iċ-ċavetta tal-aċċess miżjuda.",
     "passkeyAddFailed": "Ma setgħetx tiġi miżjuda ċavetta tal-aċċess. Erġa' pprova.",
     "passkeyAddUnsupported": "Dan l-apparat ma jistax joħloq ċwievet tal-aċċess.",

@@ -37840,6 +37840,46 @@
     ],
     "searchBlob": "webhookTriggers.get Get the full configuration and inbound webhook URL for a single webhook trigger by its trigger ID. webhooktriggers get triggerid organizationid triggerId organizationId"
   },
+  "webhookTriggers.getRequestLogs": {
+    "path": "webhookTriggers.getRequestLogs",
+    "kind": "query",
+    "summary": "Retrieve the log details for a specific webhook request received by a trigger, including what happened during that delivery. Use to inspect or debug an individual incoming webhook call.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "triggerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "requestId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "triggerId",
+        "requestId"
+      ],
+      "additionalProperties": false
+    },
+    "tags": [
+      "webhooktriggers",
+      "getrequestlogs",
+      "triggerid",
+      "requestid",
+      "organizationid"
+    ],
+    "searchBlob": "webhookTriggers.getRequestLogs Retrieve the log details for a specific webhook request received by a trigger, including what happened during that delivery. Use to inspect or debug an individual incoming webhook call. webhooktriggers getrequestlogs triggerid requestid organizationid triggerId requestId organizationId"
+  },
   "webhookTriggers.invoke": {
     "path": "webhookTriggers.invoke",
     "kind": "mutation",

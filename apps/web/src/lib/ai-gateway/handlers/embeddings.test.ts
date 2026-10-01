@@ -137,9 +137,22 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
       );
 
       expect(response.status).toBe(200);
-      expect(getUpstreamBody().provider).toEqual({ only: ['openai'], data_collection: 'deny' });
+      expect(getUpstreamBody().provider).toEqual({ data_collection: 'deny' });
     }
   );
+
+  it('routes member provider grants beyond the organization provider list', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes: new Set(['azure', 'virtual']) },
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    const response = await handleEmbeddingsRequest(makeRequest());
+
+    expect(response.status).toBe(200);
+    expect(getUpstreamBody().provider).toEqual({ only: ['azure'], data_collection: 'allow' });
+  });
 
   it('preserves request zdr through group provider overrides', async () => {
     setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai', 'azure'] });

@@ -55,6 +55,9 @@ jobs:
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
 
+      - name: Test meta-janitor approval gates
+        run: node --test scripts/meta-janitor-approve.test.mjs
+
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.

@@ -241,6 +241,7 @@
     "addPasskey": "Afegeix una clau d'accés",
     "passkeyDefaultName": "Clau d'accés",
     "passkeyAddedOn": "Afegida {{date}}",
+    "passkeyLastUsedOn": "Darrer ús {{date}}",
     "passkeyAdded": "Clau d'accés afegida.",
     "passkeyAddFailed": "No s'ha pogut afegir una clau d'accés. Torna-ho a provar.",
     "passkeyAddUnsupported": "Aquest dispositiu no pot crear claus d'accés.",

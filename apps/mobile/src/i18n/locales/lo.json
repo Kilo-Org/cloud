@@ -241,6 +241,7 @@
     "addPasskey": "ເພີ່ມກະແຈເຂົ້າ",
     "passkeyDefaultName": "ກະແຈເຂົ້າ",
     "passkeyAddedOn": "ເພີ່ມເມື່ອ {{date}}",
+    "passkeyLastUsedOn": "ໃຊ້ຄັ້ງສຸດທ້າຍ {{date}}",
     "passkeyAdded": "ເພີ່ມກະແຈເຂົ້າແລ້ວ.",
     "passkeyAddFailed": "ບໍ່ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້. ລອງອີກຄັ້ງ.",
     "passkeyAddUnsupported": "ອຸປະກອນນີ້ສ້າງກະແຈເຂົ້າບໍ່ໄດ້.",

@@ -426,6 +426,19 @@ const existingReviewStateWithHistory: ExistingReviewState = {
 };
 
 describe('generateReviewPrompt (incremental review)', () => {
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+  });
+
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',

@@ -544,6 +544,29 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
+    { model: '~typesafe/jev-latest', provider: 'typesafe' },
+    { model: 'respan/span-01-lite:free', provider: 'respan' },
+    { model: 'jaredpalmer/kev-4b', provider: 'siliconflow' },
+  ])('forwards System One model $model with its fixed provider', async ({ model, provider }) => {
+    setAuth('org-123');
+
+    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.model).toBe(model);
+    const [{ modelId, providerLookup }] = jest.mocked(resolveOrganizationMemberModelDecision).mock
+      .calls[0];
+    expect(modelId).toBe(model);
+    if (!providerLookup) throw new Error('Expected the fixed System One provider lookup');
+    await expect(providerLookup(model)).resolves.toEqual(new Set([provider]));
+    await runAfter();
+    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ requested_model: model })
+    );
+  });
+
+  it.each([
     { eligible: ['typesafe'], expected: { only: ['typesafe'] } },
     { eligible: ['typesafe', 'virtual'], expected: { only: ['typesafe'] } },
     { eligible: undefined, expected: {} },

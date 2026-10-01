@@ -10,6 +10,34 @@ import { providerPrivacySchema } from '../provider-privacy';
 
 export const TYPESAFE_MODEL = 'typesafe/jev-1.13';
 
+/** OpenRouter models whose output modality is `decisions`. */
+const SYSTEM_ONE_MODELS = [
+  TYPESAFE_MODEL,
+  '~typesafe/jev-latest',
+  'inception/mercury-decide:free',
+  'jaredpalmer/kev-4b',
+  'respan/span-01',
+  'respan/span-01-lite',
+  'respan/span-01-lite:free',
+  'togethercomputer/tev1-4b-experimental',
+  'upstage/solar-decide',
+] as const;
+
+type SystemOneModel = (typeof SYSTEM_ONE_MODELS)[number];
+
+/** The OpenRouter provider slug that serves each System One model. */
+export const SYSTEM_ONE_MODEL_PROVIDERS: Readonly<Record<SystemOneModel, string>> = {
+  [TYPESAFE_MODEL]: 'typesafe',
+  '~typesafe/jev-latest': 'typesafe',
+  'inception/mercury-decide:free': 'inception',
+  'jaredpalmer/kev-4b': 'siliconflow',
+  'respan/span-01': 'respan',
+  'respan/span-01-lite': 'respan',
+  'respan/span-01-lite:free': 'respan',
+  'togethercomputer/tev1-4b-experimental': 'together',
+  'upstage/solar-decide': 'upstage',
+};
+
 const entrySchema = z.union([
   z.string(),
   z.record(z.string(), z.json()),
@@ -40,9 +68,9 @@ const questionSchema = z.discriminatedUnion('type', [
 
 export const systemOneRequestSchema = z.object({
   model: z
-    .enum([TYPESAFE_MODEL, 'jev-1.13'])
+    .enum([...SYSTEM_ONE_MODELS, 'jev-1.13'])
     .default(TYPESAFE_MODEL)
-    .transform(() => TYPESAFE_MODEL),
+    .transform(model => (model === 'jev-1.13' ? TYPESAFE_MODEL : model)),
   state: entrySchema,
   provider: providerPrivacySchema.optional(),
   questions: z

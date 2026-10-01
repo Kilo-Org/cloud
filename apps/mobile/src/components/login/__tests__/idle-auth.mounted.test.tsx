@@ -141,10 +141,10 @@ afterEach(async () => {
   await i18n.changeLanguage('en');
 });
 
-async function mountIdleAuth(start: StartFn): Promise<R> {
+async function mountIdleAuth(start: StartFn, onSignInStart?: () => void): Promise<R> {
   const ref: { current: R | undefined } = { current: undefined };
   await act(async () => {
-    ref.current = TestRenderer.create(createElement(IdleAuth, { start }));
+    ref.current = TestRenderer.create(createElement(IdleAuth, { start, onSignInStart }));
     await Promise.resolve();
   });
   const r = ref.current;
@@ -777,6 +777,68 @@ describe('IdleAuth provider label layout', () => {
     });
   });
 });
+describe('IdleAuth new-attempt notification', () => {
+  beforeEach(() => {
+    ssoRecovery.value = null;
+    nativeAuth.busy = undefined;
+    nativeAuth.emailError = undefined;
+    nativeAuth.signInWithApple.mockClear();
+    nativeAuth.signInWithPasskey.mockClear();
+    nativeAuth.requestEmailCode.mockReset();
+    passkeySupport.supported = true;
+    providers.appleAvailable = false;
+    providers.googleConfigured = false;
+  });
+
+  it('notifies at the start of an email sign-in attempt', async () => {
+    nativeAuth.requestEmailCode.mockResolvedValue(true);
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    await act(async () => {
+      (findButton(renderer.root, 'Continue with email').props.onPress as () => void)();
+      await Promise.resolve();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when a provider sign-in starts', async () => {
+    providers.appleAvailable = true;
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with Apple').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('notifies when the passkey ceremony starts', async () => {
+    const onSignInStart = vi.fn<() => void>();
+    const renderer = await mountIdleAuth(vi.fn<StartFn>(), onSignInStart);
+
+    act(() => {
+      (findButton(renderer.root, 'Sign in with a passkey').props.onPress as () => void)();
+    });
+
+    expect(onSignInStart).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
 describe('IdleAuth email continue copy', () => {
   it('shows a Continue button with email accessibility', async () => {
     const start = vi.fn<StartFn>();

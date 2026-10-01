@@ -71,8 +71,6 @@ export type AppleStoreDecodedNotification = {
   notificationUUID: string;
   notificationType: string;
   subtype?: string;
-  /** The App Store `signedDate`, in milliseconds since the epoch. */
-  signedDate?: number;
   environment: AppleStoreEnvironment;
   /**
    * The UNIX time, in milliseconds, that the App Store signed the notification.
@@ -187,7 +185,6 @@ export async function decodeAppleStoreNotificationJws(
     notificationUUID: payload.notificationUUID,
     notificationType: payload.notificationType,
     subtype: payload.subtype,
-    signedDate: payload.signedDate,
     environment: normalizeEnvironment(payload.data?.environment),
     signedDate: payload.signedDate,
     signedTransactionInfo: payload.data?.signedTransactionInfo,

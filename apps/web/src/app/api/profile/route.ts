@@ -1,7 +1,6 @@
 import type { ProfileOrganization } from '@/lib/organizations/organizations';
 import { getUserFromAuth } from '@/lib/user/server';
 import { getProfileOrganizations } from '@/lib/organizations/organizations';
-import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
 import { NextResponse } from 'next/server';
 
 export async function GET(): Promise<
@@ -21,10 +20,6 @@ export async function GET(): Promise<
   const profileOrganizations = await getProfileOrganizations(user.id, {
     excludeAccessBlocked: true,
   });
-  const preferredOrganizationId = await resolvePreferredVerifiedDomainOrganizationId(
-    user,
-    profileOrganizations
-  );
 
   return NextResponse.json({
     user: {
@@ -35,6 +30,6 @@ export async function GET(): Promise<
     },
     organizations: profileOrganizations.length > 0 ? profileOrganizations : undefined,
     hasPersonalAccount: !user.personal_account_disabled,
-    selectedOrganizationId: preferredOrganizationId ?? profileOrganizations[0]?.id,
+    selectedOrganizationId: profileOrganizations[0]?.id,
   });
 }

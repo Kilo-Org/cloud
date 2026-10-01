@@ -560,18 +560,10 @@ function getRefundCycleItemKind(cycleKey: string): KiloPassIssuanceItemKind | nu
 }
 
 /**
- * The store time of an App Store event row: its `signedDate`, or its claim time for a row written
- * before the row kept `signedDate`.
- */
-const appStoreEventTimeMs = sql<number>`COALESCE(
-  (${kilo_pass_store_events.payload_json}->>'signedDate')::double precision,
-  EXTRACT(EPOCH FROM ${kilo_pass_store_events.created_at}) * 1000
-)`;
-
-/**
  * True when a processed event of `notificationTypes` for this transaction is newer in store time
  * than `eventTimeMs`. The newest refund or refund reversal decides the state, so an older event
- * that arrives late changes nothing.
+ * that arrives late changes nothing. Only a row with `signedDate` counts: an older row has only its
+ * arrival time, a different clock, and it predates refund reversal handling, so it decides nothing.
  */
 async function hasNewerAppStoreRefundEvent(
   dbOrTx: DbOrTx,
@@ -589,7 +581,7 @@ async function hasNewerAppStoreRefundEvent(
           params.notificationTypes.map(type => sql`${type}`),
           sql`, `
         )})`,
-        sql`${appStoreEventTimeMs} > ${params.eventTimeMs}`
+        sql`(${kilo_pass_store_events.payload_json}->>'signedDate')::double precision > ${params.eventTimeMs}`
       )
     )
     .limit(1);

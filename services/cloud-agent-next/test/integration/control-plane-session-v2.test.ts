@@ -1079,7 +1079,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
       expect(await wrapperA.next()).toMatchObject({ type: 'session.prepare' });
       if (oldState === 'ready') {
         wrapperA.send({ type: 'session.ready', sessionId });
-        expect(await wrapperA.next()).toMatchObject({
+        expect(await wrapperA.nextSkipping(['worktree.snapshot'])).toMatchObject({
           type: 'session.prompt',
           payload: { messageId: 'old-A' },
         });
@@ -1233,7 +1233,7 @@ describe('SandboxSessionV2 end-to-end with the V2 Sandbox DO and fake wrapper', 
           spec: { attemptId: attemptB.attemptId },
         });
         wrapperB.send({ type: 'session.ready', sessionId });
-        expect(await wrapperB.next()).toMatchObject({
+        expect(await wrapperB.nextSkipping(['worktree.snapshot'])).toMatchObject({
           type: 'session.prompt',
           payload: { messageId: 'new-B' },
         });

@@ -5,10 +5,7 @@
  * instead of a bare progress line.
  */
 
-import {
-  buildRestoreIncompleteReport,
-  type RestoreIncompleteReport,
-} from './restore-outcome.js';
+import { buildRestoreIncompleteReport, type RestoreIncompleteReport } from './restore-outcome.js';
 
 export const RESTORE_INCOMPLETE_STEP_ID = 'phase:restore_incomplete';
 export const RESTORE_INCOMPLETE_LABEL = 'Session restore incomplete';

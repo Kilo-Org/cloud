@@ -2188,6 +2188,8 @@
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
+      "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",

@@ -27,7 +27,7 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
   KiloPassTier,
-} from './enums';
+} from '@/lib/kilo-pass/enums';
 import type * as AppleStoreNotifications from './apple-store-notifications';
 import type { AppleStoreDecodedNotification } from './apple-store-notifications';
 import type { AppleStoreDecodedTransaction } from './apple-store-verifier';

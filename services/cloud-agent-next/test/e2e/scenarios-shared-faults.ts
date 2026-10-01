@@ -1,10 +1,14 @@
 /**
- * Physical-fault scenarios shared by the local Docker and HTTP profiles:
- * `external-kill`, `kill-mid-flight`, `wrapper-freeze-settled-reap` and
- * `wrapper-freeze-inflight-reap`.
+ * Physical-fault scenarios for the new control plane, shared by the local
+ * Docker and HTTP profiles: `external-kill`, `kill-mid-flight`,
+ * `wrapper-freeze-settled-reap`, `wrapper-freeze-inflight-reap` and
+ * `control-socket-recycle-boot`.
  *
- * The induction is the identity-guarded `sandboxFaults` capability: a fault is
- * refused unless the observed container and wrapper process still match the
+ * Each declares `controlPlaneV2` and `controlPlaneRuntime`, so it is
+ * `unsupported` until `E2E_CONTROL_PLANE_V2=1`. Capture uses
+ * `captureControlPlaneFaultTarget`, which proves the owned container runs the
+ * new-plane wrapper before any kill, freeze or socket recycle. A fault is
+ * refused unless the observed container and that wrapper still match the
  * identity captured before the fault, so a replacement is never silently
  * rediscovered and killed/frozen.
  *
@@ -66,17 +70,17 @@ import {
 } from './scenarios-shared-runtime.js';
 import { assertScenarioPreconditions } from './public-surface-support.js';
 import { assertReapOutcome } from './sandbox-fault-evidence.js';
-import { AttachWindowMissedError, type AttachWindowResult } from './attach-window-evidence.js';
-import { healthUnhealthyReason } from '../../src/sandbox-state/allocation/reduce.js';
+import { CONTROL_PLANE_WRAPPER_BASENAME } from './sandbox-control.js';
+
 import type { LifecycleArgs, LifecycleResult } from './lifecycle.js';
 import type {
-  SandboxFaultObservation,
+  ControlPlaneRuntimeObservation,
   SandboxFaultTarget,
   ScenarioEnvironment,
   SessionSandboxObservation,
 } from './scenario-capabilities.js';
 
-const SETTLED_REAP_REASON = healthUnhealthyReason('unresponsive');
+const SETTLED_REAP_REASON = 'health_unhealthy_unresponsive';
 /** Whole-scenario budget for the fault scenarios. */
 const FAULT_TIMEOUT_MS = 15 * 60_000;
 const CONTAINER_BUDGET_MS = 240_000;
@@ -98,15 +102,6 @@ const INFLIGHT_HOLD_DIRECTIVE = 'slow:120:1000:16';
 const PACED_PROGRESS_BUDGET_MS = 90_000;
 /** Bound for the `runtime_unhealthy` terminal after an inflight freeze. */
 const UNHEALTHY_TERMINAL_BUDGET_MS = 8 * 60_000;
-/**
- * Bounded retry for `control-socket-recycle-boot`. Only a positively established
- * window miss retries, each on a fresh session with one signal, because discovery
- * before the signal can let a fast echo finish first.
- */
-const MAX_ATTACH_WINDOW_ATTEMPTS = 3;
-/** Poll interval while waiting for a discarded attempt's turn to settle. */
-const BOOT_SETTLE_POLL_MS = 500;
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -119,35 +114,7 @@ function hasMessageFailed(events: StreamEvent[], messageId: string): boolean {
   );
 }
 
-/**
- * True when the turn already has a terminal failure for the same message. A
- * genuine post-fault failure must fail the scenario even when the capability
- * reports a window miss, so a later attempt cannot pass over it. The stream
- * history is checked first; the durable status catches a failure written but not
- * yet streamed. A miss can be observed while the discarded attempt's turn is
- * still running, so the durable status is observed until the turn settles or the
- * scenario deadline expires; a single non-terminal sample would let a failure
- * that materializes later be retried away.
- */
-async function attachWindowTurnFailed(
-  deadline: ScenarioDeadline,
-  config: DriverConfig,
-  session: WorktreeSessionResult,
-  messageId: string,
-  events: StreamEvent[]
-): Promise<boolean> {
-  if (hasMessageFailed(events, messageId)) return true;
-  for (;;) {
-    const result = await deadline.within('boot durable', signal =>
-      getMessageResult(config, session.cloudAgentSessionId, messageId, signal)
-    );
-    if (result.status === 'failed' || result.status === 'interrupted') return true;
-    if (result.status === 'completed') return false;
-    await sleep(BOOT_SETTLE_POLL_MS);
-  }
-}
-
-async function prepareSession(
+export async function prepareSession(
   creations: InFlightCreations<WorktreeSessionResult>,
   config: DriverConfig,
   prompt: string
@@ -157,15 +124,21 @@ async function prepareSession(
   );
 }
 
+function requireControlPlaneRuntime(env: ScenarioEnvironment): ControlPlaneRuntimeObservation {
+  if (!env.controlPlaneRuntime) throw new Error('controlPlaneRuntime capability is required');
+  return env.controlPlaneRuntime;
+}
+
 /**
- * Capture the guarded fault target: require a present allocation first, then
- * bind the wrapper identity observed for it. A later mismatch fails the
- * induction closed instead of acting on a replacement.
+ * Capture a guarded fault target for the NEW plane: require a present
+ * allocation, prove the owned container runs the new-plane wrapper (which also
+ * captures its identity and so cannot false-pass on a legacy container), and
+ * bind that identity plus the control-plane basename onto the target.
  */
-async function captureFaultTarget(
+export async function captureControlPlaneFaultTarget(
   deadline: ScenarioDeadline,
   sandbox: SessionSandboxObservation,
-  faults: SandboxFaultObservation,
+  controlPlaneRuntime: ControlPlaneRuntimeObservation,
   session: WorktreeSessionResult,
   label: string
 ): Promise<{ allocation: string; target: SandboxFaultTarget }> {
@@ -177,17 +150,17 @@ async function captureFaultTarget(
     CONTAINER_BUDGET_MS
   );
   if (allocation === null) throw new Error(`${label} did not expose an allocation reference`);
-  const identity = await faults.captureWrapperIdentity({
+  const allocationRef = {
     cloudAgentSessionId: session.cloudAgentSessionId,
     kiloSessionId: session.kiloSessionId,
     expectedAllocationRef: allocation,
-  });
+    wrapperProcessBasename: CONTROL_PLANE_WRAPPER_BASENAME,
+  };
+  const identity = await controlPlaneRuntime.proveNewPlane(allocationRef);
   return {
     allocation,
     target: {
-      cloudAgentSessionId: session.cloudAgentSessionId,
-      kiloSessionId: session.kiloSessionId,
-      expectedAllocationRef: allocation,
+      ...allocationRef,
       expectedWrapperInstanceId: identity.instanceId,
     },
   };
@@ -281,6 +254,7 @@ async function runExternalKill(
   const sandbox = sessionSandboxObservation(env);
   const faults = env.sandboxFaults;
   if (!faults) throw new Error('sandboxFaults capability is required');
+  const controlPlaneRuntime = requireControlPlaneRuntime(env);
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
@@ -313,10 +287,10 @@ async function runExternalKill(
     streams.push(boot.stream);
     events.push(...boot.stream.events);
 
-    const { allocation, target } = await captureFaultTarget(
+    const { allocation, target } = await captureControlPlaneFaultTarget(
       deadline,
       sandbox,
-      faults,
+      controlPlaneRuntime,
       session,
       'boot'
     );
@@ -396,6 +370,7 @@ async function runKillMidFlight(
   const sandbox = sessionSandboxObservation(env);
   const faults = env.sandboxFaults;
   if (!faults) throw new Error('sandboxFaults capability is required');
+  const controlPlaneRuntime = requireControlPlaneRuntime(env);
   if (!env.gates) throw new Error('gates capability is required');
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
@@ -448,10 +423,10 @@ async function runKillMidFlight(
       throw new Error(`gate ${gateTag} did not engage before fault injection`);
     }
     await requireRunning(scenarioConfig, session.cloudAgentSessionId, messageId, deadline, 'gate');
-    const { allocation, target } = await captureFaultTarget(
+    const { allocation, target } = await captureControlPlaneFaultTarget(
       deadline,
       sandbox,
-      faults,
+      controlPlaneRuntime,
       session,
       'gate'
     );
@@ -562,6 +537,7 @@ async function runWrapperFreezeSettledReap(
   const sandbox = sessionSandboxObservation(env);
   const faults = env.sandboxFaults;
   if (!faults) throw new Error('sandboxFaults capability is required');
+  const controlPlaneRuntime = requireControlPlaneRuntime(env);
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
@@ -595,10 +571,10 @@ async function runWrapperFreezeSettledReap(
     streams.push(boot.stream);
     events.push(...boot.stream.events);
 
-    const { allocation, target } = await captureFaultTarget(
+    const { allocation, target } = await captureControlPlaneFaultTarget(
       deadline,
       sandbox,
-      faults,
+      controlPlaneRuntime,
       session,
       'boot'
     );
@@ -649,6 +625,7 @@ async function runWrapperFreezeSettledReap(
           Math.min(RECOVERY_BUDGET_MS, deadline.remaining('settled reap evidence'))
         ),
         inflight: false,
+        controlPlane: true,
         signal,
       })
     );
@@ -658,6 +635,7 @@ async function runWrapperFreezeSettledReap(
       replacementAllocationRef: replacement,
       settledReapReason: SETTLED_REAP_REASON,
       inflight: false,
+      controlPlane: true,
     });
 
     result = {
@@ -717,6 +695,7 @@ async function runWrapperFreezeInflightReap(
   const sandbox = sessionSandboxObservation(env);
   const faults = env.sandboxFaults;
   if (!faults) throw new Error('sandboxFaults capability is required');
+  const controlPlaneRuntime = requireControlPlaneRuntime(env);
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
@@ -750,10 +729,10 @@ async function runWrapperFreezeInflightReap(
     streams.push(boot.stream);
     events.push(...boot.stream.events);
 
-    const { allocation, target } = await captureFaultTarget(
+    const { allocation, target } = await captureControlPlaneFaultTarget(
       deadline,
       sandbox,
-      faults,
+      controlPlaneRuntime,
       session,
       'boot'
     );
@@ -796,9 +775,12 @@ async function runWrapperFreezeInflightReap(
     }
     const data = failedEvent.data as { reason?: string; payload?: { reason?: string } } | undefined;
     const reason = data?.reason ?? data?.payload?.reason;
-    if (reason !== 'runtime_unhealthy') {
+    // Spec §11 scenario 11: an accepted message fails `connection_lost` when the
+    // socket stays down until the sandbox stops. `runtime_unhealthy` is the
+    // legacy-plane reason.
+    if (reason !== 'connection_lost') {
       throw new Error(
-        `held message ${held.messageId} terminal reason=${reason ?? 'none'}; expected runtime_unhealthy`
+        `held message ${held.messageId} terminal reason=${reason ?? 'none'}; expected connection_lost`
       );
     }
 
@@ -842,6 +824,7 @@ async function runWrapperFreezeInflightReap(
           Math.min(RECOVERY_BUDGET_MS, deadline.remaining('inflight reap evidence'))
         ),
         inflight: true,
+        controlPlane: true,
         messageId: held.messageId,
         signal,
       })
@@ -852,6 +835,7 @@ async function runWrapperFreezeInflightReap(
       replacementAllocationRef: replacement,
       settledReapReason: SETTLED_REAP_REASON,
       inflight: true,
+      controlPlane: true,
     });
 
     result = {
@@ -860,7 +844,7 @@ async function runWrapperFreezeInflightReap(
       ok: true,
       message:
         `session=${session.cloudAgentSessionId}; frozenPid=${frozen.pid}; ` +
-        `held=${held.messageId}; runtimeUnhealthy=true; settledReap=true; ` +
+        `held=${held.messageId}; reason=connection_lost; settledReap=true; ` +
         `cause=${reapEvidence.physicalStopCause ?? 'none'}; providerStop=${reapEvidence.providerStopObserved}; ` +
         `routeStaleActive=${reapEvidence.routeStaleActive}; reapedRefAbsent=true; ` +
         `replacement=${recovery.messageId}/completed; oldRef=${allocation}!=newRef=${replacement}`,
@@ -893,23 +877,11 @@ async function runWrapperFreezeInflightReap(
 }
 
 /**
- * `control-socket-recycle-boot`: after preparing a session but before its first
- * turn completes, drop the control-plane wrapper's control socket during the
- * first attach and require the production reconnect owner to bring up a new
- * one. The initial message must still complete with the echo intact and exactly
- * one prompt dispatch.
- *
- * The induction is not a deterministic attach gate. The capability fails closed
- * unless the signal is followed by the close/reconnect sequence and no
- * `socket_response` for the attach `requestId` appears before the selected close.
- * A positively established miss (a matching response before that close) is
- * retried on a fresh session with one signal, at most three times; every other
- * capability outcome fails. A `cloud.message.failed` or a durable
- * `failed`/`interrupted` after the capability returns fails the scenario and is
- * never retried as a miss. It can pass on a base tree, because a close that lands
- * while `session.attach` is outstanding is recovered by the already-present
- * unconfirmed-attach release; the unit tests are the discriminator for the
- * prompt-reconcile and prompt-budget branches.
+ * `control-socket-recycle-boot`: as soon as the new-plane wrapper process
+ * exists, send `SIGUSR1` so it drops its control socket and reconnects. The
+ * initial message must still complete with the echo intact, and the allocation
+ * must be the same one. The new plane does not emit the legacy `session.attach`
+ * diagnostic, so this does not wait for that record.
  */
 async function runControlSocketRecycleBoot(
   args: LifecycleArgs,
@@ -921,6 +893,7 @@ async function runControlSocketRecycleBoot(
   const sandbox = sessionSandboxObservation(env);
   const faults = env.sandboxFaults;
   if (!faults) throw new Error('sandboxFaults capability is required');
+  const controlPlaneRuntime = requireControlPlaneRuntime(env);
   const owned = createOwnedSessionRegistry(config, cleanupRemoteSession);
   const scenarioConfig = owned.config;
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
@@ -937,147 +910,100 @@ async function runControlSocketRecycleBoot(
     events,
     durationMs: Date.now() - startedAt,
   });
-  // Every attempt missed, or the pre-signal completion bound was reached.
-  let result: LifecycleResult = fail('attach window missed');
+  let result: LifecycleResult = fail('control socket recycle did not complete');
 
   try {
     assertScenarioPreconditions(scenarioConfig, args.api);
-    for (let attempt = 1; attempt <= MAX_ATTACH_WINDOW_ATTEMPTS; attempt += 1) {
-      const evidenceCursor = await faults.captureWorkerLogCursor();
-      const session = await prepareSession(
-        creations,
-        scenarioConfig,
-        fakeDirective(`echo:boot-${runId}`)
-      );
-      owned.register(session);
+    const session = await prepareSession(
+      creations,
+      scenarioConfig,
+      fakeDirective(`echo:boot-${runId}`)
+    );
+    owned.register(session);
 
-      const { allocation, target } = await captureFaultTarget(
-        deadline,
-        sandbox,
-        faults,
-        session,
-        'boot'
-      );
+    // The new plane does not emit the legacy `session.attach` diagnostic, so
+    // signal as soon as the wrapper process exists, before opening the stream.
+    const { allocation, target } = await captureControlPlaneFaultTarget(
+      deadline,
+      sandbox,
+      controlPlaneRuntime,
+      session,
+      'boot'
+    );
+    const recycled = await faults.recycleWrapperSocket(target);
+    if (!recycled.recycled)
+      throw new Error(`recycleWrapperSocket reported no recycle: ${recycled.detail}`);
 
-      const snapshot = await deadline.within('boot snapshot', signal =>
-        getSessionSnapshot(scenarioConfig, session.cloudAgentSessionId, signal)
-      );
-      const messageId = snapshot.initialMessageId;
-      if (!messageId) throw new Error('boot did not expose an initial message id');
-      const stream = await deadline.within('boot stream', signal =>
-        openConnectedStream(scenarioConfig, session.cloudAgentSessionId, true, undefined, signal)
-      );
-      streams.push(stream);
+    const snapshot = await deadline.within('boot snapshot', signal =>
+      getSessionSnapshot(scenarioConfig, session.cloudAgentSessionId, signal)
+    );
+    const messageId = snapshot.initialMessageId;
+    if (!messageId) throw new Error('boot did not expose an initial message id');
+    const stream = await deadline.within('boot stream', signal =>
+      openConnectedStream(scenarioConfig, session.cloudAgentSessionId, true, undefined, signal)
+    );
+    streams.push(stream);
 
-      // A failure already in history fails; a completion already in history is a
-      // miss (it finished before any fault evidence), so do not signal.
-      if (hasMessageFailed(stream.events, messageId)) {
-        throw new Error(`boot turn ${messageId} failed before the attach-window signal`);
-      }
-      if (stream.events.some(event => isMessageCompleted(event, messageId))) {
-        stream.close();
-        continue;
-      }
-
-      let observed: AttachWindowResult;
-      try {
-        observed = await faults.dropControlSocketDuringAttach({
-          fromByte: evidenceCursor,
-          sessionId: session.cloudAgentSessionId,
-          kiloSessionId: session.kiloSessionId,
-          containerId: allocation,
-          expectedWrapperInstanceId: target.expectedWrapperInstanceId,
-          waitForAttachMs: Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('attach drop'))),
-        });
-      } catch (error) {
-        // Only a positively established window miss retries. A post-signal
-        // failure takes precedence over the miss: a failed or interrupted turn
-        // must fail the scenario rather than be discarded and retried.
-        if (error instanceof AttachWindowMissedError) {
-          if (
-            await attachWindowTurnFailed(
-              deadline,
-              scenarioConfig,
-              session,
-              messageId,
-              stream.events
-            )
-          ) {
-            throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
-          }
-          stream.close();
-          continue;
-        }
-        throw error;
-      }
-
-      // After induction, a failure is terminal: never retried as a miss.
-      if (hasMessageFailed(stream.events, messageId)) {
-        throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
-      }
-
-      const terminal = await stream.waitForTerminal(
-        Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('boot terminal'))),
-        messageId
-      );
-      if (
-        terminal !== null &&
-        terminal.streamEventType === 'cloud.message.failed' &&
-        messageIdFromEvent(terminal) === messageId
-      ) {
-        throw new Error(`boot turn ${messageId} failed after the attach-window signal`);
-      }
-      if (!isMessageCompleted(terminal, messageId)) {
-        throw new Error(`boot turn ${messageId} did not complete after the control-socket recycle`);
-      }
-      const status = await deadline.within('boot durable', signal =>
-        awaitDurableTerminal(
-          scenarioConfig,
-          session.cloudAgentSessionId,
-          messageId,
-          deadline.remaining('boot durable'),
-          signal
-        )
-      );
-      if (status !== 'completed') throw new Error(`boot durable status=${status}`);
-      try {
-        await awaitCorrelatedChildText({
-          stream,
-          parentMessageId: messageId,
-          timeoutMs: Math.max(
-            1,
-            Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
-          ),
-          label: 'boot turn',
-          ready: text => echoPayloadMatches(text, `boot-${runId}`),
-        });
-      } catch {
-        result = fail(`boot turn did not echo boot-${runId}`);
-        break;
-      }
-
-      const promptDispatches = await faults.countPromptDispatches({
-        fromByte: evidenceCursor,
-        sessionId: session.cloudAgentSessionId,
-      });
-      if (promptDispatches !== 1) {
-        throw new Error(`expected exactly 1 prompt dispatch, observed ${promptDispatches}`);
-      }
-
-      events.push(...stream.events);
-      result = {
-        name: scenarioName,
-        conversation,
-        ok: true,
-        message:
-          `session=${session.cloudAgentSessionId}; attachRequestId=${observed.attachRequestId}; ` +
-          `closed=${observed.closedConnectionId}; ready=${observed.readyConnectionId}; ` +
-          `promptDispatches=${promptDispatches}; boot=${messageId}/completed; attempts=${attempt}`,
-        events,
-        durationMs: Date.now() - startedAt,
-      };
-      break;
+    if (hasMessageFailed(stream.events, messageId)) {
+      throw new Error(`boot turn ${messageId} failed after the control-socket recycle`);
     }
+
+    const terminal = await stream.waitForTerminal(
+      Math.max(1, Math.min(TURN_BUDGET_MS, deadline.remaining('boot terminal'))),
+      messageId
+    );
+    if (
+      terminal !== null &&
+      terminal.streamEventType === 'cloud.message.failed' &&
+      messageIdFromEvent(terminal) === messageId
+    ) {
+      throw new Error(`boot turn ${messageId} failed after the control-socket recycle`);
+    }
+    if (!isMessageCompleted(terminal, messageId)) {
+      throw new Error(`boot turn ${messageId} did not complete after the control-socket recycle`);
+    }
+    const status = await deadline.within('boot durable', signal =>
+      awaitDurableTerminal(
+        scenarioConfig,
+        session.cloudAgentSessionId,
+        messageId,
+        deadline.remaining('boot durable'),
+        signal
+      )
+    );
+    if (status !== 'completed') throw new Error(`boot durable status=${status}`);
+    await awaitCorrelatedChildText({
+      stream,
+      parentMessageId: messageId,
+      timeoutMs: Math.max(
+        1,
+        Math.min(CONTENT_CORRELATION_BUDGET_MS, deadline.remaining('boot turn content'))
+      ),
+      label: 'boot turn',
+      ready: text => echoPayloadMatches(text, `boot-${runId}`),
+    });
+    const returned = await waitForPresentAllocation(
+      deadline,
+      sandbox,
+      session,
+      'reconnected',
+      CONTAINER_BUDGET_MS
+    );
+    if (returned !== allocation) {
+      throw new Error(`recycle replaced the allocation ${allocation} -> ${returned ?? 'none'}`);
+    }
+
+    events.push(...stream.events);
+    result = {
+      name: scenarioName,
+      conversation,
+      ok: true,
+      message:
+        `session=${session.cloudAgentSessionId}; recycledPid=${recycled.pid}; ` +
+        `boot=${messageId}/completed; allocation=${allocation}`,
+      events,
+      durationMs: Date.now() - startedAt,
+    };
   } catch (error) {
     result = fail(errorMessage(error));
   } finally {
@@ -1099,7 +1025,7 @@ async function runControlSocketRecycleBoot(
 export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   'external-kill': {
     name: 'external-kill',
-    requires: ['sessionSandbox', 'sandboxFaults'],
+    requires: ['sessionSandbox', 'sandboxFaults', 'controlPlaneRuntime', 'controlPlaneV2'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
@@ -1108,7 +1034,7 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'kill-mid-flight': {
     name: 'kill-mid-flight',
-    requires: ['sessionSandbox', 'sandboxFaults', 'gates'],
+    requires: ['sessionSandbox', 'sandboxFaults', 'gates', 'controlPlaneRuntime', 'controlPlaneV2'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
@@ -1117,7 +1043,7 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'wrapper-freeze-settled-reap': {
     name: 'wrapper-freeze-settled-reap',
-    requires: ['sessionSandbox', 'sandboxFaults'],
+    requires: ['sessionSandbox', 'sandboxFaults', 'controlPlaneRuntime', 'controlPlaneV2'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
@@ -1126,7 +1052,7 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'wrapper-freeze-inflight-reap': {
     name: 'wrapper-freeze-inflight-reap',
-    requires: ['sessionSandbox', 'sandboxFaults'],
+    requires: ['sessionSandbox', 'sandboxFaults', 'controlPlaneRuntime', 'controlPlaneV2'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,
@@ -1135,7 +1061,7 @@ export const FAULT_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'control-socket-recycle-boot': {
     name: 'control-socket-recycle-boot',
-    requires: ['sessionSandbox', 'sandboxFaults'],
+    requires: ['sessionSandbox', 'sandboxFaults', 'controlPlaneRuntime', 'controlPlaneV2'],
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: FAULT_TIMEOUT_MS,

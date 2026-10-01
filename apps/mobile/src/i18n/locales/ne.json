@@ -2188,6 +2188,8 @@
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
+      "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
+      "connectProviderToStart": "सुरु गर्नको लागि प्रदायक जडान गर्नुहोस्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",

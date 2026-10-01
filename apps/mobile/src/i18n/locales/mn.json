@@ -2188,6 +2188,8 @@
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
+      "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",

@@ -2188,6 +2188,8 @@
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
+      "selectRepositoryToStart": "Selecciona un repositorio para comezar.",
+      "connectProviderToStart": "Conecta un provedor para comezar.",
       "promptPlaceholder": "En que che gustaría traballar?",
       "couldNotLoadModels": "Non se puideron cargar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositorio e o modelo da sesión orixinal xa non están dispoñibles. Escólleos a continuación.",

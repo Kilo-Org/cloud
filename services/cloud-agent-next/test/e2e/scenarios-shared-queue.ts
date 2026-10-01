@@ -13,7 +13,10 @@
  * observed on a fast warm-up turn **before** the hold starts, so the hold's
  * action window is not consumed by container readiness. Readiness is attributed
  * with `waitForPacedProgress` and the turn must be `running`, never merely
- * `queued`, before the scenario queues or interrupts behind it.
+ * `queued`, before the scenario queues or interrupts behind it. `queue-overflow`
+ * is the exception: the new plane delivers while its route is `ready`, so it
+ * fills during the cold preparation (the only window where messages stay
+ * `queued`).
  */
 
 import {
@@ -457,22 +460,24 @@ async function queueRapidFireBody(
 }
 
 /**
- * queue-overflow: drive the pending queue up to `PENDING_SESSION_MESSAGE_LIMIT`
- * (10) and assert the next enqueue fails with HTTP 429 (TOO_MANY_REQUESTS).
+ * queue-overflow: fill a cold session's pending queue up to the server bound and
+ * assert the next enqueue fails with HTTP 429 (TOO_MANY_REQUESTS /
+ * PENDING_QUEUE_FULL), then interrupt to clear it.
  *
- * Strategy: hold the first message on a running `slow:120:1000:16` turn so it
- * stays active-but-busy in the wrapper, freeing the pending slot. Then enqueue
- * echoes (pending → capacity) until the server rejects one, within a stated
- * fill budget, and interrupt to clear the queue.
+ * The new plane delivers a message as soon as its route is `ready` (spec §5), so
+ * a message is `queued` only while the route is not ready. Filling immediately
+ * after the cold start — while the first preparation is still running — drives
+ * the bound deterministically on both planes; the boot message occupies one
+ * slot. The interrupt follows the fill at once, so the still-preparing route
+ * cannot deliver the queue before it is cleared.
  */
 async function queueOverflowBody(
   args: LifecycleArgs,
-  env: ScenarioEnvironment
+  _env: ScenarioEnvironment
 ): Promise<LifecycleResult> {
   const startedAt = Date.now();
   const { config, conversation, timeoutMs = QUEUE_OVERFLOW_TIMEOUT_MS, api = 'unified' } = args;
   const scenarioName = 'queue-overflow';
-  const sandbox = sessionSandboxObservation(env);
   const deadline = createScenarioDeadline(startedAt, timeoutMs);
   let stream: StreamConnection | undefined;
 
@@ -486,16 +491,13 @@ async function queueOverflowBody(
   });
 
   try {
-    const hold = await startPacedHold(
-      deadline,
-      config,
-      sandbox,
-      api,
-      'slow:120:1000:16',
-      scenarioName
+    const boot = await deadline.within('boot start', signal =>
+      startSession(config, { prompt: fakeDirective('echo:warmup'), signal }, api)
     );
-    stream = hold.stream;
-    const sessionId = hold.boot.cloudAgentSessionId;
+    const sessionId = boot.cloudAgentSessionId;
+    stream = await deadline.within('boot stream', signal =>
+      openConnectedStream(config, sessionId, true, undefined, signal)
+    );
 
     // Fill the queue until enqueue starts failing with 429. The limit is
     // server-enforced (PENDING_SESSION_MESSAGE_LIMIT). Post-#6660 a ready runtime
@@ -862,7 +864,7 @@ export const QUEUE_SHARED_SCENARIOS: Record<string, SharedScenario> = {
   },
   'queue-overflow': {
     name: 'queue-overflow',
-    requires: ['sessionSandbox'],
+    requires: [],
     defaultConversation: '_',
     defaultTimeoutMs: QUEUE_OVERFLOW_TIMEOUT_MS,
     run: runQueueOverflow,

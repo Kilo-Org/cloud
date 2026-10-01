@@ -29,9 +29,9 @@ const {
   generateSessionIdMock: vi.fn(() => 'agent_12345678-1234-1234-1234-123456789abc'),
   generateSandboxRoutingTargetMock: vi
     .fn()
-    .mockResolvedValue({ kind: 'isolated', sandboxId: 'sb-test-123' }),
+    .mockResolvedValue({ kind: 'isolated', sandboxId: 'ses-0123456789abcdef' }),
   selectSandboxForNewSessionMock: vi.fn().mockResolvedValue({
-    sandboxId: 'sb-test-123',
+    sandboxId: 'ses-0123456789abcdef',
     provider: 'cloudflare',
   }),
   selectSandboxProviderMock: vi.fn(() => 'cloudflare'),
@@ -141,6 +141,7 @@ function createMockDOStub(
 ) {
   return {
     registerSession: overrides.registerSession ?? vi.fn().mockResolvedValue({ success: true }),
+    registerSessionFromMetadata: vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission:
       overrides.createSessionWithInitialAdmission ??
       vi.fn().mockResolvedValue({
@@ -517,8 +518,12 @@ describe('sandbox selection Worker API', () => {
       const metadata = expect.objectContaining({
         workspace: expect.objectContaining({ sandboxAllocation: 'cloudflare-single' }),
       });
-      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(metadata);
-      expect(doStub.registerSession).toHaveBeenCalledWith(metadata);
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata })
+      );
+      expect(doStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({ metadata })
+      );
     }
   );
 });
@@ -554,10 +559,10 @@ describe('prepareSession endpoint', () => {
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
       provider: 'cloudflare',
     });
     selectSandboxProviderMock.mockReturnValue('cloudflare');
@@ -1570,10 +1575,10 @@ describe('start endpoint', () => {
     generateSessionIdMock.mockReturnValue('agent_12345678-1234-1234-1234-123456789abc');
     generateSandboxRoutingTargetMock.mockResolvedValue({
       kind: 'isolated',
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
     });
     selectSandboxForNewSessionMock.mockResolvedValue({
-      sandboxId: 'sb-test-123',
+      sandboxId: 'ses-0123456789abcdef',
       provider: 'cloudflare',
     });
     selectSandboxProviderMock.mockReturnValue('cloudflare');
@@ -2025,7 +2030,7 @@ describe('start endpoint', () => {
     });
     generateSandboxRoutingTargetMock.mockImplementationOnce(async () => {
       steps.push('sandbox');
-      return { kind: 'isolated', sandboxId: 'sb-test-123' };
+      return { kind: 'isolated', sandboxId: 'ses-0123456789abcdef' };
     });
     recordSandboxIdentityMock.mockImplementationOnce(async () => {
       steps.push('sandbox-report');
@@ -2065,7 +2070,7 @@ describe('start endpoint', () => {
     expect(recordSandboxIdentityMock).toHaveBeenCalledWith(
       {
         cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
-        sandboxId: 'sb-test-123',
+        sandboxId: 'ses-0123456789abcdef',
       },
       expect.any(Object)
     );

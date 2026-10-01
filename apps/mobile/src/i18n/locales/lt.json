@@ -2244,6 +2244,8 @@
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
+      "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
+      "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",

@@ -25,10 +25,11 @@
  *
  * `E2E_PROFILE=deployed` switches to the deployed profile: it never loads
  * `.dev.vars`/root env files, never touches Postgres, and selects scenarios
- * from `SHARED_SCENARIOS` (see `test/e2e/README.md`). The default profile is
- * `local`.
+ * from `SHARED_SCENARIOS` (see `test/e2e/README.md`). `E2E_PROFILE=local-http`
+ * drives the local Worker over HTTP only. The default profile is `local`.
  */
 
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -42,9 +43,12 @@ import { DEFAULT_CONFIG, type ApiVersion, type DriverConfig } from './client.js'
 import { bootstrapDeployedProfile, fetchStreamTicket, type DeployedAuth } from './deployed-auth.js';
 import { isControlPlaneOwner, isWorktreeOwner } from '../../src/session-plane.js';
 import type { LifecycleResult } from './lifecycle.js';
-import { runSharedScenario, resolveScenarioApi } from './scenario-capabilities.js';
+import { runSharedScenario, resolveScenarioApi, type Profile } from './scenario-capabilities.js';
 import { SHARED_SCENARIOS, type SharedScenario } from './scenarios-shared.js';
-import { createLocalScenarioEnvironment } from './capabilities-local.js';
+import {
+  createLocalScenarioEnvironment,
+  credentialContainmentEnabled,
+} from './capabilities-local.js';
 import { createDeployedScenarioEnvironment } from './capabilities-deployed.js';
 import { createLocalHttpScenarioEnvironment } from './e2e-surface-client.js';
 
@@ -155,7 +159,7 @@ function printUsage(): void {
   console.error('  per-turn deadline for cold-hot');
   console.error('');
   console.error(
-    'E2E_PROFILE=deployed selects the deployed profile (unified API, except scenarios that pin the legacy prepare flow).'
+    'E2E_PROFILE=local-http|deployed selects an HTTP-only profile (unified API, except scenarios that pin the legacy prepare flow).'
   );
   console.error(
     'Scenarios that require a local-only capability report unsupported on profiles that lack it.'
@@ -276,25 +280,22 @@ function previewEventData(data: Record<string, unknown>): string {
 type ParsedArgs = NonNullable<ReturnType<typeof parseArgs>>;
 
 /**
- * Resolve `E2E_PROFILE`. Unset/empty/whitespace and `local` select the local
- * profile; `deployed` selects the deployed profile. Any other value is a
- * configuration error rather than a silent fallback.
+ * Resolve the profile from `E2E_PROFILE`: `local` (unset, empty or whitespace),
+ * `local-http` or `deployed`. The older `E2E_LOCAL_HTTP=1` still turns a `local`
+ * selection into `local-http`. Any other value is a configuration error rather
+ * than a silent fallback.
  */
-function resolveProfile(): 'local' | 'deployed' {
-  const raw = process.env.E2E_PROFILE;
+export function resolveProfile(env: Record<string, string | undefined> = process.env): Profile {
+  const raw = env.E2E_PROFILE;
   const value = raw?.trim() ?? '';
-  if (value === '' || value === 'local') return 'local';
-  if (value === 'deployed') return 'deployed';
-  console.error(`invalid E2E_PROFILE: ${raw} (expected "local" or "deployed")`);
+  if (value === '' || value === 'local') return env.E2E_LOCAL_HTTP === '1' ? 'local-http' : 'local';
+  if (value === 'local-http' || value === 'deployed') return value;
+  console.error(`invalid E2E_PROFILE: ${raw} (expected "local", "local-http" or "deployed")`);
   printUsage();
   process.exit(2);
 }
 
 async function runLocal(parsed: ParsedArgs): Promise<void> {
-  if (process.env.E2E_LOCAL_HTTP === '1') {
-    await runLocalHttp(parsed);
-    return;
-  }
   const { lifecycle, conversation, verbose, timeoutMs: requestedTimeoutMs } = parsed;
   const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
@@ -307,7 +308,11 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
   loadRepoEnvFiles(SERVICE_PACKAGE_DIR);
   const devVars = loadDevVars(SERVICE_PACKAGE_DIR);
   const seededEmail = process.env.E2E_USER_EMAIL?.trim();
-  const email = seededEmail ?? `kilo-e2e-driver-${Date.now()}${DRIVER_USER_EMAIL_SUFFIX}`;
+  // Parallel matrix children start in the same millisecond, so the clock alone
+  // collides on the unique email.
+  const email =
+    seededEmail ??
+    `kilo-e2e-driver-${Date.now()}-${randomUUID().slice(0, 8)}${DRIVER_USER_EMAIL_SUFFIX}`;
   const user = seededEmail
     ? await loadExistingUserByEmail(process.env.DATABASE_URL, seededEmail)
     : await ensureTestUser(process.env.DATABASE_URL, email, {
@@ -350,7 +355,9 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
     config,
     conversation,
     api,
-    env: createLocalScenarioEnvironment(),
+    env: createLocalScenarioEnvironment({
+      credentialContainmentEnabled: credentialContainmentEnabled(devVars),
+    }),
     ...timeoutRequestArgs(definition, requestedTimeoutMs),
   });
   printResult(result, { verbose });
@@ -360,7 +367,7 @@ async function runLocal(parsed: ParsedArgs): Promise<void> {
 type DeployedProfileEnv = ReturnType<typeof bootstrapDeployedProfile>;
 
 /**
- * `E2E_LOCAL_HTTP=1`: the local Worker and its public tunnels, driven with the
+ * `E2E_PROFILE=local-http`: the local Worker and its public tunnels, driven with the
  * deployed-style auth composition (a real personal token plus backend stream
  * tickets) and the HTTP-only capability set. There is no Docker fallback, so it
  * dispatches only from `SHARED_SCENARIOS`.
@@ -370,7 +377,7 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
   const definition = SHARED_SCENARIOS[lifecycle];
   if (!definition) {
     console.error(
-      `${lifecycle} is not a shared scenario; E2E_LOCAL_HTTP=1 supports: ` +
+      `${lifecycle} is not a shared scenario; the local-http profile supports: ` +
         Object.keys(SHARED_SCENARIOS).join(', ')
     );
     process.exit(2);
@@ -378,7 +385,7 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
   const api = requireScenarioApi(definition, parsed.api);
   if (parsed.api === 'legacy' && definition.defaultApi !== 'legacy') {
     console.error(
-      'E2E_LOCAL_HTTP=1 supports the unified API only; rerun without --api=legacy. ' +
+      'The local-http profile supports the unified API only; rerun without --api=legacy. ' +
         '(Scenarios that pin the legacy prepare flow select it themselves.)'
     );
     process.exit(2);
@@ -399,6 +406,7 @@ async function runLocalHttp(parsed: ParsedArgs): Promise<void> {
       surfaceUrl: config.workerUrl,
       bearerToken: auth.token,
       internalApiSecret: config.internalApiSecret,
+      credentialContainmentEnabled: credentialContainmentEnabled(loadDevVars(SERVICE_PACKAGE_DIR)),
     }),
     ...timeoutRequestArgs(definition, timeoutMs),
   });
@@ -487,16 +495,19 @@ async function main(): Promise<void> {
     printUsage();
     process.exit(2);
   }
-  if (resolveProfile() === 'deployed') {
+  const profile = resolveProfile();
+  if (profile === 'deployed') {
     await runDeployed(parsed);
-    return;
+  } else if (profile === 'local-http') {
+    await runLocalHttp(parsed);
+  } else {
+    await runLocal(parsed);
   }
-  await runLocal(parsed);
 }
 
-// Only run as a CLI when this file is executed directly. `smoke.ts` imports
-// `printResult` from here, and without this guard `main()` would fire at
-// module-load time and kill the smoke matrix before it starts.
+// Only run as a CLI when this file is executed directly. `matrix.ts` imports
+// `resolveProfile` from here, and without this guard `main()` would fire at
+// module-load time and kill the matrix runner before it starts.
 const invokedDirectly = process.argv[1]
   ? fileURLToPath(import.meta.url) === path.resolve(process.argv[1])
   : false;

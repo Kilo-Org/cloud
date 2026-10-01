@@ -1,6 +1,6 @@
 import '../lib/load-env';
 import { sql } from 'drizzle-orm';
-import { db } from '../lib/drizzle';
+import { db } from '@/lib/drizzle';
 
 function quotePostgresIdentifier(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`;

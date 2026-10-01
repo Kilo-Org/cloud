@@ -2188,6 +2188,8 @@
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
+      "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
+      "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "prefillRepoAndModelUnavailable": "คลังโค้ดและโมเดลของเซสชันเดิมใช้ไม่ได้แล้ว เลือกคลังโค้ดและโมเดลใหม่ด้านล่าง",

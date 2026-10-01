@@ -134,13 +134,14 @@ function buildDevContainerTrustEnv(sessionHome: string): Record<string, string> 
 }
 
 /**
- * Pinned kilo CLI version installed *inside* the dev container.
+ * Pinned kilo CLI version installed in the sandbox and the dev container.
  *
- * Keep this in sync with `KILOCODE_CLI_VERSION` in `Dockerfile.dind` /
- * `wrangler.jsonc#image_vars` so the kilo running in the dev container
- * matches the one we use on the outer sandbox.
+ * Single source of truth: `src/shared/kilo-cli-version.ts`. The Dockerfiles,
+ * `wrangler.jsonc#image_vars`, both `@kilocode/sdk` manifests and the generated
+ * slash-command stamp are asserted against it by `devcontainer.test.ts`.
+ * Re-exported here for existing importers.
  */
-export const KILO_CLI_VERSION = '7.8.1';
+export { KILO_CLI_VERSION } from '../shared/kilo-cli-version.js';
 
 const DEVCONTAINER_RUNTIME_BUN_VERSION = '1.3.14';
 const DEVCONTAINER_RUNTIME_BOOTSTRAP_TIMEOUT_MS = 10 * 60 * 1000;

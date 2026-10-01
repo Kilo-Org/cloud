@@ -2188,6 +2188,8 @@
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
+      "selectRepositoryToStart": "Kies 'n bewaarplek om te begin.",
+      "connectProviderToStart": "Koppel 'n verskaffer om te begin.",
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
       "prefillRepoAndModelUnavailable": "Die oorspronklike sessie se bewaarplek en model is nie meer beskikbaar nie. Kies hieronder 'n nuwe bewaarplek en model.",

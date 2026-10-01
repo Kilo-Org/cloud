@@ -129,9 +129,9 @@ export function trackStartedSession(
 ): DriverConfig {
   return {
     ...config,
-    onSessionCreated: sessionId => {
+    onSessionCreated: (sessionId, kiloSessionId) => {
       onTracked(sessionId);
-      config.onSessionCreated?.(sessionId);
+      config.onSessionCreated?.(sessionId, kiloSessionId);
     },
   };
 }
@@ -212,9 +212,9 @@ export function createOwnedSessionRegistry(
 
   const composed: DriverConfig = {
     ...config,
-    onSessionCreated: id => {
-      if (!owned.has(id)) owned.set(id, undefined);
-      config.onSessionCreated?.(id);
+    onSessionCreated: (id, kiloSessionId) => {
+      if (owned.get(id) === undefined) owned.set(id, kiloSessionId);
+      config.onSessionCreated?.(id, kiloSessionId);
     },
   };
   return {

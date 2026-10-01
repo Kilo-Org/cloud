@@ -2188,6 +2188,8 @@
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
+      "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
       "prefillRepoAndModelUnavailable": "İlkin sessiyanın repozitoriyası və modeli artıq əlçatan deyil. Aşağıdan repozitoriya və model seç.",

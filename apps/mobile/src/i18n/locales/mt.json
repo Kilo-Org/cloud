@@ -2272,6 +2272,8 @@
       "leaveChanges": "Ħalli l-bidliet",
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
+      "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
+      "connectProviderToStart": "Ikkonnettja fornitur biex tibda.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
       "prefillRepoAndModelUnavailable": "Ir-repożitorju u l-mudell tas-sessjoni oriġinali m'għadhomx disponibbli. Agħżel oħrajn hawn taħt.",

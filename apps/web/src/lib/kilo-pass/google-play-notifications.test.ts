@@ -21,7 +21,7 @@ import {
   KiloPassTier,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
-} from './enums';
+} from '@/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
@@ -1016,7 +1016,8 @@ describe('processGooglePlayKiloPassNotification', () => {
         .update(kilocode_users)
         .set({ microdollars_used: paid!.kilo_pass_threshold! })
         .where(eq(kilocode_users.id, user.id));
-      const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
+      const { maybeIssueKiloPassBonusFromUsageThreshold } =
+        await import('@/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({
           kiloUserId: user.id,
@@ -1660,7 +1661,8 @@ describe('processGooglePlayKiloPassNotification', () => {
       .update(kilocode_users)
       .set({ microdollars_used: after!.kilo_pass_threshold! })
       .where(eq(kilocode_users.id, user.id));
-    const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
+    const { maybeIssueKiloPassBonusFromUsageThreshold } =
+      await import('@/lib/kilo-pass/usage-triggered-bonus');
     const issue = () =>
       maybeIssueKiloPassBonusFromUsageThreshold({
         kiloUserId: user.id,
@@ -2113,7 +2115,8 @@ describe('processGooglePlayKiloPassNotification', () => {
         expect(pendingCancel?.status).toBe('active');
         expect(pendingCancel?.cancel_at_period_end).toBe(true);
       }
-      const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
+      const { maybeIssueKiloPassBonusFromUsageThreshold } =
+        await import('@/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
       await db

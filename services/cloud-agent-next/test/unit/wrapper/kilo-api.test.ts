@@ -5,6 +5,7 @@ import {
   type KiloEvent,
   type WrapperKiloClient,
 } from '../../../wrapper/src/kilo-api.js';
+import { KILO_CLI_VERSION } from '../../../src/shared/kilo-cli-version.js';
 import { createKiloClient, type KiloClient as SDKClient } from '@kilocode/sdk';
 import type { SessionPromptResponse } from '@kilocode/sdk/v2';
 import { isDefaultSessionTitle } from '@kilocode/session-ingest-contracts';
@@ -542,7 +543,7 @@ describe('createWrapperKiloClient session initialization', () => {
       slug: 'kilo_sess',
       directory: workspacePath,
       title: 'New session - ' + new Date(body.timeCreated).toISOString(),
-      version: '7.8.1',
+      version: KILO_CLI_VERSION,
       timeCreated: expect.any(Number),
       timeUpdated: body.timeCreated,
     });

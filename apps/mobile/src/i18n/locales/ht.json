@@ -2188,6 +2188,8 @@
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
+      "selectRepositoryToStart": "Chwazi yon depo pou kòmanse.",
+      "connectProviderToStart": "Konekte yon founisè pou kòmanse.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",
       "prefillRepoAndModelUnavailable": "Depo ak modèl sesyon orijinal la pa disponib ankò. Chwazi lòt anba a.",

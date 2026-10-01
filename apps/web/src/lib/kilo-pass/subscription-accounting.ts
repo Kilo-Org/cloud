@@ -3,8 +3,8 @@ import { and, desc, eq, lte, sql } from 'drizzle-orm';
 
 import type { DrizzleTransaction } from '@/lib/drizzle';
 import { toMicrodollars } from '@/lib/microdollars';
-import { getPausedMonthSet } from './pause-events';
-import { getPreviousIssueMonth } from './stripe-handlers-utils';
+import { getPausedMonthSet } from '@/lib/kilo-pass/pause-events';
+import { getPreviousIssueMonth } from '@/lib/kilo-pass/stripe-handlers-utils';
 
 export async function updateKiloPassThresholdAfterBaseCredits(
   tx: DrizzleTransaction,

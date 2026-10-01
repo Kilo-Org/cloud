@@ -55,6 +55,9 @@ jobs:
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
 
+      - name: Test meta-janitor approval gates
+        run: node --test scripts/meta-janitor-approve.test.mjs
+
       # dorny/paths-filter has no built-in retry: one dropped connection to
       # api.github.com ("other side closed" while listing the PR's changed
       # files) fails the step and, with it, every check that needs this job.
@@ -82,6 +85,7 @@ jobs:
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
+              - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/deploy-infra/builder/**'
               - 'package.json'
@@ -115,6 +119,7 @@ jobs:
               - 'packages/db/**'
               - 'packages/encryption/**'
               - 'packages/trpc/**'
+              - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/deploy-infra/builder/**'
               - 'package.json'
@@ -320,11 +325,8 @@ jobs:
         # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
         run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter container-usage-meter test:postgres
 
-      - name: Run control-plane ingest Postgres and Durable Object regression
-        env:
-          NODE_ENV: development
-          CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: ${{ env.POSTGRES_URL }}
-        run: pnpm --filter cloudflare-session-ingest exec vitest run --config vitest.postgres.config.ts
+      - name: Run Session Ingest Durable Object regressions
+        run: pnpm --filter cloudflare-session-ingest run test:integration
 
   build:
     needs: [changes, typecheck, lint, format-check, drizzle-check]

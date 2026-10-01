@@ -2188,6 +2188,8 @@
       "leaveChanges": "മാറ്റങ്ങൾ നിലനിർത്തുക",
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
+      "selectRepositoryToStart": "ആരംഭിക്കാൻ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
+      "connectProviderToStart": "ആരംഭിക്കാൻ ഒരു സേവനദാതാവിനെ കണക്റ്റ് ചെയ്യുക.",
       "promptPlaceholder": "എന്ത് ജോലിയാണ് ചെയ്യേണ്ടത്?",
       "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "prefillRepoAndModelUnavailable": "മൂല സെഷന്റെ റിപ്പോസിറ്ററിയും മോഡലും ഇനി ലഭ്യമല്ല. പകരമുള്ളവ താഴെ തിരഞ്ഞെടുക്കുക.",

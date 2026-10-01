@@ -2188,6 +2188,8 @@
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
+      "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
+      "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
       "prefillRepoAndModelUnavailable": "Бастапқы сессияның репозиторийі мен моделі енді қолжетімсіз. Оларды төменде таңдаңыз.",

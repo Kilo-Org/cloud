@@ -1675,6 +1675,8 @@
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
+      "selectRepositoryToStart": "選取儲存庫以開始。",
+      "connectProviderToStart": "連結平台以開始。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",

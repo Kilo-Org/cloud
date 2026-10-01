@@ -7,7 +7,7 @@ export const TOPUP_CANCELED_QUERY_STRING_KEY = 'topup-canceled';
 export const DEFAULT_MEMBER_DAILY_LIMIT_USD = 25.0;
 export const STRIPE_SUB_QUERY_STRING_KEY = 'subscription_session_id';
 
-import type { BillingCycle, OrganizationPlan } from './organization-types';
+import type { BillingCycle, OrganizationPlan } from '@/lib/organizations/organization-types';
 
 // Per-seat monthly rate indexed by plan and billing cycle
 export const SEAT_PRICING = {

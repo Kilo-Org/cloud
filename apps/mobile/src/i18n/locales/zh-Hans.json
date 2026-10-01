@@ -1675,6 +1675,8 @@
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
+      "selectRepositoryToStart": "选择仓库以开始。",
+      "connectProviderToStart": "连接代码托管平台以开始。",
       "promptPlaceholder": "你想完成什么任务？",
       "couldNotLoadModels": "无法加载模型。",
       "prefillRepoAndModelUnavailable": "原会话的仓库和模型已不可用。请在下方重新选择。",

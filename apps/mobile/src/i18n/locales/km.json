@@ -2188,6 +2188,8 @@
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",
+      "selectRepositoryToStart": "ដើម្បីចាប់ផ្តើម សូមជ្រើសរើសឃ្លាំងកូដ។",
+      "connectProviderToStart": "ដើម្បីចាប់ផ្តើម សូមភ្ជាប់អ្នកផ្តល់សេវា។",
       "promptPlaceholder": "តើអ្នកចង់ធ្វើការលើអ្វី?",
       "couldNotLoadModels": "មិនអាចផ្ទុកម៉ូដែលបានទេ។",
       "prefillRepoAndModelUnavailable": "ឃ្លាំងកូដ និងម៉ូដែលរបស់វគ្គដើមលែងអាចប្រើបានទៀតហើយ។ សូមជ្រើសរើសឃ្លាំងកូដ និងម៉ូដែលខាងក្រោម។",

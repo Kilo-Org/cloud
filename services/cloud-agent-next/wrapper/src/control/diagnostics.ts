@@ -28,6 +28,12 @@ type Options = {
 
 type PendingBatch = { id: string; body: string; sequence: number; attempts: number };
 
+const TERMINAL_SOCKET_PHASES = new Set([
+  'hello_rejected',
+  'reconnect_exhausted',
+  'explicitly_closed',
+]);
+
 function isTerminalRecord(record: ControlDiagnosticRecord): boolean {
   const { event, fields } = record;
   if (event === 'wrapper.lifecycle')
@@ -41,6 +47,8 @@ function isTerminalRecord(record: ControlDiagnosticRecord): boolean {
       fields.phase === 'deadline_expired'
     );
   }
+  if (event === 'control.socket')
+    return fields.phase !== undefined && TERMINAL_SOCKET_PHASES.has(fields.phase);
   return (
     event === 'session.execution' &&
     (fields.status !== undefined ||

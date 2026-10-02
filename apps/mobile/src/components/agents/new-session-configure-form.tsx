@@ -17,7 +17,6 @@ import { NewSessionPrompt } from '@/components/agents/new-session-prompt';
 import { NewSessionRepositorySection } from '@/components/agents/new-session-repository-section';
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
-import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal-scroll';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -166,7 +165,6 @@ export function NewSessionConfigureForm({
   // taller than the lifted viewport, and without the restore the card's top
   // edge (rounded corner, top padding, the prompt's first line) comes back
   // clipped under the header.
-  const composerReveal = useComposerRevealScroll();
   // The pinned footer's single source of bottom clearance: it clears the system
   // navigation bar under Start. Without it the primary action can sit in the
   // bar's translucent region a formSheet leaves exposed below itself (the
@@ -206,32 +204,15 @@ export function NewSessionConfigureForm({
 
   const body = (
     <ScrollView
-      ref={composerReveal.scrollRef}
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
-      onLayout={event => {
-        // The one layout feeds both consumers: the form frame height sets the
-        // prompt's input floor, and the hook's viewport height drives the reveal.
-        handleScrollFrameLayout(event);
-        composerReveal.onViewportLayout(event.nativeEvent.layout.height);
-      }}
-      onScroll={event => {
-        composerReveal.onScroll(event.nativeEvent.contentOffset.y);
-      }}
-      scrollEventThrottle={16}
-      onScrollBeginDrag={() => {
-        composerReveal.onUserScroll();
-      }}
+      onLayout={handleScrollFrameLayout}
     >
       <View
         onLayout={event => {
-          composerReveal.onComposerLayout({
-            y: event.nativeEvent.layout.y,
-            height: event.nativeEvent.layout.height,
-          });
           const nextTop = Math.max(Math.round(event.nativeEvent.layout.y), 0);
           setComposerTop(current => (current === nextTop ? current : nextTop));
         }}

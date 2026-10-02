@@ -89,6 +89,10 @@
             "message": "FlashList is the app's list component."
           },
           {
+            "name": "@expo/ui/community/bottom-sheet",
+            "message": "Use Sheet from @/components/ui/sheet."
+          },
+          {
             "name": "@gorhom/bottom-sheet",
             "message": "Use Sheet from @/components/ui/sheet."
           },

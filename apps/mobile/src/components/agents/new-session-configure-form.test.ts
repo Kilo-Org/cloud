@@ -299,30 +299,6 @@ function findElement(node: Node, typeName: string): ElementNode {
   return null;
 }
 
-/** The first node below the ScrollView carrying an `onLayout` (the composer wrapper). */
-function findOnLayoutHandler(
-  node: Node
-): ((event: { nativeEvent: { layout: { y: number; height: number } } }) => void) | null {
-  if (node === null || typeof node !== 'object') {
-    return null;
-  }
-  const props = node.props ?? {};
-  const children = props.children;
-  const type = (node as { type?: unknown }).type;
-  if (type !== 'ScrollView' && typeof props.onLayout === 'function') {
-    return props.onLayout as (event: {
-      nativeEvent: { layout: { y: number; height: number } };
-    }) => void;
-  }
-  for (const child of Array.isArray(children) ? children : [children]) {
-    const found = findOnLayoutHandler(child as Node);
-    if (found) {
-      return found;
-    }
-  }
-  return null;
-}
-
 /** The pinned footer's own bottom padding — the form's single clearance source. */
 function findFooterPaddingBottom(node: Node): number | null {
   const lift = findElementByType(node, 'KeyboardAvoidingView');
@@ -1182,64 +1158,5 @@ describe('NewSessionConfigureForm', () => {
     expect(findElementByType(element, 'ScrollView')?.onLayout).toEqual(expect.any(Function));
     // The mocked useState holds the initial measurement (0) and never setStates.
     expect(findElementByType(element, 'NewSessionPrompt')?.frameHeight).toBe(0);
-  });
-
-  // ── Case 16: reveal the composer card's bottom row above the IME ──
-  it('scrolls the composer card bottom above the keyboard once it opens', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    const scrollView = findElementByType(element, 'ScrollView');
-    if (!scrollView) {
-      throw new Error('expected the form to render a ScrollView');
-    }
-    const scrollTo = vi.fn();
-    // The hook's ScrollView ref is the reveal's target; the plain-function
-    // mount leaves it on the element props (ref is a regular prop in React 19).
-    (scrollView.ref as { current: unknown }).current = { scrollTo };
-
-    // The keyboard-lift view shrinks the scroll viewport once the IME is up.
-    (scrollView.onLayout as (event: unknown) => void)({
-      nativeEvent: { layout: { height: 380 } },
-    });
-
-    // The composer card sits 16pt below the content top and is 420pt tall, so
-    // its bottom edge is 56pt below the lifted viewport bottom.
-    const onComposerLayout = findOnLayoutHandler(element);
-    if (!onComposerLayout) {
-      throw new Error('expected the composer wrapper to carry an onLayout');
-    }
-    onComposerLayout({ nativeEvent: { layout: { y: 16, height: 420 } } });
-
-    // Nothing moves while the keyboard is down — the keyboard-down state is untouched.
-    expect(scrollTo).not.toHaveBeenCalled();
-
-    keyboardSubscribers.show?.();
-    expect(scrollTo).toHaveBeenCalledTimes(1);
-    expect(scrollTo).toHaveBeenCalledWith({ y: 56, animated: false });
-  });
-
-  // ── Case 17: the restore needs the user's live offset ──
-  it('feeds the ScrollView onScroll into the composer reveal', async () => {
-    const { NewSessionConfigureForm } = await import('./new-session-configure-form');
-
-    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
-    const element = NewSessionConfigureForm(defaultProps()) as Node;
-
-    const scrollView = findElementByType(element, 'ScrollView');
-    if (!scrollView) {
-      throw new Error('expected the form to render a ScrollView');
-    }
-    // Dropping either wiring would silently disable the keyboard-hide restore.
-    expect(typeof scrollView.onScroll).toBe('function');
-    expect(scrollView.scrollEventThrottle).toBe(16);
-
-    // The handler is the hook's `onScroll`: it must forward the native offset.
-    const onScroll = scrollView.onScroll as (event: unknown) => void;
-    expect(() => {
-      onScroll({ nativeEvent: { contentOffset: { y: 120 } } });
-    }).not.toThrow();
   });
 });

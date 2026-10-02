@@ -1,7 +1,7 @@
 import { AlertCircle, Share, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResumableZoom } from 'react-native-zoom-toolkit';
@@ -11,6 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { StateSurface } from '@/components/centered-state-surface';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Image } from '@/components/ui/image';
+import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -20,9 +21,13 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
  * raw gestures. This file is the only place that imports the zoom library; see
  * the "Unified Elements" table in `apps/mobile/AGENTS.md`.
  *
- * The viewer keeps RN `Modal`: it must present above the session page sheet,
- * where a `@rn-primitives/portal` overlay would render behind it.
+ * The viewer is a native sheet at the full detent, so it presents above the
+ * session page sheet — also a native sheet — where a `@rn-primitives/portal`
+ * overlay would render behind it.
  */
+
+/** The one detent: the whole window. */
+const VIEWER_SNAP_POINTS = ['100%'];
 
 /** Zoom limits: 1x at content fit, 5x at the deepest zoom. */
 const VIEWER_MAX_SCALE = 5;
@@ -38,7 +43,7 @@ type ImageViewerProps = {
   /** Omit to hide the share action entirely. */
   onShare?: () => void;
   sharing?: boolean;
-  /** Share failure message. Rendered inline — the toast layer sits behind this modal. */
+  /** Share failure message. Rendered inline — the toast layer sits behind this surface. */
   shareError?: string | null;
   onClose: () => void;
 };
@@ -55,6 +60,9 @@ export function ImageViewer({
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  // iOS presents the sheet below the status bar; Android expands it over the
+  // status bar, so only Android pads the header by the top inset.
+  const headerTopInset = Platform.OS === 'ios' ? 0 : insets.top;
 
   // Landscape side safe areas (notch/Dynamic Island, Android cutouts) shift the
   // header row off the sensor on this full-screen modal. They go on an inner
@@ -100,25 +108,17 @@ export function ImageViewer({
   );
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      // RN locks a full-screen modal on iPhone to portrait unless it lists the
-      // orientations it supports (RCTModalHostView falls back to
-      // UIInterfaceOrientationMaskPortrait when the prop is unset). With
-      // rotation enabled app-wide, an unset prop keeps the viewer's content at
-      // portrait bounds in a landscape window: the header still shows at the
-      // top, but the image area runs past the visible screen and clips the
-      // photo at the bottom (e11 viewer-landscape spot defect). Android
-      // dialogs follow the activity, so the prop is inert there.
-      supportedOrientations={['portrait', 'landscape']}
-      backdropColor={colors.background}
-      animationType="fade"
-      onRequestClose={onClose}
+      onClose={onClose}
+      snapPoints={VIEWER_SNAP_POINTS}
+      showHandle={false}
+      background={colors.background}
     >
       <StateSurface className="flex-1 bg-background">
         <View
           className="border-b border-border bg-background"
-          style={{ paddingTop: insets.top, height: insets.top + 56 }}
+          style={{ paddingTop: headerTopInset, height: headerTopInset + 56 }}
         >
           <View
             className="flex-1 flex-row items-center justify-between px-4"
@@ -146,8 +146,8 @@ export function ImageViewer({
             ) : null}
           </View>
         </View>
-        {/* RNGH gestures need their own root inside an RN Modal — the app-root
-            GestureHandlerRootView does not reach a Modal's native view hierarchy. */}
+        {/* RNGH gestures need their own root inside the sheet — the app-root
+            GestureHandlerRootView does not reach the sheet's native window. */}
         <GestureHandlerRootView className="flex-1">
           <View className="flex-1 items-center justify-center overflow-hidden bg-black">
             {/* Mounted only while the viewer is open and the bitmap decodes, so
@@ -197,6 +197,6 @@ export function ImageViewer({
           </View>
         ) : null}
       </StateSurface>
-    </Modal>
+    </Sheet>
   );
 }

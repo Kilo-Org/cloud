@@ -8,7 +8,6 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   Platform: { OS: 'android' as const },
   Pressable: 'Pressable',
   View: 'View',
@@ -257,18 +256,20 @@ describe('ImageViewer mounted', () => {
     renderer.unmount();
   });
 
-  it('supports landscape so a full-screen modal is never portrait-locked', async () => {
+  it('presents as a full-window sheet, which the platform rotates with the app', async () => {
     const renderer = await mountViewer({ onShare: () => undefined });
 
-    // e11 viewer-landscape: RN locks a full-screen modal on iPhone to portrait
-    // unless the Modal lists the orientations it supports. With rotation
-    // enabled app-wide, an unset prop kept the viewer's content at portrait
-    // bounds in a landscape window and clipped the photo at the screen bottom.
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal missing');
+    // e11 viewer-landscape: RN locked a full-screen modal on iPhone to portrait
+    // unless the Modal listed the orientations it supports, so the photo clipped
+    // at the screen bottom in a landscape window. A native sheet follows the
+    // activity's orientation, so the viewer carries no orientation list and
+    // owns the whole window with its own header.
+    const sheet = findByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('sheet missing');
     }
-    expect(modal.props.supportedOrientations).toEqual(['portrait', 'landscape']);
+    expect(sheet.props.snapPoints).toEqual(['100%']);
+    expect(sheet.props.handleComponent).toBeNull();
 
     renderer.unmount();
   });

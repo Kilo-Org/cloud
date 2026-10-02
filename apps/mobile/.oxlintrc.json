@@ -385,8 +385,6 @@
       "files": [
         "src/components/ui/sheet.tsx",
         "src/components/ui/dialog.tsx",
-        "src/components/ui/image-viewer.tsx",
-        "src/components/agents/session-page-sheet.tsx",
         "src/components/rename-modal.tsx",
         "src/components/destructive-confirm-dialog.tsx",
         "src/components/feedback-prompt-dialog.tsx",

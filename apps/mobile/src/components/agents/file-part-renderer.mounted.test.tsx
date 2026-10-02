@@ -112,7 +112,6 @@ const safeAreaMock = vi.hoisted(() => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -318,7 +317,7 @@ describe('FilePartRenderer mounted', () => {
       });
       expect(selected).toEqual(['message-1']);
       expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
-      expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+      expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
       expect(showActionSheetWithOptions).not.toHaveBeenCalled();
       await press(button);
       if (mime === 'image/png') {
@@ -989,7 +988,7 @@ describe('FilePartRenderer mounted', () => {
 
     expect(toastMock.error).toHaveBeenCalledWith('Preview unavailable');
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1400,7 +1399,7 @@ describe('FilePartRenderer mounted', () => {
     // The presign is still in flight, so the chip is busy. A tap during that
     // window must open the modal once the URL lands, without a second tap.
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await act(async () => {
       presignHolder.resolve?.({
@@ -1439,7 +1438,7 @@ describe('FilePartRenderer mounted', () => {
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
 
     expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await flushAsync();
 
@@ -1722,7 +1721,7 @@ describe('FilePartRenderer mounted', () => {
     const root = renderer.root;
 
     await press(first(pressableByLabel(root, `Preview ${uuid}.md`)));
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await act(async () => {
       presignHolder.reject?.(new Error('presign failed'));
@@ -1731,7 +1730,7 @@ describe('FilePartRenderer mounted', () => {
     await flushAsync();
 
     expect(toastMock.error).toHaveBeenCalledWith('Could not load this file. Try again.');
-    expect(findByType(root, 'Modal')).toHaveLength(0);
+    expect(findByType(root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1753,17 +1752,18 @@ describe('FilePartRenderer preview sheet surface', () => {
     return renderer;
   }
 
-  it('renders the native pageSheet Modal on iOS', async () => {
+  it('renders the native full-window sheet on iOS', async () => {
     const renderer = await openMarkdownPreview();
 
-    const modals = findByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.animationType).toBe('slide');
-    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     await unmount(renderer);
   });
@@ -1778,15 +1778,16 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
-  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await openMarkdownPreview();
 
-    const modals = findByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = findByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -1807,20 +1808,20 @@ describe('FilePartRenderer preview sheet surface', () => {
     await unmount(renderer);
   });
 
-  it('closes the preview when Android Back fires onRequestClose', async () => {
+  it('closes the preview when the sheet is dismissed', async () => {
     reactNativeMock.Platform.OS = 'android';
     const renderer = await openMarkdownPreview();
 
-    const modal = findByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = findByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
     await act(async () => {
       await Promise.resolve();
-      (modal.props.onRequestClose as () => void)();
+      (sheet.props.onClose as () => void)();
     });
 
-    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });
@@ -1837,7 +1838,7 @@ describe('FilePartRenderer preview sheet surface', () => {
       (header.props.onDone as () => void)();
     });
 
-    expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(findByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     await unmount(renderer);
   });

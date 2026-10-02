@@ -7,12 +7,12 @@ import {
   findByTestID,
   host,
   makeAssistantMessage,
-  modal,
   reactNativeMock,
   readyState,
   renderSheet,
   retryButton,
   safeAreaMock,
+  sheet,
   textValues,
   updateSheet,
 } from './child-session-sheet-test-helpers';
@@ -186,7 +186,7 @@ describe('ChildSessionSheet mounted', () => {
 });
 
 describe('ChildSessionSheet sheet surface', () => {
-  it('renders the native pageSheet Modal on iOS and preserves onDismiss', async () => {
+  it('renders the native full-window sheet on iOS and preserves onDismiss', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
     const renderer = await renderSheet({
@@ -195,19 +195,28 @@ describe('ChildSessionSheet sheet surface', () => {
       onDismiss,
     });
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.animationType).toBe('slide');
-    expect(modalNode.props.presentationStyle).toBe('pageSheet');
-    expect(modalNode.props.transparent).toBeUndefined();
-    expect(modalNode.props.onRequestClose).toBe(onClose);
-    expect(modalNode.props.onDismiss).toBe(onDismiss);
+    const sheetNode = sheet(renderer.root);
+    // One detent, the whole window, and no drag indicator: the caller's
+    // SheetHeader owns the top of the surface.
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.handleComponent).toBeNull();
+    expect(sheetNode.props.index).toBe(0);
+    expect(sheetNode.props.onClose).toBe(onClose);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
+
+    // The native dismiss event flows through to the caller.
+    await act(async () => {
+      await Promise.resolve();
+      (sheet(renderer.root).props.onDismiss as () => void)();
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
   });
 
-  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34, left: 0, right: 0 });
 
@@ -215,8 +224,9 @@ describe('ChildSessionSheet sheet surface', () => {
       buildProps({ getChildMessages: () => [], hydrationState: readyState })
     );
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.transparent).toBeUndefined();
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.index).toBe(0);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -225,7 +235,7 @@ describe('ChildSessionSheet sheet surface', () => {
     expect(surface[0]?.props.style).toEqual({ paddingTop: 24 });
   });
 
-  it('closes when Android Back fires onRequestClose', async () => {
+  it('closes when the native sheet dismisses', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await renderSheet({
@@ -233,9 +243,11 @@ describe('ChildSessionSheet sheet surface', () => {
       onClose,
     });
 
+    // Android Back, a swipe down and a backdrop tap all route through the
+    // native sheet's one close path.
     await act(async () => {
       await Promise.resolve();
-      (modal(renderer.root).props.onRequestClose as () => void)();
+      (sheet(renderer.root).props.onClose as () => void)();
     });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -257,7 +269,7 @@ describe('ChildSessionSheet sheet surface', () => {
     });
     await updateSheet(renderer, props);
 
-    expect(modal(renderer.root).props.visible).toBe(false);
+    expect(sheet(renderer.root).props.index).toBe(-1);
     expect(closeCount).toBe(1);
   });
 });

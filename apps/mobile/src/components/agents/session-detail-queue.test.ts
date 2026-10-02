@@ -7,7 +7,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react';
-import { Modal, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -158,7 +158,6 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
   KeyboardAvoidingView: 'KeyboardAvoidingView',
-  Modal: 'Modal',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -728,7 +727,8 @@ function openDetails(renderer: TestRenderer.ReactTestRenderer, message: StoredMe
 }
 
 function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
-  const close = findByType(renderer, Modal)[0]?.props.onRequestClose as () => void;
+  const detailSheet = renderer.root.findAll(node => (node.type as string) === 'BottomSheet')[0];
+  const close = detailSheet?.props.onClose as () => void;
   act(() => {
     close();
   });

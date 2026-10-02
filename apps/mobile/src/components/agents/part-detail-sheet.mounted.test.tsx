@@ -46,7 +46,6 @@ const scrollMock = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(params?: { animated?: boolean }) => void>(),
 }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   ScrollView: (props: { children?: ReactNode; ref?: Ref<typeof scrollMock> }) => {
     useImperativeHandle(props.ref, () => scrollMock, []);
     return createElement('ScrollView', { ...props, ref: undefined });
@@ -399,15 +398,15 @@ describe('PartDetailSheet mounted', () => {
     act(() => {
       openers.get('main')?.('write-1');
     });
-    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
-      1
-    );
+    expect(
+      findByType(renderer.root, 'BottomSheet').filter(node => propOf(node, 'index') === 0)
+    ).toHaveLength(1);
     act(() => {
       openers.get('subagent')?.('write-1');
     });
-    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
-      2
-    );
+    expect(
+      findByType(renderer.root, 'BottomSheet').filter(node => propOf(node, 'index') === 0)
+    ).toHaveLength(2);
     expect(findByType(renderer.root, 'CenteredState')).toHaveLength(2);
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
     act(() => {

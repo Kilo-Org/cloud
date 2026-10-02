@@ -82,7 +82,6 @@ vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }))
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -734,17 +733,18 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     return renderer;
   }
 
-  it('renders the native pageSheet Modal on iOS', async () => {
+  it('renders the native full-window sheet on iOS', async () => {
     const renderer = await openMarkdownPreview();
 
-    const modals = nodesByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.animationType).toBe('slide');
-    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
@@ -752,13 +752,13 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
   it('centers an empty preview outside the content scroller', async () => {
     fileText.mockResolvedValueOnce('');
     const renderer = await openMarkdownPreview();
-    const modal = nodesByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
-    expect(nodesByType(modal, 'CenteredState')).toHaveLength(1);
-    expect(nodesByType(modal, 'ScrollView')).toHaveLength(0);
-    expect(nodesByType(modal, 'SheetHeader')).toHaveLength(1);
+    expect(nodesByType(sheet, 'CenteredState')).toHaveLength(1);
+    expect(nodesByType(sheet, 'ScrollView')).toHaveLength(0);
+    expect(nodesByType(sheet, 'SheetHeader')).toHaveLength(1);
     act(() => {
       renderer.unmount();
     });
@@ -775,15 +775,16 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
-  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await openMarkdownPreview();
 
-    const modals = nodesByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -804,20 +805,20 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
-  it('closes the preview when Android Back fires onRequestClose', async () => {
+  it('closes the preview when the sheet is dismissed', async () => {
     reactNativeMock.Platform.OS = 'android';
     const renderer = await openMarkdownPreview();
 
-    const modal = nodesByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
     await act(async () => {
       await Promise.resolve();
-      (modal.props.onRequestClose as () => void)();
+      (sheet.props.onClose as () => void)();
     });
 
-    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -835,7 +836,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
       (header.props.onDone as () => void)();
     });
 
-    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     renderer.unmount();
   });

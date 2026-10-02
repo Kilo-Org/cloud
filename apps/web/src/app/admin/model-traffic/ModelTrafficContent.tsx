@@ -12,7 +12,6 @@ import {
   Legend,
   Line,
   LineChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
@@ -41,6 +40,7 @@ type ChartRow = { timestamp: number } & Record<string, number | null>;
 
 const REFRESH_INTERVAL_MS = 60_000;
 const CHART_HEIGHT_CLASS = 'h-[360px]';
+const CHART_STYLE = { width: '100%', height: '100%' };
 // A handful of requests in a bucket makes a single failure read as a huge error rate.
 const MIN_REQUESTS_FOR_ERROR_RATE = 20;
 
@@ -225,46 +225,49 @@ function RequestVolumeChart({
       title="Request volume"
       description={`Successful and failed requests per ${traffic.bucketMinutes}-minute bucket, stacked by model. Click a legend entry to hide it.`}
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis {...timeAxisProps} />
-          <YAxis
-            tick={{ fontSize: 11 }}
-            tickFormatter={(value: number) => compactNumber.format(value)}
-            width={48}
-          />
-          <Tooltip
-            content={
-              <SeriesTooltip
-                bucketMinutes={traffic.bucketMinutes}
-                formatValue={entry => Number(entry.value).toLocaleString()}
-                showTotal
-              />
-            }
-          />
-          <Legend
-            onClick={onToggle}
-            itemSorter={null}
-            wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
-          />
-          {series.map(item => (
-            <Area
-              key={item.key}
-              dataKey={item.key}
-              name={item.label}
-              stackId="requests"
-              type="monotone"
-              stroke={item.color}
-              fill={item.color}
-              fillOpacity={0.5}
-              strokeWidth={1}
-              hide={hidden.has(item.label)}
-              isAnimationActive={false}
+      <AreaChart
+        responsive
+        style={CHART_STYLE}
+        data={rows}
+        margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+        <XAxis {...timeAxisProps} />
+        <YAxis
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value: number) => compactNumber.format(value)}
+          width={48}
+        />
+        <Tooltip
+          content={
+            <SeriesTooltip
+              bucketMinutes={traffic.bucketMinutes}
+              formatValue={entry => Number(entry.value).toLocaleString()}
+              showTotal
             />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
+          }
+        />
+        <Legend
+          onClick={onToggle}
+          itemSorter={null}
+          wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+        />
+        {series.map(item => (
+          <Area
+            key={item.key}
+            dataKey={item.key}
+            name={item.label}
+            stackId="requests"
+            type="monotone"
+            stroke={item.color}
+            fill={item.color}
+            fillOpacity={0.5}
+            strokeWidth={1}
+            hide={hidden.has(item.label)}
+            isAnimationActive={false}
+          />
+        ))}
+      </AreaChart>
     </ChartCard>
   );
 }
@@ -311,56 +314,59 @@ function ErrorRateChart({
       title="Error rate"
       description={`Share of requests with HTTP status ≥ 400 per ${traffic.bucketMinutes}-minute bucket. Buckets with fewer than ${MIN_REQUESTS_FOR_ERROR_RATE} requests are left out.`}
     >
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={rows} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis {...timeAxisProps} />
-          <YAxis
-            tick={{ fontSize: 11 }}
-            tickFormatter={(value: number) => `${value}%`}
-            domain={[0, errorRateAxisMax]}
-            allowDecimals={false}
-            width={48}
-          />
-          <Tooltip
-            content={({ active, payload, label }) => (
-              <SeriesTooltip
-                active={active}
-                payload={payload}
-                label={label}
-                bucketMinutes={traffic.bucketMinutes}
-                formatValue={entry => {
-                  const row = typeof label === 'number' ? rowsByTimestamp.get(label) : undefined;
-                  const key = String(entry.dataKey);
-                  const errors = row?.[`${key}Errors`] ?? 0;
-                  const requests = row?.[`${key}Requests`] ?? 0;
-                  return `${formatPercent(Number(entry.value))} (${errors.toLocaleString()} / ${requests.toLocaleString()})`;
-                }}
-              />
-            )}
-          />
-          <Legend
-            onClick={onToggle}
-            itemSorter={null}
-            wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
-          />
-          {series.map(item => (
-            <Line
-              key={item.key}
-              dataKey={item.key}
-              name={item.label}
-              type="monotone"
-              stroke={item.color}
-              strokeWidth={item.dashed ? 2 : 1.5}
-              strokeDasharray={item.dashed ? '6 3' : undefined}
-              dot={false}
-              connectNulls={false}
-              hide={hidden.has(item.label)}
-              isAnimationActive={false}
+      <LineChart
+        responsive
+        style={CHART_STYLE}
+        data={rows}
+        margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+        <XAxis {...timeAxisProps} />
+        <YAxis
+          tick={{ fontSize: 11 }}
+          tickFormatter={(value: number) => `${value}%`}
+          domain={[0, errorRateAxisMax]}
+          allowDecimals={false}
+          width={48}
+        />
+        <Tooltip
+          content={({ active, payload, label }) => (
+            <SeriesTooltip
+              active={active}
+              payload={payload}
+              label={label}
+              bucketMinutes={traffic.bucketMinutes}
+              formatValue={entry => {
+                const row = typeof label === 'number' ? rowsByTimestamp.get(label) : undefined;
+                const key = String(entry.dataKey);
+                const errors = row?.[`${key}Errors`] ?? 0;
+                const requests = row?.[`${key}Requests`] ?? 0;
+                return `${formatPercent(Number(entry.value))} (${errors.toLocaleString()} / ${requests.toLocaleString()})`;
+              }}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+          )}
+        />
+        <Legend
+          onClick={onToggle}
+          itemSorter={null}
+          wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+        />
+        {series.map(item => (
+          <Line
+            key={item.key}
+            dataKey={item.key}
+            name={item.label}
+            type="monotone"
+            stroke={item.color}
+            strokeWidth={item.dashed ? 2 : 1.5}
+            strokeDasharray={item.dashed ? '6 3' : undefined}
+            dot={false}
+            connectNulls={false}
+            hide={hidden.has(item.label)}
+            isAnimationActive={false}
+          />
+        ))}
+      </LineChart>
     </ChartCard>
   );
 }

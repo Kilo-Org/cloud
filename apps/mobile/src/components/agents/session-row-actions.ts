@@ -83,79 +83,36 @@ export async function copySessionLink(
   }
 }
 
-type SessionActionMenuOptions = {
-  showActionSheetWithOptions: (
-    options: ActionSheetOptions,
-    onSelect: (index?: number) => void
-  ) => void;
-  onCopySessionId: () => void;
-  /**
-   * Omitted → no View PR entry. Only a session with an associated PR passes
-   * this, so the entry never appears on a session without one.
-   */
-  onViewPr?: () => void;
-  /** Omitted → no Rename entry. */
-  onRename?: () => void;
-  /**
-   * Omitted → no Exit session entry. Additive for the running-session row:
-   * the old menu form (Copy / Rename / Delete / Cancel) stays unchanged for
-   * callers that omit `onExit`.
-   */
-  onExit?: () => void;
-  /** Omitted → no Delete entry. */
-  onDelete?: () => void;
-  /** Themed sheet base options (`useThemedActionSheetOptions()`), spread first. */
-  themedSheet: ThemedActionSheetOptions;
+export type SessionActionMenuItem = {
+  key: 'open' | 'copy' | 'view-pr' | 'rename' | 'exit' | 'delete';
+  label: string;
+  destructive: boolean;
+  run: () => void;
+};
+
+export type SessionActionMenu = {
+  items: SessionActionMenuItem[];
+  cancelLabel: string;
 };
 
 /**
- * Shared session long-press menu. Builds one options list — Copy session ID,
+ * The one session action set, in today's order: Open, optional Copy session ID,
  * optional View PR, optional Rename, optional Exit session, optional Delete
- * session, Cancel — and dispatches by index. View PR is additive when
- * `onViewPr` is passed; Exit session is additive when `onExit` is passed;
- * callers that omit them keep the old Copy / Rename / Delete / Cancel form.
- * iOS delegates to native ActionSheetIOS via @expo/react-native-action-sheet;
- * Android gets backdrop-tap and hardware-back dismiss from the library.
+ * session. Copy ID and View PR are additive when their callbacks are passed, so
+ * a session without an associated PR never shows View PR, and a caller that
+ * does not own the clipboard keeps the preview-only form. Delete wins when both
+ * exist; Exit is destructive only when Delete is absent. The preview panel
+ * builds from here so its order, copy and indices cannot diverge.
  */
-export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
-  const {
-    showActionSheetWithOptions,
-    onCopySessionId,
-    onViewPr,
-    onRename,
-    onExit,
-    onDelete,
-    themedSheet,
-  } = opts;
-
-  const options = [i18n.t('agents.sessionRow.copyId')];
-  const handlers: (() => void)[] = [onCopySessionId];
-
-  if (onViewPr) {
-    options.push(i18n.t('securityAgent.findingRow.viewPr'));
-    handlers.push(onViewPr);
-  }
-  if (onRename) {
-    options.push(i18n.t('common.rename'));
-    handlers.push(onRename);
-  }
-  if (onExit) {
-    options.push(i18n.t('agentChat.remoteSession.exitSession'));
-    handlers.push(onExit);
-  }
-  if (onDelete) {
-    options.push(i18n.t('agents.sessionRow.deleteSession'));
-    handlers.push(onDelete);
-  }
-  options.push(i18n.t('common.cancel'));
-
-  const cancelButtonIndex = options.length - 1;
-  const deleteIndex = options.indexOf(i18n.t('agents.sessionRow.deleteSession'));
-  const exitIndex = options.indexOf(i18n.t('agentChat.remoteSession.exitSession'));
-  // Delete wins when both exist; Exit is destructive only when Delete is absent.
-  const destructiveButtonIndex = [deleteIndex, exitIndex].find(index => index !== -1);
-
-  showActionSheetWithOptions(
+export function buildSessionActionMenuItems(input: {
+  onOpen: () => void;
+  onCopySessionId?: () => void;
+  onViewPr?: () => void;
+  onRename?: () => void;
+  onExit?: () => void;
+  onDelete?: () => void;
+}): SessionActionMenu {
+  const items: SessionActionMenuItem[] = [
     {
       key: 'open',
       label: i18n.t('glanceable.openSession'),
@@ -164,6 +121,22 @@ export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
     },
   ];
 
+  if (input.onCopySessionId) {
+    items.push({
+      key: 'copy',
+      label: i18n.t('agents.sessionRow.copyId'),
+      destructive: false,
+      run: input.onCopySessionId,
+    });
+  }
+  if (input.onViewPr) {
+    items.push({
+      key: 'view-pr',
+      label: i18n.t('securityAgent.findingRow.viewPr'),
+      destructive: false,
+      run: input.onViewPr,
+    });
+  }
   if (input.onRename) {
     items.push({
       key: 'rename',

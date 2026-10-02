@@ -16,11 +16,8 @@ import {
   useSessionAttentionRevision,
 } from '@/lib/session-attention';
 import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
-import {
-  namedSessionTitle,
-  SESSION_TITLE_MAX_LENGTH,
-  useUserSessionTitlesRevision,
-} from './session-detail-rename-state';
+import { useTRPC } from '@/lib/trpc';
+import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
@@ -165,34 +162,30 @@ export function StoredSessionRow({
   const statusKind = session.status === null ? null : glanceableStatusKind(session.status);
 
   const handleLongPress = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    showSessionActionMenu({
-      showActionSheetWithOptions,
-      themedSheet,
+    openSessionPreviewStore({
+      sessionId: session.session_id,
+      title,
+      initialRenameValue: renameInitialValue,
+      onOpen: onPress,
+      live,
+      statusKind,
+      needsInput,
+      totalCostMicrodollars: session.total_cost_microdollars,
       onCopySessionId: () => {
-        void copySessionId(session.session_id);
+        // Load the clipboard/action module at press time: the mounted row test
+        // runs in a node environment that cannot load `expo-clipboard`.
+        void (async () => {
+          const { copySessionId } = await import('./session-row-actions');
+          await copySessionId(session.session_id);
+        })();
       },
       onViewPr: session.associatedPr
         ? () => {
             void openSessionPr(session.associatedPr?.url, t('common.pullRequest'));
           }
         : undefined,
-      onRename: onRename
-        ? () => {
-            if (Platform.OS === 'ios') {
-              showRenamePrompt(renameInitialValue, newTitle => {
-                onRename(newTitle);
-              });
-            } else {
-              setRenameVisible(true);
-            }
-          }
-        : undefined,
-      onDelete: onDelete
-        ? () => {
-            showDeleteConfirm(onDelete);
-          }
-        : undefined,
+      onRename,
+      onDelete,
     });
   };
 

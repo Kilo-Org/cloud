@@ -8,7 +8,7 @@ import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
 import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
-import { Platform, Pressable, View } from 'react-native';
+import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { SessionRow } from '@/components/ui/session-row';
@@ -273,19 +273,25 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       onOpen: () => {
         onPress(session);
       },
+      live: true,
+      statusKind: glanceableStatusKind(session.status),
+      needsInput,
+      totalCostMicrodollars: session.totalCostMicrodollars ?? null,
+      onCopySessionId: () => {
+        // Load the clipboard/action module at press time: the mounted row test
+        // runs in a node environment that cannot load `expo-clipboard`.
+        void (async () => {
+          const { copySessionId } = await import('./session-row-actions');
+          await copySessionId(session.id);
+        })();
+      },
       onViewPr: session.associatedPr
         ? () => {
             void openSessionPr(session.associatedPr?.url, t('common.pullRequest'));
           }
         : undefined,
-      onRename: () => {
-        if (Platform.OS === 'ios') {
-          showRenamePrompt(renameInitialValue, newTitle => {
-            renameSession(session.id, newTitle);
-          });
-        } else {
-          setRenameVisible(true);
-        }
+      onRename: newTitle => {
+        renameSession(session.id, newTitle);
       },
       onExit: canExit ? handleExit : undefined,
     });

@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useFeatureFlagVariantKey, usePostHog } from 'posthog-js/react';
 import { toast } from 'sonner';
 import { Loader2, TriangleAlert, X } from 'lucide-react';
-import { KILO_AUTO_BALANCED_MODEL } from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_BALANCED_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type { KiloClawDashboardStatus } from '@/lib/kiloclaw/types';
 import { controllerVersionOk, gatewayStatusOk } from '@/lib/kiloclaw/types';
 import { useKiloClawGatewayStatus, useKiloClawMutations } from '@/hooks/useKiloClaw';

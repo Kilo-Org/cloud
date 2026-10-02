@@ -10,11 +10,11 @@ import {
 } from '@kilocode/db/schema';
 import { MCPGatewayOAuthGrantStatus } from '@kilocode/db/schema-types';
 import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { createGatewayRepository } from '@/lib/mcp-gateway/repository';
 import { createOAuthGrantService } from '@/lib/mcp-gateway/oauth-grant-service';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { db } from '@/lib/drizzle';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 function serializeTimestamp(value: string) {
   return new Date(value).toISOString();

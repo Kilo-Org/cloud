@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { BOUNCER_URL, INTERNAL_API_SECRET } from '@/lib/config.server';
+import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).

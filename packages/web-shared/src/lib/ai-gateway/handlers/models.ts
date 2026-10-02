@@ -1,17 +1,23 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user/server';
+import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gateway/byok';
-import { tagOpenAiChatGptByokModels } from '@/lib/ai-gateway/openai-chatgpt/routing';
-import { readDb } from '@/lib/drizzle';
-import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
-import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
-import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
+import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import {
+  addUserByokAvailability,
+  getUserByokProviderIds,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
+import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import {
+  getEnkryptBenchmarks,
+  publishEnkryptModels,
+} from '@kilocode/web-shared/lib/model-stats/enkrypt';
 
 async function modelResponse(response: OpenRouterModelsResponse) {
   const snapshot = await getEnkryptBenchmarks();

@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 
 export async function createTestOrganization(
   name: string,

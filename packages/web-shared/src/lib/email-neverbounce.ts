@@ -1,4 +1,4 @@
-import { NEVERBOUNCE_API_KEY } from '@/lib/config.server';
+import { NEVERBOUNCE_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { captureMessage } from '@sentry/nextjs';
 
 type NeverBounceResult = 'valid' | 'invalid' | 'disposable' | 'catchall' | 'unknown';

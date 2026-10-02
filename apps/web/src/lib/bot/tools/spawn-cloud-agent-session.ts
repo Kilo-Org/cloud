@@ -12,8 +12,8 @@ import {
   buildGitLabCloneUrl,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import { APP_URL } from '@/lib/constants';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';

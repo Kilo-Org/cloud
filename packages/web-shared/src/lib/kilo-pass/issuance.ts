@@ -21,15 +21,18 @@ import { KiloPassCadence } from './enums';
 import { KiloPassIssuanceItemKind } from './enums';
 import { type KiloPassIssuanceSource } from './enums';
 
-import type { db as defaultDb } from '@/lib/drizzle';
-import { processTopUp } from '@/lib/credits';
-import { grantCreditForCategory, type GrantCreditOptions } from '@/lib/promotionalCredits';
-import { toMicrodollars } from '@/lib/microdollars';
+import type { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import {
+  grantCreditForCategory,
+  type GrantCreditOptions,
+} from '@kilocode/web-shared/lib/promotionalCredits';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { and, asc, eq, gt, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { computeKiloPassBonusUsd } from '@/lib/kilo-pass/bonus-decision';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { computeKiloPassBonusUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import type { Dayjs } from 'dayjs';
 
 type Db = typeof defaultDb;

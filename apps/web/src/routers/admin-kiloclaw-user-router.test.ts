@@ -1,7 +1,7 @@
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   kiloclaw_admin_audit_logs,
   kiloclaw_subscription_change_log,
@@ -11,7 +11,7 @@ import {
 import { count, eq } from 'drizzle-orm';
 import { insertKiloClawSubscriptionChangeLog } from '@kilocode/db';
 import type { User } from '@kilocode/db/schema';
-import { client as stripeMock } from '@/lib/stripe-client';
+import { client as stripeMock } from '@kilocode/web-shared/lib/stripe-client';
 
 const mockKiloclawStart = jest.fn();
 const startedResponse = {

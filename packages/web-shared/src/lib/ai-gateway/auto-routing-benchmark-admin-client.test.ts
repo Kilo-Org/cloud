@@ -6,7 +6,7 @@ import {
   getBenchmarkRoutingTable,
 } from './auto-routing-benchmark-admin-client';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   AUTO_ROUTING_BENCHMARK_WORKER_URL: 'https://benchmark-worker.example.com',
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));

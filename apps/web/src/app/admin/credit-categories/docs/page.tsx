@@ -1,7 +1,7 @@
 import ReactMarkdown from 'react-markdown';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { generatePromoCreditCategoriesMarkdown } from '@/lib/PromoCreditCategoryConfig';
-import { promoCreditCategories } from '@/lib/promoCreditCategories';
+import { generatePromoCreditCategoriesMarkdown } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
+import { promoCreditCategories } from '@kilocode/web-shared/lib/promoCreditCategories';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {
   BreadcrumbItem,

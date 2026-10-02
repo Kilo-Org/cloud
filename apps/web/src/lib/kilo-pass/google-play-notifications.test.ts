@@ -12,8 +12,8 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
@@ -21,10 +21,10 @@ import {
   KiloPassTier,
   KiloPassIssuanceItemKind,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
-import { toMicrodollars } from '@/lib/microdollars';
+import type * as bouncerClientModule from '@kilocode/web-shared/lib/bouncer/client';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { storeCreditPaymentId } from '@/lib/credits/store-products';
 import { googlePlayCreditProviderTransactionId } from '@/lib/credits/store-verifier';
 import { completeStoreCreditPurchase } from '@/lib/credits/store-completion';
@@ -80,8 +80,10 @@ jest.mock('@/lib/kilo-pass/posthog-tracking', () => ({
 }));
 
 // Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
   return {
     __esModule: true,
     ...actual,
@@ -95,7 +97,8 @@ type BouncerClientMock = {
 };
 
 function getBouncerClientMock(): jest.Mock {
-  return (jest.requireMock('@/lib/bouncer/client') as BouncerClientMock).reportCreditEvent;
+  return (jest.requireMock('@kilocode/web-shared/lib/bouncer/client') as BouncerClientMock)
+    .reportCreditEvent;
 }
 
 type PosthogTrackingMock = {
@@ -1042,7 +1045,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         .set({ microdollars_used: paid!.kilo_pass_threshold! })
         .where(eq(kilocode_users.id, user.id));
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({
           kiloUserId: user.id,
@@ -1687,7 +1690,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       .set({ microdollars_used: after!.kilo_pass_threshold! })
       .where(eq(kilocode_users.id, user.id));
     const { maybeIssueKiloPassBonusFromUsageThreshold } =
-      await import('@/lib/kilo-pass/usage-triggered-bonus');
+      await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
     const issue = () =>
       maybeIssueKiloPassBonusFromUsageThreshold({
         kiloUserId: user.id,
@@ -2141,7 +2144,7 @@ describe('processGooglePlayKiloPassNotification', () => {
         expect(pendingCancel?.cancel_at_period_end).toBe(true);
       }
       const { maybeIssueKiloPassBonusFromUsageThreshold } =
-        await import('@/lib/kilo-pass/usage-triggered-bonus');
+        await import('@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
       await db

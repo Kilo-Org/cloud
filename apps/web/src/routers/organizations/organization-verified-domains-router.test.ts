@@ -18,10 +18,13 @@ jest.mock('@workos-inc/node', () => {
   return { ...actual, WorkOS: jest.fn(() => mockWorkOSInstance), mockWorkOSInstance };
 });
 
-import { db } from '@/lib/drizzle';
-import { addUserToOrganization, createOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  addUserToOrganization,
+  createOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   organization_audit_logs,
   organization_domain_claims,

@@ -15,13 +15,13 @@ import 'server-only';
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
 import { BITBUCKET_WORKSPACE_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { GIT_TOKEN_SERVICE_API_URL } from '@kilocode/web-shared/lib/config.server';
+import { generateInternalServiceToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import {
   getBitbucketWorkspaceAccessTokenStatus,
   readCachedBitbucketWorkspaceAccessTokenRepositories,
 } from '@/lib/integrations/platforms/bitbucket/workspace-access-token-repository-cache';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * The account that owns the review context. Bitbucket Cloud is supported in

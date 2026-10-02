@@ -8,8 +8,8 @@ import {
   verifyOAuthStateDetailed,
   type OAuthStateVerificationFailureReason,
 } from '@/lib/integrations/oauth-state';
-import { redisClient } from '@/lib/redis';
-import { githubUserAuthorizationPkceRedisKey } from '@/lib/redis-keys';
+import { redisClient } from '@kilocode/web-shared/lib/redis';
+import { githubUserAuthorizationPkceRedisKey } from '@kilocode/web-shared/lib/redis-keys';
 
 const STATE_PREFIX = 'github-user-authorization:';
 const PKCE_TTL_SECONDS = OAUTH_STATE_TTL_SECONDS + 5;

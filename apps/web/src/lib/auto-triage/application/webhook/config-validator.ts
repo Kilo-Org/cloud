@@ -1,5 +1,5 @@
 import type { AutoTriageAgentConfig } from '@/lib/auto-triage/core/schemas';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Result of configuration validation

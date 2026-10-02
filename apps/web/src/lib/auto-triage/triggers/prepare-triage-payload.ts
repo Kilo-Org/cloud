@@ -7,14 +7,14 @@
 
 import { prepareCloudAgentWorkflowUser } from '@/lib/auth/cloud-agent-workflow-user';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { getTriageTicketById } from '../db/triage-tickets';
 import type { Owner } from '../core';
 import type { AutoTriageAgentConfig, DispatchTriageRequest } from '../core/schemas';
-import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';
 
 export interface PreparePayloadParams {

@@ -1,12 +1,12 @@
 import { sql } from 'drizzle-orm';
 import type { UserDeletionTaskProgress } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getPostgresErrorCode } from '@/lib/db-errors';
 import {
   USER_DELETION_ANONYMIZE_MIN_STATEMENT_TIMEOUT_MS,
   USER_DELETION_ANONYMIZE_PAGE_TIMEOUT_MS,
   USER_DELETION_ANONYMIZE_TIMEOUT_BUFFER_MS,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { userIdKeyedAbsenceOutcome } from '@/lib/user/deletion-queue/deletion-subject';
 import type {
   DeletionHandlerContext,

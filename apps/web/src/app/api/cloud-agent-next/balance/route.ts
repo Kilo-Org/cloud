@@ -1,6 +1,6 @@
 import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(): Promise<

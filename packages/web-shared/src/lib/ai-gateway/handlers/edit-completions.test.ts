@@ -1,32 +1,32 @@
 import { describe, it, expect, beforeEach, afterAll } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-} from '@/lib/ai-gateway/processUsage.types';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
 }));
-jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
   emitApiMetricsForResponse: jest.fn(),
 }));
-jest.mock('@/lib/user/server');
-jest.mock('@/lib/organizations/organization-usage');
-jest.mock('@/lib/ai-gateway/byok');
-jest.mock('@/lib/organizations/effective-model-access.server', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
+jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn().mockResolvedValue({
     decision: { allowed: true },
   }),
 }));
-jest.mock('@/lib/redis', () => ({
+jest.mock('@kilocode/web-shared/lib/redis', () => ({
   redisClient: {
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue('OK'),
@@ -34,7 +34,7 @@ jest.mock('@/lib/redis', () => ({
     getdel: jest.fn().mockResolvedValue(null),
   },
 }));
-jest.mock('@/lib/debugUtils', () => ({
+jest.mock('@kilocode/web-shared/lib/debugUtils', () => ({
   debugSaveProxyRequest: jest.fn(),
   debugSaveProxyResponseStream: jest.fn(),
 }));
@@ -53,8 +53,11 @@ jest.mock('next/server', () => ({
 const mockedLogMicrodollarUsage = jest.fn(
   async (_stats: MicrodollarUsageStats, _ctx: MicrodollarUsageContext) => null
 );
-jest.mock('@/lib/ai-gateway/processUsage', () => ({
-  ...(jest.requireActual('@/lib/ai-gateway/processUsage') as Record<string, unknown>),
+jest.mock('@kilocode/web-shared/lib/ai-gateway/processUsage', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/ai-gateway/processUsage') as Record<
+    string,
+    unknown
+  >),
   logMicrodollarUsage: (stats: MicrodollarUsageStats, ctx: MicrodollarUsageContext) =>
     mockedLogMicrodollarUsage(stats, ctx),
 }));

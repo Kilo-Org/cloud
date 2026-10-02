@@ -13,7 +13,7 @@
  * from failing in a CLI context.
  */
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
 
 const encryptionKey =

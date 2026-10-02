@@ -12,9 +12,9 @@ process.env.KILOCLAW_API_URL ||= 'https://claw.test';
 process.env.INTERNAL_API_SECRET ||= 'test-secret';
 
 import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { createCallerFactory } from '@/lib/trpc/init';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   kiloclaw_inbound_email_aliases,
   kiloclaw_inbound_email_reserved_aliases,
@@ -44,7 +44,7 @@ type KiloClawClientMock = {
   __startMock: AnyMock;
 };
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   const stripeMock = {
     subscriptions: { retrieve: jest.fn(), update: jest.fn(), list: jest.fn() },
     subscriptionSchedules: {
@@ -62,7 +62,7 @@ jest.mock('@/lib/stripe-client', () => {
   return { client: stripeMock };
 });
 
-jest.mock('@/lib/kiloclaw/stripe-price-ids.server', () => ({
+jest.mock('@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server', () => ({
   getStripePriceIdForClawPlan: jest.fn(() => 'price_test_kiloclaw'),
   getStripePriceIdForClawPlanIntro: jest.fn((plan: string) =>
     plan === 'standard' ? 'price_standard_intro' : 'price_commit'
@@ -96,9 +96,11 @@ jest.mock('next/headers', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => {
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = jest.requireActual<typeof import('@/lib/config.server')>('@/lib/config.server');
+  const actual = jest.requireActual<typeof import('@kilocode/web-shared/lib/config.server')>(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     KILOCLAW_API_URL: 'https://claw.test',

@@ -1,25 +1,28 @@
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
-} from '@/routers/organizations/utils';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { successResult } from '@/lib/maybe-result';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
 import {
   OrgAutoTopUpAmountCentsSchema,
   DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS,
-} from '@/lib/autoTopUpConstants';
-import type { OrgAutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
+import type { OrgAutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import { createOrgAutoTopUpSetupCheckoutSession } from '@/lib/organizations/organization-auto-top-up';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 
 /**
  * Reports the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers do not await

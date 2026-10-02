@@ -6,13 +6,13 @@ import {
   isKiloCredentialExchangeEligible,
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { expect } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { APP_URL } from '@/lib/constants';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
-import { validateAuthorizationHeader } from '@/lib/tokens';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 import { POST as exchangeNativeCredentials } from '@/app/api/auth/native/exchange/route';
 
 export async function expectNonExchangeableSystemToken(

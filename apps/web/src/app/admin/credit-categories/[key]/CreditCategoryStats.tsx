@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type {
   GuiCreditCategoryStatistics,
   CreditCategoriesApiResponse,
-} from '@/lib/PromoCreditCategoryConfig';
+} from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 
 interface CreditCategoryStatsProps {
   creditCategoryKey: string;

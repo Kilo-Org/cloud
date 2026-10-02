@@ -2,7 +2,7 @@ import 'server-only';
 
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
 
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import {
@@ -10,10 +10,10 @@ import {
   KiloPassPaymentProvider as KiloPassPaymentProviderValue,
   type KiloPassCadence,
   type KiloPassTier,
-} from '@/lib/kilo-pass/enums';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
-import { getOpenPauseEvent } from '@/lib/kilo-pass/pause-events';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
+import { getOpenPauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 
 type Db = typeof defaultDb;
 type DbOrTx = Db | DrizzleTransaction;

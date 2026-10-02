@@ -1,6 +1,6 @@
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser } from '@/lib/user';
-import { WORKOS_API_KEY } from '@/lib/config.server';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { WorkOS } from '@workos-inc/node';
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
@@ -9,11 +9,11 @@ import {
   getOrganizationById,
   getOrganizationMembers,
   skipCustomerSourceSurveyForOrgJoin,
-} from '@/lib/organizations/organizations';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
-import { sendOrgSSOUserJoinedEmail } from '@/lib/email';
-import { SSO_SIGNIN_PATH } from '@/lib/auth/constants';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
+import { sendOrgSSOUserJoinedEmail } from '@kilocode/web-shared/lib/email';
+import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 
 const workos = new WorkOS(WORKOS_API_KEY);

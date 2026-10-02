@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -7,10 +7,14 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN } from '@/lib/config.server';
+import {
+  DISCORD_CLIENT_ID,
+  DISCORD_CLIENT_SECRET,
+  DISCORD_BOT_TOKEN,
+} from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 
 // Discord OAuth2 scopes for the bot integration

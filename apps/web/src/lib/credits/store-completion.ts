@@ -2,16 +2,16 @@ import { credit_transactions } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 
-import { reportCreditEvent } from '@/lib/bouncer/client';
+import { reportCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
 import { runAfterResponse } from '@/lib/after-response';
-import { processTopUp } from '@/lib/credits';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 
 import {
   findEffectiveStoreCreditRefundEvent,

@@ -1,7 +1,7 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { grantCreditForCategory } from '@/lib/promotionalCredits';
+import { grantCreditForCategory } from '@kilocode/web-shared/lib/promotionalCredits';
 import * as fs from 'node:fs/promises';
 
 const isDryRun = !process.argv.includes('--apply');

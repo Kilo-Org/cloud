@@ -1,10 +1,10 @@
 import 'server-only';
 
-import { encryptKeyedEnvelope } from '@/lib/encryption';
+import { encryptKeyedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import {
   USER_GITHUB_APP_TOKEN_ACTIVE_KEY_ID,
   USER_GITHUB_APP_TOKEN_ACTIVE_PUBLIC_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 
 // Single source of truth for the `standard` GitHub user-token envelope: scheme,
 // active public key, and AAD. Every caller that stores a `user_github_app_tokens`

@@ -1,6 +1,6 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   CLOUDFLARE_ACCOUNT_ID: '',
   CLOUDFLARE_ANALYTICS_API_TOKEN: '',
 }));

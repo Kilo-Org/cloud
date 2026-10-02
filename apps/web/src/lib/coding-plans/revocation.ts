@@ -2,8 +2,8 @@ import 'server-only';
 
 import { and, asc, desc, eq, inArray, isNotNull, max, ne, sql } from 'drizzle-orm';
 
-import { encryptApiKey } from '@/lib/ai-gateway/byok/encryption';
-import { BYOK_ENCRYPTION_KEY } from '@/lib/config.server';
+import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   getCodingPlanValidationResult,
@@ -12,7 +12,7 @@ import {
   validateCodingPlanCredential,
 } from '@/lib/coding-plans/inventory-validation';
 import { getCodingPlanPrice, isCodingPlanId, type CodingPlanId } from '@/lib/coding-plans/pricing';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { coding_plan_key_inventory, coding_plan_subscriptions } from '@kilocode/db/schema';
 
 export type ManualRevocationStatus = 'revocation_pending' | 'revocation_failed';

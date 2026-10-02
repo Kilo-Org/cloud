@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 
-jest.mock('@/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({ CRON_SECRET: 'cron-secret' }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 jest.mock('@/lib/kilo-pass-org/service', () => ({ runOrganizationPassIssuanceCron: jest.fn() }));
 jest.mock('@/lib/kilo-pass-org/notifications', () => ({
   dispatchOrganizationPassBlockedNotifications: jest.fn(),
 }));
-jest.mock('@/lib/utils.server', () => ({ sentryLogger: jest.fn(() => jest.fn()) }));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  sentryLogger: jest.fn(() => jest.fn()),
+}));
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { dispatchOrganizationPassBlockedNotifications } from '@/lib/kilo-pass-org/notifications';
 import { runOrganizationPassIssuanceCron } from '@/lib/kilo-pass-org/service';
 import { GET } from './route';

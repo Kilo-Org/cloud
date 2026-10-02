@@ -1,5 +1,5 @@
 import { custom_llm2 } from '@kilocode/db/schema';
-import { readDb } from '@/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';

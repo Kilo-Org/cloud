@@ -1,9 +1,9 @@
-import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type {
   GatewayChatApiKind,
   ProviderApiUrlOverrides,
   TransformRequestContext,
-} from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
 import type { DirectByokModel } from '@kilocode/db/schema-types';
 

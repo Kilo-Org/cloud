@@ -5,7 +5,7 @@
  * Follows Drizzle ORM patterns used throughout the codebase.
  */
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
   cloud_agent_code_review_attempts,
@@ -31,8 +31,8 @@ import {
   getTableColumns,
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest } from '@/lib/utils.server';
-import { sanitizePostgresString } from '@/lib/sanitize-jsonb';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { sanitizePostgresString } from '@kilocode/web-shared/lib/sanitize-jsonb';
 import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';

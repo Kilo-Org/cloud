@@ -18,7 +18,7 @@ import {
   canManageOrganization,
   canManageOrganizationBilling,
 } from '@kilocode/app-shared/organizations';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

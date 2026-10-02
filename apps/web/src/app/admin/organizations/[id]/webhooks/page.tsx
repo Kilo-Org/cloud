@@ -1,7 +1,7 @@
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { redirect } from 'next/navigation';
 import { AdminWebhookTriggersList } from '@/app/admin/webhooks/AdminWebhookTriggersList';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

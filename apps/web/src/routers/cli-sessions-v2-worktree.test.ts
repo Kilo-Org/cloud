@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { db } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cli_sessions_v2,
   cloud_agent_worktrees,
@@ -15,7 +15,7 @@ import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { TRPCClientError } from '@trpc/client';
 import type * as TrpcServerModule from '@trpc/server';
 import { and, eq, inArray, isNotNull, or } from 'drizzle-orm';
-import type { TRPCContext } from '@/lib/trpc/init';
+import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import type { cliSessionsV2Router } from './cli-sessions-v2-router';
 import type {
   DeleteWorktreeInput,
@@ -52,7 +52,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   getSession: mockGetRuntimeSession,
 }));
 
-jest.mock('@/lib/trpc/init', () => {
+jest.mock('@kilocode/web-shared/lib/trpc/init', () => {
   const { initTRPC } = jest.requireActual<typeof TrpcServerModule>('@trpc/server');
   const trpc = initTRPC.context<TRPCContext>().create();
 
@@ -71,7 +71,7 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   createCloudAgentNextClient: mockCreateCloudAgentNextClient,
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateApiToken: jest.fn(() => 'cloud-agent-token'),
 }));
 
@@ -89,7 +89,7 @@ jest.mock('@/lib/session-ingest-client', () => ({
   unshareSession: jest.fn(),
 }));
 
-jest.mock('@/lib/admin/admin-access-log', () => ({
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   recordKiloAdminElevation: jest.fn(),
   UNSCOPED_TARGET: 'unscoped',
 }));
@@ -200,7 +200,7 @@ beforeAll(async () => {
       created_by_kilo_user_id: USER_ID,
     },
   ]);
-  const { createCallerFactory } = await import('@/lib/trpc/init');
+  const { createCallerFactory } = await import('@kilocode/web-shared/lib/trpc/init');
   const { cliSessionsV2Router } = await import('./cli-sessions-v2-router');
   createCaller = createCallerFactory(cliSessionsV2Router);
 });

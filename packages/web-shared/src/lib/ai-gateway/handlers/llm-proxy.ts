@@ -1,41 +1,41 @@
 import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { toMicrodollars } from '@/lib/microdollars';
-import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
-import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
+import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import {
   validateFeatureHeader,
   FEATURE_HEADER,
   isUserRateLimitedFeature,
   type FeatureValue,
-} from '@/lib/feature-detection';
+} from '@kilocode/web-shared/lib/feature-detection';
 import type {
   OpenRouterChatCompletionRequest,
   GatewayResponsesRequest,
   GatewayMessagesRequest,
   GatewayRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
-} from '@/lib/ai-gateway/provider-privacy';
-import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { getDirectByokModel } from '@/lib/ai-gateway/providers/direct-byok';
-import { sendUpstreamAttempt } from '@/lib/ai-gateway/providers/upstream-attempt';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
+import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@/lib/getRootSpan';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import {
   isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModel,
-} from '@/lib/ai-gateway/is-free-model';
+} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -64,67 +64,67 @@ import {
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { isDataCollectionExplicitlyDisallowed } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   rewriteModelResponse,
   logUnrewrittenResponse,
-} from '@/lib/ai-gateway/rewriteModelResponse';
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
 import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
-} from '@/lib/anonymous';
+} from '@kilocode/web-shared/lib/anonymous';
 import {
   checkFreeModelRateLimit,
   checkFreeModelRateLimitByUser,
   logFreeModelRequest,
   checkPromotionLimit,
-} from '@/lib/free-model-rate-limiter';
-import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@/lib/constants';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+} from '@kilocode/web-shared/lib/free-model-rate-limiter';
+import { PROMOTION_MAX_REQUESTS, PROMOTION_WINDOW_HOURS } from '@kilocode/web-shared/lib/constants';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
   gatewayRateLimitKey,
   isGatewayAccountRateLimited,
-} from '@/lib/ai-gateway/gateway-account-rate-limit';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
-import { isCloudflareIP } from '@/lib/cloudflare-ip';
+} from '@kilocode/web-shared/lib/ai-gateway/gateway-account-rate-limit';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isUnavailableModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { isCloudflareIP } from '@kilocode/web-shared/lib/cloudflare-ip';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
+import { fetchEfficientAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-decision';
 import {
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
-} from '@/lib/ai-gateway/auto-routing-denied-models';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
-} from '@/lib/ai-gateway/processUsage.types';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import {
   getMaxTokens,
   hasMiddleOutTransform,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { redactProviderHints } from '@kilocode/auto-routing-contracts';
-import { logExceptInTest } from '@/lib/utils.server';
-import { readDb } from '@/lib/drizzle';
-import { getOrganizationGroupPolicyContext } from '@/lib/organizations/organization-group-policy-context.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
-} from '@/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { bouncerAccountId, decide, type DecideTier } from '@/lib/bouncer/client';
-import { simHash64 } from '@/lib/bouncer/simhash';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+import { bouncerAccountId, decide, type DecideTier } from '@kilocode/web-shared/lib/bouncer/client';
+import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 

@@ -9,14 +9,14 @@ import {
   KiloPassOrgProcessingCondition,
   KiloPassOrgPurchaseChannel,
 } from '@kilocode/db/schema-types';
-import type { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
-import { db } from '@/lib/drizzle';
-import { client as stripe } from '@/lib/stripe-client';
+import type { KiloPassCadence, KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import {
   getKnownStripePriceIdsForKiloPass,
   getStripePriceIdForKiloPass,
-} from '@/lib/kilo-pass/stripe-price-ids.server';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
+} from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import {
   handleKiloPassInvoiceCreated,
   SERVICE_FEE_FAILURE_APPLICATION,
@@ -24,9 +24,12 @@ import {
   type KiloPassInvoiceCreatedResult,
   type KiloPassInvoiceCreatedStripe,
 } from '@/lib/service-fees/invoice-created';
-import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
-import { getEffectiveOrganizationServiceFeeExemption } from '@/lib/service-fees/organization-exemptions';
-import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
+import { createServiceFeeStores } from '@kilocode/web-shared/lib/service-fees/drizzle-store';
+import { getEffectiveOrganizationServiceFeeExemption } from '@kilocode/web-shared/lib/service-fees/organization-exemptions';
+import {
+  reportChargeAttempted,
+  type ChargeAttemptContext,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
 import {
   buildServiceFeeCommercialMetadata,
   getInvoiceLineInvoiceItemId,
@@ -36,7 +39,7 @@ import {
   listAllInvoiceLineItems,
   sumEligibleKiloPassSubtotalMinor,
   type InvoiceLineItemListClient,
-} from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   markServiceFeeAssessmentCharged,
   markServiceFeeAssessmentMissed,
@@ -45,18 +48,18 @@ import {
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
   type ServiceFeeStripeIds,
-} from '@/lib/service-fees/assessments';
-import { buildAutoTopUpServiceFeeInvoiceItem } from '@/lib/service-fees/checkout';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { buildAutoTopUpServiceFeeInvoiceItem } from '@kilocode/web-shared/lib/service-fees/checkout';
 import {
   resolveServiceFeeTaxInput,
   type ServiceFeeTaxInput,
   type ServiceFeeTaxPrincipal,
   type StripePriceTaxReader,
-} from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/tax';
 import {
   sendMissedServiceFeeAlert,
   type MissedServiceFeeAlertInput,
-} from '@/lib/service-fees/alerts';
+} from '@kilocode/web-shared/lib/service-fees/alerts';
 import {
   settleKiloPassInvoiceServiceFee,
   type KiloPassServiceFeeSettlementDependencies,
@@ -66,7 +69,7 @@ import {
 import {
   SERVICE_FEE_SUPPORTED_CURRENCY,
   type ServiceFeeCommercialMetadata,
-} from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/types';
 import {
   activatePaidAgreement,
   bindProviderSeatAddOnItem,
@@ -96,13 +99,13 @@ import {
 import {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
-} from '@/lib/kilo-pass-org/stripe-metadata';
+} from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
 import { monthlyWindowContaining, type IssuanceWindow } from './calculations';
 
 export {
   getOrganizationKiloPassMetadata,
   ORGANIZATION_KILO_PASS_METADATA_TYPE,
-} from '@/lib/kilo-pass-org/stripe-metadata';
+} from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
 
 function intervalToCadence(
   interval: Stripe.Price.Recurring.Interval | undefined

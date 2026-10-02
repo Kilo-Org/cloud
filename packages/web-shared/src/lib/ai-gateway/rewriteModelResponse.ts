@@ -1,27 +1,33 @@
 import { api_request_log, type User } from '@kilocode/db/schema';
-import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
-import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+import { isKiloExclusiveFreeModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { detectToolCallArgumentErrors } from '@kilocode/web-shared/lib/ai-gateway/api-request-log-errors';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
   getReasoningEffort,
   getReasoningEffortTimeoutSuggestion,
-} from '@/lib/ai-gateway/providers/openrouter/request-helpers';
-import type { ProviderId, ProviderResponseTransforms } from '@/lib/ai-gateway/providers/types';
-import { getOutputHeaders } from '@/lib/ai-gateway/llm-proxy-helpers';
-import type { ChatCompletionChunk, OpenRouterUsage } from '@/lib/ai-gateway/processUsage.types';
-import { isDynamicallyOptedIntoRequestLogging } from '@/lib/ai-gateway/request-logging-opt-ins';
-import { db } from '@/lib/drizzle';
-import { errorExceptInTest, logExceptInTest } from '@/lib/utils.server';
-import { withRequestId } from '@/lib/ai-gateway/request-id';
-import { sanitizeJsonbValue } from '@/lib/sanitize-jsonb';
-import { uploadApiRequestLogBlobs } from '@/lib/r2/api-request-log';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import type {
+  ProviderId,
+  ProviderResponseTransforms,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getOutputHeaders } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import type {
+  ChatCompletionChunk,
+  OpenRouterUsage,
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { isDynamicallyOptedIntoRequestLogging } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
+import { sanitizeJsonbValue } from '@kilocode/web-shared/lib/sanitize-jsonb';
+import { uploadApiRequestLogBlobs } from '@kilocode/web-shared/lib/r2/api-request-log';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { createParser } from 'eventsource-parser';
 import { after, NextResponse } from 'next/server';
 import type OpenAI from 'openai';
 import type Anthropic from '@anthropic-ai/sdk';
-import { applyReasoningDetailsResponseTransform } from '@/lib/ai-gateway/reasoning-details-transform';
+import { applyReasoningDetailsResponseTransform } from '@kilocode/web-shared/lib/ai-gateway/reasoning-details-transform';
 
 /**
  * Handle passed to the response pipeline so the upstream response body can be

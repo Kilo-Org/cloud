@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import {
   familyHasUnavailableFreeModel,
   isUnavailableModel,
-} from '@/lib/ai-gateway/unavailable-models';
+} from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 
 describe('unavailable models', () => {
   test('keeps exact matching for request rejection', () => {

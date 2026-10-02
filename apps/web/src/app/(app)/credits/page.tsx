@@ -27,7 +27,7 @@ import {
   TOPUP_STATUS_PENDING,
   TOPUP_STATUS_QUERY_STRING_KEY,
   TOPUP_TRANSACTION_QUERY_STRING_KEY,
-} from '@/lib/organizations/constants';
+} from '@kilocode/web-shared/lib/organizations/constants';
 import * as z from 'zod';
 import { toast } from 'sonner';
 

@@ -1,49 +1,55 @@
 import { after, NextResponse, type NextRequest } from 'next/server';
 import * as z from 'zod';
-import { FEATURE_HEADER, type FeatureValue } from '@/lib/feature-detection';
+import { FEATURE_HEADER, type FeatureValue } from '@kilocode/web-shared/lib/feature-detection';
 import {
   countAndStoreUsage,
   logMicrodollarUsage,
   processTokenData,
-} from '@/lib/ai-gateway/processUsage';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { startInactiveSpan, captureException, captureMessage } from '@sentry/nextjs';
-import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
-import { summarizeUserPayments } from '@/lib/creditTransactions';
-import { isAutoTopUpInFlight } from '@/lib/autoTopUpInFlight';
+import { APP_URL, FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
+import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
+import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
 import { type User } from '@kilocode/db/schema';
-import { errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import { errorExceptInTest, warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 import type { Span } from '@sentry/nextjs';
-import { debugSaveProxyResponseStream } from '@/lib/debugUtils';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import { debugSaveProxyResponseStream } from '@kilocode/web-shared/lib/debugUtils';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterProviderConfig,
   GatewayRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
-import { toMicrodollars } from '@/lib/microdollars';
-import { normalizeProjectId } from '@/lib/normalizeProjectId';
-import { getXKiloCodeVersionNumber } from '@/lib/userAgent';
-import { getEffectiveProviderPrivacy } from '@/lib/ai-gateway/provider-privacy';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
+import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
+import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { createParser, type EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   findKiloExclusiveModel,
   shouldRedactErrorResponse,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
   PromptInfo,
-} from '@/lib/ai-gateway/processUsage.types';
-import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
-import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
-import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getInferenceProvider } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+} from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { detectContextOverflow } from '@kilocode/web-shared/lib/ai-gateway/context-overflow';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_FREE_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type {
+  GatewayChatApiKind,
+  ProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { computeOpenRouterCostFields } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getInferenceProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 // FIM suffix markers for tracking purposes - used to wrap suffix in a fake system prompt format
 // This allows FIM requests to be tracked consistently with chat requests

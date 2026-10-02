@@ -1,7 +1,7 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   eq,
   and,
@@ -49,8 +49,11 @@ import { baseGetSessionNextOutputSchema } from './cloud-agent-next-schemas';
 import { projectSessionGoal } from '@kilocode/cloud-agent-sdk';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 import { verifyWebhookTriggerAccess } from '@/lib/webhook-trigger-ownership';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { recordKiloAdminElevation, UNSCOPED_TARGET } from '@/lib/admin/admin-access-log';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import {
+  recordKiloAdminElevation,
+  UNSCOPED_TARGET,
+} from '@kilocode/web-shared/lib/admin/admin-access-log';
 import {
   fetchPullRequestByNumber,
   fetchPullRequestReviewDecision,

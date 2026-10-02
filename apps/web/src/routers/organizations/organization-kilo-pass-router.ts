@@ -2,7 +2,7 @@ import { kilo_pass_org_agreements, organizations } from '@kilocode/db/schema';
 import { TRPCError } from '@trpc/server';
 import { desc, eq } from 'drizzle-orm';
 import * as z from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { organizationKiloPassService } from '@/lib/kilo-pass-org/service';
 import { listKiloPassOrganizationInvoices } from '@/lib/kilo-pass-org/billing-history';
 import {
@@ -12,11 +12,11 @@ import {
   scheduleOrganizationKiloPassCancellation,
 } from '@/lib/kilo-pass-org/stripe-adapter';
 import { OrganizationKiloPassCheckoutScheduleError } from '@/lib/kilo-pass-org/cancellation-schedule';
-import { createTRPCRouter } from '@/lib/trpc/init';
-import { client as stripe } from '@/lib/stripe-client';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { ipCountryFromHeaders } from '@kilocode/web-shared/lib/bouncer/credit-events';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -24,7 +24,7 @@ import {
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 
 const TierSchema = z.enum(['tier_19', 'tier_49', 'tier_199']);
 const AllocationSchema = z.object({

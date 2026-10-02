@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { organizationsRouter } from '@/routers/organizations/organization-router';
 import { userRouter } from '@/routers/user-router';
 import { cliSessionsV2Router } from '@/routers/cli-sessions-v2-router';

@@ -1,9 +1,9 @@
-import { ReasoningDetailType } from '@/lib/ai-gateway/custom-llm/reasoning-details';
-import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
+import { ReasoningDetailType } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import type {
   MessageWithReasoning,
   OpenRouterChatCompletionRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
 export function fixOpenCodeDuplicateReasoning(
   requestedModel: string,

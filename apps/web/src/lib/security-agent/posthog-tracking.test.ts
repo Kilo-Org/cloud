@@ -4,7 +4,7 @@ import type {
   trackSecurityAgentUiInteraction as trackSecurityAgentUiInteractionType,
 } from './posthog-tracking';
 
-jest.mock('@/lib/posthog', () => {
+jest.mock('@kilocode/web-shared/lib/posthog', () => {
   const mockCapture = jest.fn();
 
   return {
@@ -26,7 +26,9 @@ jest.mock('@sentry/nextjs', () => {
 let trackSecurityAgentRemediationAction: typeof trackSecurityAgentRemediationActionType;
 let trackSecurityAgentUiInteraction: typeof trackSecurityAgentUiInteractionType;
 
-const posthogMock: { mockCapture: jest.Mock } = jest.requireMock('@/lib/posthog');
+const posthogMock: { mockCapture: jest.Mock } = jest.requireMock(
+  '@kilocode/web-shared/lib/posthog'
+);
 const sentryMock: { mockCaptureException: jest.Mock } = jest.requireMock('@sentry/nextjs');
 const { mockCapture } = posthogMock;
 const { mockCaptureException } = sentryMock;

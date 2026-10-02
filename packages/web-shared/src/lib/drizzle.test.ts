@@ -1,4 +1,9 @@
-import { pool, db, selectReplicaUrl, shouldExitOnPoolError } from '@/lib/drizzle';
+import {
+  pool,
+  db,
+  selectReplicaUrl,
+  shouldExitOnPoolError,
+} from '@kilocode/web-shared/lib/drizzle';
 
 describe('drizzle', () => {
   describe('pool', () => {

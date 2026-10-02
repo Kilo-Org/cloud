@@ -17,10 +17,10 @@ import { UserTablePagination } from '../components/UserTablePagination';
 import { UserSearchInput } from '../components/UserSearchInput';
 import { UserAvatarLink } from '../components/UserAvatarLink';
 import type { SortConfig, SortableField } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 import { formatMicrodollars } from '@/lib/admin-utils';
 import { formatIsoDateTime_IsoOrderNoSeconds } from '@/lib/utils';
-import type { CreditCategoryUsersApiResponse } from '@/lib/PromoCreditCategoryConfig';
+import type { CreditCategoryUsersApiResponse } from '@kilocode/web-shared/lib/PromoCreditCategoryConfig';
 
 interface CreditCategoryUsersProps {
   creditCategoryKey: string;

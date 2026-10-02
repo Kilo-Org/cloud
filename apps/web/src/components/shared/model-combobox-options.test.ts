@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { preferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
 import type { ModelOption } from './ModelCombobox';
 import { buildModelOptionGroups, getModelOptionKeywords } from './model-combobox-options';
 

@@ -15,7 +15,7 @@ const mockConfig = {
   GOOGLE_PLAY_INTEGRITY_CERT_DIGESTS: 'test-cert-digest',
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME() {
     return mockConfig.GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME;
   },

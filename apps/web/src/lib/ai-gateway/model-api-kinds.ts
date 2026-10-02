@@ -1,6 +1,6 @@
-import { findKiloExclusiveModel } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import type { GatewayChatApiKind } from '@/lib/ai-gateway/providers/types';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import type { GatewayChatApiKind } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 const GATEWAY_CHAT_API_KINDS: readonly GatewayChatApiKind[] = [
   'chat_completions',

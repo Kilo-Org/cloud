@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
-    '@/lib/ai-gateway/providers/gateway-models-cache'
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
@@ -17,10 +17,10 @@ import {
   KILO_AUTO_FREE_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
-} from '@/lib/ai-gateway/auto-model';
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 const { resolveAutoModel, applyResolvedAutoModel } =
   jest.requireActual<typeof AutoModelResolution>('./resolution');
@@ -39,7 +39,7 @@ const zeroBalancePromise = Promise.resolve(0);
 const primaryDefaultFallback = { model: PRIMARY_DEFAULT_MODEL };
 const { getOpenRouterModelsFromDatabase: mockedGetOpenRouterModels } = jest.requireMock<
   jest.Mocked<typeof GatewayModelsCache>
->('@/lib/ai-gateway/providers/gateway-models-cache');
+>('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 
 const sampleDecision: AutoRoutingDecision = {
   model: 'anthropic/claude-haiku-4',

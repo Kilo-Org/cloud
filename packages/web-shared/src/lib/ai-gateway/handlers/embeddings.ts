@@ -1,15 +1,15 @@
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
+import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -24,32 +24,32 @@ import {
   temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import {
   getEffectiveProviderPrivacy,
   providerPrivacySchema,
-} from '@/lib/ai-gateway/provider-privacy';
+} from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import {
   createAnonymousContext,
   isAnonymousContext,
   type AnonymousUserContext,
-} from '@/lib/anonymous';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/anonymous';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
   buildUpstreamBody,
   type EmbeddingProxyRequest,
   validateEmbeddingDimensions,
-} from '@/lib/ai-gateway/embeddings/embedding-request';
-import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
-import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
-import type { Provider } from '@/lib/ai-gateway/providers/types';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+} from '@kilocode/web-shared/lib/ai-gateway/embeddings/embedding-request';
+import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 

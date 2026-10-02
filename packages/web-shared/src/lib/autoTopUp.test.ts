@@ -1,16 +1,22 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_top_up_configs, kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User, Organization } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization, addUserToOrganization } from '@/lib/organizations/organizations';
-import { maybePerformAutoTopUp, maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
-import { sendAutoTopUpFailedEmail } from '@/lib/email';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import {
+  createOrganization,
+  addUserToOrganization,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+} from '@kilocode/web-shared/lib/autoTopUp';
+import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
   ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
-} from '@/lib/autoTopUpConstants';
-import type { UserForBalance } from '@/lib/user/balance-types';
+} from '@kilocode/web-shared/lib/autoTopUpConstants';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import {
   credit_transactions,
   kilo_pass_issuance_items,
@@ -22,23 +28,25 @@ import {
   KiloPassIssuanceItemKind,
   type KiloPassIssuanceSource,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import crypto from 'node:crypto';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
-import { reportCreditEvent } from '@/lib/bouncer/client';
+import type * as bouncerClientModule from '@kilocode/web-shared/lib/bouncer/client';
+import { reportCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
 import Stripe from 'stripe';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
 
 // Mock email sending to avoid CustomerIO errors in tests
-jest.mock('@/lib/email', () => ({
+jest.mock('@kilocode/web-shared/lib/email', () => ({
   sendAutoTopUpFailedEmail: jest.fn().mockResolvedValue({ sent: true }),
 }));
 
 // Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
   return {
     __esModule: true,
     ...actual,
@@ -46,7 +54,7 @@ jest.mock('@/lib/bouncer/client', () => {
   };
 });
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   return {
     client: {
       invoices: {
@@ -574,8 +582,8 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
       next_yearly_issue_at: null,
     });
 
-    const { client } = await import('@/lib/stripe-client');
-    const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
+    const { maybePerformAutoTopUp } = await import('@kilocode/web-shared/lib/autoTopUp');
 
     await maybePerformAutoTopUp(user);
 
@@ -652,7 +660,7 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
       bonus_percent_applied: 0.1,
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     (client.invoices.create as jest.Mock).mockResolvedValue({
       id: 'inv_test_1',
       created: 1_700_000_000,
@@ -664,7 +672,7 @@ describe('maybePerformAutoTopUp with Kilo Pass', () => {
     (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_test_1' });
     (client.invoices.pay as jest.Mock).mockResolvedValue({ status: 'paid' });
 
-    const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
+    const { maybePerformAutoTopUp } = await import('@kilocode/web-shared/lib/autoTopUp');
 
     await maybePerformAutoTopUp(user);
 
@@ -693,7 +701,7 @@ describe('invoice metadata includes traceId', () => {
       disabled_reason: null,
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     (client.invoices.create as jest.Mock).mockResolvedValue({
       id: 'inv_trace_test',
       created: 1_700_000_000,
@@ -705,7 +713,7 @@ describe('invoice metadata includes traceId', () => {
     (client.invoiceItems.create as jest.Mock).mockResolvedValue({ id: 'ii_trace_test' });
     (client.invoices.pay as jest.Mock).mockResolvedValue({ id: 'inv_trace_test', status: 'paid' });
 
-    const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
+    const { maybePerformAutoTopUp } = await import('@kilocode/web-shared/lib/autoTopUp');
     await maybePerformAutoTopUp(user);
 
     const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -763,7 +771,7 @@ describe('invoice metadata includes traceId', () => {
       disabled_reason: null,
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     (client.invoices.create as jest.Mock).mockResolvedValue({
       id: 'inv_decline_test',
       created: 1_700_000_000,
@@ -780,7 +788,7 @@ describe('invoice metadata includes traceId', () => {
       })
     );
 
-    const { maybePerformAutoTopUp } = await import('@/lib/autoTopUp');
+    const { maybePerformAutoTopUp } = await import('@kilocode/web-shared/lib/autoTopUp');
     await maybePerformAutoTopUp(user);
 
     expect(reportCreditEvent).toHaveBeenCalledWith(

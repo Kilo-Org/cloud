@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { and, count, eq, gte, sql } from 'drizzle-orm';
 import {
@@ -6,7 +6,7 @@ import {
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   PROMOTION_WINDOW_HOURS,
   PROMOTION_MAX_REQUESTS,
-} from '@/lib/constants';
+} from '@kilocode/web-shared/lib/constants';
 
 export type RateLimitResult = {
   allowed: boolean;

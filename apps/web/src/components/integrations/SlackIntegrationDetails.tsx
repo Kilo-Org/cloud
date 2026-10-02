@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { IS_DEVELOPMENT } from '@/lib/constants';
+import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import { PLATFORM } from '@/lib/integrations/core/constants';

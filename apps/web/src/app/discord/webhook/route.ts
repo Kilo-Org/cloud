@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { after, NextResponse } from 'next/server';
 import { InteractionType, InteractionResponseType } from 'discord-interactions';
 import { verifyDiscordRequest } from '@/lib/discord/verify-request';
-import { DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY } from '@/lib/config.server';
+import { DISCORD_BOT_TOKEN, DISCORD_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
 import { processDiscordBotMessage } from '@/lib/discord-bot';
 import {
   postDiscordMessage,

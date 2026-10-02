@@ -6,7 +6,9 @@ import {
   GitHubIntegrationDetails,
 } from './GitHubIntegrationDetails';
 
-jest.mock('@/lib/config.server', () => ({ NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret' }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  NEXTAUTH_SECRET: 'synthetic-oauth-signing-secret',
+}));
 
 describe('GitHub user-connect recovery copy', () => {
   test.each([

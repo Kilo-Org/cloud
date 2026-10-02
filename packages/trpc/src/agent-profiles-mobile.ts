@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { agentProfilesRouter } from '@/routers/agent-profiles-router';
 
 /**

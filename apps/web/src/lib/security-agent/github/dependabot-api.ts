@@ -15,7 +15,11 @@ import type {
   DependabotAlertsAvailability,
   DependabotAlertState,
 } from '../core/types';
-import { errorExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
+import {
+  errorExceptInTest,
+  sentryLogger,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 
 const log = sentryLogger('security-agent:dependabot-api', 'info');
 const warn = sentryLogger('security-agent:dependabot-api', 'warning');

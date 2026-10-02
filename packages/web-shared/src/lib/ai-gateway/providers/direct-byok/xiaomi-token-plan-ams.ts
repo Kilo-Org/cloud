@@ -1,5 +1,5 @@
-import type { DirectByokProvider } from '@/lib/ai-gateway/providers/direct-byok/types';
-import { cachedEnhancedDirectByokModelList } from '@/lib/ai-gateway/providers/direct-byok/model-list';
+import type { DirectByokProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 
 export default {
   id: 'xiaomi-token-plan-ams',

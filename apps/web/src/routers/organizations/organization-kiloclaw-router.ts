@@ -2,8 +2,8 @@ import 'server-only';
 
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
-import { createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { createTRPCRouter, UpstreamApiError } from '@kilocode/web-shared/lib/trpc/init';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   AgentIdSchema,
@@ -29,10 +29,13 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import {
+  KILOCLAW_API_URL,
+  KILOCLAW_INSTANCE_URL_TEMPLATE,
+} from '@kilocode/web-shared/lib/config.server';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
-import { sentryLogger } from '@/lib/utils.server';
-import { db } from '@/lib/drizzle';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   kiloclaw_version_pins,
   kiloclaw_image_catalog,
@@ -63,10 +66,10 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
   organizationBillingProcedure,
-} from '@/routers/organizations/utils';
-import { requireOrganizationKiloClawComputeEntitlement } from '@/lib/organizations/trial-middleware';
+} from '@kilocode/web-shared/routers/organizations/utils';
+import { requireOrganizationKiloClawComputeEntitlement } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
 
 /** Error codes whose messages may contain raw internal details. */

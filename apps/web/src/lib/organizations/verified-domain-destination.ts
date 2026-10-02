@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { db } from '@/lib/drizzle';
-import type { ProfileOrganization } from '@/lib/organizations/organizations';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import type { ProfileOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { verifiedDomainEmailIdentity } from '@/lib/organizations/verified-domain';
 import { organization_domain_claims, type Organization, type User } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';

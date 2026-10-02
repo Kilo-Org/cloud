@@ -10,14 +10,18 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 import type * as BouncerClient from '@/lib/bouncer/client';
+import { parseBouncerCreditEventBody } from '@/lib/bouncer/credit-event-schema';
 
 // SWC + static ESM imports do not see jest.mock replacements on the same module id, so the client
 // is loaded after the config mock is registered (same convention as the store-completion tests).
 let deliverCreditEvent: typeof BouncerClient.deliverCreditEvent;
 let decide: typeof BouncerClient.decide;
+let reportUsageEvent: typeof BouncerClient.reportUsageEvent;
+let creditEventWireBody: typeof BouncerClient.creditEventWireBody;
+let normalizeJa4: typeof BouncerClient.normalizeJa4;
 
 beforeAll(() => {
-  ({ deliverCreditEvent, decide } =
+  ({ deliverCreditEvent, decide, reportUsageEvent, creditEventWireBody, normalizeJa4 } =
     jest.requireActual<typeof BouncerClient>('@/lib/bouncer/client'));
 });
 
@@ -135,5 +139,142 @@ describe('decide', () => {
     await expect(
       decide({ requestId: 'r', tier: 'free', accountId: 'org:o' }, { timeoutMs: 50 })
     ).resolves.toBeNull();
+  });
+});
+
+function lastRequestBody(): Record<string, unknown> {
+  const call = mockFetch.mock.calls[mockFetch.mock.calls.length - 1];
+  const body = call?.[1]?.body;
+  return JSON.parse(String(body)) as Record<string, unknown>;
+}
+
+describe('normalizeJa4', () => {
+  it('keeps a bounded lowercase digest unchanged', () => {
+    expect(normalizeJa4('t13d1516h2_8daaf6152771_b1ff8ab')).toBe('t13d1516h2_8daaf6152771_b1ff8ab');
+  });
+
+  it('trims and lowercases without otherwise rewriting the value', () => {
+    expect(normalizeJa4('  T13D1516H2_8DAAF6  ')).toBe('t13d1516h2_8daaf6');
+  });
+
+  it('keeps a value at the 128-character boundary', () => {
+    const value = 'a'.repeat(128);
+    expect(normalizeJa4(value)).toBe(value);
+  });
+
+  it('omits an empty, over-long, or otherwise invalid value whole, never truncated', () => {
+    expect(normalizeJa4(undefined)).toBeUndefined();
+    expect(normalizeJa4(null)).toBeUndefined();
+    expect(normalizeJa4('')).toBeUndefined();
+    expect(normalizeJa4('   ')).toBeUndefined();
+    expect(normalizeJa4('has space')).toBeUndefined();
+    expect(normalizeJa4('has-dash')).toBeUndefined();
+    expect(normalizeJa4('a'.repeat(129))).toBeUndefined();
+  });
+});
+
+describe('reportUsageEvent ja4', () => {
+  const baseEvent = {
+    requestId: 'r-ja4',
+    tier: 'anonymous' as const,
+    ip: '203.0.113.7',
+    inputTokens: 1,
+    outputTokens: 2,
+    clientAttributed: false,
+    hasTools: false,
+    requestedLogprobs: false,
+  };
+
+  it('sends a normalized ja4 while keeping the anonymous identity', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent({ ...baseEvent, ja4: 'T13D1516H2_8DAA' });
+    const body = lastRequestBody();
+    expect(body.ja4).toBe('t13d1516h2_8daa');
+    expect(body.tier).toBe('anonymous');
+  });
+
+  it('omits an invalid ja4 without dropping the whole usage event', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent({ ...baseEvent, ja4: 'not a digest!' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(lastRequestBody()).not.toHaveProperty('ja4');
+  });
+
+  it('omits ja4 when the request did not carry one', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent(baseEvent);
+    expect(lastRequestBody()).not.toHaveProperty('ja4');
+  });
+});
+
+describe('decide ja4', () => {
+  it('sends a bounded ja4 on a signed-in decide', async () => {
+    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    await decide(
+      { requestId: 'r', tier: 'free', accountId: 'user:u', ip: '203.0.113.7', ja4: 'A_B' },
+      { timeoutMs: 50 }
+    );
+    expect(lastRequestBody().ja4).toBe('a_b');
+  });
+});
+
+describe('creditEventWireBody ja4', () => {
+  it('carries a normalized ja4 on a request-initiated charge.attempted', () => {
+    const body = creditEventWireBody({
+      type: 'charge.attempted',
+      eventId: 'evt-ja4',
+      userId: 'user-1',
+      flow: 'topup',
+      amountCents: 100,
+      accountCreatedAt: new Date('2026-01-01T00:00:00Z'),
+      ja4: 'A_B',
+    });
+    expect(body.ja4).toBe('a_b');
+  });
+
+  it('omits an invalid ja4 rather than sending it', () => {
+    const body = creditEventWireBody({
+      type: 'charge.attempted',
+      eventId: 'evt-ja4-bad',
+      userId: 'user-1',
+      flow: 'topup',
+      amountCents: 100,
+      accountCreatedAt: new Date('2026-01-01T00:00:00Z'),
+      ja4: 'x'.repeat(200),
+    });
+    expect(body).not.toHaveProperty('ja4');
+  });
+
+  it('never emits ja4 on a store event', () => {
+    const body = creditEventWireBody({
+      type: 'store.purchase',
+      eventId: 'e',
+      userId: 'u',
+      provider: 'apple',
+      referenceId: 'ref',
+    });
+    expect(body).not.toHaveProperty('ja4');
+  });
+});
+
+describe('parseBouncerCreditEventBody ja4', () => {
+  it('preserves a persisted ja4 on a charge body', () => {
+    const parsed = parseBouncerCreditEventBody({
+      type: 'charge.attempted',
+      eventId: 'e',
+      userId: 'u',
+      ja4: 'a_b',
+    });
+    expect(parsed?.ja4).toBe('a_b');
+  });
+
+  it('preserves a charge body without ja4', () => {
+    const parsed = parseBouncerCreditEventBody({
+      type: 'charge.failed',
+      eventId: 'e',
+      userId: 'u',
+    });
+    expect(parsed).not.toBeNull();
+    expect(parsed).not.toHaveProperty('ja4');
   });
 });

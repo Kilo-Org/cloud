@@ -273,6 +273,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Inference reports remain report-only and never gate the provider request. [SERVER]
   - Usage and decide requests have 30-second transport budgets. Every inference endpoint reports its API kind.
   - Anonymous usage uses the client IP, without a payer. Signed-in usage excludes shared infrastructure addresses for server-side Kilo features.
+  - Usage, decide, and request-initiated `charge.attempted` events carry the Vercel `x-vercel-ja4-digest` client fingerprint when the request has a valid one, lowercased and bounded to `^[a-z0-9_]{1,128}$`; a missing or invalid header is omitted whole, never truncated. It describes the client TLS/HTTP characteristics of the peer that reached Kilo's edge (often shared proxy infrastructure), not a person or device, and is correlation evidence only — see https://vercel.com/docs/vercel-firewall/firewall-concepts.
   - Financial events enter the durable `bouncer_credit_event_outbox` before acknowledgment. The dispatcher sends `/api/v2/credit-event` with a 5-second transport budget.
   - Delivery retries use the same event ID and type. Eight failed attempts produce a visible terminal failure; terminal rows remain for 30 days.
   - Apple `originalTransactionId` identifies a subscription chain, not an Apple ID. Refund requests and declined requests use distinct event types.

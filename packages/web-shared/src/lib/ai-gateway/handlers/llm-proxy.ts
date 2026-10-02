@@ -122,7 +122,7 @@ import {
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
-import { bouncerAccountId } from '@/lib/bouncer/client';
+import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecide,
@@ -586,17 +586,26 @@ export async function handleLlmProxyRequest(
     user = maybeUser;
   }
 
+  // Fraud/project headers are pure header parsing; resolve them once here so
+  // decide, usage, and the classifier-overhead billing below share one read.
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+
   // Start the report-only verdict alongside balance and provider work. Register
   // it with after() now so early returns do not end its lifetime. The event id is
   // generated server-side so decide and usage share one identity for this request.
   const bouncerRequestId = randomUUID();
   after(
     (isAnonymousContext(user)
-      ? bouncerDecide({ requestId: bouncerRequestId, ip: clientIp })
+      ? bouncerDecide({
+          requestId: bouncerRequestId,
+          ip: clientIp,
+          ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
+        })
       : balanceAndSettingsPromise.then(({ balance, plan }) =>
           bouncerDecide({
             requestId: bouncerRequestId,
             ip: clientIp,
+            ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
             account: {
               accountId: bouncerAccountId(user.id, organizationId),
               tier: bouncerDecideTier(organizationId, plan, balance),
@@ -608,11 +617,6 @@ export async function handleLlmProxyRequest(
       () => undefined
     )
   );
-
-  // Fraud/project headers are pure header parsing; resolve them here so the
-  // classifier-overhead billing below can be scheduled before any downstream
-  // rejection path runs.
-  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
   // Bill the classifier overhead as soon as the cost is known and we have an
   // authenticated user — via after(), so the row is persisted even when the

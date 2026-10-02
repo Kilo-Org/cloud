@@ -45,6 +45,14 @@ type CreditSubject = {
   cardFingerprint?: string | null;
   /** The client IP. Omit it for an off-session charge. */
   ip?: string | null;
+  /**
+   * The bounded opaque client-fingerprint digest from the Vercel `x-vercel-ja4-digest`
+   * header, when the request carried a valid one. It describes the client TLS/HTTP
+   * fingerprint of the peer that reached Kilo's edge (often shared proxy
+   * infrastructure, not the end user or a device), so it is correlation evidence
+   * only. Omit it when the header is missing or invalid; never truncate it.
+   */
+  ja4?: string | null;
 };
 
 /** The store that sent a money event. */
@@ -128,6 +136,13 @@ type UsageEventFields = {
   apiKind?: ApiKind;
   /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
   ip?: string | null;
+  /**
+   * The bounded opaque client-fingerprint digest from the Vercel `x-vercel-ja4-digest`
+   * header, when the request carried a valid one. Omit it when the header is missing or
+   * invalid. It fingerprints the client TLS/HTTP characteristics of the peer that reached
+   * Kilo's edge, not a person or device.
+   */
+  ja4?: string | null;
   inputTokens: number;
   outputTokens: number;
   /** True if the request came from a known Kilo client: a known feature value or a Kilo version header. */
@@ -154,13 +169,20 @@ export type UsageEvent =
 export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
 
 export type DecideRequest =
-  | { requestId: string; tier: 'anonymous'; ip: string }
+  | { requestId: string; tier: 'anonymous'; ip: string; ja4?: string | null }
   | {
       requestId: string;
       tier: Exclude<DecideTier, 'anonymous'>;
       accountId: string;
       /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
       ip?: string | null;
+      /**
+       * The bounded opaque client-fingerprint digest from the Vercel `x-vercel-ja4-digest`
+       * header, when the request carried a valid one. Omit it when the header is missing or
+       * invalid. It fingerprints the client TLS/HTTP characteristics of the peer that reached
+       * Kilo's edge, not a person or device.
+       */
+      ja4?: string | null;
     };
 
 export type DecideVerdict = {
@@ -198,6 +220,20 @@ function country(value: string | null | undefined): string | undefined {
 
 function id(value: string | null | undefined): string | undefined {
   return value ? value.slice(0, MAX_ID_LENGTH) : undefined;
+}
+
+/**
+ * Bouncer's accepted client-fingerprint digest: a bounded, opaque token. The Vercel
+ * `x-vercel-ja4-digest` header may carry a standard JA4 string or a hash, so this only bounds
+ * the shape (`^[a-z0-9_]{1,128}$`) instead of decoding TLS fields. Trim and lowercase, then keep
+ * the value only while it matches; an over-long or otherwise invalid value is dropped whole —
+ * never truncated or substringed, so an identity is never silently rewritten.
+ */
+const JA4_DIGEST = /^[a-z0-9_]{1,128}$/;
+
+export function normalizeJa4(value: string | null | undefined): string | undefined {
+  const normalized = value?.trim().toLowerCase();
+  return normalized && JA4_DIGEST.test(normalized) ? normalized : undefined;
 }
 
 /**
@@ -322,7 +358,8 @@ function isStoreCreditEvent(event: CreditEvent): event is StoreCreditEvent {
 export function creditEventWireBody(event: CreditEvent): Record<string, unknown> {
   if (isStoreCreditEvent(event)) {
     return compact({
-      // A store event carries no card and no client IP: bouncer's typia types reject both.
+      // A store event carries no card, client IP, or client fingerprint:
+      // bouncer's typia types reject all three.
       eventId: bouncerWireEventId(event.eventId),
       occurredAt: isoTime(event.occurredAt),
       userId: id(event.userId),
@@ -346,6 +383,7 @@ export function creditEventWireBody(event: CreditEvent): Record<string, unknown>
     orgId: id(event.orgId),
     cardFingerprint: id(event.cardFingerprint),
     ip: event.ip ?? undefined,
+    ja4: normalizeJa4(event.ja4),
   };
   switch (event.type) {
     case 'charge.attempted':
@@ -418,6 +456,7 @@ export async function reportUsageEvent(event: UsageEvent): Promise<void> {
     occurredAt: isoTime(event.occurredAt),
     apiKind: event.apiKind,
     ip: event.ip ?? undefined,
+    ja4: normalizeJa4(event.ja4),
     inputTokens: Math.max(0, Math.round(event.inputTokens)),
     outputTokens: Math.max(0, Math.round(event.outputTokens)),
     clientAttributed: event.clientAttributed,
@@ -445,12 +484,18 @@ export async function decide(
 ): Promise<DecideVerdict | null> {
   const body =
     request.tier === 'anonymous'
-      ? { requestId: id(request.requestId), tier: request.tier, ip: request.ip }
+      ? {
+          requestId: id(request.requestId),
+          tier: request.tier,
+          ip: request.ip,
+          ja4: normalizeJa4(request.ja4),
+        }
       : compact({
           requestId: id(request.requestId),
           tier: request.tier,
           accountId: request.accountId,
           ip: request.ip ?? undefined,
+          ja4: normalizeJa4(request.ja4),
         });
   return (await post(DECIDE_PATH, body, timeoutMs, signal)) as DecideVerdict | null;
 }

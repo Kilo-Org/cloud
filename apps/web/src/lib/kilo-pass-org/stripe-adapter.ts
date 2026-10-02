@@ -1238,6 +1238,7 @@ export async function createOrganizationKiloPassCheckout(input: {
       accountCreatedAt: input.attempt.accountCreatedAt,
       ip: input.attempt.ip,
       ipCountry: input.attempt.ipCountry,
+      ja4: input.attempt.ja4,
     });
   }
   let feeResult: Awaited<ReturnType<typeof attachPreparedOrganizationKiloPassServiceFee>> | null =

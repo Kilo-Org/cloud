@@ -315,6 +315,7 @@ async function reportSeatChangeAttempt(params: {
   userId: string;
   ip?: string | null;
   ipCountry?: string | null;
+  ja4?: string | null;
 }): Promise<void> {
   const organizationId = params.subscription.metadata?.organizationId;
   if (!organizationId) {
@@ -336,6 +337,7 @@ async function reportSeatChangeAttempt(params: {
     accountCreatedAt: organization.createdAt,
     ip: params.ip,
     ipCountry: params.ipCountry,
+    ja4: params.ja4,
   });
 }
 
@@ -1994,6 +1996,7 @@ export async function getStripeTopUpCheckoutUrl(
       ipCountry: attempt.ipCountry,
       cardFingerprint: attempt.cardFingerprint,
       cardCountry: attempt.cardCountry,
+      ja4: attempt.ja4,
     });
   }
 
@@ -2156,6 +2159,7 @@ export async function getStripeSeatsCheckoutUrl(
         accountCreatedAt: props.attempt.accountCreatedAt,
         ip: props.attempt.ip,
         ipCountry: props.attempt.ipCountry,
+        ja4: props.attempt.ja4,
       });
     }
 
@@ -2321,6 +2325,7 @@ export async function handleUpdateSeatCount(
     userId: string;
     ip?: string | null;
     ipCountry?: string | null;
+    ja4?: string | null;
   }
 ): Promise<UpdateSeatCountResult> {
   const isIncreasingSeats = currentSeatCount < newSeatCount;
@@ -2503,6 +2508,7 @@ export async function handleUpdateSeatCount(
           userId: attempt.userId,
           ip: attempt.ip,
           ipCountry: attempt.ipCountry,
+          ja4: attempt.ja4,
         }).catch(error => {
           captureException(error, { tags: { source: 'bouncer_charge_attempted' } });
         });

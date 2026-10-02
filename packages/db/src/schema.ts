@@ -11619,8 +11619,8 @@ export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.
  * is recreated, but it keeps its original `occurredAt`, so bouncer's standing
  * (current) computation still does not double-count it. `payload` holds the
  * shaped wire body for the event and carries account PII (user id, client ip,
- * card fingerprint); `user_id` is denormalized onto the row so user soft
- * deletion can delete it.
+ * card fingerprint, JA4 client-fingerprint digest); `user_id` is denormalized
+ * onto the row so user soft deletion can delete it.
  */
 export type BouncerCreditEventOutboxPayload = Record<string, unknown>;
 

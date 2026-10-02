@@ -52,7 +52,11 @@ import { AuthProviderIdSchema } from '@/lib/auth/provider-metadata';
 import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { createAutoTopUpSetupCheckoutSession } from '@/lib/stripe';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@/lib/bouncer/credit-events';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@/lib/autoTopUpConstants';
 import {
@@ -967,6 +971,7 @@ export const userRouter = createTRPCRouter({
             accountCreatedAt: ctx.user.created_at,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           });
           const redirectUrl = await createAutoTopUpSetupCheckoutSession(
             ctx.user.id,
@@ -997,6 +1002,7 @@ export const userRouter = createTRPCRouter({
         accountCreatedAt: ctx.user.created_at,
         ip: ctx.ip,
         ipCountry: ipCountryFromHeaders(ctx.headersList),
+        ja4: ja4FromHeaders(ctx.headersList),
       });
       const redirectUrl = await createAutoTopUpSetupCheckoutSession(
         ctx.user.id,

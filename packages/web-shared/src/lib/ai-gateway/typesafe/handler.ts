@@ -35,7 +35,7 @@ import {
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
-import { bouncerAccountId } from '@/lib/bouncer/client';
+import { bouncerAccountId, normalizeJa4 } from '@/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
@@ -136,6 +136,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   scheduleBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
+    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
       tier: bouncerDecideTier(organizationId, plan, balance),

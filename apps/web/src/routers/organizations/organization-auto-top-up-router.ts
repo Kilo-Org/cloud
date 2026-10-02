@@ -19,7 +19,11 @@ import { createOrgAutoTopUpSetupCheckoutSession } from '@/lib/organizations/orga
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@/lib/bouncer/credit-events';
 
 /**
  * Durably enqueues the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers
@@ -45,6 +49,7 @@ async function reportOrgAutoTopUpAttempt(params: {
     accountCreatedAt: organization.created_at,
     ip: params.ip,
     ipCountry: ipCountryFromHeaders(params.headers),
+    ja4: ja4FromHeaders(params.headers),
   });
 }
 

@@ -28,7 +28,11 @@ import {
 } from '@/lib/service-fees/checkout';
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { APP_URL } from '@/lib/constants';
-import { enqueueChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  enqueueChargeAttempted,
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@/lib/bouncer/credit-events';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -2944,6 +2948,7 @@ export const kiloPassRouter = createTRPCRouter({
             accountCreatedAt: ctx.user.created_at,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           }),
       });
     }),

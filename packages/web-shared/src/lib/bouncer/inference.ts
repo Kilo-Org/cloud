@@ -83,18 +83,23 @@ export function bouncerDecideTier(
 export function bouncerDecide(params: {
   requestId: string;
   ip: string | undefined;
+  /** Normalized client-fingerprint digest, when the request carried a valid header. */
+  ja4?: string | undefined;
   account?: { accountId: string; tier: Exclude<DecideTier, 'anonymous'> };
 }): Promise<DecideVerdict | null> {
-  const { requestId, ip, account } = params;
+  const { requestId, ip, ja4, account } = params;
   if (account) {
     return decide(
-      { requestId, tier: account.tier, accountId: account.accountId, ip },
+      { requestId, tier: account.tier, accountId: account.accountId, ip, ja4 },
       { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
     );
   }
   // Anonymous verdicts are keyed on the IP; without one there is nothing to ask.
   if (ip === undefined) return Promise.resolve(null);
-  return decide({ requestId, tier: 'anonymous', ip }, { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS });
+  return decide(
+    { requestId, tier: 'anonymous', ip, ja4 },
+    { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
+  );
 }
 
 /**
@@ -105,6 +110,8 @@ export function bouncerDecide(params: {
 export function scheduleBouncerDecide(params: {
   requestId: string;
   ip: string | undefined;
+  /** Normalized client-fingerprint digest, when the request carried a valid header. */
+  ja4?: string | undefined;
   account?: { accountId: string; tier: Exclude<DecideTier, 'anonymous'> };
 }): void {
   after(

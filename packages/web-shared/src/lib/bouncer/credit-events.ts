@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import {
   bouncerWireEventId,
   creditEventWireBody,
+  normalizeJa4,
   type CreditEvent,
   type CreditFlow,
 } from '@/lib/bouncer/client';
@@ -24,6 +25,15 @@ const logWarning = sentryLogger('bouncer-credit-event-outbox', 'warning');
 /** `x-vercel-ip-country` from request headers, for a bouncer `ipCountry`. */
 export function ipCountryFromHeaders(headers?: Headers | null): string | null {
   return headers?.get('x-vercel-ip-country')?.trim() || null;
+}
+
+/**
+ * `x-vercel-ja4-digest` from request headers, normalized to bouncer's bounded opaque digest
+ * (`^[a-z0-9_]{1,128}$`), or null when the header is missing or invalid. It fingerprints the
+ * client TLS/HTTP characteristics of the peer that reached Kilo's edge, not a person or device.
+ */
+export function ja4FromHeaders(headers?: Headers | null): string | null {
+  return normalizeJa4(headers?.get('x-vercel-ja4-digest')) ?? null;
 }
 
 /**
@@ -81,6 +91,12 @@ export type ChargeAttemptContext = {
   ipCountry?: string | null;
   cardFingerprint?: string | null;
   cardCountry?: string | null;
+  /**
+   * The bounded client-fingerprint digest from the request's Vercel header, when valid. It
+   * fingerprints the client TLS/HTTP characteristics of the peer that reached Kilo's edge, not a
+   * person or device; omit it for an off-session charge, which has no client request.
+   */
+  ja4?: string | null;
 };
 
 /**
@@ -114,6 +130,7 @@ export async function enqueueChargeAttempted(
     ipCountry: params.ipCountry,
     cardFingerprint: params.cardFingerprint,
     cardCountry: params.cardCountry,
+    ja4: params.ja4,
   });
 }
 

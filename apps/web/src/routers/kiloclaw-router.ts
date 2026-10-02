@@ -35,6 +35,7 @@ import {
   enqueueChargeAttempted,
   reportChargeAttempted,
   ipCountryFromHeaders,
+  ja4FromHeaders,
 } from '@/lib/bouncer/credit-events';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
@@ -5064,6 +5065,7 @@ export const kiloclawRouter = createTRPCRouter({
         accountCreatedAt: ctx.user.created_at,
         ip: ctx.ip,
         ipCountry: ipCountryFromHeaders(ctx.headersList),
+        ja4: ja4FromHeaders(ctx.headersList),
       });
 
       const session = await stripe.checkout.sessions.create({
@@ -5353,6 +5355,7 @@ export const kiloclawRouter = createTRPCRouter({
             accountCreatedAt: ctx.user.created_at,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
+            ja4: ja4FromHeaders(ctx.headersList),
           }),
       });
     }),

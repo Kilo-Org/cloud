@@ -90,7 +90,7 @@ import {
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
-import { reportUsageEvent } from '@/lib/bouncer/client';
+import { normalizeJa4, reportUsageEvent } from '@/lib/bouncer/client';
 
 const posthogClient = PostHogClient();
 
@@ -1353,6 +1353,9 @@ async function reportBouncerUsageEvent(
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
     apiKind: usageContext.api_kind,
+    // The client fingerprint comes from the raw fraud headers already carried on
+    // this context; it is bounded here so an invalid header cannot fail the event.
+    ja4: normalizeJa4(usageContext.fraudHeaders.http_x_vercel_ja4_digest),
     inputTokens: usageStats.inputTokens,
     outputTokens: usageStats.outputTokens,
     clientAttributed: bouncer.clientAttributed,

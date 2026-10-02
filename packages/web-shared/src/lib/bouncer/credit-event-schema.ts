@@ -37,6 +37,7 @@ const chargeBodySchema = z
     occurredAt: z.string().optional(),
     cardFingerprint: z.string().optional(),
     ip: z.string().optional(),
+    ja4: z.string().optional(),
     flow: z.string().optional(),
     amountCents: z.number().optional(),
     accountCreatedAt: z.string().optional(),

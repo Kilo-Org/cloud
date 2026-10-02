@@ -1338,6 +1338,7 @@ async function reportBouncerUsageEvent(
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
     accountId: bouncerAccountId(usageContext.kiloUserId, usageContext.organizationId),
+    ip: bouncer.clientIp,
     inputTokens: usageStats.inputTokens,
     outputTokens: usageStats.outputTokens,
     clientAttributed: bouncer.clientAttributed,

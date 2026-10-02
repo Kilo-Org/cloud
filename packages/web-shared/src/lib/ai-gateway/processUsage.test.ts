@@ -1356,6 +1356,7 @@ describe('logMicrodollarUsage', () => {
       bouncer: {
         requestId: 'req-bouncer-1',
         occurredAt: new Date('2026-09-29T10:00:00.000Z'),
+        clientIp: '203.0.113.9',
         clientAttributed: true,
         requestedLogprobs: true,
         samples: 2,
@@ -1369,6 +1370,7 @@ describe('logMicrodollarUsage', () => {
       requestId: 'req-bouncer-1',
       occurredAt: new Date('2026-09-29T10:00:00.000Z'),
       accountId: `user:${user.id}`,
+      ip: '203.0.113.9',
       inputTokens: 100,
       outputTokens: 50,
       clientAttributed: true,

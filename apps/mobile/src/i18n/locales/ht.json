@@ -2636,6 +2636,7 @@
       "provider": "Founisè",
       "totalCost": "Pri total",
       "usageReflectsLatest": "Itilizasyon sa a baze sou dènye repons asistan an fin bay la.",
+      "usageUnavailable": "Itilizasyon kontèks la pa disponib",
       "tokenUsage": "Itilizasyon jeton",
       "cacheRate": "Pousantaj kach",
       "modelsCount": "Modèl ({{displayCount}})",

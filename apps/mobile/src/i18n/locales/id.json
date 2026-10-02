@@ -2123,6 +2123,7 @@
       "provider": "Penyedia",
       "totalCost": "Total biaya",
       "usageReflectsLatest": "Data penggunaan dihitung dari respons asisten terakhir yang sudah selesai.",
+      "usageUnavailable": "Penggunaan konteks tidak tersedia",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Persentase cache",
       "modelsCount": "Model ({{displayCount}})",

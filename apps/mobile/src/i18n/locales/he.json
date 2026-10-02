@@ -2145,6 +2145,7 @@
       "provider": "ספק",
       "totalCost": "עלות כוללת",
       "usageReflectsLatest": "נתוני השימוש משקפים את תשובת העוזר האחרונה שהושלמה.",
+      "usageUnavailable": "ניצול ההקשר אינו זמין",
       "tokenUsage": "שימוש בטוקנים",
       "cacheRate": "שיעור השימוש במטמון",
       "modelsCount": "מודלים ({{displayCount}})",

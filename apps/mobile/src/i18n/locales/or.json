@@ -2636,6 +2636,7 @@
       "provider": "ସେବା ପ୍ରଦାନକାରୀ",
       "totalCost": "ମୋଟ ଖର୍ଚ୍ଚ",
       "usageReflectsLatest": "ଏହି ବ୍ୟବହାର ତଥ୍ୟ ସହାୟକର ସଦ୍ୟ ସମାପ୍ତ ଉତ୍ତର ଉପରେ ଆଧାରିତ।",
+      "usageUnavailable": "ପ୍ରସଙ୍ଗ ବ୍ୟବହାର ଅନୁପଲବ୍ଧ",
       "tokenUsage": "ଟୋକନ୍ ବ୍ୟବହାର",
       "cacheRate": "କ୍ୟାଶ୍ ହାର",
       "modelsCount": "ମଡେଲ୍ ({{displayCount}})",

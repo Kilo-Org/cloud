@@ -2636,6 +2636,7 @@
       "provider": "ಪೂರೈಕೆದಾರ",
       "totalCost": "ಒಟ್ಟು ವೆಚ್ಚ",
       "usageReflectsLatest": "ಇಲ್ಲಿ ತೋರಿಸಿರುವ ಬಳಕೆಯು ಸಹಾಯಕನ ಕೊನೆಯ ಪೂರ್ಣಗೊಂಡ ಪ್ರತಿಕ್ರಿಯೆಗೆ ಸಂಬಂಧಿಸಿದೆ.",
+      "usageUnavailable": "ಸಂದರ್ಭ ಬಳಕೆ ಲಭ್ಯವಿಲ್ಲ",
       "tokenUsage": "ಟೋಕನ್ ಬಳಕೆ",
       "cacheRate": "ಕ್ಯಾಶ್ ಬಳಕೆಯ ಪ್ರಮಾಣ",
       "modelsCount": "ಮಾದರಿಗಳು ({{displayCount}})",

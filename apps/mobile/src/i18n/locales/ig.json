@@ -2636,6 +2636,7 @@
       "provider": "Onye na-enye ọrụ",
       "totalCost": "Ngụkọta ọnụ ahịa",
       "usageReflectsLatest": "Ojiji a sitere na nzaghachi ikpeazụ onye inyeaka mechara.",
+      "usageUnavailable": "Ojiji nke context adịghị",
       "tokenUsage": "Ojiji tokin",
       "cacheRate": "Pasent sitere na nchekwa nwa oge",
       "modelsCount": "Ihe nlereanya ({{displayCount}})",

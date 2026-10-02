@@ -2145,6 +2145,7 @@
       "provider": "Proveedor",
       "totalCost": "Coste total",
       "usageReflectsLatest": "El uso corresponde a la última respuesta completa del asistente.",
+      "usageUnavailable": "Uso de contexto no disponible",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Porcentaje de uso de la caché",
       "modelsCount": "Modelos ({{displayCount}})",

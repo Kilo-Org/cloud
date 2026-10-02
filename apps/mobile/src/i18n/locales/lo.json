@@ -2636,6 +2636,7 @@
       "provider": "ຜູ້ໃຫ້ບໍລິການ",
       "totalCost": "ຄ່າໃຊ້ຈ່າຍທັງໝົດ",
       "usageReflectsLatest": "ຂໍ້ມູນການໃຊ້ງານອີງຕາມຄຳຕອບຫຼ້າສຸດທີ່ຜູ້ຊ່ວຍຕອບສຳເລັດແລ້ວ.",
+      "usageUnavailable": "ການນຳໃຊ້ບໍລິບົດບໍ່ສາມາດໃຊ້ໄດ້",
       "tokenUsage": "ການໃຊ້ໂທເຄັນ",
       "cacheRate": "ອັດຕາການໃຊ້ແຄັດ",
       "modelsCount": "ໂມເດວ ({{displayCount}})",

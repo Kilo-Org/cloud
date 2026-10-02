@@ -2674,6 +2674,7 @@
       "provider": "Proveïdor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "L'ús correspon a l'última resposta completa de l'assistent.",
+      "usageUnavailable": "L'ús del context no està disponible",
       "tokenUsage": "Ús de tòkens",
       "cacheRate": "Percentatge de memòria cau",
       "modelsCount": "Models utilitzats ({{displayCount}})",

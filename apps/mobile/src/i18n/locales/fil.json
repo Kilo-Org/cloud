@@ -2636,6 +2636,7 @@
       "provider": "Tagapagbigay ng serbisyo",
       "totalCost": "Kabuuang gastos",
       "usageReflectsLatest": "Batay ang paggamit sa pinakahuling natapos na tugon ng katulong.",
+      "usageUnavailable": "Hindi available ang paggamit ng context",
       "tokenUsage": "Paggamit ng token",
       "cacheRate": "Porsyento mula sa cache",
       "modelsCount": "Mga modelo ({{displayCount}})",

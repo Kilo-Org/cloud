@@ -2674,6 +2674,7 @@
       "provider": "Pakalpojumu sniedzējs",
       "totalCost": "Kopējās izmaksas",
       "usageReflectsLatest": "Izmantojuma dati atbilst pēdējai pabeigtajai asistenta atbildei.",
+      "usageUnavailable": "Konteksta izmantošana nav pieejama",
       "tokenUsage": "Tokenu izmantojums",
       "cacheRate": "Kešatmiņas īpatsvars",
       "modelsCount": "Modeļi ({{displayCount}})",

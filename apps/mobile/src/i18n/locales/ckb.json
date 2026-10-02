@@ -2636,6 +2636,7 @@
       "provider": "دابینکەر",
       "totalCost": "تێچوونی گشتی",
       "usageReflectsLatest": "ئاماری بەکارهێنان بەپێی دوایین وەڵامی تەواوبووی یاریدەدەرە.",
+      "usageUnavailable": "بەکارهێنانی چوارچێوە بەردەست نییە",
       "tokenUsage": "بەکارهێنانی تۆکن",
       "cacheRate": "ڕێژەی کاش",
       "modelsCount": "مۆدێلەکان ({{displayCount}})",

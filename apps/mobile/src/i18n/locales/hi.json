@@ -2104,6 +2104,7 @@
       "tokensWithPercentage": "टोकन ({{percentage}})",
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यह उपयोग सहायक के सबसे हाल में पूरे हुए उत्तर पर आधारित है।",
+      "usageUnavailable": "संदर्भ उपयोग अनुपलब्ध है",
       "used": "उपयोग हुआ",
       "modelsCount_one": "मॉडल ({{displayCount}})",
       "modelsCount_other": "मॉडल ({{displayCount}})"

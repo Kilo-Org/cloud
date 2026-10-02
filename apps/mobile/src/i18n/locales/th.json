@@ -2636,6 +2636,7 @@
       "provider": "ผู้ให้บริการ",
       "totalCost": "ค่าใช้จ่ายรวม",
       "usageReflectsLatest": "ข้อมูลการใช้งานอ้างอิงจากคำตอบล่าสุดที่ผู้ช่วยสร้างเสร็จแล้ว",
+      "usageUnavailable": "ไม่สามารถดูการใช้บริบทได้",
       "tokenUsage": "การใช้โทเคน",
       "cacheRate": "อัตราแคช",
       "modelsCount": "โมเดล ({{displayCount}})",

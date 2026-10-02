@@ -2636,6 +2636,7 @@
       "provider": "Mpamatsy",
       "totalCost": "Vidiny manontolo",
       "usageReflectsLatest": "Mifototra amin'ny valiny farany vitan'ny mpanampy ny fampiasana aseho.",
+      "usageUnavailable": "Tsy misy ny fampiasana ny context",
       "tokenUsage": "Fampiasana sombin-tsoratra",
       "cacheRate": "Tahan'ny fampiasana ny tahiry vonjimaika",
       "modelsCount": "Modely ({{displayCount}})",

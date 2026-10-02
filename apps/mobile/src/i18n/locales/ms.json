@@ -2636,6 +2636,7 @@
       "provider": "Penyedia",
       "totalCost": "Jumlah kos",
       "usageReflectsLatest": "Penggunaan ini berdasarkan respons pembantu terkini yang telah selesai dijana.",
+      "usageUnavailable": "Penggunaan konteks tidak tersedia",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Kadar cache",
       "modelsCount": "Model ({{displayCount}})",

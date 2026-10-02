@@ -2750,6 +2750,7 @@
       "provider": "Fornitur",
       "totalCost": "Spiża totali",
       "usageReflectsLatest": "L-użu jirrifletti l-aħħar tweġiba tal-assistent li tlestiet.",
+      "usageUnavailable": "Użu tal-kontest mhux disponibbli",
       "tokenUsage": "Użu tal-unitajiet tat-test",
       "cacheRate": "Rata tal-memorja temporanja",
       "modelsCount": "Mudelli ({{displayCount}})",

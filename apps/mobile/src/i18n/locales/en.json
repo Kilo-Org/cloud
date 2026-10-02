@@ -2670,6 +2670,7 @@
       "provider": "Provider",
       "totalCost": "Total cost",
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
+      "usageUnavailable": "Context usage unavailable",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
       "modelsCount_one": "Model ({{displayCount}})",

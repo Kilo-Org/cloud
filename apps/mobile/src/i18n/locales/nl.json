@@ -2123,6 +2123,7 @@
       "provider": "Aanbieder",
       "totalCost": "Totale kosten",
       "usageReflectsLatest": "Het getoonde gebruik is gebaseerd op het laatst voltooide antwoord van de assistent.",
+      "usageUnavailable": "Contextgebruik niet beschikbaar",
       "tokenUsage": "Tokenverbruik",
       "cacheRate": "Cachepercentage",
       "modelsCount": "Modellen ({{displayCount}})",

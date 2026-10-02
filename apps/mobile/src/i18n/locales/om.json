@@ -2636,6 +2636,7 @@
       "provider": "Dhiyeessaa",
       "totalCost": "Baasii waliigalaa",
       "usageReflectsLatest": "Fayyadamni kun deebii gargaaraa isa dhuma xumurame irratti hundaa'a.",
+      "usageUnavailable": "Fayyadama context hin argamu",
       "tokenUsage": "Fayyadama tookanootaa",
       "cacheRate": "Dhibbeentaa kuusaa yeroo",
       "modelsCount": "Moodeloota ({{displayCount}})",

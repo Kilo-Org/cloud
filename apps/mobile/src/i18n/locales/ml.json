@@ -2636,6 +2636,7 @@
       "provider": "ദാതാവ്",
       "totalCost": "ആകെ ചെലവ്",
       "usageReflectsLatest": "അവസാനം പൂർത്തിയായ അസിസ്റ്റന്റിന്റെ മറുപടിയെ അടിസ്ഥാനമാക്കിയുള്ള ഉപയോഗമാണ് കാണിക്കുന്നത്.",
+      "usageUnavailable": "സന്ദർഭ ഉപയോഗം ലഭ്യമല്ല",
       "tokenUsage": "ടോക്കൺ ഉപയോഗം",
       "cacheRate": "കാഷെ നിരക്ക്",
       "modelsCount": "മോഡലുകൾ ({{displayCount}})",

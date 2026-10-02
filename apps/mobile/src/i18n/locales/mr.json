@@ -2636,6 +2636,7 @@
       "provider": "सेवा पुरवठादार",
       "totalCost": "एकूण खर्च",
       "usageReflectsLatest": "दाखवलेला वापर सहाय्यकाच्या सर्वात अलीकडील पूर्ण प्रतिसादावर आधारित आहे.",
+      "usageUnavailable": "संदर्भ वापर अनुपलब्ध आहे",
       "tokenUsage": "टोकनचा वापर",
       "cacheRate": "कॅशचे प्रमाण",
       "modelsCount": "मॉडेल ({{displayCount}})",

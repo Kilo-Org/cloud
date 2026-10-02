@@ -2167,6 +2167,7 @@
       "provider": "Dostawca",
       "totalCost": "Całkowity koszt",
       "usageReflectsLatest": "Wykorzystanie kontekstu uwzględnia ostatnią w pełni wygenerowaną odpowiedź asystenta.",
+      "usageUnavailable": "Wykorzystanie kontekstu niedostępne",
       "tokenUsage": "Zużycie tokenów",
       "cacheRate": "Udział pamięci podręcznej",
       "modelsCount": "Modele ({{displayCount}})",

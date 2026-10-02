@@ -2046,6 +2046,7 @@
       "provider": "Fournisseur",
       "totalCost": "Coût total",
       "usageReflectsLatest": "L'utilisation correspond à la dernière réponse complète de l'assistant.",
+      "usageUnavailable": "Utilisation du contexte indisponible",
       "tokenUsage": "Utilisation des jetons",
       "cacheRate": "Taux d'utilisation du cache",
       "modelsCount": "Modèles ({{displayCount}})",

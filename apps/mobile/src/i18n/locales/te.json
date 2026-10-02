@@ -2636,6 +2636,7 @@
       "provider": "ప్రొవైడర్",
       "totalCost": "మొత్తం ఖర్చు",
       "usageReflectsLatest": "చివరిగా పూర్తయిన సహాయకుడి ప్రతిస్పందన ఆధారంగా ఈ వినియోగాన్ని చూపిస్తున్నాము.",
+      "usageUnavailable": "సందర్భ వినియోగం అందుబాటులో లేదు",
       "tokenUsage": "టోకెన్ వినియోగం",
       "cacheRate": "కాష్ రేటు",
       "modelsCount": "మోడళ్లు ({{displayCount}})",

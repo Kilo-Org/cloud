@@ -2636,6 +2636,7 @@
       "provider": "Umhlinzeki",
       "totalCost": "Izindleko zizonke",
       "usageReflectsLatest": "Ukusetshenziswa kubonisa impendulo yakamuva ephelele yomsizi.",
+      "usageUnavailable": "Ukusetshenziswa komongo akutholakali",
       "tokenUsage": "Ukusetshenziswa kwamathokheni",
       "cacheRate": "Izinga lokusebenzisa inqolobane yesikhashana",
       "modelsCount": "Amamodeli ({{displayCount}})",

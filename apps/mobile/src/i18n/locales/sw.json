@@ -2636,6 +2636,7 @@
       "provider": "Mtoa huduma",
       "totalCost": "Gharama ya jumla",
       "usageReflectsLatest": "Matumizi yanatokana na jibu la mwisho la msaidizi lililokamilika.",
+      "usageUnavailable": "Matumizi ya muktadha hayapatikani",
       "tokenUsage": "Matumizi ya tokeni",
       "cacheRate": "Kiwango cha hifadhi ya muda",
       "modelsCount": "Modeli ({{displayCount}})",

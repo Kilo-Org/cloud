@@ -2636,6 +2636,7 @@
       "provider": "પ્રદાતા",
       "totalCost": "કુલ ખર્ચ",
       "usageReflectsLatest": "આ વપરાશની વિગતો સહાયકના સૌથી તાજેતરના પૂર્ણ થયેલા જવાબ પર આધારિત છે.",
+      "usageUnavailable": "સંદર્ભ વપરાશ અનુપલબ્ધ છે",
       "tokenUsage": "ટોકનનો વપરાશ",
       "cacheRate": "કેશ દર",
       "modelsCount": "મોડલ ({{displayCount}})",

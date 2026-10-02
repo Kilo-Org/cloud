@@ -2750,6 +2750,7 @@
       "provider": "Soláthraí",
       "totalCost": "Costas iomlán",
       "usageReflectsLatest": "Baineann an úsáid leis an bhfreagra is déanaí a chríochnaigh an cúntóir.",
+      "usageUnavailable": "Níl úsáid an chomhthéacs ar fáil",
       "tokenUsage": "Úsáid comharthaí",
       "cacheRate": "Ráta taisce",
       "modelsCount": "Samhlacha ({{displayCount}})",

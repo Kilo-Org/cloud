@@ -2123,6 +2123,7 @@
       "provider": "Anbieter",
       "totalCost": "Gesamtkosten",
       "usageReflectsLatest": "Die Nutzungswerte beziehen sich auf die zuletzt fertiggestellte Antwort des Assistenten.",
+      "usageUnavailable": "Kontextnutzung nicht verfügbar",
       "tokenUsage": "Token-Nutzung",
       "cacheRate": "Cache-Rate",
       "modelsCount": "Modelle ({{displayCount}})",

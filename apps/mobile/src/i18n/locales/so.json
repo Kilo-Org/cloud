@@ -2636,6 +2636,7 @@
       "provider": "Bixiyaha",
       "totalCost": "Kharashka guud",
       "usageReflectsLatest": "Isticmaalku wuxuu muujinayaa jawaabtii ugu dambaysay ee kaaliyuhu dhammeeyay.",
+      "usageUnavailable": "Isticmaalka context lama heli karo",
       "tokenUsage": "Isticmaalka halbeegyada qoraalka",
       "cacheRate": "Heerka kaydka ku meelgaarka ah",
       "modelsCount": "Moodeellada ({{displayCount}})",

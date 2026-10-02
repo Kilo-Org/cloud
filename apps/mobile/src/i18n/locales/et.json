@@ -2636,6 +2636,7 @@
       "provider": "Pakkuja",
       "totalCost": "Kogukulu",
       "usageReflectsLatest": "Kasutusandmed kajastavad assistendi viimast valmis vastust.",
+      "usageUnavailable": "Konteksti kasutamine pole saadaval",
       "tokenUsage": "Tokenite kasutus",
       "cacheRate": "Vahemälu osakaal",
       "modelsCount": "Mudelid ({{displayCount}})",

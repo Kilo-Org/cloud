@@ -2636,6 +2636,7 @@
       "provider": "አቅራቢ",
       "totalCost": "ጠቅላላ ወጪ",
       "usageReflectsLatest": "አጠቃቀሙ በረዳቱ የመጨረሻ የተጠናቀቀ ምላሽ ላይ የተመሠረተ ነው።",
+      "usageUnavailable": "የአውድ አጠቃቀም አይገኝም",
       "tokenUsage": "የቶከን አጠቃቀም",
       "cacheRate": "የመሸጎጫ አጠቃቀም መጠን",
       "modelsCount": "ሞዴሎች ({{displayCount}})",

@@ -2636,6 +2636,7 @@
       "provider": "Leverandør",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Forbruket gjelder til og med det siste fullførte svaret fra assistenten.",
+      "usageUnavailable": "Kontekstbruk er ikke tilgjengelig",
       "tokenUsage": "Tokenbruk",
       "cacheRate": "Andel fra hurtigbuffer",
       "modelsCount": "Modeller ({{displayCount}})",

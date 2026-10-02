@@ -143,6 +143,14 @@
     {
       "path": "/api/cron/code-review-outcome-aggregate",
       "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-verified-domain-claims",
+      "schedule": "0 0 29 2 *"
+    },
+    {
+      "path": "/api/cron/cleanup-verified-domain-claims?execute=true",
+      "schedule": "0 0 29 2 *"
     }
   ],
   "build": {

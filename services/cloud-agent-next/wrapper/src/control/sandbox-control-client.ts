@@ -22,6 +22,7 @@ import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
+  SANDBOX_CONTROL_RECOVERY_ATTEMPT_TIMEOUT_MS,
   SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlFrameSchema,
@@ -150,6 +151,12 @@ const PERMANENT_CONTROL_ERRORS = new Set([
   'idempotency_conflict',
 ]);
 
+class PermanentControlConnectError extends Error {
+  constructor() {
+    super('sandbox control hello rejected permanently');
+  }
+}
+
 export type SandboxControlClient = {
   connect(): Promise<void>;
   close(): void;
@@ -205,6 +212,8 @@ const KEEPALIVE_INTERVAL_MS = 20_000;
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
 const EVENT_RECEIPT_TIMEOUT_MS = 30_000;
+const RECONNECT_BUDGET_MS =
+  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS * SANDBOX_CONTROL_RECOVERY_ATTEMPT_TIMEOUT_MS;
 
 const preparedEventSchema = z.object({
   streamEventType: z.string(),
@@ -291,6 +300,8 @@ export function createSandboxControlClient(
 ): SandboxControlClient {
   const wrapperInstanceId = options.wrapperInstanceId;
   let state: ClientState = { kind: 'idle' };
+  let activeConnectStartedAt: number | undefined;
+  let activeConnectAttempts = 0;
   let recovery: { episodeId: string; attempt: number; deadlineAt: number } | undefined;
   let committedRecovery: { episodeId: string; attempt: number; deadlineAt: number } | undefined;
   let readiness = Promise.withResolvers<void>();
@@ -548,6 +559,25 @@ export function createSandboxControlClient(
       bufferedBytes: ws?.bufferedAmount,
     });
 
+  const terminalSocketDiagnostic = (
+    phase: 'hello_rejected' | 'reconnect_exhausted' | 'explicitly_closed',
+    fields: {
+      attempt?: number;
+      connectionId?: string;
+      elapsedMs?: number;
+      deadlineAt?: number;
+      reason?: string;
+      errorCode?: string;
+      readyState?: number;
+      bufferedBytes?: number;
+    }
+  ): void =>
+    emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
+      phase,
+      wrapperInstanceId,
+      ...fields,
+    });
+
   function retireConnection(ws: WebSocket): void {
     if (state.kind !== 'ready' || state.socket !== ws) return;
     const current = state;
@@ -751,9 +781,11 @@ export function createSandboxControlClient(
 
   function connectAttempt(
     starting: Extract<ClientState, { kind: 'starting' }>,
-    deadlineAt: number
+    deadlineAt: number,
+    attempt: number
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      const attemptStartedAt = Date.now();
       diagnostic('opening');
       const ws = (options.openWebSocket ?? defaultOpenWebSocket)(options.url, options.credential);
       const connectionId = crypto.randomUUID();
@@ -778,11 +810,15 @@ export function createSandboxControlClient(
         if (ws.readyState === 0 || ws.readyState === 1) ws.close();
       }
 
-      function fail(): void {
+      function failWith(error: Error): void {
         if (phase === 'finished') return;
         diagnostic('failed', ws);
         dispose();
-        reject(new Error('sandbox control connect failed'));
+        reject(error);
+      }
+
+      function fail(): void {
+        failWith(new Error('sandbox control connect failed'));
       }
 
       function onFailure(): void {
@@ -831,6 +867,7 @@ export function createSandboxControlClient(
               scopedCleanupResult: true,
               workingBranches: true,
               gitAuthor: true,
+              mcpServers: true,
               nativeRuntimeIdCapture: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
@@ -876,7 +913,17 @@ export function createSandboxControlClient(
           if (phase !== 'hello') return;
           const hello = sandboxHelloResultSchema.safeParse(frame.result);
           if (!frame.ok || !hello.success) {
-            fail();
+            const code = frame.ok ? undefined : frame.error?.code;
+            if (code === 'unauthorized' || code === 'protocol_error') {
+              terminalSocketDiagnostic('hello_rejected', {
+                attempt,
+                connectionId,
+                elapsedMs: Date.now() - attemptStartedAt,
+                reason: 'permanent_hello_rejection',
+                errorCode: code,
+              });
+              failWith(new PermanentControlConnectError());
+            } else fail();
             return;
           }
           const capabilities: unknown = hello.data.capabilities;
@@ -958,29 +1005,48 @@ export function createSandboxControlClient(
 
   async function connectUntilReady(
     starting: Extract<ClientState, { kind: 'starting' }>,
-    deadlineAt: number
+    deadlineAt: number,
+    maxAttempts: number,
+    startedAt: number,
+    reconnect: boolean
   ): Promise<void> {
     const signal = starting.abort.signal;
-    const timeout = setTimeout(
-      () => starting.abort.abort(new Error('sandbox control startup timeout')),
-      deadlineAt - Date.now()
-    );
+    let budgetReported = false;
+    const reportReconnectExhausted = (attempt: number): void => {
+      if (!reconnect || budgetReported) return;
+      budgetReported = true;
+      terminalSocketDiagnostic('reconnect_exhausted', {
+        attempt,
+        elapsedMs: Date.now() - startedAt,
+        deadlineAt,
+        reason: 'reconnect_budget_exhausted',
+      });
+    };
+    const throwBudgetExhausted = (attempt: number): never => {
+      reportReconnectExhausted(attempt);
+      throw new Error('sandbox control startup timeout');
+    };
+    const timeout = setTimeout(() => {
+      reportReconnectExhausted(activeConnectAttempts);
+      starting.abort.abort(new Error('sandbox control startup timeout'));
+    }, deadlineAt - Date.now());
     try {
-      for (let attempt = 1; attempt <= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS; attempt += 1) {
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         signal.throwIfAborted();
-        if (Date.now() >= deadlineAt) throw new Error('sandbox control startup timeout');
+        if (Date.now() >= deadlineAt) throwBudgetExhausted(attempt);
+        activeConnectAttempts = attempt;
         try {
           emitControlDiagnostic(options.onDiagnostic, 'control.socket', {
             phase: 'connect_attempt',
             attempt,
           });
-          await connectAttempt(starting, deadlineAt);
+          await connectAttempt(starting, deadlineAt, attempt);
           return;
-        } catch {
+        } catch (error) {
+          if (error instanceof PermanentControlConnectError) throw error;
           signal.throwIfAborted();
           const remaining = deadlineAt - Date.now();
-          if (remaining <= 0 || attempt === SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS)
-            throw new Error('sandbox control startup timeout');
+          if (remaining <= 0 || attempt === maxAttempts) throwBudgetExhausted(attempt);
           options.log?.('sandbox control connect failed');
           const delayMs = Math.min(
             remaining,
@@ -1004,15 +1070,24 @@ export function createSandboxControlClient(
     }
   }
 
-  function startConnection(): Promise<void> {
+  function startConnection(reconnect = false): Promise<void> {
     if (state.kind === 'closed') return Promise.reject(new Error('sandbox control client closed'));
     if (state.kind === 'ready') return Promise.resolve();
     if (state.kind === 'starting') return state.promise;
-    const deadlineAt = Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
+    const startedAt = Date.now();
+    const deadlineAt =
+      startedAt + (reconnect ? RECONNECT_BUDGET_MS : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+    activeConnectStartedAt = startedAt;
+    activeConnectAttempts = 0;
+    const maxAttempts = reconnect
+      ? Number.POSITIVE_INFINITY
+      : SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS;
     const starting: Extract<ClientState, { kind: 'starting' }> = {
       kind: 'starting',
       abort: new AbortController(),
-      promise: Promise.resolve().then(() => connectUntilReady(starting, deadlineAt)),
+      promise: Promise.resolve().then(() =>
+        connectUntilReady(starting, deadlineAt, maxAttempts, startedAt, reconnect)
+      ),
     };
     state = starting;
     return starting.promise;
@@ -1021,7 +1096,7 @@ export function createSandboxControlClient(
   function reconnect(): void {
     if (reconnecting || state.kind !== 'idle') return;
     reconnecting = true;
-    void startConnection().then(
+    void startConnection(true).then(
       () => {
         reconnecting = false;
       },
@@ -1438,7 +1513,16 @@ export function createSandboxControlClient(
 
     close(): void {
       const current = state;
-      diagnostic('closed', current.kind === 'ready' ? current.socket : undefined);
+      if (current.kind !== 'closed') {
+        terminalSocketDiagnostic('explicitly_closed', {
+          attempt: activeConnectAttempts,
+          reason: 'client_closed',
+          readyState: current.kind === 'ready' ? current.socket.readyState : undefined,
+          bufferedBytes: current.kind === 'ready' ? current.socket.bufferedAmount : undefined,
+          elapsedMs:
+            activeConnectStartedAt === undefined ? undefined : Date.now() - activeConnectStartedAt,
+        });
+      }
       rejectPendingRequests('Sandbox control client closed');
       clearEventReceiptTracking('client_closed');
       eventTransport.close();

@@ -215,7 +215,6 @@
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
     "bonusCreditsExpiring": "{{amount}} miqdoridagi bonus kreditlarning muddati {{date}} sanasida tugaydi.",
-    "creditBalanceEmpty": "Hisobingizda kredit qolmagan. Bu hisobning kreditlari iOS ilovasidan tashqarida boshqariladi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -241,6 +240,7 @@
     "addPasskey": "Kirish kaliti qoʻshish",
     "passkeyDefaultName": "Kirish kaliti",
     "passkeyAddedOn": "{{date}} qoʻshildi",
+    "passkeyLastUsedOn": "Oxirgi marta ishlatilgan {{date}}",
     "passkeyAdded": "Kirish kaliti qoʻshildi.",
     "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
     "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
+      "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo cheklanmagan",
       "unbindFailed": "Reponi ajratib boʻlmadi"
     }
+  },
+  "credits": {
+    "title": "Kredit sotib olish",
+    "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
+    "packLabel": "{{amount}} qiymatidagi kredit qo'shish",
+    "priceUnavailable": "Narx mavjud emas",
+    "purchased": "Kreditlar balansingizga qo'shildi.",
+    "empty": "Kredit paketlari hozircha mavjud emas.",
+    "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
+    "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   }
 }

@@ -2,7 +2,7 @@ import { describe, test, expect, afterEach } from '@jest/globals';
 import { db } from '@/lib/drizzle';
 import { organizations } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createOrganization } from './organizations';
+import { createOrganization } from '@/lib/organizations/organizations';
 import {
   createOrganizationMode,
   getAllOrganizationModes,

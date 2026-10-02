@@ -215,7 +215,6 @@
     "showBalance": "Үлдэгдэл харуулах",
     "balanceHidden": "Үлдэгдэл нуугдсан",
     "bonusCreditsExpiring": "{{amount}} урамшууллын кредитийн хугацаа {{date}} өдөр дуусна.",
-    "creditBalanceEmpty": "Таны кредит дууссан байна. Энэ бүртгэлийн кредитийг iOS аппын гаднаас удирдана.",
     "signOutTitle": "Гарах уу?",
     "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай.",
     "deleteAccountTitle": "Бүртгэлийг устгах уу?",
@@ -241,6 +240,7 @@
     "addPasskey": "Нэвтрэх түлхүүр нэмэх",
     "passkeyDefaultName": "Нэвтрэх түлхүүр",
     "passkeyAddedOn": "{{date}}-нд нэмсэн",
+    "passkeyLastUsedOn": "Сүүлд ашигласан {{date}}",
     "passkeyAdded": "Нэвтрэх түлхүүр нэмэгдлээ.",
     "passkeyAddFailed": "Нэвтрэх түлхүүр нэмж чадсангүй. Дахин оролдоно уу.",
     "passkeyAddUnsupported": "Энэ төхөөрөмж нэвтрэх түлхүүр үүсгэж чадахгүй.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",
+      "selectRepositoryToStart": "Эхлэхийн тулд кодын сангаа сонгоно уу.",
+      "connectProviderToStart": "Эхлэхийн тулд үйлчилгээ үзүүлэгчийг холбоно уу.",
       "promptPlaceholder": "Юун дээр ажиллах вэ?",
       "couldNotLoadModels": "Загваруудыг ачаалж чадсангүй.",
       "prefillRepoAndModelUnavailable": "Анхны сессийн кодын сан болон загварыг ашиглах боломжгүй болсон. Доороос өөр кодын сан, загвар сонгоно уу.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Репо хязгааргүй",
       "unbindFailed": "Репо-г салгаж чадсангүй"
     }
+  },
+  "credits": {
+    "title": "Кредит худалдан авах",
+    "description": "Кредит нь Kilo App дээр AI кодчилолын сессүүдийг ажиллуулахын тулд таны Kilo үлдэгдэлд нэмэгддэг нэг удаагийн худалдан авалт юм. Дэлгүүр таны данснаас төлбөр авч, дэлгүүр төлбөрийг баталгаажуулсны дараа кредит нэмэгдэнэ.",
+    "packLabel": "{{amount}} кредит нэмэх",
+    "priceUnavailable": "Үнэ боломжгүй",
+    "purchased": "Кредит таны үлдэгдэлд нэмэгдлээ.",
+    "empty": "Кредит багцууд одоогоор боломжгүй байна.",
+    "noMatchingProducts": "App Store тохирох кредит багц буцаагаагүй.",
+    "noMatchingProductsPlay": "Google Play тохирох кредит багц буцаагаагүй.",
+    "purchaseOwnedByAnotherAccount": "Энэ Apple Account дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү.",
+    "purchaseOwnedByAnotherAccountPlay": "Энэ Google Play бүртгэл дээрх кредит нь өөр Kilo бүртгэлд харьяалагдана. Ашиглахын тулд тухайн Kilo бүртгэлдээ нэвтэрнэ үү."
   }
 }

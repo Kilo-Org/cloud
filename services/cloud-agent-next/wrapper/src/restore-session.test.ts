@@ -5,6 +5,7 @@ import os from 'node:os';
 import { restoreSession, extractDiffs, seedSessionIngestRegistration } from './restore-session';
 import { buildRestoreIncompleteReport } from './restore-outcome';
 import { buildWorktreeKiloEnvironment } from './control/worktree-runtime';
+import * as processUtils from './utils';
 
 const SESSION_ID = 'ses_test123';
 
@@ -1794,12 +1795,25 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     mockFetchOk(makeSnapshot([]));
     const descendantMarker = path.join(tmpDir, 'import-descendant-survived');
     writeSignalIgnoringDescendantMockKilo(binDir, descendantMarker);
+    const runProcess = processUtils.runProcess;
+    // New executable scripts can consume the import deadline during macOS startup.
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        command === 'kilo'
+          ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
+          : runProcess(command, args, options)
+    );
     const startedAt = Date.now();
 
-    const result = await restoreSession(SESSION_ID, workspace, undefined, {
-      importTimeoutMs: 500,
-      importTerminationGraceMs: 150,
-    });
+    let result;
+    try {
+      result = await restoreSession(SESSION_ID, workspace, undefined, {
+        importTimeoutMs: 500,
+        importTerminationGraceMs: 150,
+      });
+    } finally {
+      importProcess.mockRestore();
+    }
     const elapsedMs = Date.now() - startedAt;
 
     expect(result.ok).toBe(false);

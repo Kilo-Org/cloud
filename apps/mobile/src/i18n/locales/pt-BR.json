@@ -215,7 +215,6 @@
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
-    "creditBalanceEmpty": "Seu saldo de créditos está zerado. Nesta conta, os créditos são gerenciados fora do app para iOS.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -241,6 +240,7 @@
     "addPasskey": "Adicionar uma chave de acesso",
     "passkeyDefaultName": "Chave de acesso",
     "passkeyAddedOn": "Adicionada em {{date}}",
+    "passkeyLastUsedOn": "Último uso {{date}}",
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tente novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
@@ -1656,6 +1656,8 @@
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
+      "selectRepositoryToStart": "Selecione um repositório para começar.",
+      "connectProviderToStart": "Conecte um provedor para começar.",
       "promptPlaceholder": "No que você quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original não estão mais disponíveis. Escolha-os abaixo.",
@@ -3489,5 +3491,17 @@
       "unboundToast": "Repo não consolidado",
       "unbindFailed": "Não foi possível desvincular o repositório"
     }
+  },
+  "credits": {
+    "title": "Comprar créditos",
+    "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "packLabel": "Adicionar {{amount}} em créditos",
+    "priceUnavailable": "Preço indisponível",
+    "purchased": "Créditos adicionados ao seu saldo.",
+    "empty": "Os pacotes de créditos estão indisponíveis no momento.",
+    "noMatchingProducts": "A App Store não retornou nenhum pacote de créditos correspondente.",
+    "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
   }
 }

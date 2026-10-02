@@ -29,7 +29,7 @@ import {
 } from '@/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
 import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
-import { reportCreditEvent, type CreditEvent } from '@/lib/bouncer/client';
+import { reportCreditEvent, type CreditEvent, type StoreCreditEvent } from '@/lib/bouncer/client';
 import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
@@ -71,6 +71,10 @@ import {
   type OrganizationKiloPassSeatCapacityStripe,
   type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import {
+  releaseCancellationSchedule,
+  scheduleToReleaseBeforeSeatUpdate,
+} from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
@@ -242,11 +246,12 @@ async function resolveBouncerCreditOwner(params: {
 }
 
 /** A credit event without its payer: `reportWebhookCreditEvent` resolves the payer. */
-type WebhookCreditEvent = CreditEvent extends infer Event
-  ? Event extends CreditEvent
-    ? Omit<Event, 'userId' | 'orgId'>
-    : never
-  : never;
+type WebhookCreditEvent =
+  Exclude<CreditEvent, StoreCreditEvent> extends infer Event
+    ? Event extends CreditEvent
+      ? Omit<Event, 'userId' | 'orgId'>
+      : never
+    : never;
 
 /**
  * Resolves the payer and reports one webhook outcome to bouncer. It never throws: the owner
@@ -2336,6 +2341,11 @@ export async function handleUpdateSeatCount(
   }
   const paidSeatQuantity = rawPaidQuantity;
   const organizationPassItem = resolveSeatUpdateOrganizationPassItem(subscription);
+  const scheduleToRelease = await scheduleToReleaseBeforeSeatUpdate({
+    subscription,
+    paidSeatItem,
+    passItem: organizationPassItem,
+  });
 
   let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
     prorationDate,
@@ -2391,6 +2401,7 @@ export async function handleUpdateSeatCount(
   try {
     const locked = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+      if (scheduleToRelease) await releaseCancellationSchedule(scheduleToRelease);
       const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {

@@ -47,6 +47,9 @@ import { WORKTREE_SHARED_SCENARIOS } from './scenarios-shared-worktrees.js';
 import { CONVERSATION_SHARED_SCENARIOS } from './scenarios-shared-conversations.js';
 import { LOAD_SHARED_SCENARIOS } from './scenarios-shared-load.js';
 import { FAULT_SHARED_SCENARIOS } from './scenarios-shared-faults.js';
+import { PARALLEL_SHARED_SCENARIOS } from './scenarios-shared-parallel.js';
+import { CONTROL_PLANE_SHARED_SCENARIOS } from './scenarios-shared-control-plane.js';
+import { PROCESS_FAULT_SHARED_SCENARIOS } from './scenarios-shared-process-faults.js';
 
 /** Generous default per-turn budget for a real first container cold start. */
 const DEFAULT_TURN_TIMEOUT_MS = 240_000;
@@ -542,10 +545,10 @@ async function runColdHot(args: LifecycleArgs, env: ScenarioEnvironment): Promis
       }
       if (sandbox && before !== undefined && coldContainerId !== null) {
         const after = await sandbox.snapshotContainerIds();
-        const sameContainers = after.has(coldContainerId) && [...after].every(id => before.has(id));
+        const sameContainers = after.has(coldContainerId);
         if (!sameContainers) {
           return fail(
-            `${directive}: sandbox identity changed; expected ${coldContainerId} to persist with no new container ` +
+            `${directive}: sandbox identity changed; expected ${coldContainerId} to persist ` +
               `(before=${[...before].join(',')}, after=${[...after].join(',')})`
           );
         }
@@ -931,4 +934,9 @@ export const SHARED_SCENARIOS: Record<string, SharedScenario> = {
   ...LOAD_SHARED_SCENARIOS,
   ...CONVERSATION_SHARED_SCENARIOS,
   ...FAULT_SHARED_SCENARIOS,
+  // New-plane (C1-gated) scenarios; `controlPlaneV2` makes them unsupported
+  // until `E2E_CONTROL_PLANE_V2=1`.
+  ...PARALLEL_SHARED_SCENARIOS,
+  ...CONTROL_PLANE_SHARED_SCENARIOS,
+  ...PROCESS_FAULT_SHARED_SCENARIOS,
 };

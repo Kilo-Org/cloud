@@ -215,7 +215,6 @@
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
     "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
-    "creditBalanceEmpty": "Ba ka da ragowar kuɗin amfani. Ana sarrafa kuɗin amfani na wannan asusun a wajen manhajar iOS.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -241,6 +240,7 @@
     "addPasskey": "Ƙara maɓallin shiga",
     "passkeyDefaultName": "Maɓallin shiga",
     "passkeyAddedOn": "An ƙara {{date}}",
+    "passkeyLastUsedOn": "An yi amfani da shi na ƙarshe {{date}}",
     "passkeyAdded": "An ƙara maɓallin shiga.",
     "passkeyAddFailed": "Ba a iya ƙara maɓallin shiga ba. Sake gwadawa.",
     "passkeyAddUnsupported": "Wannan na'urar ba za ta iya ƙirƙirar maɓallan shiga ba.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "Bar canje-canje",
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",
+      "selectRepositoryToStart": "Zaɓi ma'ajiya don farawa.",
+      "connectProviderToStart": "Haɗa mai ba da sabis don farawa.",
       "promptPlaceholder": "Me kake so ka yi aiki a kai?",
       "couldNotLoadModels": "An kasa loda samfura.",
       "prefillRepoAndModelUnavailable": "An daina samun ma'ajiya da samfurin da aka yi amfani da su a zaman na asali. Zaɓi wasu a ƙasa.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo kwance",
       "unbindFailed": "An kasa kwance repo"
     }
+  },
+  "credits": {
+    "title": "Sayi kuɗin amfani",
+    "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "packLabel": "Ƙara kuɗin amfani na {{amount}}",
+    "priceUnavailable": "Farashi ba ya nan",
+    "purchased": "An ƙara kuɗin amfani a ma'auninka.",
+    "empty": "Fakitin kuɗin amfani ba su nan a yanzu.",
+    "noMatchingProducts": "App Store bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "noMatchingProductsPlay": "Google Play bai dawo da wani fakitin kuɗin amfani da ya dace ba.",
+    "purchaseOwnedByAnotherAccount": "Kuɗin amfani da ke kan wannan Apple Account na wani asusun Kilo ne daban. Shiga wancan asusun Kilo don amfani da shi.",
+    "purchaseOwnedByAnotherAccountPlay": "Kuɗin amfani da ke kan wannan Google Play account na wani asusun Kilo ne daban. Shiga wannan asusun Kilo don amfani da shi."
   }
 }

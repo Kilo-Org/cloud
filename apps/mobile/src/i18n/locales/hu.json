@@ -215,7 +215,6 @@
     "showBalance": "Egyenleg megjelenítése",
     "balanceHidden": "Egyenleg elrejtve",
     "bonusCreditsExpiring": "{{amount}} értékű bónuszkredit lejárati ideje: {{date}}.",
-    "creditBalanceEmpty": "Elfogytak a kreditjeid. Ennél a fióknál a krediteket az iOS-alkalmazáson kívül kezelheted.",
     "signOutTitle": "Kijelentkezel?",
     "signOutMessage": "A munkaterületed eléréséhez újra be kell jelentkezned.",
     "deleteAccountTitle": "Törlöd a fiókodat?",
@@ -241,6 +240,7 @@
     "addPasskey": "Jelkulcs hozzáadása",
     "passkeyDefaultName": "Jelkulcs",
     "passkeyAddedOn": "Hozzáadva: {{date}}",
+    "passkeyLastUsedOn": "Utoljára használva {{date}}",
     "passkeyAdded": "Jelkulcs hozzáadva.",
     "passkeyAddFailed": "Nem sikerült jelkulcsot hozzáadni. Próbáld újra.",
     "passkeyAddUnsupported": "Ez az eszköz nem tud jelkulcsokat létrehozni.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
+      "selectRepositoryToStart": "Válassz egy tárolót az indításhoz.",
+      "connectProviderToStart": "Csatlakoztass egy szolgáltatót az indításhoz.",
       "promptPlaceholder": "Min szeretnél dolgozni?",
       "couldNotLoadModels": "Nem sikerült betölteni a modelleket.",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet tárolója és modellje már nem érhető el. Válassz helyettük másikat az alábbiak közül.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo kötetlen",
       "unbindFailed": "Nem sikerült feloldani a repót"
     }
+  },
+  "credits": {
+    "title": "Kreditek vásárlása",
+    "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
+    "packLabel": "{{amount}} értékű kredit hozzáadása",
+    "priceUnavailable": "Az ár nem érhető el",
+    "purchased": "A kreditek hozzáadva az egyenlegedhez.",
+    "empty": "A kreditcsomagok jelenleg nem érhetők el.",
+    "noMatchingProducts": "Az App Store nem adott vissza megfelelő kreditcsomagot.",
+    "noMatchingProductsPlay": "A Google Play nem adott vissza megfelelő kreditcsomagot.",
+    "purchaseOwnedByAnotherAccount": "Az ehhez az Apple Account-fiókhoz tartozó kreditek egy másik Kilo-fiókhoz kapcsolódnak. A használatukhoz jelentkezz be abba a Kilo-fiókba.",
+    "purchaseOwnedByAnotherAccountPlay": "Az ezen Google Play-fiókon lévő kreditek egy másik Kilo-fiókhoz tartoznak. A használatukhoz jelentkezz be abba a Kilo-fiókba."
   }
 }

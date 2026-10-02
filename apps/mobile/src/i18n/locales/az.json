@@ -215,7 +215,6 @@
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
     "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
-    "creditBalanceEmpty": "Kredit balansın boşdur. Bu hesabın kreditləri iOS tətbiqindən kənarda idarə olunur.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -241,6 +240,7 @@
     "addPasskey": "Giriş açarı əlavə et",
     "passkeyDefaultName": "Giriş açarı",
     "passkeyAddedOn": "{{date}} tarixində əlavə edildi",
+    "passkeyLastUsedOn": "Son istifadə {{date}}",
     "passkeyAdded": "Giriş açarı əlavə edildi.",
     "passkeyAddFailed": "Giriş açarı əlavə etmək mümkün olmadı. Yenidən cəhd edin.",
     "passkeyAddUnsupported": "Bu cihaz giriş açarı yarada bilmir.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",
+      "selectRepositoryToStart": "Başlamaq üçün repozitoriya seç.",
+      "connectProviderToStart": "Başlamaq üçün provayder qoş.",
       "promptPlaceholder": "Nə üzərində işləmək istəyirsən?",
       "couldNotLoadModels": "Modelləri yükləmək mümkün olmadı.",
       "prefillRepoAndModelUnavailable": "İlkin sessiyanın repozitoriyası və modeli artıq əlçatan deyil. Aşağıdan repozitoriya və model seç.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo bağlanmamışdır",
       "unbindFailed": "Repo bağlamaq mümkün olmadı"
     }
+  },
+  "credits": {
+    "title": "Kredit al",
+    "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
+    "packLabel": "{{amount}} dəyərində kredit əlavə et",
+    "priceUnavailable": "Qiymət mövcud deyil",
+    "purchased": "Kredit balansına əlavə edildi.",
+    "empty": "Kredit paketləri hazırda əlçatan deyil.",
+    "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   }
 }

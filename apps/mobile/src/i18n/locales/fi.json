@@ -215,7 +215,6 @@
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
     "bonusCreditsExpiring": "Bonuskrediittejä vanhenee {{date}}: {{amount}}.",
-    "creditBalanceEmpty": "Krediittisaldosi on nolla. Tämän tilin krediittejä hallitaan iOS-sovelluksen ulkopuolella.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -241,6 +240,7 @@
     "addPasskey": "Lisää pääsyavain",
     "passkeyDefaultName": "Pääsyavain",
     "passkeyAddedOn": "Lisätty {{date}}",
+    "passkeyLastUsedOn": "Viimeksi käytetty {{date}}",
     "passkeyAdded": "Pääsyavain lisätty.",
     "passkeyAddFailed": "Pääsyavainta ei voitu lisätä. Yritä uudelleen.",
     "passkeyAddUnsupported": "Tämä laite ei voi luoda pääsyavaimia.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
+      "selectRepositoryToStart": "Valitse repositorio aloittaaksesi.",
+      "connectProviderToStart": "Yhdistä palveluntarjoaja aloittaaksesi.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon repositorio ja malli eivät ole enää käytettävissä. Valitse uudet alta.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo sitomaton",
       "unbindFailed": "Repoa ei voitu purkaa"
     }
+  },
+  "credits": {
+    "title": "Osta krediittejä",
+    "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "packLabel": "Lisää {{amount}} krediittejä",
+    "priceUnavailable": "Hinta ei saatavilla",
+    "purchased": "Krediitit on lisätty saldoosi.",
+    "empty": "Krediittipaketit eivät ole juuri nyt saatavilla.",
+    "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa krediittipakettia.",
+    "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
+    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
+    "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
   }
 }

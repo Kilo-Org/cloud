@@ -1,5 +1,5 @@
 import type { AgentSandboxProvider } from '../types.js';
-import { sessionPlaneFromId } from '../session-plane.js';
+import { isControlSession } from '../session-plane.js';
 
 export type ProviderCapabilities = {
   terminal: boolean;
@@ -25,5 +25,5 @@ export function sessionHasTerminal(
   sessionId: string,
   provider: AgentSandboxProvider = 'cloudflare'
 ): boolean {
-  return sessionPlaneFromId(sessionId) === 'control' || PROVIDER_CAPABILITIES[provider].terminal;
+  return isControlSession(sessionId) || PROVIDER_CAPABILITIES[provider].terminal;
 }

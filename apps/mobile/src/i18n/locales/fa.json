@@ -215,7 +215,6 @@
     "showBalance": "نمایش موجودی",
     "balanceHidden": "موجودی پنهان است",
     "bonusCreditsExpiring": "{{amount}} اعتبار هدیه در {{date}} منقضی می‌شود.",
-    "creditBalanceEmpty": "موجودی اعتبار شما صفر است. اعتبار این حساب خارج از برنامهٔ iOS مدیریت می‌شود.",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
     "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "deleteAccountTitle": "حساب حذف شود؟",
@@ -241,6 +240,7 @@
     "addPasskey": "افزودن کلید عبور",
     "passkeyDefaultName": "کلید عبور",
     "passkeyAddedOn": "افزوده‌شده در {{date}}",
+    "passkeyLastUsedOn": "آخرین استفاده {{date}}",
     "passkeyAdded": "کلید عبور افزوده شد.",
     "passkeyAddFailed": "افزودن کلید عبور ممکن نشد. دوباره تلاش کنید.",
     "passkeyAddUnsupported": "این دستگاه نمی‌تواند کلید عبور بسازد.",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
+      "selectRepositoryToStart": "برای شروع یک مخزن انتخاب کنید.",
+      "connectProviderToStart": "برای شروع یک ارائه‌دهنده را متصل کنید.",
       "promptPlaceholder": "می‌خواهید روی چه چیزی کار کنید؟",
       "couldNotLoadModels": "بارگذاری مدل‌ها ممکن نشد.",
       "prefillRepoAndModelUnavailable": "مخزن و مدل نشست اصلی دیگر در دسترس نیستند. از گزینه‌های زیر مخزن و مدل دیگری انتخاب کنید.",
@@ -3446,5 +3448,17 @@
       "unboundToast": "Repo بدون محدودیت",
       "unbindFailed": "Repo لغو پیوند نشد"
     }
+  },
+  "credits": {
+    "title": "خرید اعتبار",
+    "description": "اعتبار یک خرید یکباره است که برای اجرای جلسات کدنویسی هوش مصنوعی در Kilo App به موجودی Kilo شما اضافه می‌شود. فروشگاه مبلغ را از حساب شما دریافت می‌کند و اعتبار پس از تأیید پرداخت توسط فروشگاه اضافه می‌شود.",
+    "packLabel": "افزودن {{amount}} اعتبار",
+    "priceUnavailable": "قیمت در دسترس نیست",
+    "purchased": "اعتبار به موجودی شما اضافه شد.",
+    "empty": "بسته‌های اعتبار در حال حاضر در دسترس نیستند.",
+    "noMatchingProducts": "App Store هیچ بسته اعتبار منطبقی برنگرداند.",
+    "noMatchingProductsPlay": "Google Play هیچ بسته اعتبار منطبقی برنگرداند.",
+    "purchaseOwnedByAnotherAccount": "اعتبار این Apple Account متعلق به حساب دیگری در Kilo است. برای استفاده از آن وارد همان حساب Kilo شوید.",
+    "purchaseOwnedByAnotherAccountPlay": "اعتبار این حساب Google Play متعلق به یک حساب Kilo دیگر است. برای استفاده از آن وارد آن حساب Kilo شوید."
   }
 }

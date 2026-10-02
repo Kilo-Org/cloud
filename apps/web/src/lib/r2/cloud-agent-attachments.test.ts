@@ -5,7 +5,7 @@ import type {
   generateImageUploadUrl as GenerateImageUploadUrl,
 } from './cloud-agent-attachments';
 
-jest.mock('./client', () => ({
+jest.mock('@/lib/r2/client', () => ({
   r2Client: {},
   r2CloudAgentAttachmentsBucketName: 'attachment-bucket',
 }));

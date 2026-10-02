@@ -25,6 +25,9 @@ vi.mock('../../e2e/idle-stop-evidence.js', () => ({
 
 vi.mock('../../e2e/sandbox-control.js', () => ({
   captureControlWrapperProcess: mocks.captureControlWrapperProcess,
+  captureControlPlaneWrapperProcess: mocks.captureControlWrapperProcess,
+  CONTROL_PLANE_WRAPPER_BASENAME: 'kilocode-control-plane-wrapper.js',
+  LEGACY_CONTROL_WRAPPER_BASENAME: 'kilocode-control-wrapper.js',
   recycleControlConnection: mocks.recycleControlConnection,
   signalKiloServerProcess: vi.fn(),
   waitForNewSandboxPresent: vi.fn(),

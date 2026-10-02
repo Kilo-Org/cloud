@@ -2419,3 +2419,61 @@ describe('fake-llm-server /test/* admin guard', () => {
     await expect(res.json()).resolves.toEqual({ status: 'ok', service: 'fake-llm' });
   });
 });
+
+describe('first-token directive', () => {
+  it('emits one held content chunk, then completes on the replayed request', async () => {
+    const h = await start();
+
+    const first = await postChat(h.url, '__fake__:first-token:held');
+    expect(first.status).toBe(200);
+    if (!first.body) throw new Error('Expected a streamed response body');
+    const reader = first.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let held = '';
+    // The first request never finishes, so read only until the held token.
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const boundary = buffer.indexOf('\n\n');
+      if (boundary < 0) continue;
+      const event = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+      if (!dataLine || dataLine.slice('data: '.length) === '[DONE]') continue;
+      const parsed = JSON.parse(dataLine.slice('data: '.length)) as {
+        choices?: Array<{ delta?: { content?: unknown } }>;
+      };
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (typeof content === 'string' && content.length > 0) {
+        held = content;
+        break;
+      }
+    }
+    expect(held).toBe('held-first-token');
+    await reader.cancel().catch(() => undefined);
+
+    const replay = await postChat(h.url, '__fake__:first-token:held');
+    const chunks = await parseSse(replay);
+    const text = chunks
+      .map(chunk => {
+        const choices = chunk.choices as Array<{ delta?: { content?: unknown } }> | undefined;
+        const content = choices?.[0]?.delta?.content;
+        return typeof content === 'string' ? content : '';
+      })
+      .join('');
+    expect(text).toContain('done-held');
+
+    const status = await h.adminFetch('/test/scenario-status?tag=held');
+    await expect(status.json()).resolves.toMatchObject({ tag: 'held', requests: 2 });
+  });
+
+  it('records the last user prompt for prompt-content assertions', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:echo:prompt-recording');
+    await parseSse(res);
+    const last = await h.adminFetch('/test/last-prompt');
+    await expect(last.json()).resolves.toMatchObject({ text: '__fake__:echo:prompt-recording' });
+  });
+});

@@ -276,7 +276,6 @@ export async function maybeAutoDismissAnalysis(options: {
   const ownerConverted = toOwner(owner, userId);
   const config = await getSecurityAgentConfig(ownerConverted);
 
-  // Check if auto-dismiss is enabled (default: false)
   if (!config.auto_dismiss_enabled) {
     return { dismissed: false };
   }
@@ -325,7 +324,6 @@ export async function maybeAutoDismissAnalysis(options: {
   if (triage?.needsSandboxAnalysis === false && triage.suggestedAction === 'dismiss') {
     const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
-    // Check confidence threshold
     const meetsThreshold =
       threshold === 'low' ||
       (threshold === 'medium' && triage.confidence !== 'low') ||
@@ -406,13 +404,11 @@ export async function autoDismissEligibleFindings(
 
   const threshold = config.auto_dismiss_confidence_threshold ?? 'high';
 
-  // Build owner condition
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_findings.owned_by_organization_id, ownerConverted.id)
       : eq(security_findings.owned_by_user_id, ownerConverted.id);
 
-  // Find completed analyses where triage suggests dismiss
   const findings = await db
     .select({
       id: security_findings.id,
@@ -447,7 +443,6 @@ export async function autoDismissEligibleFindings(
         continue;
       }
 
-      // Check confidence threshold
       if (threshold === 'high' && triage.confidence !== 'high') {
         skipped++;
         continue;
@@ -518,13 +513,11 @@ export async function countEligibleForAutoDismiss(
 }> {
   const ownerConverted = toOwner(owner, userId);
 
-  // Build owner condition
   const ownerCondition =
     ownerConverted.type === 'org'
       ? eq(security_findings.owned_by_organization_id, ownerConverted.id)
       : eq(security_findings.owned_by_user_id, ownerConverted.id);
 
-  // Find completed analyses where triage suggests dismiss
   const findings = await db
     .select({
       analysis: security_findings.analysis,

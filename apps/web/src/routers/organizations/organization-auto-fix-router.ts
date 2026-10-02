@@ -3,7 +3,7 @@ import {
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
   organizationBillingMutationProcedure,
-} from './utils';
+} from '@/routers/organizations/utils';
 import { fetchGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   getAgentConfigForOwner,

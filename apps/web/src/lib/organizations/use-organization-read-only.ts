@@ -1,7 +1,7 @@
 'use client';
 
 import { useOrganizationTrialStatus } from '@/app/api/organizations/hooks';
-import { isStatusReadOnly } from './trial-utils';
+import { isStatusReadOnly } from '@/lib/organizations/trial-utils';
 
 /**
  * Hook to determine if organization is in read-only mode.

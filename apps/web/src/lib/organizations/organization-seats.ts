@@ -1,4 +1,4 @@
-import type { Organization, OrganizationSeatsPurchase } from '@kilocode/db/schema';
+import type { Organization } from '@kilocode/db/schema';
 import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
 import {
   kilocode_users,
@@ -18,7 +18,7 @@ import {
   getOrganizationById,
   isOrganizationMember,
 } from '@/lib/organizations/organizations';
-import { resolveEffectiveOrganizationSsoPolicy } from './organization-sso-policy';
+import { resolveEffectiveOrganizationSsoPolicy } from '@/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail } from '@/lib/email-address';
 import { errorExceptInTest, logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { captureException } from '@sentry/nextjs';
@@ -63,45 +63,6 @@ const SubscriptionMetadataSchema = z.object({
 });
 
 export type SubscriptionMetadata = z.infer<typeof SubscriptionMetadataSchema>;
-
-/**
- * Returns the most recently created seat purchase for an organization.
- *
- * organization_seats_purchases is append-only: every subscription event
- * (creation, renewal, cancellation) inserts a new row.  The most recently
- * created row therefore always reflects the current subscription state.
- */
-export async function getMostRecentSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(eq(organization_seats_purchases.organization_id, organizationId))
-    .orderBy(desc(organization_seats_purchases.created_at))
-    .limit(1);
-
-  return purchase || null;
-}
-
-/** Returns the most recently ended seat purchase by period end. Used for resubscribe flow. */
-export async function getMostRecentEndedSeatPurchase(
-  organizationId: Organization['id']
-): Promise<OrganizationSeatsPurchase | null> {
-  const [purchase] = await db
-    .select()
-    .from(organization_seats_purchases)
-    .where(
-      and(
-        eq(organization_seats_purchases.organization_id, organizationId),
-        eq(organization_seats_purchases.subscription_status, 'ended')
-      )
-    )
-    .orderBy(desc(organization_seats_purchases.expires_at))
-    .limit(1);
-
-  return purchase || null;
-}
 
 export async function getOrganizationSeatUsage(
   organizationId: Organization['id']

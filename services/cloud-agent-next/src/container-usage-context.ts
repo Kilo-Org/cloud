@@ -203,7 +203,7 @@ type BillingRuntimeStatusCapability = {
   getBillingRuntimeStatus?: MeteredSandboxInstance['getBillingRuntimeStatus'];
 };
 
-const sandboxBillingInputEnvelopeSchema = z
+export const sandboxBillingInputEnvelopeSchema = z
   .object({
     sandboxId: z
       .string()

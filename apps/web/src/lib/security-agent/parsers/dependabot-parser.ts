@@ -21,7 +21,6 @@ export function parseDependabotAlert(
 ): ParsedSecurityFinding {
   const status = mapDependabotStateToStatus(alert.state);
 
-  // Get ignored reason if dismissed
   let ignoredReason: string | null = null;
   let ignoredBy: string | null = null;
 
@@ -30,13 +29,10 @@ export function parseDependabotAlert(
     ignoredBy = alert.dismissed_by?.login || null;
   }
 
-  // Extract CWE IDs from the advisory
   const cweIds = alert.security_advisory.cwes?.map(cwe => cwe.cwe_id) || null;
 
-  // Extract CVSS score from the advisory
   const cvssScore = alert.security_advisory.cvss?.score || null;
 
-  // Extract dependency scope
   const dependencyScope = alert.dependency.scope || null;
 
   return {

@@ -215,7 +215,6 @@
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
     "bonusCreditsExpiring": "{{amount}} बराबरको बोनस क्रेडिटको म्याद {{date}} मा सकिन्छ।",
-    "creditBalanceEmpty": "तपाईंको क्रेडिट मौज्दात शून्य छ। यो खाताका क्रेडिटहरू iOS एपबाहिर व्यवस्थापन गरिन्छन्।",
     "signOutTitle": "साइन आउट गर्ने?",
     "signOutMessage": "आफ्नो कार्यक्षेत्र प्रयोग गर्न फेरि साइन इन गर्नुपर्नेछ।",
     "deleteAccountTitle": "खाता मेट्ने?",
@@ -241,6 +240,7 @@
     "addPasskey": "पासकी थप्नुहोस्",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} मा थपियो",
+    "passkeyLastUsedOn": "पछिल्लो पटक प्रयोग {{date}}",
     "passkeyAdded": "पासकी थपियो।",
     "passkeyAddFailed": "पासकी थप्न सकिएन। फेरि प्रयास गर्नुहोस्।",
     "passkeyAddUnsupported": "यो यन्त्रले पासकी बनाउन सक्दैन।",
@@ -2188,6 +2188,8 @@
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
+      "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
+      "connectProviderToStart": "सुरु गर्नको लागि प्रदायक जडान गर्नुहोस्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",
@@ -3446,5 +3448,17 @@
       "unboundToast": "रिपो अनबाउन्ड",
       "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन"
     }
+  },
+  "credits": {
+    "title": "क्रेडिट किन्नुहोस्",
+    "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",
+    "packLabel": "{{amount}} बराबरको क्रेडिट थप्नुहोस्",
+    "priceUnavailable": "मूल्य उपलब्ध छैन",
+    "purchased": "तपाईंको ब्यालेन्समा क्रेडिट थपियो।",
+    "empty": "क्रेडिट प्याकहरू अहिले उपलब्ध छैनन्।",
+    "noMatchingProducts": "App Store ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
+    "noMatchingProductsPlay": "Google Play ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
+    "purchaseOwnedByAnotherAccount": "यो Apple Account मा रहेको क्रेडिट अर्कै Kilo खाताको हो। प्रयोग गर्न त्यही Kilo खातामा साइन इन गर्नुहोस्।",
+    "purchaseOwnedByAnotherAccountPlay": "यो Google Play खातामा रहेको क्रेडिट अर्को Kilo खातासँग सम्बन्धित छ। प्रयोग गर्न त्यो Kilo खातामा साइन इन गर्नुहोस्।"
   }
 }

@@ -338,6 +338,32 @@ async function countAllocationWrites(
   );
 }
 
+/**
+ * Captures `allocation_transition` diagnostics emitted while `action` runs in
+ * the live DO, so a test can assert on the bounded fields of a real transition.
+ */
+async function captureAllocationTransitions(
+  stub: DurableObjectStub<SandboxControlV2>,
+  action: (instance: SandboxControlV2, state: DurableObjectState) => Promise<void>
+): Promise<Record<string, unknown>[]> {
+  return runInDurableObject(stub, async (instance, state) => {
+    const captured: Record<string, unknown>[] = [];
+    const withFields = vi.spyOn(logger, 'withFields').mockImplementation(fields => {
+      const bounded = fields as unknown as Record<string, unknown>;
+      if (bounded.diagnosticEvent === 'allocation_transition') captured.push(bounded);
+      return logger;
+    });
+    const info = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    try {
+      await action(instance, state);
+    } finally {
+      withFields.mockRestore();
+      info.mockRestore();
+    }
+    return captured;
+  });
+}
+
 afterEach(async () => {
   await reset();
 });
@@ -630,6 +656,41 @@ describe('SandboxControlV2 allocation lifecycle', () => {
       toAllocationId: current.allocationId,
     });
     expect(current.allocationId).not.toBe(allocationId);
+  });
+
+  it('records a peer wrapper close as origin=peer on the disconnect transition', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    const records = await captureAllocationTransitions(stub, async (instance, state) => {
+      const [socket] = state.getWebSockets();
+      if (socket === undefined) throw new Error('Missing wrapper socket');
+      await (
+        instance as unknown as { webSocketClose(ws: WebSocket): Promise<void> }
+      ).webSocketClose(socket);
+    });
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({ from: 'connected', to: 'disconnected', origin: 'peer' });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({ kind: 'disconnected', connectionId: null });
+  });
+
+  it('records an owner heartbeat-timeout close as origin=heartbeat_timeout', async () => {
+    const provider = createFakeProvider();
+    const stub = await startAllocation(provider);
+    await awaitStarting(provider, stub);
+    await connectAndHello(provider, stub);
+    await setDeadline(stub, { last_frame_at: Date.now() - TIMERS.heartbeatMs - 1_000 });
+    const records = await captureAllocationTransitions(stub, instance => instance.alarm());
+    const closed = records.find(record => record.event === 'socket-closed');
+    expect(closed).toMatchObject({
+      from: 'connected',
+      to: 'disconnected',
+      origin: 'heartbeat_timeout',
+    });
+    expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
+    expect(await readState(stub)).toMatchObject({ kind: 'disconnected' });
   });
 
   it('does not accept a late hello after its deadline or move allocation and route state', async () => {
@@ -1680,6 +1741,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
                 allocationId: string;
                 connectionId: string;
                 wrapperId?: string;
+                origin?: 'peer' | 'heartbeat_timeout';
               }): Promise<void>;
             }
           ).applyEvent.bind(instance);
@@ -1695,6 +1757,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
             at: Date.now(),
             allocationId: state.allocationId,
             connectionId: 'conn-1',
+            origin: 'peer',
           });
         });
       } else {

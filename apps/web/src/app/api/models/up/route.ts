@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { monitoredModels } from '@/lib/ai-gateway/models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 // Simple hardcoded key for authentication

@@ -59,10 +59,8 @@ export function selectAutoFreeCandidate(
   return null;
 }
 
-export const preferredModels = [
-  KILO_AUTO_EFFICIENT_MODEL.id,
-  KILO_AUTO_FREE_MODEL.id,
-
+/** The concrete models in `preferredModels`; auto models route elsewhere and are not monitored. */
+export const monitoredModels = [
   ...autoFreeModels.map(({ model }) => model),
 
   CLAUDE_OPUS_CURRENT_MODEL_ID,
@@ -71,6 +69,12 @@ export const preferredModels = [
   GLM_FLASH_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
+];
+
+export const preferredModels = [
+  KILO_AUTO_EFFICIENT_MODEL.id,
+  KILO_AUTO_FREE_MODEL.id,
+  ...monitoredModels,
 ];
 
 export function isPdfSupportingModel(model: string): boolean {

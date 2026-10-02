@@ -1,5 +1,13 @@
 import { vi } from 'vitest';
 
+/** The subset of keyboard state the app reads through `useKeyboardState`. */
+type KeyboardStateSnapshot = {
+  height: number;
+  isVisible: boolean;
+  progress: number;
+  duration: number;
+};
+
 // The mobile vitest projects run with no app build, so `@/lib/config` cannot
 // load: its real module needs the baked `extra`. Tests that exercise modules
 // importing it (the auth retry helpers and everything built on them) would
@@ -24,13 +32,23 @@ vi.mock('expo-video', () => ({ VideoView: 'VideoView', useVideoPlayer: () => ({}
 
 // `react-native-keyboard-controller` is a native module. Tests assert the app's
 // keyboard surfaces through host elements, so the provider and the views are
-// plain hosts and the keyboard read reports a hidden keyboard. A test that
-// needs a lift mocks `useKeyboardState` itself.
+// plain hosts and the keyboard read reports a hidden keyboard. `useKeyboardState`
+// honors its selector, as the real hook does: a reader that asks for
+// `state.height` must receive the number, not the whole state object. A test
+// that needs a lift mocks the hook itself with a driveable store.
 vi.mock('react-native-keyboard-controller', () => ({
   KeyboardProvider: 'KeyboardProvider',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
   KeyboardChatScrollView: 'KeyboardChatScrollView',
-  useKeyboardState: () => ({ height: 0, isVisible: false, progress: 0, duration: 0 }),
+  useKeyboardState: (selector?: (state: KeyboardStateSnapshot) => unknown) => {
+    const snapshot: KeyboardStateSnapshot = {
+      height: 0,
+      isVisible: false,
+      progress: 0,
+      duration: 0,
+    };
+    return selector ? selector(snapshot) : snapshot;
+  },
 }));
 
 // `@rn-primitives/alert-dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs`

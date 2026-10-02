@@ -91,9 +91,10 @@ pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboard
 (`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
 without the reduction the content floats a navigation-bar height above the keyboard.
 
-The one hand-rolled piece left is `@/components/agents/use-composer-reveal-scroll`: it scrolls a
-non-focused element (the new-session composer card's pill row) into view, which the native chat scroll
-view has no equivalent for. Do not add a second keyboard listener beside the provider.
+The one hand-rolled piece left is `@/components/agents/use-composer-reveal-scroll`: it scrolls the
+new-session composer card (`NewSessionPrompt`, whose bottom row is the `ChatToolbar` mode/model controls)
+into view while the IME is up. The native chat scroll view has no equivalent for revealing a non-focused
+element. Do not add a second keyboard listener beside the provider.
 
 ## Implementation Rules
 

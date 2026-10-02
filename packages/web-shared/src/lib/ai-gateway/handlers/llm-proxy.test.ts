@@ -752,24 +752,27 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     });
   });
 
-  it('still reports usage and decides without an ip when the header is not an address', async () => {
-    const { handleLlmProxyRequest } = await import('./llm-proxy');
+  it.each(['not-an-address', 'fe80::1%eth0'])(
+    'still reports usage and decides without an ip when the header is %s',
+    async forwardedFor => {
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
 
-    const response = await handleLlmProxyRequest(
-      makeRequest(makeBody(), { 'x-forwarded-for': 'not-an-address' }) as never
-    );
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), { 'x-forwarded-for': forwardedFor }) as never
+      );
 
-    // A non-literal must not reach bouncer: its typia check rejects the whole
-    // event, which would drop the usage ledger row instead of just the field.
-    expect(response.status).toBe(200);
-    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
-    expect(usageContext?.bouncer?.clientIp).toBeUndefined();
-    expect(mockedDecide).toHaveBeenCalledWith(
-      expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
-      { timeoutMs: 30_000 }
-    );
-    expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
-  });
+      // A value bouncer's typia check rejects must not reach it: bouncer rejects the
+      // whole event, which would drop the usage ledger row instead of just the field.
+      expect(response.status).toBe(200);
+      const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+      expect(usageContext?.bouncer?.clientIp).toBeUndefined();
+      expect(mockedDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
+        { timeoutMs: 30_000 }
+      );
+      expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
+    }
+  );
 
   it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {
     const pending = Promise.withResolvers<DecideVerdict | null>();

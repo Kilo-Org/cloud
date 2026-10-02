@@ -204,12 +204,17 @@ const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;
 /**
  * Bouncer's typia types accept a bare IPv4/IPv6 literal only. `x-forwarded-for`
  * can carry an IPv6 bracket, a port, or a value that is not an address at all,
- * so drop the wrapper and return `undefined` unless a real literal remains.
+ * so drop the wrapper and return `undefined` unless a literal remains.
  */
 function bareIpLiteral(value: string): string | undefined {
   const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(value);
   const ipv4WithPort = /^([^:]+):\d+$/.exec(value);
   const candidate = bracketed?.[1] ?? ipv4WithPort?.[1] ?? value;
+  // A scope id passes `isIP`, and bouncer's typia format rejects it. Drop it rather
+  // than send a value that fails the whole event.
+  if (candidate.includes('%')) {
+    return undefined;
+  }
   return isIP(candidate) ? candidate : undefined;
 }
 

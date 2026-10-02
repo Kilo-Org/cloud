@@ -103,10 +103,9 @@ export type Turn = {
   resubmitted: boolean;
   /**
    * Diagnostic only: real-progress events seen from descendant sessions in this
-   * turn's tree. They are excluded from the root progress clock, so this count
-   * is reported at expiry to distinguish "descendant progress arrived but was
-   * ignored" from "no descendant progress arrived at all". It never moves
-   * `lastProgressAt` or any other accounting.
+   * turn's tree, counted alongside the root progress they mark. This count is
+   * reported at expiry to distinguish "descendant progress arrived" from "no
+   * descendant progress arrived at all". It never affects any accounting.
    */
   descendantProgressEvents: number;
   /** Aborts the running finalization step (timeout or Stop). */
@@ -760,7 +759,6 @@ export function createTurnManager(deps: TurnManagerDeps) {
       onKiloError(turn, properties);
       return;
     }
-    if (isRealProgress(turn, type, properties)) markProgress(turn);
   }
 
   function tick(): void {
@@ -900,13 +898,13 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (turn === undefined) return;
       // A subagent's question still pauses the root turn (spec §6).
       applyInteraction(turn, event.type);
+      const realProgress = isRealProgress(turn, event.type, event.properties);
+      if (realProgress) markProgress(turn);
       if (eventSessionId !== root) {
-        // Diagnostic only: count real descendant progress without touching the
-        // root progress clock, so a no-progress expiry can report whether
-        // descendant progress reached the manager.
-        if (isRealProgress(turn, event.type, event.properties)) {
-          turn.descendantProgressEvents += 1;
-        }
+        // Diagnostic only: count the descendant progress that was marked above,
+        // so a no-progress expiry can report whether descendant progress reached
+        // the manager.
+        if (realProgress) turn.descendantProgressEvents += 1;
         return;
       }
       if (event.type === 'message.updated') {

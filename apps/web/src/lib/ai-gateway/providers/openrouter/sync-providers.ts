@@ -1,6 +1,6 @@
 import pLimit from 'p-limit';
 import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import { normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
+import { getRawOpenRouterModels, normalizeModelId } from '@/lib/ai-gateway/providers/openrouter';
 import {
   convertFromKiloExclusiveModel,
   getInferenceProvider,
@@ -33,6 +33,8 @@ import { injectExtraProviderModels } from '@/lib/ai-gateway/providers/openrouter
 import { withWorstProviderDataPolicy } from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
 import { isUnavailableModel } from '@/lib/ai-gateway/unavailable-models';
 import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models';
+import { injectVirtualModels } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organization-types';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -42,13 +44,13 @@ import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models'
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-async function fetchGatewayModels(gateway: Provider) {
+async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
-  const modelsResponse = await fetch(`${gateway.apiUrl}/models`, {
+  const modelsResponse = await fetch(`${gateway.apiUrl}${modelsPath}`, {
     method: 'GET',
     headers,
   });
@@ -127,10 +129,13 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   return providers;
 }
 
-async function syncProviders(
-  providers: OpenRouterProvider[],
-  vercelModels: Record<string, StoredModel>
-) {
+async function syncProviders(params: {
+  providers: OpenRouterProvider[];
+  openRouterModels: Record<string, StoredModel>;
+  openRouterCatalogModels: CatalogModel[];
+  vercelModels: Record<string, StoredModel>;
+}) {
+  const { providers, openRouterModels, openRouterCatalogModels, vercelModels } = params;
   if (providers.length === 0) {
     throw new Error('No providers found in OpenRouter response');
   }
@@ -218,6 +223,12 @@ async function syncProviders(
     providerModelData,
     openRouterFreeEndpoints,
     kiloExclusiveModels,
+  });
+
+  injectVirtualModels({
+    providerModelData,
+    catalogModels: openRouterCatalogModels,
+    storedModels: openRouterModels,
   });
 
   // Filter out providers with no models
@@ -364,8 +375,9 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(OPENROUTER);
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
+  // The default OpenRouter list only has text-output models; System One models output decisions.
+  const openrouter_data = await fetchGatewayModels(OPENROUTER, '/models?output_modalities=all');
+  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, '/models');
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {
@@ -374,7 +386,14 @@ export async function syncAndStoreProviders() {
     );
   }
 
-  const providers = await syncProviders(openrouterProviders, vercel_data);
+  const openRouterCatalog = await getRawOpenRouterModels();
+
+  const providers = await syncProviders({
+    providers: openrouterProviders,
+    openRouterModels: openrouter_data,
+    openRouterCatalogModels: openRouterCatalog.data,
+    vercelModels: vercel_data,
+  });
 
   if (providers.total_providers < 10) {
     throw new Error(`Suspicious: total number of providers is ${providers.total_providers} < 10`);

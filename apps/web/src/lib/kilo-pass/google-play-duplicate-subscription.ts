@@ -3,8 +3,12 @@ import { captureException } from '@sentry/nextjs';
 
 import { kilo_pass_store_events } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { KiloPassAuditLogAction, KiloPassAuditLogResult, KiloPassPaymentProvider } from './enums';
-import { appendKiloPassAuditLog } from './issuance';
+import {
+  KiloPassAuditLogAction,
+  KiloPassAuditLogResult,
+  KiloPassPaymentProvider,
+} from '@/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
 import { revokeGooglePlaySubscriptionPurchase } from './google-play-sdk';
 
 export type ReverseDuplicateGooglePlaySubscriptionParams = {

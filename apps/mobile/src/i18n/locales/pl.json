@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Brak połączenia",
     "notifications": "Powiadomienia",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozytoria",
     "securityAgent": "Agent bezpieczeństwa",
     "unknown": "Brak danych",
@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Wróć",
     "idle": "W gotowości",
+    "scheduled": "Zaplanowano",
     "keepEditing": "Kontynuuj edycję",
     "keepRunning": "Nie przerywaj",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
     "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
-    "creditBalanceEmpty": "Nie masz środków na koncie. Środkami na tym koncie zarządza się poza aplikacją na iOS.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -240,6 +240,7 @@
     "addPasskey": "Dodaj klucz dostępu",
     "passkeyDefaultName": "Klucz dostępu",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Ostatnio użyto {{date}}",
     "passkeyAdded": "Dodano klucz dostępu.",
     "passkeyAddFailed": "Nie udało się dodać klucza dostępu. Spróbuj ponownie.",
     "passkeyAddUnsupported": "To urządzenie nie może tworzyć kluczy dostępu.",
@@ -1531,12 +1532,14 @@
       "couldNotLoadActive": "Nie udało się wczytać aktywnych sesji.",
       "couldNotRefresh": "Nie udało się odświeżyć",
       "noSessionsYetDescription": "Rozpocznij zadanie programistyczne na telefonie. Twoje sesje pojawią się tutaj.",
+      "viewHistory": "Historia sesji",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Wpisz inne hasło wyszukiwania.",
       "tryAdjustFilters": "Zmień lub wyczyść filtry.",
       "couldNotSearch": "Nie udało się wyszukać sesji.",
       "completedWillAppear": "Zakończone sesje pojawią się tutaj.",
       "noPastSessions": "Brak poprzednich sesji",
+      "pastSessions": "Poprzednie sesje",
       "live": "NA ŻYWO",
       "updating": "Aktualizowanie"
     },
@@ -1549,6 +1552,7 @@
       "idCopied": "Skopiowano identyfikator sesji",
       "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji.",
       "untitled": "Sesja bez tytułu",
+      "actions": "Działania dotyczące sesji",
       "sessionDeleted": "Usunięto sesję",
       "needsInput": "czeka na odpowiedź",
       "fromPlatform": "z {{platform}}",
@@ -1564,7 +1568,7 @@
       "dollar_many": "dolarów",
       "costSpoken": "koszt {{cost}}",
       "costSpokenWithTime": "koszt {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}"
+      "pullRequest": "PR {{number}}"
     },
     "githubInstall": {
       "couldNotOpenMessage": "Nie udało się rozpocząć konfiguracji aplikacji GitHub. Spróbuj ponownie.",
@@ -1605,7 +1609,9 @@
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
+      "continueInNewSession": "Kontynuuj w nowej sesji",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
+      "emptyTranscriptDescription": "Ta sesja nie ma jeszcze żadnych wiadomości.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
@@ -1695,6 +1701,8 @@
       "leaveChanges": "Pozostaw zmiany",
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
+      "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
+      "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",
@@ -2088,6 +2096,7 @@
       "selectModelBeforeSending": "Wybierz model przed wysłaniem wiadomości.",
       "preparingPlaceholder": "Konfigurowanie środowiska…",
       "finalizingPlaceholder": "Kończenie…",
+      "sessionLoadFailed": "Nie udało się wczytać sesji. Najpierw spróbuj ponownie.",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
       "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij „Wyślij”, aby spróbować ponownie.",
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
@@ -2159,6 +2168,7 @@
       "provider": "Dostawca",
       "totalCost": "Całkowity koszt",
       "usageReflectsLatest": "Wykorzystanie kontekstu uwzględnia ostatnią w pełni wygenerowaną odpowiedź asystenta.",
+      "usageUnavailable": "Wykorzystanie kontekstu niedostępne",
       "tokenUsage": "Zużycie tokenów",
       "cacheRate": "Udział pamięci podręcznej",
       "modelsCount": "Modele ({{displayCount}})",
@@ -2197,7 +2207,10 @@
     "markdownImage": {
       "load": "Wczytaj",
       "loadWithHost": "Wczytaj {{host}}",
-      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS."
+      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS.",
+      "trustTitle": "Wczytać obraz z {{host}}?",
+      "trustMessage": "Zaufanie hostowi {{host}} spowoduje, że jego obrazy będą wczytywane bez pytania za każdym razem. Możesz to później cofnąć w sekcji Zaufane hosty.",
+      "loadOnce": "Wczytaj raz"
     },
     "markdownLink": {
       "invalidLink": "Tego linku nie można otworzyć.",
@@ -2306,7 +2319,8 @@
     "optionsExpiredDescription": "Wróć do poprzedniego ekranu i ponownie otwórz okno wyboru."
   },
   "sessionRow": {
-    "needsInput": "CZEKA NA ODPOWIEDŹ"
+    "needsInput": "CZEKA NA ODPOWIEDŹ",
+    "scheduled": "ZAPLANOWANO"
   },
   "voiceInput": {
     "listening": "Nasłuchiwanie...",
@@ -2680,7 +2694,14 @@
       "moreLinesAbove_one": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_other": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
       "moreLinesAbove_few": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
-      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}"
+      "moreLinesAbove_many": "… liczba dodatkowych wierszy powyżej: {{displayCount}}",
+      "deleteComment": "Usuń komentarz",
+      "deleteCommentTitle": "Usunąć komentarz?",
+      "deleteCommentMessage": "Ten komentarz zostanie usunięty z PR-a.",
+      "commentEditFailed": "Nie udało się zapisać twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentEditUnavailable": "Tego komentarza nie można edytować. Mógł zostać usunięty.",
+      "commentDeleteFailed": "Nie udało się usunąć twojego komentarza. Sprawdź połączenie i spróbuj ponownie.",
+      "commentDeleteUnavailable": "Tego komentarza nie można usunąć."
     },
     "entry": {
       "eyebrow": "Otwórz PR lub merge request za pomocą adresu URL",
@@ -2945,7 +2966,7 @@
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "staleHint": "pR zmienił się od czasu napisania tego komentarza.",
+      "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
       "summaryPlaceholder": "Opcjonalne podsumowanie przeglądu"
@@ -3017,6 +3038,8 @@
     "linkPasteNotAPullRequest": "To nie jest odnośnik do PR ani merge requestu",
     "announce": {
       "commentPosted": "Opublikowano komentarz",
+      "commentUpdated": "Komentarz zaktualizowany",
+      "commentDeleted": "Komentarz usunięty",
       "reviewSubmitted": "Wysłano przegląd",
       "autoMergeEnabled": "Włączono automatyczne scalanie"
     },
@@ -3251,7 +3274,12 @@
     "subtitle": "Hosty, których linki otwierasz bez potwierdzenia",
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
+    "imagesSectionTitle": "Zaufane hosty obrazów",
+    "imagesSectionDescription": "Obrazy z tych hostów są wczytywane bez ponownego pytania.",
+    "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
+    "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {
@@ -3281,7 +3309,8 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady.",
     "openSession": "Otwórz",
     "approveFailed": "Nie udało się zatwierdzić. Dotknij $t(common.approve), aby spróbować ponownie.",
-    "newestResult": "Najnowszy wynik"
+    "newestResult": "Najnowszy wynik",
+    "scheduledWakes": "budzi się {{time}}"
   },
   "transcriptionModel": {
     "title": "Model transkrypcji",
@@ -3515,5 +3544,17 @@
       "unboundToast": "Repo niezwiązane",
       "unbindFailed": "Nie można odłączyć repozytorium"
     }
+  },
+  "credits": {
+    "title": "Kup kredyty",
+    "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "packLabel": "Dodaj {{amount}} w kredytach",
+    "priceUnavailable": "Cena niedostępna",
+    "purchased": "Kredyty zostały dodane do Twojego salda.",
+    "empty": "Pakiety kredytów są obecnie niedostępne.",
+    "noMatchingProducts": "App Store nie zwrócił pasujących pakietów kredytów.",
+    "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
+    "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   }
 }

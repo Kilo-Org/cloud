@@ -161,7 +161,6 @@ type CloudAgentSessionDismissSuggestionInput = {
 };
 
 type CloudAgentSessionTransport = {
-  // Cloud Agent transport construction
   getTicket?:
     | ((
         sessionId: CloudAgentSessionId
@@ -169,7 +168,6 @@ type CloudAgentSessionTransport = {
     | undefined;
   api?: CloudAgentApi | undefined;
 
-  // Shared
   fetchSnapshot?: ((kiloSessionId: KiloSessionId) => Promise<SessionSnapshot>) | undefined;
   /**
    * Page-aware root snapshot fetch. The transport uses this for its initial
@@ -190,7 +188,6 @@ type CloudAgentSessionTransport = {
   lifecycleHooks?: ConnectionLifecycleHooks | undefined;
   websocketHeaders?: WebSocketHeaders | undefined;
 
-  // Remote CLI live transport construction
   userWebConnection?: UserWebConnection | undefined;
 };
 
@@ -198,7 +195,6 @@ type CloudAgentSession = {
   storage: SessionStorage;
   state: ServiceState;
 
-  // Commands
   send: (input: CloudAgentSessionSendInput) => unknown | Promise<unknown>;
   interrupt: () => unknown | Promise<unknown>;
   cancelQueuedMessage: (messageId: string) => Promise<{ dropped: boolean }>;
@@ -216,11 +212,9 @@ type CloudAgentSession = {
   createRemoteSession: (input?: CreateRemoteSessionInput) => Promise<KiloSessionId>;
   exitRemoteSession: () => Promise<void>;
 
-  // Capability checks
   canSend: boolean;
   canInterrupt: boolean;
 
-  // Lifecycle
   connect: () => void;
   disconnect: () => void;
   destroy: () => void;

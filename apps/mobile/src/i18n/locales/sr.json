@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepovezano",
     "notifications": "Obaveštenja",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitorijumi",
     "securityAgent": "Bezbednosni agent",
     "unknown": "Nepoznato",
@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Nazad",
     "idle": "U mirovanju",
+    "scheduled": "Zakazano",
     "keepEditing": "Nastavi uređivanje",
     "keepRunning": "Nastavi izvršavanje",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} ističu {{date}}.",
-    "creditBalanceEmpty": "Nemaš više kredita. Kreditima za ovaj nalog upravlja se van iOS aplikacije.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Moraćeš ponovo da se prijaviš da bi pristupio svom radnom prostoru.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -240,6 +240,7 @@
     "addPasskey": "Dodaj pristupni ključ",
     "passkeyDefaultName": "Pristupni ključ",
     "passkeyAddedOn": "Dodato {{date}}",
+    "passkeyLastUsedOn": "Poslednje korišćenje {{date}}",
     "passkeyAdded": "Pristupni ključ je dodat.",
     "passkeyAddFailed": "Pristupni ključ nije mogao da se doda. Pokušaj ponovo.",
     "passkeyAddUnsupported": "Ovaj uređaj ne može da pravi pristupne ključeve.",
@@ -577,7 +578,14 @@
       "replyForbiddenTerm": "Nemaš dozvolu da odgovoriš na ovaj {{term}}.",
       "moreLinesAbove_one": "… Iznad ima još redova: {{displayCount}}.",
       "moreLinesAbove_other": "… Iznad ima još redova: {{displayCount}}.",
-      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}."
+      "moreLinesAbove_few": "… Iznad ima još redova: {{displayCount}}.",
+      "deleteComment": "Obriši komentar",
+      "deleteCommentTitle": "Obrisati komentar?",
+      "deleteCommentMessage": "Ovaj komentar će biti obrisan iz zahteva za spajanje.",
+      "commentEditFailed": "Nije moguće sačuvati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentEditUnavailable": "Ovaj komentar se ne može urediti. Možda je obrisan.",
+      "commentDeleteFailed": "Nije moguće obrisati tvoj komentar. Proveri vezu i pokušaj ponovo.",
+      "commentDeleteUnavailable": "Ovaj komentar se ne može obrisati."
     },
     "couldNotOpenGitHubAppSettings": "Nije moguće otvoriti podešavanja GitHub aplikacije.",
     "installKiloGitHubApp": "Instaliraj aplikaciju Kilo za GitHub",
@@ -727,7 +735,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Izmeni zastareli komentar na čekanju za {{location}}",
       "editA11y": "Izmeni komentar na čekanju za {{location}}",
-      "staleHint": "pR je izmenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je izmenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju za {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled će biti poslat samo sa vrstom pregleda izabranom iznad.",
@@ -763,6 +771,8 @@
     "linkPasteNotAPullRequest": "Ovo nije veza do zahteva za spajanje ili merge requesta",
     "announce": {
       "commentPosted": "Komentar objavljen",
+      "commentUpdated": "Komentar ažuriran",
+      "commentDeleted": "Komentar obrisan",
       "reviewSubmitted": "Pregled poslat",
       "autoMergeEnabled": "Automatsko spajanje je uključeno"
     },
@@ -2042,12 +2052,14 @@
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije.",
       "couldNotRefresh": "Nije moguće osvežiti",
       "noSessionsYetDescription": "Započni zadatak programiranja sa telefona. Tvoje sesije će se pojaviti ovde.",
+      "viewHistory": "Istorija sesija",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj sa drugim pojmom za pretragu.",
       "tryAdjustFilters": "Pokušaj da promeniš ili ukloniš filtere.",
       "couldNotSearch": "Nije moguće pretražiti sesije.",
       "completedWillAppear": "Završene sesije će se pojaviti ovde.",
       "noPastSessions": "Nema prethodnih sesija",
+      "pastSessions": "Prethodne sesije",
       "live": "UŽIVO",
       "updating": "Ažuriranje"
     },
@@ -2060,6 +2072,7 @@
       "idCopied": "ID sesije je kopiran",
       "couldNotCopyId": "Nije moguće kopirati ID sesije.",
       "untitled": "Sesija bez naslova",
+      "actions": "Radnje za sesiju",
       "sessionDeleted": "Sesija je obrisana",
       "needsInput": "čeka unos",
       "fromPlatform": "iz {{platform}}",
@@ -2113,7 +2126,9 @@
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ovu sesiju možeš samo da čitaš.",
+      "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
+      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
@@ -2203,6 +2218,8 @@
       "leaveChanges": "Ostavi izmene",
       "commitAndPush": "Komituj i pošalji",
       "startSession": "Pokreni sesiju",
+      "selectRepositoryToStart": "Izaberi repozitorijum da započneš.",
+      "connectProviderToStart": "Poveži platformu da započneš.",
       "promptPlaceholder": "Na čemu želiš da radiš?",
       "couldNotLoadModels": "Učitavanje modela nije uspelo.",
       "prefillRepoAndModelUnavailable": "Repozitorijum i model izvorne sesije više nisu dostupni. Izaberi druge ispod.",
@@ -2587,6 +2604,7 @@
       "selectModelBeforeSending": "Izaberi model pre slanja.",
       "preparingPlaceholder": "Priprema okruženja...",
       "finalizingPlaceholder": "Završavanje...",
+      "sessionLoadFailed": "Sesija nije mogla da se učita. Prvo pokušajte ponovo.",
       "cannotReceiveFiles": "Ova sesija ne može da prima fajlove. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Prilaganje fajlova nije uspelo. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
@@ -2657,6 +2675,7 @@
       "provider": "Provajder",
       "totalCost": "Ukupan trošak",
       "usageReflectsLatest": "Prikazana potrošnja odgovara poslednjem dovršenom odgovoru asistenta.",
+      "usageUnavailable": "Korišćenje konteksta nije dostupno",
       "tokenUsage": "Potrošnja tokena",
       "cacheRate": "Udeo tokena iz keša",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2686,14 +2705,17 @@
       "open": "otvoren PR",
       "closed": "zatvoren zahtev za spajanje",
       "merged": "spojen zahtev za spajanje",
-      "draft": "pR u nacrtu",
+      "draft": "PR u nacrtu",
       "updating": "Ažuriranje, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dozvoljene su samo slike dostupne preko HTTPS veze."
+      "httpsOnly": "Dozvoljene su samo slike dostupne preko HTTPS veze.",
+      "trustTitle": "Učitati sliku sa {{host}}?",
+      "trustMessage": "Ako označiš {{host}} kao pouzdan, njegove slike će se učitavati bez pitanja svaki put. To kasnije možeš ukloniti u Pouzdani hostovi.",
+      "loadOnce": "Učitaj jednom"
     },
     "markdownLink": {
       "invalidLink": "Ovaj link se ne može otvoriti.",
@@ -2801,7 +2823,8 @@
     "optionsExpiredDescription": "Vrati se na prethodni ekran i ponovo otvori ovaj izbor."
   },
   "sessionRow": {
-    "needsInput": "ČEKA UNOS"
+    "needsInput": "ČEKA UNOS",
+    "scheduled": "ZAKAZANO"
   },
   "voiceInput": {
     "listening": "Slušam…",
@@ -3208,7 +3231,12 @@
     "subtitle": "Hostovi čije linkove otvaraš bez potvrde",
     "emptyTitle": "Nema pouzdanih hostova",
     "emptyDescription": "Kada označiš host kao pouzdan, linkovi ka njemu otvaraju se bez ponovne potvrde.",
+    "imagesSectionTitle": "Pouzdani hostovi za slike",
+    "imagesSectionDescription": "Slike sa ovih hostova učitavaju se bez ponovnog pitanja.",
+    "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
+    "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
+    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu.",
     "backToPreferences": "Nazad na podešavanja"
   },
   "quickChat": {
@@ -3238,7 +3266,8 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu.",
     "openSession": "Otvori",
     "approveFailed": "Odobravanje nije uspelo. Dodirni $t(common.approve) da pokušaš ponovo.",
-    "newestResult": "Najnoviji rezultat"
+    "newestResult": "Najnoviji rezultat",
+    "scheduledWakes": "budi se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model za transkripciju",
@@ -3472,5 +3501,17 @@
       "unboundToast": "Repo je odvezan",
       "unbindFailed": "Nije moguće opozvati vezivanje repo-a"
     }
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo aplikaciji. Prodavnica tereti tvoj račun, a krediti se dodaju nakon što prodavnica potvrdi plaćanje.",
+    "packLabel": "Dodaj {{amount}} u kreditima",
+    "priceUnavailable": "Cena nije dostupna",
+    "purchased": "Krediti su dodati na tvoj saldo.",
+    "empty": "Paketi kredita trenutno nisu dostupni.",
+    "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
+    "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "purchaseOwnedByAnotherAccount": "Krediti na ovom nalogu Apple Account pripadaju drugom Kilo nalogu. Prijavi se na taj Kilo nalog da ih koristiš.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   }
 }

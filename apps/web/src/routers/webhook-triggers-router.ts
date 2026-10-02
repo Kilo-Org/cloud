@@ -6,6 +6,7 @@ import { TRPCError } from '@trpc/server';
 import { and, eq, isNull } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import {
   cloud_agent_webhook_triggers,
   agent_environment_profiles,
@@ -13,6 +14,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { resolveCloudAgentSessionIds } from '@/lib/webhook-session-resolution';
+import { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import { triggerIdSchema, triggerIdCreateSchema } from '@/lib/webhook-trigger-validation';
 import {
   validateCronExpression,
@@ -222,19 +224,6 @@ async function assertTriggerOwnership(
   }
 
   return trigger;
-}
-
-/**
- * Check if a PostgreSQL error is a unique constraint violation.
- */
-function isUniqueViolation(error: unknown): boolean {
-  // PostgreSQL unique violation error code is 23505
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    (error as { code: string }).code === '23505'
-  );
 }
 
 /**
@@ -814,10 +803,29 @@ export const webhookTriggersRouter = createTRPCRouter({
       return { success: true };
     }),
 
-  /**
-   * List captured requests for a trigger.
-   * Proxies to worker and enriches with kiloSessionId from PostgreSQL.
-   */
+  getRequestLogs: baseProcedure
+    .input(
+      z
+        .object({
+          triggerId: triggerIdSchema,
+          requestId: z.string().uuid(),
+          organizationId: z.string().uuid().optional(),
+        })
+        .strict()
+    )
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      await assertTriggerOwnership(ctx.user.id, input.triggerId, input.organizationId);
+      return getWebhookRequestLogs(
+        input.organizationId ? undefined : ctx.user.id,
+        input.organizationId,
+        input.triggerId,
+        input.requestId
+      );
+    }),
+
   listRequests: baseProcedure
     .input(
       z.object({

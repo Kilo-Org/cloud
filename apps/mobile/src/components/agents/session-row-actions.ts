@@ -1,4 +1,3 @@
-import { type ActionSheetOptions } from '@expo/react-native-action-sheet';
 import { sessionResumeUrl } from '@kilocode/app-shared/universal-links';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -6,7 +5,6 @@ import { Alert } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
-import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 
 export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -159,16 +157,37 @@ export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
 
   showActionSheetWithOptions(
     {
-      ...themedSheet,
-      options,
-      cancelButtonIndex,
-      ...(destructiveButtonIndex !== undefined && { destructiveButtonIndex }),
+      key: 'open',
+      label: i18n.t('glanceable.openSession'),
+      destructive: false,
+      run: input.onOpen,
     },
-    index => {
-      if (index === undefined || index === cancelButtonIndex) {
-        return;
-      }
-      handlers[index]?.();
-    }
-  );
+  ];
+
+  if (input.onRename) {
+    items.push({
+      key: 'rename',
+      label: i18n.t('common.rename'),
+      destructive: false,
+      run: input.onRename,
+    });
+  }
+  if (input.onExit) {
+    items.push({
+      key: 'exit',
+      label: i18n.t('agentChat.remoteSession.exitSession'),
+      destructive: input.onDelete === undefined,
+      run: input.onExit,
+    });
+  }
+  if (input.onDelete) {
+    items.push({
+      key: 'delete',
+      label: i18n.t('agents.sessionRow.deleteSession'),
+      destructive: true,
+      run: input.onDelete,
+    });
+  }
+
+  return { items, cancelLabel: i18n.t('common.cancel') };
 }

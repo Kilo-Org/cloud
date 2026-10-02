@@ -5,7 +5,7 @@ import { getOrganizationById } from '@/lib/organizations/organizations';
 import { organizations } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { eq, sql } from 'drizzle-orm';
-import { toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { userCanManageCredits } from '@/lib/admin/credit-management';
 
 export async function POST(

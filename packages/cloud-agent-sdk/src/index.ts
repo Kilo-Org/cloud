@@ -179,7 +179,6 @@ export type {
   SessionSnapshotPage,
   SessionSnapshotPageOutcome,
   OlderMessagesError,
-  // Re-exported opencode types
   Part,
   TextPart,
   ToolPart,

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "वापस जाएँ",
     "idle": "निष्क्रिय",
+    "scheduled": "निर्धारित",
     "keepEditing": "संपादन जारी रखें",
     "keepRunning": "चालू रखें",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "बैलेंस दिखाएँ",
     "balanceHidden": "बैलेंस छिपा हुआ है",
     "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
-    "creditBalanceEmpty": "आपके पास कोई क्रेडिट नहीं बचा है। इस खाते के क्रेडिट iOS ऐप के बाहर प्रबंधित किए जाते हैं।",
     "signOutTitle": "साइन आउट करें?",
     "signOutMessage": "अपने कार्यक्षेत्र तक पहुँचने के लिए आपको फिर से साइन इन करना होगा।",
     "deleteAccountTitle": "खाता हटाएँ?",
@@ -240,6 +240,7 @@
     "addPasskey": "पासकी जोड़ें",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} को जोड़ा गया",
+    "passkeyLastUsedOn": "अंतिम बार उपयोग {{date}}",
     "passkeyAdded": "पासकी जोड़ दी गई।",
     "passkeyAddFailed": "पासकी जोड़ी नहीं जा सकी। फिर से प्रयास करें।",
     "passkeyAddUnsupported": "यह डिवाइस पासकी नहीं बना सकता।",
@@ -1516,7 +1517,9 @@
       "couldNotSearch": "सत्र खोजे नहीं जा सके।",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछला सत्र नहीं",
+      "pastSessions": "पिछले सत्र",
       "noSessionsYetDescription": "अपने फ़ोन से कोडिंग कार्य शुरू करें। आपके सत्र यहाँ दिखाई देंगे।",
+      "viewHistory": "सत्रों का इतिहास",
       "tryAdjustFilters": "अपने फ़िल्टर बदलकर या हटाकर देखें।",
       "tryDifferentSearch": "किसी दूसरे शब्द से खोजें।",
       "live": "लाइव",
@@ -1531,6 +1534,7 @@
       "idCopied": "सत्र की ID कॉपी हो गई",
       "renameMessage": "इस सत्र के लिए नया नाम दर्ज करें।",
       "untitled": "बिना शीर्षक वाला सत्र",
+      "actions": "सत्र के विकल्प",
       "sessionDeleted": "सत्र हटाया गया",
       "needsInput": "इनपुट चाहिए",
       "fromPlatform": "{{platform}} से",
@@ -1573,12 +1577,14 @@
       "couldNotLoad": "सत्र लोड नहीं हो सका।",
       "failedToLoadDetails": "सत्र का विवरण लोड नहीं हो सका।",
       "emptyDescription": "शुरू करने के लिए नीचे एक संदेश भेजें।",
+      "emptyTranscriptDescription": "इस सत्र में अभी कोई संदेश नहीं है।",
       "failedToStopExecution": "चल रहा काम रोका नहीं जा सका।",
       "stopped": "सत्र रोक दिया गया",
       "committing": "कमिट किया जा रहा है…",
       "committed": "कमिट हो गया",
       "commitFailed": "कमिट विफल रहा",
       "readOnly": "इस सत्र को केवल पढ़ा जा सकता है।",
+      "continueInNewSession": "नए सत्र में जारी रखें",
       "renamePlaceholder": "सत्र का नाम",
       "renameSession": "सत्र का नाम बदलें",
       "scrollToBottom": "सबसे नीचे स्क्रॉल करें",
@@ -1671,6 +1677,8 @@
       "leaveChanges": "बदलाव रहने दें",
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
+      "selectRepositoryToStart": "शुरू करने के लिए रिपॉज़िटरी चुनें।",
+      "connectProviderToStart": "शुरू करने के लिए प्रदाता कनेक्ट करें।",
       "promptPlaceholder": "आप किस पर काम करना चाहेंगे?",
       "couldNotLoadModels": "मॉडल लोड नहीं हो सके।",
       "prefillRepoAndModelUnavailable": "मूल सत्र की रिपॉज़िटरी और मॉडल अब उपलब्ध नहीं हैं। नीचे दूसरी रिपॉज़िटरी और मॉडल चुनें।",
@@ -2013,6 +2021,7 @@
       "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें।",
       "preparingPlaceholder": "एनवायरनमेंट तैयार हो रहा है…",
       "finalizingPlaceholder": "काम पूरा किया जा रहा है…",
+      "sessionLoadFailed": "सत्र लोड नहीं हो सका। पहले फिर से प्रयास करें।",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
       "couldNotAttachFiles": "फ़ाइलें जोड़ी नहीं जा सकीं। फिर से कोशिश करने के लिए ‘भेजें’ पर टैप करें।",
       "discardAttachmentsMessage": "अपलोड की गई ऐसी फ़ाइलें हटा दी जाएँगी जो किसी भेजे गए संदेश से जुड़ी नहीं हैं।",
@@ -2096,6 +2105,7 @@
       "tokensWithPercentage": "टोकन ({{percentage}})",
       "totalCost": "कुल लागत",
       "usageReflectsLatest": "यह उपयोग सहायक के सबसे हाल में पूरे हुए उत्तर पर आधारित है।",
+      "usageUnavailable": "संदर्भ उपयोग अनुपलब्ध है",
       "used": "उपयोग हुआ",
       "modelsCount_one": "मॉडल ({{displayCount}})",
       "modelsCount_other": "मॉडल ({{displayCount}})"
@@ -2149,7 +2159,10 @@
     "markdownImage": {
       "load": "लोड करें",
       "loadWithHost": "{{host}} लोड करें",
-      "httpsOnly": "केवल HTTPS वाली छवियाँ लोड की जा सकती हैं।"
+      "httpsOnly": "केवल HTTPS वाली छवियाँ लोड की जा सकती हैं।",
+      "trustTitle": "{{host}} से छवि लोड करें?",
+      "trustMessage": "{{host}} पर भरोसा करने पर उसकी छवियाँ हर बार पूछे बिना लोड होंगी। आप इसे बाद में विश्वसनीय होस्ट में हटा सकते हैं।",
+      "loadOnce": "एक बार लोड करें"
     },
     "markdownLink": {
       "invalidLink": "यह लिंक नहीं खोला जा सकता।",
@@ -2256,7 +2269,8 @@
     "optionsExpiredDescription": "पिछली स्क्रीन पर वापस जाएँ और विकल्प चुनने की यह स्क्रीन फिर से खोलें।"
   },
   "sessionRow": {
-    "needsInput": "इनपुट चाहिए"
+    "needsInput": "इनपुट चाहिए",
+    "scheduled": "निर्धारित"
   },
   "voiceInput": {
     "listening": "सुनना जारी है…",
@@ -2620,7 +2634,14 @@
       "deletedUser": "हटाया गया उपयोगकर्ता",
       "replyForbiddenTerm": "आपको इस {{term}} पर उत्तर देने की अनुमति नहीं है।",
       "moreLinesAbove_one": "… ऊपर {{displayCount}} और पंक्ति है।",
-      "moreLinesAbove_other": "… ऊपर {{displayCount}} और पंक्तियाँ हैं।"
+      "moreLinesAbove_other": "… ऊपर {{displayCount}} और पंक्तियाँ हैं।",
+      "deleteComment": "टिप्पणी हटाएँ",
+      "deleteCommentTitle": "टिप्पणी हटाएँ?",
+      "deleteCommentMessage": "यह टिप्पणी पुल रिक्वेस्ट से हटा दी जाएगी।",
+      "commentEditFailed": "आपकी टिप्पणी सहेजी नहीं जा सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+      "commentEditUnavailable": "यह टिप्पणी संपादित नहीं की जा सकती। हो सकता है इसे हटा दिया गया हो।",
+      "commentDeleteFailed": "आपकी टिप्पणी हटाई नहीं जा सकी। अपना कनेक्शन जाँचें और फिर से कोशिश करें।",
+      "commentDeleteUnavailable": "यह टिप्पणी हटाई नहीं जा सकती।"
     },
     "entry": {
       "eyebrow": "URL से पुल रिक्वेस्ट या मर्ज रिक्वेस्ट खोलें",
@@ -2933,6 +2954,8 @@
     "linkPasteNotAPullRequest": "यह पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक नहीं है",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट हुई",
+      "commentUpdated": "टिप्पणी अपडेट हुई",
+      "commentDeleted": "टिप्पणी हटा दी गई",
       "reviewSubmitted": "समीक्षा भेजी गई",
       "autoMergeEnabled": "ऑटो-मर्ज चालू हुआ"
     },
@@ -3165,7 +3188,12 @@
     "subtitle": "वे होस्ट जिन्हें बिना पूछे खोलने की अनुमति है",
     "emptyTitle": "कोई विश्वसनीय होस्ट नहीं",
     "emptyDescription": "किसी लिंक के होस्ट पर भरोसा करने के बाद उसके लिंक दोबारा पूछे बिना खुलते हैं।",
+    "imagesSectionTitle": "विश्वसनीय छवि होस्ट",
+    "imagesSectionDescription": "इन होस्ट की छवियाँ दोबारा पूछे बिना लोड होती हैं।",
+    "imagesSectionEmpty": "कोई विश्वसनीय छवि होस्ट नहीं",
     "revoke": "{{host}} को विश्वसनीय होस्ट से हटाएँ",
+    "revokeMessage": "इस होस्ट के लिंक दोबारा पुष्टि माँगेंगे।",
+    "revokeImageMessage": "इस होस्ट की छवियाँ दोबारा पुष्टि माँगेंगी।",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।",
     "openSession": "खोलें",
     "approveFailed": "स्वीकार नहीं किया जा सका। फिर से कोशिश करने के लिए $t(common.approve) पर टैप करें।",
-    "newestResult": "नवीनतम परिणाम"
+    "newestResult": "नवीनतम परिणाम",
+    "scheduledWakes": "{{time}} जागेगा"
   },
   "transcriptionModel": {
     "title": "आवाज़ को टेक्स्ट में बदलने का मॉडल",
@@ -3429,5 +3458,17 @@
       "unboundToast": "रेपो अनबाउंड",
       "unbindFailed": "रेपो को अनबाइंड नहीं किया जा सका"
     }
+  },
+  "credits": {
+    "title": "क्रेडिट खरीदें",
+    "description": "क्रेडिट एक बार की खरीद है जो Kilo App में AI कोडिंग सत्र चलाने के लिए आपके Kilo बैलेंस में जोड़ी जाती है। स्टोर आपके खाते से शुल्क लेता है और स्टोर द्वारा भुगतान की पुष्टि के बाद क्रेडिट जोड़े जाते हैं।",
+    "packLabel": "{{amount}} के क्रेडिट जोड़ें",
+    "priceUnavailable": "कीमत उपलब्ध नहीं",
+    "purchased": "आपके बैलेंस में क्रेडिट जोड़े गए।",
+    "empty": "क्रेडिट पैक अभी उपलब्ध नहीं हैं।",
+    "noMatchingProducts": "App Store ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "noMatchingProductsPlay": "Google Play ने कोई मेल खाता क्रेडिट पैक नहीं लौटाया।",
+    "purchaseOwnedByAnotherAccount": "इस Apple Account का क्रेडिट किसी दूसरे Kilo खाते से जुड़ा है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।",
+    "purchaseOwnedByAnotherAccountPlay": "इस Google Play खाते का क्रेडिट किसी दूसरे Kilo खाते से संबंधित है। इसका उपयोग करने के लिए उस Kilo खाते में साइन इन करें।"
   }
 }

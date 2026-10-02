@@ -1,12 +1,12 @@
 import { describe, test, expect } from '@jest/globals';
-import { insertTestUser } from '../tests/helpers/user.helper';
-import { createTestOrganization } from '../tests/helpers/organization.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
 
 import {
   getCreditTransactionsForOrganization,
   getCreditTransactionsForOrganizationPage,
 } from '@/lib/creditTransactions';
-import { db, pool } from './drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { credit_transactions } from '@kilocode/db/schema';
 
 function whereClause(text: string): string {

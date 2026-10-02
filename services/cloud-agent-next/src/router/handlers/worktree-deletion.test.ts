@@ -12,8 +12,12 @@ import { router } from '../auth';
 import { deleteWorktree } from './worktree-deletion';
 
 const mocks = vi.hoisted(() => ({ getSession: vi.fn(), getControl: vi.fn(), getDb: vi.fn() }));
-vi.mock('../../sandbox-session/session-stub', () => ({ getSandboxSessionStub: mocks.getSession }));
-vi.mock('../../sandbox-control/stub', () => ({ getSandboxControlStub: mocks.getControl }));
+vi.mock('../../sandbox-session/session-stub', () => ({
+  getSandboxSessionStub: mocks.getSession,
+}));
+vi.mock('../../sandbox-control/stub', () => ({
+  getSandboxControlStub: mocks.getControl,
+}));
 vi.mock('../../db/pg', () => ({ getPgDb: mocks.getDb }));
 
 const worktreeId = 'worktree_11111111-1111-4111-8111-111111111111';
@@ -53,8 +57,10 @@ function fixture(rootCount = 1, childCount = 0) {
   mocks.getSession.mockImplementation((_env, ownerId: string, id: string) => {
     expect(ownerId).toBe(userId);
     return {
-      beginWorktreeDeletion: () => beginSession(id),
-      getWorktreeChildSessions: readChildren,
+      beginWorktreeDeletion: async () => ({
+        location: await beginSession(id),
+        children: await readChildren(),
+      }),
       finishWorktreeDeletion: () => finishSession(id),
     };
   });

@@ -7,13 +7,16 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WRAPPER_VERSION } from '../src/shared/wrapper-version.js';
+import { KILO_CLI_VERSION } from '../src/shared/kilo-cli-version.js';
 
 export const SNAPSHOT_RUNTIME = 'node24';
 export const PINNED_BUN_VERSION = '1.3.14';
-export const PINNED_KILO_VERSION = '7.6.2';
 export const SNAPSHOT_MANIFEST_PATH = '/usr/local/share/kilo/runtime-manifest.json';
 export const SNAPSHOT_WRAPPER_PATH = '/usr/local/bin/kilocode-wrapper.js';
-export const SNAPSHOT_CONTROL_WRAPPER_PATH = '/usr/local/bin/kilocode-control-wrapper.js';
+export const SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH =
+  '/usr/local/bin/kilocode-control-plane-wrapper.js';
+export const SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH =
+  '/usr/local/bin/kilocode-control-plane-supervisor.sh';
 const API_BASE = 'https://api.vercel.com';
 const DEFAULT_TIMEOUT_MS = 10 * 60_000;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -23,7 +26,17 @@ const SECRET_ENV_NAMES = ['VERCEL_TOKEN'];
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DEV_VARS_PATH = resolve(PACKAGE_ROOT, '.dev.vars');
 const DEFAULT_WRAPPER_PATH = resolve(PACKAGE_ROOT, 'wrapper', 'dist', 'wrapper.js');
-const DEFAULT_CONTROL_WRAPPER_PATH = resolve(PACKAGE_ROOT, 'wrapper', 'dist', 'control-wrapper.js');
+const DEFAULT_CONTROL_PLANE_WRAPPER_PATH = resolve(
+  PACKAGE_ROOT,
+  'wrapper',
+  'dist',
+  'control-plane-wrapper.js'
+);
+const DEFAULT_CONTROL_PLANE_SUPERVISOR_PATH = resolve(
+  PACKAGE_ROOT,
+  'wrapper',
+  'control-plane-supervisor.sh'
+);
 const DEV_VARS_FALLBACK_KEYS = ['VERCEL_TOKEN', 'VERCEL_TEAM_ID', 'VERCEL_PROJECT_ID'];
 
 export type RuntimeManifest = {
@@ -210,14 +223,18 @@ export function defaultRuntimeBuildId(now = new Date()): string {
 
 export function resolveSnapshotInputs(args: Args): {
   wrapperPath: string;
-  controlWrapperPath: string;
+  controlPlaneWrapperPath: string;
+  controlPlaneSupervisorPath: string;
   wrapperVersion: string;
   runtimeBuildId: string;
 } {
   return {
     wrapperPath: resolve(optionalArg(args, 'wrapper') ?? DEFAULT_WRAPPER_PATH),
-    controlWrapperPath: resolve(
-      optionalArg(args, 'control-wrapper') ?? DEFAULT_CONTROL_WRAPPER_PATH
+    controlPlaneWrapperPath: resolve(
+      optionalArg(args, 'control-plane-wrapper') ?? DEFAULT_CONTROL_PLANE_WRAPPER_PATH
+    ),
+    controlPlaneSupervisorPath: resolve(
+      optionalArg(args, 'control-plane-supervisor') ?? DEFAULT_CONTROL_PLANE_SUPERVISOR_PATH
     ),
     wrapperVersion: optionalArg(args, 'wrapper-version') ?? WRAPPER_VERSION,
     runtimeBuildId: optionalArg(args, 'build-id') ?? defaultRuntimeBuildId(),
@@ -842,8 +859,8 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
       script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${PINNED_BUN_VERSION}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
     },
     {
-      label: `install kilo ${PINNED_KILO_VERSION}`,
-      script: `sudo npm install -g ${shellQuote(`@kilocode/cli@${PINNED_KILO_VERSION}`)}`,
+      label: `install kilo ${KILO_CLI_VERSION}`,
+      script: `sudo npm install -g ${shellQuote(`@kilocode/cli@${KILO_CLI_VERSION}`)}`,
     },
     {
       label: 'verify runtime pins',
@@ -946,7 +963,7 @@ async function validateChild(
     if (errors.length) throw new Error(`runtime manifest validation failed: ${errors.join(', ')}`);
     await execute(config, target.sessionId, 'bash', [
       '-lc',
-      `test "$(bun --version)" = ${shellQuote(expected.bunVersion)} && test "$(sha256sum ${SNAPSHOT_WRAPPER_PATH} | cut -d' ' -f1)" = ${shellQuote(expected.wrapperSha256)} && test -f ${SNAPSHOT_CONTROL_WRAPPER_PATH} && git --version >/dev/null && kilo --version >/dev/null`,
+      `test "$(bun --version)" = ${shellQuote(expected.bunVersion)} && test "$(sha256sum ${SNAPSHOT_WRAPPER_PATH} | cut -d' ' -f1)" = ${shellQuote(expected.wrapperSha256)} && test -f ${SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH} && test -f ${SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH} && git --version >/dev/null && kilo --version >/dev/null`,
     ]);
     await smokeWrapper(config, target.sessionId, expected);
     await scanRemote(config, target.sessionId);
@@ -960,7 +977,8 @@ async function validateChild(
 
 async function buildSnapshot(args: Args): Promise<void> {
   const config = providerConfig(args);
-  const { wrapperPath, controlWrapperPath } = resolveSnapshotInputs(args);
+  const { wrapperPath, controlPlaneWrapperPath, controlPlaneSupervisorPath } =
+    resolveSnapshotInputs(args);
   if (args['skip-wrapper-build'] !== true) {
     log('building wrapper bundle');
     await runLocal('bun', ['run', 'build'], dirname(dirname(wrapperPath)));
@@ -968,21 +986,32 @@ async function buildSnapshot(args: Args): Promise<void> {
   const expected = await readExpectedManifest(args);
   const timeoutMs = optionalNumber(args, 'timeout-ms', DEFAULT_TIMEOUT_MS);
   const wrapper = await readFile(wrapperPath);
-  const controlWrapper = await readFile(controlWrapperPath);
+  const controlPlaneWrapper = await readFile(controlPlaneWrapperPath);
+  const controlPlaneSupervisor = await readFile(controlPlaneSupervisorPath);
   await withTrackedSessions(config, async () => {
     const builder = await createSandbox(config, `ses-snapshot-builder-${randomUUID()}`, timeoutMs);
     await installBuilder(config, builder.sessionId);
     const stagedWrapperPath = `/tmp/${basename(SNAPSHOT_WRAPPER_PATH)}`;
-    const stagedControlWrapperPath = `/tmp/${basename(SNAPSHOT_CONTROL_WRAPPER_PATH)}`;
+    const stagedControlPlaneWrapperPath = `/tmp/${basename(SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH)}`;
+    const stagedControlPlaneSupervisorPath = `/tmp/${basename(
+      SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH
+    )}`;
     const stagedManifestPath = `/tmp/${basename(SNAPSHOT_MANIFEST_PATH)}`;
-    log('uploading wrapper, control wrapper, and runtime manifest');
+    log('uploading wrappers, control-plane supervisor, and runtime manifest');
     await writeRemoteFile(config, builder.sessionId, '/tmp', basename(stagedWrapperPath), wrapper);
     await writeRemoteFile(
       config,
       builder.sessionId,
       '/tmp',
-      basename(stagedControlWrapperPath),
-      controlWrapper
+      basename(stagedControlPlaneWrapperPath),
+      controlPlaneWrapper
+    );
+    await writeRemoteFile(
+      config,
+      builder.sessionId,
+      '/tmp',
+      basename(stagedControlPlaneSupervisorPath),
+      controlPlaneSupervisor
     );
     await writeRemoteFile(
       config,
@@ -997,9 +1026,9 @@ async function buildSnapshot(args: Args): Promise<void> {
       'bash',
       [
         '-lc',
-        `sudo install -m 0755 ${shellQuote(stagedWrapperPath)} ${shellQuote(SNAPSHOT_WRAPPER_PATH)} && sudo install -m 0755 ${shellQuote(stagedControlWrapperPath)} ${shellQuote(SNAPSHOT_CONTROL_WRAPPER_PATH)} && sudo install -m 0644 ${shellQuote(stagedManifestPath)} ${shellQuote(SNAPSHOT_MANIFEST_PATH)} && rm -f ${shellQuote(stagedWrapperPath)} ${shellQuote(stagedControlWrapperPath)} ${shellQuote(stagedManifestPath)}`,
+        `sudo install -m 0755 ${shellQuote(stagedWrapperPath)} ${shellQuote(SNAPSHOT_WRAPPER_PATH)} && sudo install -m 0755 ${shellQuote(stagedControlPlaneWrapperPath)} ${shellQuote(SNAPSHOT_CONTROL_PLANE_WRAPPER_PATH)} && sudo install -m 0755 ${shellQuote(stagedControlPlaneSupervisorPath)} ${shellQuote(SNAPSHOT_CONTROL_PLANE_SUPERVISOR_PATH)} && sudo install -m 0644 ${shellQuote(stagedManifestPath)} ${shellQuote(SNAPSHOT_MANIFEST_PATH)} && rm -f ${shellQuote(stagedWrapperPath)} ${shellQuote(stagedControlPlaneWrapperPath)} ${shellQuote(stagedControlPlaneSupervisorPath)} ${shellQuote(stagedManifestPath)}`,
       ],
-      { label: 'install wrappers and manifest' }
+      { label: 'install wrappers, supervisor and manifest' }
     );
     log('smoking wrapper');
     await smokeWrapper(config, builder.sessionId, expected);
@@ -1120,7 +1149,6 @@ Build/validate/acceptance arguments:
   --snapshot-id <id>       Required except for build
   --build-id <id>          Defaults to local-YYYYMMDD-HHMMSS
   --wrapper <path>         Defaults to wrapper/dist/wrapper.js
-  --control-wrapper <path> Defaults to wrapper/dist/control-wrapper.js
   --wrapper-version <semver> Defaults to the current WRAPPER_VERSION
   --timeout-ms <ms>        Optional bounded sandbox timeout (default ${DEFAULT_TIMEOUT_MS})
   --skip-wrapper-build     Build only: use the existing wrapper bundle

@@ -5,6 +5,7 @@ import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrappe
 import { formatGitResultFailure } from '../../../wrapper/src/git-errors.js';
 import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
 import {
+  buildWorktreeKiloEnvironment,
   createWorktreeKiloRuntimes,
   type WorktreeKiloAuth,
   type WorktreeKiloRuntimes,
@@ -81,6 +82,28 @@ const auth: WorktreeKiloAuth = {
 };
 const originalEnv = { GH_TOKEN: 'github-original', CUSTOM_VALUE: 'profile-value' };
 const registries: WorktreeKiloRuntimes[] = [];
+
+describe('cloud runtime feature configuration', () => {
+  it('disables background subagents, indexing and snapshots despite profile or inherited overrides', () => {
+    const overrides = {
+      KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'true',
+      KILO_DISABLE_CODEBASE_INDEXING: '',
+      KILO_CONFIG_CONTENT: JSON.stringify({ snapshot: true }),
+      OPENCODE_CONFIG_CONTENT: JSON.stringify({ snapshot: true }),
+    };
+    const env = buildWorktreeKiloEnvironment(
+      identity.directory,
+      '/runtime-home',
+      auth,
+      overrides,
+      overrides
+    );
+    expect(env.KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS).toBe('false');
+    expect(env.KILO_DISABLE_CODEBASE_INDEXING).toBe('vscode-no-workspace');
+    expect(JSON.parse(env.KILO_CONFIG_CONTENT).snapshot).toBe(false);
+    expect(JSON.parse(env.OPENCODE_CONFIG_CONTENT).snapshot).toBe(false);
+  });
+});
 
 function createFeedConnection(sseMaxRetryAttempts: number): {
   connection: KiloFeedConnection;

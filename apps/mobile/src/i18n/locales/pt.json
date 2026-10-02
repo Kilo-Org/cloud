@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Voltar",
     "idle": "Em espera",
+    "scheduled": "Agendada",
     "keepEditing": "Continuar a editar",
     "keepRunning": "Continuar em execução",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "Os créditos de bónus no valor de {{amount}} expiram em {{date}}.",
-    "creditBalanceEmpty": "Não tem saldo de créditos. Para esta conta, os créditos são geridos fora da aplicação iOS.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -240,6 +240,7 @@
     "addPasskey": "Adicionar uma chave de acesso",
     "passkeyDefaultName": "Chave de acesso",
     "passkeyAddedOn": "Adicionada {{date}}",
+    "passkeyLastUsedOn": "Último uso {{date}}",
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tenta novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
@@ -577,7 +578,14 @@
       "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
       "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
       "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
-      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima",
+      "deleteComment": "Eliminar comentário",
+      "deleteCommentTitle": "Eliminar o comentário?",
+      "deleteCommentMessage": "Este comentário será eliminado do PR.",
+      "commentEditFailed": "Não foi possível guardar o teu comentário. Verifica a tua ligação e tenta novamente.",
+      "commentEditUnavailable": "Este comentário não pode ser editado. Pode ter sido eliminado.",
+      "commentDeleteFailed": "Não foi possível eliminar o teu comentário. Verifica a tua ligação e tenta novamente.",
+      "commentDeleteUnavailable": "Este comentário não pode ser eliminado."
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -763,6 +771,8 @@
     "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
+      "commentUpdated": "Comentário atualizado",
+      "commentDeleted": "Comentário eliminado",
       "reviewSubmitted": "Revisão enviada",
       "autoMergeEnabled": "Integração automática ativada"
     },
@@ -2042,12 +2052,14 @@
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas.",
       "couldNotRefresh": "Não foi possível atualizar",
       "noSessionsYetDescription": "Inicia uma tarefa de programação no teu telemóvel. As tuas sessões aparecerão aqui.",
+      "viewHistory": "Histórico de sessões",
       "noMatches": "Nenhuma sessão encontrada",
       "tryDifferentSearch": "Experimenta outro termo de pesquisa.",
       "tryAdjustFilters": "Experimenta ajustar ou limpar os filtros.",
       "couldNotSearch": "Não foi possível pesquisar as sessões.",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Sem sessões anteriores",
+      "pastSessions": "Sessões anteriores",
       "live": "EM TEMPO REAL",
       "updating": "A atualizar"
     },
@@ -2060,6 +2072,7 @@
       "idCopied": "ID da sessão copiado",
       "couldNotCopyId": "Não foi possível copiar o ID da sessão.",
       "untitled": "Sessão sem título",
+      "actions": "Ações da sessão",
       "sessionDeleted": "Sessão eliminada",
       "needsInput": "à espera de resposta",
       "fromPlatform": "de {{platform}}",
@@ -2113,7 +2126,9 @@
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é apenas de leitura.",
+      "continueInNewSession": "Continuar numa nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
+      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "renameAccessibility": "Renomear sessão: {{title}}",
@@ -2203,6 +2218,8 @@
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
+      "selectRepositoryToStart": "Seleciona um repositório para começar.",
+      "connectProviderToStart": "Liga um fornecedor para começar.",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original já não estão disponíveis. Escolha outros abaixo.",
@@ -2587,6 +2604,7 @@
       "selectModelBeforeSending": "Selecione um modelo antes de enviar.",
       "preparingPlaceholder": "A configurar o ambiente…",
       "finalizingPlaceholder": "A concluir…",
+      "sessionLoadFailed": "Não foi possível carregar a sessão. Tente novamente primeiro.",
       "cannotReceiveFiles": "Esta sessão não pode receber ficheiros. Remova os anexos para enviar a sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar ficheiros. Toque em enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
@@ -2657,6 +2675,7 @@
       "provider": "Fornecedor",
       "totalCost": "Custo total",
       "usageReflectsLatest": "A utilização apresentada corresponde à última resposta concluída do assistente.",
+      "usageUnavailable": "Utilização de contexto indisponível",
       "tokenUsage": "Utilização de tokens",
       "cacheRate": "Taxa de cache",
       "modelsCount": "Modelos ({{displayCount}})",
@@ -2693,7 +2712,10 @@
     "markdownImage": {
       "load": "Carregar",
       "loadWithHost": "Carregar {{host}}",
-      "httpsOnly": "Só são permitidas imagens via HTTPS."
+      "httpsOnly": "Só são permitidas imagens via HTTPS.",
+      "trustTitle": "Carregar a imagem de {{host}}?",
+      "trustMessage": "Ao confiar em {{host}}, as imagens deste são carregadas sem perguntar sempre. Pode revogar mais tarde em Servidores de confiança.",
+      "loadOnce": "Carregar uma vez"
     },
     "markdownLink": {
       "invalidLink": "Não é possível abrir esta ligação.",
@@ -2801,7 +2823,8 @@
     "optionsExpiredDescription": "Volte ao ecrã anterior e abra novamente este seletor."
   },
   "sessionRow": {
-    "needsInput": "À ESPERA DE RESPOSTA"
+    "needsInput": "À ESPERA DE RESPOSTA",
+    "scheduled": "AGENDADA"
   },
   "voiceInput": {
     "listening": "A ouvir...",
@@ -3208,7 +3231,12 @@
     "subtitle": "Servidores cujas ligações pode abrir sem confirmação",
     "emptyTitle": "Sem servidores de confiança",
     "emptyDescription": "Ao confiar no servidor de uma ligação, pode abrir as ligações desse servidor sem nova confirmação.",
+    "imagesSectionTitle": "Servidores de imagens de confiança",
+    "imagesSectionDescription": "As imagens destes servidores são carregadas sem voltar a perguntar.",
+    "imagesSectionEmpty": "Sem servidores de imagens de confiança",
     "revoke": "Deixar de confiar em {{host}}",
+    "revokeMessage": "As ligações para este servidor voltarão a pedir confirmação.",
+    "revokeImageMessage": "As imagens deste servidor voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {
@@ -3238,7 +3266,8 @@
     "activityKitDisabledBody": "Ativa as atividades em direto nas definições para ver os agentes ativos no ecrã bloqueado.",
     "openSession": "Abrir",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
-    "newestResult": "Resultado mais recente"
+    "newestResult": "Resultado mais recente",
+    "scheduledWakes": "acorda {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3472,5 +3501,17 @@
       "unboundToast": "Repositório desvinculado",
       "unbindFailed": "Não foi possível desvincular o repositório"
     }
+  },
+  "credits": {
+    "title": "Comprar créditos",
+    "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
+    "packLabel": "Adicionar {{amount}} em créditos",
+    "priceUnavailable": "Preço indisponível",
+    "purchased": "Créditos adicionados ao seu saldo.",
+    "empty": "Os pacotes de créditos estão indisponíveis de momento.",
+    "noMatchingProducts": "A App Store não devolveu nenhum pacote de créditos correspondente.",
+    "noMatchingProductsPlay": "O Google Play não devolveu nenhum pacote de créditos correspondente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."
   }
 }

@@ -16,7 +16,6 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { parseParam } from '@/lib/route-params';
 import { modePickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
-import { cn } from '@/lib/utils';
 
 export type { AgentMode };
 
@@ -67,12 +66,11 @@ export function ModeSelector({
       accessibilityRole="button"
       accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}
-      className={cn(
-        'shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
-        disabled && 'opacity-50'
-      )}
+      className="shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70"
     >
-      <ModeIcon size={14} color={colors.foreground} />
+      {/* The label stays at full theme contrast; a disabled chip dims only its
+       * icon so the pill text keeps the WCAG AA 4.5:1 ratio (D2). */}
+      <ModeIcon size={14} color={disabled ? colors.mutedForeground : colors.foreground} />
       <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
         {selectedLabel}
       </Text>

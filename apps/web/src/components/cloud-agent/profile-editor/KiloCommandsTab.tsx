@@ -13,7 +13,7 @@ import { InlineDeleteConfirmation } from '@/components/ui/inline-delete-confirma
 import { cn } from '@/lib/utils';
 import { useProfileMutations, type ProfileKiloCommand } from '@/hooks/useCloudAgentProfiles';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
-import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { useModelSelectorList } from '@/lib/ai-gateway/hooks';
 import {
   MAX_KILO_COMMAND_NAME_LENGTH,
   MAX_KILO_COMMAND_TEMPLATE_LENGTH,

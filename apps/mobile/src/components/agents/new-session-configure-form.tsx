@@ -127,6 +127,7 @@ export function NewSessionConfigureForm({
   onAutoCommitChange,
   isSpawningRemote,
   isStartDisabled,
+  startBlockedReason = null,
   onStartSession,
   cloudCreateError = null,
   onRetryCloudCreate,
@@ -382,6 +383,7 @@ export function NewSessionConfigureForm({
         isRemote={isRemote}
         isStartDisabled={isStartDisabled}
         isStarting={isStarting}
+        startBlockedReason={startBlockedReason}
         onStartSession={onStartSession}
       />
     </View>

@@ -120,7 +120,31 @@ describe('pushDataSchema active_agents_glanceable', () => {
       newestResultKind: 'needsInput',
       newestResultAt: '2025-12-31T23:59:00.000Z',
     } as const;
-    expect(pushDataSchema.parse(withNewest)).toEqual(withNewest);
+    expect(pushDataSchema.parse(withNewest)).toEqual({
+      ...withNewest,
+      scheduled: 0,
+      scheduledAt: null,
+    });
+  });
+
+  it('parses a payload from a server without the scheduled keys as defaults', () => {
+    const parsed = pushDataSchema.parse(payload);
+    if (parsed.type !== 'active_agents_glanceable') {
+      throw new Error('expected the active_agents_glanceable variant');
+    }
+    expect(parsed.scheduled).toBe(0);
+    expect(parsed.scheduledAt).toBeNull();
+  });
+
+  it('round-trips a payload carrying scheduled count, wake time, and kind', () => {
+    const withScheduled = {
+      ...payload,
+      scheduled: 2,
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+      newestResultKind: 'scheduled',
+      newestResultAt: '2026-09-23T18:00:00.000Z',
+    } as const;
+    expect(pushDataSchema.parse(withScheduled)).toEqual(withScheduled);
   });
 });
 
@@ -232,6 +256,8 @@ describe('pushDataSchema active_agents_glanceable', () => {
     // spread it straight into a snapshot. Every other key round-trips exactly.
     expect(parsed).toEqual({
       ...glanceablePayload,
+      scheduled: 0,
+      scheduledAt: null,
       newestResultKind: null,
       newestResultAt: null,
     });
@@ -244,6 +270,8 @@ describe('pushDataSchema active_agents_glanceable', () => {
     const payload = { ...glanceablePayload, needsApproval: 2 };
     expect(pushDataSchema.parse(payload)).toEqual({
       ...payload,
+      scheduled: 0,
+      scheduledAt: null,
       newestResultKind: null,
       newestResultAt: null,
     });

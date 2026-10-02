@@ -111,6 +111,12 @@ function MessageBubbleImpl({
     onLongPressDetails?.(message);
   }, [message, onLongPressDetails]);
 
+  // The markdown render cache is scoped to this message and its session: the
+  // forwarded fence long-press closes over `message`, so identical markdown in
+  // another message — or the same text reused after a session switch — must not
+  // share cached elements (it would open the wrong message's details).
+  const renderScope = `${message.info.sessionID}:${message.info.id}`;
+
   // The bubble is memo-wrapped, but the transcript still re-renders its rows
   // while a message streams. Memoize the derived text on the parts identity so
   // the filter/map/join and the first-human-part scan run once per part list
@@ -225,6 +231,10 @@ function MessageBubbleImpl({
                       value={userTextContent}
                       variant="user"
                       selectable={false}
+                      // Scope the render cache to this message: the forwarded
+                      // long-press closes over `message`, so identical user text
+                      // in another message must not reuse these elements.
+                      renderScope={renderScope}
                       // Forward the bubble's long-press so a press-and-hold on a
                       // code fence still opens message details instead of being
                       // swallowed by the fence's copy trigger.
@@ -312,6 +322,9 @@ function MessageBubbleImpl({
       defaultReasoningExpanded={defaultReasoningExpanded}
       onOpenChildSession={onOpenChildSession}
       modelOptions={modelOptions}
+      // Scope the render cache to this message, as the user branch does: the
+      // forwarded fence long-press closes over `message`.
+      renderScope={renderScope}
       // Markdown text parts forward this into the code-fence copy
       // trigger so a long press still opens message details.
       onLongPressCode={onLongPressDetails ? handleLongPress : undefined}

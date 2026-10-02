@@ -9,7 +9,7 @@ USER root
 # Build arguments for metadata (all optional with defaults)
 ARG BUILD_DATE=""
 ARG VCS_REF=""
-ARG KILOCODE_CLI_VERSION="7.6.2"
+ARG KILOCODE_CLI_VERSION="7.8.1"
 
 # Cloudflare Containers run without root privileges, so Docker must run in
 # rootless mode. The Sandbox SDK server is copied into this image so the
@@ -117,10 +117,13 @@ RUN mkdir -p /opt/kilo-cloud \
     && bun build src/main.ts --outfile=/opt/kilo-cloud/kilocode-wrapper.js --target=bun --minify \
     && bun build src/restore-session.ts --outfile=/opt/kilo-cloud/kilo-restore-session.js --target=bun --minify \
     && bun build src/bitbucket-review-cli.ts --outfile=/opt/kilo-cloud/bb --target=bun --minify \
-    && bun build src/control/main.ts --outfile=/opt/kilo-cloud/kilocode-control-wrapper.js --target=bun --minify \
+    && bun build src/control-plane/main.ts --outfile=/opt/kilo-cloud/kilocode-control-plane-wrapper.js --target=bun --minify \
     && chmod +x /opt/kilo-cloud/bb \
+    && cp control-plane-supervisor.sh /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
+    && chmod +x /opt/kilo-cloud/kilocode-control-plane-supervisor.sh \
     && ln -sf /opt/kilo-cloud/kilocode-wrapper.js /usr/local/bin/kilocode-wrapper.js \
-    && ln -sf /opt/kilo-cloud/kilocode-control-wrapper.js /usr/local/bin/kilocode-control-wrapper.js \
+    && ln -sf /opt/kilo-cloud/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js \
+    && ln -sf /opt/kilo-cloud/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh \
     && ln -sf /opt/kilo-cloud/kilo-restore-session.js /usr/local/bin/kilo-restore-session.js \
     && ln -sf /opt/kilo-cloud/bb /usr/local/bin/bb \
     && rm -rf /tmp/wrapper-build

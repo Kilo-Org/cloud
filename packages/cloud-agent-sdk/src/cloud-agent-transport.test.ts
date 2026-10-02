@@ -10,10 +10,6 @@ import { createCloudAgentTransport } from './cloud-agent-transport';
 import type { SessionSnapshot, SessionSnapshotPageOutcome } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// WebSocket mock
-// ---------------------------------------------------------------------------
-
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
@@ -46,10 +42,6 @@ afterEach(() => {
   // @ts-expect-error -- cleanup global mock
   delete global.WebSocket;
 });
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** Flush microtask queue so Promise.all + .then in connect() settles. */
 async function flushPromises(): Promise<void> {
@@ -105,10 +97,6 @@ beforeEach(() => {
   resetCounter();
 });
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 describe('CloudAgentTransport event routing', () => {
   it('routes chat events to onChatEvent', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
@@ -128,7 +116,6 @@ describe('CloudAgentTransport event routing', () => {
 
     expect(chatEvents).toHaveLength(1);
     expect(chatEvents[0]).toEqual(expect.objectContaining({ type: 'message.updated' }));
-    // session.created from snapshot replay
     expect(serviceEvents).toHaveLength(1);
     expect(serviceEvents[0]).toEqual(expect.objectContaining({ type: 'session.created' }));
 
@@ -147,7 +134,6 @@ describe('CloudAgentTransport event routing', () => {
       })
     );
 
-    // session.created from snapshot replay + session.status from sendRaw
     expect(serviceEvents).toHaveLength(2);
     expect(serviceEvents[0]).toEqual(expect.objectContaining({ type: 'session.created' }));
     expect(serviceEvents[1]).toEqual(expect.objectContaining({ type: 'session.status' }));
@@ -226,7 +212,6 @@ describe('CloudAgentTransport event routing', () => {
     transport.connect();
     await flushPromises();
 
-    // Chat event
     sendRaw(
       kilocode('message.updated', {
         info: {
@@ -238,7 +223,6 @@ describe('CloudAgentTransport event routing', () => {
       })
     );
 
-    // Service event
     sendRaw(
       kilocode('session.status', {
         sessionID: 'ses-1',
@@ -246,7 +230,6 @@ describe('CloudAgentTransport event routing', () => {
       })
     );
 
-    // Chat event (delta)
     sendRaw(
       kilocode('message.part.delta', {
         sessionID: 'ses-1',
@@ -261,7 +244,6 @@ describe('CloudAgentTransport event routing', () => {
     expect(chatEvents[0]).toEqual(expect.objectContaining({ type: 'message.updated' }));
     expect(chatEvents[1]).toEqual(expect.objectContaining({ type: 'message.part.delta' }));
 
-    // session.created from snapshot replay + session.status from sendRaw
     expect(serviceEvents).toHaveLength(2);
     expect(serviceEvents[0]).toEqual(expect.objectContaining({ type: 'session.created' }));
     expect(serviceEvents[1]).toEqual(expect.objectContaining({ type: 'session.status' }));
@@ -347,12 +329,10 @@ describe('CloudAgentTransport unexpected disconnect', () => {
       })
     );
 
-    // complete → stopped(complete) through normal pipeline
     sendRaw(createEvent('complete', { currentBranch: 'main' }));
 
     const stoppedBefore = serviceEvents.filter(e => e.type === 'stopped').length;
 
-    // Now close unexpectedly — should NOT generate another stopped
     mockWs.onclose?.({
       code: 1011,
       reason: 'network dropped',
@@ -385,10 +365,8 @@ describe('CloudAgentTransport ticket handling', () => {
     transport.connect();
     await flushPromises();
 
-    // WebSocket was constructed (ticket resolved)
     expect(webSocketConstructor).toHaveBeenCalled();
 
-    // Events still route correctly (session.created from replay + session.status from sendRaw)
     sendRaw(
       kilocode('session.status', {
         sessionID: 'ses-1',
@@ -483,7 +461,6 @@ describe('CloudAgentTransport lifecycle', () => {
     // disconnect before ticket resolves — bumps generation
     transport.disconnect();
 
-    // Now resolve the ticket — should be stale
     resolveTicket.resolve?.('late-ticket');
     await flushPromises();
 
@@ -649,10 +626,6 @@ describe('CloudAgentTransport command delegation', () => {
     transport.destroy();
   });
 });
-
-// ---------------------------------------------------------------------------
-// Snapshot refetch on reconnect
-// ---------------------------------------------------------------------------
 
 describe('CloudAgentTransport snapshot refetch on reconnect', () => {
   // Microtask-based flush that works under jest.useFakeTimers()
@@ -1203,7 +1176,6 @@ describe('CloudAgentTransport page-seam', () => {
         const firstUrl = String(webSocketConstructor.mock.calls[0]?.[0]);
         expect(firstUrl).toContain('fromId=0');
 
-        // Send a wire event with eventId > 0 to advance the live cursor
         const establish = {
           eventId: 55,
           executionId: null,
@@ -1217,7 +1189,6 @@ describe('CloudAgentTransport page-seam', () => {
         };
         sendRaw(establish);
 
-        // Disconnect and reconnect
         mockWs.onclose?.({
           code: 1006,
           reason: '',
@@ -1300,7 +1271,6 @@ describe('CloudAgentTransport page-seam', () => {
         };
         sendRaw(sentinel);
 
-        // Disconnect and reconnect.
         mockWs.onclose?.({
           code: 1006,
           reason: '',
@@ -1373,7 +1343,6 @@ describe('CloudAgentTransport page-seam', () => {
         });
       }
 
-      // Collect the observable IDs from session.status retry events.
       const deliveredIds = serviceEvents
         .slice(serviceCountBefore)
         .filter(
@@ -1398,10 +1367,6 @@ describe('CloudAgentTransport page-seam', () => {
     });
   });
 });
-
-// ---------------------------------------------------------------------------
-// Exactly-once event replay
-// ---------------------------------------------------------------------------
 
 describe('CloudAgentTransport event delivery and replay cursor', () => {
   /**
@@ -1573,7 +1538,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
     sendRaw(eventWithId(3));
     sendRaw(eventWithId(8));
 
-    // Both events delivered — cursor advanced from 3 to 8.
     expect(serviceEvents.length).toBe(serviceCountBefore + 2);
 
     transport.destroy();
@@ -1587,7 +1551,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
 
     const serviceCountBefore = serviceEvents.length;
 
-    // Sentinel events always pass through — even repeated ones.
     sendRaw(eventWithId(0));
     sendRaw(eventWithId(0));
     sendRaw(eventWithId(0));
@@ -1635,12 +1598,10 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       transport.connect();
       await flushMicrotasks();
 
-      // Phase 1: deliver events 1 through 5.
       for (let id = 1; id <= 5; id++) {
         sendRaw(eventWithObservedId(id));
       }
 
-      // Disconnect (triggers reconnect via connection.ts reconnection logic).
       mockWs.onclose?.({
         code: 1006,
         reason: '',
@@ -1661,7 +1622,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       }
       await flushMicrotasks();
 
-      // Collect IDs delivered via session.status events tagged with retry.
       const deliveredIds = serviceEvents
         .filter(
           (
@@ -1705,7 +1665,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
 
       const serviceCountBefore = serviceEvents.length;
 
-      // Advance the cursor to 10.
       sendRaw(eventWithId(10));
       expect(serviceEvents.length).toBe(serviceCountBefore + 1);
 
@@ -1713,7 +1672,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       sendRaw(eventWithId(5));
       expect(serviceEvents.length).toBe(serviceCountBefore + 2);
 
-      // Disconnect and reconnect to inspect the replay cursor.
       mockWs.onclose?.({
         code: 1006,
         reason: '',
@@ -1723,7 +1681,6 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
       await flushMicrotasks();
 
       const reconnectUrl = String(webSocketConstructor.mock.calls.at(-1)?.[0]);
-      // Cursor must still be 10, not 5.
       expect(reconnectUrl).toContain('fromId=10');
 
       transport.destroy();
@@ -1748,16 +1705,13 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
 
       const serviceCountBefore = serviceEvents.length;
 
-      // Advance cursor to 7.
       sendRaw(eventWithId(7));
       expect(serviceEvents.length).toBe(serviceCountBefore + 1);
 
-      // Sentinels flow through but do not change the cursor.
       sendRaw(eventWithId(0));
       sendRaw(eventWithId(0));
       expect(serviceEvents.length).toBe(serviceCountBefore + 3);
 
-      // Disconnect and reconnect — cursor must still be 7.
       mockWs.onclose?.({
         code: 1006,
         reason: '',
@@ -1776,9 +1730,7 @@ describe('CloudAgentTransport event delivery and replay cursor', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Duplicate WebSocket connect investigation (W10.2)
-// ---------------------------------------------------------------------------
 
 describe('CloudAgentTransport single-connect guarantee', () => {
   it('opens exactly one connection per connect() call (no duplicate)', async () => {

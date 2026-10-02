@@ -19,6 +19,33 @@ import { createOrgAutoTopUpSetupCheckoutSession } from '@/lib/organizations/orga
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
+import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+
+/**
+ * Reports the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers do not await
+ * it: the org lookup and the report stay off the checkout path.
+ */
+async function reportOrgAutoTopUpAttempt(params: {
+  organizationId: string;
+  userId: string;
+  amountCents: number;
+  ip?: string | null;
+  headers?: Headers;
+}): Promise<void> {
+  const organization = await getOrganizationById(params.organizationId);
+  if (!organization) {
+    return;
+  }
+  reportChargeAttempted({
+    flow: 'auto_topup',
+    userId: params.userId,
+    orgId: params.organizationId,
+    amountCents: params.amountCents,
+    accountCreatedAt: organization.created_at,
+    ip: params.ip,
+    ipCountry: ipCountryFromHeaders(params.headers),
+  });
+}
 
 export const organizationAutoTopUpRouter = createTRPCRouter({
   getConfig: organizationBillingProcedure.query(async ({ input }) => {
@@ -82,6 +109,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
           const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
+          void reportOrgAutoTopUpAttempt({
+            organizationId,
+            userId: ctx.user.id,
+            amountCents: selectedAmount,
+            ip: ctx.ip,
+            headers: ctx.headersList,
+          }).catch(() => undefined);
+
           const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
             ctx.user.id,
             organizationId,
@@ -112,6 +147,14 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
       const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
       const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
+
+      void reportOrgAutoTopUpAttempt({
+        organizationId,
+        userId: ctx.user.id,
+        amountCents: selectedAmount,
+        ip: ctx.ip,
+        headers: ctx.headersList,
+      }).catch(() => undefined);
 
       const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
         ctx.user.id,

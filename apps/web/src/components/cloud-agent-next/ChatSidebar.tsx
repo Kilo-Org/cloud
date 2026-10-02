@@ -23,6 +23,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation';
 import type { StoredSession } from './types';
 import {
+  getRunningSessionSortTime,
   getSidebarWorktreeActivity,
   getSidebarWorktreeLabel,
   getSidebarWorktreePrSession,
@@ -750,15 +751,44 @@ export function ChatSidebar({
     [activeSessions]
   );
 
-  const liveOnlySessions = activeSessions.filter(
-    activeS => !sessions.some(s => s.sessionId === activeS.id)
-  );
+  // Heartbeats reorder activeSessions per connection, so the Remote section
+  // needs its own stable order: attention first, then working, id last.
+  const liveOnlySessions = useMemo(() => {
+    const remotePriority = (status: string) =>
+      status === 'question' || status === 'permission'
+        ? 2
+        : status === 'busy' || status === 'retry'
+          ? 1
+          : 0;
+    return activeSessions
+      .filter(activeS => !sessions.some(s => s.sessionId === activeS.id))
+      .sort(
+        (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
+      );
+  }, [activeSessions, sessions]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 
+  // Pin running sessions to a coarse sort time so status updates cannot
+  // reshuffle the list; idle sessions keep raw recency.
+  const sortPins = useMemo(() => {
+    const pins = new Map<string, number>();
+    for (const session of sessions) {
+      const liveStatus = activeSessionStatuses.get(session.sessionId) ?? null;
+      const isRunning =
+        getSessionActivityIndicatorKind(liveStatus, null) !== null ||
+        getSessionActivityIndicatorKind(
+          session.sessionStatus ?? null,
+          session.sessionStatusUpdatedAt ?? null
+        ) !== null;
+      if (isRunning) pins.set(session.sessionId, getRunningSessionSortTime(session, true));
+    }
+    return pins;
+  }, [sessions, activeSessionStatuses]);
+
   const dateGroups = useMemo(
-    () => groupSidebarSessionsByDate(sessions, undefined, worktreeDetails),
-    [sessions, worktreeDetails]
+    () => groupSidebarSessionsByDate(sessions, undefined, worktreeDetails, sortPins),
+    [sessions, worktreeDetails, sortPins]
   );
   const { folderGroups, ungrouped } = useMemo(
     () => groupWorkspacesByFolder(dateGroups, workspaceFolders?.folders ?? []),
@@ -1134,41 +1164,6 @@ export function ChatSidebar({
           <div className="py-8 text-center text-sm text-gray-500">No sessions yet</div>
         ) : (
           <>
-            {/* Live-only sessions (not in stored list) */}
-            {liveOnlySessions.length > 0 && (
-              <>
-                <div className="text-muted-foreground px-2 pt-2 pb-1 text-[11px] font-semibold tracking-wider uppercase">
-                  Remote
-                </div>
-                {liveOnlySessions.map(activeS => {
-                  const activityIndicatorKind = getSessionActivityIndicatorKind(
-                    activeS.status,
-                    null
-                  );
-
-                  return (
-                    <div
-                      key={activeS.id}
-                      onClick={() => handleSessionClick(activeS.id)}
-                      className={cn(
-                        'group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
-                        activeS.id === currentSessionId && 'bg-accent font-medium'
-                      )}
-                    >
-                      <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
-                        {activeS.title}
-                      </span>
-                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {activityIndicatorKind ? (
-                          <SessionStatusIndicator status={activeS.status} statusUpdatedAt={null} />
-                        ) : null}
-                      </span>
-                    </div>
-                  );
-                })}
-              </>
-            )}
-
             {workspaceFolders &&
               folderGroups.map(({ folder, worktrees }, index) => (
                 <WorkspaceFolderSection
@@ -1202,6 +1197,42 @@ export function ChatSidebar({
                   {worktrees.map(renderWorktree)}
                 </WorkspaceFolderSection>
               ))}
+
+            {/* Live-only sessions (not in stored list) */}
+            {liveOnlySessions.length > 0 && (
+              <>
+                <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                  Remote
+                </div>
+                {liveOnlySessions.map(activeS => {
+                  const activityIndicatorKind = getSessionActivityIndicatorKind(
+                    activeS.status,
+                    null
+                  );
+
+                  return (
+                    <div
+                      key={activeS.id}
+                      onClick={() => handleSessionClick(activeS.id)}
+                      className={cn(
+                        'group hover:bg-accent flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors',
+                        activeS.id === currentSessionId && 'bg-accent font-medium'
+                      )}
+                    >
+                      <span className="line-clamp-1 min-w-0 flex-1 leading-snug">
+                        {activeS.title}
+                      </span>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                        {activityIndicatorKind ? (
+                          <SessionStatusIndicator status={activeS.status} statusUpdatedAt={null} />
+                        ) : null}
+                      </span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+
             <div
               role="region"
               aria-label="Ungrouped workspaces"

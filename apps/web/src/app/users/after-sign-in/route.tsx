@@ -1,4 +1,5 @@
-import { getProfileRedirectPath, getUserFromAuth } from '@/lib/user/server';
+import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
+import { getUserFromAuth } from '@/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
 import PostHogClient from '@/lib/posthog';

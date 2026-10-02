@@ -6,7 +6,7 @@ import type { UserOrganizationWithSeats } from '@/lib/organizations/organization
 import { summarizeUserPayments } from '@/lib/creditTransactions';
 import { hasOrganizationEverPaid, hasUserEverPaid } from '@/lib/creditTransactions';
 
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 
 /** Pre-fetched data shared across notification generators to avoid duplicate DB queries. */
 type NotificationContext = {
@@ -99,17 +99,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     showIn: ['extension', 'cli'],
   },
   {
-    id: 'kilo-console-beta',
-    title: 'Try Kilo Console (Beta)',
-    message: 'Manage git worktrees, sessions, and all CLI settings from a browser-based UI.',
-    action: {
-      actionText: 'How to install',
-      actionURL:
-        'https://blog.kilo.ai/p/kilo-console-beta-is-live?utm_source=kilo-cli&utm_medium=notifications&utm_campaign=cli-tips',
-    },
-    showIn: ['cli'],
-  },
-  {
     id: 'app-builder-promo-mar-6',
     title: 'Try App Builder',
     message: "Don't feel like coding? Try App Builder to build with natural language from the web",
@@ -132,16 +121,6 @@ const normalUnconditionalNotifications: KiloNotification[] = [
     suggestModelId: 'nvidia/nemotron-3-super-120b-a12b:free',
     showIn: ['extension', 'cli'],
     expiresAt: '2026-03-25T08:00:00Z',
-  },
-  {
-    id: 'minimax-byteplus-credits-aug-6',
-    title: 'Buy Coding Plans with Kilo Credits',
-    message: 'Buy coding plans from MiniMax & Byteplus directly with your Kilo credits.',
-    action: {
-      actionText: 'View Subscriptions',
-      actionURL: 'https://app.kilo.ai/subscriptions',
-    },
-    showIn: ['extension', 'cli'],
   },
 ];
 

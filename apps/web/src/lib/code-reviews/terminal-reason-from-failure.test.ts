@@ -43,6 +43,12 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it('does not treat a billing admission outage as a user payment failure', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'admission_billing_unavailable' })).toBe(
+      'sandbox_connection'
+    );
+  });
+
   it('splits rate limiting by whose key was throttled', () => {
     const rateLimited = { code: 'assistant_error', assistantReason: 'rate_limited' } as const;
 
@@ -56,6 +62,27 @@ describe('terminalReasonFromCloudAgentFailure', () => {
       terminalReasonFromCloudAgentFailure({ ...rateLimited, providerOwnership: 'unknown' })
     ).toBe('assistant_rate_limited');
     expect(terminalReasonFromCloudAgentFailure(rateLimited)).toBe('assistant_rate_limited');
+  });
+
+  it('splits provider authentication by whose key was rejected', () => {
+    const unauthenticated = {
+      code: 'assistant_error',
+      assistantReason: 'provider_authentication',
+    } as const;
+
+    // The projected callback message drops the raw '[BYOK]' sentence, so
+    // ownership is the only signal left that routes this onto the actionable
+    // (disable + email) path instead of generic unauthorized.
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'byok' })
+    ).toBe('byok_invalid_key');
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'managed' })
+    ).toBe('assistant_unauthorized');
+    expect(
+      terminalReasonFromCloudAgentFailure({ ...unauthenticated, providerOwnership: 'unknown' })
+    ).toBe('assistant_unauthorized');
+    expect(terminalReasonFromCloudAgentFailure(unauthenticated)).toBe('assistant_unauthorized');
   });
 
   it('prefers the structured assistant reason over the safe message', () => {
@@ -89,6 +116,8 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     ['structured_output', 'assistant_structured_output'],
     ['timeout', 'assistant_timeout'],
     ['invalid_request', 'assistant_invalid_request'],
+    ['provider_disconnect', 'assistant_provider_disconnect'],
+    ['gateway_unavailable', 'assistant_gateway_unavailable'],
   ] as const)('maps assistant reason %s to %s', (assistantReason, expected) => {
     expect(
       terminalReasonFromCloudAgentFailure({

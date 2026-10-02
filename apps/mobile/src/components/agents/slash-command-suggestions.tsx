@@ -96,7 +96,9 @@ function SlashCommandSuggestionRow({
     >
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-foreground">{`/${command.name}`}</Text>
+          <Text className="min-w-0 flex-1 text-sm font-semibold text-foreground" numberOfLines={1}>
+            {`/${command.name}`}
+          </Text>
           {isSkill ? (
             <View className="rounded-full bg-muted px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">

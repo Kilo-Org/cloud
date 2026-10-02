@@ -32,6 +32,16 @@ describe('AutoFreeConfigSchema', () => {
     expect(AutoFreeConfigSchema.safeParse(AUTO_FREE_FALLBACK_CONFIG).success).toBe(true);
   });
 
+  it.each([
+    'stealth/space-bunny-alpha',
+    'nvidia/nemotron-3-ultra-550b-a55b:free',
+    'dots-studio/dots-3-note-preview:free',
+    '~provider/model-latest',
+  ])('accepts model ID %p', model => {
+    const result = AutoFreeConfigSchema.safeParse({ models: [{ ...config.models[0], model }] });
+    expect(result.success).toBe(true);
+  });
+
   it('rejects duplicate models', () => {
     const result = AutoFreeConfigSchema.safeParse({
       models: [config.models[0], config.models[0]],
@@ -39,15 +49,20 @@ describe('AutoFreeConfigSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it.each(["x');--:free", "x\\'--:free", 'provider/model :free', ''])(
-    'rejects model ID %p',
-    model => {
-      const result = AutoFreeConfigSchema.safeParse({
-        models: [{ ...config.models[0], model }],
-      });
-      expect(result.success).toBe(false);
-    }
-  );
+  it.each([
+    "x');--:free",
+    "x\\'--:free",
+    'provider/model :free',
+    'Provider/Model:free',
+    'provider/model_a:free',
+    'provider@model:free',
+    '',
+  ])('rejects model ID %p', model => {
+    const result = AutoFreeConfigSchema.safeParse({
+      models: [{ ...config.models[0], model }],
+    });
+    expect(result.success).toBe(false);
+  });
 
   it.each([0, -1, 1.5])('rejects weight %s', weight => {
     const result = AutoFreeConfigSchema.safeParse({

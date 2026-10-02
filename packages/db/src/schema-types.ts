@@ -2268,8 +2268,8 @@ export const AutoFreeModelSchema = z.object({
     .string()
     .trim()
     .regex(
-      /^[A-Za-z0-9._:~/@+-]+$/,
-      'Model IDs may only contain letters, digits, and . _ : ~ / @ + -'
+      /^[a-z0-9./:~-]+$/,
+      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
     ),
   weight: z.number().int().positive(),
   reasoning: z.object({

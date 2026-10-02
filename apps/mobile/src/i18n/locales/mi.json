@@ -2047,6 +2047,7 @@
       "idCopied": "Kua tāruatia te ID o te wātū",
       "couldNotCopyId": "Kāore i taea te tārua i te ID o te wātū.",
       "untitled": "Wātū taitara-kore",
+      "actions": "Ngā mahi mō te wātū",
       "sessionDeleted": "Kua mukua te wātū",
       "needsInput": "me whai urupare",
       "fromPlatform": "mai i {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Ka taea tēnei wātū te pānui anake.",
       "continueInNewSession": "Haere tonu i tētahi wātū hou",
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
+      "emptyTranscriptDescription": "Kāore anō he karere i tēnei wātū.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
       "renameAccessibility": "Whakaingoatia anō te wātū: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Kōwhiria he tauira i mua i te tuku.",
       "preparingPlaceholder": "Kei te whakarite i te taiao…",
       "finalizingPlaceholder": "Kei te whakaoti…",
+      "sessionLoadFailed": "Kāore i taea te uta te wātū. Me whakamātau anō i te tuatahi.",
+      "sendUnavailable": "Kāore te tuku e wātea kia rite rā anō te wātū.",
       "cannotReceiveFiles": "Kāore e taea e tēnei wātū te whiwhi kōnae. Tangohia ngā whakapirihanga kia taea ai te tuku i tō karere.",
       "couldNotAttachFiles": "Kāore i taea te whakapiri i ngā kōnae. Pāwhiria te pātene tuku hei whakamātau anō.",
       "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
@@ -2634,6 +2638,7 @@
       "provider": "Kaiwhakarato",
       "totalCost": "Te utu katoa",
       "usageReflectsLatest": "Ko te whakamahinga e whakaaturia ana nō te whakautu hou rawa a te kaiāwhina kua oti.",
+      "usageUnavailable": "Kāore te whakamahinga horopako e wātea ana",
       "tokenUsage": "Te whakamahinga tōkena",
       "cacheRate": "Te ōrau keteroki",
       "modelsCount": "Ngā tauira ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "Utaina",
       "loadWithHost": "Utaina {{host}}",
-      "httpsOnly": "Ko ngā atahanga HTTPS anake ka whakaaetia."
+      "httpsOnly": "Ko ngā atahanga HTTPS anake ka whakaaetia.",
+      "trustTitle": "Utaina te atahanga mai i {{host}}?",
+      "trustMessage": "Mā te whirinaki ki {{host}} ka utaina ōna atahanga me te kore pātai i ia wā. Ka taea te whakakore ā muri ake i Ngā paetukutuku whirinaki.",
+      "loadOnce": "Utaina kotahi"
     },
     "markdownLink": {
       "invalidLink": "Kāore e taea te whakatuwhera i tēnei hononga.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Ngā paetukutuku e whakaaetia ana kia tuwhera me te kore pātai",
     "emptyTitle": "Kāore he paetukutuku whirinaki",
     "emptyDescription": "Ina whakawhirinaki koe ki te paetukutuku o tētahi hononga, ka tuwhera taua hononga me te kore pātai anō.",
+    "imagesSectionTitle": "Ngā paetukutuku atahanga whirinaki",
+    "imagesSectionDescription": "Ka utaina ngā atahanga mai i ēnei paetukutuku me te kore pātai anō.",
+    "imagesSectionEmpty": "Kāore he paetukutuku atahanga whirinaki",
     "revoke": "Whakakorea te whirinaki ki {{host}}",
     "revokeMessage": "Ka pātai anō ngā hononga ki tēnei paetukutuku mō te whakaaetanga.",
+    "revokeImageMessage": "Ka pātai anō ngā atahanga mai i tēnei paetukutuku mō te whakaaetanga.",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
   "quickChat": {

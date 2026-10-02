@@ -1534,6 +1534,7 @@
       "idCopied": "세션 ID 복사됨",
       "couldNotCopyId": "세션 ID를 복사하지 못했습니다.",
       "untitled": "제목 없는 세션",
+      "actions": "세션 작업",
       "sessionDeleted": "세션이 삭제되었습니다.",
       "needsInput": "입력 필요",
       "fromPlatform": "{{platform}}에서",
@@ -1586,6 +1587,7 @@
       "readOnly": "읽기 전용 세션입니다.",
       "continueInNewSession": "새 세션에서 계속하기",
       "emptyDescription": "아래에서 메시지를 보내 대화를 시작하세요.",
+      "emptyTranscriptDescription": "이 세션에는 아직 메시지가 없습니다.",
       "scrollToBottom": "맨 아래로 스크롤",
       "emptyTitle": "아직 메시지가 없습니다",
       "renameAccessibility": "세션 이름 변경: {{title}}",
@@ -2052,6 +2054,8 @@
       "selectModelBeforeSending": "메시지를 보내기 전에 모델을 선택하세요.",
       "preparingPlaceholder": "환경 설정 중...",
       "finalizingPlaceholder": "마무리 중...",
+      "sessionLoadFailed": "세션을 불러오지 못했습니다. 먼저 다시 시도하세요.",
+      "sendUnavailable": "세션이 준비될 때까지 전송할 수 없습니다.",
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
       "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 보내기를 눌러 다시 시도하세요.",
       "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
@@ -2121,6 +2125,7 @@
       "provider": "제공업체",
       "totalCost": "총 비용",
       "usageReflectsLatest": "사용량은 가장 최근에 생성이 완료된 어시스턴트 응답을 기준으로 합니다.",
+      "usageUnavailable": "컨텍스트 사용량을 사용할 수 없습니다",
       "tokenUsage": "토큰 사용량",
       "cacheRate": "캐시 비율",
       "modelsCount": "모델 ({{displayCount}})",
@@ -2155,7 +2160,10 @@
     "markdownImage": {
       "load": "불러오기",
       "loadWithHost": "{{host}}에서 불러오기",
-      "httpsOnly": "HTTPS 이미지만 지원합니다."
+      "httpsOnly": "HTTPS 이미지만 지원합니다.",
+      "trustTitle": "{{host}}에서 이미지를 불러올까요?",
+      "trustMessage": "{{host}}를 신뢰하면 매번 묻지 않고 이미지를 불러옵니다. 나중에 신뢰하는 호스트에서 해제할 수 있습니다.",
+      "loadOnce": "한 번 불러오기"
     },
     "markdownLink": {
       "invalidLink": "이 링크를 열 수 없습니다.",
@@ -3181,8 +3189,12 @@
     "subtitle": "확인 없이 링크를 열도록 허용한 호스트",
     "emptyTitle": "신뢰하는 호스트 없음",
     "emptyDescription": "링크의 호스트를 신뢰하도록 설정하면 다음부터 확인 없이 링크가 열립니다.",
+    "imagesSectionTitle": "신뢰하는 이미지 호스트",
+    "imagesSectionDescription": "이 호스트의 이미지는 다시 묻지 않고 불러옵니다.",
+    "imagesSectionEmpty": "신뢰하는 이미지 호스트 없음",
     "revoke": "{{host}} 신뢰 해제",
     "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
+    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다.",
     "backToPreferences": "환경설정으로 돌아가기"
   },
   "quickChat": {

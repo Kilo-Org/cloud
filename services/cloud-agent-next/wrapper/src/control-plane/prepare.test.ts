@@ -566,6 +566,34 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
+  it('logs bounded git failure provenance on the failure line without changing the frame or retries', async () => {
+    const harness = createHarness();
+    harness.setClone(
+      result(
+        128,
+        "fatal: unable to access 'https://github.com/acme/repo.git/': The requested URL returned error: 429"
+      )
+    );
+    const spec = routeSpec({
+      git: { url: 'https://github.com/acme/repo.git', token: 'managed-alias', platform: 'github' },
+    });
+
+    await harness.manager.prepare(spec);
+
+    const failureLog = harness.logs.find(line => line.includes('control-plane prepare failed'));
+    expect(failureLog).toContain('matcher=git_rate_limited http=429 operation=clone route=managed');
+    expect(failureLog).not.toContain('github.com');
+    // Classification, retry count and the wire frame are unchanged.
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(3);
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.failed',
+      sessionId: spec.sessionId,
+      reason: 'workspace_setup_failed',
+      step: 'clone',
+      subtype: 'git_rate_limited',
+    });
+  });
+
   it('fails clone on timeout with the git_clone_timeout subtype', async () => {
     const harness = createHarness(TIMEOUT_TIMERS);
     harness.setClone(() => new Promise<ExecResult>(() => undefined));

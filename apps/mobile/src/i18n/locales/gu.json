@@ -2047,6 +2047,7 @@
       "idCopied": "સત્રનું ID કૉપિ થયું",
       "couldNotCopyId": "સત્રનું ID કૉપિ કરી શકાયું નહીં.",
       "untitled": "શીર્ષક વિનાનું સત્ર",
+      "actions": "સત્રના વિકલ્પો",
       "sessionDeleted": "સત્ર કાઢી નાખ્યું",
       "needsInput": "જવાબ જરૂરી",
       "fromPlatform": "{{platform}}માંથી",
@@ -2099,6 +2100,7 @@
       "readOnly": "આ સત્ર માત્ર વાંચી શકાય છે.",
       "continueInNewSession": "નવા સત્રમાં ચાલુ રાખો",
       "emptyDescription": "શરૂ કરવા નીચે સંદેશ મોકલો.",
+      "emptyTranscriptDescription": "આ સત્રમાં હજુ કોઈ સંદેશ નથી.",
       "scrollToBottom": "નીચે સ્ક્રોલ કરો",
       "emptyTitle": "હજુ કોઈ સંદેશ નથી",
       "renameAccessibility": "સત્રનું નામ બદલો: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "સંદેશ મોકલતા પહેલાં મોડલ પસંદ કરો.",
       "preparingPlaceholder": "કાર્યપરિસર તૈયાર થઈ રહ્યું છે...",
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
+      "sessionLoadFailed": "સત્ર લોડ કરી શકાયું નથી. પહેલા ફરી પ્રયાસ કરો.",
+      "sendUnavailable": "સત્ર તૈયાર ન થાય ત્યાં સુધી મોકલવું ઉપલબ્ધ નથી.",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો સ્વીકારી શકતું નથી. તમારો સંદેશ મોકલવા માટે જોડેલી ફાઇલો દૂર કરો.",
       "couldNotAttachFiles": "ફાઇલો જોડી શકાઈ નહીં. ફરી પ્રયાસ કરવા “મોકલો” પર ટેપ કરો.",
       "discardAttachmentsMessage": "હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
@@ -2634,6 +2638,7 @@
       "provider": "પ્રદાતા",
       "totalCost": "કુલ ખર્ચ",
       "usageReflectsLatest": "આ વપરાશની વિગતો સહાયકના સૌથી તાજેતરના પૂર્ણ થયેલા જવાબ પર આધારિત છે.",
+      "usageUnavailable": "સંદર્ભ વપરાશ અનુપલબ્ધ છે",
       "tokenUsage": "ટોકનનો વપરાશ",
       "cacheRate": "કેશ દર",
       "modelsCount": "મોડલ ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "લોડ કરો",
       "loadWithHost": "{{host}} લોડ કરો",
-      "httpsOnly": "માત્ર HTTPS છબીઓ જ લોડ કરી શકાય છે."
+      "httpsOnly": "માત્ર HTTPS છબીઓ જ લોડ કરી શકાય છે.",
+      "trustTitle": "{{host}} પરથી છબી લોડ કરવી?",
+      "trustMessage": "{{host}} પર ભરોસો કરવાથી તેની છબીઓ દર વખતે પૂછ્યા વિના લોડ થશે. તમે પછીથી વિશ્વસનીય હોસ્ટમાં તે રદ કરી શકો છો.",
+      "loadOnce": "એક વાર લોડ કરો"
     },
     "markdownLink": {
       "invalidLink": "આ લિંક ખોલી શકાતી નથી.",
@@ -3181,8 +3189,12 @@
     "subtitle": "પૂછ્યા વિના ખોલવા માટે તમે વિશ્વાસ કરો છો તે હોસ્ટ",
     "emptyTitle": "કોઈ વિશ્વસનીય હોસ્ટ નથી",
     "emptyDescription": "જ્યારે તમે લિંકના હોસ્ટ પર ભરોસો રાખો છો, ત્યારે તે ફરીથી પૂછ્યા વિના ખુલે છે.",
+    "imagesSectionTitle": "વિશ્વસનીય છબી હોસ્ટ",
+    "imagesSectionDescription": "આ હોસ્ટની છબીઓ ફરી પૂછ્યા વિના લોડ થાય છે.",
+    "imagesSectionEmpty": "કોઈ વિશ્વસનીય છબી હોસ્ટ નથી",
     "revoke": "{{host}} માટેની મંજૂરી રદ કરો",
     "revokeMessage": "આ હોસ્ટની લિંક ફરીથી પુષ્ટિ માગશે.",
+    "revokeImageMessage": "આ હોસ્ટની છબીઓ ફરીથી પુષ્ટિ માગશે.",
     "backToPreferences": "પસંદગીઓ પર પાછા જાઓ"
   },
   "quickChat": {

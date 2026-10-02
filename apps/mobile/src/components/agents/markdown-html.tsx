@@ -7,7 +7,6 @@ import {
   Text,
   useWindowDimensions,
 } from 'react-native';
-import { MarkedLexer } from 'react-native-marked';
 import RenderHTML, {
   type CustomBlockRenderer,
   type CustomMixedRenderer,
@@ -29,6 +28,7 @@ import {
   getMarkdownHtmlTagStyles,
   type MarkdownPalette,
 } from './markdown-palette';
+import { lexMarkdown } from './markdown-parse-cache';
 import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
@@ -56,7 +56,7 @@ const HTML_DOM_VISITORS: DomVisitorCallbacks = {
   },
 };
 
-type MarkdownHtmlSegment = {
+export type MarkdownHtmlSegment = {
   type: 'html' | 'markdown';
   raw: string;
 };
@@ -199,8 +199,7 @@ function tokenSegment(token: Token): MarkdownHtmlSegment {
 }
 
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
-  // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-  const tokens = MarkedLexer(value, { gfm: true });
+  const tokens = lexMarkdown(value);
   const segments: MarkdownHtmlSegment[] = [];
   for (const token of tokens) {
     pushSegment(segments, tokenSegment(token));
@@ -226,7 +225,7 @@ type MarkdownHtmlAppend = {
 };
 
 /** A segmentation of a value together with the snapshot the next call reuses. */
-type MarkdownHtmlSplit = {
+export type MarkdownHtmlSplit = {
   segments: MarkdownHtmlSegment[];
   snapshot: MarkdownHtmlSnapshot;
 };
@@ -399,8 +398,7 @@ export function splitMarkdownHtmlIncremental(
   ) {
     const headSegments = [...previous.headSegments];
     const suffix = value.slice(previous.tailStart);
-    // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-    const tokens = MarkedLexer(suffix, { gfm: true });
+    const tokens = lexMarkdown(suffix);
     // A definition in the appended suffix can duplicate one already in the
     // head: the suffix lex emits it, the whole-value lex drops it, so the two
     // no longer agree. Fall through and re-lex the whole value in that case.
@@ -427,8 +425,7 @@ export function splitMarkdownHtmlIncremental(
 
   // No reusable prefix: lex the whole value once and keep every token before
   // the boundary as the head, so the next publish starts from a token boundary.
-  // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-  const tokens = MarkedLexer(value, { gfm: true });
+  const tokens = lexMarkdown(value);
   const headSegments: MarkdownHtmlSegment[] = [];
   const { segments, tailStart } = appendTokens(tokens, headSegments, 0);
   return {

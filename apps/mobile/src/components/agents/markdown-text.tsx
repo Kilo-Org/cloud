@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ColorSchemeName, useColorScheme, View } from 'react-native';
 import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -16,6 +16,13 @@ import {
   type MarkdownVariant,
 } from './markdown-palette';
 import {
+  markdownHtmlSplitCache,
+  markdownRenderCache,
+  type MarkdownRenderEntry,
+  markdownRenderKey,
+  markdownTableSegmentsCache,
+} from './markdown-parse-cache';
+import {
   type MarkdownCodeLongPressHandler,
   type MarkdownCopyCodeHandler,
   type MarkdownLinkLongPressHandler,
@@ -29,6 +36,15 @@ export type MarkdownTextProps = {
   value: string;
   variant?: MarkdownVariant;
   selectable?: boolean;
+  /**
+   * A stable identity for the host that supplied the interactive handlers, e.g.
+   * a message id. The per-message handlers a host forwards close over that
+   * message, so two messages with identical markdown must not share cached
+   * render elements; this is the cache scope that keeps them apart while still
+   * letting a remount of the same message reuse its parse. Omitted by static,
+   * handler-free callers, which are safe to share by value alone.
+   */
+  renderScope?: string;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   /**
    * Optional tap handler invoked when a rendered link is pressed. When this
@@ -54,6 +70,7 @@ export function MarkdownText({
   value,
   variant = 'assistant',
   selectable = true,
+  renderScope,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -70,10 +87,18 @@ export function MarkdownText({
   // keeps an unrelated re-render from re-lexing an unchanged value; the ref
   // survives it so the next value still extends the snapshot.
   const snapshotRef = useRef<MarkdownHtmlSnapshot | undefined>(undefined);
-  const { segments, snapshot } = useMemo(
-    () => splitMarkdownHtmlIncremental(value, snapshotRef.current),
-    [value]
-  );
+  const { segments, snapshot } = useMemo(() => {
+    // A remount (a FlashList row re-entering the window) starts without a
+    // snapshot, so the incremental parser can only rebuild the whole value.
+    // Completed values were cached on the previous mount — including the last
+    // streaming publish, which is the value a remount sees — so reuse that
+    // parse instead of lexing and segmenting the same source again.
+    const cached =
+      snapshotRef.current === undefined ? markdownHtmlSplitCache.get(value) : undefined;
+    const result = cached ?? splitMarkdownHtmlIncremental(value, snapshotRef.current);
+    markdownHtmlSplitCache.set(value, result);
+    return result;
+  }, [value]);
   snapshotRef.current = snapshot;
 
   // Always render through the same wrapping View with index keys: switching to
@@ -98,6 +123,7 @@ export function MarkdownText({
             value={segment.raw}
             palette={palette}
             selectable={selectable}
+            renderScope={renderScope}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
             onCopyCode={onCopyCode}
@@ -139,6 +165,7 @@ function MarkdownContent({
   value,
   palette,
   selectable = true,
+  renderScope,
   onLongPressLink,
   onPressLink,
   onCopyCode,
@@ -146,14 +173,32 @@ function MarkdownContent({
 }: Readonly<MarkdownContentProps>) {
   // Tables are extracted before any renderer runs: each table becomes a chip
   // (parsed on open), and the remaining markdown runs render through useMarkdown.
-  const [snapshot, setSnapshot] = useState(() => ({
-    value,
-    segments: splitTableSegments(value),
-  }));
-  const segments = useMemo(
-    () => (snapshot.value === value ? snapshot.segments : splitTableSegments(value, snapshot)),
-    [value, snapshot]
-  );
+  // A mount that finds a previously segmented value (a remount of a completed
+  // message) reuses the split instead of re-lexing it.
+  const [snapshot, setSnapshot] = useState(() => {
+    const cached = markdownTableSegmentsCache.get(value);
+    if (cached !== undefined) {
+      return { value, segments: cached };
+    }
+    const segments = splitTableSegments(value);
+    markdownTableSegmentsCache.set(value, segments);
+    return { value, segments };
+  });
+  const segments = useMemo(() => {
+    if (snapshot.value === value) {
+      return snapshot.segments;
+    }
+    // Streaming appends transfer table keys from *this* instance's previous
+    // split, and that transfer is not value-pure. The value-only cache cannot
+    // carry the snapshot context, so compute against it instead of reading the
+    // cache: a foreign no-previous entry (the `useState` initializer above
+    // stores one) would hand a newly added table the key of one this instance
+    // just invalidated, reconciling live `MarkdownTable` state onto a
+    // different table.
+    const next = splitTableSegments(value, snapshot);
+    markdownTableSegmentsCache.set(value, next);
+    return next;
+  }, [value, snapshot]);
   if (snapshot.value !== value) {
     setSnapshot({ value, segments });
   }
@@ -179,6 +224,7 @@ function MarkdownContent({
             value={segment.raw}
             palette={palette}
             selectable={selectable}
+            renderScope={renderScope}
             onLongPressLink={onLongPressLink}
             onPressLink={onPressLink}
             onCopyCode={onCopyCode}
@@ -194,6 +240,7 @@ type MarkdownSegmentProps = {
   value: string;
   palette: MarkdownPalette;
   selectable: boolean;
+  renderScope?: string;
   onLongPressLink?: MarkdownLinkLongPressHandler;
   onPressLink?: MarkdownLinkPressHandler;
   onCopyCode?: MarkdownCopyCodeHandler;
@@ -204,13 +251,98 @@ function MarkdownSegment({
   value,
   palette,
   selectable,
+  renderScope,
   onLongPressLink,
   onPressLink,
   onCopyCode,
   onLongPressCode,
 }: Readonly<MarkdownSegmentProps>) {
   const colorScheme = useColorScheme();
+  const renderKey = markdownRenderKey({
+    value,
+    renderScope,
+    palette,
+    selectable,
+    colorScheme,
+    hasLongPressLink: onLongPressLink !== undefined,
+    hasPressLink: onPressLink !== undefined,
+    hasCopyCode: onCopyCode !== undefined,
+    hasLongPressCode: onLongPressCode !== undefined,
+  });
 
+  // A row that re-enters the FlashList window remounts this component, and
+  // `useMarkdown` would lex and re-create the whole value. A completed value's
+  // elements are cached under `renderKey` (value + the render-affecting props),
+  // so a remount reuses them and skips the lex. The renderer-per-value contract
+  // is what makes this safe: the cached elements came from a renderer built for
+  // exactly this value, so their element keys stay stable.
+  //
+  // The decision is pinned when the instance mounts. Consulting the cache on
+  // every render could swap a live parse for cached elements mid-stream and
+  // remount the subtree (resetting CodeBlock state); an instance that hits the
+  // cache drops back to a live parse only if the value later changes.
+  const cachedRef = useRef<{ key: string; entry: MarkdownRenderEntry } | null | undefined>(
+    undefined
+  );
+  if (cachedRef.current === undefined) {
+    const cached = markdownRenderCache.get(renderKey);
+    cachedRef.current = cached === undefined ? null : { key: renderKey, entry: cached };
+  } else if (cachedRef.current !== null && cachedRef.current.key !== renderKey) {
+    cachedRef.current = null;
+  }
+
+  // Cached elements carry callbacks the renderer captured when they were built.
+  // A remount reuses them because the value did not change, but the host may
+  // have recomputed its message-bound closures since (a reaction or delivery
+  // failure updates the message without its markdown). Re-bind the renderer to
+  // the current handlers so a reused fence long-press opens the current
+  // message's actions, not the stale ones. A live parse already has them.
+  useEffect(() => {
+    cachedRef.current?.entry.bindHandlers({
+      onLongPressLink,
+      onPressLink,
+      onCopyCode,
+      onLongPressCode,
+    });
+  });
+
+  return (
+    <View>
+      {cachedRef.current !== null ? (
+        cachedRef.current.entry.elements
+      ) : (
+        <MarkdownSegmentFresh
+          value={value}
+          palette={palette}
+          selectable={selectable}
+          onLongPressLink={onLongPressLink}
+          onPressLink={onPressLink}
+          onCopyCode={onCopyCode}
+          onLongPressCode={onLongPressCode}
+          renderKey={renderKey}
+          colorScheme={colorScheme}
+        />
+      )}
+    </View>
+  );
+}
+
+type MarkdownSegmentFreshProps = MarkdownSegmentProps & {
+  renderKey: string;
+  colorScheme: ColorSchemeName;
+};
+
+function MarkdownSegmentFresh({
+  value,
+  palette,
+  selectable,
+  onLongPressLink,
+  onPressLink,
+  onCopyCode,
+  onLongPressCode,
+  renderKey,
+  colorScheme,
+}: Readonly<MarkdownSegmentFreshProps>) {
   const styles = useMemo(() => getMarkdownStyles(palette), [palette]);
 
   const theme = useMemo(
@@ -250,5 +382,19 @@ function MarkdownSegment({
     renderer,
   });
 
-  return <View>{elements}</View>;
+  // Hand the parsed elements to the module cache for the next remount. The
+  // effect (not render) keeps the render pass free of side effects; the value
+  // is already visible by the time a row can leave and re-enter the window. The
+  // binder lets a cache hit point this renderer at the host's current handlers,
+  // so the reused elements never dispatch through a stale message closure.
+  useEffect(() => {
+    markdownRenderCache.set(renderKey, {
+      elements,
+      bindHandlers: handlers => {
+        renderer.setHandlers(handlers);
+      },
+    });
+  }, [renderKey, elements, renderer]);
+
+  return <>{elements}</>;
 }

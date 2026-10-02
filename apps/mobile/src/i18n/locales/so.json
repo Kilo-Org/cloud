@@ -2047,6 +2047,7 @@
       "idCopied": "ID-ga kalfadhiga waa la nuqulay",
       "couldNotCopyId": "ID-ga kalfadhiga nuqul lagama samayn karin.",
       "untitled": "Kalfadhi aan magac lahayn",
+      "actions": "Tallaabooyinka kalfadhiga",
       "sessionDeleted": "Kalfadhiga waa la tirtiray",
       "needsInput": "jawaab sugaya",
       "fromPlatform": "ka yimid {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Kalfadhigan waa la akhrin karaa oo keliya.",
       "continueInNewSession": "Sii wad kalfadhi cusub",
       "emptyDescription": "Farriin ku dir meesha hoose si aad u bilowdo.",
+      "emptyTranscriptDescription": "Kalfadhigan weli ma laha farriimo.",
       "scrollToBottom": "U dhaadhac xagga hoose",
       "emptyTitle": "Weli ma jiraan farriimo",
       "renameAccessibility": "Beddel magaca kalfadhiga: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
+      "sessionLoadFailed": "Seshan lama soo gelin karin. Marka hore mar kale isku day.",
+      "sendUnavailable": "Dirista lama heli karo ilaa seshanku diyaar noqdo.",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
@@ -2634,6 +2638,7 @@
       "provider": "Bixiyaha",
       "totalCost": "Kharashka guud",
       "usageReflectsLatest": "Isticmaalku wuxuu muujinayaa jawaabtii ugu dambaysay ee kaaliyuhu dhammeeyay.",
+      "usageUnavailable": "Isticmaalka context lama heli karo",
       "tokenUsage": "Isticmaalka halbeegyada qoraalka",
       "cacheRate": "Heerka kaydka ku meelgaarka ah",
       "modelsCount": "Moodeellada ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "Soo shub",
       "loadWithHost": "Soo shub {{host}}",
-      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay."
+      "httpsOnly": "Sawirrada HTTPS oo keliya ayaa la oggol yahay.",
+      "trustTitle": "Soo shub sawirka ka yimid {{host}}?",
+      "trustMessage": "Aaminka {{host}} wuxuu soo shubaa sawirradiisa adigoon mar walba weydiin. Waxaad mar dambe ka noqon kartaa Martigeliyeyaasha la aaminay.",
+      "loadOnce": "Soo shub hal mar"
     },
     "markdownLink": {
       "invalidLink": "Xiriiriyahan lama furi karo.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Martigeliyeyaasha aad oggolaatay in la furo adigoon la weydiin",
     "emptyTitle": "Ma jiraan martigeliyeyaal la aaminay",
     "emptyDescription": "Markaad aaminto martigeliyaha xiriiriyaha, xiriiriyuhu wuu furmaa adigoon mar kale la weydiin.",
+    "imagesSectionTitle": "Martigeliyeyaasha sawirka la aaminay",
+    "imagesSectionDescription": "Sawirrada martigeliyeyaashan waxaa la soo shubaa adigoon mar kale weydiin.",
+    "imagesSectionEmpty": "Ma jiraan martigeliyeyaal sawir la aaminay",
     "revoke": "Ka noqo aaminaadda {{host}}",
     "revokeMessage": "Xiriiriyeyaasha martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
+    "revokeImageMessage": "Sawirrada martigeliyahan ayaa mar kale weydiin doona xaqiijin.",
     "backToPreferences": "Ku noqo doorashooyinka"
   },
   "quickChat": {

@@ -1534,6 +1534,7 @@
       "idCopied": "セッションIDをコピーしました",
       "couldNotCopyId": "セッションIDをコピーできませんでした。",
       "untitled": "無題のセッション",
+      "actions": "セッションの操作",
       "sessionDeleted": "セッションを削除しました",
       "needsInput": "入力が必要",
       "fromPlatform": "{{platform}}から",
@@ -1586,6 +1587,7 @@
       "readOnly": "このセッションは読み取り専用です。",
       "continueInNewSession": "新しいセッションで続行",
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
+      "emptyTranscriptDescription": "このセッションにはまだメッセージがありません。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション「{{title}}」の名前を変更",
@@ -2052,6 +2054,8 @@
       "selectModelBeforeSending": "送信前にモデルを選択してください。",
       "preparingPlaceholder": "環境を準備中…",
       "finalizingPlaceholder": "終了処理中…",
+      "sessionLoadFailed": "セッションを読み込めませんでした。先に再試行してください。",
+      "sendUnavailable": "セッションの準備ができるまで送信できません。",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。「送信」をタップして、もう一度お試しください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
@@ -2121,6 +2125,7 @@
       "provider": "プロバイダー",
       "totalCost": "合計コスト",
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
+      "usageUnavailable": "コンテキスト使用状況を利用できません",
       "tokenUsage": "トークン使用量",
       "cacheRate": "キャッシュ率",
       "modelsCount": "モデル（{{displayCount}}）",
@@ -2155,7 +2160,10 @@
     "markdownImage": {
       "load": "読み込む",
       "loadWithHost": "{{host}}から読み込む",
-      "httpsOnly": "HTTPSの画像のみ読み込めます。"
+      "httpsOnly": "HTTPSの画像のみ読み込めます。",
+      "trustTitle": "{{host}} から画像を読み込みますか？",
+      "trustMessage": "{{host}} を信頼すると、毎回確認せずにその画像が読み込まれます。後で信頼済みホストから取り消せます。",
+      "loadOnce": "1回だけ読み込む"
     },
     "markdownLink": {
       "invalidLink": "このリンクを開けません。",
@@ -3181,8 +3189,12 @@
     "subtitle": "確認せずに開くことを許可したホスト",
     "emptyTitle": "信頼済みホストはありません",
     "emptyDescription": "リンク先のホストを信頼済みにすると、次回から確認せずに開けます。",
+    "imagesSectionTitle": "信頼済み画像ホスト",
+    "imagesSectionDescription": "これらのホストの画像は確認なしで読み込まれます。",
+    "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {

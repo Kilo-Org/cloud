@@ -61,6 +61,8 @@ type ContainersRecord = {
   state: ContainersState;
   allocationRef: string | null;
   stopOpId: string | null;
+  // Retained so records persisted before snapshots were disabled still round-trip. Container
+  // snapshots are no longer created, restored or consumed.
   lastSnapshot: { id: string; sourceAllocation: string } | null;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
@@ -94,7 +96,6 @@ const PROBE_TIMEOUT_MS = 5_000;
 const CONTAINER_CALL_TIMEOUT_MS = 5_000;
 /** Pause between readiness probes, so repeated pgrep stays sequential and bounded. */
 const WRAPPER_READINESS_POLL_MS = 1_000;
-const SNAPSHOT_TIMEOUT_MS = 10_000;
 const DESTROY_TIMEOUT_MS = 30_000;
 const MAX_LOG_BYTES = 1024 * 1024;
 
@@ -247,7 +248,7 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.startContainerAndActivateBilling(
       container,
       record,
-      this.startOptions(input.instance, record.lastSnapshot?.id)
+      this.startOptions(input.instance)
     );
     await this.startWrapper(container, input.env, input.containment === true);
     await this.writeRunning(ref, 'clear');
@@ -395,12 +396,12 @@ export class SandboxContainers extends DurableObject<Env> {
         if (record.stopOpId === null) {
           await this.writeRecord({ ...record, stopOpId });
         }
-        return this.finishStop(record, ref, stopOpId);
+        return this.finishStop(record);
       }
       const stopOpId = crypto.randomUUID();
       const stopping: ContainersRecord = { ...record, state: 'stopping', stopOpId };
       await this.writeRecord(stopping);
-      return this.finishStop(stopping, ref, stopOpId);
+      return this.finishStop(stopping);
     });
   }
 
@@ -460,11 +461,7 @@ export class SandboxContainers extends DurableObject<Env> {
     // A stopped container is started and metered before the probe. An already
     // running container is probed first, and billing is activated by outcome.
     if (!container.running) {
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
+      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
     }
     const probe = await this.probeWrapper(container);
     if (probe === 'ambiguous') {
@@ -475,11 +472,7 @@ export class SandboxContainers extends DurableObject<Env> {
     }
     if (probe === 'absent') {
       // Skip physical start when already running, but still activate billing.
-      await this.startContainerAndActivateBilling(
-        container,
-        record,
-        this.startOptions(instance, record.lastSnapshot?.id)
-      );
+      await this.startContainerAndActivateBilling(container, record, this.startOptions(instance));
       await this.startWrapper(container, env, containment);
     } else {
       await this.activateBillingIfRunning(container, record);
@@ -713,14 +706,7 @@ export class SandboxContainers extends DurableObject<Env> {
     return container;
   }
 
-  private startOptions(
-    instance: ContainerInstanceSize,
-    snapshotId?: string
-  ): ContainerStartupOptions {
-    // The runtime startup union requires image XOR containerSnapshot.
-    if (snapshotId !== undefined) {
-      return { containerSnapshot: { id: snapshotId }, instance, enableInternet: true };
-    }
+  private startOptions(instance: ContainerInstanceSize): ContainerStartupOptions {
     return { image: this.containerImage(), instance, enableInternet: true };
   }
 
@@ -743,11 +729,7 @@ export class SandboxContainers extends DurableObject<Env> {
     };
   }
 
-  private async finishStop(
-    record: ContainersRecord,
-    ref: string,
-    stopOpId: string
-  ): Promise<'terminal' | 'retryable'> {
+  private async finishStop(record: ContainersRecord): Promise<'terminal' | 'retryable'> {
     const container = this.ctx.container;
     if (!container) {
       // A missing container only proves cleanup for a record that never reached
@@ -762,7 +744,6 @@ export class SandboxContainers extends DurableObject<Env> {
       await this.settleBillingAtStop(record);
       return stopPath('no_container_not_started', 'terminal');
     }
-    await this.snapshotBeforeDestroy(container, ref, stopOpId);
     const destroyStartedAt = Date.now();
     try {
       await withTimeout(container.destroy(), DESTROY_TIMEOUT_MS, 'container destroy timed out');
@@ -780,44 +761,6 @@ export class SandboxContainers extends DurableObject<Env> {
     await this.writeRecord(this.terminalRecord(current));
     await this.settleBillingAtStop(current);
     return stopPath('destroyed', 'terminal', { destroyMs: Date.now() - destroyStartedAt });
-  }
-
-  private async snapshotBeforeDestroy(
-    container: Container,
-    ref: string,
-    stopOpId: string
-  ): Promise<void> {
-    const attempt = container.snapshotContainer({});
-    try {
-      const snapshot = await withTimeout(
-        attempt,
-        SNAPSHOT_TIMEOUT_MS,
-        'container snapshot timed out'
-      );
-      await this.publishSnapshot(snapshot.id, ref, stopOpId);
-    } catch (error) {
-      logControlDiagnostic(
-        'container_snapshot',
-        {
-          result: 'failed',
-          errorName: error instanceof Error ? diagnosticCause(error.name) : 'unknown',
-          cause: error instanceof Error ? diagnosticCause(error.message) : 'unknown',
-        },
-        'warn'
-      );
-      void attempt.then(
-        snapshot => this.runExclusive(() => this.publishSnapshot(snapshot.id, ref, stopOpId)),
-        () => undefined
-      );
-    }
-  }
-
-  private async publishSnapshot(id: string, ref: string, stopOpId: string): Promise<void> {
-    const record = await this.readRecord();
-    if (record.state !== 'stopping') return;
-    if (record.allocationRef !== ref) return;
-    if (record.stopOpId !== stopOpId) return;
-    await this.writeRecord({ ...record, lastSnapshot: { id, sourceAllocation: ref } });
   }
 
   private billingScheduler(): ContainersBillingScheduler {

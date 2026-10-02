@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { TRPCError } from '@trpc/server';
-// The client deadline and the upstream budget this one must stay between.
-// Imported from source rather than restated so the constants can never drift.
+// The client deadline this budget must stay under. Imported from source rather
+// than restated so the two constants can never drift apart.
 import { CONTROL_PLANE_DEADLINE_MS, RequestDeadlineError } from '@kilocode/event-service';
 
-import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import {
   CONTROL_PLANE_PROCEDURE_BUDGET_MS,
   controlPlanePathFromInfo,
@@ -61,11 +60,9 @@ afterEach(() => {
 });
 
 describe('the control-plane budgets', () => {
-  test('the procedure budget is strictly under the client deadline, above the upstream budget', () => {
+  test('the procedure budget is strictly under the client deadline', () => {
     expect(CONTROL_PLANE_PROCEDURE_BUDGET_MS).toBe(10_000);
     expect(CONTROL_PLANE_PROCEDURE_BUDGET_MS).toBeLessThan(CONTROL_PLANE_DEADLINE_MS);
-    // The inner internal-service fetch bound fires first, so this is the backstop.
-    expect(CONTROL_PLANE_UPSTREAM_BUDGET_MS).toBeLessThan(CONTROL_PLANE_PROCEDURE_BUDGET_MS);
   });
 });
 

@@ -2047,6 +2047,7 @@
       "idCopied": "Sessiya identifikatori nusxalandi",
       "couldNotCopyId": "Sessiya identifikatorini nusxalab bo'lmadi.",
       "untitled": "Nomsiz sessiya",
+      "actions": "Sessiya amallari",
       "sessionDeleted": "Sessiya o'chirildi",
       "needsInput": "javob kutilmoqda",
       "fromPlatform": "{{platform}}dan",
@@ -2099,6 +2100,7 @@
       "readOnly": "Bu sessiyani faqat o'qish mumkin.",
       "continueInNewSession": "Yangi sessiyada davom etish",
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
+      "emptyTranscriptDescription": "Bu sessiyada hali xabarlar yo'q.",
       "scrollToBottom": "Eng pastga o'tish",
       "emptyTitle": "Hali xabarlar yo'q",
       "renameAccessibility": "Sessiya nomini o'zgartirish: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Yuborishdan oldin modelni tanlang.",
       "preparingPlaceholder": "Muhit sozlanmoqda...",
       "finalizingPlaceholder": "Yakunlanmoqda...",
+      "sessionLoadFailed": "Sessiyani yuklab bo'lmadi. Avval qayta urinib ko'ring.",
+      "sendUnavailable": "Sessiya tayyor bo'lmaguncha yuborish mavjud emas.",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirilgan fayllarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborish tugmasini bosing.",
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
@@ -2634,6 +2638,7 @@
       "provider": "Provayder",
       "totalCost": "Umumiy xarajat",
       "usageReflectsLatest": "Foydalanish ko'rsatkichlari yordamchining oxirgi tugallangan javobiga tegishli.",
+      "usageUnavailable": "Kontekstdan foydalanish mavjud emas",
       "tokenUsage": "Tokenlardan foydalanish",
       "cacheRate": "Keshdan foydalanish ulushi",
       "modelsCount": "Modellar ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "Yuklash",
       "loadWithHost": "{{host}} saytidan yuklash",
-      "httpsOnly": "Faqat HTTPS orqali uzatiladigan rasmlarni yuklash mumkin."
+      "httpsOnly": "Faqat HTTPS orqali uzatiladigan rasmlarni yuklash mumkin.",
+      "trustTitle": "{{host}} saytidan rasm yuklansinmi?",
+      "trustMessage": "{{host}} saytiga ishonch bildirsangiz, rasmlari har safar so'ramasdan yuklanadi. Keyinchalik Ishonchli saytlar bo'limida uni bekor qilishingiz mumkin.",
+      "loadOnce": "Bir marta yuklash"
     },
     "markdownLink": {
       "invalidLink": "Bu havolani ochib bo'lmaydi.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Tasdiq so'ramasdan ochiladigan saytlar",
     "emptyTitle": "Ishonchli saytlar yo'q",
     "emptyDescription": "Saytni ishonchli deb belgilasangiz, uning havolalari qayta tasdiq so'ramasdan ochiladi.",
+    "imagesSectionTitle": "Ishonchli rasm saytlari",
+    "imagesSectionDescription": "Bu saytlarning rasmlari qayta so'ramasdan yuklanadi.",
+    "imagesSectionEmpty": "Ishonchli rasm saytlari yo'q",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
     "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
+    "revokeImageMessage": "Bu saytning rasmlari yana tasdiq so'raydi.",
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {

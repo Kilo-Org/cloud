@@ -44,6 +44,13 @@ function fixture() {
       auto_merge: { merge_method: 'squash' },
       mergeable: true,
     },
+    rules: [
+      { type: 'pull_request', parameters: { dismiss_stale_reviews_on_push: false } },
+      {
+        type: 'required_status_checks',
+        parameters: { required_status_checks: [{ context: 'test', integration_id: 15368 }] },
+      },
+    ],
     checks: [
       {
         name: 'test',
@@ -80,7 +87,6 @@ function fixture() {
 async function run(data) {
   const approvals = [];
   const calls = [];
-  const failures = [];
   let prReads = 0;
   let signalReads = 0;
   const listReads = new Map();
@@ -126,7 +132,7 @@ async function run(data) {
       calls.push([route, params]);
       assert.equal(params.per_page, 100);
       if (data.apiFailure === route) throw new Error('GitHub API unavailable');
-      const key = route;
+      const key = typeof route === 'string' && route.startsWith('GET ') ? 'rules' : route;
       const readCount = (listReads.get(key) ?? 0) + 1;
       listReads.set(key, readCount);
       if (readCount > 1 && data.finalApiFailure === key) throw new Error('GitHub API unavailable');
@@ -135,9 +141,8 @@ async function run(data) {
   };
   await execute(github, data.context, {
     info: () => {},
-    setFailed: message => failures.push(message),
   });
-  return { approvals, calls, failures };
+  return { approvals, calls };
 }
 
 test('workflow is created-comment-only, least-privilege, and never checks out PR code', () => {
@@ -174,7 +179,7 @@ test('workflow is created-comment-only, least-privilege, and never checks out PR
   );
 });
 
-test('approves the assessed commit with a real review and no merge command', async () => {
+test('approves the assessed commit without requiring stale-approval dismissal', async () => {
   const result = await run(fixture());
   assert.equal(result.approvals.length, 1);
   assert.deepEqual(result.approvals[0], {
@@ -216,6 +221,9 @@ const rejectedCases = {
   'an edited live signal': d => (d.signal.updated_at = '2026-09-30T12:01:00Z'),
   'a changed live signal': d => (d.signal.body += ' modified'),
   'a signal attached to another PR': d => (d.signal.issue_url += '1'),
+  'missing required checks policy': d => (d.rules = d.rules.slice(0, 1)),
+  'a missing required check': d => (d.checks = d.checks.slice(1)),
+  'a check from the wrong integration': d => (d.checks[0].app.id = 123),
   'a check from another commit': d => (d.checks[0].head_sha = 'c'.repeat(40)),
   'a pending check': d => (d.checks[0].status = 'in_progress'),
   'a failed check': d => (d.checks[0].conclusion = 'failure'),
@@ -286,6 +294,12 @@ test('does not duplicate an existing Actions approval for the same SHA', async (
   assert.equal((await run(data)).approvals.length, 0);
 });
 
+test('approves without a pull-request ruleset while still requiring CI checks', async () => {
+  const data = fixture();
+  data.rules = data.rules.filter(rule => rule.type !== 'pull_request');
+  assert.equal((await run(data)).approvals.length, 1);
+});
+
 test('review-summary formatting is assessed by the meta-janitor, not the workflow', async () => {
   const data = fixture();
   data.comments[1].body = 'An entirely different review format assessed by the meta-janitor';
@@ -336,6 +350,13 @@ test('uses the newest commit status rather than an older failure', async () => {
 test('permits path-gated skipped checks while requiring successful Kilo review', async () => {
   const data = fixture();
   data.checks[0].conclusion = 'skipped';
+  assert.equal((await run(data)).approvals.length, 1);
+});
+
+test('a commit status can satisfy an unpinned required context', async () => {
+  const data = fixture();
+  data.rules[1].parameters.required_status_checks = [{ context: 'external' }];
+  data.statuses = [{ context: 'external', state: 'success' }];
   assert.equal((await run(data)).approvals.length, 1);
 });
 

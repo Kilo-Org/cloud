@@ -42,6 +42,44 @@ git diff --check
 
   Then restart Metro and force-quit the app.
 
+## Library First
+
+Before you build a UI element, find the library that already does it.
+
+1. Check the element map below. If the concern has an entry, use that element.
+2. Check `@expo/ui` (`node_modules/@expo/ui/build/`), which ships native modules for `57.x`: universal
+   `BottomSheet`, `Picker`, `Switch`, `TextInput`, `List`, `Host`, plus
+   `community/{segmented-control, picker, datetime-picker, masked-view, menu, pager-view, slider}`.
+3. Check the Expo SDK 57 docs for the concern.
+4. Check npm for a maintained package. A release in the last six months is the bar.
+
+A hand-built element is correct only when steps 1–4 fail. Record the decision in the PR body: the library
+and version you chose, or which candidates you rejected and why. "It was easier to write it" is not a
+reason.
+
+## Unified Elements
+
+One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces the "Use instead" column.
+
+| Concern | Element | Use instead of |
+|---|---|---|
+| Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
+| Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
+| Dialog / confirm, screen-level | `@/components/ui/dialog` (`@rn-primitives/alert-dialog`) | a direct `@rn-primitives/alert-dialog` import |
+| System confirm, non-destructive | `Alert.alert` | — |
+| Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
+| Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
+| Image viewer | `@/components/ui/image-viewer` | `react-native-image-viewing`, `react-native-awesome-gallery` |
+| Video | `expo-video` | `react-native-video`, `expo-av` |
+| Toast | `sonner-native` | `react-native-toast-message`, `burnt` |
+| Images | `@/components/ui/image` | `Image` from `react-native`, `expo-image` |
+| Icons | `@/components/ui/icons` | `lucide-react-native` |
+| Markdown | `@/components/markdown/markdown-text` | `react-native-markdown-display` |
+
+A `Modal` opened from sheet content is a sanctioned exception and stays on RN `Modal`: a dialog rendered
+through `@rn-primitives/portal` lives in the app's React tree and cannot paint above a native sheet.
+`RenameModal`, `DestructiveConfirmDialog`, and `FeedbackPromptDialog` keep RN `Modal` for this reason.
+
 ## Implementation Rules
 
 - Write the smallest boring implementation. Reuse existing helpers, components, and contracts.
@@ -74,7 +112,7 @@ git diff --check
 ## UI and UX Rules
 
 - `ScreenHeader` is the first child of the screen root; set stack `headerShown: false`.
-- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm destructive actions with `Alert.alert()`.
+- Prefer native sheets, alerts, pickers, gestures, and keyboard behavior. Confirm a non-destructive action with `Alert.alert()`. Confirm a destructive action with `@/components/ui/dialog`, because Android's native `AlertDialog` drops the `style: 'destructive'` affordance.
 - Every pressable gives lightweight feedback unless navigation or a native control already provides it.
 - Every data screen handles loading, empty, error, and happy states. Use `Skeleton` matching final dimensions, `EmptyState`, and pagination when results can grow.
 - Use `ActivityIndicator` only for inline waits. Where layout would jump, use the existing Reanimated `FadeIn`/`FadeOut`/`LinearTransition` patterns.

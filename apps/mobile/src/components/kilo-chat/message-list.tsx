@@ -87,9 +87,8 @@ export function MessageList({
       }),
     []
   );
-  // useMessages returns messages oldest-to-newest.
-  // FlashList v2 does not support `inverted`; instead we use maintainVisibleContentPosition
-  // with startRenderingFromBottom, which expects chronological order.
+  // useMessages returns messages oldest-to-newest. The list renders chronological
+  // order with maintainVisibleContentPosition + startRenderingFromBottom.
   const chronological = messages;
   const newestMessage = chronological.at(-1);
   const messageMap = useMemo(

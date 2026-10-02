@@ -1,12 +1,11 @@
 import { test, expect, describe } from '@jest/globals';
-import { preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { monitoredModels, preferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
 import {
   CLAUDE_OPUS_CURRENT_MODEL_ID,
   CLAUDE_SONNET_CURRENT_MODEL_ID,

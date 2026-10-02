@@ -4,9 +4,9 @@ import type { Organization } from '@kilocode/db/schema';
 import {
   classifyOrganizationEntitlement,
   type OrganizationTrialDisplayStatus,
-} from '@/lib/organizations/trial-utils';
+} from '@kilocode/web-shared/lib/organizations/trial-utils';
 import { z } from 'zod';
-import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@kilocode/web-shared/lib/ai-gateway/models';
 
 export function useOrganizationWithMembers(id: string, options?: { enabled?: boolean }) {
   const trpc = useTRPC();

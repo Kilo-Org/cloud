@@ -1,5 +1,5 @@
 import { createHash, createHmac } from 'crypto';
-import { USER_DELETION_AUDIT_HMAC_KEY } from '@/lib/config.server';
+import { USER_DELETION_AUDIT_HMAC_KEY } from '@kilocode/web-shared/lib/config.server';
 
 export class DeletionHmacError extends Error {
   constructor(message: string) {

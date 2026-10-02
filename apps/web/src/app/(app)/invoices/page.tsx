@@ -1,4 +1,4 @@
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 import { InvoicesPageClient } from './InvoicesPageClient';
 import { captureException } from '@sentry/nextjs';
 import { PageLayout } from '@/components/PageLayout';

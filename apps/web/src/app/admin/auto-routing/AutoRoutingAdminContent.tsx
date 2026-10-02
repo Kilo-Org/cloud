@@ -28,7 +28,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import {
   OpenRouterModelsResponseSchema,
   type OpenRouterModelsResponse,
-} from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 import { cn } from '@/lib/utils';
 import { BenchmarksSection } from './BenchmarksSection';
 import { parseAdminResponse } from './admin-fetch';

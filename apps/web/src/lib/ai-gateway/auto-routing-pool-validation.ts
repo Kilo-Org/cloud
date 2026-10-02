@@ -7,15 +7,15 @@ import {
   type AutoRoutingSettingsResponse,
   type PoolEntry,
 } from '@kilocode/auto-routing-contracts';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   getDirectByokModelsForOrganization,
   getDirectByokModelsForUser,
-} from '@/lib/ai-gateway/providers/direct-byok';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 
 export type PoolValidationReason =
   | 'unknown_model'

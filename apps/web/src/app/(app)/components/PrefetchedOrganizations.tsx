@@ -3,7 +3,7 @@ import * as Sentry from '@sentry/nextjs';
 import { dehydrate, HydrationBoundary, QueryClient } from '@tanstack/react-query';
 import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import type { User } from '@kilocode/db/schema';
-import { createTRPCContext } from '@/lib/trpc/init';
+import { createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { SeedUserQuery } from './SeedUserQuery';
 

@@ -4,7 +4,7 @@ import {
   CODE_REVIEW_BENIGN_TERMINAL_REASONS,
   CODE_REVIEW_TERMINAL_REASONS,
 } from '@kilocode/db/schema-types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   NON_TERMINAL_CODE_REVIEW_STATUSES,
   STALE_QUEUED_CODE_REVIEW_MINUTES,

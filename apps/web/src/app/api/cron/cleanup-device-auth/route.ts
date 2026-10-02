@@ -13,7 +13,7 @@ import {
 } from '@/lib/auth/passkey';
 import { cleanupExpiredAccessCodes } from '@/lib/kiloclaw/access-codes';
 import { cleanupExpiredInstallStates } from '@/lib/integrations/github/install-state';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 
 const CRON_SECRET = process.env['CRON_SECRET'];
 if (!CRON_SECRET) {

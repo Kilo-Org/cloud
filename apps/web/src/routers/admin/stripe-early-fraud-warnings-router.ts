@@ -1,8 +1,8 @@
 import { desc, eq, sql } from 'drizzle-orm';
 import * as z from 'zod';
 
-import { db } from '@/lib/drizzle';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   kilocode_users,
   organizations,

@@ -1,4 +1,4 @@
-jest.mock('@/lib/redis', () => ({ redisClient: {} }));
+jest.mock('@kilocode/web-shared/lib/redis', () => ({ redisClient: {} }));
 jest.mock('@/lib/snowflake', () => ({
   resolveSnowflakeConfig: jest.fn(),
   executeSnowflakeStatement: jest.fn(),
@@ -9,7 +9,7 @@ import {
   resolveSnowflakeConfig,
   type SnowflakeConfig,
 } from '@/lib/snowflake';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const mockResolveSnowflakeConfig = jest.mocked(resolveSnowflakeConfig);
 const mockExecuteSnowflakeStatement = jest.mocked(executeSnowflakeStatement);

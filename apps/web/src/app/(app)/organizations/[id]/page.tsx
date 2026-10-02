@@ -1,6 +1,6 @@
 import { OrganizationDashboard } from '@/components/organizations/OrganizationDashboard';
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@/lib/organizations/constants';
+import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@kilocode/web-shared/lib/organizations/constants';
 import { isOrgAutoTopUpFeatureEnabled } from '@/lib/organizations/organization-auto-top-up';
 
 export default async function OrganizationByIdPage({

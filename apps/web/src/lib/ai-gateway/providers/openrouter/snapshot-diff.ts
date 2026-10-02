@@ -1,5 +1,5 @@
-import type { NormalizedOpenRouterResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
 export type SnapshotDiff = {
   /** providerSlug -> sorted list of normalized model ids newly offered by that provider */

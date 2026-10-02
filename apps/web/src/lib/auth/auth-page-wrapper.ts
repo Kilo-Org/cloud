@@ -1,4 +1,4 @@
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { redirect } from 'next/navigation';
 import { detectSsoAccountMismatch, type SsoAccountMismatch } from '@/lib/auth/sso-account-mismatch';
 

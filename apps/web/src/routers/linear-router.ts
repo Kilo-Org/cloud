@@ -1,6 +1,6 @@
 import 'server-only';
 import { z } from 'zod';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import * as linearService from '@/lib/integrations/linear-service';
 import { TRPCError } from '@trpc/server';
 import {
@@ -8,9 +8,9 @@ import {
   resolveAuthorizedOwner,
   optionalOrgInput,
 } from '@/lib/integrations/resolve-owner';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 

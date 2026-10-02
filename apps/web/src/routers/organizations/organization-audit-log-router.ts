@@ -1,13 +1,13 @@
 import * as z from 'zod';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { organization_audit_logs } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, lt, gt, desc, asc, count, min, max, ilike, gte, lte, inArray } from 'drizzle-orm';
-import { AuditLogAction } from '@/lib/organizations/organization-audit-logs';
+import { AuditLogAction } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 
 const PAGE_SIZE = 100;
 

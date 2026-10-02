@@ -10,7 +10,7 @@ import {
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { INLINE_LINK_TOUCH_TARGET } from '@/components/auth/touch-targets';
 import Link from 'next/link';
-import { LANDING_URL } from '@/lib/constants';
+import { LANDING_URL } from '@kilocode/web-shared/lib/constants';
 
 export function BlockedNotification() {
   return (

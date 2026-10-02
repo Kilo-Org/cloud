@@ -18,32 +18,35 @@ import { getScheduledSeatDecrease } from '@/components/subscriptions/seats/sched
 import {
   getMostRecentSeatPurchase,
   getMostRecentEndedSeatPurchase,
-} from '@/lib/organizations/organization-seat-purchases';
+} from '@kilocode/web-shared/lib/organizations/organization-seat-purchases';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organization_seats_purchases, type OrganizationSeatsPurchase } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, desc, ne } from 'drizzle-orm';
-import { getOrganizationById } from '@/lib/organizations/organizations';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
   organizationMemberProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
-import { BillingCycleSchema } from '@/lib/organizations/organization-types';
-import { ipCountryFromHeaders, ja4FromHeaders } from '@/lib/bouncer/credit-events';
-import { successResult } from '@/lib/maybe-result';
-import { client } from '@/lib/stripe-client';
-import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
-import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
-import type { KiloPassTier } from '@/lib/kilo-pass/enums';
-import { KiloPassCadence } from '@/lib/kilo-pass/enums';
+import { BillingCycleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  ipCountryFromHeaders,
+  ja4FromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { successResult } from '@kilocode/web-shared/lib/maybe-result';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { isSeatLineItem } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
+import { getStripePriceIdForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import { getOrganizationKiloPassMetadata } from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
+import type { KiloPassTier } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassCadence } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,

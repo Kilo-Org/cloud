@@ -11,7 +11,7 @@ import {
   TOPUP_STATUS_PENDING,
   TOPUP_STATUS_QUERY_STRING_KEY,
   TOPUP_TRANSACTION_QUERY_STRING_KEY,
-} from '@/lib/organizations/constants';
+} from '@kilocode/web-shared/lib/organizations/constants';
 import { PageContainer } from '@/components/layouts/PageContainer';
 
 const MAX_TRANSACTION_LOOKUP_ATTEMPTS = 15;

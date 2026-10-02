@@ -1,11 +1,11 @@
 import { describe, expect, test } from '@jest/globals';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
 } from '@/lib/ai-gateway/providers/openrouter/free-endpoint-data-policy';
-import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 function offering(slug: string, isFree = false): OpenRouterModel {
   return {

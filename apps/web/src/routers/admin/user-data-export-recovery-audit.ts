@@ -1,6 +1,6 @@
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 export type DataExportRecoveryAuditEvent = {
   event: 'admin_data_export_recovery';

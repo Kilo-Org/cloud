@@ -16,7 +16,7 @@ import {
 } from '@kilocode/worker-utils/code-review-council';
 import { getManualCodeReviewConfig } from '../manual-config';
 import { setCodeReviewCouncilResult } from '../db/code-reviews';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Pure mapping: captures the council manifest from the final assistant message and joins each

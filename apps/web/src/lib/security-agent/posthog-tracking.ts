@@ -6,7 +6,7 @@
  */
 
 import 'server-only';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import type { SecurityAgentUiInteraction } from '@/lib/security-agent/core/schemas';
 import { captureException } from '@sentry/nextjs';
 

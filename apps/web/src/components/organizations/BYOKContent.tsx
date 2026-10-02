@@ -1,7 +1,7 @@
 'use client';
 
 import { useFeatureFlagEnabled } from 'posthog-js/react';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { OrganizationPageHeader } from './OrganizationPageHeader';
 import { OrganizationContextProvider } from './OrganizationContext';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';

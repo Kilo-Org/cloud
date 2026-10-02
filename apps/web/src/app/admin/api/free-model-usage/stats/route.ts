@@ -1,14 +1,14 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { free_model_usage } from '@kilocode/db/schema';
 import { sql } from 'drizzle-orm';
 import {
   FREE_MODEL_RATE_LIMIT_WINDOW_HOURS,
   FREE_MODEL_MAX_REQUESTS_PER_WINDOW,
   ADMIN_RATE_LIMIT_TEST_MODEL,
-} from '@/lib/constants';
+} from '@kilocode/web-shared/lib/constants';
 
 export type FreeModelUsageStatsResponse = {
   // Current window stats (last 3 hours)

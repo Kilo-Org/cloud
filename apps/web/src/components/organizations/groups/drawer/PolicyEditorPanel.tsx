@@ -1,7 +1,7 @@
 'use client';
 
 import type { DrawerStackHelpers } from '@/components/drawer';
-import type { OrganizationGroupPolicyType } from '@/lib/organizations/group-policies/organization-group-policies';
+import type { OrganizationGroupPolicyType } from '@kilocode/web-shared/lib/organizations/group-policies/organization-group-policies';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { organizationGroupPolicyDefinition } from '@/components/organizations/groups/policies/registry.client';

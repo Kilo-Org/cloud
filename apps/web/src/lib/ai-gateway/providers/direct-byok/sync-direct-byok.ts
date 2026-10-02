@@ -2,20 +2,20 @@ import * as z from 'zod';
 import {
   type DirectByokModel,
   type DirectByokModelFlag,
-} from '@/lib/ai-gateway/providers/direct-byok/types';
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { db } from '@/lib/drizzle';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
   ReasoningEffortSchema,
   VerbositySchema,
   type OpenCodeSettings,
 } from '@kilocode/db/schema-types';
-import { getAiSdkProvider } from '@/lib/ai-gateway/providers/model-settings';
+import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import {
   getFallbackModelVariants,
   REASONING_VARIANTS_BINARY,
-} from '@/lib/ai-gateway/providers/variants';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;

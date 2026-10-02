@@ -17,7 +17,7 @@ import { AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import type { UserDetailProps } from '@/types/admin';
 import type { UserBalanceUpdates } from '@/lib/user/recompute-balances';
-import { IS_DEVELOPMENT } from '@/lib/constants';
+import { IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
 import { Input } from '@/components/ui/input';
 
 const credit_accounting_invariants = (

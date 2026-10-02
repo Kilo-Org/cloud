@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   github_app_installations,
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, isNotNull } from 'drizzle-orm';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
   bindGitHubIntegrationToCanonicalInstallation,
   connectVerifiedGitHubInstallation,

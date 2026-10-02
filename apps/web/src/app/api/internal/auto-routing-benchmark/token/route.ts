@@ -31,13 +31,13 @@ import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token'
 import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   isResourceTokenIssuanceEnabled,
   INTERNAL_API_SECRET,
   NEXTAUTH_SECRET,
-} from '@/lib/config.server';
-import { generateApiToken } from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/config.server';
+import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import {
   KILO_API_AUDIENCE,
   KILO_GATEWAY_AUDIENCE,

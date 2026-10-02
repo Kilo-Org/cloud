@@ -1,5 +1,8 @@
 import 'server-only';
-import { INTERNAL_API_SECRET, SECURITY_AUTO_ANALYSIS_WORKER_URL } from '@/lib/config.server';
+import {
+  INTERNAL_API_SECRET,
+  SECURITY_AUTO_ANALYSIS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 
 type ManualAnalysisOwner =
   | { organizationId: string; userId?: never }

@@ -1,6 +1,6 @@
 import { createCallerForUser } from '@/routers/test-utils';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_webhook_triggers,
   cli_sessions_v2,
@@ -49,8 +49,8 @@ jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: jest.fn(async () => ({ token: 'test-cloud-agent-control-token' })),
 }));
 
-jest.mock('@/lib/tokens', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/tokens');
+jest.mock('@kilocode/web-shared/lib/tokens', () => {
+  const actual: Record<string, unknown> = jest.requireActual('@kilocode/web-shared/lib/tokens');
   return {
     ...actual,
     generateApiToken: jest.fn(() => 'test-api-token'),
@@ -58,8 +58,10 @@ jest.mock('@/lib/tokens', () => {
   };
 });
 
-jest.mock('@/lib/config.server', () => {
-  const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
+jest.mock('@kilocode/web-shared/lib/config.server', () => {
+  const actual: Record<string, unknown> = jest.requireActual(
+    '@kilocode/web-shared/lib/config.server'
+  );
   return {
     ...actual,
     SESSION_INGEST_WORKER_URL: 'https://test-ingest.example.com',

@@ -17,13 +17,13 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import type Stripe from 'stripe';
 
-import { enqueueChargeAttempted } from '@/lib/bouncer/credit-events';
-import { db } from '@/lib/drizzle';
+import { enqueueChargeAttempted } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type * as CheckoutSession from '@/lib/kilo-pass/checkout-session';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { bouncer_credit_event_outbox } from '@kilocode/db/schema';
 
-jest.mock('@/lib/stripe-client', () => ({
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   client: {
     checkout: {
       sessions: { list: jest.fn(), expire: jest.fn() },
@@ -45,7 +45,7 @@ type StripeClientMock = {
     };
   };
 };
-const stripeClient = jest.requireMock<StripeClientMock>('@/lib/stripe-client');
+const stripeClient = jest.requireMock<StripeClientMock>('@kilocode/web-shared/lib/stripe-client');
 const mockListSessions = stripeClient.client.checkout.sessions.list;
 const mockExpireSession = stripeClient.client.checkout.sessions.expire;
 const mockListSubscriptions = stripeClient.client.subscriptions.list;

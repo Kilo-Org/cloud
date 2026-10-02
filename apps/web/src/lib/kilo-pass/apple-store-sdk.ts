@@ -4,7 +4,7 @@ import {
   SignedDataVerifier,
 } from '@apple/app-store-server-library';
 
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 export const APPLE_STORE_BUNDLE_ID = 'com.kilocode.kiloapp';
 

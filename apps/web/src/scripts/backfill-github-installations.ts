@@ -5,7 +5,7 @@ import {
   backfillGitHubInstallations,
   reportGitHubConnectionRoleReconciliation,
 } from '@/lib/integrations/db/github-installations-backfill';
-import { closeAllDrizzleConnections } from '@/lib/drizzle';
+import { closeAllDrizzleConnections } from '@kilocode/web-shared/lib/drizzle';
 
 const Args = z.strictObject({
   reportRoles: z.enum(['true']).optional(),

@@ -1,4 +1,8 @@
-import { NEXTAUTH_SECRET, NEXTAUTH_URL, TURNSTILE_SECRET_KEY } from '@/lib/config.server';
+import {
+  NEXTAUTH_SECRET,
+  NEXTAUTH_URL,
+  TURNSTILE_SECRET_KEY,
+} from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';

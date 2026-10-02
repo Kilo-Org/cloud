@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { exa_monthly_usage, exa_usage_log, kilocode_users, type User } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
-import { scheduleOrganizationLowBalanceAlert } from '@/lib/organizations/organization-usage';
-import type { OrganizationUsageMutationResult } from '@/lib/organizations/organization-usage';
-import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
-import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
+import { scheduleOrganizationLowBalanceAlert } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
+import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
 
 export type ExaMonthlyUsageResult = {
   /** Total spend in microdollars for the current month. */

@@ -1,24 +1,28 @@
 import { NextRequest } from 'next/server';
-import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@kilocode/web-shared/lib/config.server';
 import { createDelegatedResourceToken } from '@/lib/auth/resource-delegation';
-import { generateOrganizationApiToken } from '@/lib/tokens';
+import { generateOrganizationApiToken } from '@kilocode/web-shared/lib/tokens';
 import { POST } from './route';
 
-jest.mock('@/lib/config.server', () => ({ isResourceTokenIssuanceEnabled: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  isResourceTokenIssuanceEnabled: jest.fn(),
+}));
 jest.mock('@/lib/organizations/organization-auth', () => ({
   getAuthorizedOrgContext: jest.fn(async () => ({
     success: true,
     data: { user: { id: 'oauth/test-user', role: 'member' }, organization: { name: 'Test' } },
   })),
 }));
-jest.mock('@/lib/organizations/organization-audit-logs', () => ({ createAuditLog: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-audit-logs', () => ({
+  createAuditLog: jest.fn(),
+}));
 jest.mock('@/lib/auth/resource-delegation', () => ({
   isDelegableResource: (value: string) =>
     ['api', 'gateway', 'attribution', 'html-deploy'].includes(value),
   canIssueLegacyOrganizationToken: jest.fn(async () => true),
   createDelegatedResourceToken: jest.fn(async () => ({ token: 'delegated', expiresAt: 'expiry' })),
 }));
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateOrganizationApiToken: jest.fn(() => ({ token: 'legacy', expiresAt: 'expiry' })),
 }));
 

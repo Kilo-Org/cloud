@@ -1,6 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { platform_integrations, type GitHubInstallState, type User } from '@kilocode/db/schema';
 import { Octokit } from '@octokit/rest';
 import { createAppAuth } from '@octokit/auth-app';
@@ -23,7 +23,7 @@ import {
   observeGitHubInstallationLifecycle,
   updateGitHubInstallationRepositories,
 } from '@/lib/integrations/db/github-installations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   createPendingIntegration,
   findGitHubBotLinkIntegrations,
@@ -35,15 +35,15 @@ import type {
   IntegrationPermissions,
   Owner,
 } from '@/lib/integrations/core/types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubBotLinkState } from '@/lib/bot/github-link-state';
 import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
-import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isOrganizationMember } from '@kilocode/web-shared/lib/organizations/organizations';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import {
   consumeInstallState,
   type InstallStateRejectionReason,

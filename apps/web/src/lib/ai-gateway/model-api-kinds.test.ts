@@ -1,17 +1,19 @@
 import { describe, expect, it } from '@jest/globals';
 import { gatewayChatApisForModel, modelServesAllGatewayChatApis } from './model-api-kinds';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import type * as ModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 // Stub the catalog so the rejection test doesn't depend on any specific provider file.
 // 'test-exclusive/chat-only' resolves to a synthetic provider that does not support Messages.
 // 'test-exclusive/disabled' is filtered out by findKiloExclusiveModel, mirroring how
 // disabled catalog models fall back to OpenRouter.
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/kilo-exclusive-models');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
   const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@/lib/ai-gateway/providers/definitions/openrouter'
+    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
   );
   const stubModels: KiloExclusiveModel[] = [
     {

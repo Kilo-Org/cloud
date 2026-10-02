@@ -8,17 +8,17 @@ import {
   type EligibleCatalog,
 } from './auto-routing-pool-validation';
 
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
   getDirectByokModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/organizations/organization-models', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-models', () => ({
   getAvailableModelsForOrganization: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
   kiloExclusiveModels: [
     {
       public_id: 'kilo/hidden-model',
@@ -31,12 +31,14 @@ jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => ({
   ],
 }));
 
-const { getEnhancedOpenRouterModels } = jest.requireMock('@/lib/ai-gateway/providers/openrouter');
+const { getEnhancedOpenRouterModels } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/providers/openrouter'
+);
 const { getDirectByokModelsForUser, getDirectByokModelsForOrganization } = jest.requireMock(
-  '@/lib/ai-gateway/providers/direct-byok'
+  '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
 );
 const { getAvailableModelsForOrganization } = jest.requireMock(
-  '@/lib/organizations/organization-models'
+  '@kilocode/web-shared/lib/organizations/organization-models'
 );
 
 const mockedGetEnhanced = jest.mocked(getEnhancedOpenRouterModels);

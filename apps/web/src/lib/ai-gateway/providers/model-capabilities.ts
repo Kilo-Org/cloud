@@ -1,6 +1,6 @@
 import 'server-only';
-import { AUTO_MODELS } from '@/lib/ai-gateway/auto-model';
-import { db } from '@/lib/drizzle';
+import { AUTO_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { modelStats } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 

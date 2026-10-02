@@ -2,7 +2,7 @@ import * as React from 'react';
 import { ExternalLink } from 'lucide-react';
 import { OpenAILogo } from '@/components/auth/OpenAILogo';
 import { Button } from '@/components/ui/button';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 /**
  * The usage link from the "Sign in with ChatGPT" partner guidelines: a "Manage

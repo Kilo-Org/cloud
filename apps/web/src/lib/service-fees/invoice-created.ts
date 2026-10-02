@@ -2,12 +2,12 @@ import 'server-only';
 
 import type Stripe from 'stripe';
 
-import { getOrganizationKiloPassMetadata } from '@/lib/kilo-pass-org/stripe-metadata';
-import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
+import { getOrganizationKiloPassMetadata } from '@kilocode/web-shared/lib/kilo-pass-org/stripe-metadata';
+import { getKiloPassMetadataFromStripeMetadata } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
 import {
   sendMissedServiceFeeAlert,
   type MissedServiceFeeAlertInput,
-} from '@/lib/service-fees/alerts';
+} from '@kilocode/web-shared/lib/service-fees/alerts';
 import {
   markServiceFeeAssessmentCharged,
   markServiceFeeAssessmentMissed,
@@ -17,13 +17,13 @@ import {
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
   type ServiceFeeStripeIds,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   buildAutoTopUpServiceFeeInvoiceItem,
   createInvoiceServiceFeeAssessmentKey,
   isKiloOwnedAutoTopUpInvoice,
   SERVICE_FEE_FAILURE_APPLICATION,
-} from '@/lib/service-fees/checkout';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
 import {
   getInvoiceLineInvoiceItemId,
   isEligibleKiloPassInvoiceLine,
@@ -31,14 +31,17 @@ import {
   listAllInvoiceLineItems,
   sumEligibleKiloPassSubtotalMinor,
   type InvoiceLineItemListClient,
-} from '@/lib/service-fees/stripe-lines';
+} from '@kilocode/web-shared/lib/service-fees/stripe-lines';
 import {
   resolveServiceFeeTaxInput,
   type ServiceFeeTaxInput,
   type ServiceFeeTaxPrincipal,
   type StripePriceTaxReader,
-} from '@/lib/service-fees/tax';
-import { SERVICE_FEE_SUPPORTED_CURRENCY, type ServiceFeeFlow } from '@/lib/service-fees/types';
+} from '@kilocode/web-shared/lib/service-fees/tax';
+import {
+  SERVICE_FEE_SUPPORTED_CURRENCY,
+  type ServiceFeeFlow,
+} from '@kilocode/web-shared/lib/service-fees/types';
 
 export type KiloPassInvoiceCreatedStripe = InvoiceLineItemListClient & {
   prices?: StripePriceTaxReader['prices'];

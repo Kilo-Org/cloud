@@ -2,7 +2,7 @@ import 'server-only';
 import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { cliSessions, cli_sessions_v2 } from '@kilocode/db/schema';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { getWorkerRequest, type CapturedRequest } from '@/lib/webhook-agent/webhook-agent-client';
 import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { getBlobContent } from '@/lib/r2/cli-sessions';

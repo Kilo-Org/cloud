@@ -10,8 +10,8 @@
  */
 
 import { captureMessage } from '@sentry/nextjs';
-import { getEnvVariable } from '@/lib/dotenvx';
-import { getKnownStripePriceIdsForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { getKnownStripePriceIdsForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import {
   auditRestrictedCoupons,
   listCouponSnapshotsEnsuringAppliesTo,
@@ -20,8 +20,8 @@ import {
   type RestrictedCouponAlertPayload,
   type StripeCouponSnapshot,
 } from '@/lib/service-fees/restricted-coupon-audit';
-import { sendAdminSlackNotification } from '@/lib/slack/admin-notifications';
-import { client as stripe } from '@/lib/stripe-client';
+import { sendAdminSlackNotification } from '@kilocode/web-shared/lib/slack/admin-notifications';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 
 /**
  * Lists coupons paginated and guarantees applies_to is actually retrieved:

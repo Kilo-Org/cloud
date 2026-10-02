@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 
 export async function POST(
   _request: NextRequest,

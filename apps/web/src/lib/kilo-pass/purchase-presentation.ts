@@ -1,8 +1,8 @@
-import { APP_URL } from '@/lib/constants';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import type { DrizzleTransaction, db as defaultDb } from '@/lib/drizzle';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getKiloPassStateForUser } from '@kilocode/web-shared/lib/kilo-pass/state';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_PASS_MANAGE_CTA_LABEL,
   mapKiloPassStatusToClass,

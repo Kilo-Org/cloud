@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { failureResult } from '@/lib/maybe-result';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { failureResult } from '@kilocode/web-shared/lib/maybe-result';
 import type { User } from '@kilocode/db/schema';
 import {
   getExaMonthlyUsage,
   getExaFreeAllowanceMicrodollars,
   recordExaUsage,
 } from '@/lib/exa-usage';
-import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@/lib/constants';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
+import { EXA_MONTHLY_ALLOWANCE_MICRODOLLARS } from '@kilocode/web-shared/lib/constants';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { captureException } from '@sentry/nextjs';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
@@ -32,13 +32,13 @@ async function flushAfterCallbacks() {
   afterCallbacks = [];
 }
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   EXA_API_KEY: 'test-exa-key',
 }));
 
-jest.mock('@/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/user/server');
 jest.mock('@/lib/exa-usage');
-jest.mock('@/lib/organizations/organization-usage');
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);

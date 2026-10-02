@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 
-import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
+import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from '@/lib/kilo-pass/enums';
 import type * as GooglePlayVerifier from './google-play-verifier';
 
 const mockGetGooglePlaySubscriptionOrder = jest.fn(async () => order());

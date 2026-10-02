@@ -21,7 +21,7 @@ import { WrapperFinalizingError } from '../kilo/wrapper-client.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import type { WrapperCommand } from '../shared/protocol.js';
 import type { Env as WorkerEnv } from '../types.js';
-import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { resolveLegacySessionStub } from '../sandbox-session/session-stub.js';
 import { WrapperCleanupBlockedError } from './wrapper-cleanup-blocked-error.js';
 import { RUNTIME_AUTHORIZATION_RECOVERY_KEY } from './runtime-authorization-persistence.js';
 import {
@@ -159,7 +159,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     if (!orchestrator) {
       orchestrator = new ExecutionOrchestrator({
         getAgentSandbox: plan => resolveAgentSandbox(plan.workspace.metadata),
-        getSessionStub: (userId, sessionId) => resolveSessionStub(env, userId, sessionId),
+        getSessionStub: (userId, sessionId) => resolveLegacySessionStub(env, userId, sessionId),
         env,
       });
     }

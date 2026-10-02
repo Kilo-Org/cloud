@@ -215,7 +215,6 @@
     "showBalance": "Mostra el saldo",
     "balanceHidden": "Saldo amagat",
     "bonusCreditsExpiring": "{{amount}} en crèdits de bonificació caduquen el {{date}}.",
-    "creditBalanceEmpty": "No et queden crèdits. Per a aquest compte, els crèdits es gestionen fora de l'aplicació d'iOS.",
     "signOutTitle": "Vols tancar la sessió?",
     "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball.",
     "deleteAccountTitle": "Vols eliminar el compte?",
@@ -241,6 +240,7 @@
     "addPasskey": "Afegeix una clau d'accés",
     "passkeyDefaultName": "Clau d'accés",
     "passkeyAddedOn": "Afegida {{date}}",
+    "passkeyLastUsedOn": "Darrer ús {{date}}",
     "passkeyAdded": "Clau d'accés afegida.",
     "passkeyAddFailed": "No s'ha pogut afegir una clau d'accés. Torna-ho a provar.",
     "passkeyAddUnsupported": "Aquest dispositiu no pot crear claus d'accés.",
@@ -2072,6 +2072,7 @@
       "idCopied": "ID de la sessió copiat",
       "couldNotCopyId": "No s'ha pogut copiar l'ID de la sessió.",
       "untitled": "Sessió sense títol",
+      "actions": "Accions de la sessió",
       "sessionDeleted": "Sessió eliminada",
       "needsInput": "pendent de resposta",
       "fromPlatform": "des de {{platform}}",
@@ -2125,7 +2126,9 @@
       "renamePlaceholder": "Nom de la sessió",
       "transcriptAccessibility": "Transcripció de la sessió",
       "readOnly": "Aquesta sessió és només de lectura.",
+      "continueInNewSession": "Continua en una sessió nova",
       "emptyDescription": "Envia un missatge a continuació per començar.",
+      "emptyTranscriptDescription": "Aquesta sessió encara no té missatges.",
       "scrollToBottom": "Desplaça't al final",
       "emptyTitle": "Encara no hi ha missatges",
       "renameAccessibility": "Reanomena la sessió: {{title}}",
@@ -2215,6 +2218,8 @@
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
+      "selectRepositoryToStart": "Selecciona un repositori per començar.",
+      "connectProviderToStart": "Connecta un proveïdor per començar.",
       "promptPlaceholder": "En què vols treballar?",
       "couldNotLoadModels": "No s'han pogut carregar els models.",
       "prefillRepoAndModelUnavailable": "El repositori i el model de la sessió original ja no estan disponibles. Tria'ls a continuació.",
@@ -2599,6 +2604,7 @@
       "selectModelBeforeSending": "Selecciona un model abans d'enviar el missatge.",
       "preparingPlaceholder": "Configurant l'entorn…",
       "finalizingPlaceholder": "Finalitzant…",
+      "sessionLoadFailed": "No s'ha pogut carregar la sessió. Torneu-ho a provar primer.",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
       "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toca el botó d'enviament per tornar-ho a provar.",
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
@@ -2669,6 +2675,7 @@
       "provider": "Proveïdor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "L'ús correspon a l'última resposta completa de l'assistent.",
+      "usageUnavailable": "L'ús del context no està disponible",
       "tokenUsage": "Ús de tòkens",
       "cacheRate": "Percentatge de memòria cau",
       "modelsCount": "Models utilitzats ({{displayCount}})",
@@ -2705,7 +2712,10 @@
     "markdownImage": {
       "load": "Carrega",
       "loadWithHost": "Carrega {{host}}",
-      "httpsOnly": "Només es permeten imatges amb HTTPS."
+      "httpsOnly": "Només es permeten imatges amb HTTPS.",
+      "trustTitle": "Carregar la imatge de {{host}}?",
+      "trustMessage": "Si confies en {{host}}, les seves imatges es carregaran sense preguntar cada vegada. Pots revocar-ho més tard a Servidors de confiança.",
+      "loadOnce": "Carrega una vegada"
     },
     "markdownLink": {
       "invalidLink": "Aquest enllaç no es pot obrir.",
@@ -3221,8 +3231,12 @@
     "subtitle": "Servidors que pots obrir sense confirmació",
     "emptyTitle": "No hi ha servidors de confiança",
     "emptyDescription": "Quan confies en el servidor d'un enllaç, els seus enllaços s'obren sense tornar a demanar confirmació.",
+    "imagesSectionTitle": "Servidors d'imatges de confiança",
+    "imagesSectionDescription": "Les imatges d'aquests servidors es carreguen sense tornar a preguntar.",
+    "imagesSectionEmpty": "No hi ha servidors d'imatges de confiança",
     "revoke": "Deixa de confiar en {{host}}",
     "revokeMessage": "Els enllaços a aquest servidor tornaran a demanar confirmació.",
+    "revokeImageMessage": "Les imatges d'aquest servidor tornaran a demanar confirmació.",
     "backToPreferences": "Torna a les preferències"
   },
   "quickChat": {
@@ -3487,5 +3501,17 @@
       "unboundToast": "Repo no lligat",
       "unbindFailed": "No s'ha pogut desenllaçar el repo"
     }
+  },
+  "credits": {
+    "title": "Compra crèdits",
+    "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
+    "packLabel": "Afegeix {{amount}} en crèdits",
+    "priceUnavailable": "Preu no disponible",
+    "purchased": "S'han afegit crèdits al teu saldo.",
+    "empty": "Els paquets de crèdits no estan disponibles ara mateix.",
+    "noMatchingProducts": "L'App Store no ha retornat cap paquet de crèdits coincident.",
+    "noMatchingProductsPlay": "Google Play no ha retornat cap paquet de crèdits coincident.",
+    "purchaseOwnedByAnotherAccount": "Els crèdits d'aquest Apple Account pertanyen a un altre compte de Kilo. Inicia la sessió en aquell compte de Kilo per utilitzar-los.",
+    "purchaseOwnedByAnotherAccountPlay": "Els crèdits d'aquest compte de Google Play pertanyen a un compte de Kilo diferent. Inicia la sessió en aquest compte de Kilo per utilitzar-los."
   }
 }

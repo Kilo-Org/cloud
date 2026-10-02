@@ -215,7 +215,6 @@
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "Os créditos de bónus no valor de {{amount}} expiram em {{date}}.",
-    "creditBalanceEmpty": "Não tem saldo de créditos. Para esta conta, os créditos são geridos fora da aplicação iOS.",
     "signOutTitle": "Terminar sessão?",
     "signOutMessage": "Terás de iniciar sessão novamente para aceder ao teu espaço de trabalho.",
     "deleteAccountTitle": "Eliminar conta?",
@@ -241,6 +240,7 @@
     "addPasskey": "Adicionar uma chave de acesso",
     "passkeyDefaultName": "Chave de acesso",
     "passkeyAddedOn": "Adicionada {{date}}",
+    "passkeyLastUsedOn": "Último uso {{date}}",
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tenta novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
@@ -2072,6 +2072,7 @@
       "idCopied": "ID da sessão copiado",
       "couldNotCopyId": "Não foi possível copiar o ID da sessão.",
       "untitled": "Sessão sem título",
+      "actions": "Ações da sessão",
       "sessionDeleted": "Sessão eliminada",
       "needsInput": "à espera de resposta",
       "fromPlatform": "de {{platform}}",
@@ -2125,7 +2126,9 @@
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é apenas de leitura.",
+      "continueInNewSession": "Continuar numa nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
+      "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Ir para o fim da conversa",
       "emptyTitle": "Ainda sem mensagens",
       "renameAccessibility": "Renomear sessão: {{title}}",
@@ -2215,6 +2218,8 @@
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
+      "selectRepositoryToStart": "Seleciona um repositório para começar.",
+      "connectProviderToStart": "Liga um fornecedor para começar.",
       "promptPlaceholder": "Em que quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original já não estão disponíveis. Escolha outros abaixo.",
@@ -2599,6 +2604,7 @@
       "selectModelBeforeSending": "Selecione um modelo antes de enviar.",
       "preparingPlaceholder": "A configurar o ambiente…",
       "finalizingPlaceholder": "A concluir…",
+      "sessionLoadFailed": "Não foi possível carregar a sessão. Tente novamente primeiro.",
       "cannotReceiveFiles": "Esta sessão não pode receber ficheiros. Remova os anexos para enviar a sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar ficheiros. Toque em enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
@@ -2669,6 +2675,7 @@
       "provider": "Fornecedor",
       "totalCost": "Custo total",
       "usageReflectsLatest": "A utilização apresentada corresponde à última resposta concluída do assistente.",
+      "usageUnavailable": "Utilização de contexto indisponível",
       "tokenUsage": "Utilização de tokens",
       "cacheRate": "Taxa de cache",
       "modelsCount": "Modelos ({{displayCount}})",
@@ -2705,7 +2712,10 @@
     "markdownImage": {
       "load": "Carregar",
       "loadWithHost": "Carregar {{host}}",
-      "httpsOnly": "Só são permitidas imagens via HTTPS."
+      "httpsOnly": "Só são permitidas imagens via HTTPS.",
+      "trustTitle": "Carregar a imagem de {{host}}?",
+      "trustMessage": "Ao confiar em {{host}}, as imagens deste são carregadas sem perguntar sempre. Pode revogar mais tarde em Servidores de confiança.",
+      "loadOnce": "Carregar uma vez"
     },
     "markdownLink": {
       "invalidLink": "Não é possível abrir esta ligação.",
@@ -3221,8 +3231,12 @@
     "subtitle": "Servidores cujas ligações pode abrir sem confirmação",
     "emptyTitle": "Sem servidores de confiança",
     "emptyDescription": "Ao confiar no servidor de uma ligação, pode abrir as ligações desse servidor sem nova confirmação.",
+    "imagesSectionTitle": "Servidores de imagens de confiança",
+    "imagesSectionDescription": "As imagens destes servidores são carregadas sem voltar a perguntar.",
+    "imagesSectionEmpty": "Sem servidores de imagens de confiança",
     "revoke": "Deixar de confiar em {{host}}",
     "revokeMessage": "As ligações para este servidor voltarão a pedir confirmação.",
+    "revokeImageMessage": "As imagens deste servidor voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {
@@ -3487,5 +3501,17 @@
       "unboundToast": "Repositório desvinculado",
       "unbindFailed": "Não foi possível desvincular o repositório"
     }
+  },
+  "credits": {
+    "title": "Comprar créditos",
+    "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de programação com IA na aplicação Kilo. A loja cobra na sua conta e os créditos são adicionados depois de a loja confirmar o pagamento.",
+    "packLabel": "Adicionar {{amount}} em créditos",
+    "priceUnavailable": "Preço indisponível",
+    "purchased": "Créditos adicionados ao seu saldo.",
+    "empty": "Os pacotes de créditos estão indisponíveis de momento.",
+    "noMatchingProducts": "A App Store não devolveu nenhum pacote de créditos correspondente.",
+    "noMatchingProductsPlay": "O Google Play não devolveu nenhum pacote de créditos correspondente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencem a outra conta Kilo. Inicia sessão nessa conta Kilo para os usares.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta do Google Play pertencem a uma conta Kilo diferente. Inicie sessão nessa conta Kilo para os usar."
   }
 }

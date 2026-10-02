@@ -148,6 +148,12 @@ export type FakeLlmState = {
   scopedChatCompletionRequests: Map<string, number>;
   /** Durable: per-tag scenario counters. */
   scenarios: Map<string, InternalScenarioStatus>;
+  /**
+   * Durable: the last user-message text the adapter saw, so a scenario can
+   * assert what actually reached the model (for example an attachment's
+   * content). Bounded by the adapter's own request size limits.
+   */
+  lastUserText: string;
 };
 
 const RELEASED_GATE_FOLLOWUP_TTL_MS = 10_000;
@@ -187,6 +193,8 @@ export type PersistedFakeLlmState = {
   scenarios: PersistedScenarioStatus[];
   /** Optional for snapshots written before scope attribution existed. */
   scopedChatCompletionRequests?: Array<[string, number]>;
+  /** Optional for snapshots written before prompt recording existed. */
+  lastUserText?: string;
 };
 
 export function createFakeLlmState(): FakeLlmState {
@@ -199,6 +207,7 @@ export function createFakeLlmState(): FakeLlmState {
     transcriptionRequests: 0,
     scopedChatCompletionRequests: new Map(),
     scenarios: new Map(),
+    lastUserText: '',
   };
 }
 
@@ -245,6 +254,7 @@ export function serializeFakeLlmState(state: FakeLlmState): PersistedFakeLlmStat
     releasedGateFollowups,
     scenarios: retained,
     scopedChatCompletionRequests: retainedScoped,
+    lastUserText: state.lastUserText,
   };
 }
 
@@ -258,6 +268,7 @@ export function hydrateFakeLlmState(
   state.nextRequestId = persisted.nextRequestId ?? 0;
   state.chatCompletionRequests = persisted.chatCompletionRequests ?? 0;
   state.transcriptionRequests = persisted.transcriptionRequests ?? 0;
+  state.lastUserText = persisted.lastUserText ?? '';
   for (const [tag, expiresAt] of persisted.releasedGateFollowups ?? []) {
     state.releasedGateFollowups.set(tag, expiresAt);
   }
@@ -690,6 +701,7 @@ function directiveTag(directive: Directive | null): string | undefined {
       'read-then-write',
       'tool-stream',
       'question',
+      'first-token',
     ].includes(directive.scenario)
   ) {
     return undefined;
@@ -1312,6 +1324,53 @@ export const scenarioRegistry: Record<string, ScenarioHandler> = {
     });
   },
 
+  /**
+   * `first-token:<tag>[:<completion>]` — the scenario-19 hang primitive.
+   *
+   * The first request with this tag emits exactly one assistant content chunk
+   * (the held first token) and then parks the SSE stream open, so a client that
+   * is frozen mid-turn never receives a finish. Kilo is frozen with `SIGSTOP`
+   * separately; holding the first token keeps the turn in flight instead of
+   * letting a fast echo complete before the freeze is observed.
+   *
+   * A later request with the same tag completes normally. The wrapper's
+   * restart-resubmission replays the same prompt, so that is how the turn
+   * recovers once Kilo is back. The counter is read before emitting because
+   * `handleChatCompletions` increments it for every tagged request, so
+   * `requests > 1` identifies the replay.
+   */
+  'first-token'(args, ctx) {
+    const match = stripPromptContext(args[0] ?? '').match(
+      /^([A-Za-z0-9_-]+)(?::([A-Za-z0-9_-]+))?/
+    );
+    const tag = match?.[1];
+    if (!tag) {
+      writeJsonError(ctx.emit, 402, 'first-token directive requires a tag', 'invalid_request');
+      return;
+    }
+    if (scenarioStatus(ctx.state, tag).requests > 1) {
+      writeAssistantResponse(ctx, match?.[2] ?? `done-${tag}`);
+      return;
+    }
+    writeChunk(
+      ctx.emit,
+      makeChunk(ctx.id, ctx.model, { role: 'assistant', content: 'held-first-token' })
+    );
+    ctx.emit.start();
+    ctx.state.liveResponses.add(ctx.emit);
+    logEvent('scenario.parked', { reqId: ctx.reqLogId, scenario: 'first-token', tag });
+    // Never close until the client does (Kilo restart closes the old stream).
+    ctx.emit.onClose(() => {
+      ctx.state.liveResponses.delete(ctx.emit);
+      logEvent('scenario.unparked', {
+        reqId: ctx.reqLogId,
+        scenario: 'first-token',
+        tag,
+        reason: 'client-closed',
+      });
+    });
+  },
+
   'error-terminal'(args, ctx) {
     const message = args[0] ?? 'simulated error';
     writeJsonError(ctx.emit, 400, message, 'invalid_request');
@@ -1639,7 +1698,9 @@ async function handleChatCompletions(
   const messages = isRecord(body) ? body.messages : undefined;
   const messageCount = Array.isArray(messages) ? messages.length : 0;
   const bodyModel = isRecord(body) && typeof body.model === 'string' ? body.model : undefined;
-  const { scope, text: prompt } = extractPromptScope(extractLastUserMessageText(body));
+  const lastUserText = extractLastUserMessageText(body);
+  const { scope, text: prompt } = extractPromptScope(lastUserText);
+  state.lastUserText = lastUserText;
   const directive = parseDirective(prompt);
   const tools = advertisedTools(body);
   const tag = directiveTag(directive);
@@ -2002,6 +2063,10 @@ export async function handleFakeLlmRequest(
     }
     if (route === 'GET /test/requests') {
       handleRequestCounts(request, emit, state);
+      return;
+    }
+    if (route === 'GET /test/last-prompt') {
+      emit.json(200, { text: state.lastUserText });
       return;
     }
     if (route === 'GET /test/scenario-status') {

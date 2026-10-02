@@ -29,7 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { usePreferredModels } from '@/components/shared/usePreferredModels';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
@@ -117,6 +117,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     openRouterProviders,
   });
 
+  const preferredModels = usePreferredModels();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -124,7 +125,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       index.set(modelId, i);
     }
     return index;
-  }, []);
+  }, [preferredModels]);
 
   const providerIndex = selectors.modelProvidersIndex;
 
@@ -470,12 +471,11 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           showBackButton={false}
         />
 
-        <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
-
         <Tabs defaultValue="models">
           <TabsList className="w-fit">
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
+            <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -515,6 +515,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onToggleProviderEnabled={handleToggleProviderEnabled}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
+          </TabsContent>
+
+          <TabsContent
+            value="auto-routing"
+            forceMount
+            className="mt-6 data-[state=inactive]:hidden"
+          >
+            <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>
 

@@ -41,7 +41,7 @@ import {
   settleOperation,
   type OutboxEventInput,
 } from '@kilocode/db/operation-ledger';
-import { ensureOrganizationAccess } from './organizations/utils';
+import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { assertTermsAccepted } from './github-pr-review-router';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
 import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';

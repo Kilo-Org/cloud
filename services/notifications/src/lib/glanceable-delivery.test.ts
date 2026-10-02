@@ -2037,7 +2037,7 @@ describe('toGlanceableContentState', () => {
 });
 
 describe('buildGlanceableExpoMessages', () => {
-  it('emits one data-only, tag-collapsed message per Expo token', () => {
+  it('emits one strictly data-only, collapseId message per Expo token', () => {
     const messages = buildGlanceableExpoMessages(
       [
         { token: 'ExponentPushToken[aaa]', locale: null },
@@ -2051,24 +2051,38 @@ describe('buildGlanceableExpoMessages', () => {
     for (const message of messages) {
       expect(message.data).toEqual(snapshot);
       expect(message._contentAvailable).toBe(true);
+      // No presentation field may be present: any of these would let Expo/FCM
+      // turn the wake into a visible (and empty) OS notification.
       expect(message.title).toBeUndefined();
       expect(message.body).toBeUndefined();
+      expect(message.channelId).toBeUndefined();
+      expect(message.tag).toBeUndefined();
       expect(message.sound).toBeNull();
       expect(message.priority).toBe('default');
-      expect(message.channelId).toBe('needs-input');
-      expect(message.tag).toBe('deadbeef');
+      // The data-message collapse key never presents anything.
+      expect(message.collapseId).toBe('deadbeef');
+      expect(Object.keys(message).sort()).toEqual([
+        '_contentAvailable',
+        'collapseId',
+        'data',
+        'priority',
+        'sound',
+        'to',
+      ]);
     }
     expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
   });
 
-  it('names the kind channel: progress when the snapshot waits on nothing', () => {
+  it('never attaches a presentation channel, even when the snapshot waits on input', () => {
     const messages = buildGlanceableExpoMessages(
       [{ token: 'ExponentPushToken[aaa]', locale: null }],
       { ...snapshot, needsInput: 0 },
       'default'
     );
 
-    expect(messages[0].channelId).toBe('agent-progress');
+    expect(messages[0].channelId).toBeUndefined();
+    expect(messages[0].tag).toBeUndefined();
+    expect(messages[0].collapseId).toBe('deadbeef');
   });
 
   it('builds the iOS wake at default priority and the Android wake at high priority', () => {
@@ -2228,7 +2242,8 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends).toHaveLength(1);
     expect(calls.expoSends[0]).toHaveLength(1);
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[aaa]');
-    expect(calls.expoSends[0][0].tag).toBe('deadbeef');
+    expect(calls.expoSends[0][0].collapseId).toBe('deadbeef');
+    expect(calls.expoSends[0][0].tag).toBeUndefined();
     expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
     expect(calls.expoSends[0][0].priority).toBe('high');
   });
@@ -2306,6 +2321,9 @@ describe('deliverGlanceableSnapshot', () => {
     expect(calls.expoSends[0][0].priority).toBe('default');
     expect(calls.expoSends[0][0].title).toBeUndefined();
     expect(calls.expoSends[0][0].body).toBeUndefined();
+    expect(calls.expoSends[0][0].channelId).toBeUndefined();
+    expect(calls.expoSends[0][0].tag).toBeUndefined();
+    expect(calls.expoSends[0][0].collapseId).toBe('deadbeef');
   });
 
   it('sends one update to the newest activity and ends the older duplicate', async () => {

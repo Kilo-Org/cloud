@@ -17,7 +17,10 @@ jest.mock('next-auth', () => ({
   default: jest.fn(),
   getServerSession: jest.fn(),
 }));
-jest.mock('@/lib/user', () => ({ findUserById: (...args: unknown[]) => mockFindUser(...args) }));
+jest.mock('@/lib/user', () => ({}));
+jest.mock('@/lib/user/find-user-by-id', () => ({
+  findUserById: (...args: unknown[]) => mockFindUser(...args),
+}));
 jest.mock('@/lib/drizzle', () => ({
   db: { query: { kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) } } },
   readDb: {},
@@ -48,8 +51,6 @@ jest.mock('@/lib/organizations/trial-utils', () => ({}));
 jest.mock('@/lib/organizations/organization-seats', () => ({}));
 jest.mock('@/lib/organizations/sales-demo', () => ({}));
 jest.mock('@/lib/organizations/organization-sso-policy', () => ({}));
-jest.mock('@/lib/organizations/verified-domain-membership', () => ({}));
-jest.mock('@/lib/organizations/verified-domain-destination', () => ({}));
 jest.mock('@/lib/account-linking-session', () => ({}));
 jest.mock('@/lib/admin/admin-access-log', () => ({}));
 jest.mock('@/lib/user/sso', () => ({}));

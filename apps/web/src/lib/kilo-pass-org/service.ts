@@ -189,10 +189,13 @@ export type OrganizationKiloPassProviderOperations = {
   scheduleCancellation(input: {
     providerSubscriptionId: string;
     providerSeatAddOnItemId: string;
+    agreementId: string;
+    organizationId: string;
   }): Promise<void>;
   resumeCancellation(input: {
     providerSubscriptionId: string;
     providerSeatAddOnItemId: string;
+    organizationId: string;
   }): Promise<void>;
 };
 
@@ -1015,6 +1018,50 @@ export async function bindProviderSeatAddOnItem(input: {
     .where(eq(kilo_pass_org_agreements.id, input.agreementId));
 }
 
+/**
+ * Ends an agreement whose pass item left the subscription. A released
+ * cancellation schedule is audited once per schedule, so webhook retries after
+ * a partial failure do not duplicate the record.
+ */
+export async function endAgreementAfterPassItemRemoved(input: {
+  agreementId: string;
+  scheduleRelease: {
+    scheduleId: string;
+    status: string;
+    alreadyTerminal: boolean;
+  } | null;
+}) {
+  await db.transaction(async tx => {
+    const [ended] = await tx
+      .update(kilo_pass_org_agreements)
+      .set({ state: KiloPassOrgAgreementState.Ended })
+      .where(
+        and(
+          eq(kilo_pass_org_agreements.id, input.agreementId),
+          ne(kilo_pass_org_agreements.state, KiloPassOrgAgreementState.Ended)
+        )
+      )
+      .returning({ id: kilo_pass_org_agreements.id });
+    if (!input.scheduleRelease) return;
+    await tx
+      .insert(kilo_pass_org_audit_records)
+      .values({
+        agreement_id: input.agreementId,
+        action: 'provider_schedule_released',
+        reason: 'pass_item_removed',
+        before_json: { scheduleId: input.scheduleRelease.scheduleId },
+        after_json: {
+          scheduleId: input.scheduleRelease.scheduleId,
+          scheduleStatus: input.scheduleRelease.status,
+          alreadyTerminal: input.scheduleRelease.alreadyTerminal,
+          agreementEnded: ended !== undefined,
+        },
+        idempotency_key: `provider-schedule-released:${input.scheduleRelease.scheduleId}`,
+      })
+      .onConflictDoNothing();
+  });
+}
+
 /** Adverse payment events stop future issuance without reversing already granted credits. */
 export async function suspendAgreementForPaymentReview(providerSubscriptionId: string) {
   await db.transaction(async tx => {
@@ -1772,6 +1819,8 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
     await scheduleProviderCancellation({
       providerSubscriptionId: provider_subscription_id,
       providerSeatAddOnItemId: provider_seat_add_on_item_id,
+      agreementId: row.agreement.id,
+      organizationId,
     });
     await db.transaction(async tx => {
       await tx
@@ -1811,6 +1860,7 @@ export const organizationKiloPassService: OrganizationKiloPassService = {
     await resumeProviderCancellation({
       providerSubscriptionId: row.agreement.provider_subscription_id,
       providerSeatAddOnItemId: row.agreement.provider_seat_add_on_item_id,
+      organizationId,
     });
     await db.transaction(async tx => {
       await tx

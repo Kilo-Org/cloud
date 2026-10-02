@@ -104,6 +104,18 @@ repository.
    MUST leave the session usable for a later message. Retry and offline status
    are not real progress. A stop during a retry MUST still end the turn
    immediately (rule 6).
+   For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
+   check and the 60-minute hard execution cap. If the control plane cannot
+   reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
+   The user MUST still be able to Stop or queue another message while the
+   wrapper reconnects. If the connection returns, accepted work MUST
+   NOT fail because the connection dropped. If no wrapper frame arrives for
+   five minutes, the environment MUST stop and every accepted message on it
+   MUST fail with a specific connection reason; queued messages MUST wait for a
+   new environment in the same chat. Each affected composer MUST become usable;
+   already-terminal messages MUST stay unchanged. Do not wait for the 60-minute
+   execution cap or physical stop confirmation, and do not claim that Kilo
+   stalled or returned an error.
 
 ### Composer
 
@@ -380,6 +392,14 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-09-26 -- Bounded workspace control recovery
+
+- For `workspace_*` chats, made the wrapper the owner of Kilo progress and
+  execution limits. Lost wrapper contact has one five-minute bound from the
+  last wrapper frame; then the environment stops, accepted work fails with a
+  connection reason, and queued work waits for a new environment in the same
+  chat. Design: `services/cloud-agent-next/docs/control-plane.md`.
 
 ### 2026-09-21 -- Decoupled turn and sandbox idle bounds
 

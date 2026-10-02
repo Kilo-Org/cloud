@@ -11,9 +11,12 @@ import {
   resumeOrganizationKiloPassCancellation,
   scheduleOrganizationKiloPassCancellation,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import { OrganizationKiloPassCheckoutScheduleError } from '@/lib/kilo-pass-org/cancellation-schedule';
 import { createTRPCRouter } from '@/lib/trpc/init';
 import { client as stripe } from '@/lib/stripe-client';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
+import { getOrganizationById } from '@/lib/organizations/organizations';
+import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
@@ -231,12 +234,41 @@ export const organizationKiloPassRouter = createTRPCRouter({
       }).strict()
     )
     .output(CheckoutOutputSchema)
-    .mutation(async ({ input, ctx }) =>
-      organizationKiloPassService.createCheckout(
-        { ...input, actorUserId: ctx.user.id },
-        createOrganizationKiloPassCheckout
-      )
-    ),
+    .mutation(async ({ input, ctx }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      try {
+        return await organizationKiloPassService.createCheckout(
+          { ...input, actorUserId: ctx.user.id },
+          params =>
+            createOrganizationKiloPassCheckout({
+              ...params,
+              attempt: organization
+                ? {
+                    accountCreatedAt: organization.created_at,
+                    ip: ctx.ip,
+                    ipCountry: ipCountryFromHeaders(ctx.headersList),
+                  }
+                : undefined,
+            })
+        );
+      } catch (error) {
+        if (error instanceof OrganizationKiloPassCheckoutScheduleError) {
+          if (error.reason === 'schedule_conflict') {
+            throw new TRPCError({
+              code: 'PRECONDITION_FAILED',
+              message:
+                'Your seat subscription has another scheduled change. Cancel that change or wait for it to take effect before buying Kilo Pass.',
+            });
+          }
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message:
+              'We could not prepare your seat subscription for Kilo Pass. Kilo Pass was not added. Try again in a few minutes.',
+          });
+        }
+        throw error;
+      }
+    }),
 
   reconcilePayment: organizationParentBillingProcedure
     .output(z.object({ activated: z.boolean() }))

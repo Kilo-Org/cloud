@@ -16,7 +16,6 @@ import {
   UserDeletionStepKey,
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { anonymizeCloudUserData } from '@/lib/user';
 import { catalogForVersion, teardownStepKeys } from '@/lib/user/deletion-queue/deletion-catalog';
@@ -34,10 +33,6 @@ import { handleAnonymize } from '@/lib/user/deletion-queue/handlers/anonymize';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
-jest.mock('@/lib/ai-gateway/abuse-service', () => ({
-  reportEvents: jest.fn(async () => undefined),
-}));
-
 jest.mock('@/lib/user', () => ({
   anonymizeCloudUserData: jest.fn(async () => undefined),
 }));
@@ -52,14 +47,12 @@ jest.mock('@/lib/user/owned-by-user-batch-delete', () => {
   };
 });
 
-const reportEventsMock = jest.mocked(reportEvents);
 const anonymizeCloudUserDataMock = jest.mocked(anonymizeCloudUserData);
 const deleteOwnedByUserIdPageMock = jest.mocked(deleteOwnedByUserIdPage);
 
 describe('handleAnonymize', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
     deleteOwnedByUserIdPageMock.mockReset();
     deleteOwnedByUserIdPageMock.mockImplementation(
@@ -98,7 +91,6 @@ describe('handleAnonymize', () => {
           event.event_type === UserDeletionAuditEventType.Anonymized
       )
     ).toBe(false);
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not emit user.deleted when the Cloud subject is authoritatively absent', async () => {
@@ -133,7 +125,6 @@ describe('handleAnonymize', () => {
 
     expect(outcome).toEqual({ kind: 'not_applicable', errorCode: 'authoritative_absence' });
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('commits webhook and code-review pages before returning succeeded', async () => {
@@ -203,12 +194,11 @@ describe('handleAnonymize', () => {
 describe('anonymize shared persistence', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
   });
 
   it('commits the Cloud scrub, anonymized_at, terminal step, audits, and activity together', async () => {
-    const { user, request, claimToken } = await prepareRunningAnonymize(
+    const { request, claimToken } = await prepareRunningAnonymize(
       `anon-runner-${crypto.randomUUID()}@example.com`
     );
 
@@ -247,9 +237,6 @@ describe('anonymize shared persistence', () => {
       .from(user_deletion_activity)
       .where(eq(user_deletion_activity.request_id, request.id));
     expect(activities.some(event => event.event_type === 'succeeded')).toBe(true);
-    expect(reportEventsMock).toHaveBeenCalledWith({
-      events: [{ type: 'user.deleted', data: { kilo_user_id: user.id } }],
-    });
   });
 
   it('rolls back request writes when anonymizeCloudUserData throws', async () => {
@@ -279,7 +266,6 @@ describe('anonymize shared persistence', () => {
       .where(eq(user_deletion_steps.id, step.id));
     expect(updatedStep?.status).toBe(UserDeletionStepStatus.Running);
     expect(updatedStep?.claim_token).toBe(claimToken);
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not scrub or emit when the claim is lost', async () => {
@@ -297,7 +283,6 @@ describe('anonymize shared persistence', () => {
 
     expect(result).toEqual({ kind: 'stale_claim' });
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('records teardown_incomplete without scrubbing when teardown is no longer complete', async () => {
@@ -330,7 +315,6 @@ describe('anonymize shared persistence', () => {
       });
     }
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 
   it('does not emit user.deleted when replaying an already-terminal step', async () => {
@@ -345,7 +329,6 @@ describe('anonymize shared persistence', () => {
       handlerDeadlineAt: Date.now() + 60_000,
     });
     expect(first.kind).toBe('applied');
-    reportEventsMock.mockClear();
     anonymizeCloudUserDataMock.mockClear();
 
     const replay = await persistHandlerOutcome({
@@ -357,7 +340,6 @@ describe('anonymize shared persistence', () => {
     });
     expect(replay.kind).toBe('already_terminal');
     expect(anonymizeCloudUserDataMock).not.toHaveBeenCalled();
-    expect(reportEventsMock).not.toHaveBeenCalled();
   });
 });
 

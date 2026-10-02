@@ -26,9 +26,6 @@ jest.mock('@/lib/account-linking-session', () => ({
 jest.mock('@/lib/organizations/organization-sso-policy', () => ({
   resolveSsoAuthorityForDomain: jest.fn(),
 }));
-jest.mock('@/lib/organizations/verified-domain-membership', () => ({
-  ensureVerifiedDomainOrganizationMembership: jest.fn(),
-}));
 jest.mock('@/lib/organizations/organizations', () => ({
   ...(jest.requireActual('@/lib/organizations/organizations') as object),
   getUserOrgMemberships: jest.fn(),
@@ -40,21 +37,17 @@ jest.mock('@/lib/stripe-client', () => ({
 }));
 
 import jwt from 'jsonwebtoken';
-import { authOptions } from '@/lib/user/server';
+import { authOptions } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 import { getOrganizationById, getUserOrgMemberships } from '@/lib/organizations/organizations';
 
 const mockCreateOrUpdateUser = jest.mocked(createOrUpdateUser);
 const mockLinkAccountToExistingUser = jest.mocked(linkAccountToExistingUser);
 const mockGetAccountLinkingSession = jest.mocked(getAccountLinkingSession);
 const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
-const mockEnsureVerifiedDomainOrganizationMembership = jest.mocked(
-  ensureVerifiedDomainOrganizationMembership
-);
 const mockGetUserOrgMemberships = jest.mocked(getUserOrgMemberships);
 const mockGetOrganizationById = jest.mocked(getOrganizationById);
 
@@ -89,10 +82,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
       status: 'not_required',
       domain: 'example.com',
     });
-    mockEnsureVerifiedDomainOrganizationMembership.mockReset().mockResolvedValue({
-      organizationId: 'verified-domain-org',
-      membershipCreated: true,
-    });
   });
 
   it('passes autoLink=true for a Google profile that asserts email_verified', async () => {
@@ -106,10 +95,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
-    expect(mockCreateOrUpdateUser.mock.invocationCallOrder[0]).toBeLessThan(
-      mockEnsureVerifiedDomainOrganizationMembership.mock.invocationCallOrder[0]
-    );
   });
 
   it('passes autoLink=false for a GitHub profile without an email_verified claim', async () => {
@@ -123,7 +108,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(false);
-    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
   it('passes autoLink=true for an email (magic link) sign-in', async () => {
@@ -144,7 +128,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
   });
 
   it('passes autoLink=true for an Apple profile with the string "true" email_verified claim', async () => {
@@ -158,7 +141,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockCreateOrUpdateUser.mock.calls[0]?.[2]).toBe(true);
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
   });
 
   it('admits fake login after settlement without applying ordinary SSO discovery', async () => {
@@ -179,60 +161,9 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toBe(true);
     expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
   });
 
-  it('fails ordinary authentication when verified-domain admission fails', async () => {
-    mockEnsureVerifiedDomainOrganizationMembership.mockRejectedValueOnce(
-      new Error('verified-domain admission failed')
-    );
-
-    const result = await signIn({
-      user: {
-        id: 'email-cb-email@example.com',
-        email: 'cb-email@example.com',
-        name: 'cb-email',
-        image: '',
-      },
-      account: {
-        provider: 'email',
-        providerAccountId: 'cb-email@example.com',
-        type: 'credentials',
-      },
-      profile: undefined,
-    } as never);
-
-    expect(result).toContain('error=UNKNOWN-ERROR');
-    expect(mockEnsureVerifiedDomainOrganizationMembership).toHaveBeenCalledWith('settled-user');
-  });
-
-  it('checks the settled user block before verified-domain admission', async () => {
-    mockCreateOrUpdateUser.mockResolvedValueOnce({
-      success: true,
-      user: { id: 'blocked-user', blocked_reason: 'blocked' },
-      isNew: false,
-    } as never);
-
-    const result = await signIn({
-      user: {
-        id: 'email-blocked@example.com',
-        email: 'blocked@example.com',
-        name: 'blocked',
-        image: '',
-      },
-      account: {
-        provider: 'email',
-        providerAccountId: 'blocked@example.com',
-        type: 'credentials',
-      },
-      profile: undefined,
-    } as never);
-
-    expect(result).toContain('error=BLOCKED');
-    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
-  });
-
-  it('preserves ordinary-auth SSO enforcement before verified-domain admission', async () => {
+  it('enforces ordinary-auth SSO before user settlement', async () => {
     mockResolveSsoAuthorityForDomain.mockResolvedValueOnce({
       status: 'required',
       domain: 'example.com',
@@ -247,7 +178,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
 
     expect(result).toContain('/users/sign_in?domain=example.com');
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
   it('admits a passkey without Turnstile or user settlement, after the SSO-authority block', async () => {
@@ -261,7 +191,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(result).toBe(true);
     expect(cookieStore.has('turnstile_jwt')).toBe(false);
     expect(mockCreateOrUpdateUser).not.toHaveBeenCalled();
-    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
   });
 
   it('still enforces SSO for a passkey sign-in on an SSO-protected domain', async () => {
@@ -348,26 +277,6 @@ describe('authOptions.callbacks.signIn auto-link wiring', () => {
     expect(profile.openAiChatGptOrganizationId).toBe('00000000-0000-4000-8000-000000000001');
   });
 
-  it('does not run verified-domain admission during provider-account linking', async () => {
-    mockGetAccountLinkingSession.mockResolvedValueOnce({
-      existingUserId: 'existing-user',
-      targetProvider: 'google',
-    } as never);
-    mockLinkAccountToExistingUser.mockResolvedValueOnce({
-      success: true,
-      user: { id: 'existing-user', blocked_reason: null },
-    } as never);
-
-    const result = await signIn({
-      user: { id: 'x', email: 'link@example.com', name: 'Link User', image: '' },
-      account: { provider: 'google', providerAccountId: 'link-google-id', type: 'oauth' },
-      profile: { email_verified: true, email: 'link@example.com' },
-    } as never);
-
-    expect(result).toBe(true);
-    expect(mockLinkAccountToExistingUser).toHaveBeenCalled();
-    expect(mockEnsureVerifiedDomainOrganizationMembership).not.toHaveBeenCalled();
-  });
   // The link start authorized the connect, but the OpenAI consent round-trip
   // can outlive that role, so the callback re-reads the current membership
   // before the jwt callback stores the organization's shared-services

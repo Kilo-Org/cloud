@@ -7,7 +7,7 @@ const mockIsLocalCodeReviewDevelopmentEnabled = jest.fn();
 jest.mock('@/lib/organizations/organizations', () => ({
   getOrganizationById: (...args: unknown[]) => mockGetOrganizationById(...args),
 }));
-jest.mock('@/lib/organizations/organization-seats', () => ({
+jest.mock('@/lib/organizations/organization-seat-purchases', () => ({
   getMostRecentSeatPurchase: (...args: unknown[]) => mockGetMostRecentSeatPurchase(...args),
 }));
 jest.mock('@/lib/config.server', () => ({

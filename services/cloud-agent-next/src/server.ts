@@ -40,15 +40,15 @@ import {
   KILO_FACADE_GLOBAL_FEED_PATH,
   KILO_FACADE_USER_ID_HEADER,
 } from './kilo-facade/user-kilo-facade.js';
-import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
-import { getSandboxSessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
-import { sessionPlaneFromId } from './session-plane.js';
-import { withDORetry } from './utils/do-retry.js';
 import {
-  generateSandboxCredential,
-  hashSandboxCredential,
-  parseBearerCredential,
-} from './sandbox-control/credential.js';
+  getSandboxSessionStub,
+  resolveLegacySessionStub,
+  resolveSessionStub,
+} from './sandbox-session/session-stub.js';
+import { isControlSession, isLegacySession, sessionFor } from './session-plane.js';
+import { withDORetry } from './utils/do-retry.js';
+import { parseBearerCredential } from './sandbox-control/credential.js';
+import { admitSandboxWrapperUpgrade } from './sandbox-control/socket-admission.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
 import {
@@ -57,8 +57,12 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
-import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  inferRuntimeCredentialProxyRoute,
+  type RuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
 import {
   issueRuntimeProxyAttestation,
   RUNTIME_PROXY_ATTESTATION_HEADER,
@@ -195,29 +199,29 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   logger.withFields({ cloudAgentSessionId, userId, ptyId }).info('/terminal: WebSocket authorized');
 
-  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
-    const stub = getSandboxSessionStub(env, userId, cloudAgentSessionId);
-    if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-      return new Response('Runtime authorization recovery is in progress', { status: 503 });
+  return sessionFor(
+    cloudAgentSessionId,
+    () =>
+      getSandboxSessionStub(env, userId, cloudAgentSessionId).fetch(
+        createTerminalForwardRequest(request, '/terminal/browser', ptyId)
+      ),
+    async () => {
+      const stub = resolveLegacySessionStub(env, userId, cloudAgentSessionId);
+      if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+        return new Response('Runtime authorization recovery is in progress', { status: 503 });
+      }
+      const metadata = await stub.getMetadata();
+      const terminal = await resolveTerminalWrapperClient({
+        env,
+        metadata,
+        sessionId: cloudAgentSessionId,
+      });
+      if (!terminal.success || !terminal.data) {
+        return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
+      }
+      return terminal.data.client.connectTerminal(ptyId, request);
     }
-    return stub.fetch(createTerminalForwardRequest(request, '/terminal/browser', ptyId));
-  }
-
-  const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
-  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-    return new Response('Runtime authorization recovery is in progress', { status: 503 });
-  }
-  const metadata = await stub.getMetadata();
-  const terminal = await resolveTerminalWrapperClient({
-    env,
-    metadata,
-    sessionId: cloudAgentSessionId,
-  });
-  if (!terminal.success || !terminal.data) {
-    return new Response(terminal.error ?? 'Terminal unavailable', { status: 503 });
-  }
-
-  return terminal.data.client.connectTerminal(ptyId, request);
+  );
 }
 
 app.use('*', async (c: Context<HonoContext>, next: Next) => {
@@ -282,35 +286,8 @@ function requireInternalApi(c: Context<HonoContext>): Response | null {
 
 registerControlLogRoutes(app);
 
-app.post('/internal/sandbox-control/seed', async (c: Context<HonoContext>) => {
-  const unauthorized = requireInternalApi(c);
-  if (unauthorized) return unauthorized;
-
-  const body = (await c.req.json().catch(() => null)) as { sandboxId?: unknown } | null;
-  const sandboxId = body?.sandboxId;
-  if (typeof sandboxId !== 'string' || !isSandboxControlId(sandboxId)) {
-    return c.text('Invalid sandboxId', 400);
-  }
-
-  const credential = generateSandboxCredential();
-  const stub = getSandboxControlStub(c.env, sandboxId);
-  await stub.setWrapperCredentialHash(await hashSandboxCredential(credential));
-  return c.json({ sandboxId, credential });
-});
-
 app.get('/sandbox-control/:sandboxId', async (c: Context<HonoContext>) => {
-  const upgradeHeader = c.req.header('Upgrade');
-  if (upgradeHeader?.toLowerCase() !== 'websocket') {
-    return c.text('Expected WebSocket upgrade', 426);
-  }
-
-  const sandboxId = c.req.param('sandboxId');
-  if (!sandboxId || !isSandboxControlId(sandboxId)) {
-    return c.text('Invalid sandboxId', 400);
-  }
-
-  const stub = getSandboxControlStub(c.env, sandboxId);
-  return stub.fetch(c.req.raw);
+  return admitSandboxWrapperUpgrade(c.req.raw, c.env, c.req.param('sandboxId') ?? '');
 });
 
 app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoContext>) => {
@@ -324,11 +301,10 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   if (!ownerId) {
     return c.text('Invalid ownerId', 400);
   }
-  if (
-    !sessionId ||
-    !sessionIdSchema.safeParse(sessionId).success ||
-    sessionPlaneFromId(sessionId) !== 'control'
-  ) {
+  if (!sessionId || !sessionIdSchema.safeParse(sessionId).success) {
+    return c.text('Invalid sessionId', 400);
+  }
+  if (!isControlSession(sessionId)) {
     return c.text('Invalid sessionId', 400);
   }
   if (!ptyId || !PtyIdSchema.safeParse(ptyId).success) {
@@ -341,9 +317,6 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   }
 
   const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
-  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
-    return c.text('Runtime authorization recovery in progress', 503);
-  }
   return stub.fetch(
     createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
   );
@@ -473,7 +446,7 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const requestPath = new URL(c.req.url).pathname;
   if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
-  if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest' && route !== 'exa')
     return c.text('Not found', 404);
   return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
 }
@@ -482,7 +455,7 @@ async function forwardRuntimeCredentialProxy(
   c: Context<HonoContext>,
   handle: string,
   claims: RuntimeProxyHandleClaims,
-  route: 'backend' | 'provider' | 'ingest',
+  route: RuntimeCredentialProxyRoute,
   path: string
 ): Promise<Response> {
   if (!claims) return c.text('Unauthorized', 401);
@@ -523,7 +496,7 @@ async function forwardRuntimeCredentialProxy(
   try {
     // The route allowlist is resolved above before a proof is issued.
     const audience: RuntimeProxyAttestationAudience =
-      route === 'backend' ? 'kilo-api' : route === 'provider' ? 'kilo-gateway' : 'session-ingest';
+      route === 'backend' ? 'kilo-api' : route === 'ingest' ? 'session-ingest' : 'kilo-gateway';
     const proof = await issueRuntimeProxyAttestation({
       secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
         if (!value) throw new Error('Authentication unavailable');
@@ -539,6 +512,14 @@ async function forwardRuntimeCredentialProxy(
       createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),
       { redirect: 'manual' }
     );
+    if (!response.ok) {
+      logRuntimeProxyRequestFailed({
+        upstreamAttempted: true,
+        upstreamStatus: response.status,
+        sessionId: claims.sessionId,
+        kiloSessionId: claims.kiloSessionId,
+      });
+    }
     return sanitizeRuntimeProxyResponse(response);
   } catch {
     return c.text('Upstream unavailable', 502);
@@ -607,8 +588,14 @@ async function rejectLegacyWrapperTokenForRuntimeGrant(
   sessionId: string
 ): Promise<Response | null> {
   if (claims.type !== 'legacy_kilo_token') return null;
+  // The legacy wrapper grant check only applies to the legacy plane. A control
+  // session returns not-found before any authorization read, because its
+  // wrapper never presents a legacy Kilo token.
+  if (!isLegacySession(sessionId)) {
+    return new Response('Session not found', { status: 404 });
+  }
   const status = await withDORetry(
-    () => resolveSessionStub(env, userId, sessionId),
+    () => resolveLegacySessionStub(env, userId, sessionId),
     stub => stub.getRuntimeAuthorizationStatus(),
     'getRuntimeAuthorizationStatus'
   );
@@ -752,8 +739,7 @@ app.get('/stream', async (c: Context<HonoContext>) => {
 
   logger.withFields({ cloudAgentSessionId, userId }).info('/stream: WebSocket upgrade authorized');
 
-  const stub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
-  return stub.fetch(c.req.raw);
+  return resolveSessionStub(c.env, userId, cloudAgentSessionId).fetch(c.req.raw);
 });
 
 app.get('/terminal', async (c: Context<HonoContext>) => {
@@ -771,7 +757,7 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
   if (!rawUserId || !cloudAgentSessionId) {
     return c.text('Missing route params', 400);
   }
-  if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
+  if (!isLegacySession(cloudAgentSessionId)) {
     return c.text('Not found', 404);
   }
 
@@ -837,8 +823,14 @@ app.all('/sessions/:userId/:sessionId/kilo-global-ingest', async (c: Context<Hon
     return projectSessionAccessHttpError(error);
   }
 
-  const sessionStub = resolveSessionStub(c.env, userId, cloudAgentSessionId);
-  const validation = await sessionStub.validateKiloGlobalFeedProducer({
+  // The Kilo global feed is a legacy-plane producer route; the control wrapper
+  // publishes through the control-plane ingest instead. The guard above already
+  // failed a control session closed, so this always validates a legacy session.
+  const validation = await resolveLegacySessionStub(
+    c.env,
+    userId,
+    cloudAgentSessionId
+  ).validateKiloGlobalFeedProducer({
     kiloSessionId,
     wrapperRunId,
     wrapperGeneration,
@@ -916,7 +908,7 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return projectSessionAccessHttpError(error);
   }
 
-  if (sessionPlaneFromId(sessionId) === 'control') {
+  if (!isLegacySession(sessionId)) {
     return c.text('Not found', 404);
   }
 
@@ -940,7 +932,7 @@ app.put(
     if (!rawUserId || !filename || !sessionId || !executionId) {
       return c.text('Missing route params', 400);
     }
-    if (sessionPlaneFromId(sessionId) === 'control') {
+    if (!isLegacySession(sessionId)) {
       return c.text('Not found', 404);
     }
 
@@ -1055,9 +1047,9 @@ app.post('/internal/streams/close', async (c: Context<HonoContext>) => {
     );
 
   for (const row of rows) {
-    if (!row.cloudAgentSessionId) continue;
-    const stub = resolveSessionStub(c.env, userId, row.cloudAgentSessionId);
-    await stub.closeOrgStreams(organizationId);
+    const sessionId = row.cloudAgentSessionId;
+    if (!sessionId) continue;
+    await resolveSessionStub(c.env, userId, sessionId).closeOrgStreams(organizationId);
   }
 
   return c.body(null, 204);
@@ -1095,7 +1087,11 @@ app.notFound(createNotFoundHandler());
 app.onError(createErrorHandler(logger, { includeMessage: false }));
 
 export const REPORT_RETENTION_CRON = '17 2 * * *';
-export const OUTCOME_AGGREGATE_CRON = '*/3 * * * *';
+export const OUTCOME_AGGREGATE_CRON = '*/5 * * * *';
+// Cloudflare has been observed to keep firing a previously configured `*/3` trigger after a
+// deploy changed it to `*/5`. Accept both so a stale trigger cannot silently disable collection;
+// the collector floors `scheduledTime` to 5-minute buckets, so extra ticks only repeat a bucket.
+export const OUTCOME_AGGREGATE_CRONS = new Set([OUTCOME_AGGREGATE_CRON, '*/3 * * * *']);
 
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Response | Promise<Response> {
@@ -1125,9 +1121,9 @@ export default {
       await removeExpiredCloudAgentReportData(env);
       return;
     }
-    if (controller.cron === OUTCOME_AGGREGATE_CRON) {
+    if (OUTCOME_AGGREGATE_CRONS.has(controller.cron)) {
       try {
-        await runCloudAgentOutcomeCollection(env);
+        await runCloudAgentOutcomeCollection(env, new Date(), controller.scheduledTime);
       } finally {
         await runCloudAgentOpenStockCollection(env);
       }

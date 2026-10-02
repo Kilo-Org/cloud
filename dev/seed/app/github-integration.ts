@@ -186,6 +186,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     repositories,
     installed_at: details.createdAt,
     github_app_type: options.appType,
+    github_connection_role: 'workflow',
     repositories_synced_at: nowIso,
   } satisfies typeof platform_integrations.$inferInsert;
 
@@ -240,6 +241,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
           integration_status: 'active',
           repositories: values.repositories,
           github_app_type: options.appType,
+          github_connection_role: 'workflow',
           auth_invalid_at: null,
           auth_invalid_reason: null,
           repositories_synced_at: nowIso,

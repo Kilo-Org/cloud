@@ -30,6 +30,7 @@ import type { ModelNotFoundRuntimeDiagnostics } from '../../src/shared/runtime-m
 import { gateResultFromProperties } from '../../src/shared/kilo-event-properties.js';
 import { buildModelNotFoundRuntimeDiagnostics } from './model-diagnostics.js';
 import { createRunningBashEventCoalescer } from './running-bash-event-coalescer.js';
+import { isSuccessfulGitHubSummaryWrite } from './publication-self-check.js';
 import { slashCommandCatalogStatus } from '../../src/shared/slash-commands.js';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -1140,6 +1141,13 @@ export function createConnectionManager(
           const gateResult = gateResultFromProperties(properties);
           if (gateResult !== undefined) {
             state.observeGateResult(gateResult);
+          }
+          if (
+            eventType === 'message.part.updated' &&
+            state.currentSession?.publicationSelfCheck === true &&
+            isSuccessfulGitHubSummaryWrite(properties.part)
+          ) {
+            state.observeSummaryPublication();
           }
 
           state.updateActivity();

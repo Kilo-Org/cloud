@@ -215,7 +215,6 @@
     "showBalance": "Tampilkan saldo",
     "balanceHidden": "Saldo tersembunyi",
     "bonusCreditsExpiring": "Kredit bonus senilai {{amount}} akan kedaluwarsa pada {{date}}.",
-    "creditBalanceEmpty": "Saldo kreditmu kosong. Untuk akun ini, kredit dikelola di luar aplikasi iOS.",
     "signOutTitle": "Keluar?",
     "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "deleteAccountTitle": "Hapus akun?",
@@ -241,6 +240,7 @@
     "addPasskey": "Tambah kunci sandi",
     "passkeyDefaultName": "Kunci sandi",
     "passkeyAddedOn": "Ditambahkan {{date}}",
+    "passkeyLastUsedOn": "Terakhir digunakan {{date}}",
     "passkeyAdded": "Kunci sandi ditambahkan.",
     "passkeyAddFailed": "Tidak dapat menambahkan kunci sandi. Coba lagi.",
     "passkeyAddUnsupported": "Perangkat ini tidak dapat membuat kunci sandi.",
@@ -1534,6 +1534,7 @@
       "idCopied": "ID sesi disalin",
       "couldNotCopyId": "Tidak dapat menyalin ID sesi.",
       "untitled": "Sesi tanpa judul",
+      "actions": "Tindakan untuk sesi",
       "sessionDeleted": "Sesi dihapus",
       "needsInput": "perlu masukan",
       "fromPlatform": "dari {{platform}}",
@@ -1584,7 +1585,9 @@
       "renamePlaceholder": "Nama sesi",
       "transcriptAccessibility": "Transkrip sesi",
       "readOnly": "Sesi ini hanya dapat dibaca.",
+      "continueInNewSession": "Lanjutkan di sesi baru",
       "emptyDescription": "Kirim pesan di bawah untuk memulai.",
+      "emptyTranscriptDescription": "Sesi ini belum memiliki pesan.",
       "scrollToBottom": "Gulir ke bawah",
       "emptyTitle": "Belum ada pesan",
       "renameAccessibility": "Ganti nama sesi: {{title}}",
@@ -1674,6 +1677,8 @@
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
+      "selectRepositoryToStart": "Pilih repositori untuk memulai.",
+      "connectProviderToStart": "Hubungkan penyedia untuk memulai.",
       "promptPlaceholder": "Apa yang ingin kamu kerjakan?",
       "couldNotLoadModels": "Tidak dapat memuat model.",
       "prefillRepoAndModelUnavailable": "Repositori dan model dari sesi asal sudah tidak tersedia. Pilih penggantinya di bawah.",
@@ -2049,6 +2054,7 @@
       "selectModelBeforeSending": "Pilih model sebelum mengirim pesan.",
       "preparingPlaceholder": "Menyiapkan lingkungan...",
       "finalizingPlaceholder": "Menyelesaikan...",
+      "sessionLoadFailed": "Sesi tidak dapat dimuat. Coba lagi dulu.",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima berkas. Hapus lampiran untuk mengirim pesanmu.",
       "couldNotAttachFiles": "Tidak dapat melampirkan berkas. Ketuk Kirim untuk mencoba lagi.",
       "discardAttachmentsMessage": "Unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
@@ -2118,6 +2124,7 @@
       "provider": "Penyedia",
       "totalCost": "Total biaya",
       "usageReflectsLatest": "Data penggunaan dihitung dari respons asisten terakhir yang sudah selesai.",
+      "usageUnavailable": "Penggunaan konteks tidak tersedia",
       "tokenUsage": "Penggunaan token",
       "cacheRate": "Persentase cache",
       "modelsCount": "Model ({{displayCount}})",
@@ -2152,7 +2159,10 @@
     "markdownImage": {
       "load": "Muat",
       "loadWithHost": "Muat {{host}}",
-      "httpsOnly": "Hanya gambar melalui HTTPS yang dapat dimuat."
+      "httpsOnly": "Hanya gambar melalui HTTPS yang dapat dimuat.",
+      "trustTitle": "Muat gambar dari {{host}}?",
+      "trustMessage": "Mempercayai {{host}} akan memuat gambarnya tanpa bertanya setiap saat. Anda dapat mencabutnya nanti di Host tepercaya.",
+      "loadOnce": "Muat sekali"
     },
     "markdownLink": {
       "invalidLink": "Tautan ini tidak dapat dibuka.",
@@ -3178,8 +3188,12 @@
     "subtitle": "Host tepercaya yang dapat dibuka tanpa konfirmasi",
     "emptyTitle": "Tidak ada host tepercaya",
     "emptyDescription": "Tautan dari host yang kamu percayai akan terbuka tanpa meminta konfirmasi lagi.",
+    "imagesSectionTitle": "Host gambar tepercaya",
+    "imagesSectionDescription": "Gambar dari host ini dimuat tanpa bertanya lagi.",
+    "imagesSectionEmpty": "Tidak ada host gambar tepercaya",
     "revoke": "Cabut kepercayaan untuk {{host}}",
     "revokeMessage": "Tautan ke host ini akan meminta konfirmasi lagi.",
+    "revokeImageMessage": "Gambar dari host ini akan meminta konfirmasi lagi.",
     "backToPreferences": "Kembali ke preferensi"
   },
   "quickChat": {
@@ -3444,5 +3458,17 @@
       "unboundToast": "Repo tidak terikat",
       "unbindFailed": "Tidak dapat melepaskan ikatan repo"
     }
+  },
+  "credits": {
+    "title": "Beli kredit",
+    "description": "Kredit adalah pembelian satu kali yang ditambahkan ke saldo Kilo Anda untuk menjalankan sesi coding AI di Kilo App. Toko menagih akun Anda dan kredit ditambahkan setelah toko mengonfirmasi pembayaran.",
+    "packLabel": "Tambahkan kredit {{amount}}",
+    "priceUnavailable": "Harga tidak tersedia",
+    "purchased": "Kredit telah ditambahkan ke saldo Anda.",
+    "empty": "Paket kredit tidak tersedia saat ini.",
+    "noMatchingProducts": "App Store tidak mengembalikan paket kredit yang cocok.",
+    "noMatchingProductsPlay": "Google Play tidak mengembalikan paket kredit yang cocok.",
+    "purchaseOwnedByAnotherAccount": "Kredit pada Apple Account ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredit di akun Google Play ini milik akun Kilo yang berbeda. Masuk ke akun Kilo tersebut untuk menggunakannya."
   }
 }

@@ -6,7 +6,7 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 - `NODE_ENV` - Node environment (`development`, `production`, `test`); used by virtually every package. [SERVER]
 - `CI` - Set to `true` in CI environments; detected by Next.js, Playwright, Vitest, and various tooling to alter behavior (non-interactive, skip prompts, etc.). [SERVER]
-- `PORT` - Port for local dev servers. Next.js defaults to 3000; used by `apps/web/src/lib/constants.ts` and various test servers. [SERVER]
+- `PORT` - Port for local dev servers. Next.js defaults to 3000; used by `packages/web-shared/src/lib/constants.ts` and various test servers. [SERVER]
 - `HOME` - User home directory; used by child processes spawned by services (OpenClaw resolves `~/.openclaw`, Expo devcert for mkcert certs). [SYSTEM]
 - `PATH` - System executable search path; modified by tooling (OpenClaw, tsx, etc.) to locate CLIs. [SYSTEM]
 - `TMUX` - Set when running inside a tmux session; used by `dev/local/tmux.ts` to detect tmux environment. [SYSTEM]
@@ -20,13 +20,13 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Configuration & Constant URLs
 
-- `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `apps/web/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
-- `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `apps/web/src/lib/config.server.ts`. [SERVER]
+- `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
+- `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `packages/web-shared/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
-- `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `apps/web/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
-- `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `apps/web/src/lib/trpc/init.ts`. [SERVER]
-- `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `apps/web/src/lib/observability/request-timing.ts`. [SERVER]
+- `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
+- `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
+- `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `packages/web-shared/src/lib/observability/request-timing.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
@@ -59,7 +59,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 ### Vercel & Build Info
 
-- `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `apps/web/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
+- `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `packages/web-shared/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
 - `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
@@ -224,7 +224,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### Redis & Queue
 
-- `REDIS_URL` - Redis connection URL; used by `apps/web/src/lib/redis.ts` and bot state. `[SECRET]`
+- `REDIS_URL` - Redis connection URL; used by `packages/web-shared/src/lib/redis.ts` and bot state. `[SECRET]`
 
 ### Encryption & Secrets
 
@@ -270,9 +270,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
-- `ABUSE_SERVICE_URL` - URL for the abuse detection service. [SERVER]
-- `ABUSE_SERVICE_CF_ACCESS_CLIENT_ID` - Cloudflare Access client ID for abuse service. [PUBLIC]
-- `ABUSE_SERVICE_CF_ACCESS_CLIENT_SECRET` - Cloudflare Access client secret for abuse service. `[SECRET]`
+- `BOUNCER_URL` - URL of the bouncer worker (report-only fraud, distillation, and rate verdicts). Defaults to https://bouncer.kiloapps.io in production. Usage reports and decide transport requests have 30-second trial budgets; gateway decide runs through `after()` and never delays inference. Credit reports keep their 5-second budget because Stripe webhooks await them. [SERVER]
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
@@ -280,15 +278,15 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### AI Providers
 
-- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
+- `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `packages/web-shared/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
-- `OPENAI_CHATGPT_API_KEY` - Partner project key for the delegated "Sign in with ChatGPT" route (`apps/web/src/lib/ai-gateway/openai-chatgpt/routing.ts`); sent as `Authorization: Bearer` alongside the user's `OpenAI-On-Behalf-Of-Token`. OpenAI requires this key to come from the project that owns the OAuth client (`oaiapp_Abz1xcqSQAvvIwtxyemZbXBJ`); a key from another project makes every delegated call fail with an opaque `400 Bad Request`. `[SECRET]`
-- `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/lib/ai-gateway/handlers/fim-completions.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
-- `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/lib/ai-gateway/handlers/fim-completions.ts` and `apps/web/src/lib/ai-gateway/handlers/edit-completions.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
+- `OPENAI_CHATGPT_API_KEY` - Partner project key for the delegated "Sign in with ChatGPT" route (`packages/web-shared/src/lib/ai-gateway/openai-chatgpt/routing.ts`); sent as `Authorization: Bearer` alongside the user's `OpenAI-On-Behalf-Of-Token`. OpenAI requires this key to come from the project that owns the OAuth client (`oaiapp_Abz1xcqSQAvvIwtxyemZbXBJ`); a key from another project makes every delegated call fail with an opaque `400 Bad Request`. `[SECRET]`
+- `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `packages/web-shared/src/lib/ai-gateway/handlers/fim-completions.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `packages/web-shared/src/lib/config.server.ts`. `[SECRET]`
+- `INCEPTION_API_KEY` - Inception Labs API key; used in `packages/web-shared/src/lib/ai-gateway/handlers/fim-completions.ts` and `packages/web-shared/src/lib/ai-gateway/handlers/edit-completions.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `packages/web-shared/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
 - `ENKRYPT_API_KEY` - API key for the Enkrypt scores endpoint; sent only in the server-side `apikey` header. Required when Enkrypt ingestion is enabled, but optional at application startup. See [Enkrypt operations](docs/enkrypt-sync-operations.md) for release gates, monitoring, and independent shutdown controls. `[SECRET]`
-- `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `apps/web/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
+- `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `packages/web-shared/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
 
@@ -343,8 +341,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
 ### Cloudflare Analytics
 
-- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
-- `CLOUDFLARE_ANALYTICS_API_TOKEN` - Cloudflare API token with **Account Analytics: Read** only, used by the web app to query `containersUsageAdaptiveGroups` for on-demand admin reconciliation; used in `apps/web/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. Optional at process start — missing values surface as actionable errors at point of use. `[SECRET]`
+- `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
+- `CLOUDFLARE_ANALYTICS_API_TOKEN` - Cloudflare API token with **Account Analytics: Read** only, used by the web app to query `containersUsageAdaptiveGroups` for on-demand admin reconciliation; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. Optional at process start — missing values surface as actionable errors at point of use. `[SECRET]`
 
 ### R2 / Object Storage
 
@@ -352,6 +350,9 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_ACCESS_KEY_ID` - R2 access key ID for CLI session storage. `[SECRET]`
 - `R2_SECRET_ACCESS_KEY` - R2 secret access key for CLI session storage. `[SECRET]`
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
+- `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
+- `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
+- `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
 
 ## Services
 

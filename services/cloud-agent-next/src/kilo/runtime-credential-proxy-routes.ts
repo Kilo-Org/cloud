@@ -4,7 +4,7 @@ export type RuntimeCredentialProxyTargets = {
   sessionIngestBaseUrl: string;
 };
 
-export type RuntimeCredentialProxyRoute = 'backend' | 'provider' | 'ingest';
+export type RuntimeCredentialProxyRoute = 'backend' | 'provider' | 'ingest' | 'exa';
 
 type ResolveRuntimeCredentialProxyRouteInput = {
   targets: RuntimeCredentialProxyTargets;
@@ -113,12 +113,29 @@ function logicalProviderPath(pathname: string): string | null {
   return isAllowedProviderRoute('GET', path) || isAllowedProviderRoute('POST', path) ? path : null;
 }
 
+export const EXA_PROXY_PATHS = [
+  '/api/exa/search',
+  '/api/exa/contents',
+  '/api/exa/findSimilar',
+  '/api/exa/answer',
+  '/api/exa/context',
+] as const;
+
+const exaProxyPathSet: ReadonlySet<string> = new Set(EXA_PROXY_PATHS);
+
+function isAllowedExaRoute(method: string, path: string): boolean {
+  return method === 'POST' && exaProxyPathSet.has(path);
+}
+
 /** Identifies the facade plane only; the route resolver still enforces its allowlist. */
 export function inferRuntimeCredentialProxyRoute(
   pathname: string
 ): RuntimeCredentialProxyRoute | null {
   if (pathname.startsWith('/api/openrouter/') || pathname.startsWith('/api/gateway/')) {
     return 'provider';
+  }
+  if (pathname.startsWith('/api/exa/')) {
+    return 'exa';
   }
   if (
     pathname === '/api/session' ||
@@ -203,6 +220,9 @@ export function resolveRuntimeCredentialProxyRoute(
     input.route === 'backend' &&
     isAllowedBackendRoute(input.method, path, input.organizationId)
   ) {
+    return targetUrl(input.targets.backendBaseUrl, path, input.search);
+  }
+  if (input.route === 'exa' && isAllowedExaRoute(input.method, path)) {
     return targetUrl(input.targets.backendBaseUrl, path, input.search);
   }
   if (input.route === 'provider') {

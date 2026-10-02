@@ -4,6 +4,8 @@ import { createCallerFactory } from '@/lib/trpc/init';
 import type { User } from '@kilocode/db/schema';
 import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import type { adminWebhookTriggersRouter as AdminWebhookTriggersRouter } from './admin-webhook-triggers-router';
+import type { getWebhookRequestLogs } from '@/lib/webhook-request-logs';
 import type {
   createWorkerTrigger as createWorkerTriggerType,
   updateWorkerTrigger as updateWorkerTriggerType,
@@ -17,6 +19,10 @@ import type {
 } from './webhook-triggers-router';
 
 const mockEnsureOrganizationAccess = jest.fn<typeof ensureOrganizationAccess>();
+const mockGetWebhookRequestLogs = jest.fn<typeof getWebhookRequestLogs>();
+jest.mock('@/lib/webhook-request-logs', () => ({
+  getWebhookRequestLogs: mockGetWebhookRequestLogs,
+}));
 const mockGetSandboxSelectionOptions =
   jest.fn<CloudAgentNextClient['getSandboxSelectionOptions']>();
 
@@ -35,6 +41,7 @@ const mockUpdateWorkerTrigger = jest.fn<typeof updateWorkerTriggerType>();
 const mockInvokeWorkerScheduledTrigger = jest.fn<typeof invokeWorkerScheduledTriggerType>();
 const mockDbInsert = jest.fn();
 const mockDbUpdate = jest.fn();
+const mockFindAdmin = jest.fn<() => Promise<Partial<User> | undefined>>();
 const mockSelectWhere = jest.fn<
   () => Promise<
     Array<{
@@ -47,6 +54,7 @@ const mockSelectWhere = jest.fn<
 
 jest.mock('@/lib/drizzle', () => ({
   db: {
+    query: { kilocode_users: { findFirst: mockFindAdmin } },
     select: () => ({
       from: () => ({
         where: mockSelectWhere,
@@ -85,6 +93,9 @@ let createCaller: ReturnType<
 >;
 let WebhookTriggerCreateInput: typeof WebhookTriggerCreateInputType;
 let WebhookTriggerUpdateInput: typeof WebhookTriggerUpdateInputType;
+let createAdminCaller: ReturnType<
+  typeof createCallerFactory<typeof AdminWebhookTriggersRouter._def.record>
+>;
 
 const user = { id: 'user-1', is_admin: false } as User;
 const createInput = {
@@ -116,6 +127,8 @@ beforeAll(async () => {
   createCaller = createCallerFactory(router.webhookTriggersRouter);
   WebhookTriggerCreateInput = router.WebhookTriggerCreateInput;
   WebhookTriggerUpdateInput = router.WebhookTriggerUpdateInput;
+  const adminRouter = await import('./admin-webhook-triggers-router');
+  createAdminCaller = createCallerFactory(adminRouter.adminWebhookTriggersRouter);
 });
 
 describe('webhook trigger variant inputs', () => {
@@ -136,6 +149,115 @@ describe('webhook trigger variant inputs', () => {
     });
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
     mockGetSandboxSelectionOptions.mockResolvedValue({ enabled: false, options: [] });
+    mockFindAdmin.mockResolvedValue({
+      is_admin: true,
+      can_view_sessions: true,
+      blocked_reason: null,
+    });
+  });
+
+  it('authorizes personal request logs before reading the worker', async () => {
+    mockGetWebhookRequestLogs.mockResolvedValue({
+      logs: [],
+      processStatus: 'captured',
+      logsReady: false,
+    });
+    await createCaller({ user }).getRequestLogs({
+      triggerId: 'trigger-id',
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
+    expect(mockGetWebhookRequestLogs).toHaveBeenCalledWith(
+      user.id,
+      undefined,
+      'trigger-id',
+      '00000000-0000-4000-8000-000000000005'
+    );
+  });
+
+  it('requires admin session viewing permission for request logs', async () => {
+    mockFindAdmin.mockResolvedValue({
+      is_admin: true,
+      can_view_sessions: false,
+      blocked_reason: null,
+    });
+    await expect(
+      createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+        scope: 'user',
+        userId: 'target',
+        triggerId: 'trigger-id',
+        requestId: '00000000-0000-4000-8000-000000000005',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockSelectWhere).not.toHaveBeenCalled();
+    expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
+  });
+
+  it('uses the selected personal admin scope rather than the admin owner', async () => {
+    await createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+      scope: 'user',
+      userId: 'target',
+      triggerId: 'trigger-id',
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
+    expect(mockGetWebhookRequestLogs).toHaveBeenCalledWith(
+      'target',
+      undefined,
+      'trigger-id',
+      '00000000-0000-4000-8000-000000000005'
+    );
+  });
+
+  it('uses the selected organization admin scope', async () => {
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+    await createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+      scope: 'organization',
+      organizationId,
+      triggerId: 'trigger-id',
+      requestId: '00000000-0000-4000-8000-000000000005',
+    });
+    expect(mockGetWebhookRequestLogs).toHaveBeenCalledWith(
+      undefined,
+      organizationId,
+      'trigger-id',
+      '00000000-0000-4000-8000-000000000005'
+    );
+  });
+
+  it('rejects an admin trigger outside the selected scope before reading logs', async () => {
+    mockSelectWhere.mockResolvedValue([]);
+    await expect(
+      createAdminCaller({ user: { ...user, is_admin: true } }).getRequestLogs({
+        scope: 'user',
+        userId: 'target',
+        triggerId: 'trigger-id',
+        requestId: '00000000-0000-4000-8000-000000000005',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
+  });
+
+  it('denies request logs when the trigger is not owned', async () => {
+    mockSelectWhere.mockResolvedValue([]);
+    await expect(
+      createCaller({ user }).getRequestLogs({
+        triggerId: 'trigger-id',
+        requestId: '00000000-0000-4000-8000-000000000005',
+      })
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
+  });
+
+  it('checks organization access before retrieving request logs', async () => {
+    mockEnsureOrganizationAccess.mockRejectedValue(new TRPCError({ code: 'FORBIDDEN' }));
+    await expect(
+      createCaller({ user }).getRequestLogs({
+        triggerId: 'trigger-id',
+        requestId: '00000000-0000-4000-8000-000000000005',
+        organizationId: '00000000-0000-4000-8000-000000000001',
+      })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(mockSelectWhere).not.toHaveBeenCalled();
+    expect(mockGetWebhookRequestLogs).not.toHaveBeenCalled();
   });
 
   it.each(['high', 'High', 'a'.repeat(50)])('accepts valid create variant %s', variant => {

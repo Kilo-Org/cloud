@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
 import { getUserFromAuth } from '@/lib/user/server';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
 import { insertUsageRecord } from '@/lib/ai-gateway/processUsage';
 import type { MicrodollarUsage } from '@kilocode/db/schema';

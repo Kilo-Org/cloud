@@ -1,21 +1,28 @@
 name: Deploy Web to Staging
 
 on:
-  push:
-    branches: [main]
-    paths-ignore:
-      - 'apps/mobile/**'
+  schedule:
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
+  deployments: read
 
 concurrency:
   group: deploy-staging
   cancel-in-progress: false
 
 jobs:
+  check-changes:
+    uses: ./.github/workflows/check-deployment-changes.yml
+    with:
+      workflow_file: deploy-staging.yml
+
   check-staging-db-startup:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -29,6 +36,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -46,6 +54,8 @@ jobs:
         run: NODE_ENV=production pnpm exec tsx scripts/check-production-db-startup.ts
 
   run-migrations:
+    needs: check-changes
+    if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -59,6 +69,7 @@ jobs:
         uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
         with:
           lfs: true
+          ref: ${{ needs.check-changes.outputs.target_sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
@@ -76,26 +87,71 @@ jobs:
         run: NODE_ENV=production pnpm run drizzle migrate
 
   deploy-app:
-    needs: [check-staging-db-startup, run-migrations]
+    needs: [check-changes, check-staging-db-startup, run-migrations]
+    if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_APP
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_APP }}
 
   deploy-global-app:
-    needs: [check-staging-db-startup, run-migrations]
+    needs: [check-changes, check-staging-db-startup, run-migrations]
+    if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
       vercel_project_id_var: VERCEL_PROJECT_ID_GLOBAL_APP
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
   deploy-workers:
-    needs: [check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
+    needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
+    if: needs.check-changes.outputs.should_deploy == 'true'
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
+      base_sha: ${{ needs.check-changes.outputs.base_sha }}
+      source_sha: ${{ needs.check-changes.outputs.target_sha }}
     secrets: inherit
+
+  record-deployment:
+    needs:
+      [
+        check-changes,
+        check-staging-db-startup,
+        run-migrations,
+        deploy-app,
+        deploy-global-app,
+        deploy-workers,
+      ]
+    if: >-
+      ${{
+        !cancelled() &&
+        needs.check-changes.outputs.should_deploy == 'true' &&
+        needs.check-staging-db-startup.result == 'success' &&
+        needs.run-migrations.result == 'success' &&
+        needs.deploy-app.result == 'success' &&
+        needs.deploy-global-app.result == 'success' &&
+        needs.deploy-workers.result == 'success'
+      }}
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    permissions:
+      deployments: write
+    steps:
+      - name: Record fully deployed staging SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ needs.check-changes.outputs.target_sha }}
+        run: |
+          deployment_id=$(jq -n \
+            --arg ref "$SOURCE_SHA" \
+            '{ref:$ref, environment:"scheduled-deploy-staging", auto_merge:false, required_contexts:[], production_environment:false}' \
+            | gh api --method POST "repos/$GITHUB_REPOSITORY/deployments" --input - --jq '.id')
+          gh api --method POST "repos/$GITHUB_REPOSITORY/deployments/$deployment_id/statuses" \
+            -f state=success > /dev/null
+          echo "Staging release completed: \`$SOURCE_SHA\`." >> "$GITHUB_STEP_SUMMARY"

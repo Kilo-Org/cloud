@@ -215,7 +215,6 @@
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
     "bonusCreditsExpiring": "Creditele bonus în valoare de {{amount}} expiră la {{date}}.",
-    "creditBalanceEmpty": "Nu mai ai credite. Pentru acest cont, creditele se gestionează în afara aplicației iOS.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -241,6 +240,7 @@
     "addPasskey": "Adaugă o cheie de acces",
     "passkeyDefaultName": "Cheie de acces",
     "passkeyAddedOn": "Adăugată {{date}}",
+    "passkeyLastUsedOn": "Ultima utilizare {{date}}",
     "passkeyAdded": "Cheie de acces adăugată.",
     "passkeyAddFailed": "Nu s-a putut adăuga o cheie de acces. Încearcă din nou.",
     "passkeyAddUnsupported": "Acest dispozitiv nu poate crea chei de acces.",
@@ -2072,6 +2072,7 @@
       "idCopied": "ID-ul sesiunii a fost copiat",
       "couldNotCopyId": "Nu s-a putut copia ID-ul sesiunii.",
       "untitled": "Sesiune fără titlu",
+      "actions": "Acțiuni pentru sesiune",
       "sessionDeleted": "Sesiune ștearsă",
       "needsInput": "așteaptă un răspuns",
       "fromPlatform": "din {{platform}}",
@@ -2125,7 +2126,9 @@
       "renamePlaceholder": "Numele sesiunii",
       "transcriptAccessibility": "Transcrierea sesiunii",
       "readOnly": "Această sesiune poate fi doar citită.",
+      "continueInNewSession": "Continuă într-o sesiune nouă",
       "emptyDescription": "Trimite un mesaj mai jos pentru a începe.",
+      "emptyTranscriptDescription": "Această sesiune nu are încă mesaje.",
       "scrollToBottom": "Derulează la final",
       "emptyTitle": "Încă niciun mesaj",
       "renameAccessibility": "Redenumește sesiunea: {{title}}",
@@ -2215,6 +2218,8 @@
       "leaveChanges": "Păstrează modificările",
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
+      "selectRepositoryToStart": "Selectează un depozit pentru a începe.",
+      "connectProviderToStart": "Conectează un furnizor pentru a începe.",
       "promptPlaceholder": "La ce vrei să lucrezi?",
       "couldNotLoadModels": "Nu s-au putut încărca modelele.",
       "prefillRepoAndModelUnavailable": "Depozitul și modelul sesiunii inițiale nu mai sunt disponibile. Alege altele mai jos.",
@@ -2599,6 +2604,7 @@
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
+      "sessionLoadFailed": "Sesiunea nu a putut fi încărcată. Reîncercați mai întâi.",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Nu s-au putut atașa fișierele. Atinge butonul de trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
@@ -2669,6 +2675,7 @@
       "provider": "Furnizor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "Datele de utilizare corespund celui mai recent răspuns finalizat al asistentului.",
+      "usageUnavailable": "Utilizarea contextului nu este disponibilă",
       "tokenUsage": "Utilizarea tokenurilor",
       "cacheRate": "Rată de utilizare a cache-ului",
       "modelsCount": "Modele ({{displayCount}})",
@@ -2705,7 +2712,10 @@
     "markdownImage": {
       "load": "Încarcă",
       "loadWithHost": "Încarcă {{host}}",
-      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS."
+      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS.",
+      "trustTitle": "Încărcați imaginea de la {{host}}?",
+      "trustMessage": "Dacă ai încredere în {{host}}, imaginile sale se încarcă fără a întreba de fiecare dată. Poți retrage acest lucru mai târziu în Gazde de încredere.",
+      "loadOnce": "Încarcă o dată"
     },
     "markdownLink": {
       "invalidLink": "Acest link nu poate fi deschis.",
@@ -3221,8 +3231,12 @@
     "subtitle": "Gazde ale căror linkuri se deschid fără confirmare",
     "emptyTitle": "Nicio gazdă de încredere",
     "emptyDescription": "Dacă marchezi gazda unui link ca fiind de încredere, linkurile acesteia se vor deschide fără o nouă confirmare.",
+    "imagesSectionTitle": "Gazde de imagini de încredere",
+    "imagesSectionDescription": "Imaginile de la aceste gazde se încarcă fără a mai întreba.",
+    "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
     "backToPreferences": "Înapoi la preferințe"
   },
   "quickChat": {
@@ -3487,5 +3501,17 @@
       "unboundToast": "Repo nelegat",
       "unbindFailed": "Nu s-a putut dezlega repo"
     }
+  },
+  "credits": {
+    "title": "Cumpără credite",
+    "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
+    "packLabel": "Adaugă {{amount}} în credite",
+    "priceUnavailable": "Preț indisponibil",
+    "purchased": "Creditele au fost adăugate la soldul tău.",
+    "empty": "Pachetele de credite nu sunt disponibile momentan.",
+    "noMatchingProducts": "App Store nu a returnat pachete de credite corespunzătoare.",
+    "noMatchingProductsPlay": "Google Play nu a returnat pachete de credite corespunzătoare.",
+    "purchaseOwnedByAnotherAccount": "Creditele asociate acestui Apple Account aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi.",
+    "purchaseOwnedByAnotherAccountPlay": "Creditele de pe acest cont Google Play aparțin unui alt cont Kilo. Autentifică-te în acel cont Kilo pentru a le folosi."
   }
 }

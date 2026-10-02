@@ -215,7 +215,6 @@
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
     "bonusCreditsExpiring": "{{amount}} کے بونس کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
-    "creditBalanceEmpty": "آپ کے کریڈٹس ختم ہو گئے ہیں۔ اس اکاؤنٹ کے کریڈٹس کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -241,6 +240,7 @@
     "addPasskey": "رسائی کلید شامل کریں",
     "passkeyDefaultName": "رسائی کلید",
     "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyLastUsedOn": "آخری استعمال {{date}}",
     "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
     "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
@@ -2047,6 +2047,7 @@
       "idCopied": "سیشن کی ID کاپی ہو گئی",
       "couldNotCopyId": "سیشن کی ID کاپی نہیں ہو سکی۔",
       "untitled": "بلا عنوان سیشن",
+      "actions": "سیشن کی کارروائیاں",
       "sessionDeleted": "سیشن حذف ہو گیا",
       "needsInput": "ان پٹ درکار",
       "fromPlatform": "{{platform}} سے",
@@ -2097,7 +2098,9 @@
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
       "readOnly": "اس سیشن کو صرف پڑھا جا سکتا ہے۔",
+      "continueInNewSession": "نئے سیشن میں جاری رکھیں",
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
+      "emptyTranscriptDescription": "اس سیشن میں ابھی کوئی پیغام نہیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
       "renameAccessibility": "سیشن کا نام تبدیل کریں: {{title}}",
@@ -2187,6 +2190,8 @@
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
+      "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں ہیں۔ نیچے سے نئی ریپوزٹری اور ماڈل منتخب کریں۔",
@@ -2562,6 +2567,7 @@
       "selectModelBeforeSending": "پیغام بھیجنے سے پہلے ماڈل منتخب کریں۔",
       "preparingPlaceholder": "ماحول تیار ہو رہا ہے...",
       "finalizingPlaceholder": "کام مکمل ہو رہا ہے...",
+      "sessionLoadFailed": "سیشن لوڈ نہیں ہو سکا۔ پہلے دوبارہ کوشش کریں۔",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے منسلک فائلیں ہٹائیں۔",
       "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کرنے کے لیے بھیجنے کے بٹن پر ٹیپ کریں۔",
       "discardAttachmentsMessage": "اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
@@ -2631,6 +2637,7 @@
       "provider": "فراہم کنندہ",
       "totalCost": "کل لاگت",
       "usageReflectsLatest": "استعمال کے یہ اعداد معاون کے آخری مکمل جواب کے مطابق ہیں۔",
+      "usageUnavailable": "سیاق کا استعمال دستیاب نہیں ہے",
       "tokenUsage": "ٹوکن کا استعمال",
       "cacheRate": "کیش کی شرح",
       "modelsCount": "ماڈلز ({{displayCount}})",
@@ -2665,7 +2672,10 @@
     "markdownImage": {
       "load": "لوڈ کریں",
       "loadWithHost": "{{host}} لوڈ کریں",
-      "httpsOnly": "صرف HTTPS والی تصاویر لوڈ کی جا سکتی ہیں۔"
+      "httpsOnly": "صرف HTTPS والی تصاویر لوڈ کی جا سکتی ہیں۔",
+      "trustTitle": "کیا {{host}} سے تصویر لوڈ کی جائے؟",
+      "trustMessage": "{{host}} پر اعتماد کرنے سے اس کی تصاویر ہر بار پوچھے بغیر لوڈ ہوں گی۔ آپ بعد میں قابل اعتماد ہوسٹس میں اسے واپس لے سکتے ہیں۔",
+      "loadOnce": "ایک بار لوڈ کریں"
     },
     "markdownLink": {
       "invalidLink": "یہ لنک نہیں کھولا جا سکتا۔",
@@ -3178,8 +3188,12 @@
     "subtitle": "وہ ہوسٹس جن کے لنکس دوبارہ اجازت لیے بغیر کھل سکتے ہیں",
     "emptyTitle": "کوئی قابل اعتماد ہوسٹ نہیں",
     "emptyDescription": "کسی لنک کے ہوسٹ پر بھروسہ کرنے کے بعد اس کے لنکس دوبارہ اجازت لیے بغیر کھلتے ہیں۔",
+    "imagesSectionTitle": "قابل اعتماد تصویری ہوسٹس",
+    "imagesSectionDescription": "ان ہوسٹس کی تصاویر دوبارہ پوچھے بغیر لوڈ ہوتی ہیں۔",
+    "imagesSectionEmpty": "کوئی قابل اعتماد تصویری ہوسٹ نہیں",
     "revoke": "{{host}} پر اعتماد ختم کریں",
     "revokeMessage": "اس ہوسٹ کے لنکس دوبارہ تصدیق طلب کریں گے۔",
+    "revokeImageMessage": "اس ہوسٹ کی تصاویر دوبارہ تصدیق طلب کریں گی۔",
     "backToPreferences": "ترجیحات پر واپس جائیں"
   },
   "quickChat": {
@@ -3444,5 +3458,17 @@
       "unboundToast": "ریپو انباؤنڈ",
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
     }
+  },
+  "credits": {
+    "title": "کریڈٹس خریدیں",
+    "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
+    "packLabel": "{{amount}} کے کریڈٹس شامل کریں",
+    "priceUnavailable": "قیمت دستیاب نہیں",
+    "purchased": "آپ کے بیلنس میں کریڈٹس شامل کر دیے گئے ہیں۔",
+    "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
+    "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
+    "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   }
 }

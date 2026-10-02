@@ -183,10 +183,12 @@ function parseCloneSizeProxies(output: string): {
   return proxies;
 }
 
-function gitProgressReporter(
-  progress: BootstrapProgress | undefined,
-  step: 'cloning' | 'branch',
-  prefix: string
+/**
+ * Parses `git --progress` output into throttled "Receiving objects: 45%" lines.
+ * Shared by the legacy bootstrap and the control-plane preparation.
+ */
+export function createGitProgressReporter(
+  report: (progressText: string) => void
 ): (stream: ProcessOutputStream, output: string) => void {
   let bufferedOutput = '';
   let lastReportedProgress = '';
@@ -206,8 +208,16 @@ function gitProgressReporter(
 
     lastReportedProgress = progressText;
     lastReportedAt = now;
-    progress?.(step, `${prefix} ${progressText}`);
+    report(progressText);
   };
+}
+
+function gitProgressReporter(
+  progress: BootstrapProgress | undefined,
+  step: 'cloning' | 'branch',
+  prefix: string
+): (stream: ProcessOutputStream, output: string) => void {
+  return createGitProgressReporter(progressText => progress?.(step, `${prefix} ${progressText}`));
 }
 
 function longGitOptions(
@@ -683,7 +693,7 @@ async function writeCloudAgentRules(request: WrapperSessionReadyRequest): Promis
   await fs.mkdir(rulesDir, { recursive: true });
   await fs.writeFile(
     path.join(rulesDir, 'cloud-agent.md'),
-    buildCloudAgentRules(request.agentSessionId)
+    buildCloudAgentRules(process.env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS)
   );
 }
 
@@ -1375,7 +1385,6 @@ async function prepareWrapperBootstrapWorkspaceWithinDeadline(
       const incomplete = restoreTelemetry
         ? await reportRestoreIncomplete({
             diffs: restoreTelemetry.diffs ?? { applied: 0, skipped: 0, total: 0 },
-            sessionHome: request.workspace.sessionHome,
             identity: `kiloSessionId=${request.kiloSessionId} wrapperRunId=${request.session.wrapperRunId} wrapperGeneration=${request.session.wrapperGeneration}`,
             log: logToFile,
             step: {

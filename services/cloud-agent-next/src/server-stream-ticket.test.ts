@@ -93,14 +93,6 @@ vi.mock('./persistence/CloudAgentSession.js', () => ({
   CloudAgentSession: class CloudAgentSession {},
 }));
 
-vi.mock('./persistence/SandboxControl.js', () => ({
-  SandboxControl: class SandboxControl {},
-}));
-
-vi.mock('./sandbox-session/SandboxSession.js', () => ({
-  SandboxSession: class SandboxSession {},
-}));
-
 vi.mock('@kilocode/db/client', () => ({
   getWorkerDb: () => ({
     select: () => ({

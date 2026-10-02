@@ -18,6 +18,7 @@ permissions:
 
 jobs:
   build-artifacts:
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     env:
@@ -86,8 +87,9 @@ jobs:
   bump-version:
     needs: build-artifacts
     # Only a main dispatch bumps: a branch dispatch would open a PR carrying
-    # unrelated commits.
-    if: github.ref == 'refs/heads/main'
+    # unrelated commits. Also guarded to the canonical repo: a fork dispatch
+    # would otherwise push a bump branch and open a PR against the fork.
+    if: github.ref == 'refs/heads/main' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:

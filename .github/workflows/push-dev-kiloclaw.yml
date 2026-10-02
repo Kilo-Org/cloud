@@ -9,6 +9,9 @@ permissions:
 
 jobs:
   push-dev:
+    # Guard: this workflow_dispatch builds and pushes a container image to
+    # Fly and GHCR using repo secrets. Only the canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Build & Push Dev Image

@@ -16,6 +16,7 @@ import { bead_dependencies } from '../../db/tables/bead-dependencies.table';
 import { agent_nudges } from '../../db/tables/agent-nudges.table';
 import { review_metadata } from '../../db/tables/review-metadata.table';
 import { query } from '../../util/query.util';
+import { now } from '../../util/time.util';
 import * as beadOps from './beads';
 import * as agentOps from './agents';
 import * as reviewQueue from './review-queue';
@@ -432,10 +433,6 @@ function nextPollCounterState(error: PRStatusError, current: PollCounterState): 
     pollNonTransientCount,
     shouldFail: pollNonTransientCount >= PR_POLL_NON_TRANSIENT_THRESHOLD,
   };
-}
-
-function now(): string {
-  return new Date().toISOString();
 }
 
 /**

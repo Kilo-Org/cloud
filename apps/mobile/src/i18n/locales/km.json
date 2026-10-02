@@ -215,7 +215,6 @@
     "showBalance": "បង្ហាញសមតុល្យ",
     "balanceHidden": "សមតុល្យត្រូវបានលាក់",
     "bonusCreditsExpiring": "ឥណទានបន្ថែមចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}}។",
-    "creditBalanceEmpty": "អ្នកអស់ឥណទានហើយ។ សម្រាប់គណនីនេះ អ្នកត្រូវគ្រប់គ្រងឥណទាននៅខាងក្រៅកម្មវិធី iOS។",
     "signOutTitle": "ចេញពីគណនី?",
     "signOutMessage": "អ្នកត្រូវចូលគណនីម្តងទៀត ដើម្បីប្រើកន្លែងធ្វើការរបស់អ្នក។",
     "deleteAccountTitle": "លុបគណនី?",
@@ -241,6 +240,7 @@
     "addPasskey": "បន្ថែមកូនសោចូល",
     "passkeyDefaultName": "កូនសោចូល",
     "passkeyAddedOn": "បានបន្ថែម {{date}}",
+    "passkeyLastUsedOn": "ប្រើប្រាស់ចុងក្រោយ {{date}}",
     "passkeyAdded": "បានបន្ថែមកូនសោចូល។",
     "passkeyAddFailed": "មិនអាចបន្ថែមកូនសោចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "passkeyAddUnsupported": "ឧបករណ៍នេះមិនអាចបង្កើតកូនសោចូលបានទេ។",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "ឈ្មោះវគ្គ",
       "transcriptAccessibility": "កំណត់ត្រាសន្ទនារបស់វគ្គ",
       "readOnly": "វគ្គនេះអាចបានត្រឹមតែអានប៉ុណ្ណោះ។",
+      "continueInNewSession": "បន្តនៅក្នុងវគ្គថ្មី",
       "emptyDescription": "ផ្ញើសារខាងក្រោម ដើម្បីចាប់ផ្តើម។",
       "scrollToBottom": "រំកិលទៅខាងក្រោមបំផុត",
       "emptyTitle": "មិនទាន់មានសារទេ",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",
+      "selectRepositoryToStart": "ដើម្បីចាប់ផ្តើម សូមជ្រើសរើសឃ្លាំងកូដ។",
+      "connectProviderToStart": "ដើម្បីចាប់ផ្តើម សូមភ្ជាប់អ្នកផ្តល់សេវា។",
       "promptPlaceholder": "តើអ្នកចង់ធ្វើការលើអ្វី?",
       "couldNotLoadModels": "មិនអាចផ្ទុកម៉ូដែលបានទេ។",
       "prefillRepoAndModelUnavailable": "ឃ្លាំងកូដ និងម៉ូដែលរបស់វគ្គដើមលែងអាចប្រើបានទៀតហើយ។ សូមជ្រើសរើសឃ្លាំងកូដ និងម៉ូដែលខាងក្រោម។",
@@ -3444,5 +3447,17 @@
       "unboundToast": "បានផ្ដាច់ចំណង repo។",
       "unbindFailed": "មិនអាចផ្ដាច់ repo បានទេ។"
     }
+  },
+  "credits": {
+    "title": "ទិញឥណទាន",
+    "description": "ឥណទានគឺជាការទិញតែម្តងដែលបន្ថែមទៅសមតុល្យ Kilo របស់អ្នកសម្រាប់ដំណើរការវគ្គសរសេរកូដ AI នៅក្នុង Kilo App។ ហាងគិតប្រាក់ពីគណនីរបស់អ្នក ហើយឥណទានត្រូវបានបន្ថែមបន្ទាប់ពីហាងបញ្ជាក់ការបង់ប្រាក់។",
+    "packLabel": "បន្ថែមឥណទាន {{amount}}",
+    "priceUnavailable": "តម្លៃមិនអាចប្រើបានទេ",
+    "purchased": "ឥណទានត្រូវបានបន្ថែមទៅសមតុល្យរបស់អ្នក។",
+    "empty": "កញ្ចប់ឥណទានមិនអាចប្រើបាននៅពេលនេះទេ។",
+    "noMatchingProducts": "App Store មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
+    "noMatchingProductsPlay": "Google Play មិនបានត្រឡប់កញ្ចប់ឥណទានដែលត្រូវគ្នាទេ។",
+    "purchaseOwnedByAnotherAccount": "ឥណទាននៅលើ Apple Account នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។",
+    "purchaseOwnedByAnotherAccountPlay": "ឥណទាននៅលើគណនី Google Play នេះជារបស់គណនី Kilo ផ្សេង។ ចូលគណនី Kilo នោះដើម្បីប្រើវា។"
   }
 }

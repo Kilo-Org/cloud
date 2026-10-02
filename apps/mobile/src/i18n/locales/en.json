@@ -215,7 +215,6 @@
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
     "bonusCreditsExpiring": "{{amount}} in bonus credits expiring {{date}}",
-    "creditBalanceEmpty": "Your credit balance is empty. Credits are managed outside the iOS app for this account.",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -241,6 +240,7 @@
     "addPasskey": "Add a passkey",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Added {{date}}",
+    "passkeyLastUsedOn": "Last used {{date}}",
     "passkeyAdded": "Passkey added.",
     "passkeyAddFailed": "Could not add a passkey. Try again.",
     "passkeyAddUnsupported": "This device cannot create passkeys.",
@@ -2105,6 +2105,7 @@
       "renamePlaceholder": "Session name",
       "transcriptAccessibility": "Session transcript",
       "readOnly": "This is a read-only session",
+      "continueInNewSession": "Continue in a new session",
       "emptyDescription": "Send a message below to get started.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
@@ -2195,6 +2196,8 @@
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
+      "selectRepositoryToStart": "Select a repository to start.",
+      "connectProviderToStart": "Connect a provider to start.",
       "promptPlaceholder": "What would you like to work on?",
       "couldNotLoadModels": "Couldn't load models",
       "prefillRepoAndModelUnavailable": "The original session's repository and model are no longer available. Pick them below.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo unbound",
       "unbindFailed": "Couldn't unbind repo"
     }
+  },
+  "credits": {
+    "title": "Buy credits",
+    "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
+    "packLabel": "Add {{amount}} of credits",
+    "priceUnavailable": "Price unavailable",
+    "purchased": "Credits added to your balance.",
+    "empty": "Credit packs are unavailable right now.",
+    "noMatchingProducts": "No matching credit packs were returned by App Store.",
+    "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
+    "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
+    "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   }
 }

@@ -24,6 +24,7 @@ import {
 } from './sandbox-runtime.js';
 import { KILO_AGENT_SESSION_LABEL, type DevContainerHandle } from './devcontainer.js';
 import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
+import { KILO_BASH_DEFAULT_TIMEOUT_MS_DEFAULT } from '../shared/kilo-bash-timeout.js';
 import { shellQuote, validShellEnvEntries } from './utils.js';
 import {
   restoreIncompleteLogFields,
@@ -258,7 +259,7 @@ const KILO_SERVER_ENV_KEY_SET = new Set<string>(KILO_SERVER_ENV_KEYS);
  * sandboxes. Keeps stalled commands well inside the 330 s wrapper no-output
  * liveness deadline; the `kiloServerEnv` passthrough overrides it when set.
  */
-const KILO_BASH_DEFAULT_TIMEOUT_MS = '240000';
+const KILO_BASH_DEFAULT_TIMEOUT_MS = String(KILO_BASH_DEFAULT_TIMEOUT_MS_DEFAULT);
 
 function healthMatchesLease(
   health: WrapperHealthResponse,

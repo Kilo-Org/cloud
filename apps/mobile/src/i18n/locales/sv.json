@@ -215,7 +215,6 @@
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
     "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
-    "creditBalanceEmpty": "Du har inga krediter kvar. För det här kontot hanteras krediter utanför iOS-appen.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -241,6 +240,7 @@
     "addPasskey": "Lägg till en passnyckel",
     "passkeyDefaultName": "Passnyckel",
     "passkeyAddedOn": "Tillagd {{date}}",
+    "passkeyLastUsedOn": "Senast använd {{date}}",
     "passkeyAdded": "Passnyckel tillagd.",
     "passkeyAddFailed": "Det gick inte att lägga till en passnyckel. Försök igen.",
     "passkeyAddUnsupported": "Den här enheten kan inte skapa passnycklar.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Sessionens namn",
       "transcriptAccessibility": "Meddelandehistorik",
       "readOnly": "Den här sessionen är skrivskyddad.",
+      "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
+      "selectRepositoryToStart": "Välj ett kodarkiv för att starta.",
+      "connectProviderToStart": "Anslut en leverantör för att starta.",
       "promptPlaceholder": "Vad vill du arbeta med?",
       "couldNotLoadModels": "Det gick inte att läsa in modellerna.",
       "prefillRepoAndModelUnavailable": "Den ursprungliga sessionens kodarkiv och modell är inte längre tillgängliga. Välj ett nytt kodarkiv och en ny modell nedan.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo obundet",
       "unbindFailed": "Det gick inte att koppla upp repor"
     }
+  },
+  "credits": {
+    "title": "Köp krediter",
+    "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
+    "packLabel": "Lägg till {{amount}} i krediter",
+    "priceUnavailable": "Priset är inte tillgängligt",
+    "purchased": "Krediter har lagts till på ditt saldo.",
+    "empty": "Kreditpaket är inte tillgängliga just nu.",
+    "noMatchingProducts": "App Store returnerade inga matchande kreditpaket.",
+    "noMatchingProductsPlay": "Google Play returnerade inga matchande kreditpaket.",
+    "purchaseOwnedByAnotherAccount": "Krediterna på detta Apple-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediterna på detta Google Play-konto tillhör ett annat Kilo-konto. Logga in på det Kilo-kontot för att använda dem."
   }
 }

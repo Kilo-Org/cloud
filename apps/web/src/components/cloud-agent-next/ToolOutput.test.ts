@@ -81,6 +81,25 @@ describe('ToolCodeBlock', () => {
     expect(html).toContain('aria-busy="true"');
     expect(html).toContain('aria-label="Copy output"');
   });
+
+  it('overrides the height window without dropping content or copy access', () => {
+    const content = 'line\n'.repeat(120) + 'tail';
+    const html = renderToStaticMarkup(
+      React.createElement(ToolCodeBlock, {
+        content,
+        label: 'Output',
+        compact: true,
+        isStreaming: true,
+        maxHeightClassName: 'max-h-24',
+      })
+    );
+
+    expect(html).toContain('max-h-24');
+    expect(html).not.toContain('max-h-80');
+    expect(html).toContain('aria-label="Copy output"');
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain('tail</code>');
+  });
 });
 
 describe('ToolMarkdown', () => {

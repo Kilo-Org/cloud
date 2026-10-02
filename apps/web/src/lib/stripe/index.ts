@@ -17,8 +17,9 @@ import {
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, ne, not, or, sql } from 'drizzle-orm';
 import { randomUUID } from 'crypto';
-import type { FraudDetectionHeaders } from '@/lib/utils';
-import { EmptyFraudDetectionHeaders, toNonNullish } from '@/lib/utils';
+import type { FraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+import { toNonNullish } from '@/lib/utils';
 import { logExceptInTest, sentryLogger, warnExceptInTest } from '@/lib/utils.server';
 import { APP_URL } from '@/lib/constants';
 import {
@@ -27,6 +28,9 @@ import {
   SYSTEM_AUTO_TOP_UP_USER_ID,
 } from '@/lib/autoTopUpConstants';
 import { findUserByStripeCustomerId } from '@/lib/user';
+import { findOrganizationByStripeCustomerId } from '@/lib/organizations/organizations';
+import { reportCreditEvent, type CreditEvent, type StoreCreditEvent } from '@/lib/bouncer/client';
+import { reportChargeAttempted, type ChargeAttemptContext } from '@/lib/bouncer/credit-events';
 import type { UnifiedInvoice } from '@/types/billing';
 import type { StripeConfig } from '@/lib/credits';
 import { processTopUp } from '@/lib/credits';
@@ -67,6 +71,10 @@ import {
   type OrganizationKiloPassSeatCapacityStripe,
   type PreparedOrganizationKiloPassSeatCapacityFee,
 } from '@/lib/kilo-pass-org/stripe-adapter';
+import {
+  releaseCancellationSchedule,
+  scheduleToReleaseBeforeSeatUpdate,
+} from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getKiloPassMetadataFromStripeMetadata } from '@/lib/kilo-pass/stripe-handlers-metadata';
 import {
   handleKiloClawSubscriptionCreated,
@@ -84,7 +92,6 @@ import {
   KiloPassPaymentProvider,
 } from '@kilocode/db/schema-types';
 import { invoiceLooksLikeKiloClawByPriceId } from '@/lib/kiloclaw/stripe-invoice-classifier.server';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import {
   STRIPE_TEAMS_MONTHLY_PRICE_ID,
   STRIPE_TEAMS_ANNUAL_PRICE_ID,
@@ -93,6 +100,7 @@ import {
 } from '@/lib/config.server';
 import type { OrganizationPlan, BillingCycle } from '@/lib/organizations/organization-types';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
+import { annualTotal, seatPrice } from '@/lib/organizations/constants';
 import { successResult } from '@/lib/maybe-result';
 import { observeStripeEarlyFraudWarningCreated } from '@/lib/stripe/early-fraud-warning';
 import { observeStripeDisputeCreated } from '@/lib/stripe/disputes';
@@ -127,11 +135,6 @@ type KiloClawChargeContext = {
 type AffiliateDisputeSaleKind = 'kiloclaw' | 'kilo-pass';
 
 type StripeReference = string | { id: string } | null | undefined;
-
-type StripeChargeBackedAbuseEventType =
-  | 'stripe.charge.dispute.created'
-  | 'stripe.charge.dispute.funds_withdrawn'
-  | 'stripe.radar.early_fraud_warning.created';
 
 type AffiliateDisputeChargeContext = KiloClawChargeContext & {
   saleKind: AffiliateDisputeSaleKind;
@@ -200,55 +203,126 @@ function stripeReferenceId(reference: StripeReference): string | undefined {
   return reference?.id || undefined;
 }
 
-function omitUndefinedValues(data: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
+type BouncerCreditOwner = { userId: string; orgId: string | null };
+
+/**
+ * Resolves the bouncer payer for a webhook charge or invoice: the metadata actor/org when present,
+ * else the Stripe-customer mapping the dispute and early-fraud-warning observers use. Returns null
+ * when no owner resolves, in which case callers skip the bouncer event.
+ */
+async function resolveBouncerCreditOwner(params: {
+  kiloUserId?: string | null;
+  organizationId?: string | null;
+  customer?: StripeReference;
+}): Promise<BouncerCreditOwner | null> {
+  if (params.organizationId) {
+    const organizationRow = params.kiloUserId
+      ? null
+      : (
+          await db
+            .select({ actorUserId: organizations.created_by_kilo_user_id })
+            .from(organizations)
+            .where(eq(organizations.id, params.organizationId))
+            .limit(1)
+        )[0];
+    const actorUserId = params.kiloUserId ?? organizationRow?.actorUserId ?? null;
+    return actorUserId ? { userId: actorUserId, orgId: params.organizationId } : null;
+  }
+  if (params.kiloUserId) {
+    return { userId: params.kiloUserId, orgId: null };
+  }
+  const customerId = stripeReferenceId(params.customer);
+  if (!customerId) {
+    return null;
+  }
+  const user = await findUserByStripeCustomerId(customerId);
+  if (user) {
+    return { userId: user.id, orgId: null };
+  }
+  const organization = await findOrganizationByStripeCustomerId(customerId);
+  return organization?.created_by_kilo_user_id
+    ? { userId: organization.created_by_kilo_user_id, orgId: organization.id }
+    : null;
 }
 
-async function reportChargeBackedStripeAbuseEvent(params: {
-  abuseEventType: StripeChargeBackedAbuseEventType;
-  eventId: string;
-  stripeEventType: string;
-  occurredAt: number;
-  charge: StripeReference;
-  paymentIntent?: StripeReference;
-  data: Record<string, unknown>;
-  preFetchedCharge?: Stripe.Charge | null;
-}) {
-  const chargeId = stripeReferenceId(params.charge);
-  let charge: Stripe.Charge | null = params.preFetchedCharge ?? null;
+/** A credit event without its payer: `reportWebhookCreditEvent` resolves the payer. */
+type WebhookCreditEvent =
+  Exclude<CreditEvent, StoreCreditEvent> extends infer Event
+    ? Event extends CreditEvent
+      ? Omit<Event, 'userId' | 'orgId'>
+      : never
+    : never;
 
-  if (params.preFetchedCharge === undefined && chargeId) {
-    try {
-      charge = await client.charges.retrieve(chargeId);
-    } catch (error) {
-      captureException(error, {
-        tags: { source: 'stripe_abuse_event_enrichment' },
-        extra: {
-          stripe_event_id: params.eventId,
-          stripe_event_type: params.stripeEventType,
-          charge_id: chargeId,
-        },
-      });
-    }
+/**
+ * Resolves the payer and reports one webhook outcome to bouncer. It never throws: the owner
+ * lookup reads the database, and a bouncer failure must not fail the Stripe webhook, which would
+ * make Stripe retry and skip the entitlement work later in the same delivery. When the event has
+ * no card fingerprint, `fingerprintChargeId` names a charge to read it from, inside the guard.
+ */
+async function reportWebhookCreditEvent(
+  owner: Parameters<typeof resolveBouncerCreditOwner>[0],
+  event: WebhookCreditEvent,
+  fingerprintChargeId?: string | null
+): Promise<void> {
+  try {
+    const payer = await resolveBouncerCreditOwner(owner);
+    if (!payer) return;
+    const cardFingerprint =
+      event.cardFingerprint ??
+      (fingerprintChargeId ? await bouncerCardFingerprintForChargeId(fingerprintChargeId) : null);
+    await reportCreditEvent({
+      ...event,
+      cardFingerprint,
+      userId: payer.userId,
+      orgId: payer.orgId,
+    });
+  } catch (error) {
+    captureException(error, { tags: { source: 'bouncer_webhook_credit_event' } });
   }
+}
 
-  void reportEvents({
-    events: [
-      {
-        type: params.abuseEventType,
-        occurred_at: params.occurredAt,
-        data: omitUndefinedValues({
-          id: params.eventId,
-          type: params.stripeEventType,
-          charge: chargeId,
-          customer: stripeReferenceId(charge?.customer),
-          payment_intent:
-            stripeReferenceId(params.paymentIntent) ?? stripeReferenceId(charge?.payment_intent),
-          ...params.data,
-        }),
-      },
-    ],
-  }).catch(captureException);
+/** The card fingerprint of a charge, or null when the charge cannot be read. */
+async function bouncerCardFingerprintForChargeId(chargeId: string): Promise<string | null> {
+  try {
+    const charge = await client.charges.retrieve(chargeId);
+    return charge.payment_method_details?.card?.fingerprint ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reports the bouncer `charge.attempted` for an organization seat change, right before the prorated
+ * invoice is paid. The organization comes from the seat subscription metadata.
+ */
+async function reportSeatChangeAttempt(params: {
+  subscription: Stripe.Subscription;
+  amountCents: number;
+  userId: string;
+  ip?: string | null;
+  ipCountry?: string | null;
+}): Promise<void> {
+  const organizationId = params.subscription.metadata?.organizationId;
+  if (!organizationId) {
+    return;
+  }
+  const [organization] = await db
+    .select({ createdAt: organizations.created_at })
+    .from(organizations)
+    .where(eq(organizations.id, organizationId))
+    .limit(1);
+  if (!organization) {
+    return;
+  }
+  reportChargeAttempted({
+    flow: 'seats',
+    userId: params.userId,
+    orgId: organizationId,
+    amountCents: params.amountCents,
+    accountCreatedAt: organization.createdAt,
+    ip: params.ip,
+    ipCountry: params.ipCountry,
+  });
 }
 
 if (!APP_URL) throw new Error('APP_URL constant is not set');
@@ -649,14 +723,17 @@ async function handleOrgAutoTopUpSetup(
     .where(eq(organizations.id, organizationId));
 }
 
-async function handleSuccessfulCharge(event: Stripe.ChargeSucceededEvent) {
+async function handleSuccessfulCharge(
+  event: Stripe.ChargeSucceededEvent
+): Promise<Stripe.PaymentIntent> {
   const paymentIntentUnion = toNonNullish(event.data.object.payment_intent);
   const paymentIntent =
     typeof paymentIntentUnion === 'string'
       ? await client.paymentIntents.retrieve(paymentIntentUnion, { expand: ['payment_method'] })
       : paymentIntentUnion;
 
-  return await handleSuccessfulChargeWithPayment(event.data.object, paymentIntent);
+  await handleSuccessfulChargeWithPayment(event.data.object, paymentIntent);
+  return paymentIntent;
 }
 
 export async function handleSuccessfulChargeWithPayment(
@@ -948,26 +1025,8 @@ async function handlePaymentMethodEvent(
       .where(
         and(eq(payment_methods.stripe_id, paymentMethod.id), eq(payment_methods.user_id, user.id))
       );
-    void reportEvents({
-      events: [
-        {
-          type: 'stripe.payment_method.detached',
-          occurred_at: event.created * 1000,
-          data: { id: event.id, type: event.type, customer: paymentMethod.customer },
-        },
-      ],
-    });
   } else if (event.type === 'payment_method.attached') {
     await ensurePaymentMethodStored(user.id, paymentMethod);
-    void reportEvents({
-      events: [
-        {
-          type: 'stripe.payment_method.attached',
-          occurred_at: event.created * 1000,
-          data: { id: event.id, type: event.type, customer: paymentMethod.customer },
-        },
-      ],
-    });
   } else {
     await ensurePaymentMethodStored(user.id, paymentMethod);
   }
@@ -1052,9 +1111,32 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     // charge.succeeded is for one-time payments, like top-ups
     // this also actually gets called when the user first purchases a subscription as well
-    case 'charge.succeeded':
-      await handleSuccessfulCharge(event);
+    case 'charge.succeeded': {
+      const paymentIntent = await handleSuccessfulCharge(event);
+      const charge = event.data.object;
+      // One payment is reported once: a charge tied to an invoice is reported by the
+      // `invoice.paid` case below, and a standalone charge (the top-up and auto-top-up setup
+      // charges this handler credits) is reported here.
+      const chargeInvoiceId =
+        'invoice' in charge && typeof charge.invoice === 'string' ? charge.invoice : null;
+      if (!chargeInvoiceId) {
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: paymentIntent.metadata.kiloUserId,
+            organizationId: paymentIntent.metadata.organizationId,
+            customer: charge.customer,
+          },
+          {
+            type: 'charge.succeeded',
+            eventId: event.id,
+            occurredAt: new Date(event.created * 1000),
+            cardFingerprint: charge.payment_method_details?.card?.fingerprint,
+            amountCents: charge.amount,
+          }
+        );
+      }
       break;
+    }
 
     case 'invoice.created': {
       const invoice = event.data.object;
@@ -1105,6 +1187,33 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
 
     case 'invoice.paid': {
       const invoice = event.data.object;
+
+      // Bouncer: one `charge.succeeded` per invoice-backed payment (subscription invoices and
+      // auto top-up invoices). A one-time checkout charge has no invoice and is reported by the
+      // `charge.succeeded` case above, so gating on the invoice kind keeps one payment to one event.
+      const isSubscriptionInvoice = invoice.parent?.subscription_details != null;
+      const isAutoTopUpInvoice =
+        invoice.metadata?.type === 'auto-topup' || invoice.metadata?.type === 'org-auto-topup';
+      if (invoice.amount_paid > 0 && (isSubscriptionInvoice || isAutoTopUpInvoice)) {
+        const subscriptionMetadata = invoice.parent?.subscription_details?.metadata;
+        const invoiceChargeId =
+          'charge' in invoice && typeof invoice.charge === 'string' ? invoice.charge : null;
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: invoice.metadata?.kiloUserId ?? subscriptionMetadata?.kiloUserId,
+            organizationId:
+              invoice.metadata?.organizationId ?? subscriptionMetadata?.organizationId,
+            customer: invoice.customer,
+          },
+          {
+            type: 'charge.succeeded',
+            eventId: event.id,
+            occurredAt: new Date(event.created * 1000),
+            amountCents: invoice.amount_paid,
+          },
+          invoiceChargeId
+        );
+      }
 
       // Kilo Pass invoice.paid events should be routed to the Kilo Pass handler first.
       // If it is a Kilo Pass invoice, no other invoice.paid handler should run.
@@ -1294,16 +1403,17 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         dispute,
       });
 
-      void reportChargeBackedStripeAbuseEvent({
-        abuseEventType: 'stripe.charge.dispute.created',
-        eventId: event.id,
-        stripeEventType: event.type,
-        occurredAt: event.created * 1000,
-        charge: chargeId,
-        paymentIntent: dispute.payment_intent,
-        data: { dispute: dispute.id },
-        preFetchedCharge: disputeCharge,
-      });
+      // Bouncer: report the dispute against the payer the disputed charge resolved to.
+      await reportWebhookCreditEvent(
+        { customer: disputeCharge?.customer },
+        {
+          type: 'charge.disputed',
+          eventId: event.id,
+          occurredAt: new Date(event.created * 1000),
+          cardFingerprint: disputeCharge?.payment_method_details?.card?.fingerprint ?? null,
+          disputeId: dispute.id,
+        }
+      );
 
       if (!chargeId) {
         break;
@@ -1358,11 +1468,28 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
           dispute,
         });
       }
-      await syncStripeDisputeCaseFromWebhook({
+      const { disputeCharge } = await syncStripeDisputeCaseFromWebhook({
         eventId: event.id,
         eventCreated: event.created,
         dispute,
       });
+
+      // Bouncer: a won dispute clears the payer's fraud history. `charge.dispute.closed` is the
+      // canonical terminal event (Stripe also emits `charge.dispute.updated` for the same status
+      // change), so reporting only on `closed` keeps one win to one event. Reuse the disputed
+      // charge so the win repeats the same payer and card as `charge.disputed`.
+      if (event.type === 'charge.dispute.closed' && dispute.status === 'won') {
+        await reportWebhookCreditEvent(
+          { customer: disputeCharge?.customer },
+          {
+            type: 'charge.dispute_won',
+            eventId: event.id,
+            occurredAt: new Date(event.created * 1000),
+            cardFingerprint: disputeCharge?.payment_method_details?.card?.fingerprint ?? null,
+            disputeId: dispute.id,
+          }
+        );
+      }
       break;
     }
 
@@ -1648,75 +1775,54 @@ export async function processStripePaymentEventHook(event: Stripe.Event) {
         store: createServiceFeeStores().assessments,
         dispute,
       });
-      void reportChargeBackedStripeAbuseEvent({
-        abuseEventType: 'stripe.charge.dispute.funds_withdrawn',
-        eventId: event.id,
-        stripeEventType: event.type,
-        occurredAt: event.created * 1000,
-        charge: dispute.charge,
-        paymentIntent: dispute.payment_intent,
-        data: { dispute: dispute.id },
-      });
       break;
     }
 
     case 'radar.early_fraud_warning.created': {
       const earlyFraudWarning = event.data.object;
-      const observedCharge = await observeStripeEarlyFraudWarningCreated({
+      const warnedCharge = await observeStripeEarlyFraudWarningCreated({
         eventId: event.id,
         eventCreated: event.created,
         earlyFraudWarning,
       });
-      void reportChargeBackedStripeAbuseEvent({
-        abuseEventType: 'stripe.radar.early_fraud_warning.created',
-        eventId: event.id,
-        stripeEventType: event.type,
-        occurredAt: event.created * 1000,
-        charge: earlyFraudWarning.charge,
-        paymentIntent: earlyFraudWarning.payment_intent,
-        data: { early_fraud_warning: earlyFraudWarning.id },
-        preFetchedCharge: observedCharge,
-      });
+      // Bouncer: skip when the warning's charge could not be read, so no owner resolves.
+      if (warnedCharge) {
+        await reportWebhookCreditEvent(
+          {
+            kiloUserId: warnedCharge.metadata?.kiloUserId,
+            organizationId: warnedCharge.metadata?.organizationId,
+            customer: warnedCharge.customer,
+          },
+          {
+            type: 'charge.early_fraud_warning',
+            eventId: event.id,
+            occurredAt: new Date(event.created * 1000),
+            cardFingerprint: warnedCharge.payment_method_details?.card?.fingerprint ?? null,
+          }
+        );
+      }
       break;
     }
 
     case 'charge.failed': {
       const charge = event.data.object;
-      void reportEvents({
-        events: [
-          {
-            type: 'stripe.charge.failed',
-            occurred_at: event.created * 1000,
-            data: omitUndefinedValues({
-              id: event.id,
-              type: event.type,
-              charge: charge.id,
-              customer: stripeReferenceId(charge.customer),
-              decline_code: charge.failure_code ?? charge.outcome?.reason,
-            }),
-          },
-        ],
-      });
+      await reportWebhookCreditEvent(
+        {
+          kiloUserId: charge.metadata?.kiloUserId,
+          organizationId: charge.metadata?.organizationId,
+          customer: charge.customer,
+        },
+        {
+          type: 'charge.failed',
+          eventId: event.id,
+          occurredAt: new Date(event.created * 1000),
+          cardFingerprint: charge.payment_method_details?.card?.fingerprint ?? null,
+        }
+      );
       break;
     }
 
     case 'payment_intent.succeeded': {
-      const paymentIntent = event.data.object;
-      void reportEvents({
-        events: [
-          {
-            type: 'stripe.payment_intent.succeeded',
-            occurred_at: event.created * 1000,
-            data: omitUndefinedValues({
-              id: event.id,
-              type: event.type,
-              payment_intent: paymentIntent.id,
-              customer: stripeReferenceId(paymentIntent.customer),
-              amount: paymentIntent.amount_received ?? paymentIntent.amount,
-            }),
-          },
-        ],
-      });
       break;
     }
 
@@ -1815,7 +1921,9 @@ export async function getStripeTopUpCheckoutUrl(
   origin: string = 'web',
   organizationId?: string | null,
   /** Optional internal path to redirect to when the user cancels checkout. */
-  cancelPath?: string | null
+  cancelPath?: string | null,
+  /** Bouncer context; omit it to create the session without a `charge.attempted` report. */
+  attempt?: ChargeAttemptContext
 ): Promise<string | null> {
   const feeDeps = createStripeTopUpFeeDeps();
   const defaultPriceId = amount ? null : getEnvVariable('STRIPE_TOP_UP_PRICE_ID');
@@ -1860,6 +1968,20 @@ export async function getStripeTopUpCheckoutUrl(
     taxPrincipal: defaultPriceId ? { kind: 'price', priceId: defaultPriceId } : { kind: 'inline' },
     deps: feeDeps,
   });
+
+  if (attempt) {
+    reportChargeAttempted({
+      flow: 'topup',
+      userId: kiloUserId,
+      orgId: organizationId,
+      amountCents: principalMinor,
+      accountCreatedAt: attempt.accountCreatedAt,
+      ip: attempt.ip,
+      ipCountry: attempt.ipCountry,
+      cardFingerprint: attempt.cardFingerprint,
+      cardCountry: attempt.cardCountry,
+    });
+  }
 
   const checkoutSession = await createTopUpCheckoutSession({
     prepared,
@@ -1932,6 +2054,8 @@ type GetStripeCheckoutUrlProps = {
   cancelUrl: string;
   plan: OrganizationPlan;
   billingCycle: BillingCycle;
+  /** Bouncer context; omit it to create the session without a `charge.attempted` report. */
+  attempt?: ChargeAttemptContext;
 };
 
 const assertNever = (x: never): never => {
@@ -2004,6 +2128,22 @@ export async function getStripeSeatsCheckoutUrl(
     ];
 
     const successUrl = `${process.env.NEXTAUTH_URL}/payments/subscriptions/success?organizationId=${organizationId}&${STRIPE_SUB_QUERY_STRING_KEY}={CHECKOUT_SESSION_ID}`;
+
+    if (props.attempt) {
+      reportChargeAttempted({
+        flow: 'seats',
+        userId: kiloUserId,
+        orgId: organizationId,
+        // `seatPrice` is a per-month rate for both cycles; an annual checkout charges the year.
+        amountCents:
+          Math.round(
+            (billingCycle === 'annual' ? annualTotal(plan) : seatPrice(plan, billingCycle)) * 100
+          ) * quantity,
+        accountCreatedAt: props.attempt.accountCreatedAt,
+        ip: props.attempt.ip,
+        ipCountry: props.attempt.ipCountry,
+      });
+    }
 
     const checkoutSession = await client.checkout.sessions.create({
       mode: 'subscription',
@@ -2162,7 +2302,12 @@ export async function handleUpdateSeatCount(
   subscriptionStripeId: string,
   newSeatCount: number,
   currentSeatCount: number,
-  feeDeps: UpdateSeatCountServiceFeeDependencies = {}
+  feeDeps: UpdateSeatCountServiceFeeDependencies = {},
+  attempt?: {
+    userId: string;
+    ip?: string | null;
+    ipCountry?: string | null;
+  }
 ): Promise<UpdateSeatCountResult> {
   const isIncreasingSeats = currentSeatCount < newSeatCount;
   const idempotencyKey = `sub-update-${randomUUID()}`;
@@ -2196,6 +2341,11 @@ export async function handleUpdateSeatCount(
   }
   const paidSeatQuantity = rawPaidQuantity;
   const organizationPassItem = resolveSeatUpdateOrganizationPassItem(subscription);
+  const scheduleToRelease = await scheduleToReleaseBeforeSeatUpdate({
+    subscription,
+    paidSeatItem,
+    passItem: organizationPassItem,
+  });
 
   let prepared: PreparedOrganizationKiloPassSeatCapacityFee = {
     prorationDate,
@@ -2251,6 +2401,7 @@ export async function handleUpdateSeatCount(
   try {
     const locked = await db.transaction(async tx => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${subscriptionStripeId}))`);
+      if (scheduleToRelease) await releaseCancellationSchedule(scheduleToRelease);
       const updated = await client.subscriptions.update(
         subscriptionStripeId,
         {
@@ -2327,6 +2478,18 @@ export async function handleUpdateSeatCount(
       // Finalize if draft
       if (invoiceObj.status === 'draft') {
         invoiceObj = await client.invoices.finalizeInvoice(invoiceObj.id);
+      }
+
+      if (attempt) {
+        // Not awaited: bouncer's org lookup must not delay the charge, and its failure must not
+        // look like a payment failure to the catch below.
+        void reportSeatChangeAttempt({
+          subscription: updatedSubscription,
+          amountCents: invoiceObj.amount_due,
+          userId: attempt.userId,
+          ip: attempt.ip,
+          ipCountry: attempt.ipCountry,
+        }).catch(() => undefined);
       }
 
       // Attempt to pay the invoice - this will create a PaymentIntent and attempt charge

@@ -215,7 +215,6 @@
     "showBalance": "Sýna inneign",
     "balanceHidden": "Inneign falin",
     "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
-    "creditBalanceEmpty": "Þú átt enga inneign. Inneign þessa reiknings er stjórnað utan iOS-forritsins.",
     "signOutTitle": "Skrá út?",
     "signOutMessage": "Þú þarft að skrá þig aftur inn til að fá aðgang að vinnusvæðinu þínu.",
     "deleteAccountTitle": "Eyða reikningi?",
@@ -241,6 +240,7 @@
     "addPasskey": "Bæta við aðgangslykli",
     "passkeyDefaultName": "Aðgangslykill",
     "passkeyAddedOn": "Bætt við {{date}}",
+    "passkeyLastUsedOn": "Síðast notað {{date}}",
     "passkeyAdded": "Aðgangslykli bætt við.",
     "passkeyAddFailed": "Tókst ekki að bæta við aðgangslykli. Reyndu aftur.",
     "passkeyAddUnsupported": "Þetta tæki getur ekki búið til aðgangslykla.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Lotunafn",
       "transcriptAccessibility": "Samtalsferill lotunnar",
       "readOnly": "Þessi lota er skrifvarin.",
+      "continueInNewSession": "Halda áfram í nýrri lotu",
       "emptyDescription": "Sendu skilaboð hér að neðan til að byrja.",
       "scrollToBottom": "Skruna neðst",
       "emptyTitle": "Engin skilaboð ennþá",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
+      "selectRepositoryToStart": "Veldu kóðasafn til að byrja.",
+      "connectProviderToStart": "Tengdu þjónustuveitanda til að byrja.",
       "promptPlaceholder": "Hvað viltu vinna að?",
       "couldNotLoadModels": "Ekki tókst að hlaða líkönum.",
       "prefillRepoAndModelUnavailable": "Kóðasafn og líkan upprunalegu lotunnar eru ekki lengur tiltæk. Veldu ný hér að neðan.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Geymsla óbundin",
       "unbindFailed": "Ekki tókst að aftengja geymslu"
     }
+  },
+  "credits": {
+    "title": "Kaupa inneign",
+    "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
+    "packLabel": "Bæta við {{amount}} í inneign",
+    "priceUnavailable": "Verð ekki tiltækt",
+    "purchased": "Inneign hefur verið bætt við stöðuna þína.",
+    "empty": "Inneignarpakkar eru ekki tiltækir núna.",
+    "noMatchingProducts": "App Store skilaði engum samsvarandi inneignarpökkum.",
+    "noMatchingProductsPlay": "Google Play skilaði engum samsvarandi inneignarpökkum.",
+    "purchaseOwnedByAnotherAccount": "Inneignin á þessum Apple Account-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana.",
+    "purchaseOwnedByAnotherAccountPlay": "Inneignin á þessum Google Play-reikningi tilheyrir öðrum Kilo-reikningi. Skráðu þig inn á þann Kilo-reikning til að nota hana."
   }
 }

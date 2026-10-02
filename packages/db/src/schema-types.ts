@@ -1331,6 +1331,17 @@ export const CodeReviewAnalyticsCaptureStatus = {
 export type CodeReviewAnalyticsCaptureStatus =
   (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
 
+export const CodeReviewPublicationStatus = {
+  Published: 'published',
+  Unchanged: 'unchanged',
+  Missing: 'missing',
+  Unknown: 'unknown',
+  NotApplicable: 'not_applicable',
+} as const;
+
+export type CodeReviewPublicationStatus =
+  (typeof CodeReviewPublicationStatus)[keyof typeof CodeReviewPublicationStatus];
+
 export const CodeReviewAnalyticsChangeType = {
   BugFix: 'bug_fix',
   Feature: 'feature',
@@ -2251,6 +2262,35 @@ export const CustomLlmDefinitionSchema = z.object({
 });
 
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
+
+export const AutoFreeModelSchema = z.object({
+  model: z.string().trim().min(1),
+  weight: z.number().int().positive(),
+  reasoning: z.object({
+    enabled: z.boolean().optional(),
+    effort: ReasoningEffortSchema.optional(),
+  }),
+});
+
+export type AutoFreeModelConfig = z.infer<typeof AutoFreeModelSchema>;
+
+export const AutoFreeConfigSchema = z.object({
+  models: z.array(AutoFreeModelSchema).superRefine((models, ctx) => {
+    const seen = new Set<string>();
+    for (const [index, { model }] of models.entries()) {
+      if (seen.has(model)) {
+        ctx.addIssue({
+          code: 'custom',
+          message: `Duplicate model "${model}"`,
+          path: [index, 'model'],
+        });
+      }
+      seen.add(model);
+    }
+  }),
+});
+
+export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
 
 // --- StoredModel ---
 

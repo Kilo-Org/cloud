@@ -390,6 +390,10 @@ const NON_ASSISTANT_FAILURE_CLASSIFICATIONS = {
   wrapper_error_before_activity: { responsibility: 'platform', reason: 'wrapper_startup' },
   wrapper_error_after_activity: { responsibility: 'platform', reason: 'wrapper_crash' },
   missing_assistant_reply: { responsibility: 'platform', reason: 'assistant_no_reply' },
+  admission_billing_unavailable: {
+    responsibility: 'platform',
+    reason: 'admission_billing_unavailable',
+  },
   user_interrupt: { responsibility: 'user', reason: 'user_interrupt' },
   container_shutdown: { responsibility: 'platform', reason: 'container_shutdown' },
   system_interrupt: { responsibility: 'platform', reason: 'system_interrupt' },

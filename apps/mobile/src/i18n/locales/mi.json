@@ -215,7 +215,6 @@
     "showBalance": "Whakaaturia te toenga",
     "balanceHidden": "Kua huna te toenga",
     "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni tōmua tāpiri {{amount}}.",
-    "creditBalanceEmpty": "Kua pau ō moni tōmua. Ka whakahaeretia ngā moni tōmua mō tēnei pūkete ki waho o te taupānga iOS.",
     "signOutTitle": "Takiputa?",
     "signOutMessage": "Me takiuru anō koe kia uru ki tō wāhi mahi.",
     "deleteAccountTitle": "Mukua te pūkete?",
@@ -241,6 +240,7 @@
     "addPasskey": "Tāpiri he kī whakauru",
     "passkeyDefaultName": "Kī whakauru",
     "passkeyAddedOn": "I tāpirihia {{date}}",
+    "passkeyLastUsedOn": "I whakamahia whakamutunga {{date}}",
     "passkeyAdded": "Kua tāpirihia te kī whakauru.",
     "passkeyAddFailed": "Kāore i taea te tāpiri he kī whakauru. Whakamātau anō.",
     "passkeyAddUnsupported": "Kāore e taea e tēnei pūrere ngā kī whakauru te hanga.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Te ingoa o te wātū",
       "transcriptAccessibility": "Te tuhinga kōrero o te wātū",
       "readOnly": "Ka taea tēnei wātū te pānui anake.",
+      "continueInNewSession": "Haere tonu i tētahi wātū hou",
       "emptyDescription": "Tukuna he karere ki raro nei hei tīmata.",
       "scrollToBottom": "Panuku ki raro rawa",
       "emptyTitle": "Kāore anō he karere",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
+      "selectRepositoryToStart": "Kōwhiria he putunga waehere hei tīmata.",
+      "connectProviderToStart": "Honoa he kaiwhakarato hei tīmata.",
       "promptPlaceholder": "He aha tāu e hiahia ana ki te mahi?",
       "couldNotLoadModels": "Kāore i taea te uta i ngā tauira.",
       "prefillRepoAndModelUnavailable": "Kāore te putunga waehere me te tauira o te wātū taketake e wātea ana ināianei. Kōwhiria he mea kē ki raro nei.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo kore here",
       "unbindFailed": "Kaore i taea te wete i te repo"
     }
+  },
+  "credits": {
+    "title": "Hoko whiwhinga",
+    "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
+    "packLabel": "Tāpirihia {{amount}} whiwhinga",
+    "priceUnavailable": "Kāore te utu e wātea",
+    "purchased": "Kua tāpirihia ngā whiwhinga ki tō toenga.",
+    "empty": "Kāore ngā pākete whiwhinga e wātea ana i tēnei wā.",
+    "noMatchingProducts": "Kāore te App Store i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "noMatchingProductsPlay": "Kāore Google Play i whakahoki i ētahi pākete whiwhinga ōrite.",
+    "purchaseOwnedByAnotherAccount": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei Apple Account. Whakauru ki taua pūkete Kilo hei whakamahi.",
+    "purchaseOwnedByAnotherAccountPlay": "Nō tētahi atu pūkete Kilo ngā whiwhinga o tēnei pūkete Google Play. Whakauru ki taua pūkete Kilo hei whakamahi."
   }
 }

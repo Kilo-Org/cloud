@@ -1102,6 +1102,7 @@ describe('PartRenderer tool lifecycle', () => {
     { tool: 'codesearch', title: 'CodeSearch' },
     { tool: 'webfetch', title: 'WebFetch' },
     { tool: 'background_process', title: 'Check background process' },
+    { tool: 'schedule_wakeup', title: 'Schedule wakeup' },
     { tool: 'apply_patch', title: 'Apply patch' },
     { tool: 'mcp', title: 'mcp' },
     { tool: 'custom-tool', title: 'custom-tool' },
@@ -1136,6 +1137,8 @@ describe('PartRenderer tool lifecycle', () => {
     'write',
     'bash',
     'background_process',
+    'schedule_wakeup',
+    'cron_list',
     'apply_patch',
     'webfetch',
     'codesearch',
@@ -1155,6 +1158,18 @@ describe('PartRenderer tool lifecycle', () => {
     expect(html).toContain(errorState.error);
     expect(buttons(html)).toHaveLength(0);
     expect(html).not.toContain('animate-spin');
+  });
+
+  it('renders a completed native scheduler tool with no input', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PartRenderer, {
+        part: toolPart('schedule_wakeup', 'Schedule wakeup', completedState),
+      })
+    );
+
+    expect(html).toContain('Schedule wakeup');
+    expect(html).toContain('data-tool-card');
+    expect(html).not.toContain('Failed to render');
   });
 
   it.each([

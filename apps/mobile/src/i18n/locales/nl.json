@@ -215,7 +215,6 @@
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
     "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
-    "creditBalanceEmpty": "Je hebt geen tegoed meer. Het tegoed voor dit account wordt buiten de iOS-app beheerd.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -241,6 +240,7 @@
     "addPasskey": "Een passkey toevoegen",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Toegevoegd op {{date}}",
+    "passkeyLastUsedOn": "Laatst gebruikt {{date}}",
     "passkeyAdded": "Passkey toegevoegd.",
     "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
     "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",
@@ -1584,6 +1584,7 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
+      "continueInNewSession": "Doorgaan in een nieuwe sessie",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
@@ -1674,6 +1675,8 @@
       "leaveChanges": "Niet committen",
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
+      "selectRepositoryToStart": "Selecteer een repository om te starten.",
+      "connectProviderToStart": "Koppel een platform om te starten.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo niet geconsolideerd",
       "unbindFailed": "Kan repository niet ongedaan maken"
     }
+  },
+  "credits": {
+    "title": "Credits kopen",
+    "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "packLabel": "{{amount}} aan credits toevoegen",
+    "priceUnavailable": "Prijs niet beschikbaar",
+    "purchased": "Er zijn credits aan je saldo toegevoegd.",
+    "empty": "Creditpakketten zijn momenteel niet beschikbaar.",
+    "noMatchingProducts": "De App Store heeft geen overeenkomende creditpakketten geretourneerd.",
+    "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
+    "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
+    "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   }
 }

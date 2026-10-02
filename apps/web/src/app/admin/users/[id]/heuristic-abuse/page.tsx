@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { UserAdminHeuristicAbuse } from '@/app/admin/components/UserAdmin/UserAdminHeuristicAbuse';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { redirect } from 'next/navigation';
 import AdminPage from '@/app/admin/components/AdminPage';
 import {

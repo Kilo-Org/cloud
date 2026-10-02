@@ -215,7 +215,6 @@
     "showBalance": "แสดงยอดคงเหลือ",
     "balanceHidden": "ยอดคงเหลือถูกซ่อน",
     "bonusCreditsExpiring": "เครดิตโบนัส {{amount}} จะหมดอายุ {{date}}",
-    "creditBalanceEmpty": "คุณไม่มีเครดิตเหลืออยู่ บัญชีนี้ต้องจัดการเครดิตนอกแอป iOS",
     "signOutTitle": "ออกจากระบบหรือไม่?",
     "signOutMessage": "คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "deleteAccountTitle": "ลบบัญชีหรือไม่?",
@@ -241,6 +240,7 @@
     "addPasskey": "เพิ่มพาสคีย์",
     "passkeyDefaultName": "พาสคีย์",
     "passkeyAddedOn": "เพิ่มเมื่อ {{date}}",
+    "passkeyLastUsedOn": "ใช้ล่าสุด {{date}}",
     "passkeyAdded": "เพิ่มพาสคีย์แล้ว",
     "passkeyAddFailed": "เพิ่มพาสคีย์ไม่สำเร็จ ลองอีกครั้ง",
     "passkeyAddUnsupported": "อุปกรณ์นี้สร้างพาสคีย์ไม่ได้",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "ชื่อเซสชัน",
       "transcriptAccessibility": "บันทึกการสนทนาของเซสชัน",
       "readOnly": "เซสชันนี้เปิดให้อ่านได้อย่างเดียว",
+      "continueInNewSession": "ดำเนินการต่อในเซสชันใหม่",
       "emptyDescription": "ส่งข้อความด้านล่างเพื่อเริ่มต้น",
       "scrollToBottom": "เลื่อนไปด้านล่าง",
       "emptyTitle": "ยังไม่มีข้อความ",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
+      "selectRepositoryToStart": "เลือกคลังโค้ดเพื่อเริ่มต้น",
+      "connectProviderToStart": "เชื่อมต่อผู้ให้บริการเพื่อเริ่มต้น",
       "promptPlaceholder": "อยากทำงานอะไร?",
       "couldNotLoadModels": "ไม่สามารถโหลดโมเดลได้",
       "prefillRepoAndModelUnavailable": "คลังโค้ดและโมเดลของเซสชันเดิมใช้ไม่ได้แล้ว เลือกคลังโค้ดและโมเดลใหม่ด้านล่าง",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo ไม่ถูกผูกไว้",
       "unbindFailed": "ไม่สามารถเลิกผูก repo ได้"
     }
+  },
+  "credits": {
+    "title": "ซื้อเครดิต",
+    "description": "เครดิตคือการซื้อครั้งเดียวที่เพิ่มเข้าสู่ยอดคงเหลือ Kilo ของคุณสำหรับการรันเซสชันการเขียนโค้ด AI ใน Kilo App สโตร์เรียกเก็บเงินจากบัญชีของคุณ และเครดิตจะถูกเพิ่มหลังจากที่สโตร์ยืนยันการชำระเงิน",
+    "packLabel": "เพิ่มเครดิต {{amount}}",
+    "priceUnavailable": "ไม่มีราคา",
+    "purchased": "เพิ่มเครดิตเข้าสู่ยอดคงเหลือของคุณแล้ว",
+    "empty": "แพ็กเกจเครดิตไม่พร้อมใช้งานในขณะนี้",
+    "noMatchingProducts": "App Store ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "noMatchingProductsPlay": "Google Play ไม่ได้ส่งแพ็กเกจเครดิตที่ตรงกันกลับมา",
+    "purchaseOwnedByAnotherAccount": "เครดิตใน Apple Account นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน",
+    "purchaseOwnedByAnotherAccountPlay": "เครดิตในบัญชี Google Play นี้เป็นของบัญชี Kilo อื่น ลงชื่อเข้าใช้บัญชี Kilo นั้นเพื่อใช้งาน"
   }
 }

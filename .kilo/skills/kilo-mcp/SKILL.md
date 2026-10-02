@@ -34,12 +34,22 @@ The catalog is `services/kilo-mcp/catalog.json`. This skill is generated from
 it, and the catalog wins when the two disagree — read the catalog, not this
 file, for current detail.
 
+## Reporting feedback and bugs
+
+Report bugs, confusing behavior, and feature requests about the Kilo platform
+through `feedback.submit` — the HTTP `POST /feedback` endpoint does the same
+thing. Batch everything you want to report into one submission instead of
+sending several: the endpoint accepts one submission per authenticated user per
+minute, and a second call within a minute is refused with a message asking you
+to batch. MCP error responses also point agents here, so treat this as the place
+to send platform feedback and bug reports rather than a support channel.
+
 ## Areas
 
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**862 procedures** — **368 queries**, **494 mutations** — under **51 prefixes**.
+**867 procedures** — **370 queries**, **497 mutations** — under **53 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
@@ -62,11 +72,11 @@ each row's `summary` and `tags` are what the search matches.
 | `codeReviews` | 9 | 6 | 3 |
 | `gitlab` | 9 | 3 | 6 |
 | `personalReviewAgent` | 9 | 5 | 4 |
+| `webhookTriggers` | 9 | 5 | 4 |
 | `autoFix` | 8 | 4 | 4 |
 | `codingPlans` | 8 | 5 | 3 |
 | `personalAutoTriage` | 8 | 4 | 4 |
 | `reviewMemory` | 8 | 3 | 5 |
-| `webhookTriggers` | 8 | 4 | 4 |
 | `byok` | 7 | 2 | 5 |
 | `codeIndexing` | 7 | 5 | 2 |
 | `personalAutoFix` | 7 | 3 | 4 |
@@ -81,6 +91,7 @@ each row's `summary` and `tags` are what the search matches.
 | `discord` | 4 | 1 | 3 |
 | `securityAuditLog` | 4 | 3 | 1 |
 | `slack` | 4 | 1 | 3 |
+| `credits` | 3 | 1 | 2 |
 | `linear` | 3 | 1 | 2 |
 | `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
@@ -90,6 +101,7 @@ each row's `summary` and `tags` are what the search matches.
 | `appBuilderFeedback` | 1 | 0 | 1 |
 | `appReportedMessages` | 1 | 0 | 1 |
 | `cloudAgentNextFeedback` | 1 | 0 | 1 |
+| `feedback` | 1 | 0 | 1 |
 | `kiloChat` | 1 | 1 | 0 |
 | `models` | 1 | 1 | 0 |
 | `platformIntegrations` | 1 | 1 | 0 |

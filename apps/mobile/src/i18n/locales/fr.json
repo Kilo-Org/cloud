@@ -215,7 +215,6 @@
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
     "bonusCreditsExpiring": "{{amount}} de crédits bonus expirent le {{date}}.",
-    "creditBalanceEmpty": "Vous n'avez plus de crédits. Pour ce compte, les crédits se gèrent en dehors de l'application iOS.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -241,6 +240,7 @@
     "addPasskey": "Ajouter une clé d'accès",
     "passkeyDefaultName": "Clé d'accès",
     "passkeyAddedOn": "Ajoutée le {{date}}",
+    "passkeyLastUsedOn": "Dernière utilisation {{date}}",
     "passkeyAdded": "Clé d'accès ajoutée.",
     "passkeyAddFailed": "Impossible d'ajouter une clé d'accès. Réessayez.",
     "passkeyAddUnsupported": "Cet appareil ne peut pas créer de clés d'accès.",
@@ -1498,6 +1498,7 @@
       "renamePlaceholder": "Nom de la session",
       "transcriptAccessibility": "Transcription de la session",
       "readOnly": "Cette session est en lecture seule.",
+      "continueInNewSession": "Continuer dans une nouvelle session",
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
       "scrollToBottom": "Aller en bas de la conversation",
       "emptyTitle": "Aucun message pour l'instant",
@@ -1588,6 +1589,8 @@
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
+      "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
+      "connectProviderToStart": "Connectez un fournisseur pour commencer.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
       "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-en d'autres ci-dessous.",
@@ -3487,5 +3490,17 @@
       "unboundToast": "Dépôt non lié",
       "unbindFailed": "Impossible de dissocier le dépôt"
     }
+  },
+  "credits": {
+    "title": "Acheter des crédits",
+    "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
+    "packLabel": "Ajouter {{amount}} en crédits",
+    "priceUnavailable": "Prix indisponible",
+    "purchased": "Des crédits ont été ajoutés à votre solde.",
+    "empty": "Les packs de crédits sont indisponibles pour le moment.",
+    "noMatchingProducts": "L'App Store n'a renvoyé aucun pack de crédits correspondant.",
+    "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
+    "purchaseOwnedByAnotherAccount": "Les crédits associés à ce compte Apple Account appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
+    "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
   }
 }

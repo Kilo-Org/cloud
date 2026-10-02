@@ -215,7 +215,6 @@
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
     "bonusCreditsExpiring": "{{amount}} کے بونس کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
-    "creditBalanceEmpty": "آپ کے کریڈٹس ختم ہو گئے ہیں۔ اس اکاؤنٹ کے کریڈٹس کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -241,6 +240,7 @@
     "addPasskey": "رسائی کلید شامل کریں",
     "passkeyDefaultName": "رسائی کلید",
     "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyLastUsedOn": "آخری استعمال {{date}}",
     "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
     "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
       "readOnly": "اس سیشن کو صرف پڑھا جا سکتا ہے۔",
+      "continueInNewSession": "نئے سیشن میں جاری رکھیں",
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
       "emptyTitle": "ابھی کوئی پیغام نہیں",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
+      "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں ہیں۔ نیچے سے نئی ریپوزٹری اور ماڈل منتخب کریں۔",
@@ -3444,5 +3447,17 @@
       "unboundToast": "ریپو انباؤنڈ",
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
     }
+  },
+  "credits": {
+    "title": "کریڈٹس خریدیں",
+    "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
+    "packLabel": "{{amount}} کے کریڈٹس شامل کریں",
+    "priceUnavailable": "قیمت دستیاب نہیں",
+    "purchased": "آپ کے بیلنس میں کریڈٹس شامل کر دیے گئے ہیں۔",
+    "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
+    "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
+    "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   }
 }

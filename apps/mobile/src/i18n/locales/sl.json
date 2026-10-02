@@ -215,7 +215,6 @@
     "showBalance": "Prikaži stanje",
     "balanceHidden": "Stanje je skrito",
     "bonusCreditsExpiring": "Veljavnost dodatnih kreditov v vrednosti {{amount}} poteče {{date}}.",
-    "creditBalanceEmpty": "Nimaš več kreditov. Kredite za ta račun upravljaš zunaj aplikacije za iOS.",
     "signOutTitle": "Želiš se odjaviti?",
     "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "deleteAccountTitle": "Želiš izbrisati račun?",
@@ -241,6 +240,7 @@
     "addPasskey": "Dodaj ključ za dostop",
     "passkeyDefaultName": "Ključ za dostop",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Nazadnje uporabljeno {{date}}",
     "passkeyAdded": "Ključ za dostop je dodan.",
     "passkeyAddFailed": "Ključa za dostop ni bilo mogoče dodati. Poskusi znova.",
     "passkeyAddUnsupported": "Ta naprava ne more ustvariti ključev za dostop.",
@@ -2153,6 +2153,7 @@
       "renamePlaceholder": "Ime seje",
       "transcriptAccessibility": "Zapis pogovora v seji",
       "readOnly": "Ta seja je samo za branje.",
+      "continueInNewSession": "Nadaljuj v novi seji",
       "emptyDescription": "Za začetek pošlji sporočilo v spodnjem polju.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Še ni sporočil",
@@ -2243,6 +2244,8 @@
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",
+      "selectRepositoryToStart": "Izberi skladišče za začetek.",
+      "connectProviderToStart": "Poveži ponudnika za začetek.",
       "promptPlaceholder": "Česa se želiš lotiti?",
       "couldNotLoadModels": "Modelov ni bilo mogoče naložiti.",
       "prefillRepoAndModelUnavailable": "Skladišče in model prvotne seje nista več na voljo. Izberi ju spodaj.",
@@ -3530,5 +3533,17 @@
       "unboundToast": "Repo nevezan",
       "unbindFailed": "Ni bilo mogoče razvezati repoja"
     }
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti so enkraten nakup, ki se doda tvojemu Kilo stanju za izvajanje sej kodiranja z umetno inteligenco v aplikaciji Kilo. Trgovina obremeni tvoj račun in krediti se dodajo, ko trgovina potrdi plačilo.",
+    "packLabel": "Dodaj {{amount}} kreditov",
+    "priceUnavailable": "Cena ni na voljo",
+    "purchased": "Krediti so bili dodani tvojemu stanju.",
+    "empty": "Paketi kreditov trenutno niso na voljo.",
+    "noMatchingProducts": "App Store ni vrnil ustreznih paketov kreditov.",
+    "noMatchingProductsPlay": "Google Play ni vrnil ustreznih paketov kreditov.",
+    "purchaseOwnedByAnotherAccount": "Krediti v tem računu Apple Account pripadajo drugemu računu Kilo. Za uporabo se prijavi v ta račun Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na tem Google Play računu pripadajo drugemu Kilo računu. Za uporabo se prijavite v ta Kilo račun."
   }
 }

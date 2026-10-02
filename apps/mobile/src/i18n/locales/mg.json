@@ -215,7 +215,6 @@
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
     "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
-    "creditBalanceEmpty": "Tsy misy kireditra sisa ao amin'ny kaontinao. Ivelan'ny rindranasa iOS no itantanana ny kireditra ho an'ity kaonty ity.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -241,6 +240,7 @@
     "addPasskey": "Hanampy fanalahidin'ny fidirana",
     "passkeyDefaultName": "Fanalahidin'ny fidirana",
     "passkeyAddedOn": "Nampiana {{date}}",
+    "passkeyLastUsedOn": "Nampiasaina farany {{date}}",
     "passkeyAdded": "Nampiana ny fanalahidin'ny fidirana.",
     "passkeyAddFailed": "Tsy afaka nanampy fanalahidin'ny fidirana. Andramo indray.",
     "passkeyAddUnsupported": "Tsy afaka mamorona fanalahidin'ny fidirana ity fitaovana ity.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Anaran'ny fotoam-piasana",
       "transcriptAccessibility": "Rakitsoratry ny fotoam-piasana",
       "readOnly": "Azo vakina ihany ity fotoam-piasana ity.",
+      "continueInNewSession": "Tohizo ao amin'ny fotoam-piasana vaovao",
       "emptyDescription": "Mandefasa hafatra etsy ambany mba hanombohana.",
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",
+      "selectRepositoryToStart": "Safidio ny tahirin-kaody hanombohana.",
+      "connectProviderToStart": "Ampifandraiso ny mpanome tolotra hanombohana.",
       "promptPlaceholder": "Inona no tianao hiasana?",
       "couldNotLoadModels": "Tsy voaray ny modely.",
       "prefillRepoAndModelUnavailable": "Tsy azo ampiasaina intsony ny tahirin-kaody sy ny modelin'ny fotoam-piasana niandohana. Misafidiana etsy ambany.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo tsy voafatotra",
       "unbindFailed": "Tsy afaka namaha ny repo"
     }
+  },
+  "credits": {
+    "title": "Hividy kireditra",
+    "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "packLabel": "Ampio kireditra {{amount}}",
+    "priceUnavailable": "Tsy misy ny vidiny",
+    "purchased": "Nampiana tao amin'ny balananao ny kireditra.",
+    "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
+    "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
+    "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
+    "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   }
 }

@@ -1,7 +1,9 @@
+/* eslint-disable max-lines -- one matrix per gate (submit, start, continue, blocked reason), each pinning an independent field flip. */
 import { describe, expect, it } from 'vitest';
 
 import {
   resolveContinueStartDisabled,
+  resolveNewSessionStartBlockedReason,
   resolveNewSessionStartDisabled,
   resolveNewSessionSubmitDisabled,
   resolveNewSessionSubmitEnabled,
@@ -282,5 +284,212 @@ describe('resolveContinueStartDisabled', () => {
         continueInput({ isRemoteTargetSelected: true, cloneImportFailureKey: null })
       )
     ).toBe(false);
+  });
+});
+
+function newSessionGate(
+  overrides: Partial<
+    Omit<
+      Parameters<typeof resolveNewSessionStartDisabled>[0],
+      'selectedRepo' | 'selectedRepositoryResolved'
+    >
+  > = {}
+) {
+  return {
+    attachmentsHasFailed: false,
+    attachmentsIsUploading: false,
+    hasPrompt: true,
+    isCreating: false,
+    isRemoteTargetSelected: false,
+    isSubmitting: false,
+    model: 'claude-opus-4-7',
+    isProfileLoading: false,
+    ...overrides,
+  };
+}
+
+function continueGate(
+  overrides: Partial<
+    Omit<
+      Parameters<typeof resolveContinueStartDisabled>[0],
+      'selectedRepo' | 'selectedRepositoryResolved'
+    >
+  > = {}
+) {
+  return {
+    isCreating: false,
+    isSubmitting: false,
+    isSpawningRemote: false,
+    model: 'claude-opus-4-7',
+    isRemoteTargetSelected: false,
+    instanceCatalogLoading: false,
+    instanceHasSessionClone: true,
+    cloneImportFailureKey: null,
+    isModelUnavailable: false,
+    ...overrides,
+  };
+}
+
+type ReasonInput = Parameters<typeof resolveNewSessionStartBlockedReason>[0];
+
+function newSessionReasonInput(overrides: {
+  hasRepositories?: boolean;
+  hasConnectableProvider?: boolean;
+  isLoadingRepositories?: boolean;
+  isRemoteTargetSelected?: boolean;
+  selectedRepo?: string;
+  gate?: ReturnType<typeof newSessionGate>;
+}): ReasonInput {
+  return {
+    entry: 'new-session',
+    hasRepositories: overrides.hasRepositories ?? true,
+    hasConnectableProvider: overrides.hasConnectableProvider ?? false,
+    isLoadingRepositories: overrides.isLoadingRepositories ?? false,
+    isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
+    selectedRepo: overrides.selectedRepo ?? '',
+    gate: overrides.gate ?? newSessionGate(),
+  };
+}
+
+function continueReasonInput(overrides: {
+  hasRepositories?: boolean;
+  hasConnectableProvider?: boolean;
+  isLoadingRepositories?: boolean;
+  isRemoteTargetSelected?: boolean;
+  selectedRepo?: string;
+  gate?: ReturnType<typeof continueGate>;
+}): ReasonInput {
+  return {
+    entry: 'continue',
+    hasRepositories: overrides.hasRepositories ?? true,
+    hasConnectableProvider: overrides.hasConnectableProvider ?? false,
+    isLoadingRepositories: overrides.isLoadingRepositories ?? false,
+    isRemoteTargetSelected: overrides.isRemoteTargetSelected ?? false,
+    selectedRepo: overrides.selectedRepo ?? '',
+    gate: overrides.gate ?? continueGate(),
+  };
+}
+
+describe('resolveNewSessionStartBlockedReason', () => {
+  it('returns select-repository when rows exist and none is selected', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: true, hasConnectableProvider: true })
+      )
+    ).toBe('select-repository');
+  });
+
+  it('returns refresh-repositories when there are no repositories and no connectable provider', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: false, hasConnectableProvider: false })
+      )
+    ).toBe('refresh-repositories');
+  });
+
+  it('returns connect-provider when there are no repositories and a connectable provider', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: false, hasConnectableProvider: true })
+      )
+    ).toBe('connect-provider');
+  });
+
+  it('never returns connect-provider while repository rows exist', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: true, hasConnectableProvider: true })
+      )
+    ).toBe('select-repository');
+  });
+
+  it('returns null when a repository is already selected', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(newSessionReasonInput({ selectedRepo: 'org/repo' }))
+    ).toBeNull();
+  });
+
+  it('returns null for a remote-CLI target', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({
+          isRemoteTargetSelected: true,
+          gate: newSessionGate({ isRemoteTargetSelected: true }),
+        })
+      )
+    ).toBeNull();
+  });
+
+  it('returns null while the repository list is still loading and no rows exist yet', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: false, isLoadingRepositories: true })
+      )
+    ).toBeNull();
+  });
+
+  it('names select-repository while a list is loading once rows already exist', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ hasRepositories: true, isLoadingRepositories: true })
+      )
+    ).toBe('select-repository');
+  });
+
+  it('returns null when another precondition blocks Start', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ hasPrompt: false }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ model: '' }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ isProfileLoading: true }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        newSessionReasonInput({ gate: newSessionGate({ isSubmitting: true }) })
+      )
+    ).toBeNull();
+  });
+
+  it('re-evaluates the Continue clone gate and names the connect step there too', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({ hasRepositories: false, hasConnectableProvider: true })
+      )
+    ).toBe('connect-provider');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({ hasRepositories: true, hasConnectableProvider: false })
+      )
+    ).toBe('select-repository');
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({ hasRepositories: false, hasConnectableProvider: false })
+      )
+    ).toBe('refresh-repositories');
+  });
+
+  it('returns null for the Continue clone gate when another condition blocks it', () => {
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({ gate: continueGate({ model: '' }) })
+      )
+    ).toBeNull();
+    expect(
+      resolveNewSessionStartBlockedReason(
+        continueReasonInput({
+          isRemoteTargetSelected: true,
+          gate: continueGate({ isRemoteTargetSelected: true }),
+        })
+      )
+    ).toBeNull();
   });
 });

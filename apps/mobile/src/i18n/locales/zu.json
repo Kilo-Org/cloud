@@ -215,7 +215,6 @@
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
     "bonusCreditsExpiring": "Amakhredithi ebhonasi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
-    "creditBalanceEmpty": "Awunawo amakhredithi asele. Amakhredithi ale akhawunti aphathwa ngaphandle kohlelo lokusebenza lwe-iOS.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -241,6 +240,7 @@
     "addPasskey": "Engeza ukhiye wokungena",
     "passkeyDefaultName": "Ukhiye wokungena",
     "passkeyAddedOn": "Kungezwe {{date}}",
+    "passkeyLastUsedOn": "Kusetshenziswe okokugcina {{date}}",
     "passkeyAdded": "Ukhiye wokungena kungeziwe.",
     "passkeyAddFailed": "Ukhiye wokungena awukwazanga ukungezwa. Zama futhi.",
     "passkeyAddUnsupported": "Le divayisi ayikwazi ukudala amakhiye okungena.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Igama leseshini",
       "transcriptAccessibility": "Umbhalo weseshini",
       "readOnly": "Le seshini ingafundwa kuphela.",
+      "continueInNewSession": "Qhubeka kuseshini entsha",
       "emptyDescription": "Thumela umlayezo ngezansi ukuze uqale.",
       "scrollToBottom": "Skrolela phansi",
       "emptyTitle": "Ayikho imilayezo okwamanje",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Shiya izinguquko",
       "commitAndPush": "Qopha bese uthumela",
       "startSession": "Qala iseshini",
+      "selectRepositoryToStart": "Khetha inqolobane yekhodi ukuze uqale.",
+      "connectProviderToStart": "Xhuma umhlinzeki ukuze uqale.",
       "promptPlaceholder": "Ungathanda ukusebenza ngani?",
       "couldNotLoadModels": "Asikwazanga ukulayisha amamodeli.",
       "prefillRepoAndModelUnavailable": "Inqolobane yekhodi nemodeli yeseshini yokuqala akusatholakali. Khetha okunye ngezansi.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "I-Repo ikhululiwe",
       "unbindFailed": "Ayikwazanga ukukhulula i-repo"
     }
+  },
+  "credits": {
+    "title": "Thenga amakhredithi",
+    "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
+    "packLabel": "Engeza amakhredithi angu-{{amount}}",
+    "priceUnavailable": "Intengo ayitholakali",
+    "purchased": "Amakhredithi engeziwe kubhalansi yakho.",
+    "empty": "Amaphakethe amakhredithi awatholakali njengamanje.",
+    "noMatchingProducts": "I-App Store ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
+    "noMatchingProductsPlay": "I-Google Play ayizange ibuyisele amaphakethe amakhredithi ahambisanayo.",
+    "purchaseOwnedByAnotherAccount": "Amakhredithi kule Apple Account angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise.",
+    "purchaseOwnedByAnotherAccountPlay": "Amakhredithi kule akhawunti ye-Google Play angeye-akhawunti ye-Kilo ehlukile. Ngena kuleyo akhawunti ye-Kilo ukuze uwasebenzise."
   }
 }

@@ -215,7 +215,6 @@
     "showBalance": "Pokaż saldo",
     "balanceHidden": "Saldo ukryte",
     "bonusCreditsExpiring": "Środki promocyjne w kwocie {{amount}} stracą ważność {{date}}.",
-    "creditBalanceEmpty": "Nie masz środków na koncie. Środkami na tym koncie zarządza się poza aplikacją na iOS.",
     "signOutTitle": "Wylogować się?",
     "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "deleteAccountTitle": "Usunąć konto?",
@@ -241,6 +240,7 @@
     "addPasskey": "Dodaj klucz dostępu",
     "passkeyDefaultName": "Klucz dostępu",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Ostatnio użyto {{date}}",
     "passkeyAdded": "Dodano klucz dostępu.",
     "passkeyAddFailed": "Nie udało się dodać klucza dostępu. Spróbuj ponownie.",
     "passkeyAddUnsupported": "To urządzenie nie może tworzyć kluczy dostępu.",
@@ -1608,6 +1608,7 @@
       "renamePlaceholder": "Nazwa sesji",
       "transcriptAccessibility": "Zapis sesji",
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
+      "continueInNewSession": "Kontynuuj w nowej sesji",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
@@ -1698,6 +1699,8 @@
       "leaveChanges": "Pozostaw zmiany",
       "commitAndPush": "Zatwierdź i wypchnij",
       "startSession": "Rozpocznij sesję",
+      "selectRepositoryToStart": "Wybierz repozytorium, aby rozpocząć.",
+      "connectProviderToStart": "Połącz dostawcę, aby rozpocząć.",
       "promptPlaceholder": "Nad czym chcesz pracować?",
       "couldNotLoadModels": "Nie udało się wczytać modeli.",
       "prefillRepoAndModelUnavailable": "Repozytorium i model z pierwotnej sesji nie są już dostępne. Wybierz je poniżej.",
@@ -3530,5 +3533,17 @@
       "unboundToast": "Repo niezwiązane",
       "unbindFailed": "Nie można odłączyć repozytorium"
     }
+  },
+  "credits": {
+    "title": "Kup kredyty",
+    "description": "Kredyty to jednorazowy zakup dodawany do Twojego salda Kilo na potrzeby sesji kodowania AI w aplikacji Kilo. Sklep obciąża Twoje konto, a kredyty są dodawane po potwierdzeniu płatności przez sklep.",
+    "packLabel": "Dodaj {{amount}} w kredytach",
+    "priceUnavailable": "Cena niedostępna",
+    "purchased": "Kredyty zostały dodane do Twojego salda.",
+    "empty": "Pakiety kredytów są obecnie niedostępne.",
+    "noMatchingProducts": "App Store nie zwrócił pasujących pakietów kredytów.",
+    "noMatchingProductsPlay": "Google Play nie zwrócił pasujących pakietów kredytów.",
+    "purchaseOwnedByAnotherAccount": "Kredyty na tym koncie Apple należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredyty na tym koncie Google Play należą do innego konta Kilo. Zaloguj się na to konto Kilo, aby z nich korzystać."
   }
 }

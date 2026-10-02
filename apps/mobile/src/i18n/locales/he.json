@@ -215,7 +215,6 @@
     "showBalance": "הצג יתרה",
     "balanceHidden": "היתרה מוסתרת",
     "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
-    "creditBalanceEmpty": "יתרת הקרדיטים שלך היא אפס. בחשבון הזה, הקרדיטים מנוהלים מחוץ לאפליקציית iOS.",
     "signOutTitle": "להתנתק?",
     "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "deleteAccountTitle": "למחוק את החשבון?",
@@ -241,6 +240,7 @@
     "addPasskey": "הוספת מפתח גישה",
     "passkeyDefaultName": "מפתח גישה",
     "passkeyAddedOn": "נוסף ב-{{date}}",
+    "passkeyLastUsedOn": "שימוש אחרון {{date}}",
     "passkeyAdded": "מפתח הגישה נוסף.",
     "passkeyAddFailed": "לא ניתן היה להוסיף מפתח גישה. נסו שוב.",
     "passkeyAddUnsupported": "המכשיר הזה אינו יכול ליצור מפתחות גישה.",
@@ -1596,6 +1596,7 @@
       "renamePlaceholder": "שם הסשן",
       "transcriptAccessibility": "תמליל הסשן",
       "readOnly": "הסשן הזה מיועד לקריאה בלבד.",
+      "continueInNewSession": "המשך בסשן חדש",
       "emptyDescription": "שלח הודעה למטה כדי להתחיל.",
       "scrollToBottom": "גלילה לתחתית",
       "emptyTitle": "אין עדיין הודעות",
@@ -1686,6 +1687,8 @@
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
+      "selectRepositoryToStart": "בחר מאגר כדי להתחיל.",
+      "connectProviderToStart": "חבר ספק כדי להתחיל.",
       "promptPlaceholder": "על מה תרצה לעבוד?",
       "couldNotLoadModels": "לא ניתן היה לטעון את המודלים.",
       "prefillRepoAndModelUnavailable": "המאגר והמודל מהסשן המקורי כבר אינם זמינים. בחר מאגר ומודל אחרים למטה.",
@@ -3487,5 +3490,17 @@
       "unboundToast": "ריפו לא כבול",
       "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר"
     }
+  },
+  "credits": {
+    "title": "קניית קרדיטים",
+    "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
+    "packLabel": "הוספת {{amount}} בקרדיטים",
+    "priceUnavailable": "המחיר אינו זמין",
+    "purchased": "הקרדיטים נוספו ליתרה שלך.",
+    "empty": "חבילות קרדיטים אינן זמינות כעת.",
+    "noMatchingProducts": "App Store לא החזיר חבילות קרדיטים תואמות.",
+    "noMatchingProductsPlay": "Google Play לא החזיר חבילות קרדיטים תואמות.",
+    "purchaseOwnedByAnotherAccount": "הקרדיטים בחשבון Apple Account הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם.",
+    "purchaseOwnedByAnotherAccountPlay": "הקרדיטים בחשבון Google Play הזה שייכים לחשבון Kilo אחר. היכנס לחשבון Kilo הזה כדי להשתמש בהם."
   }
 }

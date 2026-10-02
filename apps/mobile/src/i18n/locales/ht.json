@@ -215,7 +215,6 @@
     "showBalance": "Montre balans",
     "balanceHidden": "Balans kache",
     "bonusCreditsExpiring": "{{amount}} nan kredi bonis ap ekspire {{date}}.",
-    "creditBalanceEmpty": "Ou pa gen kredi ki rete. Pou kont sa a, ou jere kredi yo deyò aplikasyon iOS la.",
     "signOutTitle": "Dekonekte?",
     "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "deleteAccountTitle": "Efase kont?",
@@ -241,6 +240,7 @@
     "addPasskey": "Ajoute yon kle aksè",
     "passkeyDefaultName": "Kle aksè",
     "passkeyAddedOn": "Ajoute {{date}}",
+    "passkeyLastUsedOn": "Dènye fwa yo te itilize {{date}}",
     "passkeyAdded": "Kle aksè ajoute.",
     "passkeyAddFailed": "Pa t kapab ajoute yon kle aksè. Eseye ankò.",
     "passkeyAddUnsupported": "Aparèy sa a pa ka kreye kle aksè.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Non sesyon",
       "transcriptAccessibility": "Transkripsyon sesyon an",
       "readOnly": "Ou ka li sesyon sa a sèlman.",
+      "continueInNewSession": "Kontinye nan yon nouvo sesyon",
       "emptyDescription": "Voye yon mesaj anba a pou kòmanse.",
       "scrollToBottom": "Desann jis anba",
       "emptyTitle": "Pa gen mesaj ankò",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
+      "selectRepositoryToStart": "Chwazi yon depo pou kòmanse.",
+      "connectProviderToStart": "Konekte yon founisè pou kòmanse.",
       "promptPlaceholder": "Sou ki sa ou ta renmen travay?",
       "couldNotLoadModels": "Nou pa t ka chaje modèl yo.",
       "prefillRepoAndModelUnavailable": "Depo ak modèl sesyon orijinal la pa disponib ankò. Chwazi lòt anba a.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Depo demare",
       "unbindFailed": "Pa t 'kapab dezole repo"
     }
+  },
+  "credits": {
+    "title": "Achte kredi",
+    "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
+    "packLabel": "Ajoute {{amount}} an kredi",
+    "priceUnavailable": "Pri pa disponib",
+    "purchased": "Kredi yo ajoute nan balans ou.",
+    "empty": "Pake kredi yo pa disponib kounye a.",
+    "noMatchingProducts": "App Store pa t retounen okenn pake kredi ki matche.",
+    "noMatchingProductsPlay": "Google Play pa t retounen okenn pake kredi ki matche.",
+    "purchaseOwnedByAnotherAccount": "Kredi ki sou Apple Account sa a fè pati yon lòt kont Kilo. Konekte nan kont Kilo sa a pou itilize yo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredi ki sou kont Google Play sa a fè pati yon lòt kont Kilo. Siyen nan kont Kilo sa a pou itilize yo."
   }
 }

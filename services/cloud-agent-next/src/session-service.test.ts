@@ -1,4 +1,4 @@
-import { dirname, relative } from 'node:path';
+import { relative } from 'node:path';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type * as DevContainerModule from './kilo/devcontainer.js';
 import type * as GitTokenServiceClientModule from './services/git-token-service-client.js';
@@ -993,16 +993,25 @@ describe('SessionService.resolveWorkspaceTokens', () => {
 });
 
 describe('writeGlobalRules', () => {
-  it('writes the shared Cloud Agent rules for the session', async () => {
+  it('writes the shared Cloud Agent rules sized to the shell-tool default timeout', async () => {
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const sandbox = createSandbox(createSession(), false, writeFile);
 
-    await writeGlobalRules(sandbox, '/home/agent_test', 'agent_test');
+    await writeGlobalRules(sandbox, '/home/agent_test', '900000');
 
     expect(writeFile).toHaveBeenCalledWith(
       '/home/agent_test/.kilocode/rules/cloud-agent.md',
-      buildCloudAgentRules('agent_test')
+      buildCloudAgentRules('900000')
     );
+  });
+});
+
+describe('buildCloudAgentRules', () => {
+  it('bounds commands and sleeps to the shell-tool timeout', () => {
+    const rules = buildCloudAgentRules(240_000);
+
+    expect(rules).toContain('no more than 3 minutes 30 seconds');
+    expect(rules).toContain('never sleep longer than this limit');
   });
 });
 
@@ -3460,21 +3469,25 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     });
   });
 
-  it('allowlists only the active session attachment directory for Kilo file access', async () => {
+  it('allows every external directory', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
+
+    expect(config).toMatchObject({ permission: { external_directory: 'allow' } });
+  });
+
+  it('disables the scheduler and cron tools', async () => {
     const result = await buildPromptWrapperRequests(createMetadata());
     const config: unknown = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT);
 
     expect(config).toMatchObject({
       permission: {
-        external_directory: {
-          '*': 'deny',
-          '/tmp/agent_test/**': 'allow',
-          '/tmp/attachments/agent_test/**': 'allow',
-        },
+        schedule_wakeup: 'deny',
+        cancel_wakeup: 'deny',
+        cron_create: 'deny',
+        cron_list: 'deny',
+        cron_delete: 'deny',
       },
-    });
-    expect(config).not.toMatchObject({
-      permission: { external_directory: { '/tmp/attachments/**': 'allow' } },
     });
   });
 
@@ -3491,6 +3504,9 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
 
       expect(kiloConfig.snapshot).toBe(false);
       expect(opencodeConfig).toEqual(kiloConfig);
+      expect(result.readyRequest.materialized.env.KILO_DISABLE_CODEBASE_INDEXING).toBe(
+        'vscode-no-workspace'
+      );
     }
   );
 
@@ -3543,6 +3559,17 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(config.model).toBe('kilo/test-model');
     expect(config.small_model).toBeUndefined();
     expect(config.agent?.title).toBeUndefined();
+  });
+
+  it('disables snapshots and codebase indexing in the session config', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+    const config = JSON.parse(result.readyRequest.materialized.env.KILO_CONFIG_CONTENT) as {
+      snapshot?: boolean;
+      indexing?: { enabled?: boolean };
+    };
+
+    expect(config.snapshot).toBe(false);
+    expect(config.indexing).toEqual({ enabled: false });
   });
 
   it('passes canonical document attachments through signed wrapper prompt construction', async () => {
@@ -4096,21 +4123,13 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
       permission: {
         bash: Record<string, 'allow' | 'deny'>;
         edit: Record<string, 'allow' | 'deny'>;
-        external_directory: Record<string, 'allow' | 'deny'>;
+        external_directory: string;
         task: string;
         lsp: string;
       };
     };
     const relativeInputPath = relative('/workspace/user/sessions/agent_test', inputPath);
-    expect(
-      resolveCommandGuardBashPermission(
-        config.permission.external_directory,
-        `${dirname(inputPath)}/*`
-      )
-    ).toBe('allow');
-    expect(resolveCommandGuardBashPermission(config.permission.external_directory, '/tmp/*')).toBe(
-      'deny'
-    );
+    expect(config.permission.external_directory).toBe('allow');
     expect(resolveCommandGuardBashPermission(config.permission.edit, relativeInputPath)).toBe(
       'allow'
     );

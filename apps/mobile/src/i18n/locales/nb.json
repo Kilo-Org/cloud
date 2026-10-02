@@ -215,7 +215,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter utløper {{date}}.",
-    "creditBalanceEmpty": "Du har ingen kreditter igjen. For denne kontoen administreres kreditter utenfor iOS-appen.",
     "signOutTitle": "Logge ut?",
     "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "deleteAccountTitle": "Slette kontoen?",
@@ -241,6 +240,7 @@
     "addPasskey": "Legg til en passnøkkel",
     "passkeyDefaultName": "Passnøkkel",
     "passkeyAddedOn": "Lagt til {{date}}",
+    "passkeyLastUsedOn": "Sist brukt {{date}}",
     "passkeyAdded": "Passnøkkel lagt til.",
     "passkeyAddFailed": "Kunne ikke legge til en passnøkkel. Prøv igjen.",
     "passkeyAddUnsupported": "Denne enheten kan ikke opprette passnøkler.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Øktnavn",
       "transcriptAccessibility": "Samtalelogg for økten",
       "readOnly": "Denne økten er skrivebeskyttet.",
+      "continueInNewSession": "Fortsett i en ny økt",
       "emptyDescription": "Send en melding nedenfor for å komme i gang.",
       "scrollToBottom": "Rull til bunnen",
       "emptyTitle": "Ingen meldinger ennå",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Behold endringer",
       "commitAndPush": "Lagre og send",
       "startSession": "Start økt",
+      "selectRepositoryToStart": "Velg et kodelager for å starte.",
+      "connectProviderToStart": "Koble til en leverandør for å starte.",
       "promptPlaceholder": "Hva vil du jobbe med?",
       "couldNotLoadModels": "Kunne ikke laste inn modellene.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den opprinnelige økten er ikke lenger tilgjengelige. Velg nye nedenfor.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Kunne ikke løsne repoen"
     }
+  },
+  "credits": {
+    "title": "Kjøp kreditter",
+    "description": "Kreditter er et engangskjøp som legges til Kilo-saldoen din for å kjøre AI-kodeøkter i Kilo App. Butikken belaster kontoen din, og kredittene legges til etter at butikken bekrefter betalingen.",
+    "packLabel": "Legg til {{amount}} i kreditter",
+    "priceUnavailable": "Prisen er ikke tilgjengelig",
+    "purchased": "Kreditter er lagt til saldoen din.",
+    "empty": "Kredittpakker er ikke tilgjengelige akkurat nå.",
+    "noMatchingProducts": "App Store returnerte ingen samsvarende kredittpakker.",
+    "noMatchingProductsPlay": "Google Play returnerte ingen samsvarende kredittpakker.",
+    "purchaseOwnedByAnotherAccount": "Kredittene på denne Apple-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredittene på denne Google Play-kontoen tilhører en annen Kilo-konto. Logg inn på den Kilo-kontoen for å bruke dem."
   }
 }

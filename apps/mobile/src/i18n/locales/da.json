@@ -215,7 +215,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
-    "creditBalanceEmpty": "Din kreditsaldo er 0. Kreditter til denne konto administreres uden for iOS-appen.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -241,6 +240,7 @@
     "addPasskey": "Tilføj en adgangsnøgle",
     "passkeyDefaultName": "Adgangsnøgle",
     "passkeyAddedOn": "Tilføjet {{date}}",
+    "passkeyLastUsedOn": "Sidst brugt {{date}}",
     "passkeyAdded": "Adgangsnøgle tilføjet.",
     "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
     "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",
@@ -2097,6 +2097,7 @@
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
       "readOnly": "Denne session er skrivebeskyttet.",
+      "continueInNewSession": "Fortsæt i en ny session",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
@@ -2187,6 +2188,8 @@
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
+      "selectRepositoryToStart": "Vælg et kodelager for at starte.",
+      "connectProviderToStart": "Tilslut en udbyder for at starte.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den oprindelige session er ikke længere tilgængelige. Vælg et andet kodelager og en anden model nedenfor.",
@@ -3444,5 +3447,17 @@
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Repo kunne ikke ophæves"
     }
+  },
+  "credits": {
+    "title": "Køb kreditter",
+    "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "packLabel": "Tilføj {{amount}} i kreditter",
+    "priceUnavailable": "Pris ikke tilgængelig",
+    "purchased": "Kreditter er føjet til din saldo.",
+    "empty": "Kreditpakker er ikke tilgængelige lige nu.",
+    "noMatchingProducts": "App Store returnerede ingen matchende kreditpakker.",
+    "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
+    "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   }
 }

@@ -41,8 +41,12 @@ export type CallbackTarget = {
 export type DriverUser = { id: string; email?: string; api_token_pepper?: string };
 
 export type DriverConfig = {
-  /** Track returned session IDs, including prepare success followed by initiation failure. */
-  onSessionCreated?: (sessionId: string) => void;
+  /**
+   * Track returned session IDs, including prepare success followed by initiation
+   * failure. The Kilo root id rides along so local reclaim can prove which
+   * sandbox the session owned.
+   */
+  onSessionCreated?: (sessionId: string, kiloSessionId: string) => void;
   workerUrl: string;
   expectControlPlane?: boolean;
   user: DriverUser;
@@ -233,7 +237,9 @@ export async function startSession(
     api === 'legacy'
       ? await startSessionLegacy(config, started)
       : await startSessionUnified(config, started);
-  if (api === 'unified') config.onSessionCreated?.(result.cloudAgentSessionId);
+  if (api === 'unified') {
+    config.onSessionCreated?.(result.cloudAgentSessionId, result.kiloSessionId);
+  }
   if (config.expectControlPlane && !result.cloudAgentSessionId.startsWith('workspace_')) {
     throw new Error(
       `Started ${result.cloudAgentSessionId}, but expected an enrolled workspace_* session; do not retry start`
@@ -351,7 +357,7 @@ async function startSessionLegacy(
     streamUrl?: string;
     status?: string;
   };
-  config.onSessionCreated?.(prepared.cloudAgentSessionId);
+  config.onSessionCreated?.(prepared.cloudAgentSessionId, prepared.kiloSessionId);
   const initiated = await trpcCall<InitiateResult>(
     config,
     'initiateFromKilocodeSessionV2',
@@ -402,10 +408,8 @@ export async function prepareBrowserSession(
     },
     signal
   );
-  // Success only: a rejected prepare never produced a session to clean up. The
-  // local `smoke.ts` already supplies this hook, so its cleanup now also
-  // releases browser-created sessions it previously missed.
-  config.onSessionCreated?.(prepared.cloudAgentSessionId);
+  // Success only: a rejected prepare never produced a session to clean up.
+  config.onSessionCreated?.(prepared.cloudAgentSessionId, prepared.kiloSessionId);
   return prepared;
 }
 
@@ -432,11 +436,32 @@ export async function createWorktreeChat(
     },
     { internalApiSecret: config.internalApiSecret, signal }
   );
-  // Success only, matching the legacy/unified start pattern. As with
-  // `prepareBrowserSession`, the local `smoke.ts` cleanup now also captures
-  // worktree-chat sessions it previously missed.
-  config.onSessionCreated?.(created.cloudAgentSessionId);
+  // Success only, matching the legacy/unified start pattern.
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
   return created;
+}
+
+/**
+ * Set or clear the callback target of an existing session through the internal
+ * `updateSession` endpoint.
+ *
+ * The public grouped `start` schema rejects `callbackTarget`, so the new plane's
+ * callback harness registers the sink after `start` through the same endpoint
+ * `services/code-review-infra` uses on session continuations. Internal-API
+ * authenticated.
+ */
+export async function updateSessionCallbackTarget(
+  config: DriverConfig,
+  cloudAgentSessionId: string,
+  callbackTarget: CallbackTarget | null,
+  signal?: AbortSignal
+): Promise<{ success: boolean }> {
+  return trpcCall<{ success: boolean }>(
+    config,
+    'updateSession',
+    { cloudAgentSessionId, callbackTarget },
+    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
+  );
 }
 
 export type SessionSnapshot = {
@@ -478,11 +503,46 @@ export type SendMessageResult = {
   delivery: 'sent' | 'queued';
 };
 
+/**
+ * Send a slash-command turn. The unified `send` schema accepts prompts and
+ * attachments only, so a command turn goes through `sendMessageV2` with the
+ * discriminated command payload; after the C1 cutover that endpoint resolves
+ * the `workspace_*` session to the new plane, where the DO stores a command
+ * intent and the wrapper runs it (for `compact`, a real summarization).
+ */
+export async function sendCommand(
+  config: DriverConfig,
+  args: {
+    cloudAgentSessionId: string;
+    command: string;
+    arguments?: string;
+    messageId?: string;
+    signal?: AbortSignal;
+  }
+): Promise<SendMessageResult> {
+  return trpcCall<SendMessageResult>(
+    config,
+    'sendMessageV2',
+    {
+      cloudAgentSessionId: args.cloudAgentSessionId,
+      payload: {
+        type: 'command',
+        command: args.command,
+        arguments: args.arguments ?? '',
+      },
+      ...(args.messageId ? { messageId: args.messageId } : {}),
+    },
+    { signal: args.signal }
+  );
+}
+
 export type SendMessageArgs = {
   cloudAgentSessionId: string;
   prompt: string;
   mode?: string;
   messageId?: string;
+  /** Canonical R2 attachment reference; unified `send` only. */
+  attachments?: { path: string; files: string[] };
   signal?: AbortSignal;
 };
 
@@ -492,6 +552,9 @@ export async function sendMessage(
   api: ApiVersion = 'unified'
 ): Promise<SendMessageResult> {
   if (api === 'legacy') {
+    if (args.attachments) {
+      throw new Error('attachments are accepted by the unified send only');
+    }
     return trpcCall<SendMessageResult>(
       config,
       'sendMessageV2',
@@ -512,6 +575,7 @@ export async function sendMessage(
       cloudAgentSessionId: args.cloudAgentSessionId,
       message: {
         prompt: args.prompt,
+        ...(args.attachments ? { attachments: args.attachments } : {}),
         ...(args.messageId ? { id: args.messageId } : {}),
       },
       agent: {
@@ -663,6 +727,24 @@ export async function fetchFakeRequests(
     throw new Error(`fetchFakeRequests failed: ${res.status} ${res.statusText}`);
   }
   return (await res.json()) as FakeRequestSnapshot;
+}
+
+/**
+ * The last user-message text the fake LLM adapter saw. Used by the attachment
+ * scenario to assert the attachment content reached the model rather than only
+ * that a file was read.
+ */
+export async function fetchFakeLastPrompt(
+  fakeLlmUrl: string,
+  signal?: AbortSignal
+): Promise<string> {
+  const url = `${fakeLlmUrl.replace(/\/$/, '')}/test/last-prompt`;
+  const res = await fetch(url, { headers: fakeControlHeaders(), signal });
+  if (!res.ok) {
+    throw new Error(`fetchFakeLastPrompt failed: ${res.status} ${res.statusText}`);
+  }
+  const body = (await res.json()) as { text?: unknown };
+  return typeof body.text === 'string' ? body.text : '';
 }
 
 export async function fetchFakeScenarioStatus(
@@ -838,6 +920,16 @@ export function isMessageCompleted(
         Array.isArray(event.data.messageIds) &&
         event.data.messageIds.includes(messageId)))
   );
+}
+
+/**
+ * The control-plane failure reason carried by a terminal `cloud.message.failed`
+ * event (`data.reason`, set from the message's stored reason). Returns
+ * `undefined` for a non-failure or a legacy event shape.
+ */
+export function failureReasonFromEvent(event: StreamEvent | null): string | undefined {
+  if (event === null || event.streamEventType !== 'cloud.message.failed') return undefined;
+  return typeof event.data.reason === 'string' ? event.data.reason : undefined;
 }
 
 /**

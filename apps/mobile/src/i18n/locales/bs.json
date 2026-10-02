@@ -215,7 +215,6 @@
     "showBalance": "Prikaži saldo",
     "balanceHidden": "Saldo je sakriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} istječu {{date}}.",
-    "creditBalanceEmpty": "Nemaš više kredita. Kreditima za ovaj nalog upravlja se izvan iOS aplikacije.",
     "signOutTitle": "Odjaviti se?",
     "signOutMessage": "Za pristup svom radnom prostoru morat ćeš se ponovo prijaviti.",
     "deleteAccountTitle": "Obrisati nalog?",
@@ -241,6 +240,7 @@
     "addPasskey": "Dodaj pristupni ključ",
     "passkeyDefaultName": "Pristupni ključ",
     "passkeyAddedOn": "Dodano {{date}}",
+    "passkeyLastUsedOn": "Posljednje korišteno {{date}}",
     "passkeyAdded": "Pristupni ključ dodan.",
     "passkeyAddFailed": "Pristupni ključ nije mogao biti dodan. Pokušaj ponovo.",
     "passkeyAddUnsupported": "Ovaj uređaj ne može kreirati pristupne ključeve.",
@@ -2125,6 +2125,7 @@
       "renamePlaceholder": "Naziv sesije",
       "transcriptAccessibility": "Transkript sesije",
       "readOnly": "Ova sesija je dostupna samo za čitanje.",
+      "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u nastavku za početak.",
       "scrollToBottom": "Pomjeri se na dno",
       "emptyTitle": "Još nema poruka",
@@ -2215,6 +2216,8 @@
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
+      "selectRepositoryToStart": "Odaberi repozitorij za početak.",
+      "connectProviderToStart": "Poveži platformu za početak.",
       "promptPlaceholder": "Na čemu želiš raditi?",
       "couldNotLoadModels": "Nije moguće učitati modele.",
       "prefillRepoAndModelUnavailable": "Repozitorij i model iz izvorne sesije više nisu dostupni. Odaberi ih u nastavku.",
@@ -3487,5 +3490,17 @@
       "unboundToast": "Repo nevezan",
       "unbindFailed": "Nije moguće poništiti vezivanje repo"
     }
+  },
+  "credits": {
+    "title": "Kupi kredite",
+    "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
+    "packLabel": "Dodaj {{amount}} kredita",
+    "priceUnavailable": "Cijena nije dostupna",
+    "purchased": "Krediti su dodani na tvoj saldo.",
+    "empty": "Paketi kredita trenutno nisu dostupni.",
+    "noMatchingProducts": "App Store nije vratio odgovarajuće pakete kredita.",
+    "noMatchingProductsPlay": "Google Play nije vratio odgovarajuće pakete kredita.",
+    "purchaseOwnedByAnotherAccount": "Krediti na ovom računu Apple Account pripadaju drugom Kilo računu. Prijavi se na taj Kilo račun da ih koristiš.",
+    "purchaseOwnedByAnotherAccountPlay": "Krediti na ovom Google Play nalogu pripadaju drugom Kilo nalogu. Prijavite se na taj Kilo nalog da biste ih koristili."
   }
 }

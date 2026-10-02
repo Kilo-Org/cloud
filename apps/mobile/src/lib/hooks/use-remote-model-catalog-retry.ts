@@ -12,7 +12,10 @@ type RemoteModelCatalogRetryManager = {
 
 export type RemoteModelCatalogRetryInput = {
   activeSessionType: RemoteModelCatalogRetrySessionType;
-  remoteModelState: Pick<RemoteModelState, 'catalog' | 'ownerConnectionId' | 'refresh'>;
+  remoteModelState: Pick<
+    RemoteModelState,
+    'catalog' | 'ownerConnectionId' | 'protocol' | 'refresh'
+  >;
   manager: RemoteModelCatalogRetryManager;
 };
 
@@ -20,13 +23,18 @@ export type RemoteModelCatalogRetryInput = {
  * Whether a remote session's model catalog is still worth another retry.
  *
  * The retry is only useful once the CLI owner is known (a request before then
- * is dropped by the transport), is not already in flight (`loading`), and the
- * catalog is absent, empty, or last reported an error. A populated catalog with
- * an idle refresh needs nothing.
+ * is dropped by the transport) and the CLI speaks the v1 model protocol: a
+ * legacy CLI answers `list_models` with "unknown command" and never publishes a
+ * catalog, so re-asking only burns its bounded discovery budget. A request
+ * already in flight (`loading`) needs nothing, and a populated catalog with an
+ * idle refresh is done. The catalog is retried when it is empty, or when the
+ * last refresh reported an error even over a stale catalog; a still-`unknown`
+ * protocol only retries after such an error.
  */
 export function shouldRetryRemoteModelCatalog(input: {
   activeSessionType: RemoteModelCatalogRetrySessionType;
   ownerConnectionId: string | null;
+  protocol: RemoteModelState['protocol'];
   refresh: RemoteModelState['refresh'];
   /** Models across the catalog, not providers: a provider may hold none. */
   modelCount: number;
@@ -37,8 +45,14 @@ export function shouldRetryRemoteModelCatalog(input: {
   if (input.ownerConnectionId === null) {
     return false;
   }
+  if (input.protocol === 'legacy') {
+    return false;
+  }
   if (input.refresh === 'loading') {
     return false;
+  }
+  if (input.protocol === 'unknown') {
+    return input.refresh === 'error';
   }
   return input.refresh === 'error' || input.modelCount === 0;
 }
@@ -60,6 +74,7 @@ export function useRemoteModelCatalogRetry({
   remoteModelState,
 }: RemoteModelCatalogRetryInput): void {
   const ownerConnectionId = remoteModelState.ownerConnectionId;
+  const protocol = remoteModelState.protocol;
   const refresh = remoteModelState.refresh;
   const modelCount =
     remoteModelState.catalog?.providers.reduce(
@@ -73,10 +88,18 @@ export function useRemoteModelCatalogRetry({
     activeSessionType,
     manager,
     ownerConnectionId,
+    protocol,
     modelCount,
     refresh,
   });
-  latestRef.current = { activeSessionType, manager, ownerConnectionId, modelCount, refresh };
+  latestRef.current = {
+    activeSessionType,
+    manager,
+    ownerConnectionId,
+    protocol,
+    modelCount,
+    refresh,
+  };
 
   const retryIfEligible = useCallback(() => {
     const latest = latestRef.current;
@@ -84,6 +107,7 @@ export function useRemoteModelCatalogRetry({
       !shouldRetryRemoteModelCatalog({
         activeSessionType: latest.activeSessionType,
         ownerConnectionId: latest.ownerConnectionId,
+        protocol: latest.protocol,
         refresh: latest.refresh,
         modelCount: latest.modelCount,
       })
@@ -101,6 +125,7 @@ export function useRemoteModelCatalogRetry({
       !shouldRetryRemoteModelCatalog({
         activeSessionType,
         ownerConnectionId,
+        protocol,
         refresh,
         modelCount,
       })
@@ -112,7 +137,7 @@ export function useRemoteModelCatalogRetry({
     }
     attachOwnerRef.current = ownerConnectionId;
     manager.retryRemoteModels();
-  }, [activeSessionType, manager, ownerConnectionId, modelCount, refresh]);
+  }, [activeSessionType, manager, ownerConnectionId, protocol, modelCount, refresh]);
 
   // App foreground: one attempt on every false -> active transition while the
   // screen's inputs still say the catalog needs it.

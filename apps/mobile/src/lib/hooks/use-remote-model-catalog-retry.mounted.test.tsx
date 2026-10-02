@@ -4,10 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type RemoteModelCatalogV1, type RemoteModelState } from '@kilocode/cloud-agent-sdk';
 
-import {
-  shouldRetryRemoteModelCatalog,
-  useRemoteModelCatalogRetry,
-} from '@/lib/hooks/use-remote-model-catalog-retry';
+import { useRemoteModelCatalogRetry } from '@/lib/hooks/use-remote-model-catalog-retry';
 
 const appStateListeners = vi.hoisted(() => {
   const listeners = new Set<(state: string) => void>();
@@ -140,41 +137,6 @@ afterEach(() => {
   }
 });
 
-describe('shouldRetryRemoteModelCatalog', () => {
-  const base = {
-    activeSessionType: 'remote' as const,
-    ownerConnectionId: 'owner-1',
-    refresh: 'idle' as const,
-    modelCount: 0,
-  };
-
-  it('retries an empty catalog for a remote session with a known owner', () => {
-    expect(shouldRetryRemoteModelCatalog(base)).toBe(true);
-  });
-
-  it('retries after an error even when a stale catalog is present', () => {
-    expect(shouldRetryRemoteModelCatalog({ ...base, refresh: 'error', modelCount: 1 })).toBe(true);
-  });
-
-  it('never retries while the request is loading', () => {
-    expect(shouldRetryRemoteModelCatalog({ ...base, refresh: 'loading' })).toBe(false);
-  });
-
-  it('never retries before the owner is known', () => {
-    expect(shouldRetryRemoteModelCatalog({ ...base, ownerConnectionId: null })).toBe(false);
-  });
-
-  it('never retries a non-remote session', () => {
-    expect(shouldRetryRemoteModelCatalog({ ...base, activeSessionType: 'cloud-agent' })).toBe(
-      false
-    );
-  });
-
-  it('does not retry a populated idle catalog', () => {
-    expect(shouldRetryRemoteModelCatalog({ ...base, modelCount: 1 })).toBe(false);
-  });
-});
-
 describe('useRemoteModelCatalogRetry', () => {
   it('retries once on attach for an empty remote catalog', () => {
     const manager = { retryRemoteModels: vi.fn() };
@@ -220,6 +182,20 @@ describe('useRemoteModelCatalogRetry', () => {
     const manager = { retryRemoteModels: vi.fn() };
     mount({ activeSessionType: 'cloud-agent', manager, remoteModelState: state() });
 
+    expect(manager.retryRemoteModels).not.toHaveBeenCalled();
+  });
+
+  it('does not retry a legacy CLI on attach, focus, or foreground', () => {
+    const manager = { retryRemoteModels: vi.fn() };
+    mount({
+      activeSessionType: 'remote',
+      manager,
+      remoteModelState: state({ protocol: 'legacy', refresh: 'idle' }),
+    });
+    expect(manager.retryRemoteModels).not.toHaveBeenCalled();
+
+    fireFocus();
+    fireForeground();
     expect(manager.retryRemoteModels).not.toHaveBeenCalled();
   });
 

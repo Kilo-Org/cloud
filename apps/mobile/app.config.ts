@@ -320,7 +320,7 @@ const config: ExpoConfig = {
       {
         url: 'https://sentry.io/',
         project: 'kilo-app',
-        organization: 'kilo-code',
+        organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
       },

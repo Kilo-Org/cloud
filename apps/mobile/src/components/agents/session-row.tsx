@@ -148,6 +148,7 @@ export function StoredSessionRow({
       sessionId: session.session_id,
       title,
       initialRenameValue: renameInitialValue,
+      onOpen: onPress,
       live,
       statusKind,
       needsInput,

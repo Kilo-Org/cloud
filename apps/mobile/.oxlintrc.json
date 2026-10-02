@@ -58,7 +58,14 @@
         "paths": [
           {
             "name": "react-native",
-            "importNames": ["Image", "Modal", "KeyboardAvoidingView", "FlatList", "VirtualizedList", "SectionList"],
+            "importNames": [
+              "Image",
+              "Modal",
+              "KeyboardAvoidingView",
+              "FlatList",
+              "VirtualizedList",
+              "SectionList"
+            ],
             "message": "Image → @/components/ui/image. Modal → @/components/ui/sheet or a formSheet route. KeyboardAvoidingView → react-native-keyboard-controller. FlatList/VirtualizedList/SectionList → FlashList. See apps/mobile/AGENTS.md."
           },
           {

@@ -44,42 +44,35 @@ describe('getLanguageModelIds', () => {
     ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints', 'vendor/untyped']);
   });
 
-  it('excludes System One models', () => {
-    expect(
-      getLanguageModelIds({
-        'vendor/text': storedModel({
-          id: 'vendor/text',
-          architecture: { output_modalities: ['text'] },
-        }),
-        'vendor/decide': storedModel({
-          id: 'vendor/decide',
-          architecture: { output_modalities: ['decisions'] },
-        }),
-      })
-    ).toEqual(['vendor/text']);
-  });
+  it.each(['evaluation', 'reranking', 'speech', 'transcription', 'video', 'realtime'] as const)(
+    'excludes %s models',
+    type => {
+      expect(
+        getLanguageModelIds({
+          'vendor/text': storedModel({ id: 'vendor/text', type: 'language' }),
+          'vendor/other': storedModel({ id: 'vendor/other', type }),
+        })
+      ).toEqual(['vendor/text']);
+    }
+  );
 });
 
 describe('getSystemOneModelIds', () => {
-  it('includes free variants and aliases of models that output decisions', () => {
-    const decisions = { output_modalities: ['decisions'] };
+  it('includes free variants and aliases of evaluation models', () => {
     expect(
       getSystemOneModelIds({
-        'typesafe/jev-1.13': storedModel({ id: 'typesafe/jev-1.13', architecture: decisions }),
+        'typesafe/jev-1.13': storedModel({ id: 'typesafe/jev-1.13', type: 'evaluation' }),
         '~typesafe/jev-latest': storedModel({
           id: '~typesafe/jev-latest',
+          type: 'evaluation',
           alias_target: { slug: 'typesafe/jev-1.13' },
-          architecture: decisions,
           endpoints: [],
         }),
         'respan/span-01-lite:free': storedModel({
           id: 'respan/span-01-lite:free',
-          architecture: decisions,
+          type: 'evaluation',
         }),
-        'typesafe/jev-router': storedModel({
-          id: 'typesafe/jev-router',
-          architecture: { output_modalities: ['text'] },
-        }),
+        'typesafe/jev-router': storedModel({ id: 'typesafe/jev-router', type: 'language' }),
         'vendor/untyped': storedModel({ id: 'vendor/untyped' }),
       })
     ).toEqual(['typesafe/jev-1.13', '~typesafe/jev-latest', 'respan/span-01-lite:free']);
@@ -174,10 +167,7 @@ describe('isValidOpenRouterModelId', () => {
       {
         models: {
           'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }),
-          'typesafe/jev-1.13': storedModel({
-            id: 'typesafe/jev-1.13',
-            architecture: { output_modalities: ['decisions'] },
-          }),
+          'typesafe/jev-1.13': storedModel({ id: 'typesafe/jev-1.13', type: 'evaluation' }),
         },
       },
     ]);

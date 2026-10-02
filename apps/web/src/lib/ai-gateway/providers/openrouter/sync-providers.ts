@@ -45,37 +45,31 @@ import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organi
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
 /**
- * OpenRouter's default model list only contains text-output models, so System
- * One models, which output `decisions`, are fetched with a separate filter.
+ * OpenRouter's default model list only contains text-output models. Fetching
+ * every output modality also stores non-language models, such as System One
+ * models, with a type inferred from their output modalities.
  */
-const OPENROUTER_MODEL_LIST_PATHS = ['/models', '/models?output_modalities=decisions'];
+const OPENROUTER_MODELS_PATH = '/models?output_modalities=all';
 
-async function fetchGatewayModels(gateway: Provider, modelListPaths = ['/models']) {
+async function fetchGatewayModels(gateway: Provider, modelsPath = '/models') {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
-  const modelLists = await Promise.all(
-    modelListPaths.map(async path => {
-      const modelsResponse = await fetch(`${gateway.apiUrl}${path}`, {
-        method: 'GET',
-        headers,
-      });
-      if (!modelsResponse.ok) {
-        throw new Error(
-          `Fetching models from ${gateway.id}${path} failed: ${modelsResponse.status}`
-        );
-      }
-      return ModelsSchema.parse(await modelsResponse.json()).data;
-    })
-  );
-  const models = [...new Map(modelLists.flat().map(model => [model.id, model])).values()];
+  const modelsResponse = await fetch(`${gateway.apiUrl}${modelsPath}`, {
+    method: 'GET',
+    headers,
+  });
+  if (!modelsResponse.ok) {
+    throw new Error(`Fetching models from ${gateway.id} failed: ${modelsResponse.status}`);
+  }
+  const models = ModelsSchema.parse(await modelsResponse.json());
 
   const limit = pLimit(8);
   const result: Record<string, StoredModel> = {};
   await Promise.all(
-    models.map(model =>
+    models.data.map(model =>
       limit(async () => {
         const endpointsResponse = await fetch(`${gateway.apiUrl}/models/${model.id}/endpoints`, {
           method: 'GET',
@@ -388,7 +382,7 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(OPENROUTER, OPENROUTER_MODEL_LIST_PATHS);
+  const openrouter_data = await fetchGatewayModels(OPENROUTER, OPENROUTER_MODELS_PATH);
   const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
 
   const openrouterProviders = await fetchProviders();

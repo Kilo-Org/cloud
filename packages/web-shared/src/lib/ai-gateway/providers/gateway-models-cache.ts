@@ -49,22 +49,21 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
   return models[modelId]?.alias_target?.slug ?? modelId;
 }
 
-/** System One models answer typed questions with `decisions` instead of generating text. */
-function isSystemOneModel(model: StoredModel): boolean {
-  return model.architecture?.output_modalities.includes('decisions') ?? false;
-}
-
 /** The ids of language models, including those with no endpoints. */
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(model => (model.type ?? 'language') === 'language' && !isSystemOneModel(model))
+    .filter(model => (model.type ?? 'language') === 'language')
     .map(model => model.id);
 }
 
-/** The ids of System One models, including `:free` variants and `~` aliases. */
+/**
+ * The ids of System One models, including `:free` variants and `~` aliases.
+ * Vercel types them as `evaluation`; OpenRouter models get that type from
+ * their `decisions` output modality.
+ */
 export function getSystemOneModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(isSystemOneModel)
+    .filter(model => model.type === 'evaluation')
     .map(model => model.id);
 }
 

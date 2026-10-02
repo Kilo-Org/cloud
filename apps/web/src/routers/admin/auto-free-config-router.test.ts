@@ -39,6 +39,16 @@ describe('AutoFreeConfigSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it.each(["x');--:free", "x\\'--:free", 'provider/model :free', ''])(
+    'rejects model ID %p',
+    model => {
+      const result = AutoFreeConfigSchema.safeParse({
+        models: [{ ...config.models[0], model }],
+      });
+      expect(result.success).toBe(false);
+    }
+  );
+
   it.each([0, -1, 1.5])('rejects weight %s', weight => {
     const result = AutoFreeConfigSchema.safeParse({
       models: [{ ...config.models[0], weight }],

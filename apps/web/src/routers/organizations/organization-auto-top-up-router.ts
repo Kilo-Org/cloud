@@ -22,8 +22,9 @@ import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 
 /**
- * Reports the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers do not await
- * it: the org lookup and the report stay off the checkout path.
+ * Durably enqueues the bouncer `charge.attempted` for an org auto-top-up setup checkout. Callers
+ * await it: the enqueue is a database insert (no bouncer HTTP), so it stays cheap, and a DB error
+ * propagates instead of being floated.
  */
 async function reportOrgAutoTopUpAttempt(params: {
   organizationId: string;
@@ -36,7 +37,7 @@ async function reportOrgAutoTopUpAttempt(params: {
   if (!organization) {
     return;
   }
-  reportChargeAttempted({
+  await reportChargeAttempted({
     flow: 'auto_topup',
     userId: params.userId,
     orgId: params.organizationId,
@@ -109,13 +110,13 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
           const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
           const selectedAmount = amountCents ?? DEFAULT_ORG_AUTO_TOP_UP_AMOUNT_CENTS;
 
-          void reportOrgAutoTopUpAttempt({
+          await reportOrgAutoTopUpAttempt({
             organizationId,
             userId: ctx.user.id,
             amountCents: selectedAmount,
             ip: ctx.ip,
             headers: ctx.headersList,
-          }).catch(() => undefined);
+          });
 
           const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
             ctx.user.id,
@@ -148,13 +149,13 @@ export const organizationAutoTopUpRouter = createTRPCRouter({
 
       const stripeCustomerId = await getOrCreateStripeCustomerIdForOrganization(organizationId);
 
-      void reportOrgAutoTopUpAttempt({
+      await reportOrgAutoTopUpAttempt({
         organizationId,
         userId: ctx.user.id,
         amountCents: selectedAmount,
         ip: ctx.ip,
         headers: ctx.headersList,
-      }).catch(() => undefined);
+      });
 
       const redirectUrl = await createOrgAutoTopUpSetupCheckoutSession(
         ctx.user.id,

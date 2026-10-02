@@ -11604,6 +11604,67 @@ export const external_side_effect_outbox = pgTable(
 export type ExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferSelect;
 export type NewExternalSideEffectOutboxRow = typeof external_side_effect_outbox.$inferInsert;
 
+/**
+ * Durable outbox for Bouncer financial credit events (charge steps and store
+ * money events). Financial callers enqueue a row atomically with the primary
+ * write and before they acknowledge a payment or webhook; the cron drainer
+ * claims due `pending` rows, delivers them over HTTP, and marks `delivered`.
+ * On a transport failure it backs off and retries, failing a row after 8
+ * attempts; `sending` claims older than 5 minutes are reclaimed. A unique
+ * `(event_id, event_type)` — the same identity bouncer's credit ledger dedupes
+ * on, where `event_id` is the source event id (a Stripe event id or an Apple
+ * `notificationUUID`) — makes an enqueue idempotent within the retention
+ * window: a webhook replay in that window reports nothing new. Retention is
+ * bounded, so it is not a permanent dedupe; an event replayed after the window
+ * is recreated, but it keeps its original `occurredAt`, so bouncer's standing
+ * (current) computation still does not double-count it. `payload` holds the
+ * shaped wire body for the event and carries account PII (user id, client ip,
+ * card fingerprint); `user_id` is denormalized onto the row so user soft
+ * deletion can delete it.
+ */
+export type BouncerCreditEventOutboxPayload = Record<string, unknown>;
+
+export const bouncer_credit_event_outbox = pgTable(
+  'bouncer_credit_event_outbox',
+  {
+    id: uuid()
+      .default(sql`pg_catalog.gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    /** The source event id; with `event_type`, the dedupe key that makes enqueue idempotent. */
+    event_id: text().notNull(),
+    /** The `CreditEvent` discriminant, for observability and metrics. */
+    event_type: text().notNull(),
+    /** The Kilo account the event is about; not a UUID for OAuth users. */
+    user_id: text().notNull(),
+    payload: jsonb().$type<BouncerCreditEventOutboxPayload>().notNull(),
+    status: text()
+      .$type<'pending' | 'sending' | 'delivered' | 'failed'>()
+      .notNull()
+      .default('pending'),
+    attempts: integer().notNull().default(0),
+    next_attempt_at: timestamp({ withTimezone: true, mode: 'string' }),
+    claimed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    delivered_at: timestamp({ withTimezone: true, mode: 'string' }),
+    last_error: text(),
+  },
+  table => [
+    uniqueIndex('UQ_bouncer_credit_event_outbox_event_id_type').on(
+      table.event_id,
+      table.event_type
+    ),
+    index('IDX_bouncer_credit_event_outbox_status_next_attempt_at').on(
+      table.status,
+      table.next_attempt_at
+    ),
+    index('IDX_bouncer_credit_event_outbox_user_id').on(table.user_id),
+  ]
+);
+
+export type BouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferSelect;
+export type NewBouncerCreditEventOutboxRow = typeof bouncer_credit_event_outbox.$inferInsert;
+
 export type NewContainerUsageSegment = typeof container_usage_segment.$inferInsert;
 
 // Immutable metered-infrastructure debit ledger, partitioned monthly on the

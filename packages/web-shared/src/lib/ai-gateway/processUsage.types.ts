@@ -156,9 +156,8 @@ export type MicrodollarUsageContext = {
    */
   clientRequestId?: string | null;
   /**
-   * Report-only bouncer telemetry. Set on gateway inference requests that must
-   * report a usage event; absent where one must not be sent (the classifier
-   * overhead row, anonymous requests, the FIM and edit builders).
+   * Report-only bouncer telemetry. Set on every gateway inference request that
+   * reports a usage event; absent only on the internal classifier overhead row.
    */
   bouncer?: BouncerUsageContext;
 };
@@ -173,6 +172,12 @@ export type BouncerUsageContext = {
   requestId: string;
   /** Wall-clock time the request started. */
   occurredAt: Date;
+  /**
+   * The payer key bouncer uses: `org:<id>` for an org request, else `user:<id>`.
+   * Null for an anonymous request, which bouncer keys on the IP instead and must
+   * never turn into a payer-sharing row.
+   */
+  accountId: string | null;
   /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
   clientIp?: string | null;
   /** A known Kilo feature value or a Kilo client version header was sent. */

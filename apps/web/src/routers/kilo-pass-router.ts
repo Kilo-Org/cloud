@@ -1317,7 +1317,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   });
 
   if (params.attempt) {
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'kilo_pass',
       userId: params.kiloUserId,
       amountCents: principalMinor,

@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
@@ -37,6 +38,14 @@ import {
   isAnonymousContext,
   type AnonymousUserContext,
 } from '@/lib/anonymous';
+import { bouncerAccountId } from '@/lib/bouncer/client';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  payerSharingIp,
+  rawClientIp,
+  scheduleBouncerDecide,
+} from '@/lib/bouncer/inference';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import {
@@ -47,7 +56,10 @@ import {
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { getVercelInferenceProviderConfigForUserByok } from '@/lib/ai-gateway/providers/vercel';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
+import type {
+  OrganizationPlan,
+  OrganizationSettings,
+} from '@/lib/organizations/organization-types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
 
@@ -88,6 +100,7 @@ export async function handleEmbeddingsRequest(
   request: NextRequest
 ): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
+  const requestStartedAtMs = Date.now();
 
   // Parse body first to check model before auth (needed for anonymous access)
   const requestBodyText = await request.text();
@@ -118,7 +131,7 @@ export async function handleEmbeddingsRequest(
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
   // Extract IP for all requests (needed for free model rate limiting)
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -186,6 +199,12 @@ export async function handleEmbeddingsRequest(
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
 
+  // Resolve bouncer's IP once. Anonymous requests keep the real address (they
+  // are keyed on it and never share a payer); a signed-in usage row drops shared
+  // Kilo infrastructure so it cannot be read as a payer signal.
+  const bouncerIp = bareIpLiteral(ipAddress);
+  const bouncerRequestId = randomUUID();
+
   // Build usage context
   const promptInfo = extractEmbeddingPromptInfo(requestBodyParsed);
 
@@ -215,18 +234,31 @@ export async function handleEmbeddingsRequest(
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(requestStartedAtMs),
+      accountId: isAnonymousContext(user) ? null : bouncerAccountId(user.id, organizationId),
+      clientIp: isAnonymousContext(user) ? bouncerIp : payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null,
+      requestedLogprobs: false,
+      samples: null,
+      // Embedding input is not read by any bouncer rule, so no hash is computed.
+      promptSimHash: null,
+    },
   };
 
   setTag('ui.ai_model', requestBodyParsed.model);
 
   let organizationDataCollection: OrganizationSettings['data_collection'];
+  let accountBalance = 0;
+  let accountPlan: OrganizationPlan | undefined;
 
   // Skip balance/org checks for anonymous users — they can only use free models
   if (!isAnonymousContext(user)) {
-    const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-      organizationId,
-      user
-    );
+    const { balance, settings, plan, balanceLimitedByUserAllowance } =
+      await getBalanceAndOrgSettings(organizationId, user);
+    accountBalance = balance;
+    accountPlan = plan;
     organizationDataCollection = settings?.data_collection;
 
     if (balance <= 0 && !isFreeModel(requestedModelLowerCased) && !userByok) {
@@ -278,6 +310,19 @@ export async function handleEmbeddingsRequest(
       { status: 400 }
     );
   }
+
+  // Report-only verdict: registered with after() and never awaited, so it cannot
+  // hold up the upstream call and survives an early return.
+  scheduleBouncerDecide({
+    requestId: bouncerRequestId,
+    ip: bouncerIp,
+    account: isAnonymousContext(user)
+      ? undefined
+      : {
+          accountId: bouncerAccountId(user.id, organizationId),
+          tier: bouncerDecideTier(organizationId, accountPlan, accountBalance),
+        },
+  });
 
   const embeddingRequestSpan = startInactiveSpan({
     name: 'embedding-request-start',

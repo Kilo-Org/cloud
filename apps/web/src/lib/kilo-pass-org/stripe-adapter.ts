@@ -1230,7 +1230,7 @@ export async function createOrganizationKiloPassCheckout(input: {
   });
   const invoice = typeof updated.latest_invoice === 'object' ? updated.latest_invoice : null;
   if (input.attempt && invoice) {
-    reportChargeAttempted({
+    await reportChargeAttempted({
       flow: 'kilo_pass',
       userId: input.actorUserId,
       orgId: input.organizationId,

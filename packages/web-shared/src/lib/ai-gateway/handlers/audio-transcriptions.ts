@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
@@ -36,6 +37,14 @@ import {
 import type { PromptInfo } from '@/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { bouncerAccountId } from '@/lib/bouncer/client';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  payerSharingIp,
+  rawClientIp,
+  scheduleBouncerDecide,
+} from '@/lib/bouncer/inference';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -141,6 +150,7 @@ export async function handleAudioTranscriptionsRequest(
   request: NextRequest
 ): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
+  const requestStartedAtMs = Date.now();
 
   const isMultipartRequest = (request.headers.get('content-type') ?? '')
     .toLowerCase()
@@ -161,7 +171,7 @@ export async function handleAudioTranscriptionsRequest(
     parsedRequest.kind === 'json' ? parsedRequest.body.model.trim() : parsedRequest.model;
   const requestedModelLowerCased = requestedModel.toLowerCase();
 
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const ipAddress = rawClientIp(request);
   if (!ipAddress) {
     return NextResponse.json(
       {
@@ -204,9 +214,16 @@ export async function handleAudioTranscriptionsRequest(
 
   const user = maybeUser;
 
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
   const { provider, userByok } = await getTranscriptionProvider();
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
+
+  // Resolve bouncer's identity once for this request. Transcription is always
+  // signed in, so its usage row uses a payer-safe IP that drops shared Kilo
+  // infrastructure.
+  const bouncerIp = bareIpLiteral(ipAddress);
+  const bouncerRequestId = randomUUID();
+
   const promptInfo =
     parsedRequest.kind === 'multipart'
       ? extractMultipartPromptInfo(parsedRequest.file, parsedRequest.language)
@@ -245,11 +262,22 @@ export async function handleAudioTranscriptionsRequest(
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    bouncer: {
+      requestId: bouncerRequestId,
+      occurredAt: new Date(requestStartedAtMs),
+      accountId: bouncerAccountId(user.id, organizationId),
+      clientIp: payerSharingIp(bouncerIp, feature),
+      clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+      requestedLogprobs: false,
+      samples: null,
+      // Audio carries no user text, so there is no prompt to hash.
+      promptSimHash: null,
+    },
   };
 
   setTag('ui.ai_model', requestedModel);
 
-  const { balance, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -273,6 +301,17 @@ export async function handleAudioTranscriptionsRequest(
     });
     if (!decision.allowed) return modelNotAllowedResponse();
   }
+
+  // Report-only verdict: registered with after() and never awaited, so it cannot
+  // hold up the upstream call and survives an early return.
+  scheduleBouncerDecide({
+    requestId: bouncerRequestId,
+    ip: bouncerIp,
+    account: {
+      accountId: bouncerAccountId(user.id, organizationId),
+      tier: bouncerDecideTier(organizationId, plan, balance),
+    },
+  });
 
   sentryRootSpan()?.setAttribute(
     'transcription.time_to_request_start_ms',

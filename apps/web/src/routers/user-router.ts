@@ -960,7 +960,7 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
-          reportChargeAttempted({
+          await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
             amountCents,
@@ -990,7 +990,7 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
-      reportChargeAttempted({
+      await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,
         amountCents,

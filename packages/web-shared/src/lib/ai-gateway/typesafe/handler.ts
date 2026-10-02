@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -19,7 +20,7 @@ import {
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
-import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { logMicrodollarUsageAndReportToBouncer } from '@/lib/ai-gateway/processUsage';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { systemOneRequestSchema, systemOneResponseSchema } from '@/lib/ai-gateway/typesafe/schemas';
@@ -34,6 +35,14 @@ import {
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { bouncerAccountId } from '@/lib/bouncer/client';
+import {
+  bareIpLiteral,
+  bouncerDecideTier,
+  payerSharingIp,
+  rawClientIp,
+  scheduleBouncerDecide,
+} from '@/lib/bouncer/inference';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
   return NextResponse.json({ message, error_type }, { status });
@@ -51,7 +60,8 @@ async function isSystemOneModel(modelId: string) {
 
 export async function handleSystemOneRequest(request: NextRequest) {
   const startedAt = performance.now();
-  const ipAddress = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
+  const startedAtMs = Date.now();
+  const ipAddress = rawClientIp(request);
   if (await isGatewayAccountRateLimited(request, gatewayRateLimitKey(request.headers, ipAddress))) {
     return errorResponse('Rate limit exceeded', 'rate_limit_exceeded', 429);
   }
@@ -81,7 +91,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     );
   }
 
-  const { balance, settings, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
+  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
     organizationId,
     user
   );
@@ -112,6 +122,25 @@ export async function handleSystemOneRequest(request: NextRequest) {
       providerPolicy = { ...providerPolicy, only };
     }
   }
+
+  const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
+
+  // Resolve bouncer's identity once for this request. System One is always signed
+  // in, so its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
+  const bouncerIp = bareIpLiteral(ipAddress);
+  const bouncerRequestId = randomUUID();
+
+  // Report-only verdict: registered with after() and never awaited, so it cannot
+  // hold up the upstream call and survives an early return.
+  scheduleBouncerDecide({
+    requestId: bouncerRequestId,
+    ip: bouncerIp,
+    account: {
+      accountId: bouncerAccountId(user.id, organizationId),
+      tier: bouncerDecideTier(organizationId, plan, balance),
+    },
+  });
 
   const kiloUserId = user.id;
   const mode = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
@@ -178,10 +207,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const { id, model, provider, usage } = result.data;
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
   const cost = toMicrodollars(usage.cost);
   after(async () => {
-    await logMicrodollarUsage(
+    await logMicrodollarUsageAndReportToBouncer(
       {
         messageId: id,
         model,
@@ -225,11 +253,23 @@ export async function handleSystemOneRequest(request: NextRequest) {
         has_tools: false,
         botId,
         tokenSource,
-        feature: validateFeatureHeader(request.headers.get(FEATURE_HEADER) || ''),
+        feature,
         session_id: extractHeaderAndLimitLength(request, 'X-KiloCode-TaskId'),
         mode: extractHeaderAndLimitLength(request, 'x-kilocode-mode'),
         auto_model: null,
         ttfb_ms: ttfbMs,
+        bouncer: {
+          requestId: bouncerRequestId,
+          occurredAt: new Date(startedAtMs),
+          accountId: bouncerAccountId(user.id, organizationId),
+          clientIp: payerSharingIp(bouncerIp, feature),
+          clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+          requestedLogprobs: false,
+          samples: null,
+          // System One input is a typed classification payload, not a conversation,
+          // so there is no prompt text to hash (and no raw state leaves the gateway).
+          promptSimHash: null,
+        },
       }
     );
   });

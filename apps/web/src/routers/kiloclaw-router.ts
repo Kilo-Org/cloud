@@ -5047,7 +5047,7 @@ export const kiloclawRouter = createTRPCRouter({
       const successUrl = `${APP_URL}/payments/kiloclaw/success?session_id={CHECKOUT_SESSION_ID}&clawInstanceId=${anchorInstance.id}`;
       const cancelUrl = `${APP_URL}/claw?checkout=cancelled&clawInstanceId=${anchorInstance.id}`;
 
-      reportChargeAttempted({
+      await reportChargeAttempted({
         flow: 'kiloclaw',
         userId: ctx.user.id,
         amountCents: Math.round(
@@ -5339,7 +5339,7 @@ export const kiloclawRouter = createTRPCRouter({
             { timeout: 10_000 }
           );
           // The upsell buys a Kilo Pass subscription; its first invoice total is the charged amount.
-          reportChargeAttempted({
+          await reportChargeAttempted({
             flow: 'kilo_pass',
             userId: ctx.user.id,
             amountCents: session.amount_total ?? 0,

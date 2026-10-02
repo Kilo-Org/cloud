@@ -90,7 +90,7 @@ import {
 import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
-import { bouncerAccountId, reportUsageEvent } from '@/lib/bouncer/client';
+import { reportUsageEvent } from '@/lib/bouncer/client';
 
 const posthogClient = PostHogClient();
 
@@ -1323,10 +1323,25 @@ export async function processTokenData(
 }
 
 /**
+ * Persists a usage row and then reports the same request to bouncer's usage
+ * ledger. Used by the inference paths whose provider has no generation lookup
+ * (FIM, edit, embeddings, SystemOne); chat and transcription use
+ * `processTokenData`.
+ */
+export async function logMicrodollarUsageAndReportToBouncer(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext
+): Promise<{ usageId: string; createdAt: string } | null> {
+  const record = await logMicrodollarUsage(usageStats, usageContext);
+  await reportBouncerUsageEvent(usageStats, usageContext);
+  return record;
+}
+
+/**
  * Reports this request to bouncer's report-only usage ledger, after the billing
  * write so the final token counts are in hand. The client never rejects, and
- * the verdict is not read back. The prompt SimHash is computed here, off the
- * hot path.
+ * the verdict is not read back. The caller computes the prompt SimHash, so the
+ * raw prompt never reaches this context.
  */
 async function reportBouncerUsageEvent(
   usageStats: MicrodollarUsageStats,
@@ -1334,11 +1349,10 @@ async function reportBouncerUsageEvent(
 ): Promise<void> {
   const bouncer = usageContext.bouncer;
   if (!bouncer) return;
-  await reportUsageEvent({
+  const fields = {
     requestId: bouncer.requestId,
     occurredAt: bouncer.occurredAt,
-    accountId: bouncerAccountId(usageContext.kiloUserId, usageContext.organizationId),
-    ip: bouncer.clientIp,
+    apiKind: usageContext.api_kind,
     inputTokens: usageStats.inputTokens,
     outputTokens: usageStats.outputTokens,
     clientAttributed: bouncer.clientAttributed,
@@ -1347,7 +1361,16 @@ async function reportBouncerUsageEvent(
     requestedLogprobs: bouncer.requestedLogprobs,
     samples: bouncer.samples,
     promptSimHash: bouncer.promptSimHash,
-  });
+  };
+  if (bouncer.accountId === null) {
+    // Anonymous usage is keyed on the IP and carries no payer key, so bouncer
+    // cannot turn it into a payer-sharing row. Without an IP there is nothing to
+    // report; that is a telemetry gap, never a failure to serve the request.
+    if (bouncer.clientIp == null) return;
+    await reportUsageEvent({ ...fields, tier: 'anonymous', ip: bouncer.clientIp });
+    return;
+  }
+  await reportUsageEvent({ ...fields, accountId: bouncer.accountId, ip: bouncer.clientIp });
 }
 
 async function getGenerationLookupProvider(

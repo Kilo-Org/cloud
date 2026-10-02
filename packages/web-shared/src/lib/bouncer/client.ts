@@ -402,7 +402,12 @@ export async function deliverCreditEventWireBody(
     return { delivered: false, permanent: true, status: null, error: 'bouncer_not_configured' };
   }
   const result = await postWithResult(CREDIT_EVENT_PATH, body, CREDIT_TIMEOUT_MS, signal);
-  if (result.ok) return { delivered: true, status: result.status };
+  if (result.ok) {
+    // Drain the tiny acknowledgement body so the connection is reusable. The 2xx status is
+    // authoritative for delivery; a read error is ignored and never causes a redelivery.
+    await result.response.arrayBuffer().catch(() => undefined);
+    return { delivered: true, status: result.status };
+  }
   return { delivered: false, permanent: false, status: result.status, error: result.error };
 }
 

@@ -86,6 +86,15 @@ describe('deliverCreditEvent', () => {
     ).resolves.toEqual({ delivered: true, status: 200 });
   });
 
+  it('still delivers when the acknowledgement body read fails after a 2xx', async () => {
+    const response = new Response(null, { status: 200 });
+    jest.spyOn(response, 'arrayBuffer').mockRejectedValue(new Error('read failed'));
+    mockFetch.mockResolvedValue(response);
+    await expect(
+      deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-read-fail', userId: 'user-1' })
+    ).resolves.toEqual({ delivered: true, status: 200 });
+  });
+
   it('classifies a missing bouncer configuration as a permanent failure without sending', async () => {
     mockConfigState.bouncerUrl = null;
     const result = await deliverCreditEvent({

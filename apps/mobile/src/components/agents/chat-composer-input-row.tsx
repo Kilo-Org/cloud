@@ -103,8 +103,7 @@ type ChatComposerInputRowProps = {
   /**
    * Tone for `sendDisabledReason`: `error` (the default) paints it in the
    * destructive color; `neutral` keeps a progress phase ("Setting up
-   * environment…") or the generic not-ready line in the status tone so it does
-   * not read as a failure.
+   * environment…") in the status tone so it does not read as a failure.
    */
   sendDisabledReasonTone?: 'error' | 'neutral' | null;
   textInputStyle: TextStyle;

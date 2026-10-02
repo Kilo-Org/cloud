@@ -2568,7 +2568,6 @@
       "preparingPlaceholder": "Menyediakan persekitaran...",
       "finalizingPlaceholder": "Menyelesaikan tugasan...",
       "sessionLoadFailed": "Sesi tidak dapat dimuatkan. Cuba lagi dahulu.",
-      "sendUnavailable": "Penghantaran tidak tersedia sehingga sesi sedia.",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",

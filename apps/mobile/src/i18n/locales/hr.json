@@ -2605,7 +2605,6 @@
       "preparingPlaceholder": "Postavljanje okruženja...",
       "finalizingPlaceholder": "Dovršavanje...",
       "sessionLoadFailed": "Sesiju nije bilo moguće učitati. Prvo pokušajte ponovo.",
-      "sendUnavailable": "Slanje nije dostupno dok sesija ne bude spremna.",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Ukloni privitke da pošalješ poruku.",
       "couldNotAttachFiles": "Nije moguće priložiti datoteke. Dodirni gumb za slanje da pokušaš ponovno.",
       "discardAttachmentsMessage": "Prenesene datoteke koje nisu priložene poslanim porukama bit će izbrisane.",

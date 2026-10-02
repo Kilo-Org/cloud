@@ -2568,7 +2568,6 @@
       "preparingPlaceholder": "Undirbýr umhverfi...",
       "finalizingPlaceholder": "Lýkur verkefninu...",
       "sessionLoadFailed": "Ekki tókst að hlaða lotunni. Reyndu aftur fyrst.",
-      "sendUnavailable": "Sending er ekki í boði fyrr en lotan er tilbúin.",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
       "couldNotAttachFiles": "Ekki tókst að hengja skrárnar við. Ýttu á sendihnappinn til að reyna aftur.",
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",

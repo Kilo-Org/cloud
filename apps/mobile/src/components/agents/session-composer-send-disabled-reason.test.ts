@@ -211,13 +211,12 @@ describe('resolveComposerSendDisabledReason', () => {
     ).toBe(i18n.t(key));
   });
 
-  it('falls back to the generic line for an unresolved session', () => {
-    expect(resolveComposerSendDisabledReason(idle)).toBe(
-      i18n.t('agentChat.composer.sendUnavailable')
-    );
+  it('renders no line for an unresolved session', () => {
+    expect(resolveComposerSendDisabledReason(idle)).toBeNull();
+    expect(resolveComposerSendDisabledReasonTone(idle)).toBeNull();
   });
 
-  it('never returns null while the session cannot send', () => {
+  it('never returns null for an actionable cannot-send state', () => {
     const classInputs = CLASS_CASES.map(([, message]) => ({
       canSend: false,
       error: null,
@@ -232,7 +231,6 @@ describe('resolveComposerSendDisabledReason', () => {
       cloudStatus: null,
     }));
     const inputs = [
-      idle,
       { canSend: false, error: 'fetch failed', statusIndicator: null, cloudStatus: null },
       {
         canSend: false,
@@ -314,14 +312,13 @@ describe('resolveComposerSendDisabledReason', () => {
     ).toBe('error');
   });
 
-  it('keeps progress phases and the generic line in the neutral tone', () => {
+  it('keeps progress phases in the neutral tone', () => {
     expect(
       resolveComposerSendDisabledReasonTone({ ...idle, cloudStatus: { type: 'preparing' } })
     ).toBe('neutral');
     expect(
       resolveComposerSendDisabledReasonTone({ ...idle, cloudStatus: { type: 'finalizing' } })
     ).toBe('neutral');
-    expect(resolveComposerSendDisabledReasonTone(idle)).toBe('neutral');
     expect(
       resolveComposerSendDisabledReasonTone({
         ...idle,

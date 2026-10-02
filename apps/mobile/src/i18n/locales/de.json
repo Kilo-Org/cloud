@@ -2055,7 +2055,6 @@
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
       "sessionLoadFailed": "Die Sitzung konnte nicht geladen werden. Versuchen Sie es zuerst erneut.",
-      "sendUnavailable": "Senden ist nicht verfügbar, bis die Sitzung bereit ist.",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",

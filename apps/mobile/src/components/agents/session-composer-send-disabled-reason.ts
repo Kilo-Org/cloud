@@ -21,8 +21,7 @@ export type ComposerSendDisabledReasonInput = {
   /**
    * Whether the session resolved read-only (`manager.atoms.isReadOnly`). The
    * SDK latches `canSend` false for a read-only session, so without this the
-   * reason collapses to the generic unresolved/connecting line and tells the
-   * reader a permanently read-only session will become ready. Omit when the
+   * reason would be missing on a session that can never send. Omit when the
    * caller cannot know it.
    */
   isReadOnly?: boolean;
@@ -43,8 +42,7 @@ export type ComposerSendDisabledReasonInput = {
 /**
  * How the reason line reads. `error` paints it in the destructive tone — a
  * genuine failure the reader must act on. `neutral` keeps it in the status
- * tone, so a phase like "Setting up environment…" or the generic not-ready
- * line does not read as a failure.
+ * tone, so a phase like "Setting up environment…" does not read as a failure.
  */
 export type ComposerSendDisabledReasonTone = 'error' | 'neutral';
 
@@ -104,7 +102,10 @@ function resolveReason(
       return { message: i18n.t('agentChat.session.readOnly'), tone: 'neutral' };
     }
     // Nothing more specific to say: the session is unresolved or connecting.
-    return { message: i18n.t('agentChat.composer.sendUnavailable'), tone: 'neutral' };
+    // No line renders here: the hint above the composer caused layout shift
+    // when it appeared and cleared, and a disabled send needs no explanation
+    // while the session is still opening.
+    return null;
   }
   // A code the SDK writes itself carries its own catalog copy (connection
   // lost, stopped, delivery failed, setting up, wrapping up, committing,
@@ -150,7 +151,8 @@ function resolveReason(
 
 /**
  * One line stating why the send control cannot send right now, for the line
- * beside it. Returns null only while the session can send; every cannot-send
+ * beside it. Returns null while the session can send and while the session is
+ * still opening with nothing more specific to say; every other cannot-send
  * state resolves catalog copy so the control never reads as a bare disabled
  * arrow. The reader's own language comes from `i18n`, and the returned string
  * is the same one the input row exposes to screen readers.
@@ -162,8 +164,8 @@ function resolveReason(
  * no Retry; Cloud setup and teardown state their phase; a status line with its
  * own catalog copy states it; any other terminal failure gets the class copy
  * the transcript's status indicator renders; a read-only session names
- * read-only instead of the generic not-ready line; and every other
- * unresolved/connecting session gets the generic line.
+ * read-only; and an unresolved/connecting session with none of those renders
+ * no line instead of a generic not-ready hint.
  */
 export function resolveComposerSendDisabledReason(
   input: ComposerSendDisabledReasonInput
@@ -173,9 +175,8 @@ export function resolveComposerSendDisabledReason(
 
 /**
  * The tone the reason line should render in, paired with
- * `resolveComposerSendDisabledReason`. A phase or the generic not-ready line
- * resolves to `neutral`; a genuine failure resolves to `error`. Null only
- * while the session can send.
+ * `resolveComposerSendDisabledReason`. A phase resolves to `neutral`; a genuine
+ * failure resolves to `error`. Null only while there is no reason line.
  */
 export function resolveComposerSendDisabledReasonTone(
   input: ComposerSendDisabledReasonInput

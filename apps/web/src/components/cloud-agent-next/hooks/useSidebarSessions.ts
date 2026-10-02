@@ -210,8 +210,39 @@ export type SidebarWorktreeActivity = {
   isLive: boolean;
 };
 
-function getSidebarSessionItemUpdatedAt(item: SidebarSessionItem): string {
-  return item.type === 'worktree' ? item.latestSession.updatedAt : item.session.updatedAt;
+export type SidebarSortPins = ReadonlyMap<string, number>;
+
+/**
+ * Sort-time refresh cadence for running sessions. Their `updated_at` changes on
+ * every turn, which would otherwise reshuffle the sidebar continuously, so a
+ * running session only advances once per interval.
+ */
+export const SIDEBAR_RUNNING_BUMP_INTERVAL_MS = 60_000;
+
+export function getRunningSessionSortTime(session: StoredSession, isRunning: boolean): number {
+  const updatedAt = new Date(session.updatedAt).getTime();
+  if (!isRunning) return updatedAt;
+  const createdAt = new Date(session.createdAt).getTime();
+  return (
+    createdAt +
+    Math.floor((updatedAt - createdAt) / SIDEBAR_RUNNING_BUMP_INTERVAL_MS) *
+      SIDEBAR_RUNNING_BUMP_INTERVAL_MS
+  );
+}
+
+function getSidebarSessionItemSortTime(
+  item: SidebarSessionItem,
+  sortPins: SidebarSortPins
+): number {
+  if (item.type === 'session') {
+    return sortPins.get(item.session.sessionId) ?? new Date(item.session.updatedAt).getTime();
+  }
+  let latest = Number.NEGATIVE_INFINITY;
+  for (const session of item.sessions) {
+    const time = sortPins.get(session.sessionId) ?? new Date(session.updatedAt).getTime();
+    if (time > latest) latest = time;
+  }
+  return Number.isFinite(latest) ? latest : new Date(item.latestSession.updatedAt).getTime();
 }
 
 function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession): number {
@@ -222,7 +253,8 @@ function compareStoredSessionsByUpdatedAtDesc(a: StoredSession, b: StoredSession
 
 export function groupSidebarSessions(
   sessions: StoredSession[],
-  worktreeDetails: Record<string, SidebarWorktreeDetails> = {}
+  worktreeDetails: Record<string, SidebarWorktreeDetails> = {},
+  sortPins: SidebarSortPins = new Map()
 ): SidebarSessionItem[] {
   const worktreeGroups = new Map<string, StoredSession[]>();
   const items: SidebarSessionItem[] = [];
@@ -258,15 +290,15 @@ export function groupSidebarSessions(
 
   return items.sort(
     (a, b) =>
-      new Date(getSidebarSessionItemUpdatedAt(b)).getTime() -
-      new Date(getSidebarSessionItemUpdatedAt(a)).getTime()
+      getSidebarSessionItemSortTime(b, sortPins) - getSidebarSessionItemSortTime(a, sortPins)
   );
 }
 
 export function groupSidebarSessionsByDate(
   sessions: StoredSession[],
   now = new Date(),
-  worktreeDetails: Record<string, SidebarWorktreeDetails> = {}
+  worktreeDetails: Record<string, SidebarWorktreeDetails> = {},
+  sortPins: SidebarSortPins = new Map()
 ): SidebarSessionDateGroup[] {
   const today: SidebarSessionItem[] = [];
   const yesterday: SidebarSessionItem[] = [];
@@ -274,8 +306,8 @@ export function groupSidebarSessionsByDate(
   const older: SidebarSessionItem[] = [];
   const todayStart = startOfDay(now);
 
-  for (const item of groupSidebarSessions(sessions, worktreeDetails)) {
-    const date = new Date(getSidebarSessionItemUpdatedAt(item));
+  for (const item of groupSidebarSessions(sessions, worktreeDetails, sortPins)) {
+    const date = new Date(getSidebarSessionItemSortTime(item, sortPins));
     if (isSameDay(date, now)) {
       today.push(item);
     } else if (isSameDay(date, subDays(now, 1))) {
@@ -308,8 +340,7 @@ export function groupSidebarSessionsByDate(
   if (older.length > 0) {
     older.sort(
       (a, b) =>
-        new Date(getSidebarSessionItemUpdatedAt(b)).getTime() -
-        new Date(getSidebarSessionItemUpdatedAt(a)).getTime()
+        getSidebarSessionItemSortTime(b, sortPins) - getSidebarSessionItemSortTime(a, sortPins)
     );
     groups.push({ label: 'Older', items: older });
   }

@@ -4,8 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Input } from './input';
 import { act, TestRenderer } from '@/test/renderer';
+import { lightColors } from '@/lib/hooks/theme-colors.generated';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
+// Mutable so a suite can prove the placeholder follows the active palette. The
+// inset is palette-independent; every suite resets the mock to the light tokens.
+const appearance = vi.hoisted((): { colors: Record<string, string> } => ({ colors: {} }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   TextInput: 'TextInput',
@@ -16,13 +20,16 @@ vi.mock('react-native', () => ({
   },
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => appearance.colors,
 }));
+
+appearance.colors = lightColors;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
   rtl.isRTL = false;
+  appearance.colors = lightColors;
   act(() => {
     renderer?.unmount();
   });

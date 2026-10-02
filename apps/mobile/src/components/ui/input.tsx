@@ -23,12 +23,15 @@ const INPUT_BOX_VERTICAL_STYLE: TextStyle = {
   textAlignVertical: 'center',
 };
 
+// Multiline callers retain their own height and line height.
+const INPUT_MULTILINE_INSET_CLASS = 'px-3 py-2.5';
+
 /**
  * The one single-line box: `min-h-[44px] px-3 leading-[normal]`, no vertical
  * padding, Android's center gravity, one line box for the placeholder and the
  * value, and RTL content alignment. A call site keeps its own chrome, text size
- * and horizontal inset; a `multiline` call site keeps its own box, gravity and
- * line break mode.
+ * and horizontal inset; a multiline caller keeps its own gravity and line break
+ * mode, plus the shared inset unless its padding classes override it.
  */
 function Input({
   className,
@@ -53,7 +56,7 @@ function Input({
       {...props}
       multiline={multiline}
       className={cn(
-        multiline ? undefined : INPUT_BOX_SHAPE_CLASS,
+        multiline ? INPUT_MULTILINE_INSET_CLASS : INPUT_BOX_SHAPE_CLASS,
         className,
         multiline ? undefined : INPUT_BOX_LINE_HEIGHT_CLASS
       )}

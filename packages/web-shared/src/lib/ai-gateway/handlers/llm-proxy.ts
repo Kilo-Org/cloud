@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { isIP } from 'net';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { toMicrodollars } from '@/lib/microdollars';
@@ -201,6 +202,23 @@ async function resolveRateLimit(
 const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;
 
 /**
+ * Bouncer's typia types accept a bare IPv4/IPv6 literal only. `x-forwarded-for`
+ * can carry an IPv6 bracket, a port, or a value that is not an address at all,
+ * so drop the wrapper and return `undefined` unless a literal remains.
+ */
+function bareIpLiteral(value: string): string | undefined {
+  const bracketed = /^\[([^\]]+)\](?::\d+)?$/.exec(value);
+  const ipv4WithPort = /^([^:]+):\d+$/.exec(value);
+  const candidate = bracketed?.[1] ?? ipv4WithPort?.[1] ?? value;
+  // A scope id passes `isIP`, and bouncer's typia format rejects it. Drop it rather
+  // than send a value that fails the whole event.
+  if (candidate.includes('%')) {
+    return undefined;
+  }
+  return isIP(candidate) ? candidate : undefined;
+}
+
+/**
  * Starts bouncer's report-only `decide` call as soon as the account is known.
  * The promise never rejects and its verdict is never read.
  */
@@ -208,13 +226,17 @@ function startBouncerDecide(params: {
   requestId: string;
   user: { id: string } | AnonymousUserContext;
   organizationId: string | undefined;
-  ip: string;
+  ip: string | undefined;
   balanceAndSettingsPromise: Promise<{ balance: number; plan?: OrganizationPlan }>;
 }): Promise<void> {
   const { requestId, user, organizationId, ip, balanceAndSettingsPromise } = params;
 
   const verdict = isAnonymousContext(user)
-    ? decide({ requestId, tier: 'anonymous', ip }, { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS })
+    ? ip === undefined
+      ? // Bouncer keys anonymous verdicts on the IP, so there is nothing to ask
+        // for a request whose address did not resolve.
+        Promise.resolve(null)
+      : decide({ requestId, tier: 'anonymous', ip }, { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS })
     : (async () => {
         // The tier needs the balance/plan promise. It already runs in parallel
         // with everything else here, so awaiting it inside this call moves no
@@ -227,7 +249,7 @@ function startBouncerDecide(params: {
               ? 'paid'
               : 'free';
         await decide(
-          { requestId, tier, accountId: bouncerAccountId(user.id, organizationId) },
+          { requestId, tier, accountId: bouncerAccountId(user.id, organizationId), ip },
           { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
         );
       })();
@@ -516,6 +538,10 @@ export async function handleLlmProxyRequest(
     );
   }
 
+  // Bouncer takes a bare IP literal. Normalize once here and reuse the value for
+  // the report-only decide call and the usage event, which share this request.
+  const clientIp = bareIpLiteral(ipAddress);
+
   // For rate-limited Kilo-exclusive models: check the limit and log at start.
   // Server-side products (cloud-agent, code-review, app-builder) rate-limit
   // per user when the request comes from Cloudflare IPs (Kilo infrastructure).
@@ -625,7 +651,7 @@ export async function handleLlmProxyRequest(
       requestId: bouncerRequestId,
       user,
       organizationId,
-      ip: ipAddress,
+      ip: clientIp,
       balanceAndSettingsPromise,
     })
   );
@@ -899,6 +925,7 @@ export async function handleLlmProxyRequest(
       : {
           requestId: bouncerRequestId,
           occurredAt: new Date(requestStartedAtMs),
+          clientIp,
           clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
           requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
           samples: requestedSamples(requestBodyParsed.body),

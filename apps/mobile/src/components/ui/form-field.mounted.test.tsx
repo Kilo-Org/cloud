@@ -5,10 +5,14 @@ import { FormField } from './form-field';
 import { AccessibleStatus } from './accessible-status';
 import { act, TestRenderer } from '@/test/renderer';
 import { i18n } from '@/i18n';
+import { lightColors } from '@/lib/hooks/theme-colors.generated';
 import ar from '@/i18n/locales/ar.json';
 import en from '@/i18n/locales/en.json';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
+// Mutable so a suite can prove the placeholder follows the active palette. The
+// inset is palette-independent; every suite resets the mock to the light tokens.
+const appearance = vi.hoisted((): { colors: Record<string, string> } => ({ colors: {} }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'android' },
   View: 'View',
@@ -21,14 +25,17 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#888888' }),
+  useThemeColors: () => appearance.colors,
 }));
 vi.mock('@/lib/a11y/status-announcement', () => ({ useStatusAnnouncement: vi.fn() }));
+
+appearance.colors = lightColors;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 afterEach(() => {
   rtl.isRTL = false;
+  appearance.colors = lightColors;
   act(() => {
     renderer?.unmount();
   });

@@ -38,7 +38,6 @@ import { captureException } from '@sentry/nextjs';
 import { getOrganizationById, getUserOrgMemberships } from '@/lib/organizations/organizations';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
@@ -1220,10 +1219,6 @@ export const authOptions: NextAuthOptions = {
           !(await mayConnectOpenAiChatGptSharedServices(result.user, linkingSession.organizationId))
         ) {
           return openAiChatGptConnectFailureUrl(linkingSession.organizationId, 'LINKING-FAILED');
-        }
-
-        if (!isAccountLinking && autoLinkToExistingUser) {
-          await ensureVerifiedDomainOrganizationMembership(result.user.id);
         }
 
         // NOTE(bmc): this is sad but its here for a reason, don't change it

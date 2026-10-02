@@ -8,8 +8,12 @@ jest.mock('@/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => `test-${name}`,
 }));
 
-jest.mock('@/lib/ai-gateway/monitored-models', () => ({
-  monitoredModels: ['poolside/laguna-s-2.1:free', 'minimax/minimax-m3', 'minimax/minimax-m3:free'],
+jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+  getMonitoredModels: async () => [
+    'poolside/laguna-s-2.1:free',
+    'minimax/minimax-m3',
+    'minimax/minimax-m3:free',
+  ],
 }));
 
 import { GET } from './route';

@@ -49,11 +49,11 @@ to send platform feedback and bug reports rather than a support channel.
 The first path segment names an area. Search to learn an area's vocabulary:
 each row's `summary` and `tags` are what the search matches.
 
-**867 procedures** — **370 queries**, **497 mutations** — under **53 prefixes**.
+**864 procedures** — **370 queries**, **494 mutations** — under **53 prefixes**.
 
 | Prefix | Procedures | Queries | Mutations |
 |---|---:|---:|---:|
-| `organizations` | 305 | 132 | 173 |
+| `organizations` | 301 | 131 | 170 |
 | `kiloclaw` | 96 | 35 | 61 |
 | `user` | 40 | 15 | 25 |
 | `cloudAgentNext` | 31 | 12 | 19 |
@@ -96,6 +96,7 @@ each row's `summary` and `tags` are what the search matches.
 | `quickChat` | 3 | 1 | 2 |
 | `unifiedSessions` | 3 | 3 | 0 |
 | `mcpGatewayAuthorizations` | 2 | 1 | 1 |
+| `models` | 2 | 2 | 0 |
 | `openAiChatGpt` | 2 | 1 | 1 |
 | `spendAlerts` | 2 | 1 | 1 |
 | `appBuilderFeedback` | 1 | 0 | 1 |
@@ -103,7 +104,6 @@ each row's `summary` and `tags` are what the search matches.
 | `cloudAgentNextFeedback` | 1 | 0 | 1 |
 | `feedback` | 1 | 0 | 1 |
 | `kiloChat` | 1 | 1 | 0 |
-| `models` | 1 | 1 | 0 |
 | `platformIntegrations` | 1 | 1 | 0 |
 | `userFeedback` | 1 | 0 | 1 |
 
@@ -111,6 +111,6 @@ each row's `summary` and `tags` are what the search matches.
 
 The second path segment of each area that splits, with procedure counts:
 
-- `organizations.*` — 305: `kiloclaw` 66, `cloudAgentNext` 31, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `bitbucket` 6, `sso` 6, `autoTopUp` 5, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `verifiedDomains` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
+- `organizations.*` — 301: `kiloclaw` 66, `cloudAgentNext` 31, `securityAgent` 26, `(direct)` 19, `appBuilder` 17, `deployments` 17, `groups` 14, `reviewAgent` 13, `subscription` 12, `kiloPass` 11, `settings` 11, `autoTriage` 8, `autoFix` 7, `members` 7, `bitbucket` 6, `sso` 6, `autoTopUp` 5, `modes` 5, `subOrganizations` 5, `usageDetails` 5, `securityAuditLog` 4, `auditLogs` 3, `funds` 2, `salesDemo` 1
 
 - `codeReviews.*` — 9: `(direct)` 7, `analytics` 2

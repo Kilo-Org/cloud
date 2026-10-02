@@ -50,9 +50,6 @@ jest.mock('@/lib/tokens', () => ({
   generateApiToken: jest.fn(),
   TOKEN_EXPIRY: { oneHour: 3600 },
 }));
-jest.mock('@/lib/organizations/verified-domain-membership', () => ({
-  ensureVerifiedDomainOrganizationMembership: jest.fn(),
-}));
 jest.mock('@/lib/auth/native-id-tokens', () => ({
   ...jest.requireActual('@/lib/auth/native-id-tokens'),
   verifyNativeAppleIdToken: jest.fn(),

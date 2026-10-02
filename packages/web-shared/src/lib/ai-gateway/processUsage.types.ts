@@ -173,6 +173,8 @@ export type BouncerUsageContext = {
   requestId: string;
   /** Wall-clock time the request started. */
   occurredAt: Date;
+  /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
+  clientIp?: string | null;
   /** A known Kilo feature value or a Kilo client version header was sent. */
   clientAttributed: boolean;
   /** The request set `logprobs`, `top_logprobs`, or a non-empty `logit_bias`. */

@@ -18,6 +18,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { LegendPayload, TooltipPayload } from 'recharts';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -72,6 +73,11 @@ function errorRate(series: RequestSeries, index: number): number | null {
   const requests = series.requests[index];
   if (requests < MIN_REQUESTS_FOR_ERROR_RATE) return null;
   return (series.errors[index] / requests) * 100;
+}
+
+// All-zero or fully filtered-out data would otherwise give a zero-height or non-finite axis.
+function errorRateAxisMax(dataMax: number): number {
+  return Number.isFinite(dataMax) ? Math.max(1, Math.min(100, Math.ceil(dataMax))) : 100;
 }
 
 function useModelTraffic(excludeByok: boolean) {
@@ -312,7 +318,7 @@ function ErrorRateChart({
           <YAxis
             tick={{ fontSize: 11 }}
             tickFormatter={(value: number) => `${value}%`}
-            domain={[0, (dataMax: number) => Math.min(100, Math.ceil(dataMax))]}
+            domain={[0, errorRateAxisMax]}
             allowDecimals={false}
             width={48}
           />
@@ -378,7 +384,7 @@ function ChartPlaceholder({ title, message }: { title: string; message?: string 
 export function ModelTrafficContent() {
   const [excludeByok, setExcludeByok] = useState(true);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const { data, error, isPending, dataUpdatedAt } = useModelTraffic(excludeByok);
+  const { data, error, dataUpdatedAt } = useModelTraffic(excludeByok);
   const onToggle = (entry: LegendPayload) => setHidden(current => toggleLabel(current, entry));
 
   return (
@@ -398,17 +404,25 @@ export function ModelTrafficContent() {
         </div>
       </div>
 
-      {isPending ? (
+      {data ? (
         <>
-          <ChartPlaceholder title="Request volume" />
-          <ChartPlaceholder title="Error rate" />
+          {error && (
+            <Alert variant="warning">
+              <AlertDescription>
+                Refresh failed: {error.message}. Showing data from{' '}
+                {format(dataUpdatedAt, 'HH:mm:ss')}.
+              </AlertDescription>
+            </Alert>
+          )}
+          <RequestVolumeChart traffic={data} hidden={hidden} onToggle={onToggle} />
+          <ErrorRateChart traffic={data} hidden={hidden} onToggle={onToggle} />
         </>
       ) : error ? (
         <ChartPlaceholder title="Model traffic" message={error.message} />
       ) : (
         <>
-          <RequestVolumeChart traffic={data} hidden={hidden} onToggle={onToggle} />
-          <ErrorRateChart traffic={data} hidden={hidden} onToggle={onToggle} />
+          <ChartPlaceholder title="Request volume" />
+          <ChartPlaceholder title="Error rate" />
         </>
       )}
     </div>

@@ -48,7 +48,7 @@ function imageCount(root: TestRenderer.ReactTestInstance): number {
 }
 
 describe('MarkdownImage viewer mounting', () => {
-  it('mounts ImageViewerModal only after the image is confirmed and pressed', async () => {
+  it('mounts ImageViewer only after the image is confirmed and pressed', async () => {
     const rendererRef: { current: TestRenderer.ReactTestRenderer | undefined } = {
       current: undefined,
     };

@@ -189,7 +189,7 @@ export async function handleEmbeddingsRequest(
   }
 
   // Extract fraud/project headers
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
   const { provider, userByok } = await getEmbeddingProvider(
     requestedModelLowerCased,
@@ -198,6 +198,9 @@ export async function handleEmbeddingsRequest(
   );
 
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || 'embeddings');
+  // Attribution must not inherit the billing fallback. A Kilo client is shown only
+  // by a genuine feature value or a Kilo client version header.
+  const attributionFeature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
   // Resolve bouncer's IP once. Anonymous requests keep the real address (they
   // are keyed on it and never share a payer); a signed-in usage row drops shared
@@ -239,7 +242,7 @@ export async function handleEmbeddingsRequest(
       occurredAt: new Date(requestStartedAtMs),
       accountId: isAnonymousContext(user) ? null : bouncerAccountId(user.id, organizationId),
       clientIp: isAnonymousContext(user) ? bouncerIp : payerSharingIp(bouncerIp, feature),
-      clientAttributed: feature !== null,
+      clientAttributed: attributionFeature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // Embedding input is not read by any bouncer rule, so no hash is computed.

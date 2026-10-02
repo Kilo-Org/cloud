@@ -1114,6 +1114,7 @@ async function enqueueAppStoreCreditEventToBouncer(
   if (!report) return;
   const userId = await resolveAppStoreKiloPassOwner(database, params.transaction);
   if (!userId) return;
+  const isCreditPack = Boolean(getStoreCreditProductByAppleProductId(params.transaction.productId));
   const event: StoreCreditEvent = {
     ...report,
     provider: 'apple',
@@ -1123,7 +1124,9 @@ async function enqueueAppStoreCreditEventToBouncer(
         ? undefined
         : new Date(params.notification.signedDate),
     userId,
-    originalTransactionId: params.transaction.originalTransactionId,
+    // `originalTransactionId` labels the Kilo Pass subscription chain only. A credit pack has no
+    // subscription, so its original transaction id would not correlate one; omit it.
+    originalTransactionId: isCreditPack ? undefined : params.transaction.originalTransactionId,
     referenceId: params.transaction.transactionId,
     environment: 'production',
   };

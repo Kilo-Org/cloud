@@ -70,6 +70,22 @@ describe('deliverCreditEvent', () => {
     });
   });
 
+  it('treats a body-less 204 success as delivered without parsing a body', async () => {
+    mockFetch.mockResolvedValue(new Response(null, { status: 204 }));
+    await expect(
+      deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-204', userId: 'user-1' })
+    ).resolves.toEqual({ delivered: true, status: 204 });
+  });
+
+  it('treats a non-JSON 2xx success as delivered', async () => {
+    mockFetch.mockResolvedValue(
+      new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } })
+    );
+    await expect(
+      deliverCreditEvent({ type: 'charge.failed', eventId: 'evt-text', userId: 'user-1' })
+    ).resolves.toEqual({ delivered: true, status: 200 });
+  });
+
   it('classifies a missing bouncer configuration as a permanent failure without sending', async () => {
     mockConfigState.bouncerUrl = null;
     const result = await deliverCreditEvent({

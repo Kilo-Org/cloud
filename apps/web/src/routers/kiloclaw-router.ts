@@ -31,7 +31,11 @@ import {
   MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
 } from '@/lib/kiloclaw/morning-briefing-interests';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
+import {
+  enqueueChargeAttempted,
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+} from '@/lib/bouncer/credit-events';
 import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import {
   classifyKiloClawCommitTerm,
@@ -5313,8 +5317,8 @@ export const kiloclawRouter = createTRPCRouter({
         userId: ctx.user.id,
         stripeCustomerId,
         metadata: sessionMetadata,
-        createSession: async () => {
-          const session = await stripe.checkout.sessions.create(
+        createSession: async () =>
+          stripe.checkout.sessions.create(
             {
               mode: 'subscription',
               customer: stripeCustomerId,
@@ -5337,18 +5341,19 @@ export const kiloclawRouter = createTRPCRouter({
               metadata: sessionMetadata,
             },
             { timeout: 10_000 }
-          );
-          // The upsell buys a Kilo Pass subscription; its first invoice total is the charged amount.
-          await reportChargeAttempted({
+          ),
+        // The upsell buys a Kilo Pass subscription; its first invoice total is the charged amount.
+        // Enqueue inside the checkout transaction for the charged session, created or reused.
+        onSession: (tx, session) =>
+          enqueueChargeAttempted(tx, {
+            eventId: `kilo-pass-checkout:${session.id}`,
             flow: 'kilo_pass',
             userId: ctx.user.id,
             amountCents: session.amount_total ?? 0,
             accountCreatedAt: ctx.user.created_at,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
-          });
-          return session;
-        },
+          }),
       });
     }),
 

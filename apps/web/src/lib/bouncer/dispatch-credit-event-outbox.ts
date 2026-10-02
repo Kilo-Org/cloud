@@ -114,7 +114,10 @@ async function dispatchCreditEvent(
     return 'failed';
   }
 
-  // A soft delete after enqueue must not send the deleted account's PII: drop the row instead.
+  // A soft delete after enqueue must not send the deleted account's PII: recheck the owner here and
+  // drop the claim instead. This only prevents a send that has not happened; a delivery already
+  // made before the deletion cannot be undone. The delete is fenced on this claim, so it never
+  // removes a row a newer claim owns.
   const [owner] = await db
     .select({ blockedReason: kilocode_users.blocked_reason })
     .from(kilocode_users)
@@ -122,7 +125,7 @@ async function dispatchCreditEvent(
     .limit(1);
   if (owner && isGoneOrDeletingBlockedReason(owner.blockedReason)) {
     logWarning('Dropping bouncer credit event for a soft-deleted user', outboxLogFields(row));
-    await deleteBouncerCreditEvent(db, row.id);
+    await deleteBouncerCreditEvent(db, { id: row.id, claimedAt });
     return 'failed';
   }
 

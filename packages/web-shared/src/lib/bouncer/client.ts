@@ -225,13 +225,15 @@ function compact<T extends Record<string, unknown>>(body: T): Record<string, unk
 }
 
 type PostResult =
-  | { ok: true; status: number; body: unknown }
+  | { ok: true; status: number; response: Response }
   | { ok: false; status: number | null; error: string };
 
 /**
  * One POST to the worker with an explicit result. Never throws: a transport error, timeout, or
- * non-2xx status becomes `{ ok: false }` carrying the status when one was received. The error name
- * is preserved because an abort reason is a DOMException, which is not always `instanceof Error`.
+ * non-2xx status becomes `{ ok: false }` carrying the status when one was received. A 2xx returns
+ * the raw `Response` and never reads the body, so a body-less or non-JSON success (for example a
+ * 204) is still a real delivery and cannot fail a financial report. The error name is preserved
+ * because an abort reason is a DOMException, which is not always `instanceof Error`.
  */
 async function postWithResult(
   path: string,
@@ -251,7 +253,7 @@ async function postWithResult(
     if (!response.ok) {
       return { ok: false, status: response.status, error: `http_${response.status}` };
     }
-    return { ok: true, status: response.status, body: await response.json() };
+    return { ok: true, status: response.status, response };
   } catch (error) {
     const name = (error as { name?: unknown } | null)?.name;
     return {
@@ -262,7 +264,10 @@ async function postWithResult(
   }
 }
 
-/** Best-effort POST for usage/decide: resolves to null on any failure and logs it. */
+/**
+ * Best-effort POST for usage/decide: resolves to null on any failure and logs it. Only these
+ * verdict-shaped callers read a JSON body; a body-less/non-JSON success resolves to null.
+ */
 async function post(
   path: string,
   body: unknown,
@@ -271,7 +276,13 @@ async function post(
 ): Promise<unknown> {
   if (!BOUNCER_URL || !INTERNAL_API_SECRET) return null;
   const result = await postWithResult(path, body, timeoutMs, signal);
-  if (result.ok) return result.body;
+  if (result.ok) {
+    try {
+      return await result.response.json();
+    } catch {
+      return null;
+    }
+  }
   // A decide timeout is expected on a slow call; it is not worth an error line each time.
   if (!(result.error === 'TimeoutError' && path === DECIDE_PATH)) {
     console.error('[bouncer] request failed', { path, status: result.status, error: result.error });

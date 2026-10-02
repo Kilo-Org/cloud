@@ -127,16 +127,24 @@ export async function enqueueBouncerCreditEvent(
 }
 
 /**
- * Deletes one row by id. Used by the drainer to drop a claimed row whose owner became gone/deleting
- * after enqueue, so a stale claim never sends a deleted account's PII.
+ * Deletes a claimed row, fenced on the claim token `claimedAt` (and `sending` status) exactly like
+ * the delivery marks: used by the drainer to drop a claimed row whose owner became gone/deleting
+ * after enqueue, so a stale claim never sends a deleted account's PII and never deletes a row a
+ * newer claim now owns. Returns false when the claim already transitioned.
  */
 export async function deleteBouncerCreditEvent(
   database: BouncerCreditEventOutboxDatabase,
-  id: string
+  input: { id: string; claimedAt: string }
 ): Promise<boolean> {
   const deleted = await database
     .delete(bouncer_credit_event_outbox)
-    .where(eq(bouncer_credit_event_outbox.id, id))
+    .where(
+      and(
+        eq(bouncer_credit_event_outbox.id, input.id),
+        eq(bouncer_credit_event_outbox.status, 'sending'),
+        eq(bouncer_credit_event_outbox.claimed_at, input.claimedAt)
+      )
+    )
     .returning({ id: bouncer_credit_event_outbox.id });
   return deleted.length > 0;
 }

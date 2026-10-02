@@ -143,7 +143,7 @@ const SessionRow = memo(function SessionRow({
   isEditing: boolean;
   editTitle: string;
   onEditTitleChange: (value: string) => void;
-  onSaveRename: () => void;
+  onSaveRename?: () => void;
   onCancelRename: () => void;
   onClick: (sessionId: string) => void;
 }) {
@@ -165,7 +165,7 @@ const SessionRow = memo(function SessionRow({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      onSaveRename();
+      onSaveRename?.();
     } else if (e.key === 'Escape') {
       e.preventDefault();
       onCancelRename();
@@ -959,9 +959,9 @@ export function ChatSidebar({
         onStartRename={onRenameSession ? handleStartRename : undefined}
         isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
         isEditing={editingSessionId === session.sessionId}
-        editTitle={editTitle}
+        editTitle={editingSessionId === session.sessionId ? editTitle : ''}
         onEditTitleChange={setEditTitle}
-        onSaveRename={handleSaveRename}
+        onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
         onCancelRename={handleCancelRename}
         onClick={handleSessionClick}
       />

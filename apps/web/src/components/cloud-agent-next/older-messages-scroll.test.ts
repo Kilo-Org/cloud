@@ -329,17 +329,22 @@ describe('useOlderMessagesPagination readiness', () => {
     const isProgrammaticScrollRef = { current: false };
     const lastScrollTopRef = { current: 0 };
 
+    let api: PaginationApi | null = null;
     renderPagination({
       ready: false,
       isLoadingOlderMessages: false,
       resetKey: 'ses',
       onLoad,
-      onApi: () => undefined,
+      onApi: next => {
+        api = next;
+      },
       scrollElementRef,
       isProgrammaticScrollRef,
       lastScrollTopRef,
     });
 
+    act(() => api?.tryLoadOlderFromScroll(0));
+    act(() => api?.requestOlderMessages());
     expect(onLoad).not.toHaveBeenCalled();
     expect(heightReads()).toBe(0);
 

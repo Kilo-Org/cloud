@@ -457,7 +457,10 @@ describe('ChatSidebar row rendering', () => {
     const input = dom.container.querySelector('input');
     if (!input) throw new Error('Rename input missing');
 
+    indicatorMock.mockClear();
     setInputValue(input, '  Renamed zero  ');
+    expect(indicatorMock).not.toHaveBeenCalled();
+    expect(input.getAttribute('value')).toBe('  Renamed zero  ');
     dispatchKey(input, 'Enter');
     await act(async () => undefined);
 

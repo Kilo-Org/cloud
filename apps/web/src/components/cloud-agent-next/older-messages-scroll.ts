@@ -151,6 +151,7 @@ export function useOlderMessagesPagination({
 
   const requestOlderMessages = useCallback(() => {
     if (
+      !ready ||
       !shouldTriggerOlderMessagesLoad({
         hasOlderMessages,
         isLoadingOlderMessages,
@@ -160,7 +161,7 @@ export function useOlderMessagesPagination({
     ) {
       return;
     }
-    const el = ready ? scrollElementRef.current : null;
+    const el = scrollElementRef.current;
     if (el) pendingHeightRef.current = el.scrollHeight;
     inFlightRef.current = true;
     void Promise.resolve(onLoad()).finally(() => {

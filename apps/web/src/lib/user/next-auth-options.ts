@@ -1,8 +1,8 @@
 import 'server-only';
-import { JWT_TOKEN_VERSION } from '@/lib/tokens';
+import { JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { cookies, headers } from 'next/headers';
 
-import { findUserById } from '@/lib/user/find-user-by-id';
+import { findUserById } from '@kilocode/web-shared/lib/user/find-user-by-id';
 import type { CreateOrUpdateUserArgs, CreateOrUpdateUserTrackingContext } from '@/lib/user';
 import { createOrUpdateUser, findAndSyncExistingUser } from '@/lib/user';
 import type { NextAuthOptions, Account, User as NextUser, Profile } from 'next-auth';
@@ -17,9 +17,9 @@ import DiscordProvider from 'next-auth/providers/discord';
 import WorkOSProvider from 'next-auth/providers/workos';
 import AppleProvider from 'next-auth/providers/apple';
 import CredentialsProvider from 'next-auth/providers/credentials';
-import { allow_fake_login } from '@/lib/constants';
+import { allow_fake_login } from '@kilocode/web-shared/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { verifyAndConsumeMagicLinkToken } from '@/lib/auth/magic-link-tokens';
+import { verifyAndConsumeMagicLinkToken } from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
 import { IMPACT_CLICK_ID_COOKIE } from '@/lib/impact/affiliate-utils';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -33,18 +33,21 @@ import type { AdapterUser } from 'next-auth/adapters';
 import assert from 'node:assert';
 import type { User } from '@kilocode/db/schema';
 import type { AuthProviderId } from '@kilocode/db/schema-types';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { captureException } from '@sentry/nextjs';
-import { getOrganizationById, getUserOrgMemberships } from '@/lib/organizations/organizations';
-import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
+import {
+  getOrganizationById,
+  getUserOrgMemberships,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { ensureVerifiedDomainOrganizationMembership } from '@/lib/organizations/verified-domain-membership';
 import type { AccountLinkingSession } from '@/lib/account-linking-session';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';
 import { linkAccountToExistingUser } from '@/lib/user';
-import { whenOk } from '@/lib/maybe-result';
-import type { AuthErrorType } from '@/lib/auth/constants';
-import { hosted_domain_specials } from '@/lib/auth/constants';
+import { whenOk } from '@kilocode/web-shared/lib/maybe-result';
+import type { AuthErrorType } from '@kilocode/web-shared/lib/auth/constants';
+import { hosted_domain_specials } from '@kilocode/web-shared/lib/auth/constants';
 import { authFailureRedirectUrl, ssoSignInRedirectUrl } from '@/lib/auth/redirect-urls';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import {
@@ -54,12 +57,12 @@ import {
   OPENAI_REDIRECT_URI,
   OPENAI_RESOURCE,
   isOpenAiTokenSharingGrant,
-} from '@/lib/auth/openai/config';
+} from '@kilocode/web-shared/lib/auth/openai/config';
 import {
   openAiChatGptSharedServicesOwner,
   saveOpenAiChatGptConnection,
-} from '@/lib/ai-gateway/openai-chatgpt/store';
-import type { OpenAiChatGptOwner } from '@/lib/ai-gateway/openai-chatgpt/store';
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { OpenAiChatGptOwner } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
 import {
   GITHUB_CLIENT_ID,
   GITHUB_CLIENT_SECRET,
@@ -83,18 +86,18 @@ import {
   APPLE_TEAM_ID,
   APPLE_KEY_ID,
   APPLE_PRIVATE_KEY,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import jwt from 'jsonwebtoken';
 import type { UUID } from 'node:crypto';
-import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
+import { logExceptInTest, sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { processSSOUserLogin } from '@/lib/user/sso';
-import { getLowerDomainFromEmail } from '@/lib/email-address';
+import { getLowerDomainFromEmail } from '@kilocode/web-shared/lib/email-address';
 import { z } from 'zod';
 import {
   isBlockedTLD,
   isEmailBlacklistedByDomainAsync,
   sessionAuthOptions,
-} from '@/lib/user/server';
+} from '@kilocode/web-shared/lib/user/server';
 
 export type TurnstileJwtPayload = {
   /**

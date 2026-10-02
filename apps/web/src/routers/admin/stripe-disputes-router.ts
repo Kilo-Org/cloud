@@ -10,13 +10,13 @@ import { and, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import * as z from 'zod';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   acceptStripeDisputeCase,
   isStripeDisputeCaseActionError,
   stripeDisputeDashboardUrl,
 } from '@/lib/stripe/disputes';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 
 const DisputeQueueStatusSchema = z.enum([
   'all',

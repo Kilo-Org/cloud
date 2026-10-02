@@ -1,9 +1,9 @@
-import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
-import { getOrganizationById } from '@/lib/organizations/organizations';
+import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
+import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   getEffectiveModelDecision,
   resolveOrganizationDefaultModelPolicy,
-} from '@/lib/organizations/effective-model-access.server';
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 /**
  * Get a default model that is allowed for an organization.

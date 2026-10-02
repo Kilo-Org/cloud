@@ -20,7 +20,7 @@ import {
 import { useConfirm } from '@/components/ui/confirm';
 import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { capitalize } from '@/lib/utils';
-import { SEAT_PRICING } from '@/lib/organizations/constants';
+import { SEAT_PRICING } from '@kilocode/web-shared/lib/organizations/constants';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { DetailPageHeader } from '@/components/subscriptions/DetailPageHeader';
 import { BillingHistoryTable } from '@/components/subscriptions/BillingHistoryTable';

@@ -17,7 +17,9 @@ jest.mock('next/navigation', () => ({
   }),
 }));
 
-jest.mock('@/lib/constants', () => ({ APP_URL: 'https://app.test.example.com' }));
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  APP_URL: 'https://app.test.example.com',
+}));
 jest.mock('@/lib/session-ingest-client', () => ({
   fetchSharedSessionMetadata: jest.fn(),
   fetchSharedSessionSnapshot: jest.fn(),

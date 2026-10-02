@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
-import { getModelStatsSnapshot } from '@/lib/model-stats/model-stats-cache';
+import { publishEnkryptModelStats } from '@kilocode/web-shared/lib/model-stats/enkrypt-publication';
+import { getModelStatsSnapshot } from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 
 export const revalidate = 0;
 export const dynamic = 'force-dynamic';

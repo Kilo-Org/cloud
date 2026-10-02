@@ -12,7 +12,7 @@ import {
   getAutoRoutingMode,
   getAutoRoutingSettings,
   updateAutoRoutingSettings,
-} from '@/lib/ai-gateway/auto-routing-admin-client';
+} from '@kilocode/web-shared/lib/ai-gateway/auto-routing-admin-client';
 import {
   annotateConfiguredPool,
   poolValidationMessage,
@@ -21,10 +21,10 @@ import {
   validatePoolEntries,
   type AutoRoutingSettingsApiResponse,
 } from '@/lib/ai-gateway/auto-routing-pool-validation';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
-import { ensureOrganizationAccess } from '@/routers/organizations/utils';
-import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
+import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { requireActiveSubscriptionOrTrial } from '@kilocode/web-shared/lib/organizations/trial-middleware';
 
 export type { AutoRoutingSettingsApiResponse };
 

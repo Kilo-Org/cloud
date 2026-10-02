@@ -5,7 +5,7 @@
  * Follows Drizzle ORM patterns used throughout the codebase.
  */
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { auto_triage_tickets } from '@kilocode/db/schema';
 import { eq, and, desc, count, or } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';

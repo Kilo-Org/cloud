@@ -35,9 +35,9 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import {
   getOrganizationAutoRoute,
   ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@/lib/organizations/organization-auto-model-shared';
-import { ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type CustomModesLayoutProps = {

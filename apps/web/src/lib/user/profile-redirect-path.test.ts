@@ -1,14 +1,14 @@
 import { beforeAll, describe, test, expect } from '@jest/globals';
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organization_domain_claims,
   organization_seats_purchases,
   organizations,
 } from '@kilocode/db/schema';
 import type { Organization, User } from '@kilocode/db/schema';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { eq } from 'drizzle-orm';
 
 describe('getProfileRedirectPath', () => {

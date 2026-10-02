@@ -17,7 +17,7 @@
  * needed after inserting records with this script.
  */
 import { strict as assert } from 'node:assert';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { cliConfirm } from '@/scripts/lib/cli-confirm';

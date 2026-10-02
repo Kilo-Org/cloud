@@ -1,5 +1,5 @@
 import 'server-only';
-import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   createCloudAgentNextClient,
@@ -12,12 +12,12 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
-import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
+import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   ensureOrganizationAccess,
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
@@ -92,12 +92,12 @@ async function createCloudAgentControlToken(
   ).token;
 }
 import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
-import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
-import { isMobileClient } from '@/lib/trpc/min-version';
+import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,

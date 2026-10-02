@@ -2,8 +2,12 @@ import 'server-only';
 
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
-import { baseProcedure, createTRPCRouter, UpstreamApiError } from '@/lib/trpc/init';
-import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import {
+  baseProcedure,
+  createTRPCRouter,
+  UpstreamApiError,
+} from '@kilocode/web-shared/lib/trpc/init';
+import { generateApiToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import { KiloClawInternalClient, KiloClawApiError } from '@/lib/kiloclaw/kiloclaw-internal-client';
 import {
   AgentIdSchema,
@@ -25,14 +29,20 @@ import {
   isValidCustomSecretKey,
   isValidConfigPath,
 } from '@kilocode/kiloclaw-secret-catalog';
-import { KILOCLAW_API_URL, KILOCLAW_INSTANCE_URL_TEMPLATE } from '@/lib/config.server';
+import {
+  KILOCLAW_API_URL,
+  KILOCLAW_INSTANCE_URL_TEMPLATE,
+} from '@kilocode/web-shared/lib/config.server';
 import {
   MORNING_BRIEFING_INTERESTS_MAX_TOPICS,
   MORNING_BRIEFING_INTERESTS_MAX_TOPIC_LENGTH,
 } from '@/lib/kiloclaw/morning-briefing-interests';
 import { workerUrlForInstance } from '@/lib/kiloclaw/instance-url';
-import { reportChargeAttempted, ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+} from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   classifyKiloClawCommitTerm,
   deriveKiloClawCommitFinalBoundary,
@@ -64,7 +74,7 @@ import {
 import { and, asc, eq, ne, desc, isNull, inArray, sql, like, or } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { deleteWorkerTrigger } from '@/lib/webhook-agent/webhook-agent-client';
-import { sentryLogger } from '@/lib/utils.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import type { KiloClawDashboardStatus, KiloCodeConfigResponse } from '@/lib/kiloclaw/types';
 import { queryDiskUsage } from '@/lib/kiloclaw/disk-usage';
 import {
@@ -87,13 +97,13 @@ import {
   clearTrialInactivityStopAfterStart,
 } from '@/lib/kiloclaw/instance-lifecycle';
 
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import {
   billingHistoryResponseSchema,
   mapStripeInvoiceToBillingHistoryEntry,
 } from '@/lib/subscriptions/subscription-center';
-import { client as stripe } from '@/lib/stripe-client';
-import { APP_URL } from '@/lib/constants';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { clawAccessProcedure } from '@/lib/kiloclaw/access-gate';
 import { dispatchInstallFromSource } from '@/lib/kiloclaw/install-dispatch';
@@ -103,12 +113,19 @@ import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
   getStripePriceIdForClawPlan,
   getStripePriceIdForClawPlanIntro,
-} from '@/lib/kiloclaw/stripe-price-ids.server';
-import { getStripePriceIdForKiloPass } from '@/lib/kilo-pass/stripe-price-ids.server';
-import { KiloPassTier, KiloPassCadence, KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { getMonthlyPriceUsd } from '@/lib/kilo-pass/bonus';
-import { isStripeSubscriptionEnded } from '@/lib/kilo-pass/stripe-subscription-status';
-import { getKiloPassStateForUser, type KiloPassSubscriptionState } from '@/lib/kilo-pass/state';
+} from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
+import { getStripePriceIdForKiloPass } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
+import {
+  KiloPassTier,
+  KiloPassCadence,
+  KiloPassPaymentProvider,
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { getMonthlyPriceUsd } from '@kilocode/web-shared/lib/kilo-pass/bonus';
+import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import {
+  getKiloPassStateForUser,
+  type KiloPassSubscriptionState,
+} from '@kilocode/web-shared/lib/kilo-pass/state';
 import { createOrReuseKiloPassCheckoutSession } from '@/lib/kilo-pass/checkout-session';
 import { ensureAutoIntroSchedule, resolvePhasePrice } from '@/lib/kiloclaw/stripe-handlers';
 import {
@@ -138,7 +155,7 @@ import {
   resolveCurrentPersonalSubscriptionRow,
 } from '@/lib/kiloclaw/current-personal-subscription';
 import type { ClawBillingStatus } from '@/app/(app)/claw/components/billing/billing-types';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { CHANGELOG_ENTRIES } from '@/app/(app)/claw/components/changelog-data';
 
 /**

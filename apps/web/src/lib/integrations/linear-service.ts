@@ -1,7 +1,7 @@
 import 'server-only';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { LinearClient } from '@linear/sdk';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
@@ -9,10 +9,10 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@/lib/config.server';
+import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
-import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import { isOrganizationModelUpdateAllowed } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
 // `app:mentionable` combined with `actor=app` gives us an app-actor install

@@ -3,7 +3,7 @@ import 'server-only';
 import { addMonths } from 'date-fns';
 import { and, asc, count, eq, inArray, isNull, lte, ne, sql } from 'drizzle-orm';
 
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { IMPACT_ACTION_TRACKER_IDS, buildSalePayload, hashEmailForImpact } from '@/lib/impact';
 import { resolveWinningAttributionTouch } from '@/lib/impact/referral-attribution';
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/lib/impact/referral-delivery';
 import { hashNormalizedEmailForDeletionTombstone } from '@/lib/impact/referral';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
-import { KILO_PASS_TIER_CONFIG } from '@/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import {
   deleted_user_email_tombstones,
   impact_advocate_participants,

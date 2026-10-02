@@ -12,7 +12,7 @@ import { CreateOrganizationDialog } from './CreateOrganizationDialog';
 import { OrganizationMetricCards } from './OrganizationMetricCards';
 import { useOrganizationsList } from '@/app/admin/api/organizations/hooks';
 import type { OrganizationSortableField } from '@/types/admin';
-import type { PageSize } from '@/types/pagination';
+import type { PageSize } from '@kilocode/web-shared/types/pagination';
 import type { TableVariant } from './OrganizationTableHeader';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { Button } from '@/components/ui/button';

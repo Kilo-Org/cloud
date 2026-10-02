@@ -1,7 +1,7 @@
 import { Suspense } from 'react';
 import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
 import { ChatGptUsageLink } from '@/components/chatgpt/ChatGptUsageLink';
-import { getUserFromAuthOrRedirect } from '@/lib/user/server';
+import { getUserFromAuthOrRedirect } from '@kilocode/web-shared/lib/user/server';
 
 export default async function UsagePage() {
   const user = await getUserFromAuthOrRedirect();

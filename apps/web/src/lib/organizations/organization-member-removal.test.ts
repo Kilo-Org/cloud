@@ -1,5 +1,5 @@
 import { describe, test, expect, afterEach, beforeEach } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   organizations,
   organization_invitations,
@@ -8,9 +8,9 @@ import {
   organization_seats_purchases,
   organization_user_limits,
 } from '@kilocode/db/schema';
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import { createTestOrganization } from '@/tests/helpers/organization.helper';
-import { createOrganizationUsage } from '@/tests/helpers/microdollar-usage.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { createOrganizationUsage } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import {
   getUserOrganizationsWithSeats,
   createOrganization,
@@ -20,11 +20,11 @@ import {
   inviteUserToOrganization,
   getOrganizationMembers,
   acceptOrganizationInvite,
-} from '@/lib/organizations/organizations';
+} from '@kilocode/web-shared/lib/organizations/organizations';
 import {
   getBalanceForOrganizationUser,
   ingestOrganizationTokenUsage,
-} from '@/lib/organizations/organization-usage';
+} from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { removeUserFromOrganization } from './organization-member-removal';
 import { invalidateOrganizationSessionAccess } from '@/lib/session-ingest-client';
 import { closeCloudAgentOrgStreams } from '@/lib/cloud-agent-next/cloud-agent-client';

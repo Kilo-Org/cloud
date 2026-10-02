@@ -2,8 +2,8 @@ import {
   OpenRouterSearchResponse,
   type OpenRouterModel,
   type OpenRouterProvider,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 
 export async function fetchModelsForProvider(
   provider: OpenRouterProvider

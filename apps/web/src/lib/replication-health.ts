@@ -1,8 +1,8 @@
 import { createDrizzleClient, type DrizzleClient, type pg } from '@kilocode/db/client';
 import { sql } from 'drizzle-orm';
 
-import { getEnvVariable } from '@/lib/dotenvx';
-import { db } from '@/lib/drizzle';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 
 /**
  * Replication health for the primary's read replicas and logical (Snowflake)

@@ -9,7 +9,7 @@ import type {
   GetManifestParams,
   ManifestResult,
 } from './types';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { code_indexing_manifest } from '@kilocode/db/schema';
 import { eq, and, isNull, sql, inArray, lt } from 'drizzle-orm';
 import { createHash } from 'crypto';

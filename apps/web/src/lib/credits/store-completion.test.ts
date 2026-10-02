@@ -8,11 +8,11 @@ import {
   kilo_pass_store_events,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type * as Credits from '@/lib/credits';
-import { db } from '@/lib/drizzle';
-import { toMicrodollars } from '@/lib/microdollars';
-import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import type * as Credits from '@kilocode/web-shared/lib/credits';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
+import { KiloPassPaymentProvider } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import type * as StoreCompletion from './store-completion';
 import type { ValidatedStoreCreditPurchase } from './store-verifier';
@@ -30,8 +30,8 @@ import {
 // id. The real top-up runs against the test database by default; one test makes
 // it report an already-credited transaction that does not exist, to prove the
 // inconsistent-ledger path.
-jest.mock('@/lib/credits', () => {
-  const actual = jest.requireActual<typeof Credits>('@/lib/credits');
+jest.mock('@kilocode/web-shared/lib/credits', () => {
+  const actual = jest.requireActual<typeof Credits>('@kilocode/web-shared/lib/credits');
   return {
     __esModule: true,
     ...actual,
@@ -39,18 +39,19 @@ jest.mock('@/lib/credits', () => {
   };
 });
 
-jest.mock('@/lib/bouncer/client', () => ({
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   __esModule: true,
-  ...jest.requireActual<object>('@/lib/bouncer/client'),
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/bouncer/client'),
   reportCreditEvent: jest.fn(),
 }));
 
 const mockReportCreditEvent = jest.mocked(
-  jest.requireMock<{ reportCreditEvent: jest.Mock }>('@/lib/bouncer/client').reportCreditEvent
+  jest.requireMock<{ reportCreditEvent: jest.Mock }>('@kilocode/web-shared/lib/bouncer/client')
+    .reportCreditEvent
 );
 
 const mockProcessTopUp = jest.mocked(
-  jest.requireMock<typeof Credits>('@/lib/credits').processTopUp
+  jest.requireMock<typeof Credits>('@kilocode/web-shared/lib/credits').processTopUp
 );
 
 let completeStoreCreditPurchase: typeof StoreCompletion.completeStoreCreditPurchase;

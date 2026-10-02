@@ -16,16 +16,16 @@ const CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID =
   process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ?? 'price_test_kilo_pass_tier_19_monthly';
 
 import { describe, test, expect, beforeEach, afterEach } from '@jest/globals';
-import type * as creditsModule from '@/lib/credits';
+import type * as creditsModule from '@kilocode/web-shared/lib/credits';
 import type * as organizationBillingModule from '@/lib/organizations/organization-billing';
-import type * as bouncerClientModule from '@/lib/bouncer/client';
+import type * as bouncerClientModule from '@kilocode/web-shared/lib/bouncer/client';
 
 // Allow spying on processTopUp / processTopupForOrganization inside stripe.ts.
 // The mock delegates to the real implementation by default so existing tests are unaffected.
 // We use global `jest` (not the @jest/globals import) because SWC only hoists bare
 // `jest.mock(...)` calls — it does NOT hoist `importedJest.mock(...)`.
-jest.mock('@/lib/credits', () => {
-  const actual = jest.requireActual<typeof creditsModule>('@/lib/credits');
+jest.mock('@kilocode/web-shared/lib/credits', () => {
+  const actual = jest.requireActual<typeof creditsModule>('@kilocode/web-shared/lib/credits');
   return {
     __esModule: true,
     ...actual,
@@ -56,8 +56,10 @@ jest.mock(
 );
 
 // Bouncer is report-only. Capture its calls without any network access.
-jest.mock('@/lib/bouncer/client', () => {
-  const actual = jest.requireActual<typeof bouncerClientModule>('@/lib/bouncer/client');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => {
+  const actual = jest.requireActual<typeof bouncerClientModule>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
   return {
     __esModule: true,
     ...actual,
@@ -74,14 +76,14 @@ import {
   KNOWN_SEAT_PRICE_IDS,
   getStripeSeatsCheckoutUrl,
 } from '@/lib/stripe';
-import { client } from '@/lib/stripe-client';
-import { reportCreditEvent } from '@/lib/bouncer/client';
+import { client } from '@kilocode/web-shared/lib/stripe-client';
+import { reportCreditEvent } from '@kilocode/web-shared/lib/bouncer/client';
 import * as kiloPassOrgStripe from '@/lib/kilo-pass-org/stripe-adapter';
 import {
   type ServiceFeeAssessmentRecord,
   type ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
-import { SEAT_PRODUCT_IDS } from '@/lib/organizations/stripe-seat-line-items';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
+import { SEAT_PRODUCT_IDS } from '@kilocode/web-shared/lib/organizations/stripe-seat-line-items';
 import {
   type User,
   payment_methods,
@@ -103,19 +105,19 @@ import {
   impact_referral_rewards,
   stripe_service_fee_assessments,
 } from '@kilocode/db/schema';
-import { db, auto_deleted_at } from '@/lib/drizzle';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { db, auto_deleted_at } from '@kilocode/web-shared/lib/drizzle';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { softDeleteUser } from '@/lib/user';
-import { createTestPaymentMethod } from '@/tests/helpers/payment-method.helper';
+import { createTestPaymentMethod } from '@kilocode/web-shared/tests/helpers/payment-method.helper';
 import { eq, and, count } from 'drizzle-orm';
 import type Stripe from 'stripe';
-import { createOrganization } from '@/lib/organizations/organizations';
+import { createOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
 import {
   KiloPassCadence,
   KiloPassScheduledChangeStatus,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   ImpactReferralBeneficiaryRole,
   ImpactReferralDecisionOutcome,
@@ -129,10 +131,10 @@ import {
 } from '@kilocode/db/schema-types';
 import type * as kiloclawStripeHandlersModule from '@/lib/kiloclaw/stripe-handlers';
 import type * as kiloPassStripeHandlersModule from '@/lib/kilo-pass/stripe-handlers';
-import { cleanupDbForTest } from '@/lib/drizzle';
-import { processTopUp } from '@/lib/credits';
+import { cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
+import { processTopUp } from '@kilocode/web-shared/lib/credits';
 import { processTopupForOrganization } from '@/lib/organizations/organization-billing';
-import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@/lib/service-fees/constants';
+import { SERVICE_FEE_ACTIVATION_UNIX_SECONDS } from '@kilocode/web-shared/lib/service-fees/constants';
 
 const sampleStripePaymentMethod = (): Stripe.PaymentMethod => ({
   id: `pm_test_${Math.random().toString(36).substring(7)}`,
@@ -190,7 +192,7 @@ const baseStripeEvent = () => ({
 });
 
 async function mockChargeRetrieveForKiloClaw(priceId: string) {
-  const { client } = await import('@/lib/stripe-client');
+  const { client } = await import('@kilocode/web-shared/lib/stripe-client');
   const invoice = {
     object: 'invoice',
     lines: {
@@ -204,7 +206,7 @@ async function mockChargeRetrieveForKiloClaw(priceId: string) {
 }
 
 async function mockChargeRetrieveForKiloPass(invoiceId: string, userId: string) {
-  const { client } = await import('@/lib/stripe-client');
+  const { client } = await import('@kilocode/web-shared/lib/stripe-client');
   const invoice = {
     id: invoiceId,
     object: 'invoice',
@@ -801,7 +803,7 @@ describe('processStripePaymentEventHook', () => {
   test('radar.early_fraud_warning.created persists a personal observation', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -852,7 +854,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
     await softDeleteUser(testUser.id);
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -888,7 +890,7 @@ describe('processStripePaymentEventHook', () => {
   test('radar.early_fraud_warning.created does not link a case during concurrent soft deletion', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -936,7 +938,7 @@ describe('processStripePaymentEventHook', () => {
   test('radar.early_fraud_warning.created does not link a case during concurrent deletion-in-progress', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -984,7 +986,7 @@ describe('processStripePaymentEventHook', () => {
   test('radar.early_fraud_warning.created deduplicates repeated delivery without creating actions', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockResolvedValue(
@@ -1030,7 +1032,7 @@ describe('processStripePaymentEventHook', () => {
       .insert(organizations)
       .values({ name: 'Warning Review Organization', stripe_customer_id: 'cus_efw_organization' })
       .returning();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockResolvedValue(
@@ -1068,7 +1070,7 @@ describe('processStripePaymentEventHook', () => {
     await db
       .insert(organizations)
       .values({ name: 'Shared Customer Organization', stripe_customer_id: 'cus_efw_shared' });
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockResolvedValue(
@@ -1103,7 +1105,7 @@ describe('processStripePaymentEventHook', () => {
   test('radar.early_fraud_warning.created retains an already disputed charge for manual review', async () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -1138,7 +1140,7 @@ describe('processStripePaymentEventHook', () => {
 
   test('radar.early_fraud_warning.created retains unmatched and malformed warnings for review', async () => {
     await cleanupDbForTest();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockResolvedValue(
@@ -1190,7 +1192,7 @@ describe('processStripePaymentEventHook', () => {
 
   test('radar.early_fraud_warning.created records retrieval failures as safe review cases', async () => {
     await cleanupDbForTest();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockRejectedValue(new Error('Temporary Stripe retrieval failure'));
@@ -1226,7 +1228,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const kiloClawInvoice = {
       object: 'invoice',
       lines: {
@@ -1283,7 +1285,7 @@ describe('processStripePaymentEventHook', () => {
   test('charge.dispute.created persists dispute case when charge enrichment fails', async () => {
     await cleanupDbForTest();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockRejectedValue(new Error('charge retrieve failed'));
@@ -1339,7 +1341,7 @@ describe('processStripePaymentEventHook', () => {
       stripe_status: 'needs_response',
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -1520,7 +1522,7 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const kiloPassInvoice = {
       id: 'in_kilo_pass_metadata_dispute',
       object: 'invoice',
@@ -1813,7 +1815,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const kiloPassInvoice = {
       id: 'in_kilo_pass_pending',
       object: 'invoice',
@@ -1863,7 +1865,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const kiloPassInvoice = {
       id: 'in_kilo_pass_duplicate',
       object: 'invoice',
@@ -1926,7 +1928,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const kiloPassInvoice = {
       id: 'in_kilo_pass_deferred_materialization',
       object: 'invoice',
@@ -2042,7 +2044,7 @@ describe('processStripePaymentEventHook', () => {
       impact_action_id: '1000.2000.3000',
     });
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue(
       sampleStripeChargeResponse(
         sampleStripeCharge({
@@ -2086,7 +2088,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const unrelatedInvoice = {
       id: 'in_unrelated_dispute',
       object: 'invoice',
@@ -2130,7 +2132,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest.spyOn(client.charges, 'retrieve').mockResolvedValue({
       invoice: null,
       lastResponse: { headers: {}, requestId: 'req_test', statusCode: 200 },
@@ -2167,7 +2169,7 @@ describe('processStripePaymentEventHook', () => {
     await cleanupDbForTest();
     testUser = await insertTestUser();
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const retrieveSpy = jest
       .spyOn(client.charges, 'retrieve')
       .mockRejectedValue(new Error('Stripe API unavailable'));
@@ -2887,7 +2889,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
   let listCheckoutSessionsSpy: { mockRestore: () => void } | undefined;
 
   beforeEach(async () => {
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     listCheckoutSessionsSpy = jest.spyOn(client.checkout.sessions, 'list').mockResolvedValue({
       object: 'list',
       data: [],
@@ -3153,7 +3155,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
 
     // This flow stores an org payment method by fetching it from Stripe.
     // Mock it to keep the test hermetic.
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const stripePaymentMethod = sampleStripePaymentMethod();
 
     const stripePaymentMethodResponse = {
@@ -3246,7 +3248,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
     const user = await insertTestUser();
     const org = await createOrganization('Org CreatedBy Test', user.id);
 
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const stripePaymentMethod = sampleStripePaymentMethod();
 
     const stripePaymentMethodResponse = {
@@ -3544,7 +3546,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
   });
 
   test('invoice.created skips kilo-owned auto-top-up invoices and leaves seats/KiloClaw fee-free', async () => {
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const createInvoiceItem = jest.spyOn(client.invoiceItems, 'create');
 
     try {
@@ -3627,7 +3629,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
   test('invoice.created assesses an eligible personal Kilo Pass draft without attaching a second auto-top-up fee', async () => {
     await cleanupDbForTest();
     const user = await insertTestUser();
-    const { client } = await import('@/lib/stripe-client');
+    const { client } = await import('@kilocode/web-shared/lib/stripe-client');
     const createInvoiceItem = jest.spyOn(client.invoiceItems, 'create').mockResolvedValue({
       id: 'ii_kilo_pass_fee',
       amount: 245,
@@ -4130,7 +4132,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
           handleOrganizationKiloPassPaymentAdverseForInvoice,
           handleOrganizationKiloPassSubscriptionEvent: jest.fn(),
         }));
-        jest.doMock('@/lib/stripe-client', () => ({
+        jest.doMock('@kilocode/web-shared/lib/stripe-client', () => ({
           client: {
             charges: {
               retrieve: jest.fn().mockResolvedValue({
@@ -4152,7 +4154,7 @@ describe('handleSuccessfulChargeWithPayment (org/user routing & side-effects)', 
         expect(handleOrganizationKiloPassPaymentAdverseForInvoice).toHaveBeenCalledWith(invoice);
       } finally {
         jest.dontMock('@/lib/kilo-pass-org/stripe-adapter');
-        jest.dontMock('@/lib/stripe-client');
+        jest.dontMock('@kilocode/web-shared/lib/stripe-client');
         jest.resetModules();
       }
     }
@@ -4192,7 +4194,7 @@ describe('getStripeInvoicesPage', () => {
       jest.resetModules();
       await jest.isolateModulesAsync(async () => {
         const stripe = await import('@/lib/stripe');
-        const { client } = await import('@/lib/stripe-client');
+        const { client } = await import('@kilocode/web-shared/lib/stripe-client');
 
         const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
           data: invoices,
@@ -4235,7 +4237,7 @@ describe('getStripeInvoicesPage', () => {
       jest.resetModules();
       await jest.isolateModulesAsync(async () => {
         const stripe = await import('@/lib/stripe');
-        const { client } = await import('@/lib/stripe-client');
+        const { client } = await import('@kilocode/web-shared/lib/stripe-client');
 
         const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
           data: invoices,
@@ -4260,7 +4262,7 @@ describe('getStripeInvoicesPage', () => {
       jest.resetModules();
       await jest.isolateModulesAsync(async () => {
         const stripe = await import('@/lib/stripe');
-        const { client } = await import('@/lib/stripe-client');
+        const { client } = await import('@kilocode/web-shared/lib/stripe-client');
 
         const listSpy = jest.spyOn(client.invoices, 'list').mockResolvedValue({
           data: [],

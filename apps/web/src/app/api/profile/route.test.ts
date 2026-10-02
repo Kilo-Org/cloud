@@ -1,14 +1,16 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@/lib/organizations/organizations', () => ({ getProfileOrganizations: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+  getProfileOrganizations: jest.fn(),
+}));
 jest.mock('@/lib/organizations/verified-domain-destination', () => ({
   resolvePreferredVerifiedDomainOrganizationId: jest.fn(),
 }));
 
-import { getProfileOrganizations } from '@/lib/organizations/organizations';
+import { getProfileOrganizations } from '@kilocode/web-shared/lib/organizations/organizations';
 import { resolvePreferredVerifiedDomainOrganizationId } from '@/lib/organizations/verified-domain-destination';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { GET } from './route';
 
 const mockGetUserFromAuth = jest.mocked(getUserFromAuth);

@@ -10,10 +10,10 @@
 import { captureException } from '@sentry/nextjs';
 import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 import { z } from 'zod';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@kilocode/web-shared/lib/tokens';
 import {
   generateGitHubInstallationToken,
   findKiloReviewComment,
@@ -64,7 +64,11 @@ import { DEFAULT_CODE_REVIEW_MODEL, DEFAULT_CODE_REVIEW_MODE } from '../core/con
 import type { Owner } from '../core';
 import { generateReviewPrompt } from '../prompts/generate-prompt';
 import type { CodeReviewAgentConfig } from '@/lib/agent-config/core/types';
-import { logExceptInTest, errorExceptInTest, warnExceptInTest } from '@/lib/utils.server';
+import {
+  logExceptInTest,
+  errorExceptInTest,
+  warnExceptInTest,
+} from '@kilocode/web-shared/lib/utils.server';
 import type { CodeReviewPlatform } from '../core/schemas';
 import {
   normalizeRepositoryReviewInstructions,

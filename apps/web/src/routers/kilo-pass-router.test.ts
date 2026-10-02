@@ -1,7 +1,7 @@
 import type * as StoreSubscriptionCompletion from '@/lib/kilo-pass/store-subscription-completion';
 import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { TRPCError } from '@trpc/server';
 import {
   credit_transactions,
@@ -30,7 +30,7 @@ import {
   KiloPassScheduledChangeStatus,
   KiloPassTier,
   KiloPassWelcomePromoEligibilityReason,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 import {
   ImpactReferralBeneficiaryRole,
   ImpactReferralDecisionOutcome,
@@ -46,15 +46,15 @@ import {
   computeMonthlyCadenceBonusPercent,
   computeYearlyCadenceMonthlyBonusUsd,
   getMonthlyPriceUsd,
-} from '@/lib/kilo-pass/bonus';
+} from '@kilocode/web-shared/lib/kilo-pass/bonus';
 import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_BONUS_PERCENT,
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_WELCOME_PROMO_FINGERPRINT_POLICY_ROLLOUT,
-} from '@/lib/kilo-pass/constants';
+} from '@kilocode/web-shared/lib/kilo-pass/constants';
 
-import { insertTestUser } from '@/tests/helpers/user.helper';
-import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@/tests/helpers/microdollar-usage.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import type { insertMicrodollarUsageWithDailyRollup as insertMicrodollarUsageWithDailyRollupType } from '@kilocode/web-shared/tests/helpers/microdollar-usage.helper';
 import type { BillingHistoryEntry } from '@/lib/subscriptions/subscription-center';
 import type { ValidatedStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import type Stripe from 'stripe';
@@ -65,20 +65,20 @@ import type { CreatePersonalKiloPassCheckoutSession } from '@/routers/kilo-pass-
 import type {
   ServiceFeeAssessmentRecord,
   ServiceFeeAssessmentStore,
-} from '@/lib/service-fees/assessments';
+} from '@kilocode/web-shared/lib/service-fees/assessments';
 import {
   SERVICE_FEE_ACTIVATION_UNIX_SECONDS,
   SERVICE_FEE_DESCRIPTION,
   SERVICE_FEE_METADATA_TYPE,
   SERVICE_FEE_RATE_BASIS_POINTS,
   SERVICE_FEE_VERSION,
-} from '@/lib/service-fees/constants';
+} from '@kilocode/web-shared/lib/service-fees/constants';
 import {
   SERVICE_FEE_FAILURE_APPLICATION,
   type CheckoutSessionLike,
   type ServiceFeeCheckoutDependencies,
-} from '@/lib/service-fees/checkout';
-import { buildInheritedInlineServiceFeeTaxInput } from '@/lib/service-fees/tax';
+} from '@kilocode/web-shared/lib/service-fees/checkout';
+import { buildInheritedInlineServiceFeeTaxInput } from '@kilocode/web-shared/lib/service-fees/tax';
 
 const mockAcknowledgePlay = jest
   .fn<(...args: unknown[]) => Promise<void>>()
@@ -151,7 +151,9 @@ type SentryMock = {
 };
 
 function getStripeMock(): StripeMock {
-  const mod: { __stripeMock: StripeMock } = jest.requireMock('@/lib/stripe-client');
+  const mod: { __stripeMock: StripeMock } = jest.requireMock(
+    '@kilocode/web-shared/lib/stripe-client'
+  );
   return mod.__stripeMock;
 }
 
@@ -451,7 +453,7 @@ function kiloPassCheckoutDeps(
   };
 }
 
-jest.mock('@/lib/kilo-pass/dayjs', () => {
+jest.mock('@kilocode/web-shared/lib/kilo-pass/dayjs', () => {
   const realDayjs = jest.requireActual<typeof dayjsType>('dayjs');
   const utc = jest.requireActual<typeof utcType>('dayjs/plugin/utc');
 
@@ -469,7 +471,7 @@ jest.mock('@/lib/kilo-pass/dayjs', () => {
   return { dayjs: controlledDayjs };
 });
 
-jest.mock('@/lib/stripe-client', () => {
+jest.mock('@kilocode/web-shared/lib/stripe-client', () => {
   const stripeMock = {
     subscriptions: {
       list: jest.fn(),
@@ -513,7 +515,7 @@ jest.mock('@/lib/stripe-client', () => {
   };
 });
 
-jest.mock('@/lib/kilo-pass/stripe-price-ids.server', () => {
+jest.mock('@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server', () => {
   const getStripePriceIdForKiloPassMock = jest.fn(() => 'price_test_kilo_pass');
   return {
     getStripePriceIdForKiloPass: getStripePriceIdForKiloPassMock,
@@ -3357,7 +3359,7 @@ describe('kiloPassRouter', () => {
 
     beforeAll(async () => {
       ({ insertMicrodollarUsageWithDailyRollup } =
-        await import('@/tests/helpers/microdollar-usage.helper'));
+        await import('@kilocode/web-shared/tests/helpers/microdollar-usage.helper'));
     });
 
     beforeEach(async () => {

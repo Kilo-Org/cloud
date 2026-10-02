@@ -26,14 +26,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { KILO_AUTO_BALANCED_MODEL, ORG_AUTO_MODEL } from '@/lib/ai-gateway/auto-model';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  ORG_AUTO_MODEL,
+} from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   hasActiveOrganizationModelPolicy,
   isOrganizationAutoTargetModel,
   ORGANIZATION_AUTO_MODEL_FLAG,
-} from '@/lib/organizations/organization-auto-model-shared';
-import { CUSTOM_LLM_PREFIX } from '@/lib/ai-gateway/model-utils';
+} from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { cn } from '@/lib/utils';
 
 type DefaultModelDialogProps = {

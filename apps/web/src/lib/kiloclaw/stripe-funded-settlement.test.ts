@@ -9,9 +9,9 @@ import {
   kiloclaw_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { applyStripeFundedKiloClawPeriod } from '@/lib/kiloclaw/credit-billing';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 const makeStripeSubscriptionNonRenewing =
   jest.fn<(stripeSubscriptionId: string) => Promise<void>>();

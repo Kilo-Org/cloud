@@ -1,9 +1,9 @@
 import 'server-only';
 
-import { WORKOS_API_KEY } from '@/lib/config.server';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { WORKOS_API_KEY } from '@kilocode/web-shared/lib/config.server';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { isUniqueViolation } from '@/lib/db-errors';
-import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
+import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { canonicalizeEligibleVerifiedDomain } from '@/lib/organizations/verified-domain';
 import {
   organization_domain_claims,

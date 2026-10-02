@@ -1,6 +1,6 @@
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { TownOverviewPageClient } from '@/app/(app)/gastown/[townId]/TownOverviewPageClient';
-import { GASTOWN_BILLING_ANNOUNCEMENT_ENABLED } from '@/lib/config.server';
+import { GASTOWN_BILLING_ANNOUNCEMENT_ENABLED } from '@kilocode/web-shared/lib/config.server';
 
 export default async function OrgTownOverviewPage({
   params,

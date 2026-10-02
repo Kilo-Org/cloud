@@ -21,14 +21,14 @@ import {
   kilocode_users,
   type User,
 } from '@kilocode/db/schema';
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KiloPassAuditLogAction,
   KiloPassAuditLogResult,
   KiloPassPaymentProvider,
-} from '@/lib/kilo-pass/enums';
-import { KiloPassIssuanceItemKind } from '@/lib/kilo-pass/enums';
-import { appendKiloPassAuditLog } from '@/lib/kilo-pass/issuance';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { KiloPassIssuanceItemKind } from '@kilocode/web-shared/lib/kilo-pass/enums';
+import { appendKiloPassAuditLog } from '@kilocode/web-shared/lib/kilo-pass/issuance';
 import {
   decodeAppleStoreTransactionJws,
   mapAppleKiloPassTransaction,
@@ -46,7 +46,7 @@ import {
   type CompleteStoreKiloPassPurchaseResult,
 } from './store-subscription-completion';
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
-import { reportCreditEvent, type StoreEventKind } from '@/lib/bouncer/client';
+import { reportCreditEvent, type StoreEventKind } from '@kilocode/web-shared/lib/bouncer/client';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import {
   getStoreCreditProductByAppleProductId,
@@ -63,7 +63,7 @@ import {
   type StoreCreditReversalResult,
 } from '@/lib/credits/store-refund';
 import { sanitizeErrorForTelemetry } from '@/lib/sanitize-error-for-telemetry';
-import { dayjs } from '@/lib/kilo-pass/dayjs';
+import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 
 type DbOrTx = DrizzleTransaction | typeof db;
 

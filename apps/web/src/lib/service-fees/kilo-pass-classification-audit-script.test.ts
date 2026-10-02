@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, jest, test } from '@jest/globals';
 import type Stripe from 'stripe';
 
-import { client as stripe } from '@/lib/stripe-client';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { retrieveStripeSubscriptionSnapshot } from '../../scripts/service-fees/kilo-pass-classification-audit';
 
 function subscriptionItem(id: string): Stripe.SubscriptionItem {

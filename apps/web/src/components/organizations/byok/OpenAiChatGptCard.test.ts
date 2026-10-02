@@ -22,9 +22,9 @@ import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { OpenAiChatGptCardView, type OpenAiChatGptCardViewProps } from './OpenAiChatGptCard';
-import { OPENAI_TOKEN_SHARING_SCOPE } from '@/lib/auth/openai/scopes';
+import { OPENAI_TOKEN_SHARING_SCOPE } from '@kilocode/web-shared/lib/auth/openai/scopes';
 import type { OpenAiChatGptStatus } from '@/lib/ai-gateway/openai-chatgpt/status';
-import { CHATGPT_USAGE_SETTINGS_URL } from '@/lib/ai-gateway/openai-chatgpt/usage-limit';
+import { CHATGPT_USAGE_SETTINGS_URL } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/usage-limit';
 
 const CONNECTED_AT = '2026-09-16T12:00:00.000Z';
 const RECONNECT_MESSAGE = 'Your ChatGPT connection has expired. Reconnect to continue.';

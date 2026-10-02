@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { db, readDb } from '@/lib/drizzle';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { EXPORT_FILE_SCHEMA_VERSION } from '@kilocode/db/user-data-export-file';
 import { dispatchUserDataExport } from '@/lib/user-data-export-worker-client';
-import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
+import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   classifyExportHealth,
   type ExportEmailStatus,

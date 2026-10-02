@@ -16,7 +16,7 @@ const mockConfig: { keyset: string | undefined } = {
   }),
 };
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get SLACK_CREDENTIAL_KEYSET_JSON() {
     return mockConfig.keyset;
   },

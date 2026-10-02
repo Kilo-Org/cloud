@@ -1,4 +1,4 @@
-import { RawHtml, escapeHtml } from '@/lib/email';
+import { RawHtml, escapeHtml } from '@kilocode/web-shared/lib/email';
 
 type SecurityFindingEmailVarsInput = {
   severity: string;

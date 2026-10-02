@@ -1,5 +1,5 @@
 import 'server-only';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { cliSessions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { getBlobContent } from '@/lib/r2/cli-sessions';

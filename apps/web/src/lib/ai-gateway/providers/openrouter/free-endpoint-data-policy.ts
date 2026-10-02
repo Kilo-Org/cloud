@@ -1,11 +1,11 @@
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   familyHasUnavailableFreeModel,
   isUnavailableModel,
-} from '@/lib/ai-gateway/unavailable-models';
-import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
-import { normalizeInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import type { OpenRouterModel } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 type ProviderModels = Array<{
   provider: { slug: string };

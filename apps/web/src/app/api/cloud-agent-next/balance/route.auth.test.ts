@@ -18,45 +18,49 @@ jest.mock('next-auth', () => ({
   getServerSession: jest.fn(),
 }));
 jest.mock('@/lib/user', () => ({}));
-jest.mock('@/lib/user/find-user-by-id', () => ({
+jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: (...args: unknown[]) => mockFindUser(...args),
 }));
-jest.mock('@/lib/drizzle', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   db: { query: { kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) } } },
   readDb: {},
 }));
-jest.mock('@/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
 }));
-jest.mock('@/lib/organizations/organization-usage', () => ({
+jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: (...args: unknown[]) => mockBalance(...args),
 }));
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'balance-test-secret',
   BLACKLIST_TLDS: [],
   isResourceTokenIssuanceEnabled: () => true,
 }));
-jest.mock('@/lib/constants', () => ({ ORGANIZATION_ID_HEADER: 'X-KiloCode-OrganizationId' }));
-jest.mock('@/lib/dotenvx', () => ({ getEnvVariable: jest.fn() }));
-jest.mock('@/lib/blacklist-domains-config', () => ({ getBlacklistedDomains: async () => [] }));
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/constants', () => ({
+  ORGANIZATION_ID_HEADER: 'X-KiloCode-OrganizationId',
+}));
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({ getEnvVariable: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/blacklist-domains-config', () => ({
+  getBlacklistedDomains: async () => [],
+}));
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   warnExceptInTest: jest.fn(),
   sentryLogger: () => jest.fn(),
 }));
-jest.mock('@/lib/posthog', () => ({ __esModule: true, default: jest.fn() }));
-jest.mock('@/lib/auth/magic-link-tokens', () => ({}));
+jest.mock('@kilocode/web-shared/lib/posthog', () => ({ __esModule: true, default: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/auth/magic-link-tokens', () => ({}));
 jest.mock('@/lib/impact/debug', () => ({}));
 jest.mock('@/lib/impact/referral', () => ({}));
-jest.mock('@/lib/organizations/trial-utils', () => ({}));
+jest.mock('@kilocode/web-shared/lib/organizations/trial-utils', () => ({}));
 jest.mock('@/lib/organizations/organization-seats', () => ({}));
 jest.mock('@/lib/organizations/sales-demo', () => ({}));
-jest.mock('@/lib/organizations/organization-sso-policy', () => ({}));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({}));
 jest.mock('@/lib/organizations/verified-domain-membership', () => ({}));
 jest.mock('@/lib/organizations/verified-domain-destination', () => ({}));
 jest.mock('@/lib/account-linking-session', () => ({}));
-jest.mock('@/lib/admin/admin-access-log', () => ({}));
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({}));
 jest.mock('@/lib/user/sso', () => ({}));
-jest.mock('@/lib/web-session-revocation', () => ({}));
+jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({}));
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
 const user = {

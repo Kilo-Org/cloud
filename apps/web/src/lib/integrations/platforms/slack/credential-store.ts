@@ -7,7 +7,7 @@ import {
   buildSlackCredentialLockKey,
   type SlackCredentialOwner,
 } from '@kilocode/worker-utils/slack-credential';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   decryptSlackCredentialSecret,
   encryptSlackCredentialSecret,

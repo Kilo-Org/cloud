@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { eq, sql } from 'drizzle-orm';
-import { getUserFromAuth } from '@/lib/user/server';
-import { forceImmediateExpirationRecomputation } from '@/lib/balanceCache';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 
 export async function POST(request: NextRequest): Promise<NextResponse> {

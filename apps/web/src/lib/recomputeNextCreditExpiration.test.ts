@@ -1,9 +1,9 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { credit_transactions, kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { fetchExpiringTransactions } from '@/lib/creditExpiration';
+import { fetchExpiringTransactions } from '@kilocode/web-shared/lib/creditExpiration';
 import { recomputeNextCreditExpiration } from './recomputeNextCreditExpiration';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('fetchExpiringTransactions', () => {
   beforeEach(async () => {

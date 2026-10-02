@@ -1,11 +1,11 @@
 import { and, eq } from 'drizzle-orm';
 import { user_deletion_requests, user_deletion_steps } from '@kilocode/db/schema';
 import { UserDeletionStepKey, UserDeletionStepStatus } from '@kilocode/db/schema-types';
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   USER_DELETION_DEFAULT_SUBSTACK_PUBLICATION_URL,
   USER_DELETION_SUBSTACK_USER_AGENT,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { replaceSubstackCredential } from '@/lib/user/deletion-queue/deletion-substack-credential';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
@@ -13,7 +13,7 @@ import {
   handleSubstack,
   resolvePublicationBaseUrl,
 } from '@/lib/user/deletion-queue/handlers/substack';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('resolvePublicationBaseUrl', () => {
   const originalNodeEnv = process.env.NODE_ENV;

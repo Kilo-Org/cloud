@@ -1,8 +1,8 @@
-import { getEnvVariable } from '@/lib/dotenvx';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import {
   USER_DELETION_PROVIDER_TIMEOUT_MS,
   USER_DELETION_PYLON_API_BASE,
-} from '@/lib/user/deletion-queue/deletion-constants';
+} from '@kilocode/web-shared/lib/user/deletion-queue/deletion-constants';
 import type {
   DeletionHandlerContext,
   DeletionHandlerOutcome,

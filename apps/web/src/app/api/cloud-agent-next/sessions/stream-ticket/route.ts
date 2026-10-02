@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getUserFromAuth } from '@/lib/user/server';
-import { db } from '@/lib/drizzle';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   verifyUserOwnsSessionV2ByCloudAgentId,
   verifyOrgOwnsSessionV2ByCloudAgentId,
@@ -9,7 +9,7 @@ import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 import * as z from 'zod';
-import { withRestTiming } from '@/lib/observability/request-timing';
+import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
 
 const streamTicketSchema = z.object({
   cloudAgentSessionId: z.string().min(1),

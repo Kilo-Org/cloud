@@ -1,8 +1,8 @@
 import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
-import { getUserFromAuth } from '@/lib/user/server';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { isValidCallbackPath } from '@/lib/getSignInCallbackUrl';
 import { maybeInterceptWithSurvey } from '@/lib/survey-redirect';
-import PostHogClient from '@/lib/posthog';
+import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { getAffiliateAttribution } from '@/lib/affiliate-attribution';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
 import { logImpactReferralDebug } from '@/lib/impact/debug';
@@ -25,7 +25,7 @@ import {
 } from '@/lib/impact/referral-utils';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import { browserLandingPath } from '@/lib/app-link-safe-redirect';
 import { isOpenclawAdvisorCallback } from '@/lib/signup-source';
 import { isCreditCampaignCallback, lookupCampaignBySlug } from '@/lib/credit-campaigns';

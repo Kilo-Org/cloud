@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { APP_URL } from '@/lib/constants';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
 
 // This route just redirects to the profile page after Stripe checkout.
 // All side effects (saving payment method, enabling auto-top-up, crediting balance)

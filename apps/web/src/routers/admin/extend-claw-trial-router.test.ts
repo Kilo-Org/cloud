@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach } from '@jest/globals';
-import { db, cleanupDbForTest } from '@/lib/drizzle';
+import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { CURRENT_KILOCLAW_PRICE_VERSION } from '@kilocode/db';
 import { kiloclaw_subscription_change_log, kiloclaw_subscriptions } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import type { User } from '@kilocode/db/schema';
 

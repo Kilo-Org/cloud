@@ -10,7 +10,7 @@ import {
   IMPACT_ADVOCATE_KILO_PASS_PROGRAM_ID,
   IMPACT_ADVOCATE_KILO_PASS_WIDGET_ID,
   IMPACT_ADVOCATE_TENANT_ALIAS,
-} from '@/lib/config.server';
+} from '@kilocode/web-shared/lib/config.server';
 import { logImpactReferralDebug, truncateForLog } from '@/lib/impact/debug';
 import { ImpactAdvocateProgramKey, ImpactReferralProduct } from '@kilocode/db/schema-types';
 

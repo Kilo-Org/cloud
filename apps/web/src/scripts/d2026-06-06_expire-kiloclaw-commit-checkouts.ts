@@ -1,9 +1,9 @@
 import '@/lib/load-env';
 
-import { closeAllDrizzleConnections, db } from '@/lib/drizzle';
-import { client as stripe } from '@/lib/stripe-client';
+import { closeAllDrizzleConnections, db } from '@kilocode/web-shared/lib/drizzle';
+import { client as stripe } from '@kilocode/web-shared/lib/stripe-client';
 import { KILOCLAW_COMMIT_SALES_CUTOFF, isBeforeKiloClawCommitSalesCutoff } from '@kilocode/db';
-import { getClawPlanForStripePriceId } from '@/lib/kiloclaw/stripe-price-ids.server';
+import { getClawPlanForStripePriceId } from '@kilocode/web-shared/lib/kiloclaw/stripe-price-ids.server';
 import { sql } from 'drizzle-orm';
 
 const isDryRun = !process.argv.includes('--run-actually');

@@ -1,7 +1,7 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   consumeDataExportDownloadCode,
   createDataExportDownloadCode,
@@ -10,7 +10,10 @@ import {
   reserveDataExportDownloadCode,
   __test__,
 } from './data-export-download-codes';
-import { createSignInCode, reserveSignInCode } from '@/lib/auth/magic-link-tokens';
+import {
+  createSignInCode,
+  reserveSignInCode,
+} from '@kilocode/web-shared/lib/auth/magic-link-tokens';
 
 const testEmail = 'data-export-code@example.com';
 const exportId = '11111111-1111-4111-8111-111111111111';

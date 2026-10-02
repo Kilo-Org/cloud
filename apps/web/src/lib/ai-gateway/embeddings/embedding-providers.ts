@@ -1,4 +1,4 @@
-import { MISTRAL_API_KEY } from '@/lib/config.server';
+import { MISTRAL_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import { Mistral } from '@mistralai/mistralai';
 
 export type EmbeddingProvider = 'mistral' | 'mistral-text';

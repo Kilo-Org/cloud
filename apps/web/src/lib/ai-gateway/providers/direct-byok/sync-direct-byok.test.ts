@@ -1,8 +1,8 @@
-import { DirectUserByokInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { db } from '@/lib/drizzle';
+import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
-import type { DirectByokModel } from '@/lib/ai-gateway/providers/direct-byok/types';
+import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,

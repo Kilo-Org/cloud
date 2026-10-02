@@ -21,7 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useConfirm, type ConfirmOptions } from '@/components/ui/confirm';
 import { Input } from '@/components/ui/input';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { RootRouter } from '@/routers/root-router';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 

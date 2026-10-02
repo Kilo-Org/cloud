@@ -1,5 +1,8 @@
 import type { z } from 'zod';
-import { O11Y_KILO_GATEWAY_CLIENT_SECRET, O11Y_SERVICE_URL } from '@/lib/config.server';
+import {
+  O11Y_KILO_GATEWAY_CLIENT_SECRET,
+  O11Y_SERVICE_URL,
+} from '@kilocode/web-shared/lib/config.server';
 
 export class O11yRequestError extends Error {
   status: number;

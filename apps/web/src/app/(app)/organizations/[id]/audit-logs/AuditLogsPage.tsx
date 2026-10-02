@@ -7,7 +7,7 @@ import {
   useAuditLogsPagination,
 } from '@/components/organizations/audit-logs/AuditLogsPagination';
 import { useAuditLogsFilters } from '@/components/organizations/audit-logs/useAuditLogsFilters';
-import type { OrganizationRole } from '@/lib/organizations/organization-types';
+import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { useTRPC } from '@/lib/trpc/utils';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, AlertDescription } from '@/components/ui/alert';

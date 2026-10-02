@@ -9,7 +9,7 @@ import {
   generateCloudAgentWorkflowToken,
   generateWorkflowGatewayToken,
   TOKEN_EXPIRY,
-} from '@/lib/tokens';
+} from '@kilocode/web-shared/lib/tokens';
 import { getSecurityFindingById } from '../db/security-findings';
 import {
   updateAnalysisStatus,
@@ -35,9 +35,9 @@ import { addBreadcrumb, captureException } from '@sentry/nextjs';
 import { triageSecurityFinding } from './triage-service';
 import { extractSandboxAnalysis } from './extraction-service';
 import { maybeAutoDismissAnalysis } from './auto-dismiss-service';
-import { sentryLogger } from '@/lib/utils.server';
-import { APP_URL } from '@/lib/constants';
-import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { extractLastAssistantText } from '@/lib/cloud-agent-next/session-result';
 
 import {

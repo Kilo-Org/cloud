@@ -1,5 +1,5 @@
 import { captureException } from '@sentry/nextjs';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   deployments,
   platform_integrations,
@@ -9,7 +9,7 @@ import {
 import { eq, and } from 'drizzle-orm';
 import { redeploy } from '@/lib/user-deployments/deployments-service';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { PushEventPayload } from '@/lib/integrations/platforms/github/webhook-schemas';
 import { extractBranchNameFromRef } from '@/lib/integrations/platforms/github/utils';
 import { triggerBuild } from '@/lib/app-builder/app-builder-client';

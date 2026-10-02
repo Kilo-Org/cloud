@@ -4,11 +4,11 @@ import {
   refreshVerifiedDomainClaim,
   removeVerifiedDomainClaim,
 } from '@/lib/organizations/verified-domain-service';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
   organizationAdminProcedure,
-} from '@/routers/organizations/utils';
+} from '@kilocode/web-shared/routers/organizations/utils';
 import * as z from 'zod';
 
 const ClaimInputSchema = OrganizationIdInputSchema.extend({ claimId: z.uuid() });

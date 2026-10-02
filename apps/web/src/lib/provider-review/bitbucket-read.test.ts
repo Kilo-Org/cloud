@@ -22,16 +22,16 @@ jest.mock('@/lib/integrations/platforms/bitbucket/workspace-access-token-reposit
     mockReadCachedRepositories(input),
 }));
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   GIT_TOKEN_SERVICE_API_URL: 'https://token-service.example.com',
 }));
 
-jest.mock('@/lib/tokens', () => ({
+jest.mock('@kilocode/web-shared/lib/tokens', () => ({
   generateInternalServiceToken: jest.fn(() => 'svc-mock-token'),
   TOKEN_EXPIRY: { fiveMinutes: 300 },
 }));
 
-jest.mock('@/lib/utils.server', () => ({
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   logExceptInTest: () => {},
   warnExceptInTest: () => {},
 }));

@@ -4,7 +4,7 @@ import type { SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
-import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
+import { SLACK_SIGNING_SECRET } from '@kilocode/web-shared/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const SLACK_SIGNATURE_VERSION = 'v0';

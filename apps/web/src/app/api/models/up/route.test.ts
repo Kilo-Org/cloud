@@ -4,7 +4,7 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),
 }));
 
-jest.mock('@/lib/dotenvx', () => ({
+jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => `test-${name}`,
 }));
 

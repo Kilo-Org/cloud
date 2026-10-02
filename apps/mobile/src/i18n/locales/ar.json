@@ -1570,6 +1570,7 @@
       "idCopied": "تم نسخ معرّف الجلسة",
       "couldNotCopyId": "تعذّر نسخ معرّف الجلسة.",
       "untitled": "جلسة بدون عنوان",
+      "actions": "إجراءات الجلسة",
       "sessionDeleted": "تم حذف الجلسة",
       "needsInput": "بانتظار تدخلك",
       "fromPlatform": "من {{platform}}",
@@ -1634,6 +1635,7 @@
       "readOnly": "هذه الجلسة للقراءة فقط.",
       "continueInNewSession": "المتابعة في جلسة جديدة",
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
+      "emptyTranscriptDescription": "لا تحتوي هذه الجلسة على رسائل بعد.",
       "scrollToBottom": "التمرير إلى الأسفل",
       "emptyTitle": "لا توجد رسائل بعد",
       "renameAccessibility": "إعادة تسمية الجلسة: {{title}}",
@@ -2136,6 +2138,8 @@
       "selectModelBeforeSending": "اختر نموذجًا قبل الإرسال.",
       "preparingPlaceholder": "جارٍ إعداد البيئة…",
       "finalizingPlaceholder": "جارٍ الإنهاء…",
+      "sessionLoadFailed": "تعذّر تحميل الجلسة. أعد المحاولة أولاً.",
+      "sendUnavailable": "الإرسال غير متاح حتى تصبح الجلسة جاهزة.",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
       "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
       "discardAttachmentsMessage": "ستُحذف الملفات المرفوعة التي لم تُرفق برسائل مرسلة.",
@@ -2209,6 +2213,7 @@
       "provider": "المزود",
       "totalCost": "التكلفة الإجمالية",
       "usageReflectsLatest": "تعكس بيانات الاستخدام آخر رد مكتمل من المساعد.",
+      "usageUnavailable": "استخدام السياق غير متوفر",
       "tokenUsage": "استخدام الرموز",
       "cacheRate": "نسبة التخزين المؤقت",
       "modelsCount": "النماذج ({{displayCount}})",
@@ -2251,7 +2256,10 @@
     "markdownImage": {
       "load": "تحميل",
       "loadWithHost": "تحميل الصورة من {{host}}",
-      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS."
+      "httpsOnly": "لا تُحمّل إلا الصور عبر HTTPS.",
+      "trustTitle": "تحميل الصورة من {{host}}؟",
+      "trustMessage": "الوثوق بـ{{host}} يحمّل صوره دون سؤال في كل مرة. يمكنك إلغاء ذلك لاحقًا من المضيفين الموثوقين.",
+      "loadOnce": "تحميل مرة واحدة"
     },
     "markdownLink": {
       "invalidLink": "لا يمكن فتح هذا الرابط.",
@@ -3353,8 +3361,12 @@
     "subtitle": "مضيفون تسمح بفتح روابطهم دون طلب تأكيد",
     "emptyTitle": "لا يوجد مضيفون موثوقون",
     "emptyDescription": "عندما تعتبر مضيف الرابط موثوقًا، تُفتح روابطه دون طلب تأكيد مجددًا.",
+    "imagesSectionTitle": "مضيفو الصور الموثوقون",
+    "imagesSectionDescription": "تُحمّل الصور من هؤلاء المضيفين دون سؤال مجددًا.",
+    "imagesSectionEmpty": "لا يوجد مضيفو صور موثوقون",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
     "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
+    "revokeImageMessage": "ستطلب الصور من هذا المضيف تأكيدًا مرة أخرى.",
     "backToPreferences": "العودة إلى التفضيلات"
   },
   "quickChat": {

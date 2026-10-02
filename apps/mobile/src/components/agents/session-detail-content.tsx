@@ -53,6 +53,10 @@ import {
 } from '@/components/agents/context-usage-display';
 import { resolveSessionComposerDisabled } from '@/components/agents/session-composer-disabled';
 import {
+  resolveComposerSendDisabledReason,
+  resolveComposerSendDisabledReasonTone,
+} from '@/components/agents/session-composer-send-disabled-reason';
+import {
   resolveSessionConnectionDisplay,
   resolveSessionConnectionState,
 } from '@/components/agents/session-connection-indicator-state';
@@ -1860,6 +1864,30 @@ export function SessionDetailContent({
     // catalog selection resolves.
     hasModel: Boolean(pinned.model ?? currentModel),
   });
+  // Why the send control cannot send, stated beside it and announced to screen
+  // readers. `isComposerDisabled` above is a structural lock on the whole
+  // composer; this line covers the live send gate, which keeps the input
+  // editable. `messageCount` lets a terminal error on an empty transcript —
+  // the load-error state behind the full-screen Retry — resolve to the
+  // load-failure line instead of a runtime failure class.
+  const sendDisabledReason = resolveComposerSendDisabledReason({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
+  // The tone rides the same inputs, so a progress phase ("Setting up
+  // environment…") never renders in the destructive error color.
+  const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
+    canSend,
+    isReadOnly,
+    error,
+    statusIndicator,
+    cloudStatus,
+    messageCount: messages.length,
+  });
   const composerPlaceholder = useMemo(() => {
     if (cloudStatus?.type === 'preparing') {
       return t('agentChat.composer.preparingPlaceholder');
@@ -2492,6 +2520,8 @@ export function SessionDetailContent({
               onStop={handleStop}
               disabled={isComposerDisabled}
               sendDisabled={!canSend}
+              sendDisabledReason={sendDisabledReason}
+              sendDisabledReasonTone={sendDisabledReasonTone}
               isStreaming={isStreaming}
               placeholder={composerPlaceholder}
               mode={currentMode}

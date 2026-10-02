@@ -1,4 +1,6 @@
-import { MarkedLexer as markedLexer, type Tokens } from 'react-native-marked';
+import { type Tokens } from 'react-native-marked';
+
+import { lexMarkdown } from './markdown-parse-cache';
 
 /** One extracted GFM table, rendered behind the table chip. */
 type MarkdownTableExtract = {
@@ -27,7 +29,7 @@ export function splitMarkdownTables(
   value: string,
   previous?: MarkdownSnapshot
 ): MarkdownSplitSegment[] {
-  const tokens = markedLexer(value, { gfm: true });
+  const tokens = lexMarkdown(value);
   const segments: MarkdownSplitSegment[] = [];
   const previousTables = previous?.segments.filter(segment => segment.type === 'table') ?? [];
   let markdown = '';

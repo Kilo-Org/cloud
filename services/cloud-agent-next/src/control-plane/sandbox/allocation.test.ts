@@ -206,3 +206,54 @@ describe('allocation create retry', () => {
     expect(effects).toEqual([]);
   });
 });
+
+describe('allocation socket close origin', () => {
+  function connectedState(): AllocationState {
+    return {
+      ...initialAllocationState(),
+      kind: 'connected',
+      allocationId: 'alloc-1',
+      connectionId: 'conn-1',
+      providerRef: 'ref-1',
+      wrapperId: 'wr-1',
+      lastFrameAt: 0,
+    };
+  }
+
+  it.each(['peer', 'heartbeat_timeout'] as const)(
+    'reduces a %s close to the same disconnected state without storing the origin',
+    origin => {
+      const { state, effects } = reduceAllocation(
+        connectedState(),
+        {
+          type: 'socket-closed',
+          at: 123,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          origin,
+        },
+        TIMERS
+      );
+      expect(state).toEqual({ ...connectedState(), kind: 'disconnected', connectionId: null });
+      expect(effects).toEqual([]);
+      expect('origin' in state).toBe(false);
+    }
+  );
+
+  it('ignores a close from a superseded connection regardless of origin', () => {
+    const state = connectedState();
+    const { state: next, effects } = reduceAllocation(
+      state,
+      {
+        type: 'socket-closed',
+        at: 123,
+        allocationId: 'alloc-1',
+        connectionId: 'conn-other',
+        origin: 'peer',
+      },
+      TIMERS
+    );
+    expect(next).toBe(state);
+    expect(effects).toEqual([]);
+  });
+});

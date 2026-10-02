@@ -302,6 +302,28 @@ export class NotificationChannelDO extends DurableObject<Env> {
         body = input.push.body;
       }
 
+      // A resolved locale can still yield empty copy: an i18nKey with no
+      // catalog entry falls back to `input.push.title`/`input.push.body`, which
+      // a producer may leave blank. With no title and no body, Expo/FCM surfaces
+      // a bare app-name "Kilo" row on the lock screen and in the shade. Anchor
+      // every token to content-free generic copy so no token can ever post a
+      // contentless notification. Content-free observability only: record the
+      // fixed `type` discriminator and lengths, never the empty or substituted
+      // strings themselves.
+      if (title.trim() === '' && body.trim() === '') {
+        const substituted = genericPushContentForPushData(input.push.data, resolvedLocale);
+        console.warn('push_content_substituted', {
+          idempotencyKey: input.idempotencyKey,
+          dataType: input.push.data.type,
+          titleLength: title.length,
+          bodyLength: body.length,
+          substitutedTitleLength: substituted.title.length,
+          substitutedBodyLength: substituted.body.length,
+        });
+        title = substituted.title;
+        body = substituted.body;
+      }
+
       // Android 8+ drops a notification addressed to a channel that does not
       // exist. Only clients that create channels (a non-null app version at
       // registration) get a channelId; older clients fall back to the default

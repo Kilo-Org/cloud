@@ -1292,6 +1292,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         at: Date.now(),
         allocationId: attachment.allocationId,
         connectionId: attachment.connectionId,
+        origin: 'peer',
       });
     });
   }
@@ -1544,6 +1545,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       logControlDiagnostic('allocation_transition', {
         allocationName: this.providerPin?.allocationName ?? this.sandboxId,
         event: event.type,
+        origin: event.type === 'socket-closed' ? event.origin : undefined,
         from: previous.kind,
         to: state.kind,
         fromAllocationId: previous.allocationId,
@@ -2825,6 +2827,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       at: Date.now(),
       allocationId: state.allocationId,
       connectionId: state.connectionId,
+      origin: 'heartbeat_timeout',
     });
     for (const ws of this.ctx.getWebSockets()) {
       const attachment = this.readAttachment(ws);

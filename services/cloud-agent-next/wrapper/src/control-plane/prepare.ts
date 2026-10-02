@@ -22,7 +22,7 @@ import {
   type ProcessOutputStream,
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
-import { formatGitResultFailure, gitOperationError } from '../git-errors.js';
+import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
 import { authenticatedGitUrl } from '../control/git-url.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
@@ -339,6 +339,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     emitProgress(spec.sessionId, 'clone');
     await mkdir(directory);
     if (!spec.git) return;
+    // Diagnostic route class only: a managed credential was injected into the
+    // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
+    const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
     if (!(await hasGit(directory))) {
       const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
       let lastError: WrapperBootstrapError | undefined;
@@ -363,7 +366,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           lastError = undefined;
           break;
         }
-        lastError = gitOperationError(cloned, 'clone', redact);
+        lastError = gitOperationError(cloned, 'clone', redact, gitRoute);
         if (!isNetworkFailure(lastError.subtype) || attempt === CLONE_RETRY_ATTEMPTS) break;
         await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
       }
@@ -385,6 +388,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         branchName: branch,
         signal,
         redact,
+        route: gitRoute,
       });
     } else {
       let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
@@ -397,9 +401,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ]);
         signal.throwIfAborted();
         if (existingBranch.exitCode !== 0 && existingBranch.exitCode !== 1) {
+          const lookup = gitOperationError(existingBranch, 'checkout', redact, gitRoute);
           throw new WrapperBootstrapError({
             code: 'WORKSPACE_SETUP_FAILED',
-            subtype: gitOperationError(existingBranch, 'checkout', redact).subtype,
+            subtype: lookup.subtype,
+            ...(lookup.gitFailure === undefined ? {} : { gitFailure: lookup.gitFailure }),
             message: formatGitResultFailure(existingBranch, 'git branch lookup failed', redact),
             retryable: true,
           });
@@ -414,9 +420,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           ]);
           signal.throwIfAborted();
           if (remoteBranch.exitCode !== 0 && remoteBranch.exitCode !== 1) {
+            const lookup = gitOperationError(remoteBranch, 'checkout', redact, gitRoute);
             throw new WrapperBootstrapError({
               code: 'WORKSPACE_SETUP_FAILED',
-              subtype: gitOperationError(remoteBranch, 'checkout', redact).subtype,
+              subtype: lookup.subtype,
+              ...(lookup.gitFailure === undefined ? {} : { gitFailure: lookup.gitFailure }),
               message: formatGitResultFailure(remoteBranch, 'git branch lookup failed', redact),
               retryable: true,
             });
@@ -435,7 +443,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         ),
       });
       signal.throwIfAborted();
-      if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact);
+      if (checked.exitCode !== 0) throw gitOperationError(checked, 'checkout', redact, gitRoute);
     }
     await configureGitAuthor(
       directory,
@@ -671,6 +679,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       log(
         `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
           error instanceof Error ? error.message : String(error)
+        }${
+          error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
       emitFailure(sessionId, currentStep, error);

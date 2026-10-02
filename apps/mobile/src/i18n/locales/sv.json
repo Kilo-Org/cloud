@@ -2047,6 +2047,7 @@
       "idCopied": "Sessions-ID kopierat",
       "couldNotCopyId": "Kunde inte kopiera sessions-ID.",
       "untitled": "Namnlös session",
+      "actions": "Sessionsåtgärder",
       "sessionDeleted": "Session borttagen",
       "needsInput": "väntar på svar",
       "fromPlatform": "från {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Den här sessionen är skrivskyddad.",
       "continueInNewSession": "Fortsätt i en ny session",
       "emptyDescription": "Skicka ett meddelande nedan för att komma igång.",
+      "emptyTranscriptDescription": "Den här sessionen har inga meddelanden ännu.",
       "scrollToBottom": "Rulla längst ned",
       "emptyTitle": "Inga meddelanden ännu",
       "renameAccessibility": "Byt namn på sessionen: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet.",
       "preparingPlaceholder": "Förbereder miljön…",
       "finalizingPlaceholder": "Avslutar…",
+      "sessionLoadFailed": "Sessionen kunde inte läsas in. Försök igen först.",
+      "sendUnavailable": "Det går inte att skicka förrän sessionen är redo.",
       "cannotReceiveFiles": "Den här sessionen kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
       "couldNotAttachFiles": "Det gick inte att bifoga filerna. Tryck på Skicka för att försöka igen.",
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
@@ -2634,6 +2638,7 @@
       "provider": "Leverantör",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Användningen avser det senaste färdiga svaret från assistenten.",
+      "usageUnavailable": "Kontextanvändning är inte tillgänglig",
       "tokenUsage": "Tokenanvändning",
       "cacheRate": "Andel från cache",
       "modelsCount": "Modeller ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "Läs in",
       "loadWithHost": "Läs in från {{host}}",
-      "httpsOnly": "Endast bilder via HTTPS kan läsas in."
+      "httpsOnly": "Endast bilder via HTTPS kan läsas in.",
+      "trustTitle": "Läs in bild från {{host}}?",
+      "trustMessage": "Om du betror {{host}} läses dess bilder in utan att fråga varje gång. Du kan återkalla det senare under Betrodda webbplatser.",
+      "loadOnce": "Läs in en gång"
     },
     "markdownLink": {
       "invalidLink": "Den här länken kan inte öppnas.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Webbplatser som öppnas utan att du behöver bekräfta",
     "emptyTitle": "Inga betrodda webbplatser",
     "emptyDescription": "Om du anger att du litar på en webbplats öppnas länkar dit utan att du behöver bekräfta igen.",
+    "imagesSectionTitle": "Betrodda bildwebbplatser",
+    "imagesSectionDescription": "Bilder från dessa webbplatser läses in utan att fråga igen.",
+    "imagesSectionEmpty": "Inga betrodda bildwebbplatser",
     "revoke": "Sluta lita på {{host}}",
     "revokeMessage": "Länkar till den här webbplatsen kommer att be om bekräftelse igen.",
+    "revokeImageMessage": "Bilder från den här webbplatsen kommer att be om bekräftelse igen.",
     "backToPreferences": "Tillbaka till inställningarna"
   },
   "quickChat": {

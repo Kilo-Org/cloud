@@ -77,6 +77,13 @@ let pending: {
 } | null = null;
 let startEpoch = 0;
 let terminalExpiresAt: number | null = null;
+/**
+ * The most recent `startOrUpdate` submission. The background push path awaits
+ * it (`waitForNativeStart`) so a headless task cannot finish — and its process
+ * be torn down — before the native post lands, and a native failure rejects the
+ * task for an OS retry.
+ */
+let inflightStart: Promise<void> | null = null;
 
 /** The ongoing notification line, carrying the pending notice when one waits. */
 function notificationText(snapshot: GlanceableAgentsSnapshot): string {
@@ -379,7 +386,11 @@ export const androidSink: GlanceableSink = {
   },
 
   startOrUpdate(snapshot, ctx) {
-    void tryStartOrUpdate(snapshot, ctx);
+    inflightStart = tryStartOrUpdate(snapshot, ctx);
+  },
+
+  async waitForNativeStart() {
+    await inflightStart;
   },
 
   endImmediate() {
@@ -398,5 +409,6 @@ export function _resetAndroidSinkForTests(): void {
   pending = null;
   startEpoch += 1;
   terminalExpiresAt = null;
+  inflightStart = null;
   setGlanceableActionNotice(null);
 }

@@ -1552,6 +1552,7 @@
       "idCopied": "Skopiowano identyfikator sesji",
       "couldNotCopyId": "Nie udało się skopiować identyfikatora sesji.",
       "untitled": "Sesja bez tytułu",
+      "actions": "Działania dotyczące sesji",
       "sessionDeleted": "Usunięto sesję",
       "needsInput": "czeka na odpowiedź",
       "fromPlatform": "z {{platform}}",
@@ -1610,6 +1611,7 @@
       "readOnly": "Ta sesja jest dostępna tylko do odczytu.",
       "continueInNewSession": "Kontynuuj w nowej sesji",
       "emptyDescription": "Wyślij wiadomość poniżej, aby rozpocząć.",
+      "emptyTranscriptDescription": "Ta sesja nie ma jeszcze żadnych wiadomości.",
       "scrollToBottom": "Przewiń na dół",
       "emptyTitle": "Brak wiadomości",
       "renameAccessibility": "Zmień nazwę sesji: {{title}}",
@@ -2094,6 +2096,8 @@
       "selectModelBeforeSending": "Wybierz model przed wysłaniem wiadomości.",
       "preparingPlaceholder": "Konfigurowanie środowiska…",
       "finalizingPlaceholder": "Kończenie…",
+      "sessionLoadFailed": "Nie udało się wczytać sesji. Najpierw spróbuj ponownie.",
+      "sendUnavailable": "Wysyłanie nie jest dostępne, dopóki sesja nie będzie gotowa.",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
       "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij „Wyślij”, aby spróbować ponownie.",
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
@@ -2165,6 +2169,7 @@
       "provider": "Dostawca",
       "totalCost": "Całkowity koszt",
       "usageReflectsLatest": "Wykorzystanie kontekstu uwzględnia ostatnią w pełni wygenerowaną odpowiedź asystenta.",
+      "usageUnavailable": "Wykorzystanie kontekstu niedostępne",
       "tokenUsage": "Zużycie tokenów",
       "cacheRate": "Udział pamięci podręcznej",
       "modelsCount": "Modele ({{displayCount}})",
@@ -2203,7 +2208,10 @@
     "markdownImage": {
       "load": "Wczytaj",
       "loadWithHost": "Wczytaj {{host}}",
-      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS."
+      "httpsOnly": "Można wczytywać tylko obrazy przez HTTPS.",
+      "trustTitle": "Wczytać obraz z {{host}}?",
+      "trustMessage": "Zaufanie hostowi {{host}} spowoduje, że jego obrazy będą wczytywane bez pytania za każdym razem. Możesz to później cofnąć w sekcji Zaufane hosty.",
+      "loadOnce": "Wczytaj raz"
     },
     "markdownLink": {
       "invalidLink": "Tego linku nie można otworzyć.",
@@ -3267,8 +3275,12 @@
     "subtitle": "Hosty, których linki otwierasz bez potwierdzenia",
     "emptyTitle": "Brak zaufanych hostów",
     "emptyDescription": "Gdy zaufasz hostowi, linki do niego będą otwierane bez ponownego pytania.",
+    "imagesSectionTitle": "Zaufane hosty obrazów",
+    "imagesSectionDescription": "Obrazy z tych hostów są wczytywane bez ponownego pytania.",
+    "imagesSectionEmpty": "Brak zaufanych hostów obrazów",
     "revoke": "Cofnij zaufanie do {{host}}",
     "revokeMessage": "Linki do tego hosta ponownie poproszą o potwierdzenie.",
+    "revokeImageMessage": "Obrazy z tego hosta ponownie poproszą o potwierdzenie.",
     "backToPreferences": "Wróć do preferencji"
   },
   "quickChat": {

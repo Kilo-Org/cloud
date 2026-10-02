@@ -101,6 +101,14 @@ export type Turn = {
   pausedMs: number;
   progressed: boolean;
   resubmitted: boolean;
+  /**
+   * Diagnostic only: real-progress events seen from descendant sessions in this
+   * turn's tree. They are excluded from the root progress clock, so this count
+   * is reported at expiry to distinguish "descendant progress arrived but was
+   * ignored" from "no descendant progress arrived at all". It never moves
+   * `lastProgressAt` or any other accounting.
+   */
+  descendantProgressEvents: number;
   /** Aborts the running finalization step (timeout or Stop). */
   stepAbort?: AbortController;
   submitting: Promise<void>;
@@ -329,6 +337,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
       pausedMs: 0,
       progressed: false,
       resubmitted: false,
+      descendantProgressEvents: 0,
       submitting: Promise.resolve(),
     };
     turns.set(route.sessionId, turn);
@@ -594,7 +603,9 @@ export function createTurnManager(deps: TurnManagerDeps) {
 
   function failDeadline(turn: Turn, action: TurnDeadlineAction): void {
     const reason = action === 'execution_limit' ? 'execution_limit' : 'no_progress';
-    log(`turn: ${reason} aborting session ${turn.route.kiloSessionId}`);
+    log(
+      `turn: ${reason} aborting session ${turn.route.kiloSessionId} descendantProgressEvents=${turn.descendantProgressEvents}`
+    );
     turn.stepAbort?.abort(new Error(reason));
     void abortKilo(turn.route);
     sendOutcome(turn, 'failed', reason);
@@ -889,7 +900,15 @@ export function createTurnManager(deps: TurnManagerDeps) {
       if (turn === undefined) return;
       // A subagent's question still pauses the root turn (spec §6).
       applyInteraction(turn, event.type);
-      if (eventSessionId !== root) return;
+      if (eventSessionId !== root) {
+        // Diagnostic only: count real descendant progress without touching the
+        // root progress clock, so a no-progress expiry can report whether
+        // descendant progress reached the manager.
+        if (isRealProgress(turn, event.type, event.properties)) {
+          turn.descendantProgressEvents += 1;
+        }
+        return;
+      }
       if (event.type === 'message.updated') {
         const info = event.properties.info;
         if (isRecord(info) && info.role === 'assistant' && typeof info.id === 'string') {

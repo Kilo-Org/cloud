@@ -17,7 +17,7 @@ import {
   createPendingAgreement,
   createParentSupplement,
 } from '@/lib/kilo-pass-org/service';
-import { recordOrganizationConsumption } from './consumption';
+import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 import { repairExpiredOrganizationPassBonuses } from '@/lib/kilo-pass-org/bonus-repair';
 import { processOrganizationExpirations } from '@/lib/creditExpiration';
 

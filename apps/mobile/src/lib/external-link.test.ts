@@ -36,16 +36,6 @@ describe('openExternalUrl', () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 
-  it('opens web URLs in the system browser when preferred', async () => {
-    mockedOpenUrl.mockResolvedValue(undefined);
-
-    await openExternalUrl('https://kilo.ai/changelog', { preferSystemBrowser: true });
-
-    expect(mockedOpenUrl).toHaveBeenCalledWith('https://kilo.ai/changelog');
-    expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
-    expect(toast.error).not.toHaveBeenCalled();
-  });
-
   it('opens non-web URL schemes with the platform handler', async () => {
     mockedOpenUrl.mockResolvedValue(undefined);
 

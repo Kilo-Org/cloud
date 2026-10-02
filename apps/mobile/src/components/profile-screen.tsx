@@ -308,7 +308,6 @@ export function ProfileScreen() {
             onPress={() => {
               void openExternalUrl(CHANGELOG_URL, {
                 label: t('kiloclaw.changelog.title'),
-                preferSystemBrowser: true,
               });
             }}
           />

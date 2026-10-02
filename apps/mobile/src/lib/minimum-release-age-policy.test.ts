@@ -66,10 +66,16 @@ const SDK_57_EXACT_EXCLUDE_ENTRIES = [
   'expo-glass-effect@57.0.2',
 ] as const;
 
-// FlashList 2.3.3 carries the EngagedIndicesTracker scroll-window fix the agent
-// transcript list depends on; the pin must move off 2.3.2 without waiting out the
-// gate. One exact package@version.
-const MOBILE_EXACT_EXCLUDE_ENTRIES = ['@shopify/flash-list@2.3.3'] as const;
+// Two mobile pins sit above the SDK's recommendation and must move without
+// waiting out the gate: FlashList 2.3.3 carries the EngagedIndicesTracker
+// scroll-window fix the agent transcript list depends on, and
+// react-native-keyboard-controller 1.22.6 carries the KeyboardChatScrollView
+// fixes the keyboard phase depends on (SDK 57 pins 1.21.9). One exact
+// package@version each.
+const MOBILE_EXACT_EXCLUDE_ENTRIES = [
+  '@shopify/flash-list@2.3.3',
+  'react-native-keyboard-controller@1.22.6',
+] as const;
 
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,

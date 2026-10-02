@@ -83,6 +83,13 @@ through `@rn-primitives/portal` lives in the app's React tree and cannot paint a
 `presentation: 'screen'` only for a path that is provably a tab or a plain stack screen with no sheet on
 its route — the portal dialog dims the whole app there.
 
+Keyboard avoidance is mid-migration. The session, history, quick-chat and session-detail screens clear the
+keyboard with `react-native-keyboard-controller`'s `KeyboardAvoidingView`, under the `KeyboardProvider` at
+the app root. Three surfaces still use `AppAwareKeyboardPaddingView`
+(`@/components/kilo-chat/app-aware-keyboard-padding`): the new-session footer, the kilo-chat conversation
+screen and the PR-review comment CTA bar. Each of those corrects its own bottom-inset double-count, and
+each correction came from a device finding, so they move only with a device pass.
+
 ## Implementation Rules
 
 - Write the smallest boring implementation. Reuse existing helpers, components, and contracts.

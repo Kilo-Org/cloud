@@ -118,6 +118,7 @@
     "react-native-appsflyer": "6.18.0",
     "react-native-css": "3.0.7",
     "react-native-gesture-handler": "2.32.0",
+    "react-native-keyboard-controller": "1.22.6",
     "react-native-marked": "8.1.1",
     "react-native-passkeys": "^0.4.2",
     "react-native-reanimated": "4.5.1",
@@ -157,7 +158,8 @@
     "install": {
       "exclude": [
         "@sentry/react-native",
-        "@shopify/flash-list"
+        "@shopify/flash-list",
+        "react-native-keyboard-controller"
       ]
     }
   },

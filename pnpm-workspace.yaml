@@ -112,6 +112,13 @@ minimumReleaseAgeExclude:
   # agent transcript list is exactly that shape. Patch release; exempted so the
   # contract test's pin can move off 2.3.2 without waiting out minimumReleaseAge.
   - '@shopify/flash-list@2.3.3'
+  # react-native-keyboard-controller's 1.22.3 release notes carry the
+  # KeyboardChatScrollView fixes this phase depends on (crash on unmount,
+  # overscroll during interactive dismissal on iOS, propagation view surfaceId
+  # for focused input events inside a Modal). 1.22.6 is the latest patch. Expo
+  # SDK 57 pins 1.21.9, which predates all three, so the pin is overridden with
+  # the same mechanism flash-list uses.
+  - react-native-keyboard-controller@1.22.6
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)

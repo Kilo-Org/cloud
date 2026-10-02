@@ -22,6 +22,17 @@ vi.mock('@expo/ui/community/bottom-sheet', () => ({ BottomSheet: 'BottomSheet' }
 // not have. The inline video surface is asserted through host elements.
 vi.mock('expo-video', () => ({ VideoView: 'VideoView', useVideoPlayer: () => ({}) }));
 
+// `react-native-keyboard-controller` is a native module. Tests assert the app's
+// keyboard surfaces through host elements, so the provider and the views are
+// plain hosts and the keyboard read reports a hidden keyboard. A test that
+// needs a lift mocks `useKeyboardState` itself.
+vi.mock('react-native-keyboard-controller', () => ({
+  KeyboardProvider: 'KeyboardProvider',
+  KeyboardAvoidingView: 'KeyboardAvoidingView',
+  KeyboardChatScrollView: 'KeyboardChatScrollView',
+  useKeyboardState: () => ({ height: 0, isVisible: false, progress: 0, duration: 0 }),
+}));
+
 // `@rn-primitives/alert-dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs`
 // and `dist/*.js`, and its ESM entry re-exports `./alert-dialog` with no
 // extension. Metro's Babel transform parses both for the app; no Node-side test

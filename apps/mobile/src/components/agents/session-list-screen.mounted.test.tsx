@@ -467,25 +467,6 @@ function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
 }
 /**
- * The padding the keyboard container applies to the region. The container
- * (`AppAwareKeyboardPaddingView` on Android, `KeyboardAvoidingView` on iOS)
- * already clears the IME, so the rows frame adds only the part of the rows band
- * the container does not cover; a case that asserts the rows viewport reads both
- * halves of that composition rather than the frame alone.
- */
-function keyboardContainerPadding() {
-  let padding = 0;
-  for (const node of nodes('View')) {
-    const styles = node.props.style as unknown;
-    if (Array.isArray(styles)) {
-      for (const style of styles as ({ paddingBottom?: number } | undefined)[]) {
-        padding = Math.max(padding, style?.paddingBottom ?? 0);
-      }
-    }
-  }
-  return padding;
-}
-/**
  * The band the composed app observes. The real `StateSurfaceInsets` resolves
  * `Math.max(parentReservation, bottomInset)` (`centered-state-surface.tsx:238`)
  * and the enclosing tabs layout reserves the bar's own height while the list is
@@ -1629,27 +1610,18 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(descendantsOf(container, 'CenteredState')).toHaveLength(1);
     expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
 
-    // Android: edge-to-edge never resizes the window for the IME, so the
-    // app-aware container follows the keyboard events and pads its frame; the
-    // body re-centers inside the shrunken viewport.
+    // Android: edge-to-edge never resizes the window for the IME either, and the
+    // same native container owns the lift. The tree carries no JS padding, so
+    // the body stays inside the one container instead of a per-platform fork.
     state.platform.OS = 'android';
     await renderScreen();
     act(() => {
       showKeyboard(320);
     });
-    const padded = nodes('View').find(
-      node =>
-        Array.isArray(node.props.style) &&
-        node.props.style.some(
-          (part: { paddingBottom?: number } | undefined) => part?.paddingBottom === 320
-        )
-    );
-    expect(padded).toBeDefined();
-    if (!padded) {
-      throw new Error('Missing app-aware padding container');
-    }
-    expect(descendantsOf(padded, 'CenteredState')).toHaveLength(1);
-    expect(nodes('KeyboardAvoidingView')).toHaveLength(0);
+    const androidContainer = requireNode('KeyboardAvoidingView');
+    expect(androidContainer.props.behavior).toBe('padding');
+    expect(descendantsOf(androidContainer, 'CenteredState')).toHaveLength(1);
+    expect(nodes('KeyboardAvoidingView')).toHaveLength(1);
   });
 
   it('reserves the keyboard height for the no-match body so its second line stays readable', async () => {
@@ -1752,26 +1724,24 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
-    // Keyboard down the container pads nothing and the frame ends at the tab
-    // bar: the FAB clearance rides on the content, not the frame.
+    // Keyboard down the native container lifts nothing and the frame ends at the
+    // tab bar: the FAB clearance rides on the content, not the frame.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
-    expect(keyboardContainerPadding()).toBe(0);
 
     act(() => {
       showKeyboard(320);
     });
-    // The container already pads the IME's occlusion and the frame adds only the
-    // part it does not cover, so the two together end the viewport at the IME's
-    // top edge instead of a whole keyboard height above it. The IME is taller
-    // than the FAB band, so the frame contributes nothing.
-    expect(keyboardContainerPadding()).toBe(320);
+    // The native container owns the whole IME lift, so the frame adds nothing and
+    // the viewport ends at the IME's top edge instead of a whole keyboard height
+    // above it. The IME is taller than the FAB band, so the frame contributes
+    // nothing.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: 0 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(320);
 
     act(() => {
       hideKeyboard();
     });
-    expect(keyboardContainerPadding()).toBe(0);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
@@ -1793,11 +1763,11 @@ describe('AgentSessionListScreen live filtering', () => {
     // The centered states still take the shorter IME band, so their copy clears
     // the keyboard rather than a phantom tab-bar band.
     expect(surfaceBottomInset()).toBe(100);
-    // The rows list cannot: the container covers the IME and the frame adds the
-    // rest of the FAB band, so a shorter frame never parks rows under the button.
-    expect(keyboardContainerPadding()).toBe(100);
+    // The rows list cannot: the native container lifts the IME's 100 and the
+    // frame adds the rest of the FAB band, so a shorter frame never parks rows
+    // under the button.
+    expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: fabBand - 100 });
-    expect(keyboardContainerPadding() + listStyle().marginBottom).toBe(fabBand);
 
     act(() => {
       hideKeyboard();
@@ -1815,9 +1785,10 @@ describe('AgentSessionListScreen live filtering', () => {
     state.live.activeSessions = [row];
     await renderScreen();
 
-    // The band hook's own subscription plus the app-aware container's.
-    expect(keyboardListeners('keyboardDidShow').size).toBe(2);
-    expect(keyboardListeners('keyboardDidHide').size).toBe(2);
+    // The band hook's own subscription. The native keyboard container measures
+    // the IME itself, so it adds no JS listener beside that one.
+    expect(keyboardListeners('keyboardDidShow').size).toBe(1);
+    expect(keyboardListeners('keyboardDidHide').size).toBe(1);
   });
 
   it('narrows the live list to the search text', async () => {

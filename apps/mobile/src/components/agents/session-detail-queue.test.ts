@@ -377,9 +377,6 @@ vi.mock('@/components/agents/mode-normalize', () => ({
 vi.mock('@/components/agents/queued-badge-hold', () => ({
   nextHeldQueuedIds: (held: unknown) => held,
 }));
-vi.mock('@/components/agents/session-keyboard-container-state', () => ({
-  getSessionKeyboardContainerKind: () => 'app-aware-padding',
-}));
 vi.mock('@/components/agents/context-usage-display', () => ({
   getContextSheetMountState: () => ({ mounted: false, visible: false }),
 }));

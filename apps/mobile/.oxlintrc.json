@@ -394,23 +394,6 @@
       }
     },
     {
-      // Ratchet: files still holding an element the migration replaces. A file
-      // leaves this list only when its banned import is gone. Shrink it phase by
-      // phase; the length is the remaining work.
-      //
-      // The four files below hold React Native's `KeyboardAvoidingView`, the
-      // keyboard phase that has not landed yet.
-      "files": [
-        "src/components/quick-chat/quick-chat-screen.tsx",
-        "src/components/agents/session-detail-content.tsx",
-        "src/components/agents/session-history-screen.tsx",
-        "src/components/agents/session-list-screen.tsx"
-      ],
-      "rules": {
-        "no-restricted-imports": "off"
-      }
-    },
-    {
       "files": ["src/components/ui/icons.ts"],
       "rules": {
         "no-restricted-imports": "off"

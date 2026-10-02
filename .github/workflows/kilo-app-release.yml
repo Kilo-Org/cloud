@@ -34,6 +34,11 @@ permissions:
 
 jobs:
   check-changes:
+    # Guard: this workflow_dispatch/schedule is reachable from a fork, and it
+    # submits a mobile build to the App Store / Google Play using repo secrets.
+    # Only the canonical repo may run it. (For push: main, github.repository is
+    # already the canonical repo, so the guard is a no-op there.)
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
@@ -153,12 +158,12 @@ jobs:
 
   validate:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/kilo-app-ci.yml
 
   preflight:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     permissions:
@@ -223,7 +228,7 @@ jobs:
 
   build-and-submit:
     needs: [check-changes, validate, preflight]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     outputs:
@@ -460,7 +465,7 @@ jobs:
   # the section lands, which loses the build's changelog line for ever.
   bump-version:
     needs: [check-changes]
-    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true'
+    if: needs.check-changes.outputs.should_build == 'true' && github.ref == 'refs/heads/main' && needs.check-changes.outputs.allowed == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
@@ -546,7 +551,7 @@ jobs:
   # build writes it above its own section.
   changelog:
     needs: [check-changes, bump-version, build-and-submit]
-    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main'
+    if: needs.check-changes.outputs.should_build == 'true' && needs.check-changes.outputs.allowed == 'true' && github.ref == 'refs/heads/main' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:

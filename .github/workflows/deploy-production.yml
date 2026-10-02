@@ -25,8 +25,11 @@ jobs:
       workflow_file: deploy-production.yml
 
   check-production-db-startup:
+    # Guard: this workflow only triggers on schedule/workflow_dispatch, both
+    # fork-reachable, and it touches production secrets. Only the canonical
+    # repo may run it.
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -59,7 +62,7 @@ jobs:
 
   run-migrations:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: production
@@ -92,7 +95,7 @@ jobs:
 
   stage-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -103,7 +106,7 @@ jobs:
 
   stage-global-app:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -114,6 +117,7 @@ jobs:
 
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -124,6 +128,7 @@ jobs:
 
   promote-global-app:
     needs: [stage-global-app, check-production-db-startup, run-migrations]
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
@@ -143,6 +148,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -160,7 +166,7 @@ jobs:
 
   detect-gastown-wasteland-changes:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
@@ -233,6 +239,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&
@@ -292,7 +299,7 @@ jobs:
 
   deploy-kiloclaw:
     needs: [check-changes, check-production-db-startup, run-migrations]
-    if: needs.check-changes.outputs.deploy_kiloclaw == 'true'
+    if: needs.check-changes.outputs.deploy_kiloclaw == 'true' && github.repository == 'Kilo-Org/cloud'
     # Ceiling for the reusable workflow's GITHUB_TOKEN (a called workflow cannot
     # exceed the caller). The reusable workflow restricts further per job — only
     # its isolated attest-sbom job actually uses id-token/attestations.
@@ -323,6 +330,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-production-db-startup.result == 'success' &&

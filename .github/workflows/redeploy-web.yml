@@ -12,6 +12,11 @@ concurrency:
 
 jobs:
   verify-main:
+    # Guard: this workflow_dispatch is reachable from a fork, and it deploys
+    # the web app to production using repo secrets. Only the canonical repo
+    # may run it. (verify-main already enforces GITHUB_REF == refs/heads/main,
+    # so the guard is defense-in-depth for the dispatch path.)
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
 
@@ -25,6 +30,7 @@ jobs:
 
   stage-app:
     needs: verify-main
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -34,6 +40,7 @@ jobs:
 
   stage-global-app:
     needs: verify-main
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: production
@@ -43,6 +50,7 @@ jobs:
 
   promote-app:
     needs: stage-app
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-app.outputs.deployment_url }}
@@ -53,6 +61,7 @@ jobs:
 
   promote-global-app:
     needs: stage-global-app
+    if: github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}

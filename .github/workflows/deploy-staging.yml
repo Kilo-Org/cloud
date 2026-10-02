@@ -21,8 +21,9 @@ jobs:
       workflow_file: deploy-staging.yml
 
   check-staging-db-startup:
+    # Guard: fork-reachable schedule/dispatch touching staging secrets. Canonical repo only.
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -55,7 +56,7 @@ jobs:
 
   run-migrations:
     needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     environment: staging
@@ -88,7 +89,7 @@ jobs:
 
   deploy-app:
     needs: [check-changes, check-staging-db-startup, run-migrations]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -99,7 +100,7 @@ jobs:
 
   deploy-global-app:
     needs: [check-changes, check-staging-db-startup, run-migrations]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/stage-vercel-deployment.yml
     with:
       target_environment: staging
@@ -110,7 +111,7 @@ jobs:
 
   deploy-workers:
     needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
-    if: needs.check-changes.outputs.should_deploy == 'true'
+    if: needs.check-changes.outputs.should_deploy == 'true' && github.repository == 'Kilo-Org/cloud'
     uses: ./.github/workflows/deploy-workers.yml
     with:
       target_environment: staging
@@ -130,6 +131,7 @@ jobs:
       ]
     if: >-
       ${{
+        github.repository == 'Kilo-Org/cloud' &&
         !cancelled() &&
         needs.check-changes.outputs.should_deploy == 'true' &&
         needs.check-staging-db-startup.result == 'success' &&

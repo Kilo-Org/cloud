@@ -30,6 +30,11 @@ permissions:
 
 jobs:
   stage:
+    # Guard: this reusable workflow stages a Vercel deployment using repo
+    # secrets. It is only ever called by guarded caller jobs, but the guard is
+    # also applied here so the workflow cannot run outside the canonical repo
+    # even if a caller skips its own guard.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     environment: ${{ inputs.target_environment }}

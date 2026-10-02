@@ -17,6 +17,10 @@ permissions:
 
 jobs:
   deploy:
+    # Guard: this workflow_dispatch is reachable from a fork, and it builds and
+    # pushes a container image to Fly and GHCR using repo secrets. Only the
+    # canonical repo may run it.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 30
     name: Deploy KiloClaw
@@ -258,7 +262,7 @@ jobs:
   # when its content was last built, so we don't pull a large unchanged image.
   attest-sbom:
     needs: deploy
-    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != ''
+    if: needs.deploy.outputs.image-built == 'true' && needs.deploy.outputs.image-digest != '' && github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     name: Attest image SBOM
@@ -298,6 +302,7 @@ jobs:
   # continue-on-error ensures a dev push failure never blocks prod.
   push-dev-image:
     needs: [deploy]
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     name: Push Dev Image

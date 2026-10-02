@@ -164,7 +164,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/a11y/announce', () => ({
-  moveA11yFocus: vi.fn(),
+  moveA11yFocus: vi.fn(() => true),
 }));
 
 const mockPalette: MarkdownPalette = {
@@ -353,6 +353,29 @@ function closeNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.React
 function openTable(renderer: TestRenderer.ReactTestRenderer): void {
   act(() => {
     (chipNode(renderer).props.onPress as (() => void) | undefined)?.();
+  });
+}
+
+/** The reader's header; accessibility focus is tied to its first layout. */
+function titleNode(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  const nodes = renderer.root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Text' &&
+      node.props.accessibilityRole === 'header'
+  );
+  expect(nodes).toHaveLength(1);
+  const first = nodes[0];
+  if (!first) {
+    throw new Error('table title missing');
+  }
+  return first;
+}
+
+/** The native layout pass that runs once the presented sheet's title exists. */
+function layoutTitle(renderer: TestRenderer.ReactTestRenderer): void {
+  act(() => {
+    (titleNode(renderer).props.onLayout as (() => void) | undefined)?.();
   });
 }
 
@@ -562,16 +585,75 @@ describe('MarkdownTable open path', () => {
     expect(close.props.accessibilityLabel).toBe('Close table');
   });
 
-  it('moves focus to the title when the sheet opens', () => {
+  it('moves focus to the title only once the presented sheet lays it out', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
     const renderer = renderTable();
     expect(moveA11yFocus).not.toHaveBeenCalled();
+
+    openTable(renderer);
+    expect(findSheets(renderer.root)).toHaveLength(1);
+    // `Sheet` returns null on the commit that flips `open`, so the title mounts
+    // a render later; the open flag alone must not move focus.
+    expect(moveA11yFocus).not.toHaveBeenCalled();
+
+    layoutTitle(renderer);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(1);
+    // A move to a ref that is still empty would focus nothing.
+    expect(vi.mocked(moveA11yFocus).mock.calls[0]?.[0]?.current).toBeTruthy();
+  });
+
+  it('retries the title focus after a layout that landed before the title handle existed', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    // Android delivers the first layout before the ref is attached, and
+    // `findNodeHandle` on an empty ref resolves nothing, so the helper reports
+    // false. That must not burn the once-per-presentation guard.
+    vi.mocked(moveA11yFocus).mockReturnValueOnce(false).mockReturnValue(true);
+    const renderer = renderTable();
     openTable(renderer);
 
-    expect(findSheets(renderer.root)).toHaveLength(1);
-    expect(moveA11yFocus).toHaveBeenCalled();
+    layoutTitle(renderer);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(1);
+
+    layoutTitle(renderer);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(moveA11yFocus).mock.calls[1]?.[0]?.current).toBeTruthy();
+  });
+
+  it('re-focuses the title when the reader is reopened before the dismissal reports', () => {
+    vi.mocked(useMarkdown).mockReturnValue([
+      createElement('View', { testID: 'body-cells' }, 'cells'),
+    ]);
+    const renderer = renderTable();
+    openTable(renderer);
+    layoutTitle(renderer);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      (closeNode(renderer).props.onPress as (() => void) | undefined)?.();
+    });
+    expect(findSheets(renderer.root)[0]?.props.index).toBe(-1);
+    vi.mocked(moveA11yFocus).mockClear();
+
+    // The reopen is deferred until the native dismissal reports (re-presenting
+    // mid-transition leaves the sheet gone), but the title never unmounted, so
+    // it takes focus again.
+    openTable(renderer);
+    expect(findSheets(renderer.root)[0]?.props.index).toBe(-1);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(moveA11yFocus).mock.calls[0]?.[0]?.current).toBeTruthy();
+    vi.mocked(moveA11yFocus).mockClear();
+
+    // The dismissal report re-presents the reader instead of closing it, and
+    // does not move focus again.
+    act(() => {
+      (findSheets(renderer.root)[0]?.props.onDismiss as (() => void) | undefined)?.();
+    });
+    expect(findSheets(renderer.root)[0]?.props.index).toBe(0);
+    expect(moveA11yFocus).not.toHaveBeenCalled();
   });
 });
 
@@ -787,7 +869,7 @@ describe('MarkdownTable table semantics', () => {
     expect(accessibilityLabelOf(labelElement)).toBe('Docs: Open docs');
   });
 
-  it('sheet title is a header and opening the sheet moves focus to it', () => {
+  it('sheet title is a header and takes focus when it lays out', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
@@ -795,16 +877,13 @@ describe('MarkdownTable table semantics', () => {
     expect(moveA11yFocus).not.toHaveBeenCalled();
     openTable(renderer);
 
-    const title = renderer.root.findAll(
-      node =>
-        typeof node.type === 'string' &&
-        (node.type as string) === 'Text' &&
-        node.props.accessibilityRole === 'header'
-    );
-
-    expect(title[0]?.props.children).toBe('Table');
+    expect(titleNode(renderer).props.children).toBe('Table');
     expect(findSheets(renderer.root)).toHaveLength(1);
-    expect(moveA11yFocus).toHaveBeenCalled();
+    expect(moveA11yFocus).not.toHaveBeenCalled();
+
+    layoutTitle(renderer);
+    expect(moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(moveA11yFocus).mock.calls[0]?.[0]?.current).toBeTruthy();
   });
 });
 

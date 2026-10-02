@@ -10,11 +10,9 @@ import { cn } from '@/lib/utils';
  * `@rn-primitives/dialog`; everything else imports from here. See the "Unified
  * Elements" table in `apps/mobile/AGENTS.md`.
  *
- * Both surfaces render inside the app's React tree, so neither can paint above a
- * presented native sheet: use a route with `useFormSheetScreenOptions()`, or the
- * sheet surfaces in `@/components/ui/sheet`, when the dialog must stack over
- * one. A confirm reached from a sheet uses `DestructiveConfirmDialog` directly,
- * which is a native sheet and does stack.
+ * DialogCard renders through a portal and cannot paint above a native sheet.
+ * useConfirmDialog presents DestructiveConfirmDialog as a native sheet, so a
+ * confirmation reached from a formSheet or SessionPageSheet remains visible.
  */
 
 type DialogCardProps = {

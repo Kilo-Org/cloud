@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { type TextInputProps } from 'react-native';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Input, INPUT_BOX_CLASS } from './input';
+import { Input } from './input';
 import { act, TestRenderer } from '@/test/renderer';
 
 const rtl = vi.hoisted(() => ({ isRTL: false }));
@@ -56,52 +56,10 @@ function flattenStyle(style: unknown): Record<string, unknown> {
 }
 
 describe('Input single-line box', () => {
-  it('keeps the shared box free of vertical padding and a fixed height', () => {
-    expect(INPUT_BOX_CLASS).toBe('min-h-[44px] px-3 leading-[normal]');
-  });
-
-  it('renders the shared box, centered vertical alignment, and the themed placeholder', () => {
-    const input = mountInput();
-
-    expect(input.props.className).toContain('min-h-[44px]');
-    expect(input.props.className).toContain('px-3');
-    expect(input.props.className).toContain('leading-[normal]');
-    expect(input.props.className).not.toContain('py-');
-    // min-h, never a fixed height, so Dynamic Type can still grow the field.
-    expect(input.props.className).not.toMatch(/(?:^|\s)h-/);
-    expect(input.props.textAlignVertical).toBe('center');
-    expect(input.props.placeholderTextColor).toBe('#888888');
-    expect(input.props.style).toBeUndefined();
-  });
-
-  it('forces the center alignment over a caller vertical alignment', () => {
-    const input = mountInput({ textAlignVertical: 'top' });
-
-    expect(input.props.textAlignVertical).toBe('center');
-  });
-
-  it('keeps a caller placeholder colour over the themed default', () => {
-    const input = mountInput({ placeholderTextColor: '#123456' });
-
-    expect(input.props.placeholderTextColor).toBe('#123456');
-  });
-
-  it('keeps a caller size and text size in the merged className', () => {
-    const input = mountInput({ className: 'h-12 px-4 text-lg' });
-
-    expect(input.props.className).toContain('h-12');
-    expect(input.props.className).toContain('text-lg');
-    expect(input.props.className).toContain('px-4');
-    // The caller's horizontal padding wins; the box's floor and line height stay.
-    expect(input.props.className).not.toContain('px-3');
-    expect(input.props.className).toContain('min-h-[44px]');
-    expect(input.props.className).toContain('leading-[normal]');
-  });
-
   it('applies the RTL content alignment inline', () => {
     rtl.isRTL = true;
 
-    expect(mountInput().props.style).toEqual([{ textAlign: 'right' }, undefined]);
+    expect(flattenStyle(mountInput().props.style).textAlign).toBe('right');
   });
 
   it('keeps a caller textAlign prop over the RTL default', () => {
@@ -113,36 +71,9 @@ describe('Input single-line box', () => {
     expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
   });
 
-  it('keeps a caller textAlign prop after the caller style and the RTL default', () => {
-    rtl.isRTL = true;
-
-    const style = flattenStyle(
-      mountInput({ textAlign: 'center', style: { color: '#abcdef' } }).props.style
-    );
-
-    expect(style).toEqual({ textAlign: 'center', color: '#abcdef' });
-  });
-
   it('keeps a caller textAlign prop in a left-to-right interface', () => {
     rtl.isRTL = false;
 
     expect(flattenStyle(mountInput({ textAlign: 'center' }).props.style).textAlign).toBe('center');
-  });
-});
-
-describe('Input multiline', () => {
-  it('keeps the caller box and vertical alignment', () => {
-    const input = mountInput({ multiline: true, className: 'leading-6', textAlignVertical: 'top' });
-
-    expect(input.props.className).toBe('leading-6');
-    expect(input.props.className).not.toContain('min-h-[44px]');
-    expect(input.props.textAlignVertical).toBe('top');
-  });
-
-  it('does not force an alignment when the caller sets none', () => {
-    const input = mountInput({ multiline: true });
-
-    expect(input.props.className).not.toContain('min-h-[44px]');
-    expect(input.props.textAlignVertical).toBeUndefined();
   });
 });

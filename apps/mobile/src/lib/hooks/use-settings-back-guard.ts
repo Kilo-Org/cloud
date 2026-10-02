@@ -28,14 +28,18 @@ const BUTTON_LABEL_KEY = {
 export function useSecurityAgentSettingsRedirect(
   scope: string,
   isEnabled: boolean | undefined,
-  skipRedirect = false
+  {
+    skipRedirect = false,
+    dirty = false,
+  }: Readonly<{ skipRedirect?: boolean; dirty?: boolean }> = {}
 ) {
   const router = useRouter();
+  // Undoing an edit must retry a disabled redirect that the dirty guard cancelled.
   useEffect(() => {
     if (isEnabled === false && !skipRedirect) {
       router.replace(getSecurityAgentPath(scope, 'settings'));
     }
-  }, [isEnabled, router, scope, skipRedirect]);
+  }, [isEnabled, router, scope, skipRedirect, dirty]);
 }
 
 export type SettingsBackGuardResult = {

@@ -4,59 +4,31 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
-// The box's floor and horizontal padding come before the caller's classes, so
-// a caller's `px-4` overrides the shared `px-3` through tailwind-merge. Its
-// line height comes after them: tailwind-merge drops `leading-*` when a later
-// `text-*` sets a line height of its own, and every caller keeps its own text
-// size (`text-sm` here), so the box has to re-assert the one line box both the
-// placeholder and the value are drawn in.
+// The caller's classes come after the box's shape and before its line height:
+// a caller's `px-4` beats the shared `px-3`, and every caller's own `text-*`
+// size carries a line height of its own, so the one line box has to be
+// re-asserted last (apps/mobile/AGENTS.md, Text inputs).
 const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] px-3';
 const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 
-/** The one single-line box. Every single-line field renders this. */
-export const INPUT_BOX_CLASS = `${INPUT_BOX_SHAPE_CLASS} ${INPUT_BOX_LINE_HEIGHT_CLASS}`;
+/**
+ * The box's own vertical geometry, folded into the flattened style behind the
+ * caller's own style so a caller's class or style cannot move the value and the
+ * placeholder off the middle: no vertical padding (iOS insets the centered text
+ * rect by it) and Android's center gravity. Multiline callers are untouched.
+ */
+const INPUT_BOX_VERTICAL_STYLE: TextStyle = {
+  paddingTop: 0,
+  paddingBottom: 0,
+  textAlignVertical: 'center',
+};
 
 /**
- * The shared single-line box: `min-h-[44px] px-3 leading-[normal]`.
- *
- * This is the only place the single-line box lives. A call site keeps its own
- * chrome (border, fill, text size) and its own horizontal padding — a caller's
- * `px-4` overrides the shared `px-3` through tailwind-merge, because the
- * caller's className comes after the box's shape in `cn` — but it must not add
- * vertical padding or a fixed height: the box already brings `min-h-[44px]`
- * (the touch floor, and a floor rather than a height so Dynamic Type still
- * grows the field) and `leading-[normal]` (one line box for the placeholder
- * and the value, which the same TextInput draws).
- *
- * The request's "explicit vertical padding" is delivered as this explicit
- * vertical box instead: `apps/mobile/AGENTS.md` (Text inputs) forbids `py-*`
- * on a single-line input, because iOS insets the already-centered text rect by
- * the padding and draws the text and the placeholder low. Vertical padding
- * would move both below the middle, which the "focused and unfocused put the
- * text in the same place" requirement and the 44pt floor cannot accept.
- * `textAlignVertical: 'center'` is the Android half of the same fix: the
- * platform's default gravity is top in a taller box while the placeholder is
- * drawn by a different path, which is the baseline split the sign-in email
- * field showed.
- *
- * `withRtlInputAlignment` stays on every single-line input: RN 0.86 does not
- * resolve `textAlign: 'auto'` from the native direction, so a Latin address
- * stays left-aligned under a right-aligned label in an RTL catalog
- * (`rtl-text.ts`).
- *
- * An explicit caller alignment survives that default whichever channel carries
- * it. A caller's own `style` already wins, because `withRtlInputAlignment`
- * prepends `{ textAlign: 'right' }` ahead of it. A caller's `textAlign` *prop*
- * does not: React Native resolves a flattened `style` after the prop, so the
- * injected right alignment would override a `textAlign="center"` prop in RTL
- * (the Security Agent SLA day fields, which are centred in every locale).
- * `Input` folds the prop into the style behind the caller's own style, so the
- * caller's choice stays last and wins on both platforms and in both
- * directions.
- *
- * A `multiline` caller is a different control: it keeps its own box (an
- * explicit `leading-*`) and its own `textAlignVertical`, so neither the shared
- * box nor the forced vertical alignment applies.
+ * The one single-line box: `min-h-[44px] px-3 leading-[normal]`, no vertical
+ * padding, Android's center gravity, one line box for the placeholder and the
+ * value, and RTL content alignment. A call site keeps its own chrome, text size
+ * and horizontal inset; a `multiline` call site keeps its own box, gravity and
+ * line break mode.
  */
 function Input({
   className,
@@ -65,14 +37,17 @@ function Input({
   placeholderTextColor,
   multiline,
   textAlignVertical,
+  lineBreakModeIOS,
   ...props
 }: Readonly<TextInputProps & React.RefAttributes<TextInput>>) {
   const colors = useThemeColors();
   // Fold the explicit `textAlign` prop into the style after the caller's own
-  // style, so it lands after the RTL default too: RN flattens `style` after
-  // the `textAlign` prop, so the prop alone would lose to `withRtlInputAlignment`
-  // in RTL.
+  // style, so it lands after the RTL default too: RN flattens `style` after the
+  // prop, so the prop alone would lose to `withRtlInputAlignment` in RTL.
   const contentStyle: StyleProp<TextStyle> | undefined = textAlign ? [style, { textAlign }] : style;
+  const inputStyle: StyleProp<TextStyle> = multiline
+    ? contentStyle
+    : [contentStyle, INPUT_BOX_VERTICAL_STYLE];
   return (
     <TextInput
       {...props}
@@ -82,8 +57,12 @@ function Input({
         className,
         multiline ? undefined : INPUT_BOX_LINE_HEIGHT_CLASS
       )}
-      style={withRtlInputAlignment(contentStyle)}
+      style={withRtlInputAlignment(inputStyle)}
       textAlignVertical={multiline ? textAlignVertical : 'center'}
+      // An explicit `textAlign` attaches a paragraph style whose default line
+      // break mode wraps an overlong value onto a second line; a single-line
+      // field draws one. A caller's own mode still wins.
+      lineBreakModeIOS={multiline ? lineBreakModeIOS : (lineBreakModeIOS ?? 'clip')}
       placeholderTextColor={placeholderTextColor ?? colors.mutedForeground}
     />
   );

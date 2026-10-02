@@ -21,18 +21,20 @@ import {
  */
 const SLASH_COMMAND_ITEM_PREFIX = 'slash-command:';
 
-// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
-// menu's `max-h-48 border-t border-border bg-card` classes become this style
-// plus the themed border and card background. The menu is not `flex-1`: it sits
-// inline above the composer and sizes to its rows up to `max-h-48`.
-const listStyle = { maxHeight: 192 } satisfies ViewStyle;
+// FlashList needs a concrete viewport; maxHeight alone collapses this inline list.
+// Each description row fits within 56 points; longer rows remain scrollable.
+const MAX_MENU_HEIGHT = 192;
+const MENU_ROW_HEIGHT = 56;
 
 /** The menu frame plus the themed card background and top border. */
-function menuStyle(colors: ThemeColors): ViewStyle[] {
-  return [
-    listStyle,
-    { backgroundColor: colors.card, borderTopColor: colors.border, borderTopWidth: 1 },
-  ];
+function menuStyle(colors: ThemeColors, count: number): ViewStyle {
+  return {
+    height: Math.min(MAX_MENU_HEIGHT, count * MENU_ROW_HEIGHT),
+    flex: 0,
+    backgroundColor: colors.card,
+    borderTopColor: colors.border,
+    borderTopWidth: 1,
+  };
 }
 
 type SlashCommandSuggestionsProps = {
@@ -94,7 +96,7 @@ function SlashCommandSuggestionRow({
     >
       <View className="flex-1">
         <View className="flex-row items-center gap-2">
-          <Text className="text-sm font-semibold text-foreground">/{command.name}</Text>
+          <Text className="text-sm font-semibold text-foreground">{`/${command.name}`}</Text>
           {isSkill ? (
             <View className="rounded-full bg-muted px-2 py-0.5">
               <Text className="text-[10px] font-semibold uppercase tracking-[0.5px] text-muted-foreground">
@@ -140,7 +142,7 @@ export function SlashCommandSuggestions({
 
   return (
     <FlashList
-      style={menuStyle(colors)}
+      style={menuStyle(colors, commands.length)}
       data={commands}
       keyExtractor={command => command.name}
       keyboardShouldPersistTaps="handled"

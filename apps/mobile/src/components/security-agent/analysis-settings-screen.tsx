@@ -89,8 +89,6 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     setAnalysisMode(config.data.analysisMode);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
-
   // Every field here is a model slug or a fixed enum option — there is no
   // invalid combination once hydrated, unlike the repository or SLA screens.
   const valid = true;
@@ -103,6 +101,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
@@ -128,8 +127,9 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isLoading || !config.data) {
     return <AnalysisSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
   }
 
   const modelName = (slug: string) => models.find(model => model.id === slug)?.name ?? slug;

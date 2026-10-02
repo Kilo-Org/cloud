@@ -149,10 +149,36 @@ export function MarkdownTable({
   const gestureSession = useSharedValue(0);
   const verticalRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const horizontalRef = useRef<ComponentRef<typeof ScrollView>>(null);
-  // The modal header announces as a header and receives focus after the native
-  // modal finishes presenting (onShow) so screen-reader users land on the table
-  // title instead of the first cell.
+  // The reader's header announces as a header and takes accessibility focus, so
+  // a screen-reader user lands on the table title instead of the first cell.
+  // Track whether this presentation already moved focus.
   const titleRef = useRef<RNText | null>(null);
+  const titleFocusedRef = useRef(false);
+  const titleLaidOutRef = useRef(false);
+  // Latch only when the move actually happened: on Android the title's first
+  // layout can arrive before its ref is attached, so the attempt resolves no
+  // handle, returns false, and a later signal has to retry.
+  const focusTitle = useCallback(() => {
+    if (titleFocusedRef.current) {
+      return;
+    }
+    if (moveA11yFocus(titleRef)) {
+      titleFocusedRef.current = true;
+    }
+  }, []);
+  const attachTitle = useCallback(
+    (node: RNText | null) => {
+      titleRef.current = node;
+      if (node !== null && titleLaidOutRef.current) {
+        focusTitle();
+      }
+    },
+    [focusTitle]
+  );
+  const handleTitleLayout = useCallback(() => {
+    titleLaidOutRef.current = true;
+    focusTitle();
+  }, [focusTitle]);
 
   // RNGH types an external gesture ref as RefObject<ComponentType> (see
   // node_modules/react-native-gesture-handler/lib/typescript/handlers/gestures/gesture.d.ts:5),
@@ -252,14 +278,22 @@ export function MarkdownTable({
   // only Android pads the header bar by the top inset.
   const headerTopInset = Platform.OS === 'ios' ? 0 : insets.top;
 
-  // Best-effort focus once the reader is mounted; moveA11yFocus is a no-op when
-  // the title handle is not mounted yet, so no retry loop is needed. A
-  // screen-reader user lands on the table title instead of the first cell.
+  // Focus the reader's title once per presentation, when the move can actually
+  // land. `Sheet` returns null on the commit that flips `open`, so the title
+  // mounts a render later; on Android its `onLayout` can even arrive before the
+  // ref is attached. Reaching the title is retried from each real signal — this
+  // effect for a reopen that never unmounted the title, `handleTitleLayout` and
+  // `attachTitle` otherwise — and the guard latches only on a successful move.
   useEffect(() => {
-    if (open) {
-      moveA11yFocus(titleRef);
+    if (!open) {
+      titleFocusedRef.current = false;
+      titleLaidOutRef.current = false;
+      return;
     }
-  }, [open]);
+    if (titleRef.current !== null) {
+      focusTitle();
+    }
+  }, [open, focusTitle]);
 
   // The reveal control is a sibling of the horizontal ScrollView, not a row
   // inside the table box: centred across the table's natural width it would sit
@@ -351,7 +385,8 @@ export function MarkdownTable({
             style={{ paddingTop: headerTopInset, height: headerTopInset + 56 }}
           >
             <Text
-              ref={titleRef}
+              ref={attachTitle}
+              onLayout={handleTitleLayout}
               accessibilityRole="header"
               className="text-lg font-semibold text-foreground"
               style={withRtlWritingDirection(undefined)}

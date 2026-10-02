@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Check, Eye, Search } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, type TextInput, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -12,6 +12,7 @@ import { InstanceContextBoundary } from '@/components/kiloclaw/instance-context-
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { instanceOrgId, useInstanceContext } from '@/lib/hooks/use-instance-context';
@@ -162,10 +163,18 @@ export default function ModelListScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.allModels')} />
       <View className="px-4 pb-2 pt-2">
-        <TextInput
+        {/* The shared Input supplies the single-line box: `min-h-[44px]` (never
+            `py-*`, which iOS insets the already-centered text rect by, drawing
+            the placeholder and value low) with one `leading-[normal]` line box
+            for both, and `textAlignVertical: 'center'` so Android centres the
+            value as well as the placeholder. This call site keeps only its own
+            chrome and its own `px-4`, which tailwind-merge lets win over the
+            shared `px-3`. */}
+        <Input
           ref={searchInputRef}
-          className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
+          className="rounded-lg bg-secondary px-4 text-sm text-foreground"
           placeholder={t('common.searchModels')}
+          accessibilityLabel={t('common.searchModels')}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
           autoCorrect={false}

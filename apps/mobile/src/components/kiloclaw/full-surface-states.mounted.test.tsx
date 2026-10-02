@@ -48,6 +48,9 @@ vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',
   TextInput: 'TextInput',
+  // The shared single-line Input (now under ModelListScreen's search field)
+  // reads I18nManager.isRTL through withRtlInputAlignment.
+  I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },

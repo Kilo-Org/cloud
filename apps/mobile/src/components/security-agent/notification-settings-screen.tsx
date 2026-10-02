@@ -104,8 +104,6 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     setSlaNotificationWarningDays(config.data.slaNotificationWarningDays);
   }, [config.data]);
 
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
-
   // Ref indirection keeps the tracking effect independent of the mutation
   // object's identity (a new object every render) — fires once per mount,
   // mirroring finding-detail-screen.tsx's tracked-once pattern.
@@ -138,6 +136,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   const dirty =
     hydratedRef.current &&
     getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
@@ -168,8 +167,9 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
   if (config.isLoading || !config.data) {
     return <NotificationSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
   }
 
   return (

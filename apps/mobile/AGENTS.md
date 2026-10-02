@@ -84,10 +84,17 @@ tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a 
 is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
 needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
 
+`ImageViewer` measures its viewport and gives the zoom child concrete dimensions.
+Do not use percentage dimensions inside `ResumableZoom`'s unconstrained child container.
+Use explicit pixel sizes for minimum touch targets; native rem is 14 points.
+Use `TabScreenScrollView` for scrolling screens under the absolute tab bar.
+Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone does not create a viewport.
+
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
 `KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
-conversation, manual-review and PR-discussion surfaces; `KeyboardChatScrollView` is the kilo-chat message
-list's scroll container; `useKeyboardState` is the app's one keyboard-height read. A surface whose content
+conversation, manual-review and PR-discussion surfaces; `useKeyboardState` is the app's one keyboard-height read.
+The conversation list follows the newest message when its viewport shrinks; it must not add a second keyboard inset.
+A surface whose content
 pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
 (`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
 without the reduction the content floats a navigation-bar height above the keyboard.
@@ -121,6 +128,10 @@ Nothing else may read the keyboard: no surface adds a listener beside the provid
 - Use `defaultValue` only for initial content.
 - Single-line inputs: use `leading-[normal]`. A `lineHeight` above the font's natural one (which `text-sm`/`text-base` set on their own) makes iOS draw the placeholder lower than the typed text and clip it. Multi-line inputs keep an explicit `leading-*`.
 - Single-line inputs: set the height with `min-h-*`, not `py-*`. iOS insets the already-centered text rect by the padding, so vertical padding draws the text and the placeholder low.
+- Use the shared `Input` for every single-line field.
+- `Input` removes vertical padding, centers Android text, and defaults iOS line breaks to `clip`.
+- A single-line caller can change horizontal padding, text size, and minimum height.
+- A multiline caller keeps its own padding, alignment, and line breaks.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

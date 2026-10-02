@@ -1,7 +1,7 @@
 import { AlertCircle, Share, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, View } from 'react-native';
+import { type LayoutChangeEvent, Platform, Pressable, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ResumableZoom } from 'react-native-zoom-toolkit';
@@ -80,6 +80,14 @@ export function ImageViewer({
       : undefined;
 
   const [imageError, setImageError] = useState(false);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const measureViewport = useCallback(({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+    setViewport(current =>
+      current.width === layout.width && current.height === layout.height
+        ? current
+        : { width: layout.width, height: layout.height }
+    );
+  }, []);
   // Reset a prior decode error in render when the URL changes. A successful
   // renew writes a NEW signed URL; the reset must land in the same commit so
   // the refreshed image, not the "Image unavailable" row, renders. A failed
@@ -149,7 +157,10 @@ export function ImageViewer({
         {/* RNGH gestures need their own root inside the sheet — the app-root
             GestureHandlerRootView does not reach the sheet's native window. */}
         <GestureHandlerRootView className="flex-1">
-          <View className="flex-1 items-center justify-center overflow-hidden bg-black">
+          <View
+            className="flex-1 items-center justify-center overflow-hidden bg-black"
+            onLayout={measureViewport}
+          >
             {/* Mounted only while the viewer is open and the bitmap decodes, so
                 every open starts at 1x and no zoom survives a close. */}
             {visible && uri !== null && !imageError ? (
@@ -165,7 +176,8 @@ export function ImageViewer({
                 <Image
                   source={{ uri }}
                   cachePolicy="memory"
-                  className="h-full w-full"
+                  // ResumableZoom measures an unconstrained child; percentages collapse it to zero.
+                  style={viewport}
                   contentFit="contain"
                   onError={() => {
                     setImageError(true);

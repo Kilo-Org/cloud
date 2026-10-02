@@ -92,7 +92,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // user with integration repos but no effective selection can pick repos and
   // then enable (the overview's "Select repositories" CTA lands here). Opt out
   // of the disabled-state redirect; every other sub-screen keeps it.
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, true);
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { skipRedirect: true });
 
   const valid = mode === 'all' || selectedIds.length > 0;
   const patch = { repositorySelectionMode: mode, selectedRepositoryIds: selectedIds };

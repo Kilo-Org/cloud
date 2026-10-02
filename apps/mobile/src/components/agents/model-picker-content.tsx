@@ -225,7 +225,7 @@ export function ModelPickerContent() {
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="search"
-              className="h-8 flex-1 p-0 text-base leading-[normal] text-foreground"
+              className="flex-1 p-0 text-base leading-[normal] text-foreground"
               onChangeText={setSearch}
             />
             {/* In-field clear, on every platform: `clearButtonMode` is iOS

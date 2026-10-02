@@ -728,9 +728,19 @@ function openDetails(renderer: TestRenderer.ReactTestRenderer, message: StoredMe
 
 function closeDetails(renderer: TestRenderer.ReactTestRenderer): void {
   const detailSheet = renderer.root.findAll(node => (node.type as string) === 'BottomSheet')[0];
-  const close = detailSheet?.props.onClose as () => void;
+  if (!detailSheet) {
+    // Already dismissed: the pair below unmounts the sheet, so a second close
+    // has nothing left to dismiss.
+    return;
+  }
+  // The native sheet reports a dismissal as one event pair: `onClose` then
+  // `onDismiss` (see the library's `fireCloseCallbacks`). Firing only the first
+  // left the wrapper waiting for a report that never came.
+  const close = detailSheet.props.onClose as () => void;
+  const dismiss = detailSheet.props.onDismiss as () => void;
   act(() => {
     close();
+    dismiss();
   });
 }
 

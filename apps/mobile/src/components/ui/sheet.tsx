@@ -1,5 +1,5 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -60,10 +60,30 @@ export function Sheet({
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
   const [mounted, setMounted] = useState(visible);
+  // A dismissal handed to the native sheet that has not reported back yet.
+  const [dismissalPending, setDismissalPending] = useState(false);
+
+  // The caller can reopen (`visible` true) while the dismiss animation is still
+  // running, and the native dismissal then reports after the fact. Handing the
+  // library `index` 0 at that moment races its own dismissal transition —
+  // SwiftUI/UIKit drop the presentation and the sheet never comes back (observed
+  // on device: host remounted, `presented` still false 15s later) — so the index
+  // stays -1 until the dismissal reports. `onDismiss` then flips it to 0, the
+  // transition the library's own note calls safe because the dismiss event only
+  // fires once the transition finished.
+  const mountedRef = useRef(mounted);
+  mountedRef.current = mounted;
 
   useEffect(() => {
     if (visible) {
       setMounted(true);
+      return;
+    }
+    // The host is up, so this hands the library its dismissal. Android reports
+    // that dismissal from the host's own effect, which runs before this one;
+    // `onDismiss` clears `mountedRef` in time for this check to see it.
+    if (mountedRef.current) {
+      setDismissalPending(true);
     }
   }, [visible]);
 
@@ -73,15 +93,39 @@ export function Sheet({
 
   return (
     <BottomSheet
-      index={visible ? 0 : -1}
+      index={visible && !dismissalPending ? 0 : -1}
       snapPoints={snapPoints}
       // The native sheet paints the platform surface color: without this a
       // forced in-app dark theme still shows a light sheet behind themed text.
       backgroundStyle={{ backgroundColor: background ?? colors.card }}
       handleComponent={showHandle ? undefined : null}
       enablePanDownToClose
-      onClose={onClose}
+      onClose={() => {
+        // A dismissal the caller already reopened past must not close the sheet
+        // again through the caller's own handler. A self-dismissal (backdrop,
+        // swipe, Android Back) has no pending request and reports while
+        // `visible` is still true, so it is still forwarded.
+        if (visible && dismissalPending) {
+          return;
+        }
+        onClose();
+      }}
       onDismiss={() => {
+        setDismissalPending(false);
+        if (visible && dismissalPending) {
+          // Superseded: the caller reopened while this dismissal was in flight.
+          // The next render hands the library `index` 0, re-presenting the sheet
+          // the dismissal had taken down; the sheet stays mounted, so its content
+          // never unmounts.
+          return;
+        }
+        // Clear the host flag before queueing, not just with `setMounted`: on
+        // Android this report runs from the host's effect, ahead of this
+        // component's `[visible]` effect, which reads the flag to decide whether
+        // a dismissal is still outstanding. Otherwise it re-arms
+        // `dismissalPending` for a dismissal that already reported and the next
+        // reopen passes -1 and never presents.
+        mountedRef.current = false;
         setMounted(false);
         onDismiss?.();
       }}

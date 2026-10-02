@@ -9,7 +9,7 @@
 // trigger. Every close path here routes through `onClose` or `onPick`.
 
 import { X } from '@/components/ui/icons';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, type Text as RNText, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -46,14 +46,49 @@ export function ReactionPickerSheet({
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const titleRef = useRef<RNText | null>(null);
-
-  // Best-effort focus once the rows are mounted; moveA11yFocus is a no-op when
-  // the title handle is not mounted yet, so no retry loop is needed.
-  useEffect(() => {
-    if (visible) {
-      moveA11yFocus(titleRef);
+  // Latch only when the move actually happened: on Android the title's first
+  // layout can arrive before its ref is attached, so the attempt resolves no
+  // handle, returns false, and a later signal has to retry.
+  const titleFocusedRef = useRef(false);
+  const titleLaidOutRef = useRef(false);
+  const focusTitle = useCallback(() => {
+    if (titleFocusedRef.current) {
+      return;
     }
-  }, [visible]);
+    if (moveA11yFocus(titleRef)) {
+      titleFocusedRef.current = true;
+    }
+  }, []);
+  const attachTitle = useCallback(
+    (node: RNText | null) => {
+      titleRef.current = node;
+      if (node !== null && titleLaidOutRef.current) {
+        focusTitle();
+      }
+    },
+    [focusTitle]
+  );
+  const handleTitleLayout = useCallback(() => {
+    titleLaidOutRef.current = true;
+    focusTitle();
+  }, [focusTitle]);
+
+  // Focus the picker's title once per presentation, when the move can actually
+  // land. `Sheet` returns null on the commit that flips `visible`, so the title
+  // mounts a render later; on Android its `onLayout` can even arrive before the
+  // ref is attached. Reaching the title is retried from each real signal — this
+  // effect for a reopen that never unmounted the title, `handleTitleLayout` and
+  // `attachTitle` otherwise — and the guard latches only on a successful move.
+  useEffect(() => {
+    if (!visible) {
+      titleFocusedRef.current = false;
+      titleLaidOutRef.current = false;
+      return;
+    }
+    if (titleRef.current !== null) {
+      focusTitle();
+    }
+  }, [visible, focusTitle]);
 
   const reacted = new Set<string>();
   for (const r of reactions) {
@@ -71,9 +106,10 @@ export function ReactionPickerSheet({
         style={{ paddingBottom: insets.bottom + 24 }}
       >
         <View className="flex-row items-center">
-          <View className="size-11 shrink-0" />
+          <View className="size-[48px] shrink-0" />
           <Text
-            ref={titleRef}
+            ref={attachTitle}
+            onLayout={handleTitleLayout}
             accessibilityRole="header"
             className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
           >
@@ -84,7 +120,7 @@ export function ReactionPickerSheet({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('common.closeReactions')}
-            className="size-11 shrink-0 items-center justify-center rounded-full active:bg-muted"
+            className="size-[48px] shrink-0 items-center justify-center rounded-full active:bg-muted"
             onPress={onClose}
           >
             <X size={18} color={colors.foreground} />
@@ -99,7 +135,7 @@ export function ReactionPickerSheet({
                 accessibilityRole="button"
                 accessibilityLabel={reactionLabel(content)}
                 className={cn(
-                  'h-11 w-11 items-center justify-center rounded-full active:opacity-75',
+                  'h-[48px] w-[48px] items-center justify-center rounded-full active:opacity-75',
                   isReacted ? 'bg-accent-soft' : 'bg-muted'
                 )}
                 onPress={() => {

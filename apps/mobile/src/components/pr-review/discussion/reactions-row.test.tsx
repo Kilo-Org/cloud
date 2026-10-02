@@ -4,7 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ReactionsRow } from './reactions-row';
 
-const { moveFocus } = vi.hoisted(() => ({ moveFocus: vi.fn() }));
+const { moveFocus } = vi.hoisted(() => ({
+  moveFocus: vi.fn<(ref: { current: unknown }) => boolean>(() => true),
+}));
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -74,6 +76,22 @@ function finishDismiss(renderer: TestRenderer.ReactTestRenderer): void {
   });
 }
 
+/**
+ * The native layout pass that runs once the presented picker's title exists;
+ * the picker moves accessibility focus from it.
+ */
+function layoutPickerTitle(renderer: TestRenderer.ReactTestRenderer): void {
+  const title = renderer.root.find(
+    n =>
+      typeof n.type === 'string' &&
+      (n.type as string) === 'Text' &&
+      (n.props as Props).accessibilityRole === 'header'
+  );
+  act(() => {
+    (title.props.onLayout as () => void)();
+  });
+}
+
 /** Mounts a row and taps "Add reaction" so the picker is open. */
 async function openPicker(): Promise<TestRenderer.ReactTestRenderer> {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
@@ -89,10 +107,14 @@ async function openPicker(): Promise<TestRenderer.ReactTestRenderer> {
     throw new Error('Failed to create test renderer');
   }
   press(renderer, p => p.accessibilityLabel === 'Add reaction');
-  // Opening moves the screen reader into the picker's title, the platform's
-  // presentation behaviour the picker now performs itself. Clear it so each
-  // test's timer assertions see only the restore-to-trigger move.
+  // Opening moves the screen reader into the picker's title once the presented
+  // sheet lays it out; the picker performs that itself. Clear it so each test's
+  // timer assertions see only the restore-to-trigger move.
+  expect(moveFocus).not.toHaveBeenCalled();
+  layoutPickerTitle(renderer);
   expect(moveFocus).toHaveBeenCalledTimes(1);
+  // A move to a ref that is still empty would focus nothing.
+  expect(moveFocus.mock.calls[0]?.[0]?.current).toBeTruthy();
   moveFocus.mockClear();
   return renderer;
 }
@@ -145,16 +167,66 @@ describe('ReactionsRow picker dismissal focus', () => {
     renderer.unmount();
   });
 
+  it('retries the picker title focus when a layout lands before the title handle exists', async () => {
+    // Android delivers the first layout before the ref is attached, and
+    // `findNodeHandle` on an empty ref resolves nothing, so the helper reports
+    // false. That must not burn the once-per-presentation guard.
+    moveFocus.mockReturnValueOnce(false).mockReturnValue(true);
+    const renderer = await openPicker();
+    expect(moveFocus).not.toHaveBeenCalled();
+
+    layoutPickerTitle(renderer);
+    expect(moveFocus).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
   it('cancels a pending focus restore when the picker reopens inside the window', async () => {
     const renderer = await openPicker();
 
     press(renderer, p => p.accessibilityLabel === 'Close reactions');
     press(renderer, p => p.accessibilityLabel === 'Add reaction');
-    expect(isPickerOpen(renderer)).toBe(true);
-    // The reopen moves focus into the picker again; only the restore matters here.
+    // The reopen is deferred until the native dismissal reports, so the sheet
+    // still sits at detent -1 here; it is still a reopen for the restore timer.
+    expect(sheetProps(renderer)?.index).toBe(-1);
+    // The reopen moves focus into the still-mounted picker title again; only the
+    // restore matters here.
     moveFocus.mockClear();
 
     // The stale timer must not pull focus to the trigger behind the sheet.
+    act(() => {
+      vi.advanceTimersByTime(400);
+    });
+    expect(moveFocus).not.toHaveBeenCalled();
+
+    renderer.unmount();
+  });
+
+  it('keeps a reopened picker open when the superseded dismiss reports late', async () => {
+    const renderer = await openPicker();
+
+    press(renderer, p => p.accessibilityLabel === 'Close reactions');
+    expect(sheetProps(renderer)?.index).toBe(-1);
+
+    // Reopened before the dismissal reported: the reopen is deferred (the sheet
+    // stays at detent -1 until the native transition finishes), but the title
+    // never unmounted, so focus still moves back into it.
+    press(renderer, p => p.accessibilityLabel === 'Add reaction');
+    expect(isPickerOpen(renderer)).toBe(false);
+    expect(moveFocus).toHaveBeenCalledTimes(1);
+    moveFocus.mockClear();
+
+    // The late native dismissal belongs to the closed presentation: it must
+    // re-present the picker instead of closing it, and must not pull focus back
+    // to the trigger. The native event reaches the live handlers, as the
+    // library's own dispatcher does.
+    act(() => {
+      const live = sheetProps(renderer);
+      (live?.onClose as (() => void) | undefined)?.();
+      (live?.onDismiss as (() => void) | undefined)?.();
+    });
+
+    expect(isPickerOpen(renderer)).toBe(true);
     act(() => {
       vi.advanceTimersByTime(400);
     });

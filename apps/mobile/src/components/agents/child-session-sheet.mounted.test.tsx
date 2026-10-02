@@ -201,7 +201,10 @@ describe('ChildSessionSheet sheet surface', () => {
     expect(sheetNode.props.snapPoints).toEqual(['100%']);
     expect(sheetNode.props.handleComponent).toBeNull();
     expect(sheetNode.props.index).toBe(0);
-    expect(sheetNode.props.onClose).toBe(onClose);
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);

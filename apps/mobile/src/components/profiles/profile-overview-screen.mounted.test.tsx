@@ -58,8 +58,13 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
     `/profiles/${id}/agents${org ? `?org=${org}` : ''}`,
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
+  useWindowDimensions: () => ({ width: 402, height: 874, fontScale: 1 }),
   View: 'View',
   ScrollView: 'ScrollView',
+}));
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 62, right: 0, bottom: 34, left: 0 }),
 }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ destructiveForeground: '#FFFFFF' }),

@@ -9,7 +9,6 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
-import { KeyboardChatScrollView } from 'react-native-keyboard-controller';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import {
@@ -87,6 +86,11 @@ export function MessageList({
     isAtBottomRef.current = true;
     newestScrollScheduler.schedule();
   }, [newestScrollScheduler]);
+  const handleLayout = useCallback(() => {
+    if (isAutoFollowingNewestRef.current) {
+      scrollToNewest();
+    }
+  }, [scrollToNewest]);
 
   const handleScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
@@ -181,10 +185,7 @@ export function MessageList({
       <FlashList
         ref={listRef}
         style={listStyle}
-        // The list's scroll container adjusts its content inset and offset from
-        // the `KeyboardProvider` on the UI thread, which replaces the JS scroll
-        // the app used to schedule on `keyboardDidShow`.
-        renderScrollComponent={KeyboardChatScrollView}
+        onLayout={handleLayout}
         data={chronological}
         renderItem={({ item, index }) => {
           // In chronological order, the previous message in time is data[index - 1].

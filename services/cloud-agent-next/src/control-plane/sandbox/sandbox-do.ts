@@ -171,6 +171,7 @@ import {
   failExpiredRoutes,
   isCurrentPreparingAttempt,
   listRoutes,
+  notifyPreparingRoutes,
   notifyReadyRoutes,
   onRouteFailed,
   onRouteProgress,
@@ -182,6 +183,7 @@ import {
   writeRoute,
   type RouteContext,
   type RouteGrantIssue,
+  type RoutePreparationProgress,
   type RouteRecord,
 } from './routes.js';
 import { allocation as allocationTable, routes as routesTable } from './sqlite-schema.js';
@@ -334,6 +336,25 @@ function rowToState(row: AllocationRow): AllocationState {
 
 function remainingMs(deadline: number): number {
   return Math.max(1, deadline - Date.now());
+}
+
+/**
+ * The preparation step the allocation owns until the wrapper connects. Once a
+ * wrapper is bound it reports its own steps, so there is none here.
+ */
+function sandboxPreparationProgress(state: AllocationState): RoutePreparationProgress | undefined {
+  switch (state.kind) {
+    case 'stopped':
+    case 'creating':
+      return { step: 'sandbox_create' };
+    case 'stopping':
+      return { step: 'sandbox_create', detail: 'Waiting for the previous sandbox to stop' };
+    case 'starting':
+      return { step: 'sandbox_start' };
+    case 'connected':
+    case 'disconnected':
+      return undefined;
+  }
 }
 
 /** Upper bound on concurrently outstanding wrapper control requests. */
@@ -605,7 +626,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.enqueue(async () => {
       const state = await this.readAllocation();
       const route = await readRoute(this.db, parsed.sessionId);
-      return { sessionId: parsed.sessionId, view: routeView(route, state.kind === 'connected') };
+      return {
+        sessionId: parsed.sessionId,
+        view: routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+      };
     });
   }
 
@@ -1682,7 +1706,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         state = await this.readAllocation();
       }
     }
-    return routeView(route, state.kind === 'connected');
+    return routeView(route, state.kind === 'connected', sandboxPreparationProgress(state));
   }
 
   /** Stores the sandbox owner on first use and rejects a different one. */
@@ -2058,6 +2082,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<void> {
     if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
       retireScopeGrants(this.db);
+    }
+    // Until the wrapper connects, the allocation is the preparation progress:
+    // show creating, retrying and starting rather than one silent step.
+    if (
+      (next.kind === 'creating' || next.kind === 'starting' || next.kind === 'stopping') &&
+      (previous.kind !== next.kind || previous.allocationId !== next.allocationId)
+    ) {
+      const progress = sandboxPreparationProgress(next);
+      if (progress !== undefined) {
+        await notifyPreparingRoutes(
+          this.routeContext(next),
+          previous.kind === 'creating' && next.kind === 'creating'
+            ? { ...progress, detail: 'Retrying sandbox creation' }
+            : progress
+        );
+      }
     }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
       for (const route of await listRoutes(this.db)) {
@@ -2939,7 +2979,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
       case 'session.progress':
-        await onRouteProgress(ctx, frame.sessionId, frame.step, current);
+        await onRouteProgress(
+          ctx,
+          frame.sessionId,
+          {
+            step: frame.step,
+            ...(frame.detail === undefined ? {} : { detail: frame.detail }),
+          },
+          current
+        );
         return;
       case 'session.ready':
         await onRouteReady(ctx, frame.sessionId, current);

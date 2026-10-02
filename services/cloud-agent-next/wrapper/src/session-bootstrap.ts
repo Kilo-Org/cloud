@@ -183,10 +183,12 @@ function parseCloneSizeProxies(output: string): {
   return proxies;
 }
 
-function gitProgressReporter(
-  progress: BootstrapProgress | undefined,
-  step: 'cloning' | 'branch',
-  prefix: string
+/**
+ * Parses `git --progress` output into throttled "Receiving objects: 45%" lines.
+ * Shared by the legacy bootstrap and the control-plane preparation.
+ */
+export function createGitProgressReporter(
+  report: (progressText: string) => void
 ): (stream: ProcessOutputStream, output: string) => void {
   let bufferedOutput = '';
   let lastReportedProgress = '';
@@ -206,8 +208,16 @@ function gitProgressReporter(
 
     lastReportedProgress = progressText;
     lastReportedAt = now;
-    progress?.(step, `${prefix} ${progressText}`);
+    report(progressText);
   };
+}
+
+function gitProgressReporter(
+  progress: BootstrapProgress | undefined,
+  step: 'cloning' | 'branch',
+  prefix: string
+): (stream: ProcessOutputStream, output: string) => void {
+  return createGitProgressReporter(progressText => progress?.(step, `${prefix} ${progressText}`));
 }
 
 function longGitOptions(

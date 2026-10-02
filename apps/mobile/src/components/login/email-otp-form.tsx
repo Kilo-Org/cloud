@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -107,10 +106,10 @@ export function EmailOtpForm({
         variant="outline"
         className="flex-row gap-2"
         disabled={authBusy}
+        loading={busy === 'otp-send'}
         onPress={onResend}
         accessibilityLabel={t('login.resendCode')}
       >
-        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
         {/* One line, like every other label in this stack: the Arabic secondary
             label ("إعادة إرسال الرمز") wrapped onto two lines inside the
             full-width button, so the copy did not fit its control (2026-09-19

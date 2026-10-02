@@ -36,6 +36,7 @@ vi.mock('@/lib/trpc', () => {
 });
 
 const fetchStoreProducts = vi.fn().mockResolvedValue([]);
+const reconnectStore = vi.fn<() => Promise<boolean>>().mockResolvedValue(true);
 
 const cachedProduct: AppStoreKiloPassProduct = {
   appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
@@ -69,7 +70,7 @@ type Probe = {
 function Harness({ probe }: { probe: Probe }) {
   const [connected, setConnected] = useState(false);
   probe.setConnected = setConnected;
-  probe.current = useStoreKiloPassProducts({ connected, fetchStoreProducts });
+  probe.current = useStoreKiloPassProducts({ connected, fetchStoreProducts, reconnectStore });
   return null;
 }
 
@@ -147,6 +148,42 @@ describe('useStoreKiloPassProducts store-connection timeout', () => {
       expect(api().errorMessage).not.toBeNull();
     } finally {
       vi.useRealTimers();
+      unmount();
+    }
+  });
+});
+
+/**
+ * The screen's "Try again" runs the hook's retry. It must restore the store
+ * connection first: a failed initialization leaves the native store without a
+ * live product query, so a retry that only re-runs the fetch issues no new
+ * ProductRequest and the retry card can never clear.
+ */
+describe('useStoreKiloPassProducts retry', () => {
+  beforeEach(() => {
+    mockedPlatform.OS = 'ios';
+    fetchStoreProducts.mockClear();
+    reconnectStore.mockClear();
+  });
+
+  it('reconnects the store when the user retries', async () => {
+    const { api, setConnected, unmount } = await mountHook();
+    try {
+      await act(async () => {
+        setConnected(true);
+        await Promise.resolve();
+      });
+      reconnectStore.mockClear();
+
+      await act(async () => {
+        await api().refetch();
+      });
+
+      // Before this, the retry only re-ran the store fetch, so a store whose
+      // initialization had failed was never re-initialized: no new
+      // ProductRequest was issued and the retry card stayed up.
+      expect(reconnectStore).toHaveBeenCalledTimes(1);
+    } finally {
       unmount();
     }
   });

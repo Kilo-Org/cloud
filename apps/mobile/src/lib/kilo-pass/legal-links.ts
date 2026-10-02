@@ -6,14 +6,17 @@ export function kiloPassLegalDisclosure(platformOS: string): string {
   );
 }
 
-type KiloPassLegalLink = {
+type StoreLegalLink = {
   label: string;
   url: string;
 };
 
-export function getKiloPassLegalLinks(
-  webBaseUrl: string
-): readonly [KiloPassLegalLink, KiloPassLegalLink] {
+/**
+ * The store-purchase legal links. Not Kilo Pass specific: the one-off credit
+ * packs link to the same Terms and Privacy pages, so both purchase screens
+ * share this helper.
+ */
+export function getStoreLegalLinks(webBaseUrl: string): readonly [StoreLegalLink, StoreLegalLink] {
   const baseUrl = webBaseUrl.replace(/\/+$/, '');
 
   return [

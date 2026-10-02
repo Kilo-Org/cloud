@@ -288,20 +288,6 @@ export function fixResponsesRequest(request: GatewayResponsesRequest) {
   }
 }
 
-export function removeChatCompletionsReasoning(request: OpenRouterChatCompletionRequest) {
-  for (const message of request.messages) {
-    if ('reasoning' in message) {
-      delete message.reasoning;
-    }
-    if ('reasoning_content' in message) {
-      delete message.reasoning_content;
-    }
-    if ('reasoning_details' in message) {
-      delete message.reasoning_details;
-    }
-  }
-}
-
 export function removeChatCompletionsToolNames(request: OpenRouterChatCompletionRequest) {
   for (const message of request.messages) {
     if (message.role === 'tool' && 'name' in message) {

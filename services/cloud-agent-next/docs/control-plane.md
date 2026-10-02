@@ -255,6 +255,7 @@ notification, so a lost notification never leaves it waiting.
 | `prepare`, route `failed` | New attempt with a new deadline. |
 | `prepare`, route `preparing` or `ready` | No change; return the current view. |
 | Wrapper progress | Forward to the session. |
+| Allocation enters `creating`, `starting` or `stopping` | Notify each preparing route of the sandbox step (`sandbox_create`, `sandbox_start`; a create retry or a pending stop adds a detail). `prepare` and `status` return the same step while the allocation is in one of those states (`creating`, `starting`, `stopping`, `stopped`). |
 | Wrapper `session.ready` | `ready`; notify. |
 | Wrapper `session.failed` (while preparing, or later when Kilo is unavailable) | `failed`; notify. |
 | Deadline while `preparing` | `failed` (`preparation_timeout`); notify. |
@@ -386,7 +387,9 @@ The wrapper owns the step timeouts and retries:
 | Kilo runtime start | 2 min | 1 retry |
 | Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
-Each step sends progress. A route already prepared in this process (checkout present, Kilo session
+Each step sends progress. Long steps also send a short, throttled `detail` line within the step
+(git clone and checkout percentages, clone retries, session history loading); the detail is display
+text, not route state. A route already prepared in this process (checkout present, Kilo session
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
@@ -587,7 +590,7 @@ New states map onto the current public contracts; no public shape changes.
 | Message `completed` | `cloud.message.completed` | `completed` | `completed` |
 | Message `failed` | `cloud.message.failed`, `status: 'failed'`, reason | `failed` with stage and code | `failed` |
 | Message `cancelled` | `cloud.message.failed`, `status: 'interrupted'`, reason `interrupted` | `interrupted` | `interrupted` |
-| Route `preparing(step)` | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message) and `cloud.status` `preparing` | — | — |
+| Route `preparing(step)` | `preparing` v2 row (`attemptId` = route attempt, `triggerMessageId` = oldest queued message; the step's detail is its `latestDetail`) and `cloud.status` `preparing`. A stepless view for the same attempt keeps the current step | — | — |
 | Route `ready` | `cloud.status` `ready` | — | — |
 | Route `failed` | `cloud.status` `error` | — | — |
 | Finalization running | `cloud.status` `finalizing`, from a wrapper `finalizing` event; `ready` again on the outcome | — | — |

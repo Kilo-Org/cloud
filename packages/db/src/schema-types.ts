@@ -1203,6 +1203,9 @@ export const AuditLogAction = z.enum([
   'organization.domain_claim.verify',
   'organization.domain_claim.lose_verification',
   'organization.domain_claim.remove',
+  'organization.domain_claim.cleanup_started',
+  'organization.domain_claim.cleanup_completed',
+  'organization.domain_claim.cleanup_failed',
   'organization.mode.create', // ✅
   'organization.mode.update', // ✅
   'organization.mode.delete', // ✅

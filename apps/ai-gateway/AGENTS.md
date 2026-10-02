@@ -12,8 +12,8 @@ Next.js app that serves the AI gateway API on its own. It deploys to the
   move under `/api/v1` too; the latter becomes `/api/v1/systemone`.
 - Route files are thin facades over handlers in `packages/web-shared`. Keep the
   `apps/web` `maxDuration` and `withRestTiming` usage, with route patterns that
-  match this app's paths. See `packages/web-shared/AGENTS.md` for how `@/`
-  imports resolve.
+  match this app's paths. Import them as `@kilocode/web-shared/…`; see
+  `packages/web-shared/AGENTS.md`.
 - Handlers that depend on the path accept both apps' paths, such as the LLM
   proxy's path validation.
 - `pnpm dev` runs with the web app's environment files. Start it with

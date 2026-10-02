@@ -42,7 +42,7 @@ const config: StorybookConfig = {
     if (config.resolve) {
       config.resolve.alias = {
         ...config.resolve.alias,
-        '@': [srcDir, webSharedSrcDir],
+        '@': srcDir,
         '@kilocode/web-shared': webSharedSrcDir,
         '@/lib/utils': resolve(mocksDir, 'utils.ts'),
       };

@@ -2750,7 +2750,10 @@
     "markdownImage": {
       "load": "Įkelti",
       "loadWithHost": "Įkelti iš {{host}}",
-      "httpsOnly": "Paveikslėlius galima įkelti tik per HTTPS."
+      "httpsOnly": "Paveikslėlius galima įkelti tik per HTTPS.",
+      "trustTitle": "Įkelti paveikslėlį iš {{host}}?",
+      "trustMessage": "Jei pasitikėsi svetaine {{host}}, jos paveikslėliai bus įkeliami kaskart neprašant. Vėliau galite tai atšaukti skiltyje Patikimos svetainės.",
+      "loadOnce": "Įkelti vieną kartą"
     },
     "markdownLink": {
       "invalidLink": "Šios nuorodos negalima atidaryti.",
@@ -3269,8 +3272,12 @@
     "subtitle": "Svetainės, kurias leidžiate atidaryti be patvirtinimo",
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
+    "imagesSectionTitle": "Patikimos paveikslėlių svetainės",
+    "imagesSectionDescription": "Šių svetainių paveikslėliai įkeliami neprašant dar kartą.",
+    "imagesSectionEmpty": "Patikimų paveikslėlių svetainių nėra",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
+    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {

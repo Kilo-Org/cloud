@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "{{host}} laden",
-      "httpsOnly": "Alleen afbeeldingen via HTTPS zijn toegestaan."
+      "httpsOnly": "Alleen afbeeldingen via HTTPS zijn toegestaan.",
+      "trustTitle": "Afbeelding van {{host}} laden?",
+      "trustMessage": "Als je {{host}} vertrouwt, worden de afbeeldingen geladen zonder het elke keer te vragen. Je kunt dit later intrekken onder Vertrouwde hosts.",
+      "loadOnce": "Eenmalig laden"
     },
     "markdownLink": {
       "invalidLink": "Deze link kan niet worden geopend.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Vertrouwde hosts die je zonder bevestiging kunt openen",
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
+    "imagesSectionTitle": "Vertrouwde afbeeldingshosts",
+    "imagesSectionDescription": "Afbeeldingen van deze hosts worden geladen zonder opnieuw te vragen.",
+    "imagesSectionEmpty": "Geen vertrouwde afbeeldingshosts",
     "revoke": "Vertrouwen in {{host}} intrekken",
     "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
+    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {

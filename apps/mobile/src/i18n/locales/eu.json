@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Kargatu",
       "loadWithHost": "Kargatu {{host}}",
-      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira."
+      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira.",
+      "trustTitle": "Kargatu irudia {{host}}(e)tik?",
+      "trustMessage": "{{host}} ostalariari konfiantza emanez gero, haren irudiak ez dira aldi bakoitzean galdetu gabe kargatuko. Geroago konfiantza hori kendu dezakezu Konfiantzako ostalariak atalean.",
+      "loadOnce": "Kargatu behin"
     },
     "markdownLink": {
       "invalidLink": "Esteka hau ezin da ireki.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Berrespenik gabe irekitzea baimendu duzun ostalariak",
     "emptyTitle": "Ez dago konfiantzako ostalaririk",
     "emptyDescription": "Esteka baten ostalariari konfiantza ematen badiozu, haren estekak berriro galdetu gabe irekiko dira.",
+    "imagesSectionTitle": "Konfiantzako irudi-ostalariak",
+    "imagesSectionDescription": "Ostalari hauetako irudiak berriro galdetu gabe kargatzen dira.",
+    "imagesSectionEmpty": "Ez dago konfiantzako irudi-ostalaririk",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
     "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
+    "revokeImageMessage": "Ostalari honetako irudiek berriro eskatuko dute berrespena.",
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {

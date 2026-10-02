@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "読み込む",
       "loadWithHost": "{{host}}から読み込む",
-      "httpsOnly": "HTTPSの画像のみ読み込めます。"
+      "httpsOnly": "HTTPSの画像のみ読み込めます。",
+      "trustTitle": "{{host}} から画像を読み込みますか？",
+      "trustMessage": "{{host}} を信頼すると、毎回確認せずにその画像が読み込まれます。後で信頼済みホストから取り消せます。",
+      "loadOnce": "1回だけ読み込む"
     },
     "markdownLink": {
       "invalidLink": "このリンクを開けません。",
@@ -3183,8 +3186,12 @@
     "subtitle": "確認せずに開くことを許可したホスト",
     "emptyTitle": "信頼済みホストはありません",
     "emptyDescription": "リンク先のホストを信頼済みにすると、次回から確認せずに開けます。",
+    "imagesSectionTitle": "信頼済み画像ホスト",
+    "imagesSectionDescription": "これらのホストの画像は確認なしで読み込まれます。",
+    "imagesSectionEmpty": "信頼済み画像ホストはありません",
     "revoke": "{{host}}を信頼済みホストから削除",
     "revokeMessage": "このホストへのリンクは再び確認を求めます。",
+    "revokeImageMessage": "このホストの画像は再び確認を求めます。",
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {

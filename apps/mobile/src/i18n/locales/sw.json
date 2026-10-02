@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Pakia",
       "loadWithHost": "Pakia {{host}}",
-      "httpsOnly": "Ni picha za HTTPS pekee zinazoruhusiwa."
+      "httpsOnly": "Ni picha za HTTPS pekee zinazoruhusiwa.",
+      "trustTitle": "Pakia picha kutoka {{host}}?",
+      "trustMessage": "Kumuamini {{host}} kutapakia picha zake bila kuuliza kila mara. Unaweza kuondoa hii baadaye kwenye Tovuti zinazoaminika.",
+      "loadOnce": "Pakia mara moja"
     },
     "markdownLink": {
       "invalidLink": "Kiungo hiki hakiwezi kufunguliwa.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Tovuti unazoamini zifunguke bila kuomba ruhusa",
     "emptyTitle": "Hakuna tovuti zinazoaminika",
     "emptyDescription": "Ukiamini tovuti ya kiungo, viungo vyake hufunguka bila kuomba ruhusa tena.",
+    "imagesSectionTitle": "Tovuti za picha zinazoaminika",
+    "imagesSectionDescription": "Picha kutoka tovuti hizi hupakiwa bila kuuliza tena.",
+    "imagesSectionEmpty": "Hakuna tovuti za picha zinazoaminika",
     "revoke": "Ondoa uaminifu kwa {{host}}",
     "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
+    "revokeImageMessage": "Picha kutoka tovuti hii zitaomba uthibitisho tena.",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
   "quickChat": {

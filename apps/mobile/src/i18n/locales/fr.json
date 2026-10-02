@@ -2082,7 +2082,10 @@
     "markdownImage": {
       "load": "Charger",
       "loadWithHost": "Charger {{host}}",
-      "httpsOnly": "Seules les images accessibles en HTTPS sont autorisées."
+      "httpsOnly": "Seules les images accessibles en HTTPS sont autorisées.",
+      "trustTitle": "Charger l'image depuis {{host}} ?",
+      "trustMessage": "En faisant confiance à {{host}}, ses images se chargent sans demander à chaque fois. Vous pouvez retirer cette confiance plus tard dans Sites de confiance.",
+      "loadOnce": "Charger une fois"
     },
     "markdownLink": {
       "invalidLink": "Ce lien ne peut pas être ouvert.",
@@ -3226,8 +3229,12 @@
     "subtitle": "Sites autorisés à s'ouvrir sans confirmation",
     "emptyTitle": "Aucun site de confiance",
     "emptyDescription": "Les liens vers les sites de confiance s'ouvrent sans nouvelle demande de confirmation.",
+    "imagesSectionTitle": "Sites d'images de confiance",
+    "imagesSectionDescription": "Les images de ces sites se chargent sans redemander.",
+    "imagesSectionEmpty": "Aucun site d'images de confiance",
     "revoke": "Retirer {{host}} des sites de confiance",
     "revokeMessage": "Les liens vers ce site demanderont à nouveau une confirmation.",
+    "revokeImageMessage": "Les images de ce site demanderont à nouveau une confirmation.",
     "backToPreferences": "Retour aux préférences"
   },
   "quickChat": {

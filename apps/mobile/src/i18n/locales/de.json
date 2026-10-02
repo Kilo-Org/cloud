@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "Von {{host}} laden",
-      "httpsOnly": "Bilder können nur über HTTPS geladen werden."
+      "httpsOnly": "Bilder können nur über HTTPS geladen werden.",
+      "trustTitle": "Bild von {{host}} laden?",
+      "trustMessage": "Wenn du {{host}} vertraust, werden seine Bilder geladen, ohne jedes Mal zu fragen. Du kannst das später unter Vertrauenswürdige Hosts widerrufen.",
+      "loadOnce": "Einmal laden"
     },
     "markdownLink": {
       "invalidLink": "Dieser Link kann nicht geöffnet werden.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Vertrauenswürdige Hosts, deren Links sich ohne Rückfrage öffnen",
     "emptyTitle": "Keine vertrauenswürdigen Hosts",
     "emptyDescription": "Wenn du dem Host eines Links vertraust, öffnen sich seine Links ohne erneute Rückfrage.",
+    "imagesSectionTitle": "Vertrauenswürdige Bild-Hosts",
+    "imagesSectionDescription": "Bilder von diesen Hosts werden geladen, ohne erneut zu fragen.",
+    "imagesSectionEmpty": "Keine vertrauenswürdigen Bild-Hosts",
     "revoke": "Vertrauen in {{host}} widerrufen",
     "revokeMessage": "Links zu diesem Host fragen künftig wieder nach einer Bestätigung.",
+    "revokeImageMessage": "Bilder von diesem Host fragen künftig wieder nach einer Bestätigung.",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
   "quickChat": {

@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "Tải",
       "loadWithHost": "Tải {{host}}",
-      "httpsOnly": "Chỉ hỗ trợ hình ảnh qua HTTPS."
+      "httpsOnly": "Chỉ hỗ trợ hình ảnh qua HTTPS.",
+      "trustTitle": "Tải hình ảnh từ {{host}}?",
+      "trustMessage": "Tin cậy {{host}} sẽ tải hình ảnh của máy chủ này mà không hỏi mỗi lần. Bạn có thể bỏ tin cậy sau trong Máy chủ được tin cậy.",
+      "loadOnce": "Tải một lần"
     },
     "markdownLink": {
       "invalidLink": "Không thể mở liên kết này.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Máy chủ được phép mở liên kết mà không cần xác nhận",
     "emptyTitle": "Chưa có máy chủ được tin cậy",
     "emptyDescription": "Khi bạn đánh dấu máy chủ là tin cậy, liên kết đến máy chủ đó sẽ mở mà không cần xác nhận lại.",
+    "imagesSectionTitle": "Máy chủ hình ảnh được tin cậy",
+    "imagesSectionDescription": "Hình ảnh từ các máy chủ này được tải mà không hỏi lại.",
+    "imagesSectionEmpty": "Chưa có máy chủ hình ảnh được tin cậy",
     "revoke": "Bỏ tin cậy {{host}}",
     "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
+    "revokeImageMessage": "Hình ảnh từ máy chủ này sẽ hỏi xác nhận lại.",
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {

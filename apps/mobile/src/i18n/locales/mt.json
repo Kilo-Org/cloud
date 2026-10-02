@@ -2790,7 +2790,10 @@
     "markdownImage": {
       "load": "Għabbi",
       "loadWithHost": "Għabbi {{host}}",
-      "httpsOnly": "Jistgħu jitgħabbew biss immaġnijiet minn HTTPS."
+      "httpsOnly": "Jistgħu jitgħabbew biss immaġnijiet minn HTTPS.",
+      "trustTitle": "Għabbi l-immaġni minn {{host}}?",
+      "trustMessage": "Jekk tafda lil {{host}}, l-immaġnijiet tiegħu jitgħabbew mingħajr ma jistaqsi kull darba. Tista' tirtira dan aktar tard f'Ospitanti fdati.",
+      "loadOnce": "Għabbi darba"
     },
     "markdownLink": {
       "invalidLink": "Din ir-rabta ma tistax tinfetaħ.",
@@ -3312,8 +3315,12 @@
     "subtitle": "Ospitanti li tippermetti li jinfetħu mingħajr konferma",
     "emptyTitle": "L-ebda ospitant fdat",
     "emptyDescription": "Meta tafda lill-ospitant ta' rabta, ir-rabta tinfetaħ mingħajr ma tintalab konferma oħra.",
+    "imagesSectionTitle": "Ospitanti fdati tal-immaġnijiet",
+    "imagesSectionDescription": "L-immaġnijiet minn dawn l-ospitanti jitgħabbew mingħajr ma jerġa' jistaqsi.",
+    "imagesSectionEmpty": "L-ebda ospitant fdat tal-immaġnijiet",
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
+    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma.",
     "backToPreferences": "Lura għall-preferenzi"
   },
   "quickChat": {

@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "Yükle",
       "loadWithHost": "{{host}} adresinden yükle",
-      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller yüklenebilir."
+      "httpsOnly": "Yalnızca HTTPS üzerinden sunulan görseller yüklenebilir.",
+      "trustTitle": "{{host}} adresinden görsel yüklensin mi?",
+      "trustMessage": "{{host}} sunucusuna güvenmek, görsellerini her seferinde sormadan yükler. Bunu daha sonra Güvenilen sunucular altından kaldırabilirsin.",
+      "loadOnce": "Bir kez yükle"
     },
     "markdownLink": {
       "invalidLink": "Bu bağlantı açılamıyor.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Onay istemeden açılmasına izin verdiğin sunucular",
     "emptyTitle": "Güvenilen sunucu yok",
     "emptyDescription": "Bir bağlantının sunucusunu güvenilir olarak işaretlediğinde o sunucunun bağlantıları tekrar onay istemeden açılır.",
+    "imagesSectionTitle": "Güvenilen görsel sunucuları",
+    "imagesSectionDescription": "Bu sunuculardaki görseller tekrar sorulmadan yüklenir.",
+    "imagesSectionEmpty": "Güvenilen görsel sunucusu yok",
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "revokeMessage": "Bu sunucuya verilen bağlantılar yeniden onay isteyecek.",
+    "revokeImageMessage": "Bu sunucudaki görseller yeniden onay isteyecek.",
     "backToPreferences": "Tercihlere dön"
   },
   "quickChat": {

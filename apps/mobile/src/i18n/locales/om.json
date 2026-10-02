@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Fe'i",
       "loadWithHost": "{{host}} fe'i",
-      "httpsOnly": "Suuraaleen HTTPS qofti hayyamamu."
+      "httpsOnly": "Suuraaleen HTTPS qofti hayyamamu.",
+      "trustTitle": "Suuraa {{host}} irraa fe'uu?",
+      "trustMessage": "{{host}} amanachuun suuraa isaa yeroo hunda gaafachuu malee fe'a. Booda Keessummeessitoota amanaman keessatti haquu dandeessa.",
+      "loadOnce": "Yeroo tokko fe'i"
     },
     "markdownLink": {
       "invalidLink": "Geessituun kun banamuu hin danda'u.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Keessummeessitoota osoo hin gaafatin banuuf amantu",
     "emptyTitle": "Keessummeessitoonni amanaman hin jiran",
     "emptyDescription": "Keessummeessaa geessituu tokko yoo amante, deebi'ee osoo hin gaafatin bana.",
+    "imagesSectionTitle": "Keessummeessitoota suuraa amanaman",
+    "imagesSectionDescription": "Suuraan keessummeessitoota kanaa irraa deebi'ee gaafachuu malee fe'ama.",
+    "imagesSectionEmpty": "Keessummeessitoota suuraa amanaman hin jiran",
     "revoke": "Amanamummaa {{host}} haqi",
     "revokeMessage": "Geessituuwwan gara keessummeessaa kanaa ammas mirkaneessa gaafatu.",
+    "revokeImageMessage": "Suuraan keessummeessaa kanaa irraa ammas mirkaneessa gaafatu.",
     "backToPreferences": "Gara filannoowwaniitti deebi'i"
   },
   "quickChat": {

@@ -2157,7 +2157,10 @@
     "markdownImage": {
       "load": "불러오기",
       "loadWithHost": "{{host}}에서 불러오기",
-      "httpsOnly": "HTTPS 이미지만 지원합니다."
+      "httpsOnly": "HTTPS 이미지만 지원합니다.",
+      "trustTitle": "{{host}}에서 이미지를 불러올까요?",
+      "trustMessage": "{{host}}를 신뢰하면 매번 묻지 않고 이미지를 불러옵니다. 나중에 신뢰하는 호스트에서 해제할 수 있습니다.",
+      "loadOnce": "한 번 불러오기"
     },
     "markdownLink": {
       "invalidLink": "이 링크를 열 수 없습니다.",
@@ -3183,8 +3186,12 @@
     "subtitle": "확인 없이 링크를 열도록 허용한 호스트",
     "emptyTitle": "신뢰하는 호스트 없음",
     "emptyDescription": "링크의 호스트를 신뢰하도록 설정하면 다음부터 확인 없이 링크가 열립니다.",
+    "imagesSectionTitle": "신뢰하는 이미지 호스트",
+    "imagesSectionDescription": "이 호스트의 이미지는 다시 묻지 않고 불러옵니다.",
+    "imagesSectionEmpty": "신뢰하는 이미지 호스트 없음",
     "revoke": "{{host}} 신뢰 해제",
     "revokeMessage": "이 호스트로 향하는 링크는 다시 확인을 요청합니다.",
+    "revokeImageMessage": "이 호스트의 이미지는 다시 확인을 요청합니다.",
     "backToPreferences": "환경설정으로 돌아가기"
   },
   "quickChat": {

@@ -2710,7 +2710,10 @@
     "markdownImage": {
       "load": "Ielādēt",
       "loadWithHost": "Ielādēt {{host}}",
-      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm."
+      "httpsOnly": "Atļauti tikai attēli no HTTPS adresēm.",
+      "trustTitle": "Ielādēt attēlu no {{host}}?",
+      "trustMessage": "Ja uzticies resursdatoram {{host}}, tā attēli tiks ielādēti, katru reizi neprasot. Vēlāk to vari atsaukt sadaļā Uzticamie resursdatori.",
+      "loadOnce": "Ielādēt vienreiz"
     },
     "markdownLink": {
       "invalidLink": "Šo saiti nevar atvērt.",
@@ -3226,8 +3229,12 @@
     "subtitle": "Resursdatori, kuru saites var atvērt bez apstiprinājuma",
     "emptyTitle": "Nav uzticamu resursdatoru",
     "emptyDescription": "Ja uzticies saites resursdatoram, tā saites turpmāk atveras bez atkārtota apstiprinājuma.",
+    "imagesSectionTitle": "Uzticamie attēlu resursdatori",
+    "imagesSectionDescription": "Attēli no šiem resursdatoriem tiek ielādēti bez atkārtota pieprasījuma.",
+    "imagesSectionEmpty": "Nav uzticamu attēlu resursdatoru",
     "revoke": "Atsaukt uzticību resursdatoram {{host}}",
     "revokeMessage": "Saites uz šo resursdatoru atkal prasīs apstiprinājumu.",
+    "revokeImageMessage": "Attēli no šī resursdatora atkal prasīs apstiprinājumu.",
     "backToPreferences": "Atpakaļ uz iestatījumiem"
   },
   "quickChat": {

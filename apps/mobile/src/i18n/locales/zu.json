@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Layisha",
       "loadWithHost": "Layisha {{host}}",
-      "httpsOnly": "Kuvunyelwe izithombe ze-HTTPS kuphela."
+      "httpsOnly": "Kuvunyelwe izithombe ze-HTTPS kuphela.",
+      "trustTitle": "Layisha isithombe kusuka ku-{{host}}?",
+      "trustMessage": "Ukuthemba u-{{host}} kuzolayisha izithombe zakhe ngaphandle kokubuza njalo. Ungakuhoxisa kamuva ngaphansi kwabasingathi abathenjwayo.",
+      "loadOnce": "Layisha kanye"
     },
     "markdownLink": {
       "invalidLink": "Lesi sixhumanisi asikwazi ukuvulwa.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Abasingathi obathembayo ukuthi bavuleke ngaphandle kokucela imvume",
     "emptyTitle": "Abekho abasingathi abathenjwayo",
     "emptyDescription": "Uma uthemba umsingathi wesixhumanisi, isixhumanisi sivuleka ngaphandle kokucela imvume futhi.",
+    "imagesSectionTitle": "Abasingathi bezithombe abathenjwayo",
+    "imagesSectionDescription": "Izithombe ezivela kulezi zingosi zilayishwa ngaphandle kokubuza futhi.",
+    "imagesSectionEmpty": "Awekho abasingathi bezithombe abathenjwayo",
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "revokeMessage": "Izixhumanisi eziya kulo msingathi zizocela imvume futhi.",
+    "revokeImageMessage": "Izithombe ezivela kulo msingathi zizocela imvume futhi.",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
   "quickChat": {

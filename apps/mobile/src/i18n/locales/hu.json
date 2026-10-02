@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Betöltés",
       "loadWithHost": "{{host}} betöltése",
-      "httpsOnly": "Csak HTTPS-kapcsolaton keresztül tölthetők be képek."
+      "httpsOnly": "Csak HTTPS-kapcsolaton keresztül tölthetők be képek.",
+      "trustTitle": "Kép betöltése innen: {{host}}?",
+      "trustMessage": "A(z) {{host}} webhely megbízása esetén a képei minden alkalommal kérdés nélkül betöltődnek. Ezt később a Megbízható webhelyek alatt visszavonhatod.",
+      "loadOnce": "Betöltés egyszer"
     },
     "markdownLink": {
       "invalidLink": "Ez a hivatkozás nem nyitható meg.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Jóváhagyás nélkül megnyitható webhelyek",
     "emptyTitle": "Nincsenek megbízható webhelyek",
     "emptyDescription": "Ha egy webhelyet megbízhatónak jelölsz, a hivatkozásai többé nem kérnek jóváhagyást megnyitáskor.",
+    "imagesSectionTitle": "Megbízható képwebhelyek",
+    "imagesSectionDescription": "Ezen webhelyek képei újabb kérdés nélkül betöltődnek.",
+    "imagesSectionEmpty": "Nincsenek megbízható képwebhelyek",
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "revokeMessage": "A webhelyre mutató hivatkozások ismét jóváhagyást kérnek majd.",
+    "revokeImageMessage": "A webhelyről származó képek ismét jóváhagyást kérnek majd.",
     "backToPreferences": "Vissza a beállításokhoz"
   },
   "quickChat": {

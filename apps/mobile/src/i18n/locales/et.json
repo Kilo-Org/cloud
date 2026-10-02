@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Laadi",
       "loadWithHost": "Laadi {{host}}",
-      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte."
+      "httpsOnly": "Laadida saab ainult HTTPS-ühendusega pilte.",
+      "trustTitle": "Laadi pilt saidilt {{host}}?",
+      "trustMessage": "Kui usaldad hosti {{host}}, laaditakse selle pildid ilma iga kord küsimata. Saad selle hiljem jaotises Usaldatud hostid tühistada.",
+      "loadOnce": "Laadi üks kord"
     },
     "markdownLink": {
       "invalidLink": "Seda linki ei saa avada.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Hostid, mille lingid avatakse kinnitust küsimata",
     "emptyTitle": "Usaldatud hoste pole",
     "emptyDescription": "Kui usaldad lingi hosti, avatakse selle hosti lingid edaspidi kinnitust küsimata.",
+    "imagesSectionTitle": "Usaldatud pildihostid",
+    "imagesSectionDescription": "Nende hostide pilte laaditakse ilma uuesti küsimata.",
+    "imagesSectionEmpty": "Usaldatud pildihoste pole",
     "revoke": "Lõpeta hosti {{host}} usaldamine",
     "revokeMessage": "Selle hosti lingid küsivad taas kinnitust.",
+    "revokeImageMessage": "Selle hosti pildid küsivad taas kinnitust.",
     "backToPreferences": "Tagasi eelistuste juurde"
   },
   "quickChat": {

@@ -2750,7 +2750,10 @@
     "markdownImage": {
       "load": "Načítať",
       "loadWithHost": "Načítať {{host}}",
-      "httpsOnly": "Načítať možno iba obrázky cez HTTPS."
+      "httpsOnly": "Načítať možno iba obrázky cez HTTPS.",
+      "trustTitle": "Načítať obrázok z {{host}}?",
+      "trustMessage": "Ak serveru {{host}} dôveruješ, jeho obrázky sa budú načítavať bez každodenného pýtania. Neskôr to môžeš odobrať v Dôveryhodné servery.",
+      "loadOnce": "Načítať raz"
     },
     "markdownLink": {
       "invalidLink": "Tento odkaz sa nedá otvoriť.",
@@ -3269,8 +3272,12 @@
     "subtitle": "Servery, ktorých odkazy sa otvárajú bez potvrdenia",
     "emptyTitle": "Žiadne dôveryhodné servery",
     "emptyDescription": "Ak označíš server za dôveryhodný, odkazy naň sa budú otvárať bez ďalšieho potvrdenia.",
+    "imagesSectionTitle": "Dôveryhodné servery obrázkov",
+    "imagesSectionDescription": "Obrázky z týchto serverov sa načítavajú bez ďalšieho pýtania.",
+    "imagesSectionEmpty": "Žiadne dôveryhodné servery obrázkov",
     "revoke": "Zrušiť dôveru serveru {{host}}",
     "revokeMessage": "Odkazy na tento server budú opäť vyžadovať potvrdenie.",
+    "revokeImageMessage": "Obrázky z tohto servera budú opäť vyžadovať potvrdenie.",
     "backToPreferences": "Späť na predvoľby"
   },
   "quickChat": {

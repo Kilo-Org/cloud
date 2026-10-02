@@ -2710,7 +2710,10 @@
     "markdownImage": {
       "load": "Încarcă",
       "loadWithHost": "Încarcă {{host}}",
-      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS."
+      "httpsOnly": "Sunt permise doar imaginile accesibile prin HTTPS.",
+      "trustTitle": "Încărcați imaginea de la {{host}}?",
+      "trustMessage": "Dacă ai încredere în {{host}}, imaginile sale se încarcă fără a întreba de fiecare dată. Poți retrage acest lucru mai târziu în Gazde de încredere.",
+      "loadOnce": "Încarcă o dată"
     },
     "markdownLink": {
       "invalidLink": "Acest link nu poate fi deschis.",
@@ -3226,8 +3229,12 @@
     "subtitle": "Gazde ale căror linkuri se deschid fără confirmare",
     "emptyTitle": "Nicio gazdă de încredere",
     "emptyDescription": "Dacă marchezi gazda unui link ca fiind de încredere, linkurile acesteia se vor deschide fără o nouă confirmare.",
+    "imagesSectionTitle": "Gazde de imagini de încredere",
+    "imagesSectionDescription": "Imaginile de la aceste gazde se încarcă fără a mai întreba.",
+    "imagesSectionEmpty": "Nicio gazdă de imagini de încredere",
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "revokeMessage": "Linkurile către această gazdă vor cere din nou confirmare.",
+    "revokeImageMessage": "Imaginile de la această gazdă vor cere din nou confirmare.",
     "backToPreferences": "Înapoi la preferințe"
   },
   "quickChat": {

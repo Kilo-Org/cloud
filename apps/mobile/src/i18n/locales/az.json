@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Yüklə",
       "loadWithHost": "{{host}} ünvanından yüklə",
-      "httpsOnly": "Yalnız HTTPS üzərindən şəkil yükləmək olar."
+      "httpsOnly": "Yalnız HTTPS üzərindən şəkil yükləmək olar.",
+      "trustTitle": "{{host}} ünvanından şəkil yüklənsin?",
+      "trustMessage": "{{host}} saytına etibar etsəniz, şəkilləri hər dəfə soruşmadan yüklənir. Sonradan Etibarlı saytlar bölməsindən etibarı ləğv edə bilərsiniz.",
+      "loadOnce": "Bir dəfə yüklə"
     },
     "markdownLink": {
       "invalidLink": "Bu keçidi açmaq mümkün deyil.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Təsdiq istəmədən açılmasına icazə verdiyin saytlar",
     "emptyTitle": "Etibarlı sayt yoxdur",
     "emptyDescription": "Sayta etibar etdikdə onun keçidləri bir daha təsdiq istəmədən açılır.",
+    "imagesSectionTitle": "Etibarlı şəkil saytları",
+    "imagesSectionDescription": "Bu saytlardan şəkillər bir daha soruşmadan yüklənir.",
+    "imagesSectionEmpty": "Etibarlı şəkil saytı yoxdur",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
+    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək.",
     "backToPreferences": "Parametrlərə qayıt"
   },
   "quickChat": {

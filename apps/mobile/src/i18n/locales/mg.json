@@ -2670,7 +2670,10 @@
     "markdownImage": {
       "load": "Alao",
       "loadWithHost": "Alao avy amin'ny {{host}}",
-      "httpsOnly": "Sary avy amin'ny HTTPS ihany no ekena."
+      "httpsOnly": "Sary avy amin'ny HTTPS ihany no ekena.",
+      "trustTitle": "Alao ny sary avy amin'ny {{host}}?",
+      "trustMessage": "Ny fitokisana an'i {{host}} dia mampiditra ny sariny tsy manontany isaky ny mandeha. Azonao atao ny manafoana izany ao amin'ny Mpampiantrano atokisana.",
+      "loadOnce": "Alao indray mandeha"
     },
     "markdownLink": {
       "invalidLink": "Tsy azo sokafana ity rohy ity.",
@@ -3183,8 +3186,12 @@
     "subtitle": "Mpampiantrano atokisanao ka sokafana tsy mila fanamafisana",
     "emptyTitle": "Tsy misy mpampiantrano atokisana",
     "emptyDescription": "Rehefa atokisanao ny mpampiantrano ny rohy iray, dia sokafana tsy mila fanamafisana intsony ny rohy mankany aminy.",
+    "imagesSectionTitle": "Mpampiantrano sary atokisana",
+    "imagesSectionDescription": "Ny sary avy amin'ireto mpampiantrano ireto dia alaina tsy manontany intsony.",
+    "imagesSectionEmpty": "Tsy misy mpampiantrano sary atokisana",
     "revoke": "Foano ny fitokisana ny {{host}}",
     "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
+    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity.",
     "backToPreferences": "Miverena amin'ny safidy"
   },
   "quickChat": {

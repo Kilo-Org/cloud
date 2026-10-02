@@ -196,9 +196,20 @@ describe('useActiveSessionsFloorPoll', () => {
     // arm must not fire a duplicate request for it.
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     const initial = deferred<CachedActiveSessionsData>();
-    void client
-      .fetchQuery({ queryKey: QUERY_KEY, queryFn: async () => initial.promise })
-      .catch(() => undefined);
+    // Intentionally left in flight: the rejection is not the subject here.
+    void (async () => {
+      try {
+        await client.fetchQuery({
+          queryKey: QUERY_KEY,
+          queryFn: async () => {
+            await Promise.resolve();
+            return initial.promise;
+          },
+        });
+      } catch {
+        // The deferred resolves below; a teardown-time rejection is swallowed.
+      }
+    })();
     expect(client.isFetching({ queryKey: QUERY_KEY })).toBeGreaterThan(0);
 
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'idle'));

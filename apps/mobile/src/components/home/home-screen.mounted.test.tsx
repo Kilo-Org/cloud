@@ -189,7 +189,9 @@ function nodes(type: string) {
 }
 /** The live summary card is mocked as a string; read the rows it was handed. */
 function liveCardSessions(): ActiveSession[] | undefined {
-  return nodes('LiveNowCard')[0]?.props.sessions?.activeSessions as ActiveSession[] | undefined;
+  const card = nodes('LiveNowCard')[0];
+  const props = card?.props as { sessions?: { activeSessions?: ActiveSession[] } } | undefined;
+  return props?.sessions?.activeSessions;
 }
 function text() {
   return nodes('Text')

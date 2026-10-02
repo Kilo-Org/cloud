@@ -2567,6 +2567,8 @@
       "selectModelBeforeSending": "Khetha imodeli ngaphambi kokuthumela.",
       "preparingPlaceholder": "Kusethwa indawo yokusebenza...",
       "finalizingPlaceholder": "Kuyaphethwa...",
+      "sessionLoadFailed": "Iseshini ayikwazanga ukulayishwa. Zama futhi kuqala.",
+      "sendUnavailable": "Ukuthumela akutholakali kuze kube iseshini isilungile.",
       "cannotReceiveFiles": "Le seshini ayikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
       "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha inkinobho yokuthumela ukuze uzame futhi.",
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",

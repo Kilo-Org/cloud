@@ -2641,6 +2641,8 @@
       "selectModelBeforeSending": "Pred odoslaním vyber model.",
       "preparingPlaceholder": "Pripravuje sa prostredie…",
       "finalizingPlaceholder": "Dokončuje sa…",
+      "sessionLoadFailed": "Reláciu sa nepodarilo načítať. Najprv to skúste znova.",
+      "sendUnavailable": "Odosielanie nie je dostupné, kým relácia nie je pripravená.",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Ak chceš odoslať správu, odstráň prílohy.",
       "couldNotAttachFiles": "Súbory sa nepodarilo priložiť. Klepnutím na Odoslať to skús znova.",
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",

@@ -2604,6 +2604,8 @@
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
+      "sessionLoadFailed": "Sesiunea nu a putut fi încărcată. Reîncercați mai întâi.",
+      "sendUnavailable": "Trimiterea nu este disponibilă până când sesiunea este pregătită.",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Nu s-au putut atașa fișierele. Atinge butonul de trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",

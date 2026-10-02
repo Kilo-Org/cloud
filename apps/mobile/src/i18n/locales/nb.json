@@ -2567,6 +2567,8 @@
       "selectModelBeforeSending": "Velg en modell før du sender.",
       "preparingPlaceholder": "Klargjør miljøet…",
       "finalizingPlaceholder": "Avslutter…",
+      "sessionLoadFailed": "Økten kunne ikke lastes. Prøv igjen først.",
+      "sendUnavailable": "Sending er ikke tilgjengelig før økten er klar.",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
       "couldNotAttachFiles": "Kunne ikke legge ved filene. Trykk på sendeknappen for å prøve igjen.",
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",

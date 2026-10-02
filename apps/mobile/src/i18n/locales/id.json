@@ -2054,6 +2054,8 @@
       "selectModelBeforeSending": "Pilih model sebelum mengirim pesan.",
       "preparingPlaceholder": "Menyiapkan lingkungan...",
       "finalizingPlaceholder": "Menyelesaikan...",
+      "sessionLoadFailed": "Sesi tidak dapat dimuat. Coba lagi dulu.",
+      "sendUnavailable": "Pengiriman tidak tersedia sampai sesi siap.",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima berkas. Hapus lampiran untuk mengirim pesanmu.",
       "couldNotAttachFiles": "Tidak dapat melampirkan berkas. Ketuk Kirim untuk mencoba lagi.",
       "discardAttachmentsMessage": "Unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",

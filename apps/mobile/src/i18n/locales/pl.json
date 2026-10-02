@@ -2096,6 +2096,8 @@
       "selectModelBeforeSending": "Wybierz model przed wysłaniem wiadomości.",
       "preparingPlaceholder": "Konfigurowanie środowiska…",
       "finalizingPlaceholder": "Kończenie…",
+      "sessionLoadFailed": "Nie udało się wczytać sesji. Najpierw spróbuj ponownie.",
+      "sendUnavailable": "Wysyłanie nie jest dostępne, dopóki sesja nie będzie gotowa.",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
       "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij „Wyślij”, aby spróbować ponownie.",
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",

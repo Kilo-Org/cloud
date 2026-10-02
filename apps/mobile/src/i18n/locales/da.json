@@ -2567,6 +2567,8 @@
       "selectModelBeforeSending": "Vælg en model, før du sender.",
       "preparingPlaceholder": "Forbereder miljøet...",
       "finalizingPlaceholder": "Afslutter...",
+      "sessionLoadFailed": "Sessionen kunne ikke indlæses. Prøv igen først.",
+      "sendUnavailable": "Afsendelse er ikke tilgængelig, før sessionen er klar.",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern de vedhæftede filer for at sende din besked.",
       "couldNotAttachFiles": "Kunne ikke vedhæfte filerne. Tryk på sendeknappen for at prøve igen.",
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",

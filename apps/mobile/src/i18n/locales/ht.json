@@ -2567,6 +2567,8 @@
       "selectModelBeforeSending": "Chwazi yon modèl anvan ou voye mesaj la.",
       "preparingPlaceholder": "Ap prepare anviwònman an...",
       "finalizingPlaceholder": "Ap fini...",
+      "sessionLoadFailed": "Pa t kapab chaje sesyon an. Eseye ankò dabò.",
+      "sendUnavailable": "Voye pa disponib jiskaske sesyon an pare.",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire fichye atache yo pou voye mesaj ou a.",
       "couldNotAttachFiles": "Nou pa t ka atache fichye yo. Peze Voye pou eseye ankò.",
       "discardAttachmentsMessage": "Tout fichye ou voye ki poko atache ak yon mesaj ap efase.",

@@ -2054,6 +2054,8 @@
       "selectModelBeforeSending": "Selecteer een model voordat je het bericht verzendt.",
       "preparingPlaceholder": "Omgeving voorbereiden…",
       "finalizingPlaceholder": "Afronden…",
+      "sessionLoadFailed": "De sessie kon niet worden geladen. Probeer het eerst opnieuw.",
+      "sendUnavailable": "Verzenden is niet beschikbaar tot de sessie gereed is.",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
       "couldNotAttachFiles": "De bestanden konden niet worden bijgevoegd. Tik op Verzenden om het opnieuw te proberen.",
       "discardAttachmentsMessage": "Uploads die nog niet zijn gebruikt, worden verwijderd.",

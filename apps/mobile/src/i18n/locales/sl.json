@@ -2641,6 +2641,8 @@
       "selectModelBeforeSending": "Pred pošiljanjem izberi model.",
       "preparingPlaceholder": "Priprava okolja…",
       "finalizingPlaceholder": "Zaključevanje...",
+      "sessionLoadFailed": "Seje ni bilo mogoče naložiti. Najprej poskusite znova.",
+      "sendUnavailable": "Pošiljanje ni na voljo, dokler seja ni pripravljena.",
       "cannotReceiveFiles": "Ta seja ne more prejemati datotek. Odstrani priponke, da lahko pošlješ sporočilo.",
       "couldNotAttachFiles": "Datotek ni bilo mogoče priložiti. Za ponovni poskus tapni gumb za pošiljanje.",
       "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",

@@ -2641,6 +2641,8 @@
       "selectModelBeforeSending": "Před odesláním vyberte model.",
       "preparingPlaceholder": "Příprava prostředí…",
       "finalizingPlaceholder": "Dokončování…",
+      "sessionLoadFailed": "Relaci se nepodařilo načíst. Nejprve to zkuste znovu.",
+      "sendUnavailable": "Odesílání není dostupné, dokud relace není připravena.",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na tlačítko pro odeslání to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",

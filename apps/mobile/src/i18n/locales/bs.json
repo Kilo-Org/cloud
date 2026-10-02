@@ -2604,6 +2604,8 @@
       "selectModelBeforeSending": "Odaberi model prije slanja.",
       "preparingPlaceholder": "Podešavanje okruženja...",
       "finalizingPlaceholder": "Završavanje...",
+      "sessionLoadFailed": "Sesija se nije mogla učitati. Prvo pokušajte ponovo.",
+      "sendUnavailable": "Slanje nije dostupno dok sesija ne bude spremna.",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Nije moguće priložiti datoteke. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljene datoteke koje nisu priložene poslanim porukama bit će obrisane.",

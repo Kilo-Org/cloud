@@ -2054,6 +2054,8 @@
       "selectModelBeforeSending": "Göndermeden önce bir model seç.",
       "preparingPlaceholder": "Ortam hazırlanıyor...",
       "finalizingPlaceholder": "Tamamlanıyor...",
+      "sessionLoadFailed": "Oturum yüklenemedi. Önce yeniden deneyin.",
+      "sendUnavailable": "Oturum hazır olana kadar gönderme kullanılamaz.",
       "cannotReceiveFiles": "Bu oturum dosya alamıyor. Mesajını göndermek için ekleri kaldır.",
       "couldNotAttachFiles": "Dosyalar eklenemedi. Tekrar denemek için gönder düğmesine dokun.",
       "discardAttachmentsMessage": "Henüz bir mesaja eklenmemiş yüklemeler silinecek.",

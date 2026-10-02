@@ -2138,6 +2138,8 @@
       "selectModelBeforeSending": "اختر نموذجًا قبل الإرسال.",
       "preparingPlaceholder": "جارٍ إعداد البيئة…",
       "finalizingPlaceholder": "جارٍ الإنهاء…",
+      "sessionLoadFailed": "تعذّر تحميل الجلسة. أعد المحاولة أولاً.",
+      "sendUnavailable": "الإرسال غير متاح حتى تصبح الجلسة جاهزة.",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
       "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
       "discardAttachmentsMessage": "ستُحذف الملفات المرفوعة التي لم تُرفق برسائل مرسلة.",

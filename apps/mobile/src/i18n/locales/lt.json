@@ -2641,6 +2641,8 @@
       "selectModelBeforeSending": "Prieš siųsdami pasirinkite modelį.",
       "preparingPlaceholder": "Rengiama aplinka…",
       "finalizingPlaceholder": "Baigiama…",
+      "sessionLoadFailed": "Sesijos įkelti nepavyko. Pirmiausia bandykite dar kartą.",
+      "sendUnavailable": "Siuntimas negalimas, kol sesija neparengta.",
       "cannotReceiveFiles": "Šioje sesijoje negalima gauti failų. Pašalinkite priedus, kad galėtumėte išsiųsti žinutę.",
       "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siuntimo mygtuką ir bandykite dar kartą.",
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",

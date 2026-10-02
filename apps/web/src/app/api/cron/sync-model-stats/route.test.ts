@@ -1,5 +1,3 @@
-import type * as ModelsModule from '@/lib/ai-gateway/models';
-
 let mockEnabled = false;
 let mockCronSecret: string | undefined = 'cron-secret';
 let mockMonitoredModels = ['fixture/monitored'];
@@ -33,11 +31,8 @@ jest.mock('@/lib/model-stats/model-stats-cache', () => ({
   invalidateModelStatsCache: jest.fn(),
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
-jest.mock('@/lib/ai-gateway/models', () => ({
-  ...jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models'),
-  get monitoredModels() {
-    return mockMonitoredModels;
-  },
+jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+  getMonitoredModels: async () => mockMonitoredModels,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 

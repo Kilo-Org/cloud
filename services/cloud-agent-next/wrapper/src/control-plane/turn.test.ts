@@ -921,7 +921,7 @@ describe('turn outcome rules', () => {
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
   });
 
-  it('reports descendant progress observed at a no_progress expiry without changing the outcome', async () => {
+  it('refreshes the root deadline on descendant progress and expires after descendant silence', async () => {
     const h = createHarness();
     h.registerRoute(routeSpec());
     h.manager.submit(SESSION_ID, promptPayload('m1'));
@@ -930,16 +930,14 @@ describe('turn outcome rules', () => {
     h.manager.observeKiloEvent(
       kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
     );
-    // Descendant progress arrives just before the root deadline. If it moved
-    // the root clock, the turn would not expire at the original deadline.
-    h.advance(SESSION_TIMERS.noProgressMs - 1);
-    // The root emits no progress; its descendants do. Descendant progress must
-    // not move the root clock, but the expiry must report that it was seen.
+    // Two descendant progress events just before the original deadline.
+    h.advance(SESSION_TIMERS.noProgressMs - 2);
     h.manager.observeKiloEvent(
       kiloEvent('message.part.updated', {
         part: { sessionID: childId, messageID: 'child-assistant-1', type: 'text' },
       })
     );
+    h.advance(1);
     h.manager.observeKiloEvent(
       kiloEvent('message.part.updated', {
         part: { sessionID: childId, messageID: 'child-assistant-1', type: 'tool' },
@@ -948,6 +946,16 @@ describe('turn outcome rules', () => {
     // No per-event logging: only the expiry line is written.
     expect(h.logs).toHaveLength(0);
 
+    // At the original deadline the descendant progress has refreshed the clock,
+    // so the turn is still running.
+    h.advance(1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    // One no-progress window after the last descendant progress it expires.
+    h.advance(SESSION_TIMERS.noProgressMs - 2);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
     h.advance(1);
     h.manager.tick();
     await settle();
@@ -957,6 +965,184 @@ describe('turn outcome rules', () => {
     expect(h.logs).toEqual([
       `turn: no_progress aborting session ${KILO_SESSION} descendantProgressEvents=2`,
     ]);
+  });
+
+  it.each(['completed', 'error', 'interrupted', 'superseded'] as const)(
+    'does not let a descendant turn-close (%s) settle or refresh the root',
+    async reason => {
+      const h = createHarness();
+      h.registerRoute(routeSpec());
+      h.manager.submit(SESSION_ID, promptPayload('m1'));
+      await settle();
+      const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+      h.manager.observeKiloEvent(
+        kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+      );
+      // The descendant terminal close lands just before the original deadline.
+      h.advance(SESSION_TIMERS.noProgressMs - 1);
+      h.manager.observeKiloEvent(kiloEvent('session.turn.close', { sessionID: childId, reason }));
+      await settle();
+      expect(outcomeFrames(h.frames)).toHaveLength(0);
+      // It did not refresh the clock: the root still expires at its own deadline.
+      h.advance(1);
+      h.manager.tick();
+      await settle();
+      expect(outcomeFrames(h.frames)[0]).toMatchObject({
+        status: 'failed',
+        reason: 'no_progress',
+      });
+    }
+  );
+
+  it('does not let a descendant session.error settle or refresh the root', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    h.manager.observeKiloEvent(
+      kiloEvent('session.error', { sessionID: childId, error: { message: 'child boom' } })
+    );
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'failed', reason: 'no_progress' });
+  });
+
+  it('does not let another root session refresh the target root', async () => {
+    const h = createHarness();
+    const specA = routeSpec();
+    const specB = routeSpec({
+      sessionId: 'workspace_other',
+      kiloSessionId: 'ses_cccccccccccccccccccccccccc',
+    });
+    h.registerRoute(specA);
+    h.registerRoute(specB);
+    h.manager.submit(specA.sessionId, promptPayload('m1'));
+    h.manager.submit(specB.sessionId, promptPayload('m2'));
+    await settle();
+    // The other root makes progress near A's deadline; A must not be refreshed.
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: specB.kiloSessionId, messageID: 'b-assistant-1', type: 'tool' },
+      })
+    );
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toEqual([
+      {
+        type: 'session.outcome',
+        sessionId: specA.sessionId,
+        status: 'failed',
+        reason: 'no_progress',
+        lastMessageId: 'm1',
+      },
+    ]);
+  });
+
+  it('does not refresh the root on excluded non-progress descendant events', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    // A text delta and a text part carrying the retained root prompt's messageId
+    // are the user's own prompt, not progress.
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.delta', { sessionID: childId, messageID: 'm1', delta: 'hi' })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'm1', type: 'text' },
+      })
+    );
+    // Idle, queue, assistant message metadata and heartbeat are not progress.
+    h.manager.observeKiloEvent(kiloEvent('session.idle', { sessionID: childId }));
+    h.manager.observeKiloEvent(
+      kiloEvent('session.queue.changed', { sessionID: childId, queued: ['x'] })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.updated', {
+        info: { id: 'child-assistant-1', sessionID: childId, role: 'assistant' },
+      })
+    );
+    h.manager.observeKiloEvent(kiloEvent('server.heartbeat', {}));
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'failed', reason: 'no_progress' });
+    expect(h.logs).toEqual([
+      `turn: no_progress aborting session ${KILO_SESSION} descendantProgressEvents=0`,
+    ]);
+  });
+
+  it('keeps a user wait paused while a descendant progresses, then resumes the clock', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(kiloEvent('question.asked', { sessionID: KILO_SESSION, id: 'q1' }));
+    // A descendant progresses while the root waits on the user; the wait must
+    // stay paused and the turn inactive.
+    h.advance(60_000);
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'child-assistant-1', type: 'tool' },
+      })
+    );
+    expect(h.manager.isActive()).toBe(false);
+    h.advance(SESSION_TIMERS.noProgressMs * 2);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+
+    // The answer resumes the wait; the clock restarts from the answer/progress.
+    h.manager.observeKiloEvent(
+      kiloEvent('question.replied', { sessionID: KILO_SESSION, requestID: 'q1' })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    h.manager.tick();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
+  });
+
+  it('fails agent_restarted after descendant real tool progress', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    const client = h.client(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'child-assistant-1', type: 'tool', tool: 'bash' },
+      })
+    );
+    h.manager.onRuntimeRestart({ directory: DIRECTORY, reason: 'hang', key: DIRECTORY });
+    await settle();
+    expect(client.prompts).toHaveLength(1);
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'agent_restarted' });
   });
 
   it('reports zero descendant progress for a genuinely silent turn', async () => {
@@ -1011,6 +1197,39 @@ describe('turn outcome rules', () => {
     h.manager.tick();
     await settle();
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'execution_limit' });
+  });
+
+  it('caps the turn at 60 minutes even with continuous descendant progress', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    // Continuous descendant progress resets the no-progress clock, but it must
+    // not buy the turn past the 60-minute hard cap.
+    const stepMs = SESSION_TIMERS.noProgressMs - 60_000;
+    let elapsed = 0;
+    while (elapsed + stepMs < SESSION_TIMERS.turnHardCapMs) {
+      h.advance(stepMs);
+      elapsed += stepMs;
+      h.manager.observeKiloEvent(
+        kiloEvent('message.part.updated', {
+          part: { sessionID: childId, messageID: 'child-assistant-1', type: 'tool' },
+        })
+      );
+      h.manager.tick();
+      expect(outcomeFrames(h.frames)).toHaveLength(0);
+    }
+    h.advance(SESSION_TIMERS.turnHardCapMs - elapsed);
+    h.manager.tick();
+    await settle();
+    const outcomes = outcomeFrames(h.frames);
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ status: 'failed', reason: 'execution_limit' });
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
   });
 
   it('ignores idle until Kilo explicitly completes its turn', async () => {

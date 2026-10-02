@@ -177,6 +177,50 @@ describe('reportUsageEvent', () => {
     expect(body).not.toHaveProperty('promptSimHash');
     expect(body.feature).toHaveLength(64);
   });
+
+  it('sends the client IP when the gateway resolved one', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent({
+      requestId: 'req-2',
+      accountId: 'user:user-1',
+      ip: '203.0.113.9',
+      inputTokens: 1,
+      outputTokens: 1,
+      clientAttributed: false,
+      hasTools: false,
+      requestedLogprobs: false,
+    });
+    expect(sentBody().ip).toBe('203.0.113.9');
+  });
+
+  it('omits the ip key when no address resolved', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent({
+      requestId: 'req-3',
+      accountId: 'user:user-1',
+      ip: null,
+      inputTokens: 1,
+      outputTokens: 1,
+      clientAttributed: false,
+      hasTools: false,
+      requestedLogprobs: false,
+    });
+    expect(sentBody()).not.toHaveProperty('ip');
+  });
+
+  it('posts without the ip key when the field is absent', async () => {
+    mockFetch.mockResolvedValue(Response.json({}));
+    await reportUsageEvent({
+      requestId: 'req-4',
+      accountId: 'user:user-1',
+      inputTokens: 1,
+      outputTokens: 1,
+      clientAttributed: false,
+      hasTools: false,
+      requestedLogprobs: false,
+    });
+    expect(sentBody()).not.toHaveProperty('ip');
+  });
 });
 
 describe('decide', () => {
@@ -191,6 +235,21 @@ describe('decide', () => {
     await expect(
       decide({ requestId: 'r', tier: 'paid', accountId: 'user:u' }, { timeoutMs: 50 })
     ).resolves.toEqual(verdict);
+  });
+
+  it('sends the client IP for a signed-in tier', async () => {
+    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    await decide(
+      { requestId: 'r', tier: 'paid', accountId: 'user:u', ip: '2001:db8::1' },
+      { timeoutMs: 50 }
+    );
+    expect(sentBody().ip).toBe('2001:db8::1');
+  });
+
+  it('omits the ip key for a signed-in tier without an address', async () => {
+    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    await decide({ requestId: 'r', tier: 'free', accountId: 'org:o' }, { timeoutMs: 50 });
+    expect(sentBody()).not.toHaveProperty('ip');
   });
 
   it('returns null at the timeout, without an error log', async () => {

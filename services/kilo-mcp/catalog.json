@@ -15902,6 +15902,17 @@
     ],
     "searchBlob": "models.list List all available OpenRouter AI models with their ids, names, vision support, and which ones are marked as preferred. models list"
   },
+  "models.preferred": {
+    "path": "models.preferred",
+    "kind": "query",
+    "summary": "Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order.",
+    "inputSchema": {},
+    "tags": [
+      "models",
+      "preferred"
+    ],
+    "searchBlob": "models.preferred Return the ordered list of preferred AI models for the app, including free/auto models and top paid models. Use it to populate model pickers or determine default model selection order. models preferred"
+  },
   "moderation.acceptTerms": {
     "path": "moderation.acceptTerms",
     "kind": "mutation",
@@ -17046,6 +17057,9 @@
               "organization.domain_claim.verify",
               "organization.domain_claim.lose_verification",
               "organization.domain_claim.remove",
+              "organization.domain_claim.cleanup_started",
+              "organization.domain_claim.cleanup_completed",
+              "organization.domain_claim.cleanup_failed",
               "organization.mode.create",
               "organization.mode.update",
               "organization.mode.delete",

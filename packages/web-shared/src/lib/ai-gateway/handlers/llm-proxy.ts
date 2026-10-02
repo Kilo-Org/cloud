@@ -62,6 +62,7 @@ import {
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  refusalCooldownResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -126,6 +127,10 @@ import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/vi
 import { bouncerAccountId, decide, type DecideTier } from '@/lib/bouncer/client';
 import { simHash64 } from '@/lib/bouncer/simhash';
 import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import {
+  getRefusalCooldownExpiry,
+  isRefusalCooldownSubject,
+} from '@/lib/ai-gateway/refusal-cooldown';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -741,6 +746,16 @@ export async function handleLlmProxyRequest(
     );
   }
 
+  // Read the cooldown now and await it after provider resolution, so the Redis
+  // round trip overlaps the provider lookup instead of adding to it.
+  const refusalCooldownPromise = isRefusalCooldownSubject({
+    kiloUserId: user.id,
+    organizationId,
+    model: effectiveModelIdLowerCased,
+  })
+    ? getRefusalCooldownExpiry(user.id)
+    : Promise.resolve(null);
+
   if (
     requestBodyParsed.kind === 'responses' &&
     (requestBodyParsed.body.store || requestBodyParsed.body.previous_response_id)
@@ -813,6 +828,14 @@ export async function handleLlmProxyRequest(
     return chatGptReconnectResponse(providerResult.message);
   }
   const effectiveProviderContext = providerResult;
+
+  const refusalCooldownExpiresAt = await refusalCooldownPromise;
+  if (refusalCooldownExpiresAt) {
+    console.warn(
+      `Refusal cooldown active, user: ${user.id}, model: ${effectiveModelIdLowerCased}, until: ${refusalCooldownExpiresAt.toISOString()}`
+    );
+    return refusalCooldownResponse(refusalCooldownExpiresAt);
+  }
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
     try {

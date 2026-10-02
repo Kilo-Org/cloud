@@ -52,6 +52,7 @@ import type {
   ChatCompletionChunk,
   CoreUsageWithMetaData,
   JustTheCostsUsageStats,
+  MaybeHasNativeFinishReason,
   MaybeHasOpenRouterUsage,
   MaybeHasVercelProviderMetaData,
   Message,
@@ -60,6 +61,7 @@ import type {
   NotYetCostedUsageStats,
   OpenRouterError,
   OpenRouterUsage,
+  ParsedMicrodollarUsageStats,
   PromptInfo,
   UsageMetaData,
   UsageRecordInsertResult,
@@ -75,7 +77,11 @@ import {
   parseMessagesMicrodollarUsageFromString,
 } from '@/lib/ai-gateway/processUsage.messages';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+import {
+  isErrorFinishReason,
+  isRefusalFinishReason,
+  REFUSAL_ERROR_TYPE,
+} from '@/lib/ai-gateway/finishReason';
 import {
   computeOpenRouterCostFields,
   drainSseStream,
@@ -91,6 +97,7 @@ import { calculateCustomCost_mUsd } from '@/lib/ai-gateway/custom-pricing';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@/lib/kilo-pass-org/consumption';
 import { bouncerAccountId, reportUsageEvent } from '@/lib/bouncer/client';
+import { isRefusalCooldownSubject, recordRefusal } from '@/lib/ai-gateway/refusal-cooldown';
 
 const posthogClient = PostHogClient();
 
@@ -935,11 +942,11 @@ export function countAndStoreUsage(
   usageContext: MicrodollarUsageContext,
   openrouterRequestSpan: Span | undefined
 ) {
-  let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  let usageStatsPromise: Promise<ParsedMicrodollarUsageStats | null> = Promise.resolve(null);
 
   const parseResponseText = async (
-    parse: (content: string) => MicrodollarUsageStats
-  ): Promise<MicrodollarUsageStats | null> => {
+    parse: (content: string) => ParsedMicrodollarUsageStats
+  ): Promise<ParsedMicrodollarUsageStats | null> => {
     try {
       return parse(await clonedReponse.text());
     } catch (error) {
@@ -990,7 +997,20 @@ export function countAndStoreUsage(
     }
   }
 
-  return usageStatsPromise.then(usageStats => processTokenData(usageStats, usageContext));
+  return usageStatsPromise.then(async usageStats => {
+    const countsTowardRefusalCooldown =
+      usageStats?.refusal === true &&
+      isRefusalCooldownSubject({
+        kiloUserId: usageContext.kiloUserId,
+        organizationId: usageContext.organizationId,
+        model: usageContext.requested_model,
+      });
+    const [usageRecord] = await Promise.all([
+      processTokenData(usageStats, usageContext),
+      countsTowardRefusalCooldown ? recordRefusal(usageContext.kiloUserId) : undefined,
+    ]);
+    return usageRecord;
+  });
 }
 
 export function processOpenRouterUsage(
@@ -1024,7 +1044,7 @@ export async function parseMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number
-): Promise<MicrodollarUsageStats> {
+): Promise<ParsedMicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -1046,6 +1066,7 @@ export async function parseMicrodollarUsageFromStream(
   let usage: OpenRouterUsage | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let refusal = false;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
   const sseStreamParser = createParser({
@@ -1078,6 +1099,9 @@ export async function parseMicrodollarUsageFromStream(
         if (typeof error.code === 'number') {
           effectiveStatusCode = error.code;
         }
+        if (error.metadata?.error_type === REFUSAL_ERROR_TYPE) {
+          refusal = true;
+        }
         if (error.message === 'Upstream error from Nvidia: Service temporarily overloaded') {
           console.info(`OpenRouter error: ${error.message}`, {
             source: 'sse_processing',
@@ -1107,6 +1131,9 @@ export async function parseMicrodollarUsageFromStream(
         chunkProviderMetadata?.gateway?.routing?.finalProvider ??
         inference_provider;
       finish_reason = choice?.finish_reason ?? finish_reason;
+      if (choice?.delta?.refusal || isRefusalFinishReason(choice?.native_finish_reason)) {
+        refusal = true;
+      }
 
       const contentDelta = choice?.delta?.content;
       if (contentDelta) {
@@ -1148,18 +1175,19 @@ export async function parseMicrodollarUsageFromStream(
 
   const costs = processOpenRouterUsage(usage, coreProps, vercelProviderMetadata);
 
-  return { ...coreProps, ...costs };
+  return { ...coreProps, ...costs, refusal: refusal || isRefusalFinishReason(finish_reason) };
 }
 
 export function parseMicrodollarUsageFromString(
   fullResponse: string,
   kiloUserId: string,
   statusCode: number
-): MicrodollarUsageStats {
+): ParsedMicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (OpenAI.Chat.Completions.ChatCompletion &
         MaybeHasOpenRouterUsage &
-        MaybeHasVercelProviderMetaData)
+        MaybeHasVercelProviderMetaData &
+        MaybeHasNativeFinishReason & { error?: OpenRouterError })
     | null;
 
   if (responseJson?.usage?.is_byok == null && responseJson?.usage?.cost) {
@@ -1191,7 +1219,13 @@ export function parseMicrodollarUsageFromString(
 
   const costs = processOpenRouterUsage(responseJson?.usage, coreProps, vercelProviderMetadata);
 
-  return { ...coreProps, ...costs };
+  const refusal =
+    Boolean(choice?.message?.refusal) ||
+    isRefusalFinishReason(finish_reason) ||
+    isRefusalFinishReason(choice?.native_finish_reason) ||
+    responseJson?.error?.metadata?.error_type === REFUSAL_ERROR_TYPE;
+
+  return { ...coreProps, ...costs, refusal };
 }
 
 export function calculateKiloExclusiveCost_mUsd(

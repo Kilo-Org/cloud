@@ -6,8 +6,8 @@ import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
-  MicrodollarUsageStats,
   NotYetCostedUsageStats,
+  ParsedMicrodollarUsageStats,
   PromptInfo,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
@@ -19,7 +19,7 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
 } from '@/lib/ai-gateway/processUsage.shared';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+import { isErrorFinishReason, REFUSAL_ERROR_TYPE } from '@/lib/ai-gateway/finishReason';
 
 // OpenRouter adds cost fields to the standard Responses API usage object.
 // ref: https://openrouter.ai/docs/use-cases/usage-accounting#response-format
@@ -37,6 +37,8 @@ type ResponsesApiResponse = OpenAI.Responses.Response &
   MaybeHasVercelProviderMetadata & {
     // OpenRouter may return a top-level usage with cost fields
     usage?: ResponsesApiUsage | null;
+    // OpenRouter's typed error code, kept outside the native `error` object
+    error_type?: string | null;
   };
 
 type ResponsesApiStreamEvent = {
@@ -104,13 +106,23 @@ function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): 
     .join('');
 }
 
+function isRefusalResponse(response: ResponsesApiResponse): boolean {
+  return (
+    response.error_type === REFUSAL_ERROR_TYPE ||
+    response.incomplete_details?.reason === 'content_filter' ||
+    (response.output ?? []).some(
+      item => item.type === 'message' && item.content.some(c => c.type === 'refusal')
+    )
+  );
+}
+
 export async function parseResponsesMicrodollarUsageFromStream(
   stream: ReadableStream,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number
-): Promise<MicrodollarUsageStats> {
+): Promise<ParsedMicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
     name: 'responses-stream-processing',
@@ -131,6 +143,7 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
+  let refusal = false;
 
   const sseStreamParser = createParser({
     onEvent(event: EventSourceMessage) {
@@ -168,6 +181,10 @@ export async function parseResponsesMicrodollarUsageFromStream(
         responseContent += json.delta;
       }
 
+      if (json.type === 'response.refusal.delta' || json.type === 'response.refusal.done') {
+        refusal = true;
+      }
+
       // Extract metadata whenever json.response is present so that aborted
       // streams still capture messageId/model/usage from early events like
       // response.created and response.in_progress.
@@ -184,6 +201,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
           inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
         }
         finish_reason = response.status ?? finish_reason;
+        if (isRefusalResponse(response)) {
+          refusal = true;
+        }
       }
 
       if (json.type === 'response.failed' || json.type === 'response.incomplete') {
@@ -223,13 +243,13 @@ export async function parseResponsesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  return { ...coreProps, ...costs, refusal };
 }
 
 export function parseResponsesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number
-): MicrodollarUsageStats {
+): ParsedMicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as ResponsesApiResponse | null;
 
   const usage = responseJson?.usage;
@@ -254,7 +274,11 @@ export function parseResponsesMicrodollarUsageFromString(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processResponsesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  return {
+    ...coreProps,
+    ...costs,
+    refusal: responseJson ? isRefusalResponse(responseJson) : false,
+  };
 }
 
 export function extractInputItemTextContent(

@@ -5,8 +5,8 @@ import { sentryRootSpan } from '../getRootSpan';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import type {
   JustTheCostsUsageStats,
-  MicrodollarUsageStats,
   NotYetCostedUsageStats,
+  ParsedMicrodollarUsageStats,
   PromptInfo,
   VercelProviderMetaData,
 } from '@/lib/ai-gateway/processUsage.types';
@@ -18,7 +18,11 @@ import {
   extractVercelIsByok,
   extractVercelUpstreamId,
 } from '@/lib/ai-gateway/processUsage.shared';
-import { isErrorFinishReason } from '@/lib/ai-gateway/finishReason';
+import {
+  isErrorFinishReason,
+  isRefusalFinishReason,
+  REFUSAL_ERROR_TYPE,
+} from '@/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
 
 type MaybeHasVercelProviderMetadata = {
@@ -111,7 +115,7 @@ export async function parseMessagesMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number
-): Promise<MicrodollarUsageStats> {
+): Promise<ParsedMicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
     name: 'messages-stream-processing',
@@ -233,15 +237,19 @@ export async function parseMessagesMicrodollarUsageFromStream(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  // A refusal reported as an error event lands in finish_reason via error_type.
+  return { ...coreProps, ...costs, refusal: isRefusalFinishReason(finish_reason) };
 }
 
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
   statusCode: number
-): MicrodollarUsageStats {
+): ParsedMicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
-    | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
+    | (Anthropic.Messages.Message &
+        MaybeHasVercelProviderMetadata &
+        MaybeHasOpenRouterProvider &
+        Partial<Pick<MessagesApiStreamErrorEvent, 'error'>>)
     | null;
 
   const usage = responseJson?.usage;
@@ -272,7 +280,9 @@ export function parseMessagesMicrodollarUsageFromString(
   } satisfies NotYetCostedUsageStats;
 
   const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
-  return { ...coreProps, ...costs };
+  const refusal =
+    isRefusalFinishReason(finish_reason) || responseJson?.error?.error_type === REFUSAL_ERROR_TYPE;
+  return { ...coreProps, ...costs, refusal };
 }
 
 export function extractMessagesPromptInfo(body: GatewayMessagesRequest): PromptInfo {

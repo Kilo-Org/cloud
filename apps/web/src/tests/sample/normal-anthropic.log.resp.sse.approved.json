@@ -18,5 +18,6 @@
   "cacheWriteTokens": 0,
   "outputTokens": 49,
   "cost_mUsd": 14132,
-  "is_byok": null
+  "is_byok": null,
+  "refusal": false
 }

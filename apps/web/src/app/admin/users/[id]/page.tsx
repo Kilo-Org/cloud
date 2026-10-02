@@ -21,6 +21,7 @@ import { hasReceivedAnyFreeWelcomeCredits } from '@/lib/welcomeCredits';
 import { redirect } from 'next/navigation';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
 import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/email-address';
+import { getRefusalCooldownExpiry } from '@/lib/ai-gateway/refusal-cooldown';
 
 async function getUserData(userId: string): Promise<UserDetailProps | null> {
   const user = await findUserById(userId);
@@ -98,6 +99,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     loginMethods.map(method => method.email),
     user.id
   );
+  const refusalCooldownExpiresAt = await getRefusalCooldownExpiry(user.id);
 
   return {
     ...user,
@@ -114,6 +116,7 @@ async function getUserData(userId: string): Promise<UserDetailProps | null> {
     organization_memberships: organizationMemberships,
     autoTopUpConfig,
     is_sso_protected_domain: isSSOProtectedDomain,
+    refusal_cooldown_expires_at: refusalCooldownExpiresAt?.toISOString() ?? null,
     login_methods: loginMethods.map(method => ({
       ...method,
       email_relation: conflictByEmail.get(method.email)

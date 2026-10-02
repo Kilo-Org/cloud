@@ -29,6 +29,7 @@ export const proxyErrorTypeSchema = z.enum([
   'organization_auto_configuration',
   'upstream_disconnect',
   'client_disconnect',
+  'refusal_cooldown',
 ]);
 
 export type ProxyErrorType = z.infer<typeof proxyErrorTypeSchema>;

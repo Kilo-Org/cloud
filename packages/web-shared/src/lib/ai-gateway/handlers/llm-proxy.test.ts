@@ -45,6 +45,7 @@ import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/kilo-exclusive-mod
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import type { OpenRouterProviderConfig } from '@/lib/ai-gateway/providers/openrouter/types';
 import { decide, type DecideVerdict } from '@/lib/bouncer/client';
+import { getRefusalCooldownExpiry } from '@/lib/ai-gateway/refusal-cooldown';
 import { NextRequest } from 'next/server';
 import { handleLlmProxyRequest } from './llm-proxy';
 
@@ -141,6 +142,11 @@ jest.mock('@/lib/bouncer/client', () => ({
   reportUsageEvent: jest.fn(async () => undefined),
 }));
 
+jest.mock('@/lib/ai-gateway/refusal-cooldown', () => ({
+  ...(jest.requireActual('@/lib/ai-gateway/refusal-cooldown') as Record<string, unknown>),
+  getRefusalCooldownExpiry: jest.fn(async () => null),
+}));
+
 const mockedGetUserFromAuth = jest.mocked(getUserFromAuth);
 const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedIsAutoTopUpInFlight = jest.mocked(isAutoTopUpInFlight);
@@ -165,6 +171,7 @@ const mockedCheckPromotionLimit = jest.mocked(checkPromotionLimit);
 const mockedLogFreeModelRequest = jest.mocked(logFreeModelRequest);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
 const mockedDecide = jest.mocked(decide);
+const mockedGetRefusalCooldownExpiry = jest.mocked(getRefusalCooldownExpiry);
 
 const provider = {
   id: 'openrouter',
@@ -1834,5 +1841,96 @@ describe('auto-routing shadow classifier', () => {
       expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
     );
     expect(mockedAfter).toHaveBeenCalledWith(expect.any(Promise));
+  });
+});
+
+describe('refusal cooldown', () => {
+  const cooldownExpiresAt = new Date('2026-10-02T18:05:30.000Z');
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    setUserAuth();
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+    mockedGetRefusalCooldownExpiry.mockResolvedValue(cooldownExpiresAt);
+  });
+
+  it('blocks a personal Claude request with a terminal, specific error', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('anthropic/claude-opus-5.5')) as never
+    );
+
+    expect(response.status).toBe(403);
+    const body = await response.json();
+    expect(body).toEqual({
+      error: {
+        code: 'REFUSAL_COOLDOWN',
+        message: expect.stringContaining('until 2026-10-02 18:05 UTC'),
+      },
+      error_type: 'refusal_cooldown',
+      cooldown_expires_at: cooldownExpiresAt.toISOString(),
+    });
+    // The Kilo CLI retries bodies that look transient; this one must not.
+    expect(JSON.stringify(body)).not.toMatch(
+      /\b(?:429|500|502|503|504|524)\b|rate.limit|too many requests|try again|unavailable/i
+    );
+    expect(mockedGetRefusalCooldownExpiry).toHaveBeenCalledWith('user-123');
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('serves a personal Claude request when no cooldown is active', async () => {
+    mockedGetRefusalCooldownExpiry.mockResolvedValue(null);
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('anthropic/claude-opus-5.5')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not apply to models outside the cooldown', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('google/gemini-3-pro')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetRefusalCooldownExpiry).not.toHaveBeenCalled();
+  });
+
+  it('does not apply to organization requests', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('anthropic/claude-opus-5.5')) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetRefusalCooldownExpiry).not.toHaveBeenCalled();
   });
 });

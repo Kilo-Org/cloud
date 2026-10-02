@@ -2047,6 +2047,7 @@
       "idCopied": "Nakopya ang ID ng session",
       "couldNotCopyId": "Hindi makopya ang ID ng session.",
       "untitled": "Session na walang pamagat",
+      "actions": "Mga aksiyon sa sesyon",
       "sessionDeleted": "Nabura ang session",
       "needsInput": "naghihintay ng sagot",
       "fromPlatform": "mula sa {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Mababasa lang ang sesyong ito.",
       "continueInNewSession": "Magpatuloy sa bagong sesyon",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
+      "emptyTranscriptDescription": "Wala pang mensahe ang sesyong ito.",
       "scrollToBottom": "I-scroll sa ibaba",
       "emptyTitle": "Wala pang mensahe",
       "renameAccessibility": "Palitan ang pangalan ng sesyon: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Pumili ng modelo bago magpadala.",
       "preparingPlaceholder": "Inihahanda ang kapaligiran...",
       "finalizingPlaceholder": "Tinatapos na…",
+      "sessionLoadFailed": "Hindi ma-load ang session. Subukan munang muli.",
+      "sendUnavailable": "Hindi available ang pagpapadala hanggat hindi handa ang session.",
       "cannotReceiveFiles": "Hindi makakatanggap ng mga file ang sesyong ito. Alisin ang mga kalakip para maipadala ang mensahe mo.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang Ipadala para subukang muli.",
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
@@ -2634,6 +2638,7 @@
       "provider": "Tagapagbigay ng serbisyo",
       "totalCost": "Kabuuang gastos",
       "usageReflectsLatest": "Batay ang paggamit sa pinakahuling natapos na tugon ng katulong.",
+      "usageUnavailable": "Hindi available ang paggamit ng context",
       "tokenUsage": "Paggamit ng token",
       "cacheRate": "Porsyento mula sa cache",
       "modelsCount": "Mga modelo ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "I-load",
       "loadWithHost": "I-load ang {{host}}",
-      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan."
+      "httpsOnly": "Mga larawang mula sa HTTPS lang ang pinapayagan.",
+      "trustTitle": "I-load ang larawan mula sa {{host}}?",
+      "trustMessage": "Kapag pinagkatiwalaan mo ang {{host}}, maglo-load ang mga larawan nito nang hindi na nagtatanong bawat oras. Maaari mong bawiin ito mamaya sa Mga pinagkakatiwalaang host.",
+      "loadOnce": "I-load nang isang beses"
     },
     "markdownLink": {
       "invalidLink": "Hindi mabubuksan ang link na ito.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Mga host na pinapayagan mong buksan nang hindi na nagtatanong",
     "emptyTitle": "Walang pinagkakatiwalaang host",
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
+    "imagesSectionTitle": "Mga pinagkakatiwalaang host ng larawan",
+    "imagesSectionDescription": "Naglo-load ang mga larawan mula sa mga host na ito nang hindi na nagtatanong.",
+    "imagesSectionEmpty": "Walang pinagkakatiwalaang host ng larawan",
     "revoke": "Bawiin ang tiwala sa {{host}}",
     "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
+    "revokeImageMessage": "Muling hihingi ng kumpirmasyon ang mga larawan mula sa host na ito.",
     "backToPreferences": "Bumalik sa mga setting"
   },
   "quickChat": {

@@ -91,6 +91,10 @@ export function MessageBubbleContent({
               key={index}
               text={block.text}
               isFromMe={isFromMe}
+              // Scope the render cache to this message and conversation: the
+              // forwarded fence long-press closes over `message`, so identical
+              // text in another message must not reuse these elements.
+              renderScope={`${conversationId}:${message.id}`}
               onLongPressCode={onLongPressCode}
             />
           );

@@ -14,8 +14,6 @@ import {
 import {
   type GlanceableLiveActivityContentState,
   type PushData,
-  agentNotificationKindForGlanceableSnapshot,
-  androidChannelIdForAgentKind,
   translatePush,
 } from '@kilocode/notifications';
 
@@ -111,17 +109,19 @@ export function buildGlanceableExpoMessages(
   snapshot: ActiveAgentsGlanceable,
   priority: 'default' | 'high'
 ): ExpoPushMessage[] {
-  const kind = agentNotificationKindForGlanceableSnapshot(snapshot);
   return tokens.map(
     ({ token }) =>
       ({
         to: token,
         data: snapshot,
-        // Data-only wake: `_contentAvailable` makes the OS deliver the message to
-        // the background task while the app is backgrounded/killed, and omitting
-        // title/body keeps it from becoming a visible FCM notification that skips
-        // the task. The ongoing notification and widget content come from the local
-        // `applyGlanceablePushData` path, so the push never rings or interrupts.
+        // Strictly data-only wake: `_contentAvailable` makes the OS deliver the
+        // message to the background task while the app is backgrounded/killed,
+        // and omitting title/body keeps it from becoming a visible FCM
+        // notification that skips the task. The ongoing notification and widget
+        // content come from the local `applyGlanceablePushData` path, so the push
+        // never rings or interrupts. A `channelId`/`tag` would let Expo/FCM
+        // surface a bare app-name "Kilo" row when a remote prompt starts a
+        // session, so this wake must not carry any presentation field.
         _contentAvailable: true,
         sound: null,
         // FCM defers normal-priority data messages while Android is
@@ -130,13 +130,11 @@ export function buildGlanceableExpoMessages(
         // iOS stays `default`: APNs background `content-available` pushes use
         // priority 5, and Live Activity freshness rides the direct APNs path.
         priority,
-        // The wake names the kind's channel because the ongoing card is posted
-        // locally on that same channel; the legacy `active-agents` id is deleted
-        // on startup and no client creates it, so posting to it would be dropped.
-        channelId: androidChannelIdForAgentKind(kind),
         // Android collapse key = the opaque scope key, so every aggregate update
-        // for one user+org collapses into the same ongoing notification.
-        tag: snapshot.scopeKey,
+        // for one user+org collapses into the same data message. `collapseId` is
+        // the FCM data-message collapse field; it does not create a notification
+        // and replaces the presentation `tag` this wake used to carry.
+        collapseId: snapshot.scopeKey,
       }) satisfies ExpoPushMessage
   );
 }

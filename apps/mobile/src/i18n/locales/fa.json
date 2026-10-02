@@ -2047,6 +2047,7 @@
       "idCopied": "شناسهٔ نشست کپی شد",
       "couldNotCopyId": "کپی شناسهٔ نشست ممکن نشد.",
       "untitled": "نشست بدون عنوان",
+      "actions": "اقدامات نشست",
       "sessionDeleted": "نشست حذف شد",
       "needsInput": "در انتظار ورودی",
       "fromPlatform": "از {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "این نشست فقط خواندنی است.",
       "continueInNewSession": "ادامه در یک نشست جدید",
       "emptyDescription": "برای شروع، در کادر زیر پیامی بفرستید.",
+      "emptyTranscriptDescription": "این نشست هنوز پیامی ندارد.",
       "scrollToBottom": "رفتن به پایین",
       "emptyTitle": "هنوز پیامی وجود ندارد",
       "renameAccessibility": "تغییر نام نشست: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "قبل از ارسال، یک مدل انتخاب کنید.",
       "preparingPlaceholder": "در حال آماده‌سازی محیط…",
       "finalizingPlaceholder": "در حال اتمام کار…",
+      "sessionLoadFailed": "بارگذاری نشست ممکن نشد. ابتدا دوباره تلاش کنید.",
+      "sendUnavailable": "تا زمانی که نشست آماده نشود، ارسال در دسترس نیست.",
       "cannotReceiveFiles": "این نشست نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
       "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش دوباره، روی «ارسال» بزنید.",
       "discardAttachmentsMessage": "فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
@@ -2634,6 +2638,7 @@
       "provider": "ارائه‌دهنده",
       "totalCost": "هزینه کل",
       "usageReflectsLatest": "میزان استفاده بر اساس آخرین پاسخ تکمیل‌شدهٔ دستیار است.",
+      "usageUnavailable": "میزان استفاده از زمینه در دسترس نیست",
       "tokenUsage": "مصرف توکن",
       "cacheRate": "نرخ استفاده از کش",
       "modelsCount": "مدل‌ها ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "بارگذاری",
       "loadWithHost": "بارگذاری {{host}}",
-      "httpsOnly": "فقط تصاویر دارای پیوند HTTPS بارگذاری می‌شوند."
+      "httpsOnly": "فقط تصاویر دارای پیوند HTTPS بارگذاری می‌شوند.",
+      "trustTitle": "بارگذاری تصویر از {{host}}؟",
+      "trustMessage": "اعتماد به {{host}} باعث می‌شود تصاویر آن بدون پرسیدن هر بار بارگذاری شوند. می‌توانید آن را بعداً در میزبان‌های مورد اعتماد لغو کنید.",
+      "loadOnce": "یک‌بار بارگذاری"
     },
     "markdownLink": {
       "invalidLink": "باز کردن این پیوند ممکن نیست.",
@@ -3181,8 +3189,12 @@
     "subtitle": "میزبان‌های مورد اعتماد برای باز کردن پیوندها بدون تأیید",
     "emptyTitle": "میزبان مورد اعتمادی نیست",
     "emptyDescription": "اگر به میزبان یک پیوند اعتماد کنید، پیوندهای آن بدون درخواست تأیید دوباره باز می‌شوند.",
+    "imagesSectionTitle": "میزبان‌های تصویر مورد اعتماد",
+    "imagesSectionDescription": "تصاویر این میزبان‌ها بدون پرسیدن دوباره بارگذاری می‌شوند.",
+    "imagesSectionEmpty": "هیچ میزبان تصویر مورد اعتمادی نیست",
     "revoke": "لغو اعتماد به {{host}}",
     "revokeMessage": "پیوندهای این میزبان دوباره درخواست تأیید خواهند کرد.",
+    "revokeImageMessage": "تصاویر این میزبان دوباره درخواست تأیید خواهند کرد.",
     "backToPreferences": "بازگشت به تنظیمات"
   },
   "quickChat": {

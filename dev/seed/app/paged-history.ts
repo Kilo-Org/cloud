@@ -32,6 +32,16 @@ export const MESSAGE_COUNT = 60;
  */
 export const REASONING_MESSAGE_INDEX = 11;
 
+/**
+ * The newest fixture message (an assistant row) carries a large fenced `ts`
+ * block instead of the usual padded body, so the mobile session page renders a
+ * code fence the perf proof can scroll away from and remount. It is even, and
+ * so an assistant turn, matching the branch that builds this text part.
+ * CODE_CHUNK_LINES is 32, so this spans many first-paint chunks.
+ */
+export const FENCE_MESSAGE_INDEX = 60;
+export const FENCE_CODE_LINE_COUNT = 1024;
+
 const TOKEN_EXPIRES_SECONDS = 3600;
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 500;
@@ -45,6 +55,9 @@ function printUsage(): void {
   console.log('behind a scroll-up. The first loaded assistant message (message 11)');
   console.log('carries an inline reasoning part, so "Auto expand thinking" renders its');
   console.log('expanded thinking on the burst-opening row that the prepend re-marks.');
+  console.log(
+    `The newest message (message ${FENCE_MESSAGE_INDEX}) carries a ${FENCE_CODE_LINE_COUNT}-line fenced ts block for the code-fence perf proof.`
+  );
   console.log('Writes the cli_sessions_v2 row, then ingests through the local');
   console.log('cloudflare-session-ingest worker.');
   console.log('No cloud-agent session ID is set, so the UI is historical/read-only.');
@@ -149,6 +162,27 @@ function messageBody(role: 'User' | 'Assistant', index: number): string {
     `Marker line G for message ${index}.`,
     `End of ${role.toLowerCase()} message ${index}.`,
   ].join('\n');
+}
+
+/**
+ * A deterministic fenced `ts` block. Its line count is well past the four
+ * chunks the first paint mounts (CODE_CHUNK_LINES = 32), so the mobile code
+ * block highlights lazily instead of lexing and highlighting the whole fence
+ * at mount.
+ */
+function fenceBody(lineCount: number): string {
+  const lines: string[] = [
+    `Fixture message ${FENCE_MESSAGE_INDEX} of ${MESSAGE_COUNT}: large fenced ts block.`,
+    '',
+    '```ts',
+  ];
+  for (let line = 1; line <= lineCount; line += 1) {
+    lines.push(`const pagedHistoryLine${String(line).padStart(4, '0')} = ${line};`);
+  }
+  lines.push('```');
+  lines.push('');
+  lines.push(`End of fixture message ${FENCE_MESSAGE_INDEX} fence.`);
+  return lines.join('\n');
 }
 
 function reasoningBody(index: number): string {
@@ -296,7 +330,10 @@ export function buildPagedHistoryIngestItems(): SessionIngestItem[] {
         partId: partIdFor(index),
         sessionId: SESSION_ID,
         messageId,
-        text: messageBody('Assistant', index),
+        text:
+          index === FENCE_MESSAGE_INDEX
+            ? fenceBody(FENCE_CODE_LINE_COUNT)
+            : messageBody('Assistant', index),
       })
     );
   }
@@ -457,6 +494,9 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
   console.log('Seeded a read-only 60-message cloud-agent transcript.');
   console.log('Message 11 (the first loaded assistant message) carries inline reasoning.');
   console.log('Turn on "Auto expand thinking" to see it expanded.');
+  console.log(
+    `Message ${FENCE_MESSAGE_INDEX} carries a ${FENCE_CODE_LINE_COUNT}-line fenced ts block for the code-fence perf proof.`
+  );
   console.log('Hard-refresh /cloud/chat?sessionId=' + SESSION_ID + '.');
   console.log('Newest 50 should be on screen; scroll up for the older 10.');
 
@@ -467,6 +507,10 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     messageCount,
     reasoningMessageId: messageIdFor(REASONING_MESSAGE_INDEX),
     reasoningPartId: reasoningPartIdFor(REASONING_MESSAGE_INDEX),
+    fenceMessageId: messageIdFor(FENCE_MESSAGE_INDEX),
+    fencePartId: partIdFor(FENCE_MESSAGE_INDEX),
+    fenceMessageIndex: FENCE_MESSAGE_INDEX,
+    fenceCodeLineCount: FENCE_CODE_LINE_COUNT,
     sessionIngestPort: serviceStatus.port,
     sessionIngestUrl,
     chatPath: `/cloud/chat?sessionId=${SESSION_ID}`,

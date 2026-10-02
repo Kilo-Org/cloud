@@ -2072,6 +2072,7 @@
       "idCopied": "ID sesije kopiran",
       "couldNotCopyId": "Nije moguće kopirati ID sesije.",
       "untitled": "Sesija bez naziva",
+      "actions": "Radnje za sesiju",
       "sessionDeleted": "Sesija izbrisana",
       "needsInput": "čeka unos",
       "fromPlatform": "s platforme {{platform}}",
@@ -2127,6 +2128,7 @@
       "readOnly": "Ova je sesija dostupna samo za čitanje.",
       "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Za početak pošalji poruku u nastavku.",
+      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomakni se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
@@ -2602,6 +2604,8 @@
       "selectModelBeforeSending": "Odaberi model prije slanja.",
       "preparingPlaceholder": "Postavljanje okruženja...",
       "finalizingPlaceholder": "Dovršavanje...",
+      "sessionLoadFailed": "Sesiju nije bilo moguće učitati. Prvo pokušajte ponovo.",
+      "sendUnavailable": "Slanje nije dostupno dok sesija ne bude spremna.",
       "cannotReceiveFiles": "Ova sesija ne može primati datoteke. Ukloni privitke da pošalješ poruku.",
       "couldNotAttachFiles": "Nije moguće priložiti datoteke. Dodirni gumb za slanje da pokušaš ponovno.",
       "discardAttachmentsMessage": "Prenesene datoteke koje nisu priložene poslanim porukama bit će izbrisane.",
@@ -2672,6 +2676,7 @@
       "provider": "Pružatelj",
       "totalCost": "Ukupni trošak",
       "usageReflectsLatest": "Prikazana potrošnja odnosi se na posljednji dovršeni odgovor pomoćnika.",
+      "usageUnavailable": "Upotreba konteksta nije dostupna",
       "tokenUsage": "Potrošnja tokena",
       "cacheRate": "Udio iz predmemorije",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2708,7 +2713,10 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dopuštene su samo slike dostupne putem HTTPS-a."
+      "httpsOnly": "Dopuštene su samo slike dostupne putem HTTPS-a.",
+      "trustTitle": "Učitati sliku s {{host}}?",
+      "trustMessage": "Ako povjeruješ poslužitelju {{host}}, njegove slike učitavat će se bez svakog pitanja. Kasnije to možeš opozvati u odjeljku Pouzdani poslužitelji.",
+      "loadOnce": "Učitaj jednom"
     },
     "markdownLink": {
       "invalidLink": "Ovu poveznicu nije moguće otvoriti.",
@@ -3224,8 +3232,12 @@
     "subtitle": "Poslužitelji čije se poveznice otvaraju bez potvrde",
     "emptyTitle": "Nema pouzdanih poslužitelja",
     "emptyDescription": "Kad označiš poslužitelj pouzdanim, njegove se poveznice otvaraju bez ponovne potvrde.",
+    "imagesSectionTitle": "Pouzdani poslužitelji za slike",
+    "imagesSectionDescription": "Slike s ovih poslužitelja učitavaju se bez ponovnog pitanja.",
+    "imagesSectionEmpty": "Nema pouzdanih poslužitelja za slike",
     "revoke": "Opozovi povjerenje za {{host}}",
     "revokeMessage": "Poveznice na ovaj poslužitelj ponovno će tražiti potvrdu.",
+    "revokeImageMessage": "Slike s ovog poslužitelja ponovno će tražiti potvrdu.",
     "backToPreferences": "Natrag na postavke"
   },
   "quickChat": {

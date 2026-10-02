@@ -35,8 +35,8 @@ export const SESSION_FOOTER_ROW_ITEM_PADDING = 'px-4 py-2';
 
 /**
  * Largest OS font scale the cannot-send reason grows to. It is the one row item
- * whose copy length the catalog does not bound, so it carries a cap that the
- * single-line row can absorb.
+ * whose copy length the catalog does not bound, so it carries a cap on how far
+ * a long reason can grow the row.
  */
 export const SEND_REASON_MAX_FONT_SCALE = 1.6;
 

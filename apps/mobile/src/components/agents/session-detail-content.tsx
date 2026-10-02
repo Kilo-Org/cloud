@@ -2425,11 +2425,13 @@ export function SessionDetailContent({
             the same frame and stays opaque via `bg-background`, so a future
             layout change covers a transcript row instead of overprinting it.
             One item renders at a time (working, then status, then the send
-            reason) and every item carries the same padding and line height, so
-            a mid-stream swap cannot resize the flex-1 transcript above it. The
-            reason outlives the has-messages and preparation gates: it states a
-            send gate no transcript surface carries, including the failed load
-            on an empty transcript. */}
+            reason) and every item carries the same padding and text style, so a
+            swap between the one-line items cannot resize the flex-1 transcript
+            above it. The reason keeps its full copy — it wraps instead of
+            truncating — so a long translation can still add a line. The reason
+            outlives the has-messages and preparation gates: it states a send
+            gate no transcript surface carries, including the failed load on an
+            empty transcript. */}
         {sessionFooterItem !== null ? (
           <Animated.View
             entering={FadeIn.duration(200)}

@@ -30,27 +30,102 @@ function parseTrustedImageHosts(raw: string | null): string[] {
   }
 }
 
+const IPV6_HOSTNAME_PATTERN = /^\[[0-9a-f:.]+\]$/;
+const REGISTERED_HOSTNAME_PATTERN = /^[a-z0-9\u00A1-\uFFFF._-]+$/;
+const PORT_PATTERN = /^\d+$/;
+
 /**
- * Display and match key for an image's host: lowercased hostname, plus ":port"
- * only when the port is not the protocol default. Returns null when the URL
- * cannot be parsed or carries no hostname, so a malformed URI is never trusted
- * and never auto-loads.
+ * Splits an authority's host and port. Returns null for any authority shape
+ * the native client would not resolve to that exact host, so an unusual
+ * authority fails closed instead of keying as a host the request never
+ * reaches. An IPv6 host keeps its brackets; every other host is lowercased
+ * and restricted to registered-name characters.
  */
-export function formatTrustedImageHost(uri: string): string | null {
-  try {
-    const url = new URL(uri);
-    const hostname = url.hostname.toLowerCase();
-    if (hostname === '') {
+function parseAuthorityHost(hostPort: string): { hostname: string; port: string } | null {
+  let hostname = '';
+  let port = '';
+  if (hostPort.startsWith('[')) {
+    const close = hostPort.indexOf(']');
+    if (close === -1) {
       return null;
     }
-    const port = url.port;
-    const isDefaultPort =
-      (url.protocol === 'http:' && (port === '' || port === '80')) ||
-      (url.protocol === 'https:' && (port === '' || port === '443'));
-    return port !== '' && !isDefaultPort ? `${hostname}:${port}` : hostname;
-  } catch {
+    hostname = hostPort.slice(0, close + 1).toLowerCase();
+    const afterBracket = hostPort.slice(close + 1);
+    if (afterBracket === '') {
+      port = '';
+    } else if (afterBracket.startsWith(':')) {
+      port = afterBracket.slice(1);
+    } else {
+      return null;
+    }
+    if (!IPV6_HOSTNAME_PATTERN.test(hostname)) {
+      return null;
+    }
+  } else {
+    const colon = hostPort.indexOf(':');
+    hostname = (colon === -1 ? hostPort : hostPort.slice(0, colon)).toLowerCase();
+    port = colon === -1 ? '' : hostPort.slice(colon + 1);
+    if (port.includes(':') || !REGISTERED_HOSTNAME_PATTERN.test(hostname)) {
+      return null;
+    }
+  }
+  if (port !== '' && !PORT_PATTERN.test(port)) {
     return null;
   }
+  return { hostname, port };
+}
+
+/**
+ * Display and match key for an image's host: lowercased hostname, plus ":port"
+ * only when the port is not the protocol default. Returns null when the URI is
+ * not http(s), carries no valid host, or cannot be parsed, so a malformed URI
+ * is never trusted and never auto-loads.
+ *
+ * React Native's `URL` is a regex-based polyfill whose `hostname` lets `[^@]+`
+ * cross a path separator, so `https://attacker.com/x@trusted.com/p.png` keys
+ * as `trusted.com` even though the native client connects to `attacker.com`.
+ * Deriving the key from the authority we delimit ourselves keeps the key on the
+ * host the request actually reaches, so a path `@` can never satisfy a
+ * different host's opt-in.
+ */
+export function formatTrustedImageHost(uri: string): string | null {
+  const schemeEnd = uri.indexOf('://');
+  if (schemeEnd === -1) {
+    return null;
+  }
+  const protocol = uri.slice(0, schemeEnd).toLowerCase();
+  if (protocol !== 'http' && protocol !== 'https') {
+    return null;
+  }
+  // The authority ends at the first path, query, fragment, or backslash
+  // delimiter. A backslash is a path separator for http(s) under WHATWG
+  // parsing, so it must end the authority here too.
+  const remainder = uri.slice(schemeEnd + 3);
+  const authorityEnd = remainder.search(/[/?#\\]/);
+  const authority = authorityEnd === -1 ? remainder : remainder.slice(0, authorityEnd);
+  // Userinfo ends at the last '@' in the authority; a path '@' is already
+  // excluded above and can never be promoted to the host.
+  const host = parseAuthorityHost(authority.slice(authority.lastIndexOf('@') + 1));
+  if (host === null) {
+    return null;
+  }
+  // WHATWG parses the port as a number: leading zeros drop and a port above
+  // the 16-bit maximum fails, so the native client would never resolve it.
+  // Canonicalize to that numeric endpoint or fail closed, so `:0443` keys as
+  // the same authority as `:443` instead of a distinct, never-matching host.
+  let port = '';
+  if (host.port !== '') {
+    const portNumber = Number(host.port);
+    if (portNumber > 65_535) {
+      return null;
+    }
+    port = String(portNumber);
+  }
+  const isDefaultPort =
+    port === '' ||
+    (protocol === 'http' && port === '80') ||
+    (protocol === 'https' && port === '443');
+  return isDefaultPort ? host.hostname : `${host.hostname}:${port}`;
 }
 
 // A JSON string array of host keys (lowercased hostname plus a non-default

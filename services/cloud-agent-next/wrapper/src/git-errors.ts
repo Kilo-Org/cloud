@@ -19,10 +19,7 @@ const GIT_FAILURE_PATTERNS = [
   },
   {
     subtype: 'git_rate_limited',
-    pattern: new RegExp(
-      `${GIT_HTTP_429_PATTERN.source}|too many requests|rate limit(?:ed)?`,
-      'i'
-    ),
+    pattern: new RegExp(`${GIT_HTTP_429_PATTERN.source}|too many requests|rate limit(?:ed)?`, 'i'),
   },
   {
     subtype: 'git_network_failed',

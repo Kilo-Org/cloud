@@ -24,9 +24,7 @@ describe('gitOperationError provenance', () => {
     expect(real.subtype).toBe('git_rate_limited');
     expect(textual.subtype).toBe('git_rate_limited');
 
-    expect(real.gitFailure).toBe(
-      'matcher=git_rate_limited http=429 operation=clone route=managed'
-    );
+    expect(real.gitFailure).toBe('matcher=git_rate_limited http=429 operation=clone route=managed');
     expect(textual.gitFailure).toBe(
       'matcher=git_rate_limited http=none operation=clone route=managed'
     );

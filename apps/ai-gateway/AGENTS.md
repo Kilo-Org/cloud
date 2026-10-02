@@ -18,10 +18,11 @@ Next.js app that serves the AI gateway API on its own. It deploys to the
   proxy's path validation.
 - `pnpm dev` runs with the web app's environment files. Start it with
   `pnpm dev:start ai-gateway`.
-- Deploys run from the same workflows as the web app (`deploy-production.yml`,
-  `deploy-staging.yml`, `redeploy-web.yml`) and skip while the
-  `VERCEL_PROJECT_ID_AI_GATEWAY` repository variable is unset. Crons stay on the
-  web app; do not add them to this app's `vercel.json`.
+- Deploys are manual for now: run the `Deploy AI Gateway` workflow
+  (`deploy-ai-gateway.yml`) from `main`. It deploys the commit of the last
+  completed scheduled release for the chosen environment, so the database is
+  already migrated, and the scheduled web deploys do not touch this app. Crons
+  stay on the web app; do not add them to this app's `vercel.json`.
 - Server-side Sentry and OpenTelemetry come from
   `packages/web-shared/src/lib/observability`, registered in
   `src/instrumentation.ts` with the `kilocode-ai-gateway` service name. The app

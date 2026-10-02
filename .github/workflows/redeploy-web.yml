@@ -41,18 +41,6 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
-  # Skipped until the kilocode-ai-gateway Vercel project is wired up through the
-  # repository variable VERCEL_PROJECT_ID_AI_GATEWAY.
-  stage-ai-gateway:
-    needs: verify-main
-    if: vars.VERCEL_PROJECT_ID_AI_GATEWAY != ''
-    uses: ./.github/workflows/stage-vercel-deployment.yml
-    with:
-      target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
-
   promote-app:
     needs: stage-app
     uses: ./.github/workflows/promote-vercel-deployment.yml
@@ -68,13 +56,5 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  promote-ai-gateway:
-    needs: stage-ai-gateway
-    uses: ./.github/workflows/promote-vercel-deployment.yml
-    with:
-      deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}

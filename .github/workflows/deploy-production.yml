@@ -112,19 +112,6 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
-  # Skipped until the kilocode-ai-gateway Vercel project is wired up through the
-  # repository variable VERCEL_PROJECT_ID_AI_GATEWAY.
-  stage-ai-gateway:
-    needs: check-changes
-    if: needs.check-changes.outputs.should_deploy == 'true' && vars.VERCEL_PROJECT_ID_AI_GATEWAY != ''
-    uses: ./.github/workflows/stage-vercel-deployment.yml
-    with:
-      target_environment: production
-      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
-      source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
-
   promote-app:
     needs: [stage-app, check-production-db-startup, run-migrations]
     uses: ./.github/workflows/promote-vercel-deployment.yml
@@ -140,14 +127,6 @@ jobs:
     uses: ./.github/workflows/promote-vercel-deployment.yml
     with:
       deployment_url: ${{ needs.stage-global-app.outputs.deployment_url }}
-    secrets:
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-
-  promote-ai-gateway:
-    needs: [stage-ai-gateway, check-production-db-startup, run-migrations]
-    uses: ./.github/workflows/promote-vercel-deployment.yml
-    with:
-      deployment_url: ${{ needs.stage-ai-gateway.outputs.deployment_url }}
     secrets:
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
 
@@ -341,8 +320,6 @@ jobs:
         detect-gastown-wasteland-changes,
         deploy-gastown-wasteland,
         deploy-kiloclaw,
-        stage-ai-gateway,
-        promote-ai-gateway,
       ]
     if: >-
       ${{
@@ -357,9 +334,7 @@ jobs:
         needs.deploy-workers.result == 'success' &&
         needs.detect-gastown-wasteland-changes.result == 'success' &&
         contains(fromJSON('["success","skipped"]'), needs.deploy-gastown-wasteland.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-kiloclaw.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.stage-ai-gateway.result) &&
-        contains(fromJSON('["success","skipped"]'), needs.promote-ai-gateway.result)
+        contains(fromJSON('["success","skipped"]'), needs.deploy-kiloclaw.result)
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

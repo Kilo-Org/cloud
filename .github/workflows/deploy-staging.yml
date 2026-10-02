@@ -108,19 +108,6 @@ jobs:
     secrets:
       VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_GLOBAL_APP }}
 
-  # Skipped until the kilocode-ai-gateway Vercel project is wired up through the
-  # repository variable VERCEL_PROJECT_ID_AI_GATEWAY.
-  deploy-ai-gateway:
-    needs: [check-changes, check-staging-db-startup, run-migrations]
-    if: needs.check-changes.outputs.should_deploy == 'true' && vars.VERCEL_PROJECT_ID_AI_GATEWAY != ''
-    uses: ./.github/workflows/stage-vercel-deployment.yml
-    with:
-      target_environment: staging
-      vercel_project_id_var: VERCEL_PROJECT_ID_AI_GATEWAY
-      source_sha: ${{ needs.check-changes.outputs.target_sha }}
-    secrets:
-      VERCEL_PROJECT_TOKEN: ${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}
-
   deploy-workers:
     needs: [check-changes, check-staging-db-startup, run-migrations, deploy-app, deploy-global-app]
     if: needs.check-changes.outputs.should_deploy == 'true'
@@ -140,7 +127,6 @@ jobs:
         deploy-app,
         deploy-global-app,
         deploy-workers,
-        deploy-ai-gateway,
       ]
     if: >-
       ${{
@@ -150,8 +136,7 @@ jobs:
         needs.run-migrations.result == 'success' &&
         needs.deploy-app.result == 'success' &&
         needs.deploy-global-app.result == 'success' &&
-        needs.deploy-workers.result == 'success' &&
-        contains(fromJSON('["success","skipped"]'), needs.deploy-ai-gateway.result)
+        needs.deploy-workers.result == 'success'
       }}
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5

@@ -234,7 +234,7 @@ export const SLACK_ENCRYPTION_KEY = getEnvVariable('SLACK_ENCRYPTION_KEY');
  *
  * Unlike the GitLab/Bitbucket platform-credential keys, web holds the private half
  * because the Slack webhook path decrypts in-process. See
- * `@/lib/integrations/platforms/slack/credential-keyset`.
+ * `apps/web/src/lib/integrations/platforms/slack/credential-keyset.ts`.
  */
 export const SLACK_CREDENTIAL_KEYSET_JSON = getEnvVariable('SLACK_CREDENTIAL_KEYSET_JSON');
 // Posts notifications from server-side Admin UI code to a fixed Slack channel.

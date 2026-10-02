@@ -9,7 +9,6 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@/*": ["./src/*"],
       "@kilocode/web-shared/*": ["./src/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],

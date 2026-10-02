@@ -1,10 +1,10 @@
 import { AlertCircle, Share, X } from '@/components/ui/icons';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, View } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ResumableZoom } from 'react-native-zoom-toolkit';
 import { scheduleOnRN } from 'react-native-worklets';
 
 import { CenteredState } from '@/components/centered-state';
@@ -14,7 +14,23 @@ import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-type ImageViewerModalProps = {
+/**
+ * The app's full-screen image viewer: pinch, pan, double-tap and swipe-to-
+ * dismiss, taken from `react-native-zoom-toolkit` rather than hand-rolled from
+ * raw gestures. This file is the only place that imports the zoom library; see
+ * the "Unified Elements" table in `apps/mobile/AGENTS.md`.
+ *
+ * The viewer keeps RN `Modal`: it must present above the session page sheet,
+ * where a `@rn-primitives/portal` overlay would render behind it.
+ */
+
+/** Zoom limits: 1x at content fit, 5x at the deepest zoom. */
+const VIEWER_MAX_SCALE = 5;
+
+/** Fills the viewer area; `alignSelf: 'stretch'` overrides the parent's centering. */
+const ZOOM_SURFACE_STYLE = { flex: 1, alignSelf: 'stretch' } as const;
+
+type ImageViewerProps = {
   visible: boolean;
   uri: string | null;
   /** Header a11y labels; kilo-chat passes the filename. */
@@ -27,7 +43,7 @@ type ImageViewerModalProps = {
   onClose: () => void;
 };
 
-export function ImageViewerModal({
+export function ImageViewer({
   visible,
   uri,
   filename,
@@ -35,7 +51,7 @@ export function ImageViewerModal({
   shareError = null,
   onClose,
   onShare,
-}: ImageViewerModalProps) {
+}: ImageViewerProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
@@ -67,90 +83,21 @@ export function ImageViewerModal({
     setImageError(false);
   }
 
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedX = useSharedValue(0);
-  const savedY = useSharedValue(0);
-
-  function resetZoom() {
-    scale.value = withTiming(1);
-    savedScale.value = 1;
-    translateX.value = withTiming(0);
-    translateY.value = withTiming(0);
-    savedX.value = 0;
-    savedY.value = 0;
-  }
-
-  // Reopening must start at 1x.
-  useEffect(() => {
-    if (!visible) {
-      scale.value = 1;
-      savedScale.value = 1;
-      translateX.value = 0;
-      translateY.value = 0;
-      savedX.value = 0;
-      savedY.value = 0;
-    }
-  }, [visible, scale, savedScale, translateX, translateY, savedX, savedY]);
-
   // A new image (or a reopen) retries the decode from a clean slate.
   useEffect(() => {
     setImageError(false);
   }, [visible]);
 
-  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pinch().
-  const pinch = Gesture.Pinch()
-    .onUpdate(event => {
-      scale.value = savedScale.value * event.scale;
-    })
-    .onEnd(() => {
-      const next = Math.min(Math.max(scale.value, 1), 5);
-      scale.value = withTiming(next);
-      savedScale.value = next;
-      if (next === 1) {
-        translateX.value = withTiming(0);
-        translateY.value = withTiming(0);
-        savedX.value = 0;
-        savedY.value = 0;
+  const handleSwipe = useCallback(
+    (direction: 'up' | 'down' | 'left' | 'right') => {
+      // One image per viewer, so a horizontal swipe has nothing to move to.
+      // Only the vertical swipe dismisses, the platform's photo-viewer gesture.
+      if (direction === 'up' || direction === 'down') {
+        onClose();
       }
-    });
-
-  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Pan().
-  const pan = Gesture.Pan()
-    .onUpdate(event => {
-      // Panning is only meaningful once zoomed in; at 1x the image fills the frame.
-      if (savedScale.value <= 1) {
-        return;
-      }
-      translateX.value = savedX.value + event.translationX;
-      translateY.value = savedY.value + event.translationY;
-    })
-    .onEnd(() => {
-      savedX.value = translateX.value;
-      savedY.value = translateY.value;
-    });
-
-  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Tap().
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      scheduleOnRN(resetZoom);
-    });
-
-  // Pinch and pan run together; the double-tap races them so a two-finger
-  // gesture is never swallowed by tap detection.
-  // eslint-disable-next-line new-cap -- RNGH's gesture builder API is Gesture.Race/Simultaneous().
-  const zoomGesture = Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
-
-  const imageStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
-  }));
+    },
+    [onClose]
+  );
 
   return (
     <Modal
@@ -203,22 +150,30 @@ export function ImageViewerModal({
             GestureHandlerRootView does not reach a Modal's native view hierarchy. */}
         <GestureHandlerRootView className="flex-1">
           <View className="flex-1 items-center justify-center overflow-hidden bg-black">
-            {uri && !imageError ? (
-              <GestureDetector gesture={zoomGesture}>
-                <Animated.View className="h-full w-full" style={imageStyle}>
-                  <Image
-                    source={{ uri }}
-                    cachePolicy="memory"
-                    className="h-full w-full"
-                    contentFit="contain"
-                    onError={() => {
-                      setImageError(true);
-                    }}
-                  />
-                </Animated.View>
-              </GestureDetector>
+            {/* Mounted only while the viewer is open and the bitmap decodes, so
+                every open starts at 1x and no zoom survives a close. */}
+            {visible && uri !== null && !imageError ? (
+              <ResumableZoom
+                style={ZOOM_SURFACE_STYLE}
+                maxScale={VIEWER_MAX_SCALE}
+                // onSwipe runs on the UI thread; hand the decision back to JS.
+                onSwipe={direction => {
+                  'worklet';
+                  scheduleOnRN(handleSwipe, direction);
+                }}
+              >
+                <Image
+                  source={{ uri }}
+                  cachePolicy="memory"
+                  className="h-full w-full"
+                  contentFit="contain"
+                  onError={() => {
+                    setImageError(true);
+                  }}
+                />
+              </ResumableZoom>
             ) : null}
-            {uri && imageError ? (
+            {uri !== null && imageError ? (
               <CenteredState className="w-full">
                 <View className="flex-row items-center justify-center gap-2 px-6">
                   <AlertCircle size={14} color="#ffffff" />

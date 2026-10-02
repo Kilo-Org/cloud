@@ -17,33 +17,36 @@ const { requestMock, readMock, writeMock } = vi.hoisted(() => ({
   writeMock: vi.fn(),
 }));
 
-// FlatList renders through a callback, so a host-string mock would drop every
-// row. This mock mirrors the first-mount pass of the real list: it renders
-// `initialNumToRender` rows (the window the component bounds its translation
-// fan-out to) and the rest only as they scroll into the window.
-const flatListMock = vi.hoisted(
-  () =>
-    (props: {
+// The real list mounts only the rows inside FlashList v2's draw window: the
+// viewport plus the platform draw distance (250pt on iOS and Android). This
+// menu is capped at `max-h-48` (192pt) with 44pt rows, so the first window
+// mounts about ten rows and the rest mount as they scroll in. The mock renders
+// that window — the rows the component's per-row translation fan-out is bound
+// to — instead of the whole catalog.
+const { flashListMock, FLASH_LIST_DRAWN_ROWS } = vi.hoisted(() => {
+  const drawnRows = 10;
+  return {
+    FLASH_LIST_DRAWN_ROWS: drawnRows,
+    flashListMock: (props: {
       data: readonly MobileSlashCommandInfo[];
       renderItem?: (info: { item: MobileSlashCommandInfo; index: number }) => ReactNode;
       keyExtractor?: (item: MobileSlashCommandInfo) => string;
-      initialNumToRender?: number;
     }) => {
-      const rendered =
-        typeof props.initialNumToRender === 'number'
-          ? props.data.slice(0, props.initialNumToRender)
-          : props.data;
-      const rows = rendered.map((item, index) =>
-        createElement(
-          Fragment,
-          { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
-          props.renderItem ? props.renderItem({ item, index }) : null
-        )
-      );
-      return createElement('FlatList', null, ...rows);
-    }
-);
+      const rows = props.data
+        .slice(0, FLASH_LIST_DRAWN_ROWS)
+        .map((item, index) =>
+          createElement(
+            Fragment,
+            { key: props.keyExtractor ? props.keyExtractor(item) : String(index) },
+            props.renderItem ? props.renderItem({ item, index }) : null
+          )
+        );
+      return createElement('FlashList', null, ...rows);
+    },
+  };
+});
 
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('@/lib/tool-summary-translation/tool-summary-translation-client', () => ({
   requestToolSummaryTranslations: requestMock,
 }));
@@ -54,11 +57,14 @@ vi.mock('@/lib/persist/tool-summary-translation-cache', () => ({
   writeToolSummaryTranslation: writeMock,
 }));
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
+  FlatList: 'FlatList',
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+}));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ card: '#ffffff', border: '#e5e5e5' }),
 }));
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
@@ -283,10 +289,10 @@ describe('SlashCommandSuggestions translation', () => {
     const requested = requestMock.mock.calls.flatMap(
       call => (call[0] as { texts: readonly string[] }).texts
     );
-    // The menu shows at most a few rows; the first window is what translates,
-    // not the whole 256-command catalog.
+    // The menu shows at most a window of rows; the mounted window is what
+    // translates, not the whole 256-command catalog.
     expect(requested.length).toBeGreaterThan(0);
-    expect(requested.length).toBeLessThanOrEqual(8);
+    expect(requested.length).toBeLessThanOrEqual(FLASH_LIST_DRAWN_ROWS);
     act(() => {
       renderer.unmount();
     });

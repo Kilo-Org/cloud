@@ -176,7 +176,11 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
     );
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   if (config.isError && !config.data) {
     return (
@@ -310,6 +314,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
           </Text>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

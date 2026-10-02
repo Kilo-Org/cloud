@@ -6,10 +6,12 @@ import {
   type UserMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type ComponentProps, createElement, type ReactElement } from 'react';
-import { Alert, Modal, ScrollView } from 'react-native';
+import { Modal, ScrollView } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -24,7 +26,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: native.announce },
   ActivityIndicator: 'ActivityIndicator',
-  Alert: { alert: vi.fn() },
   Modal: 'Modal',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -53,6 +54,12 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+// The Report confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still letting
+// the test read the request and run its confirm.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
 }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -91,7 +98,6 @@ beforeEach(() => {
   native.clipboard = '';
   native.copyFails = false;
   native.announce.mockClear();
-  vi.mocked(Alert.alert).mockClear();
 });
 
 function userInfo(overrides: Partial<UserMessage> = {}): UserMessage {
@@ -372,11 +378,18 @@ describe('MessageDetailsSheet mounted', () => {
       press(findByTestID(renderer.root, 'message-details-report')[0]);
     });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
-    const confirm = vi
-      .mocked(Alert.alert)
-      .mock.calls.at(-1)?.[2]
-      ?.find(button => button.style === 'destructive');
-    act(() => confirm?.onPress?.());
+    const confirmation = renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    if (!confirmation) {
+      throw new Error('missing report confirmation');
+    }
+    expect(confirmation.props).toMatchObject({
+      title: i18n.t('agentChat.messageDetails.reportAiResponse'),
+      message: i18n.t('agentChat.messageDetails.reportAiResponseConfirm'),
+      confirmLabel: i18n.t('agentChat.messageDetails.report'),
+    });
+    act(() => {
+      (confirmation.props.onConfirm as () => void)();
+    });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(0);
     act(() => {
       renderer.update(

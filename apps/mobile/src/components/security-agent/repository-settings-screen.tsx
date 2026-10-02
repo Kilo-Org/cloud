@@ -105,7 +105,11 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
     initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   // Selection is a Set for O(1) row lookups: the row renderer would otherwise
   // scan `selectedIds` once per repository per render (O(repos × selected)).
@@ -296,6 +300,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
       />
+      {dialog}
     </View>
   );
 }

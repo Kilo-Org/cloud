@@ -3,8 +3,8 @@ import { type KiloChatClient } from '@kilocode/kilo-chat';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback } from 'react';
-import { Alert } from 'react-native';
 
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { i18n } from '@/i18n';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
@@ -13,7 +13,7 @@ import { useConversationRename } from './use-conversation-rename';
 import { useLeaveConversation } from './use-conversations';
 
 // Backs the conversation header's "..." options sheet: rename (via
-// useConversationRename) and leave (with a native confirm + redirect).
+// useConversationRename) and leave (with an in-app confirm + redirect).
 export function useConversationOptionsSheet({
   client,
   conversationId,
@@ -28,6 +28,7 @@ export function useConversationOptionsSheet({
   const router = useRouter();
   const themedSheet = useThemedActionSheetOptions();
   const { showActionSheetWithOptions } = useActionSheet();
+  const { confirm, dialog: leaveDialog } = useConfirmDialog();
   const leaveConversation = useLeaveConversation(client);
   const rename = useConversationRename(client, conversationId, sandboxId);
 
@@ -52,31 +53,26 @@ export function useConversationOptionsSheet({
         }
         if (index === 1) {
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-          Alert.alert(
-            i18n.t('chat.conversation.leaveTitle'),
-            i18n.t('chat.conversation.leaveMessage'),
-            [
-              { text: i18n.t('common.cancel'), style: 'cancel' },
-              {
-                text: i18n.t('chat.conversation.leave'),
-                style: 'destructive',
-                onPress: () => {
-                  leaveConversation.mutate(
-                    { conversationId, sandboxId },
-                    {
-                      onSuccess: () => {
-                        router.replace(chatSandboxPath(sandboxId));
-                      },
-                    }
-                  );
-                },
-              },
-            ]
-          );
+          confirm({
+            title: i18n.t('chat.conversation.leaveTitle'),
+            message: i18n.t('chat.conversation.leaveMessage'),
+            confirmLabel: i18n.t('chat.conversation.leave'),
+            onConfirm: () => {
+              leaveConversation.mutate(
+                { conversationId, sandboxId },
+                {
+                  onSuccess: () => {
+                    router.replace(chatSandboxPath(sandboxId));
+                  },
+                }
+              );
+            },
+          });
         }
       }
     );
   }, [
+    confirm,
     conversationId,
     conversationTitle,
     leaveConversation,
@@ -88,6 +84,7 @@ export function useConversationOptionsSheet({
   ]);
 
   return {
+    leaveDialog,
     openOptions,
     renaming: rename.renaming,
     closeRename: rename.closeRename,

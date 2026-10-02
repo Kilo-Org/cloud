@@ -113,7 +113,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedForeground: '#6b7280',
   }),
 }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
@@ -493,7 +493,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     await pressBody(renderer.root);
 
-    const viewers = nodesByType(renderer.root, 'ImageViewerModal');
+    const viewers = nodesByType(renderer.root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props.visible).toBe(true);
     expect(viewers[0]?.props.uri).toBe('file:///cache/photo.png');
@@ -523,7 +523,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(headers[0]?.props.title).toBe('notes.md');
 
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
 
     renderer.unmount();
@@ -576,7 +576,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
       expect.any(Function)
     );
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
 
@@ -620,7 +620,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -645,7 +645,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     await act(async () => {
       await Promise.resolve();

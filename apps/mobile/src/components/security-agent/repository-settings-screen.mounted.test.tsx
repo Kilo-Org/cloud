@@ -80,7 +80,11 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 }));
 vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
   useSecurityAgentSettingsRedirect: () => undefined,
-  useSettingsBackGuard: () => ({ onBack: () => undefined, skipNextGuardRef: { current: false } }),
+  useSettingsBackGuard: () => ({
+    onBack: () => undefined,
+    skipNextGuardRef: { current: false },
+    dialog: null,
+  }),
 }));
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { githubApps: { mintInstallState: { mutate: vi.fn() } } },

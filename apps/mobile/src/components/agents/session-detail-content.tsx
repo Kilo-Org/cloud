@@ -11,7 +11,7 @@ import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import * as Haptics from 'expo-haptics';
-import { Alert, KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, type Text as RNText, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -172,6 +172,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import {
   type AnalyticsSurface,
@@ -267,6 +268,7 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  const { confirm, dialog } = useConfirmDialog();
   // Session-route navigation only: `replace` in one native-stack commit crashes
   // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
   const sessionRouter = useStackSafeReplace();
@@ -2015,26 +2017,20 @@ export function SessionDetailContent({
           return;
         }
         if (action === 'remove') {
-          Alert.alert(
-            t('agentChat.goal.removeConfirmTitle'),
-            t('agentChat.goal.removeConfirmMessage'),
-            [
-              { text: t('common.cancel'), style: 'cancel' },
-              {
-                text: t('agentChat.goal.remove'),
-                style: 'destructive',
-                onPress: () => {
-                  void runGoalAction('remove');
-                },
-              },
-            ]
-          );
+          confirm({
+            title: t('agentChat.goal.removeConfirmTitle'),
+            message: t('agentChat.goal.removeConfirmMessage'),
+            confirmLabel: t('agentChat.goal.remove'),
+            onConfirm: () => {
+              void runGoalAction('remove');
+            },
+          });
           return;
         }
         void runGoalAction(action);
       }
     );
-  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction]);
+  }, [sessionGoal, t, showActionSheetWithOptions, themedSheet, runGoalAction, confirm]);
 
   const handleGoalEditSave = useCallback(
     async (objective: string) => {
@@ -2384,6 +2380,7 @@ export function SessionDetailContent({
           ) : null}
         </View>
       </ToolRunSheetHost>
+      {dialog}
     </PartDetailSheetHost>
   );
 

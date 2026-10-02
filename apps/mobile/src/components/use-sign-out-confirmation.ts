@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
  * Sign-out confirmation.
  *
  * One destructive confirm for both platforms: the in-app
- * `DestructiveConfirmDialog` carries the red affordance on iOS and Android
+ * `ConfirmDialog` carries the red affordance on iOS and Android
  * alike. The native alert cannot be the shared implementation — Android's
  * `AlertDialog` paints every button with the theme accent, so
  * `Alert.alert`'s `style: 'destructive'` never reaches the screen there — so

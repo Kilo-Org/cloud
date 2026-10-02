@@ -19,7 +19,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import {
   type LayoutChangeEvent,
-  Modal,
+  Platform,
   Pressable,
   type Text as RNText,
   Text,
@@ -47,7 +47,7 @@ import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { CenteredState } from '@/components/centered-state';
-import { StateSurface } from '@/components/centered-state-surface';
+import { Sheet } from '@/components/ui/sheet';
 
 import { containsPressable, extractNodeText, linearRowLabel } from './markdown-a11y';
 import { getMarkdownStyles, type MarkdownPalette } from './markdown-palette';
@@ -63,6 +63,10 @@ const MODAL_HORIZONTAL_PADDING = 16;
 const ZOOM_MIN = 0.4;
 const ZOOM_MAX = 3;
 const ZOOM_DEFAULT = 1;
+
+// The reader fills the sheet: the header bar and the zoomable table need the
+// whole window, and the sheet is the only detent.
+const SHEET_SNAP_POINTS = ['100%'];
 
 // A table mounts at most TABLE_ROW_MOUNT_LIMIT rows; the reveal control below
 // the table reveals TABLE_ROW_MOUNT_STEP more on each tap. The body cannot be
@@ -243,6 +247,19 @@ export function MarkdownTable({
     transformOrigin: 'top left',
   }));
   const scrollContentStyle = { padding: 16, paddingBottom: insets.bottom + 16 };
+  // iOS presents a full-height sheet just below the status bar, so its content
+  // already clears the notch; Android expands the sheet over the status bar, so
+  // only Android pads the header bar by the top inset.
+  const headerTopInset = Platform.OS === 'ios' ? 0 : insets.top;
+
+  // Best-effort focus once the reader is mounted; moveA11yFocus is a no-op when
+  // the title handle is not mounted yet, so no retry loop is needed. A
+  // screen-reader user lands on the table title instead of the first cell.
+  useEffect(() => {
+    if (open) {
+      moveA11yFocus(titleRef);
+    }
+  }, [open]);
 
   // The reveal control is a sibling of the horizontal ScrollView, not a row
   // inside the table box: centred across the table's natural width it would sit
@@ -317,76 +334,72 @@ export function MarkdownTable({
         </View>
       </Pressable>
 
-      {open ? (
-        <Modal
-          visible
-          backdropColor={colors.background}
-          animationType="slide"
-          // Best-effort focus after native presentation; moveA11yFocus is a no-op
-          // when the title handle is not mounted yet, so no retry loop is needed.
-          onShow={() => {
-            moveA11yFocus(titleRef);
-          }}
-          onRequestClose={() => {
-            session.value += 1;
-            setOpen(false);
-          }}
-        >
-          <StateSurface className="flex-1 bg-background">
-            <View
-              className="flex-row items-center justify-between border-b border-border bg-background px-4"
-              style={{ paddingTop: insets.top, height: insets.top + 56 }}
+      <Sheet
+        visible={open}
+        snapPoints={SHEET_SNAP_POINTS}
+        // A full-height reader: the header bar below owns the top of the
+        // window, so the drag indicator would draw over it.
+        showHandle={false}
+        onClose={() => {
+          session.value += 1;
+          setOpen(false);
+        }}
+      >
+        <View className="flex-1 bg-background">
+          <View
+            className="flex-row items-center justify-between border-b border-border bg-background px-4"
+            style={{ paddingTop: headerTopInset, height: headerTopInset + 56 }}
+          >
+            <Text
+              ref={titleRef}
+              accessibilityRole="header"
+              className="text-lg font-semibold text-foreground"
+              style={withRtlWritingDirection(undefined)}
             >
-              <Text
-                ref={titleRef}
-                accessibilityRole="header"
-                className="text-lg font-semibold text-foreground"
-                style={withRtlWritingDirection(undefined)}
+              {t('agentChat.markdownTable.title')}
+            </Text>
+            <Pressable
+              onPress={() => {
+                session.value += 1;
+                setOpen(false);
+              }}
+              className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
+              accessibilityLabel={t('agentChat.markdownTable.close')}
+              accessibilityRole="button"
+              hitSlop={8}
+            >
+              <X size={20} color={colors.foreground} />
+            </Pressable>
+          </View>
+          {/* RNGH gestures need their own root inside the sheet's native window,
+              which the app-root GestureHandlerRootView does not reach. */}
+          <GestureHandlerRootView className="flex-1">
+            {raw !== undefined ? (
+              <MarkdownTableBody
+                palette={palette}
+                raw={raw}
+                columnCount={columnCount}
+                rowCount={rowCount}
+                selectable={selectable}
+                onLongPressLink={onLongPressLink}
+                onPressLink={onPressLink}
               >
-                {t('agentChat.markdownTable.title')}
-              </Text>
-              <Pressable
-                onPress={() => {
-                  session.value += 1;
-                  setOpen(false);
-                }}
-                className="h-10 w-10 items-center justify-center rounded-md bg-secondary active:opacity-70"
-                accessibilityLabel={t('agentChat.markdownTable.close')}
-                accessibilityRole="button"
-                hitSlop={8}
-              >
-                <X size={20} color={colors.foreground} />
-              </Pressable>
-            </View>
-            {/* RNGH gestures need their own root inside an RN Modal — see image-viewer-modal.tsx. */}
-            <GestureHandlerRootView className="flex-1">
-              {raw !== undefined ? (
-                <MarkdownTableBody
+                {renderTableContent}
+              </MarkdownTableBody>
+            ) : (
+              renderTableContent(
+                <MarkdownTableCells
                   palette={palette}
-                  raw={raw}
+                  header={header ?? []}
+                  rows={rows ?? []}
                   columnCount={columnCount}
-                  rowCount={rowCount}
-                  selectable={selectable}
-                  onLongPressLink={onLongPressLink}
-                  onPressLink={onPressLink}
-                >
-                  {renderTableContent}
-                </MarkdownTableBody>
-              ) : (
-                renderTableContent(
-                  <MarkdownTableCells
-                    palette={palette}
-                    header={header ?? []}
-                    rows={rows ?? []}
-                    columnCount={columnCount}
-                  />,
-                  { totalRows: (rows ?? []).length }
-                )
-              )}
-            </GestureHandlerRootView>
-          </StateSurface>
-        </Modal>
-      ) : null}
+                />,
+                { totalRows: (rows ?? []).length }
+              )
+            )}
+          </GestureHandlerRootView>
+        </View>
+      </Sheet>
     </>
   );
 }

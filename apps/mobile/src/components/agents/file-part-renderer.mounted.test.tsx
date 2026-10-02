@@ -125,8 +125,16 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
 }));
-vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', File: 'File' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/icons', () => ({
+  AlertCircle: 'AlertCircle',
+  File: 'File',
+  Share: 'Share',
+}));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
+vi.mock('expo-video', () => ({
+  VideoView: 'VideoView',
+  useVideoPlayer: () => ({ loop: false }),
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
@@ -309,12 +317,12 @@ describe('FilePartRenderer mounted', () => {
         (button.props.onLongPress as () => void)();
       });
       expect(selected).toEqual(['message-1']);
-      expect(findByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+      expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
       expect(findByType(renderer.root, 'Modal')).toHaveLength(0);
       expect(showActionSheetWithOptions).not.toHaveBeenCalled();
       await press(button);
       if (mime === 'image/png') {
-        expect(first(findByType(renderer.root, 'ImageViewerModal')).props.uri).toBe(url);
+        expect(first(findByType(renderer.root, 'ImageViewer')).props.uri).toBe(url);
       } else if (mime === 'text/markdown') {
         expect(first(findByType(renderer.root, 'ChatMarkdownText')).props.value).toBe(
           'Attachment body'
@@ -327,6 +335,30 @@ describe('FilePartRenderer mounted', () => {
       await unmount(renderer);
     }
   );
+
+  it('plays a video part inline with native controls and shares it from the caption row', async () => {
+    const url = 'https://example.test/clip.mp4';
+    cacheFilePart('part-1', { url, mime: 'video/mp4', filename: 'clip.mp4' });
+    const renderer = await mount(
+      makeFilePart({ id: 'part-1', mime: 'video/mp4', filename: 'clip.mp4', url: '' })
+    );
+
+    const video = findByType(renderer.root, 'VideoView');
+    expect(video).toHaveLength(1);
+    expect(video[0]?.props.nativeControls).toBe(true);
+    expect(video[0]?.props.contentFit).toBe('contain');
+    // No full-screen viewer: the native player owns the enlarged surface.
+    expect(findByType(renderer.root, 'ImageViewer')).toHaveLength(0);
+    expect(texts(renderer.root)).toContain('clip.mp4');
+
+    await press(first(pressableByLabel(renderer.root, 'Share clip.mp4')));
+    await flushAsync();
+    expect(shareRemoteFileMock.shareRemoteFile).toHaveBeenCalledWith(
+      expect.objectContaining({ url, filename: 'clip.mp4' })
+    );
+
+    await unmount(renderer);
+  });
 
   it('forwards image-error long-press without retrying until the normal tap', async () => {
     cacheFilePart('part-1', { url: 'https://x/a.png', mime: 'image/png', filename: 'shot.png' });
@@ -397,11 +429,11 @@ describe('FilePartRenderer mounted', () => {
     const buttons = pressableByLabel(root, 'Open shot.png full screen');
     expect(buttons).toHaveLength(1);
     expect(buttons[0]?.props.accessibilityRole).toBe('button');
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(0);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(0);
 
     await press(first(buttons));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://x/a.png' });
 
@@ -580,7 +612,7 @@ describe('FilePartRenderer mounted', () => {
 
     // Open the viewer before the renew settles.
     await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(1);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
 
     // The image errors while the renew is in flight.
     const image = findByType(root, 'Image')[0];
@@ -600,7 +632,7 @@ describe('FilePartRenderer mounted', () => {
     });
     await flushAsync();
 
-    expect(findByType(root, 'ImageViewerModal')).toHaveLength(1);
+    expect(findByType(root, 'ImageViewer')).toHaveLength(1);
     expect(pressableByLabel(root, 'Image unavailable, retry loading')).toHaveLength(0);
     expect(pressableByLabel(root, `Open ${uuid}.png full screen`)).toHaveLength(1);
 
@@ -994,7 +1026,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props.onShare).toBeTypeOf('function');
     expect(viewers[0]?.props.sharing).toBe(false);
@@ -1029,7 +1061,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, 'Open shot.png full screen')));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
@@ -1124,14 +1156,14 @@ describe('FilePartRenderer mounted', () => {
     shareRemoteFileMock.shareRemoteFile.mockRejectedValueOnce(new Error('boom'));
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
     await flushAsync();
 
-    const updated = findByType(root, 'ImageViewerModal');
+    const updated = findByType(root, 'ImageViewer');
     expect(updated[0]?.props.shareError).not.toBeNull();
     expect(toastMock.error).not.toHaveBeenCalled();
 
@@ -1155,14 +1187,14 @@ describe('FilePartRenderer mounted', () => {
     );
     shareRemoteFileMock.getShareRemoteFileReason.mockReturnValueOnce(null);
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
 
     // Close the viewer while the share is in flight.
-    const openViewers = findByType(root, 'ImageViewerModal');
+    const openViewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(openViewers).props.onClose as () => void)();
@@ -1263,14 +1295,14 @@ describe('FilePartRenderer mounted', () => {
       new ShareRemoteFileError('download-failed')
     );
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     await act(async () => {
       await Promise.resolve();
       (first(viewers).props.onShare as () => void)();
     });
     await flushAsync();
 
-    const updated = findByType(root, 'ImageViewerModal');
+    const updated = findByType(root, 'ImageViewer');
     expect(updated[0]?.props.shareError).toBe('Failed to share file. Please try again.');
     expect(toastMock.error).not.toHaveBeenCalled();
 
@@ -1444,7 +1476,7 @@ describe('FilePartRenderer mounted', () => {
 
     await press(first(pressableByLabel(root, `Open ${uuid}.png full screen`)));
 
-    const viewers = findByType(root, 'ImageViewerModal');
+    const viewers = findByType(root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props).toMatchObject({ visible: true, uri: 'https://r2.example/signed' });
 

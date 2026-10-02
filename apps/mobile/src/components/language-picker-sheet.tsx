@@ -1,8 +1,9 @@
+import { FlashList } from '@shopify/flash-list';
 import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, I18nManager, type TextInput, View } from 'react-native';
+import { I18nManager, type TextInput, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -27,6 +28,14 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  paddingHorizontal: 16,
+  paddingBottom: 16,
+} satisfies ViewStyle;
 
 export function LanguagePickerSheet({
   onClose,
@@ -262,13 +271,13 @@ export function LanguagePickerSheet({
           description={t('agents.sessionList.tryDifferentSearch')}
         />
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
+        <FlashList
+          style={[listStyle, { backgroundColor: colors.background }]}
+          contentContainerStyle={listContentContainerStyle}
           data={items}
           keyExtractor={item => item.key}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerClassName="px-4 pb-4"
           ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
           renderItem={({ item, index }) => (
             <LanguagePickerRow

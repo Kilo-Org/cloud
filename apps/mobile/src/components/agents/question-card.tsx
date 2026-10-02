@@ -1,13 +1,6 @@
 /* eslint-disable max-lines -- The blocking question card keeps its selection, custom-answer, and CTA presentation together. */
 import { useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  type Text as RNText,
-  ScrollView,
-  type TextInput,
-  View,
-} from 'react-native';
+import { Pressable, type Text as RNText, ScrollView, type TextInput, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
 import { useTranslation } from 'react-i18next';
@@ -16,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Check } from '@/components/ui/icons';
 import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   applyBlockingCardAppearance,
   type BlockingCardSubmissionError,
@@ -76,6 +70,7 @@ export function QuestionCard({
 }: Readonly<QuestionCardProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const [selectedOptions, setSelectedOptions] = useState<Record<number, Set<number>>>({});
   const [customSelected, setCustomSelected] = useState<Record<number, boolean>>({});
   const customInputs = useRef<Record<number, string>>({});
@@ -179,14 +174,12 @@ export function QuestionCard({
   }
 
   function handleReject() {
-    Alert.alert(
-      t('agentChat.questionCard.skipQuestionsTitle'),
-      t('agentChat.questionCard.skipQuestionsMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('agentChat.questionCard.skip'), style: 'destructive', onPress: onReject },
-      ]
-    );
+    confirm({
+      title: t('agentChat.questionCard.skipQuestionsTitle'),
+      message: t('agentChat.questionCard.skipQuestionsMessage'),
+      confirmLabel: t('agentChat.questionCard.skip'),
+      onConfirm: onReject,
+    });
   }
 
   function handleRetrySkip() {
@@ -416,6 +409,7 @@ export function QuestionCard({
           ) : null}
         </View>
       ) : null}
+      {dialog}
     </View>
   );
 }

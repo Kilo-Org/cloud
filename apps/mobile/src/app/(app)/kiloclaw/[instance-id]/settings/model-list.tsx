@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, Eye, Search } from '@/components/ui/icons';
+import { FlashList } from '@shopify/flash-list';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { Pressable, TextInput, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +27,8 @@ type ModelItem = {
   supportsVision: boolean;
   isPreferred: boolean;
 };
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export default function ModelListScreen() {
   const { 'instance-id': instanceId } = useLocalSearchParams<{ 'instance-id': string }>();
@@ -206,7 +209,8 @@ export default function ModelListScreen() {
             }
           />
         ) : (
-          <FlatList
+          <FlashList
+            style={listStyle}
             data={sections}
             keyExtractor={(item, index) =>
               item.type === 'header' ? `header-${item.title}` : `model-${item.model.id}-${index}`

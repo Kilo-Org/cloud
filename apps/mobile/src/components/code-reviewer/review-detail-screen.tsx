@@ -24,6 +24,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -37,21 +38,6 @@ import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hook
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
 const FINDINGS_PAGE_SIZE = 20;
-
-function confirmCancel(onConfirm: () => void) {
-  Alert.alert(
-    i18n.t('codeReviewer.reviewDetail.cancelTitle'),
-    i18n.t('codeReviewer.reviewDetail.cancelMessage'),
-    [
-      { text: i18n.t('common.keepRunning'), style: 'cancel' },
-      {
-        text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
-        style: 'destructive',
-        onPress: onConfirm,
-      },
-    ]
-  );
-}
 
 function confirmRetry(onConfirm: () => void) {
   Alert.alert(
@@ -70,11 +56,22 @@ export function ReviewDetailScreen({
 }: Readonly<{ scope: string; reviewId: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
   const [visibleCount, setVisibleCount] = useState(FINDINGS_PAGE_SIZE);
+
+  function confirmCancel(onConfirm: () => void) {
+    confirm({
+      title: i18n.t('codeReviewer.reviewDetail.cancelTitle'),
+      message: i18n.t('codeReviewer.reviewDetail.cancelMessage'),
+      confirmLabel: i18n.t('codeReviewer.reviewDetail.cancelReview'),
+      cancelLabel: i18n.t('common.keepRunning'),
+      onConfirm,
+    });
+  }
 
   if (isLoading) {
     return (
@@ -86,6 +83,7 @@ export function ReviewDetailScreen({
             <Skeleton className="h-40 w-full rounded-lg" />
           </Animated.View>
         </TabScreenScrollView>
+        {dialog}
       </View>
     );
   }
@@ -102,6 +100,7 @@ export function ReviewDetailScreen({
         <View className="flex-1 bg-background">
           <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
           <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
+          {dialog}
         </View>
       );
     }
@@ -114,6 +113,7 @@ export function ReviewDetailScreen({
           onRetry={() => void refetch()}
           isRetrying={isFetching}
         />
+        {dialog}
       </View>
     );
   }
@@ -323,6 +323,7 @@ export function ReviewDetailScreen({
           ) : null}
         </View>
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

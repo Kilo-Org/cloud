@@ -222,7 +222,11 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   if (config.isError && !config.data) {
     return (
@@ -296,6 +300,7 @@ export function SlaSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

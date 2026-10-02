@@ -65,7 +65,7 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 |---|---|---|
 | Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
-| Dialog / confirm, screen-level | `@/components/ui/dialog` (`@rn-primitives/alert-dialog`) | a direct `@rn-primitives/alert-dialog` import |
+| Dialog / confirm that needs the red affordance | `useConfirmDialog()` / `ConfirmDialog` from `@/components/ui/dialog` | a direct `@rn-primitives/alert-dialog` import |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
@@ -79,6 +79,9 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 A `Modal` opened from sheet content is a sanctioned exception and stays on RN `Modal`: a dialog rendered
 through `@rn-primitives/portal` lives in the app's React tree and cannot paint above a native sheet.
 `RenameModal`, `DestructiveConfirmDialog`, and `FeedbackPromptDialog` keep RN `Modal` for this reason.
+`useConfirmDialog()` therefore renders the RN `Modal` confirm by default, and takes
+`presentation: 'screen'` only for a path that is provably a tab or a plain stack screen with no sheet on
+its route — the portal dialog dims the whole app there.
 
 ## Implementation Rules
 

@@ -1,8 +1,10 @@
 import { type SlashCommandInfo } from '@kilocode/cloud-agent-sdk';
-import { FlatList, Pressable, View } from 'react-native';
+import { FlashList } from '@shopify/flash-list';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranslatedToolSummary } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 import { cn } from '@/lib/utils';
 
@@ -19,13 +21,19 @@ import {
  */
 const SLASH_COMMAND_ITEM_PREFIX = 'slash-command:';
 
-/**
- * Rows the list mounts on its first pass. The menu is at most `max-h-48` tall,
- * so a handful of rows fills it; bounding the first pass keeps typing `/`
- * (which matches every command) from enqueuing a whole 256-command catalog to
- * the translation gateway. Rows beyond the window mount as they scroll in.
- */
-const SLASH_COMMAND_INITIAL_ROWS = 8;
+// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
+// menu's `max-h-48 border-t border-border bg-card` classes become this style
+// plus the themed border and card background. The menu is not `flex-1`: it sits
+// inline above the composer and sizes to its rows up to `max-h-48`.
+const listStyle = { maxHeight: 192 } satisfies ViewStyle;
+
+/** The menu frame plus the themed card background and top border. */
+function menuStyle(colors: ThemeColors): ViewStyle[] {
+  return [
+    listStyle,
+    { backgroundColor: colors.card, borderTopColor: colors.border, borderTopWidth: 1 },
+  ];
+}
 
 type SlashCommandSuggestionsProps = {
   commands: MobileSlashCommandInfo[];
@@ -124,18 +132,17 @@ export function SlashCommandSuggestions({
   commands,
   onSelect,
 }: Readonly<SlashCommandSuggestionsProps>) {
+  const colors = useThemeColors();
+
   if (commands.length === 0) {
     return null;
   }
 
   return (
-    <FlatList
-      className="max-h-48 border-t border-border bg-card"
+    <FlashList
+      style={menuStyle(colors)}
       data={commands}
       keyExtractor={command => command.name}
-      initialNumToRender={SLASH_COMMAND_INITIAL_ROWS}
-      maxToRenderPerBatch={SLASH_COMMAND_INITIAL_ROWS}
-      windowSize={3}
       keyboardShouldPersistTaps="handled"
       renderItem={({ item, index }) => (
         <SlashCommandSuggestionRow

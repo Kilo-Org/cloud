@@ -23,7 +23,6 @@ import {
 } from 'react';
 import {
   AccessibilityInfo,
-  Alert,
   AppState,
   type GestureResponderEvent,
   Keyboard,
@@ -47,6 +46,7 @@ import { ChatToolbar } from '@/components/agents/chat-toolbar';
 import { type AgentMode } from '@/components/agents/mode-selector';
 import { pickAgentAttachments } from '@/components/agents/attachment-picker';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
 import {
@@ -71,7 +71,7 @@ import {
   SESSION_HEADER_HEIGHT,
   shouldEnableComposerInputScroll,
 } from '@/components/agents/chat-composer-input-height';
-import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
+import { useRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { SlashCommandSuggestions } from '@/components/agents/slash-command-suggestions';
 import { SuggestionCard } from '@/components/agents/suggestion-card';
 import {
@@ -397,25 +397,22 @@ export function ChatComposer({
   // /restart, /exit) is already rejected while attachments are present, so no
   // bypass flag is needed; a successful send clears the chips and disarms.
   const navigation = useNavigation();
+  const { confirm, dialog } = useConfirmDialog();
+  const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const releaseUnclaimedRef = useRef(upload.releaseUnclaimedUploads);
   releaseUnclaimedRef.current = upload.releaseUnclaimedUploads;
   usePreventRemove(upload.hasUnclaimedAttachments, ({ data }) => {
     const action = data.action;
-    Alert.alert(
-      i18n.t('agentChat.composer.discardAttachmentsTitle'),
-      i18n.t('agentChat.composer.discardAttachmentsMessage'),
-      [
-        { text: i18n.t('common.keepEditing'), style: 'cancel' },
-        {
-          text: i18n.t('common.discard'),
-          style: 'destructive',
-          onPress: () => {
-            releaseUnclaimedRef.current();
-            navigation.dispatch(action);
-          },
-        },
-      ]
-    );
+    confirm({
+      title: i18n.t('agentChat.composer.discardAttachmentsTitle'),
+      message: i18n.t('agentChat.composer.discardAttachmentsMessage'),
+      confirmLabel: i18n.t('common.discard'),
+      cancelLabel: i18n.t('common.keepEditing'),
+      onConfirm: () => {
+        releaseUnclaimedRef.current();
+        navigation.dispatch(action);
+      },
+    });
   });
 
   const fontSize = TEXT_INPUT_FONT_SIZE * fontScale;
@@ -1074,7 +1071,7 @@ export function ChatComposer({
           onExitSession: async onAccepted => {
             await onExitSession(onAccepted, submissionLockRef, voiceInput.settleBeforeSubmit);
           },
-          confirmExitSession: showRemoteSessionExitConfirmation,
+          confirmExitSession: confirmExit,
           onSendPrompt: async prompt => {
             const optimisticChips = upload.attachments;
             try {
@@ -1455,6 +1452,8 @@ export function ChatComposer({
           </View>
         </GestureDetector>
       </View>
+      {dialog}
+      {exitDialog}
     </BlurBar>
   );
 }

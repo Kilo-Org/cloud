@@ -91,12 +91,13 @@ export function ConversationScreen({
     }
   }, [messagesQuery]);
 
-  const { openOptions, renaming, closeRename, saveRename } = useConversationOptionsSheet({
-    client,
-    conversationId,
-    sandboxId,
-    conversationTitle,
-  });
+  const { openOptions, renaming, closeRename, saveRename, leaveDialog } =
+    useConversationOptionsSheet({
+      client,
+      conversationId,
+      sandboxId,
+      conversationTitle,
+    });
   const { typingMembers, clearTypingForMember } = useMobileTypingState({
     client,
     currentUserId,
@@ -159,18 +160,28 @@ export function ConversationScreen({
   );
 
   if (messageHistoryState === 'loading') {
-    return <ConversationHistoryLoadingView title={conversationTitle} subtitle={instanceLabel} />;
+    return (
+      <>
+        <ConversationHistoryLoadingView title={conversationTitle} subtitle={instanceLabel} />
+        {leaveDialog}
+        {messageController.deleteDialog}
+      </>
+    );
   }
 
   if (messageHistoryState === 'error') {
     return (
-      <ConversationHistoryErrorView
-        title={conversationTitle}
-        subtitle={instanceLabel}
-        onRetry={() => {
-          void messagesQuery.refetch();
-        }}
-      />
+      <>
+        <ConversationHistoryErrorView
+          title={conversationTitle}
+          subtitle={instanceLabel}
+          onRetry={() => {
+            void messagesQuery.refetch();
+          }}
+        />
+        {leaveDialog}
+        {messageController.deleteDialog}
+      </>
     );
   }
 
@@ -278,6 +289,8 @@ export function ConversationScreen({
           onClose={closeRename}
         />
       )}
+      {leaveDialog}
+      {messageController.deleteDialog}
     </View>
   );
 }

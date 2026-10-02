@@ -144,7 +144,11 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
     initialConfigRef.current = { ...initialConfigRef.current, ...patch };
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   const severityOptions = NOTIFICATION_SEVERITY_OPTIONS.map(option => ({
     value: option.value,
@@ -282,6 +286,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
           )}
         </View>
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

@@ -81,7 +81,7 @@ const ALLOWLIST: Readonly<Record<string, string>> = {
  * outlive the thing it records.
  */
 const OWNER_BOUNDARY_INPUTS: Readonly<Record<string, string>> = {
-  'src/app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx:162':
+  'src/app/(app)/kiloclaw/[instance-id]/settings/model-list.tsx:165':
     'Kilo Claw owner boundary: the models search field stays raw until the Kilo Claw owner migrates it',
   'src/components/kiloclaw/onboarding/identity-step.tsx:312':
     'Kilo Claw owner boundary: the onboarding bot-name field stays raw until the Kilo Claw owner migrates it',

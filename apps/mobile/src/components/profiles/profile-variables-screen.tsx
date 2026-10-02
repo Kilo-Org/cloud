@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -19,6 +19,7 @@ import {
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
@@ -54,6 +55,7 @@ export function ProfileVariablesScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const { setVar, deleteVar } = useAgentProfileMutations(organizationId);
 
@@ -121,16 +123,15 @@ export function ProfileVariablesScreen({
     if (deleteVar.isPending) {
       return;
     }
-    Alert.alert(t('common.delete'), key, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(key);
-        },
+    confirm({
+      title: t('common.delete'),
+      message: key,
+      confirmLabel: t('common.delete'),
+      presentation: 'screen',
+      onConfirm: () => {
+        void runDelete(key);
       },
-    ]);
+    });
   };
 
   const renderEditForm = (isNew: boolean, initial: VariableEdit) => (
@@ -216,6 +217,8 @@ export function ProfileVariablesScreen({
       >
         {content}
       </ScrollView>
+
+      {dialog}
     </View>
   );
 }

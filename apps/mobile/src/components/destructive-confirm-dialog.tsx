@@ -10,6 +10,12 @@ type DestructiveConfirmDialogProps = {
   confirmLabel: string;
   /** The safe choice's label; defaults to the generic Cancel. */
   cancelLabel?: string;
+  /**
+   * A third, non-destructive choice rendered between Cancel and the confirm —
+   * for a confirmation that offers a way out other than "do it" or "don't",
+   * such as discarding unsaved changes also offering Save.
+   */
+  extraAction?: { label: string; onPress: () => void };
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -32,6 +38,7 @@ export function DestructiveConfirmDialog({
   message,
   confirmLabel,
   cancelLabel,
+  extraAction,
   onConfirm,
   onCancel,
 }: Readonly<DestructiveConfirmDialogProps>) {
@@ -56,6 +63,17 @@ export function DestructiveConfirmDialog({
             <Button variant="outline" onPress={onCancel}>
               <Text>{cancelLabel ?? t('common.cancel')}</Text>
             </Button>
+            {extraAction ? (
+              <Pressable
+                onPress={() => {
+                  extraAction.onPress();
+                }}
+                accessibilityRole="button"
+                className="shrink-0 flex-row items-center justify-center rounded-md px-3 active:opacity-70"
+              >
+                <Text className="text-sm font-semibold text-foreground">{extraAction.label}</Text>
+              </Pressable>
+            ) : null}
             <Button variant="destructive" onPress={onConfirm}>
               <Text>{confirmLabel}</Text>
             </Button>

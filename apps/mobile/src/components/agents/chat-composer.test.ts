@@ -5,7 +5,6 @@ import * as React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { showRemoteSessionExitConfirmation } from '@/components/agents/remote-session-exit-alert';
 import { type RemoteCommandState } from '@kilocode/cloud-agent-sdk/remote-command-catalog';
 import { Text as renderText } from '@/components/ui/text';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
@@ -215,8 +214,21 @@ vi.mock('@/components/agents/attachment-picker', () => ({
   pickAgentAttachments: vi.fn(),
 }));
 
+// The exit confirm is a hook now; this suite pins only that a rejected
+// slash-command submission never asks for it.
+const exitConfirmMock = vi.hoisted(() => ({ confirmExit: vi.fn() }));
+
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: exitConfirmMock.confirmExit,
+    exitDialog: null,
+  }),
+}));
+
+// The composer reaches this hook; the suite calls the component as a plain
+// function, so every hook on its path is stubbed.
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: vi.fn(), dialog: null }),
 }));
 
 vi.mock('@/components/agents/use-text-height', () => ({
@@ -912,7 +924,7 @@ describe('ChatComposer slash-command rejection feedback', () => {
     );
     expect(statusMessage(rejected)).toBe('/quit does not take arguments.');
     expect(onSendMock).not.toHaveBeenCalled();
-    expect(showRemoteSessionExitConfirmation).not.toHaveBeenCalled();
+    expect(exitConfirmMock.confirmExit).not.toHaveBeenCalled();
   });
 
   it('clears the rejection once the input is edited', async () => {

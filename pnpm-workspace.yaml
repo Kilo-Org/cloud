@@ -104,14 +104,14 @@ minimumReleaseAgeExclude:
   - '@anthropic-ai/sdk'
   # Kilo SDK releases are owned internally and adopted with pinned runtime validation.
   - '@kilocode/sdk'
+  # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
+  - openclaw
   # FlashList 2.3.3 fixes the scroll window in EngagedIndicesTracker: the window
   # was computed from the projected offset alone, so when the trailing buffer was
   # smaller than the projection delta, rows actually on screen were excluded. The
   # agent transcript list is exactly that shape. Patch release; exempted so the
   # contract test's pin can move off 2.3.2 without waiting out minimumReleaseAge.
   - '@shopify/flash-list@2.3.3'
-  # KiloClaw pins and live-smoke-validates OpenClaw image upgrades before rollout.
-  - openclaw
 overrides:
   # Do NOT add an '@sentry/cli' override here to dedupe it against the catalog.
   # @sentry/bundler-plugin-core (used by @sentry/nextjs to upload source maps)

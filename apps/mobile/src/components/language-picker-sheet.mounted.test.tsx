@@ -23,9 +23,9 @@ const i18nManager = vi.hoisted(() => ({
   forceRTL: vi.fn(),
 }));
 const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
-// FlatList renders through a callback, so a host-string mock would drop every
+// FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     ({
       data,
@@ -44,9 +44,10 @@ const flatListMock = vi.hoisted(
         createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
       );
       const empty = data.length === 0 ? ListEmptyComponent : null;
-      return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
+      return createElement('FlashList', null, ListHeaderComponent, ...rows, empty);
     }
 );
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The sheet clears its uncontrolled search field through the ref (it must not
 // remount the input), so the mock exposes the imperative `clear` the real
@@ -65,7 +66,6 @@ vi.mock('react-native', async () => {
   MockTextInput.displayName = 'MockTextInput';
   return {
     ActivityIndicator: 'ActivityIndicator',
-    FlatList: flatListMock,
     I18nManager: i18nManager,
     TextInput: MockTextInput,
     View: 'View',
@@ -109,7 +109,7 @@ vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#6b7280' }),
+  useThemeColors: () => ({ background: '#ffffff', mutedForeground: '#6b7280' }),
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => 'device',
@@ -257,7 +257,7 @@ describe('LanguagePickerSheet apply', () => {
       description: 'Try a different search term.',
     });
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
     expect(emptyState?.props.placement).toBeUndefined();
 
@@ -272,7 +272,7 @@ describe('LanguagePickerSheet apply', () => {
   it('keeps the same item array identity when the sheet re-renders without a query change', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet(onClose);
-    const listData = renderer.root.findByType(flatListMock).props.data;
+    const listData = renderer.root.findByType(flashListMock).props.data;
 
     await act(async () => {
       renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
@@ -282,7 +282,7 @@ describe('LanguagePickerSheet apply', () => {
     // The derived list is only rebuilt on a query or applied-language change, so
     // an unrelated re-render hands the list the same `data` identity and no
     // mounted row re-renders.
-    expect(renderer.root.findByType(flatListMock).props.data).toBe(listData);
+    expect(renderer.root.findByType(flashListMock).props.data).toBe(listData);
 
     renderer.unmount();
   });
@@ -311,13 +311,15 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('preserves horizontal padding and the safe-area inset', async () => {
+  it('preserves the list frame, content padding and the safe-area inset', async () => {
     insets.bottom = 24;
     const renderer = await mountSheet(vi.fn<() => void>());
-    const list = renderer.root.findByType(flatListMock);
+    const list = renderer.root.findByType(flashListMock);
 
-    expect(list.props.contentContainerClassName).toBe('px-4 pb-4');
-    expect(list.props.contentContainerStyle).toBeUndefined();
+    // FlashList has no className path, so the old `flex-1 bg-background` frame
+    // and the `px-4 pb-4` content classes are now explicit style values.
+    expect(list.props.style).toEqual([{ flex: 1 }, { backgroundColor: '#ffffff' }]);
+    expect(list.props.contentContainerStyle).toEqual({ paddingHorizontal: 16, paddingBottom: 16 });
     expect(list.props.ListFooterComponent).toMatchObject({ props: { style: { height: 24 } } });
 
     renderer.unmount();

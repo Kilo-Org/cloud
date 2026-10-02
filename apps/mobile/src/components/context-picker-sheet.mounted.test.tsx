@@ -73,14 +73,9 @@ function rows(renderer: ReactTestRenderer) {
     }));
 }
 
-/** The outer backdrop pressable; the sheet itself carries `accessible={false}` too. */
-function backdrop(renderer: ReactTestRenderer) {
-  return renderer.root.find(
-    node =>
-      node.props.accessible === false &&
-      typeof node.props.className === 'string' &&
-      node.props.className.includes('justify-end')
-  );
+/** The native sheet wrapper; its `onClose` is the dismiss path the sheet owns. */
+function sheet(renderer: ReactTestRenderer) {
+  return renderer.root.find(node => (node.type as string) === 'BottomSheet');
 }
 
 function press(node: ReactTestInstance) {
@@ -138,7 +133,7 @@ describe('ContextPickerSheet', () => {
     expect(check[0]?.props.color).toBe(theme.colors.primary);
   });
 
-  it('reports the pressed row by index and closes on the backdrop', async () => {
+  it('reports the pressed row by index and dismisses through the sheet', async () => {
     const renderer = await mount();
 
     await press(renderer.root.findByProps({ accessibilityLabel: AXE[1] }));
@@ -146,7 +141,11 @@ describe('ContextPickerSheet', () => {
     expect(onSelect.mock.calls).toEqual([[1], [2]]);
     expect(onClose).not.toHaveBeenCalled();
 
-    await press(backdrop(renderer));
+    // The native sheet owns the backdrop and the swipe; both route through the
+    // sheet's `onClose`.
+    await act(() => {
+      (sheet(renderer).props.onClose as () => void)();
+    });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

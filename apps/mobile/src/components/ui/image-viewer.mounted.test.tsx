@@ -2,20 +2,10 @@ import { type ComponentProps, createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ImageViewerModal } from './image-viewer-modal';
+import { ImageViewer } from './image-viewer';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
-
-// A chainable gesture stub: each builder method returns the same object so the
-// modal's Pinch/Pan/Tap/Race/Simultaneous chains resolve without RNGH.
-function makeGesture(): Record<string, unknown> {
-  const gesture: Record<string, unknown> = {};
-  gesture.onUpdate = () => gesture;
-  gesture.onEnd = () => gesture;
-  gesture.numberOfTaps = () => gesture;
-  return gesture;
-}
 
 vi.mock('react-native', () => ({
   Modal: 'Modal',
@@ -25,36 +15,24 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
-vi.mock('@/lib/a11y/announce', () => ({
-  announceForA11y: vi.fn(),
-}));
 vi.mock('@/components/ui/icons', () => ({
   Share: 'Share',
   X: 'X',
   AlertCircle: 'AlertCircle',
 }));
 vi.mock('react-native-gesture-handler', () => ({
-  Gesture: {
-    Pinch: makeGesture,
-    Pan: makeGesture,
-    Tap: makeGesture,
-    Race: makeGesture,
-    Simultaneous: makeGesture,
-  },
-  GestureDetector: 'GestureDetector',
   GestureHandlerRootView: 'GestureHandlerRootView',
 }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  useSharedValue: (value: unknown) => ({ value }),
-  useAnimatedStyle: () => ({}),
-  withTiming: (value: unknown) => value,
+vi.mock('react-native-zoom-toolkit', () => ({ ResumableZoom: 'ResumableZoom' }));
+// `onSwipe` runs on the UI thread and hands the decision back through
+// `scheduleOnRN`; run it inline so the test observes the real handler.
+vi.mock('react-native-worklets', () => ({
+  scheduleOnRN: (fn: (...args: unknown[]) => void, ...args: unknown[]) => {
+    fn(...args);
+  },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => safeArea,
-}));
-vi.mock('react-native-worklets', () => ({
-  scheduleOnRN: vi.fn(),
 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -110,13 +88,13 @@ function findRowWrapper(header: TestRenderer.ReactTestInstance): TestRenderer.Re
 }
 
 async function mountViewer(
-  props: Partial<ComponentProps<typeof ImageViewerModal>>
+  props: Partial<ComponentProps<typeof ImageViewer>>
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
     await Promise.resolve();
     ref.current = TestRenderer.create(
-      createElement(ImageViewerModal, {
+      createElement(ImageViewer, {
         visible: true,
         uri: 'file:///cache/photo.png',
         filename: 'photo.png',
@@ -132,7 +110,7 @@ async function mountViewer(
   return renderer;
 }
 
-describe('ImageViewerModal mounted', () => {
+describe('ImageViewer mounted', () => {
   beforeEach(() => {
     Object.assign(safeArea, { top: 0, bottom: 0, left: 0, right: 0 });
   });
@@ -220,7 +198,7 @@ describe('ImageViewerModal mounted', () => {
     await act(async () => {
       await Promise.resolve();
       renderer.update(
-        createElement(ImageViewerModal, {
+        createElement(ImageViewer, {
           visible: true,
           uri: 'file:///cache/renewed.png',
           filename: 'photo.png',
@@ -295,11 +273,11 @@ describe('ImageViewerModal mounted', () => {
     renderer.unmount();
   });
 
-  it('fits the image inside the flex area below the header', async () => {
+  it('fits the image inside the zoom surface below the header', async () => {
     const renderer = await mountViewer({ onShare: () => undefined });
 
-    // The image fills its zoomable wrapper and is contained — never
-    // cover-scaled or clipped by the black area that starts below the header.
+    // The image fills the zoom surface and is contained — never cover-scaled
+    // or clipped by the black area that starts below the header.
     const image = findByType(renderer.root, 'Image')[0];
     if (!image) {
       throw new Error('viewer Image missing');
@@ -308,11 +286,43 @@ describe('ImageViewerModal mounted', () => {
     expect(image.props.className).toContain('h-full');
     expect(image.props.className).toContain('w-full');
 
-    const zoomWrapper = image.parent;
-    const gestureArea = zoomWrapper?.parent;
-    const imageArea = gestureArea?.parent;
+    const zoomSurface = findByType(renderer.root, 'ResumableZoom')[0];
+    const imageArea = zoomSurface?.parent;
     expect(imageArea?.props.className).toContain('flex-1');
     expect(imageArea?.props.className).toContain('overflow-hidden');
+
+    renderer.unmount();
+  });
+
+  it('dismisses on a vertical swipe and ignores a horizontal one', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountViewer({ onClose });
+
+    const zoomSurface = findByType(renderer.root, 'ResumableZoom')[0];
+    if (!zoomSurface) {
+      throw new Error('zoom surface missing');
+    }
+    const onSwipe = zoomSurface.props.onSwipe as (direction: string) => void;
+
+    await act(async () => {
+      await Promise.resolve();
+      onSwipe('left');
+    });
+    expect(onClose).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await Promise.resolve();
+      onSwipe('down');
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('does not mount the zoom surface while closed', async () => {
+    const renderer = await mountViewer({ visible: false });
+
+    expect(findByType(renderer.root, 'ResumableZoom')).toHaveLength(0);
 
     renderer.unmount();
   });

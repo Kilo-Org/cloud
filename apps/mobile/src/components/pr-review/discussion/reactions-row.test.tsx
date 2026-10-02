@@ -7,7 +7,6 @@ import { ReactionsRow } from './reactions-row';
 const { moveFocus } = vi.hoisted(() => ({ moveFocus: vi.fn() }));
 
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   Pressable: 'Pressable',
   View: 'View',
 }));
@@ -50,11 +49,29 @@ function press(renderer: TestRenderer.ReactTestRenderer, match: (props: Props) =
   });
 }
 
-function modalProps(renderer: TestRenderer.ReactTestRenderer): Props {
-  const modal = renderer.root.find(
-    node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-  );
-  return modal.props as Props;
+/** The native sheet wrapper the picker renders; absent while the picker is shut. */
+function sheetProps(renderer: TestRenderer.ReactTestRenderer): Props | undefined {
+  const sheet = renderer.root.findAll(
+    node => typeof node.type === 'string' && (node.type as string) === 'BottomSheet'
+  )[0];
+  return sheet?.props as Props | undefined;
+}
+
+/**
+ * The picker is shutting down when the sheet reports detent -1; the native
+ * sheet then unmounts. Both halves are asserted where a test cares which one it
+ * is looking at.
+ */
+function isPickerOpen(renderer: TestRenderer.ReactTestRenderer): boolean {
+  return sheetProps(renderer)?.index === 0;
+}
+
+/** Runs the native dismiss the sheet reports once its animation finishes. */
+function finishDismiss(renderer: TestRenderer.ReactTestRenderer): void {
+  const onDismiss = sheetProps(renderer)?.onDismiss as (() => void) | undefined;
+  act(() => {
+    onDismiss?.();
+  });
 }
 
 /** Mounts a row and taps "Add reaction" so the picker is open. */
@@ -72,6 +89,11 @@ async function openPicker(): Promise<TestRenderer.ReactTestRenderer> {
     throw new Error('Failed to create test renderer');
   }
   press(renderer, p => p.accessibilityLabel === 'Add reaction');
+  // Opening moves the screen reader into the picker's title, the platform's
+  // presentation behaviour the picker now performs itself. Clear it so each
+  // test's timer assertions see only the restore-to-trigger move.
+  expect(moveFocus).toHaveBeenCalledTimes(1);
+  moveFocus.mockClear();
   return renderer;
 }
 
@@ -96,17 +118,18 @@ describe('ReactionsRow picker dismissal focus', () => {
 
   it('restores focus to the trigger after the backdrop closes the picker', async () => {
     const renderer = await openPicker();
-    expect(modalProps(renderer).visible).toBe(true);
-    const surface = renderer.root.findByProps({ className: 'flex-1 justify-end bg-[#00000066]' });
+    expect(isPickerOpen(renderer)).toBe(true);
+    // The picker's content is the modal surface inside the native sheet.
+    const surface = renderer.root.findByProps({ accessibilityViewIsModal: true });
     expect(String(surface.type)).toBe('View');
-    expect(String(surface.parent?.type)).toBe('Modal');
+    expect(sheetProps(renderer)).toBeDefined();
 
-    // The backdrop is the labelled pressable without a button role.
-    press(
-      renderer,
-      p => p.accessibilityLabel === 'Close reactions' && p.accessibilityRole === undefined
-    );
-    expect(modalProps(renderer).visible).toBe(false);
+    // The picker's close control routes through the sheet's `onClose`; the
+    // native sheet owns the backdrop and the swipe, which do the same.
+    press(renderer, p => p.accessibilityLabel === 'Close reactions');
+    expect(sheetProps(renderer)?.index).toBe(-1);
+    finishDismiss(renderer);
+    expect(sheetProps(renderer)).toBeUndefined();
 
     expectDelayedFocusRestore();
     renderer.unmount();
@@ -116,7 +139,7 @@ describe('ReactionsRow picker dismissal focus', () => {
     const renderer = await openPicker();
 
     press(renderer, p => p.accessibilityLabel === 'Thumbs up');
-    expect(modalProps(renderer).visible).toBe(false);
+    expect(sheetProps(renderer)?.index).toBe(-1);
 
     expectDelayedFocusRestore();
     renderer.unmount();
@@ -125,12 +148,11 @@ describe('ReactionsRow picker dismissal focus', () => {
   it('cancels a pending focus restore when the picker reopens inside the window', async () => {
     const renderer = await openPicker();
 
-    press(
-      renderer,
-      p => p.accessibilityLabel === 'Close reactions' && p.accessibilityRole === undefined
-    );
+    press(renderer, p => p.accessibilityLabel === 'Close reactions');
     press(renderer, p => p.accessibilityLabel === 'Add reaction');
-    expect(modalProps(renderer).visible).toBe(true);
+    expect(isPickerOpen(renderer)).toBe(true);
+    // The reopen moves focus into the picker again; only the restore matters here.
+    moveFocus.mockClear();
 
     // The stale timer must not pull focus to the trigger behind the sheet.
     act(() => {
@@ -144,10 +166,14 @@ describe('ReactionsRow picker dismissal focus', () => {
   it('restores focus to the trigger after the Android back button closes the picker', async () => {
     const renderer = await openPicker();
 
+    const sheet = sheetProps(renderer);
+    if (!sheet) {
+      throw new Error('the picker sheet must be mounted while it is open');
+    }
     act(() => {
-      (modalProps(renderer).onRequestClose as () => void)();
+      (sheet.onClose as () => void)();
     });
-    expect(modalProps(renderer).visible).toBe(false);
+    expect(sheetProps(renderer)?.index).toBe(-1);
 
     expectDelayedFocusRestore();
     renderer.unmount();

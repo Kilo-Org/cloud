@@ -152,14 +152,9 @@ function radioRow(ui: Mounted, label: string) {
   return ui.renderer.root.findByProps({ accessibilityLabel: label, accessibilityRole: 'radio' });
 }
 
-/** The outer backdrop pressable of the open sheet. */
+/** The native sheet wrapper of the open picker; its `onClose` is the dismiss. */
 function backdrop(ui: Mounted) {
-  return ui.renderer.root.find(
-    node =>
-      node.type === Pressable &&
-      node.props.accessible === false &&
-      String(node.props.className).includes('justify-end')
-  );
+  return ui.renderer.root.find(node => (node.type as string) === 'BottomSheet');
 }
 
 /** The Cancel row of the open sheet: a plain button with no radio state. */
@@ -266,8 +261,10 @@ describe.each(['ios', 'android'])('ContextControl on %s', os => {
     const ui = await mount();
     await waitFor(() => !picker(ui).props.disabled);
     await openSheet(ui);
-    // The backdrop, not a row: the scope stays as it was.
-    await press(backdrop(ui));
+    // The native sheet's dismiss path, not a row: the scope stays as it was.
+    await act(() => {
+      (backdrop(ui).props.onClose as () => void)();
+    });
     expect(rows(ui)).toHaveLength(0);
     expect(ui.renderer.root.findByType('GlobalScope' as ElementType).props.id).toBe('org-missing');
   });

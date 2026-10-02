@@ -37,8 +37,8 @@ const SAFE_AREA_MODULE = /react-native-safe-area-context/;
  * and hook call, plus every line that consumes the values the hook returns. The
  * platform check covers the alignment path this entry point owns, not every
  * line of the file: a screen may legitimately fork on the platform elsewhere,
- * and the Profile screen keeps its sign-out confirmation on the shared
- * `Alert.alert` for both platforms.
+ * and the Profile screen keeps its sign-out confirmation on the shared in-app
+ * dialog for both platforms.
  *
  * The Profile screen applies its side insets as
  * `{ marginLeft: left, marginRight: right }` and hands that style on; keying on

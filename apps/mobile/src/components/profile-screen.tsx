@@ -17,10 +17,10 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { ConfirmDialog, useConfirmDialog } from '@/components/ui/dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -99,6 +99,7 @@ export function ProfileScreen() {
   const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
     () => void signOut()
   );
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
     isLoading,
@@ -141,20 +142,18 @@ export function ProfileScreen() {
     setCode,
   } = useDeleteAccount();
 
-  // Delete account keeps the native alert: Android's AppCompat dialog takes its
-  // panel and action accent from the activity theme, which the
-  // `plugins/withAndroidAlertDialogTheme` prebuild overlay points at the app
-  // tokens, and iOS renders the same call as a `UIAlertController` that already
-  // follows the device appearance.
+  // The confirmation is the app's own dialog, not the native alert: Android's
+  // `AlertDialog` paints every button with the theme accent, so
+  // `style: 'destructive'` never reaches the screen there. The Profile screen
+  // is a tab, so nothing can be presented over it and the portal dialog is
+  // always visible.
   const confirmDeleteAccount = () => {
-    Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('profile.deleteAccountConfirm'),
-        style: 'destructive',
-        onPress: beginDelete,
-      },
-    ]);
+    confirm({
+      title: t('profile.deleteAccountTitle'),
+      message: t('profile.deleteAccountMessage'),
+      confirmLabel: t('profile.deleteAccountConfirm'),
+      onConfirm: beginDelete,
+    });
   };
 
   const showPrivacyChoices = () => {
@@ -437,15 +436,20 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {confirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={dismissConfirm}
-          onConfirm={confirmSignOut}
-        />
-      )}
+      <ConfirmDialog
+        open={confirmVisible}
+        onOpenChange={open => {
+          if (!open) {
+            dismissConfirm();
+          }
+        }}
+        title={t('profile.signOutTitle')}
+        message={t('profile.signOutMessage')}
+        confirmLabel={t('common.signOut')}
+        onConfirm={confirmSignOut}
+      />
+
+      {confirmDialog}
 
       {feedbackPrompt.promptDialog}
     </View>

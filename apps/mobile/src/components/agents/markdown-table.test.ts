@@ -99,6 +99,10 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
   Modal: 'Modal',
+  Platform: {
+    OS: 'ios',
+    select: (spec: { ios?: unknown; default?: unknown }) => spec.ios ?? spec.default,
+  },
   Pressable: 'Pressable',
   Text: 'Text',
   View: 'View',
@@ -352,6 +356,17 @@ function openTable(renderer: TestRenderer.ReactTestRenderer): void {
   });
 }
 
+/**
+ * The native sheet host: `Sheet` renders `@expo/ui/community/bottom-sheet`'s
+ * `BottomSheet`, which the shared setup stubs as this host string. `Sheet`
+ * returns null until it is first shown, so a never-opened tree has none.
+ */
+function findSheets(
+  root: TestRenderer.ReactTestInstance | undefined
+): TestRenderer.ReactTestInstance[] {
+  return root === undefined ? [] : root.findAll(node => (node.type as unknown) === 'BottomSheet');
+}
+
 beforeEach(() => {
   vi.mocked(useMarkdown).mockReset();
   vi.mocked(useMarkdown).mockReturnValue([]);
@@ -359,15 +374,11 @@ beforeEach(() => {
 });
 
 describe('MarkdownTable closed tree', () => {
-  it('renders the chip and no modal chrome when closed', () => {
+  it('renders the chip and no sheet chrome when closed', () => {
     const renderer = renderTable();
 
     expect(chipNode(renderer)).toBeTruthy();
-    expect(
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      )
-    ).toHaveLength(0);
+    expect(findSheets(renderer.root)).toHaveLength(0);
     expect(
       renderer.root.findAll(
         node =>
@@ -416,18 +427,14 @@ describe('MarkdownTable closed tree', () => {
 });
 
 describe('MarkdownTable open path', () => {
-  it('opens the modal and renders title, Close, then the parsed cells', () => {
+  it('opens the sheet and renders title, Close, then the parsed cells', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
     const renderer = renderTable();
     openTable(renderer);
 
-    expect(
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      )
-    ).toHaveLength(1);
+    expect(findSheets(renderer.root)).toHaveLength(1);
     const title = renderer.root.findAll(
       node =>
         typeof node.type === 'string' &&
@@ -441,17 +448,13 @@ describe('MarkdownTable open path', () => {
     expect(useMarkdown).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the modal open and re-parses when raw changes under the same key', () => {
+  it('keeps the sheet open and re-parses when raw changes under the same key', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
     const renderer = renderTable();
     openTable(renderer);
-    expect(
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      )
-    ).toHaveLength(1);
+    expect(findSheets(renderer.root)).toHaveLength(1);
 
     act(() => {
       renderer.update(
@@ -462,11 +465,7 @@ describe('MarkdownTable open path', () => {
       );
     });
 
-    expect(
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      )
-    ).toHaveLength(1);
+    expect(findSheets(renderer.root)).toHaveLength(1);
     expect(useMarkdown).toHaveBeenLastCalledWith(
       '| Column 2 |\n| --- |\n| Row 2 |',
       expect.anything()
@@ -490,9 +489,10 @@ describe('MarkdownTable open path', () => {
     expect(renderer.root.findAll(node => (node.type as string) === 'GestureDetector')).toHaveLength(
       0
     );
-    const surface = renderer.root.find(node => (node.type as string) === 'StateSurface');
-    expect(surface.parent?.type).toBe('Modal');
-    expect(surface.props.className).toBe('flex-1 bg-background');
+    const surface = renderer.root.find(
+      node => (node.type as string) === 'View' && node.props.className === 'flex-1 bg-background'
+    );
+    expect(surface.parent?.type).toBe('BottomSheet');
   });
 
   it('replaces the centered state with cells and retains cells across an empty parse', () => {
@@ -540,11 +540,14 @@ describe('MarkdownTable open path', () => {
     act(() => {
       (closeNode(renderer).props.onPress as (() => void) | undefined)?.();
     });
-    expect(
-      renderer.root.findAll(
-        node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-      )
-    ).toHaveLength(0);
+    // Close starts the native dismiss (`index` -1); the native dismiss event
+    // then unmounts the sheet (`Sheet` returns null while not mounted).
+    const dismissing = findSheets(renderer.root)[0];
+    expect(dismissing?.props.index).toBe(-1);
+    act(() => {
+      (dismissing?.props.onDismiss as (() => void) | undefined)?.();
+    });
+    expect(findSheets(renderer.root)).toHaveLength(0);
   });
 
   it('close button is a button with accessibilityLabel "Close table"', () => {
@@ -559,21 +562,15 @@ describe('MarkdownTable open path', () => {
     expect(close.props.accessibilityLabel).toBe('Close table');
   });
 
-  it('moves focus to the title on modal show', () => {
+  it('moves focus to the title when the sheet opens', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
     const renderer = renderTable();
+    expect(moveA11yFocus).not.toHaveBeenCalled();
     openTable(renderer);
 
-    const modal = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-    )[0];
-    expect(modal).toBeTruthy();
-    expect(moveA11yFocus).not.toHaveBeenCalled();
-    act(() => {
-      (modal?.props.onShow as (() => void) | undefined)?.();
-    });
+    expect(findSheets(renderer.root)).toHaveLength(1);
     expect(moveA11yFocus).toHaveBeenCalled();
   });
 });
@@ -790,11 +787,12 @@ describe('MarkdownTable table semantics', () => {
     expect(accessibilityLabelOf(labelElement)).toBe('Docs: Open docs');
   });
 
-  it('modal title is a header and onShow moves focus to it after presentation', () => {
+  it('sheet title is a header and opening the sheet moves focus to it', () => {
     vi.mocked(useMarkdown).mockReturnValue([
       createElement('View', { testID: 'body-cells' }, 'cells'),
     ]);
     const renderer = renderTable();
+    expect(moveA11yFocus).not.toHaveBeenCalled();
     openTable(renderer);
 
     const title = renderer.root.findAll(
@@ -803,16 +801,9 @@ describe('MarkdownTable table semantics', () => {
         (node.type as string) === 'Text' &&
         node.props.accessibilityRole === 'header'
     );
-    const modal = renderer.root.findAll(
-      node => typeof node.type === 'string' && (node.type as string) === 'Modal'
-    )[0];
-    const onShow = modal?.props.onShow as (() => void) | undefined;
 
     expect(title[0]?.props.children).toBe('Table');
-    expect(modal).toBeTruthy();
-    expect(typeof onShow).toBe('function');
-    expect(moveA11yFocus).not.toHaveBeenCalled();
-    onShow?.();
+    expect(findSheets(renderer.root)).toHaveLength(1);
     expect(moveA11yFocus).toHaveBeenCalled();
   });
 });
@@ -898,7 +889,7 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
       afterIndex: 0,
     },
   ])(
-    'keeps the same modal and table when streaming $change',
+    'keeps the same sheet and table when streaming $change',
     async ({ before, after, afterIndex = -1 }) => {
       const { MarkdownText } = await import('./markdown-text');
       const { MarkdownTable: Table } = await import('./markdown-table');
@@ -918,7 +909,8 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
         act(() => {
           (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
         });
-        const modal = table.findByProps({ animationType: 'slide' });
+        const sheet = findSheets(table)[0];
+        expect(sheet).toBeTruthy();
 
         for (const [rows, index] of [
           [after, afterIndex],
@@ -934,8 +926,8 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
               node => (node.props.raw as string).trimEnd() === tableMarkdown([rows.at(index) ?? ''])
             );
           expect(updated).toBe(table);
-          expect(updated?.findByProps({ animationType: 'slide' })).toBe(modal);
-          expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+          expect(findSheets(updated)[0]).toBe(sheet);
+          expect(findSheets(renderer.root)).toHaveLength(1);
         }
       } finally {
         act(() => {
@@ -965,7 +957,7 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
       act(() => {
         (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
       });
-      expect(table.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+      expect(findSheets(table)).toHaveLength(1);
 
       // Another instance already cached a no-previous split of the next value.
       // Reusing it would give the appended table key `md-table-0`, the key the
@@ -980,7 +972,7 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
         .findAllByType(Table)
         .find(node => (node.props.raw as string).trimEnd() === stale);
       expect(staleTable).toBe(table);
-      expect(staleTable?.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+      expect(findSheets(staleTable)).toHaveLength(1);
     } finally {
       act(() => {
         renderer.unmount();
@@ -988,7 +980,7 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
     }
   });
 
-  it('does not move an open modal to the next table when its table is removed', async () => {
+  it('does not move an open sheet to the next table when its table is removed', async () => {
     const { MarkdownText } = await import('./markdown-text');
     const { MarkdownTable: Table } = await import('./markdown-table');
     const remaining = '| Name |\n| --- |\n| Remaining |';
@@ -1006,13 +998,13 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
       act(() => {
         (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
       });
-      expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+      expect(findSheets(renderer.root)).toHaveLength(1);
 
       act(() => {
         renderer.update(createElement(MarkdownText, { value: remaining }));
       });
 
-      expect(renderer.root.findAllByProps({ animationType: 'slide' })).toHaveLength(0);
+      expect(findSheets(renderer.root)).toHaveLength(0);
     } finally {
       act(() => {
         renderer.unmount();

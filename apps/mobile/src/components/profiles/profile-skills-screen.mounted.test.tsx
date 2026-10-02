@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import {
   changeText,
-  confirmAlert,
+  confirmRequest,
   findAll,
   findField,
   findOne,
@@ -12,7 +12,7 @@ import {
   pressPressable,
   pressSheetDone,
   rerenderScreen,
-  type TestAlertMock,
+  type TestConfirmMock,
   testProfile,
   testSkill,
 } from '@/components/profiles/profile-skills-screen.test-helpers';
@@ -20,7 +20,7 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
-  alert: vi.fn(),
+  confirm: vi.fn(),
   error: vi.fn(),
   query: {
     data: undefined as unknown,
@@ -47,7 +47,6 @@ vi.mock('react-native', () => ({
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
-  Alert: { alert: h.alert },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -58,6 +57,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     destructive: '#FF0000',
     primaryForeground: '#000000',
   }),
+}));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
@@ -265,7 +267,7 @@ describe('ProfileSkillsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
-      confirmAlert(h.alert as TestAlertMock);
+      confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
     });
 

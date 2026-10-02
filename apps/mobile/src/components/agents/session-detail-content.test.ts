@@ -224,6 +224,12 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
+// The goal-removal confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still letting
+// the test read the request it carries.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
+}));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/agents/part-detail-sheet-host', () => ({
@@ -3423,6 +3429,39 @@ describe('SessionDetailContent goal edit dialog', () => {
       multiline: true,
       maxLength: 500,
       initialValue: longGoal.text,
+    });
+  });
+});
+
+describe('SessionDetailContent goal removal', () => {
+  it('confirms the removal in the in-app dialog', async () => {
+    goalMountOptions = {
+      goal: { text: 'Ship the release', status: 'active' },
+      resolvedType: 'remote',
+    };
+    const view = await mountDetails([], { displayScope: PERSONAL_DISPLAY_SCOPE });
+    const section = view.renderer.root.findAllByType(SessionGoalSection)[0];
+    if (!section) {
+      throw new Error('goal section did not render');
+    }
+    const { onPress } = section.props as { onPress: () => void };
+    act(onPress);
+
+    // Pick "Remove goal" out of the goal action sheet.
+    const sheetCall = showActionSheetWithOptions.mock.calls.at(-1);
+    const sheet = sheetCall?.[0] as { options: string[] } | undefined;
+    const onSelect = sheetCall?.[1];
+    const removeIndex = sheet?.options.indexOf(i18n.t('agentChat.goal.remove')) ?? -1;
+    expect(removeIndex).toBeGreaterThanOrEqual(0);
+    act(() => {
+      onSelect?.(removeIndex);
+    });
+
+    const confirmation = view.renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    expect(confirmation?.props).toMatchObject({
+      title: i18n.t('agentChat.goal.removeConfirmTitle'),
+      message: i18n.t('agentChat.goal.removeConfirmMessage'),
+      confirmLabel: i18n.t('agentChat.goal.remove'),
     });
   });
 });

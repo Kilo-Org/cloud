@@ -1,7 +1,8 @@
+import { FlashList } from '@shopify/flash-list';
 import { type ReactNode } from 'react';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FlatList, View } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/empty-state';
@@ -10,6 +11,7 @@ import { QueryError } from '@/components/query-error';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTranscriptionModels } from '@/lib/hooks/use-transcription-models';
 import { useOrganization } from '@/lib/organization-context';
 import {
@@ -17,6 +19,14 @@ import {
   useGatewayTranscriptionModelLoaded,
   writeGatewayTranscriptionModel,
 } from '@/lib/voice-input/gateway/gateway-transcription-preference';
+
+// The picker sheet renders its own scroll container (`scrollable={false}`), so
+// the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
+const listContentContainerStyle = {
+  paddingHorizontal: 16,
+  paddingBottom: 16,
+} satisfies ViewStyle;
 
 // Static skeleton rows: count and shape match the real ChoiceRow rows
 // (name line + id caption; the final row's trailing check is transparent
@@ -49,6 +59,7 @@ export function TranscriptionModelPickerSheet() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
   const { organizationId } = useOrganization();
   // Scope the catalogue to the selected organization so the picker cannot
   // offer, or check-mark, a model the scoped upload then rejects.
@@ -84,11 +95,11 @@ export function TranscriptionModelPickerSheet() {
     );
   } else {
     content = (
-      <FlatList
-        className="flex-1 bg-background"
+      <FlashList
+        style={[listStyle, { backgroundColor: colors.background }]}
+        contentContainerStyle={listContentContainerStyle}
         data={models}
         keyExtractor={item => item.id}
-        contentContainerClassName="px-4 pb-4"
         ListFooterComponent={<View style={{ height: insets.bottom }} pointerEvents="none" />}
         renderItem={({ item, index }) => (
           <ChoiceRow

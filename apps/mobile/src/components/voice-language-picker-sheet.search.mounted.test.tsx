@@ -15,13 +15,13 @@ import { VoiceLanguagePickerSheet } from '@/components/voice-language-picker-she
 
 const DEVICE_LOCALES = ['de-DE', 'es-ES', 'nl-NL'];
 
-// The mocked FlatList renders through its render props and does not forward
+// The mocked FlashList renders through its render props and does not forward
 // `data` to the host node, so the element carrying the render props is the one
 // whose `data` identity the list was handed.
 function listData(renderer: TestRenderer.ReactTestRenderer): unknown {
   const list = renderer.root.findAll(node => typeof node.props.renderItem === 'function')[0];
   if (!list) {
-    throw new Error('FlatList not found');
+    throw new Error('FlashList not found');
   }
   return list.props.data;
 }

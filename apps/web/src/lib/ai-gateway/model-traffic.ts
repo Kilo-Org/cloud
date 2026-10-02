@@ -1,0 +1,186 @@
+import 'server-only';
+import { z } from 'zod';
+import { getEnvVariable } from '@/lib/dotenvx';
+
+export const MODEL_TRAFFIC_BUCKET_MINUTES = 5;
+export const MODEL_TRAFFIC_WINDOW_HOURS = 24;
+export const MODEL_TRAFFIC_TOP_MODEL_COUNT = 10;
+
+const BUCKET_MS = MODEL_TRAFFIC_BUCKET_MINUTES * 60 * 1000;
+const WINDOW_MS = MODEL_TRAFFIC_WINDOW_HOURS * 60 * 60 * 1000;
+const QUERY_TIMEOUT_MS = 15_000;
+
+export type RunAnalyticsEngineQuery = (sql: string) => Promise<unknown[]>;
+
+export type RequestSeries = {
+  requests: number[];
+  errors: number[];
+};
+
+export type ModelTraffic = {
+  bucketStarts: string[];
+  bucketMinutes: number;
+  models: Array<RequestSeries & { model: string; totalRequests: number }>;
+  otherModels: RequestSeries;
+  allModels: RequestSeries;
+};
+
+const BucketTotalsRowSchema = z.object({
+  bucket: z.string(),
+  requests: z.coerce.number(),
+  errors: z.coerce.number(),
+});
+
+const TopModelRowSchema = z.object({
+  model: z.string(),
+  requests: z.coerce.number(),
+});
+
+const ModelBucketRowSchema = BucketTotalsRowSchema.extend({ model: z.string() });
+
+const AnalyticsEngineResponseSchema = z.object({ data: z.array(z.unknown()) });
+
+export const queryO11yAnalyticsEngine: RunAnalyticsEngineQuery = async sql => {
+  const accountId = getEnvVariable('R2_ACCOUNT_ID');
+  const token = getEnvVariable('CF_ANALYTICS_ENGINE_TOKEN');
+  if (!accountId || !token) {
+    throw new Error('Missing Cloudflare Analytics Engine configuration');
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: sql,
+      signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Analytics Engine query failed (${response.status}): ${await response.text()}`);
+  }
+
+  return AnalyticsEngineResponseSchema.parse(await response.json()).data;
+};
+
+function sqlString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function sqlDateTime(ms: number): string {
+  return `toDateTime(${Math.floor(ms / 1000)})`;
+}
+
+// Analytics Engine returns DateTime values as UTC `YYYY-MM-DD HH:MM:SS`.
+function parseBucketMs(bucket: string): number {
+  return Date.parse(`${bucket.replace(' ', 'T')}Z`);
+}
+
+function buildFilter(startMs: number, endMs: number, excludeByok: boolean): string {
+  // o11y_api_metrics schema: blob2 = resolvedModel, blob4 = '1' on error, blob6 = '1' for BYOK.
+  return [
+    `timestamp >= ${sqlDateTime(startMs)}`,
+    `timestamp < ${sqlDateTime(endMs)}`,
+    ...(excludeByok ? ["blob6 = '0'"] : []),
+  ].join(' AND ');
+}
+
+const BUCKET_SELECT = `toStartOfInterval(timestamp, INTERVAL '${MODEL_TRAFFIC_BUCKET_MINUTES}' MINUTE) AS bucket`;
+const REQUESTS_SELECT = 'SUM(_sample_interval) AS requests';
+const ERRORS_SELECT = "SUM(IF(blob4 = '1', _sample_interval, 0)) AS errors";
+
+function emptySeries(bucketCount: number): RequestSeries {
+  return {
+    requests: Array.from({ length: bucketCount }, () => 0),
+    errors: Array.from({ length: bucketCount }, () => 0),
+  };
+}
+
+export async function getModelTraffic(
+  { now, excludeByok }: { now: Date; excludeByok: boolean },
+  runQuery: RunAnalyticsEngineQuery = queryO11yAnalyticsEngine
+): Promise<ModelTraffic> {
+  // Ending at the last completed bucket keeps the in-progress bucket from looking like a drop.
+  const endMs = Math.floor(now.getTime() / BUCKET_MS) * BUCKET_MS;
+  const startMs = endMs - WINDOW_MS;
+  const bucketCount = WINDOW_MS / BUCKET_MS;
+  const filter = buildFilter(startMs, endMs, excludeByok);
+
+  const [totalRows, topModelRows] = await Promise.all([
+    runQuery(`
+      SELECT ${BUCKET_SELECT}, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
+      FROM o11y_api_metrics
+      WHERE ${filter}
+      GROUP BY bucket
+      FORMAT JSON
+    `),
+    runQuery(`
+      SELECT blob2 AS model, ${REQUESTS_SELECT}
+      FROM o11y_api_metrics
+      WHERE ${filter}
+      GROUP BY model
+      ORDER BY requests DESC
+      LIMIT ${MODEL_TRAFFIC_TOP_MODEL_COUNT}
+      FORMAT JSON
+    `),
+  ]);
+
+  const topModels = z.array(TopModelRowSchema).parse(topModelRows);
+  const modelRows =
+    topModels.length === 0
+      ? []
+      : await runQuery(`
+          SELECT ${BUCKET_SELECT}, blob2 AS model, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
+          FROM o11y_api_metrics
+          WHERE ${filter} AND blob2 IN (${topModels.map(row => sqlString(row.model)).join(', ')})
+          GROUP BY bucket, model
+          FORMAT JSON
+        `);
+
+  const bucketIndex = (bucket: string): number | null => {
+    const index = (parseBucketMs(bucket) - startMs) / BUCKET_MS;
+    return Number.isInteger(index) && index >= 0 && index < bucketCount ? index : null;
+  };
+
+  const allModels = emptySeries(bucketCount);
+  for (const row of z.array(BucketTotalsRowSchema).parse(totalRows)) {
+    const index = bucketIndex(row.bucket);
+    if (index === null) continue;
+    allModels.requests[index] = Math.round(row.requests);
+    allModels.errors[index] = Math.round(row.errors);
+  }
+
+  const seriesByModel = new Map(topModels.map(row => [row.model, emptySeries(bucketCount)]));
+  for (const row of z.array(ModelBucketRowSchema).parse(modelRows)) {
+    const series = seriesByModel.get(row.model);
+    const index = bucketIndex(row.bucket);
+    if (!series || index === null) continue;
+    series.requests[index] = Math.round(row.requests);
+    series.errors[index] = Math.round(row.errors);
+  }
+
+  const models = topModels.map(row => ({
+    model: row.model,
+    totalRequests: Math.round(row.requests),
+    ...(seriesByModel.get(row.model) ?? emptySeries(bucketCount)),
+  }));
+
+  const otherModels = emptySeries(bucketCount);
+  for (let index = 0; index < bucketCount; index++) {
+    const topRequests = models.reduce((sum, model) => sum + model.requests[index], 0);
+    const topErrors = models.reduce((sum, model) => sum + model.errors[index], 0);
+    otherModels.requests[index] = Math.max(0, allModels.requests[index] - topRequests);
+    otherModels.errors[index] = Math.max(0, allModels.errors[index] - topErrors);
+  }
+
+  return {
+    bucketStarts: Array.from({ length: bucketCount }, (_, index) =>
+      new Date(startMs + index * BUCKET_MS).toISOString()
+    ),
+    bucketMinutes: MODEL_TRAFFIC_BUCKET_MINUTES,
+    models,
+    otherModels,
+    allModels,
+  };
+}

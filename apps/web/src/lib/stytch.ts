@@ -6,13 +6,12 @@ import type { User } from '@kilocode/db/schema';
 import { stytch_fingerprints } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { blockUser } from '@/lib/user/block';
-import { getFraudDetectionHeaders } from './utils';
+import { getFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { captureException } from '@sentry/nextjs';
-import { updateStytchValidation } from './customerInfo';
+import { updateStytchValidation } from '@/lib/customerInfo';
 import { domainIsRestrictedFromStytchFreeCredits } from './domainIsRestrictedFromStytchFreeCredits';
-import { grantCreditForCategory } from './promotionalCredits';
+import { grantCreditForCategory } from '@/lib/promotionalCredits';
 import PostHogClient from '@/lib/posthog';
-import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 
 const NEXT_PUBLIC_STYTCH_PROJECT_ENV = getEnvVariable('NEXT_PUBLIC_STYTCH_PROJECT_ENV');
@@ -158,18 +157,6 @@ export async function saveFingerprints(
     });
     if (didBlock) {
       await revokeGatewayGrantsForBlockedUser(user.id);
-      void reportEvents({
-        events: [
-          {
-            type: 'user.blocked',
-            data: {
-              kilo_user_id: user.id,
-              reason: 'autoban: stytch SMART_RATE_LIMIT_BANNED',
-              actor_email: null,
-            },
-          },
-        ],
-      });
     }
     if (process.env.NODE_ENV !== 'test')
       console.log('SECURITY: autobanned user for SMART_RATE_LIMIT_BANNED:', {

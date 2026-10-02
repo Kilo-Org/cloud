@@ -2,6 +2,7 @@ import { Fragment, type ReactNode } from 'react';
 
 import { highlightRunChildren } from '@/components/pr-review/diff/highlight-runs';
 import { type HighlightToken } from '@/lib/pr-review/diff/highlight';
+import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 
 /**
  * A blank source line still occupies its line box; an `RNText` whose only
@@ -28,13 +29,13 @@ const CODE_LINE_BREAK = '\n';
  */
 function renderLineRuns(
   tokens: readonly HighlightToken[],
-  isDark: boolean,
+  scheme: TokenScheme,
   keepBlankLineBox: boolean
 ): ReactNode {
   if (keepBlankLineBox && tokens.every(token => token.text.length === 0)) {
     return BLANK_CODE_LINE;
   }
-  return highlightRunChildren(tokens, isDark);
+  return highlightRunChildren(tokens, scheme);
 }
 
 /**
@@ -47,13 +48,13 @@ function renderLineRuns(
  */
 export function renderChunkChildren(
   chunkLines: readonly (readonly HighlightToken[])[],
-  isDark: boolean,
+  scheme: TokenScheme,
   keepBlankLineBox: boolean
 ): ReactNode[] {
   return chunkLines.map((tokens, lineIndex) => (
     <Fragment key={`line-${lineIndex}`}>
       {lineIndex > 0 ? CODE_LINE_BREAK : null}
-      {renderLineRuns(tokens, isDark, keepBlankLineBox)}
+      {renderLineRuns(tokens, scheme, keepBlankLineBox)}
     </Fragment>
   ));
 }

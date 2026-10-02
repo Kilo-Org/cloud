@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { getWebhookRoutes } from '@/lib/webhook-routes';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
 import { useAdminPermissions } from '@/app/admin/useAdminPermissions';
+import { WebhookRequestLogs } from './WebhookRequestLogs';
 
 import { Button } from '@/components/ui/button';
 import { CopyTextButton } from '@/components/admin/CopyEmailButton';
@@ -353,7 +354,8 @@ export function WebhookRequestsContent({
           <h1 className="text-3xl font-bold">Requests for {triggerId}</h1>
         </div>
         <p className="text-muted-foreground mt-2">
-          View captured requests and their processing status.
+          View captured requests, processing status, and cloud agent execution logs. Expand a
+          request to inspect its run.
         </p>
 
         {/* Webhook URL with copy button (webhook triggers only) */}
@@ -473,11 +475,22 @@ export function WebhookRequestsContent({
                       onClick={() => toggleRow(request.id)}
                     >
                       <TableCell>
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          aria-label={`${isExpanded ? 'Collapse' : 'Expand'} request ${shortId(request.id)}`}
+                          aria-expanded={isExpanded}
+                          onClick={event => {
+                            event.stopPropagation();
+                            toggleRow(request.id);
+                          }}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4" />
+                          )}
+                        </Button>
                       </TableCell>
                       <TableCell className="font-mono text-sm">{shortId(request.id)}</TableCell>
                       <TableCell>
@@ -593,6 +606,18 @@ export function WebhookRequestsContent({
                       <TableRow key={`${request.id}-expanded`}>
                         <TableCell colSpan={7} className="bg-muted/30 p-0">
                           <div className="space-y-4 p-4">
+                            {!isAdminView || canViewSessions ? (
+                              <WebhookRequestLogs
+                                triggerId={triggerId}
+                                requestId={request.id}
+                                organizationId={organizationId}
+                                adminScope={adminScope ?? undefined}
+                              />
+                            ) : (
+                              <p className="text-muted-foreground text-sm">
+                                Session viewer access is required to view execution logs.
+                              </p>
+                            )}
                             {/* Error Message (if failed) */}
                             {request.errorMessage && (
                               <div className="rounded-md border border-red-500/30 bg-red-500/10 p-3">

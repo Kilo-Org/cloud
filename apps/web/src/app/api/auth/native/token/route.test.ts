@@ -12,9 +12,9 @@ import {
   consumeSignInCode,
 } from '@/lib/auth/magic-link-tokens';
 import { consumeSignInTicket } from '@/lib/auth/passkey';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import {
   createOrUpdateUser,
-  findUserById,
   findUserByNormalizedEmail,
   findUserIdByAuthProvider,
 } from '@/lib/user';
@@ -35,6 +35,7 @@ jest.mock('@/lib/auth/passkey', () => ({
   consumeSignInTicket: jest.fn(),
 }));
 jest.mock('@/lib/user');
+jest.mock('@/lib/user/find-user-by-id');
 jest.mock('@/lib/tokens');
 jest.mock('@/lib/auth/email-signin-eligibility');
 jest.mock('@/lib/organizations/verified-domain-membership');
@@ -56,9 +57,11 @@ jest.mock('@sentry/nextjs', () => ({
 
 // eslint-disable-next-line no-var
 var mockPosthogCapture: jest.Mock;
+// Jest also runs this factory while it generates the automatic `@/lib/user`
+// mock, so reuse one capture mock across calls.
 jest.mock('@/lib/posthog', () => {
-  const capture = jest.fn();
-  mockPosthogCapture = capture;
+  mockPosthogCapture ??= jest.fn();
+  const capture = mockPosthogCapture;
   return {
     __esModule: true,
     default: jest.fn(() => ({

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Mur lura",
     "idle": "Bla attività",
+    "scheduled": "Ipprogrammat",
     "keepEditing": "Kompli editja",
     "keepRunning": "Ħallih għaddej",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
     "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
-    "creditBalanceEmpty": "M'għad fadal l-ebda kreditu fil-bilanċ tiegħek. Għal dan il-kont, il-krediti jiġu mmaniġġjati barra mill-applikazzjoni tal-iOS.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -240,6 +240,7 @@
     "addPasskey": "Żid ċavetta tal-aċċess",
     "passkeyDefaultName": "Ċavetta tal-aċċess",
     "passkeyAddedOn": "Miżjuda {{date}}",
+    "passkeyLastUsedOn": "L-aħħar użu {{date}}",
     "passkeyAdded": "Iċ-ċavetta tal-aċċess miżjuda.",
     "passkeyAddFailed": "Ma setgħetx tiġi miżjuda ċavetta tal-aċċess. Erġa' pprova.",
     "passkeyAddUnsupported": "Dan l-apparat ma jistax joħloq ċwievet tal-aċċess.",
@@ -599,7 +600,14 @@
       "moreLinesAbove_other": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_two": "… {{displayCount}} linji oħra 'l fuq.",
       "moreLinesAbove_few": "… {{displayCount}} linji oħra 'l fuq.",
-      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq."
+      "moreLinesAbove_many": "… {{displayCount}} linji oħra 'l fuq.",
+      "deleteComment": "Ħassar il-kumment",
+      "deleteCommentTitle": "Ħassar il-kumment?",
+      "deleteCommentMessage": "Dan il-kumment se jiġi mħassar mit-talba għall-għaqda.",
+      "commentEditFailed": "Ma setax jiġi ssejvjat il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentEditUnavailable": "Dan il-kumment ma jistax jiġi editjat. Jista' jkun li ġie mħassar.",
+      "commentDeleteFailed": "Ma setax jiġi mħassar il-kumment tiegħek. Iċċekkja l-konnessjoni tiegħek u erġa' pprova.",
+      "commentDeleteUnavailable": "Dan il-kumment ma jistax jiġi mħassar."
     },
     "couldNotOpenGitHubAppSettings": "Ma stajniex niftħu l-issettjar tal-app ta' GitHub.",
     "installKiloGitHubApp": "Installa l-app ta' Kilo għal GitHub",
@@ -795,6 +803,8 @@
     "linkPasteNotAPullRequest": "Din mhix ħolqa ta' PR jew merge request",
     "announce": {
       "commentPosted": "Il-kumment ġie ppubblikat",
+      "commentUpdated": "Il-kumment ġie aġġornat",
+      "commentDeleted": "Il-kumment ġie mħassar",
       "reviewSubmitted": "Ir-reviżjoni ntbagħtet",
       "autoMergeEnabled": "L-għaqda awtomatika ġiet attivata"
     },
@@ -2092,12 +2102,14 @@
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
       "couldNotRefresh": "Ma setax isir l-aġġornament",
       "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
+      "viewHistory": "Storja tas-sessjonijiet",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",
       "tryAdjustFilters": "Ipprova tibdel jew tneħħi l-filtri tiegħek.",
       "couldNotSearch": "Ma setgħetx issir it-tfittxija fis-sessjonijiet.",
       "completedWillAppear": "Is-sessjonijiet li tlestew se jidhru hawn.",
       "noPastSessions": "L-ebda sessjoni preċedenti",
+      "pastSessions": "Sessjonijiet preċedenti",
       "live": "F'ĦIN REALI",
       "updating": "Qed isir l-aġġornament"
     },
@@ -2170,6 +2182,7 @@
       "renamePlaceholder": "Isem is-sessjoni",
       "transcriptAccessibility": "Traskrizzjoni tas-sessjoni",
       "readOnly": "Din is-sessjoni hija għall-qari biss.",
+      "continueInNewSession": "Kompli f'sessjoni ġdida",
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
       "emptyTranscriptDescription": "Din is-sessjoni għadha m'għandha l-ebda messaġġ.",
       "scrollToBottom": "Skrollja sal-qiegħ",
@@ -2261,6 +2274,8 @@
       "leaveChanges": "Ħalli l-bidliet",
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",
+      "selectRepositoryToStart": "Agħżel repożitorju biex tibda.",
+      "connectProviderToStart": "Ikkonnettja fornitur biex tibda.",
       "promptPlaceholder": "Fuq xiex tixtieq taħdem?",
       "couldNotLoadModels": "Ma setgħux jitgħabbew il-mudelli.",
       "prefillRepoAndModelUnavailable": "Ir-repożitorju u l-mudell tas-sessjoni oriġinali m'għadhomx disponibbli. Agħżel oħrajn hawn taħt.",
@@ -2885,7 +2900,8 @@
     "optionsExpiredDescription": "Mur lura u erġa' iftaħ din il-lista tal-għażliet mill-iskrin ta' qabel."
   },
   "sessionRow": {
-    "needsInput": "JISTENNA TWEĠIBA"
+    "needsInput": "JISTENNA TWEĠIBA",
+    "scheduled": "IPPROGRAMMAT"
   },
   "voiceInput": {
     "listening": "Qed nisimgħu…",
@@ -3297,6 +3313,7 @@
     "emptyTitle": "L-ebda ospitant fdat",
     "emptyDescription": "Meta tafda lill-ospitant ta' rabta, ir-rabta tinfetaħ mingħajr ma tintalab konferma oħra.",
     "revoke": "Irtira l-fiduċja f'{{host}}",
+    "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
     "backToPreferences": "Lura għall-preferenzi"
   },
   "quickChat": {
@@ -3326,7 +3343,8 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar.",
     "openSession": "Iftaħ",
     "approveFailed": "Ma setax jiġi approvat. Tektek $t(common.approve) biex terġa' tipprova.",
-    "newestResult": "L-aħħar riżultat"
+    "newestResult": "L-aħħar riżultat",
+    "scheduledWakes": "iqum {{time}}"
   },
   "transcriptionModel": {
     "title": "Mudell ta' traskrizzjoni",
@@ -3560,5 +3578,17 @@
       "unboundToast": "Repo mhux marbut",
       "unbindFailed": "Ma setgħetx tħoll repo"
     }
+  },
+  "credits": {
+    "title": "Ixtri krediti",
+    "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "packLabel": "Żid {{amount}} f'krediti",
+    "priceUnavailable": "Prezz mhux disponibbli",
+    "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",
+    "empty": "Il-pakketti tal-krediti mhumiex disponibbli bħalissa.",
+    "noMatchingProducts": "L-App Store ma rritornax pakketti tal-krediti li jaqblu.",
+    "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
+    "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
+    "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   }
 }

@@ -1,13 +1,14 @@
 import { TRPCError } from '@trpc/server';
 import { logger, withLogTags } from '../../logger.js';
 import type { OperationResult } from '../../persistence/types.js';
-import type { CloudAgentSession } from '../../persistence/CloudAgentSession.js';
-import type { WrapperPty } from '../../kilo/wrapper-client.js';
 import type { SessionId } from '../../types/ids.js';
 import { withDORetry } from '../../utils/do-retry.js';
-import { resolveSessionStub } from '../../sandbox-session/session-stub.js';
+import {
+  resolveLegacySessionStub,
+  getSandboxSessionStub,
+} from '../../sandbox-session/session-stub.js';
 import { sessionHasTerminal } from '../../agent-sandbox/capabilities.js';
-import { sessionPlaneFromId } from '../../session-plane.js';
+import { sessionFor } from '../../session-plane.js';
 import { protectedProcedure } from '../auth.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import {
@@ -60,17 +61,27 @@ export function createSessionTerminalHandlers() {
           });
           rejectUnsupportedTerminal(sessionId);
 
-          const terminalInput =
-            sessionPlaneFromId(sessionId) === 'control'
-              ? { cols: input.cols, rows: input.rows, operationId: crypto.randomUUID() }
-              : { cols: input.cols, rows: input.rows };
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ pty: WrapperPty }>
-          >(
-            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
-            stub => stub.createTerminal(terminalInput),
-            'createTerminal'
+          // Generate once so a retry reuses the same creation identity.
+          const operationId = crypto.randomUUID();
+          const result = await sessionFor(
+            sessionId,
+            () =>
+              withDORetry(
+                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+                stub =>
+                  stub.terminalCreate({
+                    operationId,
+                    cols: input.cols,
+                    rows: input.rows,
+                  }),
+                'terminalCreate'
+              ),
+            () =>
+              withDORetry(
+                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
+                stub => stub.createTerminal({ cols: input.cols, rows: input.rows }),
+                'createTerminal'
+              )
           );
 
           if (!result.success || !result.data) {
@@ -95,18 +106,30 @@ export function createSessionTerminalHandlers() {
             cloudAgentSessionId: sessionId,
           });
           rejectUnsupportedTerminal(sessionId);
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ pty: WrapperPty }>
-          >(
-            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
-            stub =>
-              stub.resizeTerminal({
-                ptyId: input.ptyId,
-                cols: input.cols,
-                rows: input.rows,
-              }),
-            'resizeTerminal'
+          const result = await sessionFor(
+            sessionId,
+            () =>
+              withDORetry(
+                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+                stub =>
+                  stub.terminalResize({
+                    ptyId: input.ptyId,
+                    cols: input.cols,
+                    rows: input.rows,
+                  }),
+                'terminalResize'
+              ),
+            () =>
+              withDORetry(
+                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
+                stub =>
+                  stub.resizeTerminal({
+                    ptyId: input.ptyId,
+                    cols: input.cols,
+                    rows: input.rows,
+                  }),
+                'resizeTerminal'
+              )
           );
 
           if (!result.success || !result.data) {
@@ -132,13 +155,20 @@ export function createSessionTerminalHandlers() {
           });
           rejectUnsupportedTerminal(sessionId);
 
-          const result = await withDORetry<
-            DurableObjectStub<CloudAgentSession>,
-            OperationResult<{ success: boolean }>
-          >(
-            () => resolveSessionStub(ctx.env, ctx.userId, sessionId),
-            stub => stub.closeTerminal({ ptyId: input.ptyId }),
-            'closeTerminal'
+          const result = await sessionFor(
+            sessionId,
+            () =>
+              withDORetry(
+                () => getSandboxSessionStub(ctx.env, ctx.userId, sessionId),
+                stub => stub.terminalClose({ ptyId: input.ptyId }),
+                'terminalClose'
+              ),
+            () =>
+              withDORetry(
+                () => resolveLegacySessionStub(ctx.env, ctx.userId, sessionId),
+                stub => stub.closeTerminal({ ptyId: input.ptyId }),
+                'closeTerminal'
+              )
           );
 
           if (!result.success || !result.data) {

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "फर्कनुहोस्",
     "idle": "निष्क्रिय",
+    "scheduled": "तय भएको",
     "keepEditing": "सम्पादन जारी राख्नुहोस्",
     "keepRunning": "चलिरहन दिनुहोस्",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "मौज्दात देखाउनुहोस्",
     "balanceHidden": "मौज्दात लुकाइएको छ",
     "bonusCreditsExpiring": "{{amount}} बराबरको बोनस क्रेडिटको म्याद {{date}} मा सकिन्छ।",
-    "creditBalanceEmpty": "तपाईंको क्रेडिट मौज्दात शून्य छ। यो खाताका क्रेडिटहरू iOS एपबाहिर व्यवस्थापन गरिन्छन्।",
     "signOutTitle": "साइन आउट गर्ने?",
     "signOutMessage": "आफ्नो कार्यक्षेत्र प्रयोग गर्न फेरि साइन इन गर्नुपर्नेछ।",
     "deleteAccountTitle": "खाता मेट्ने?",
@@ -240,6 +240,7 @@
     "addPasskey": "पासकी थप्नुहोस्",
     "passkeyDefaultName": "पासकी",
     "passkeyAddedOn": "{{date}} मा थपियो",
+    "passkeyLastUsedOn": "पछिल्लो पटक प्रयोग {{date}}",
     "passkeyAdded": "पासकी थपियो।",
     "passkeyAddFailed": "पासकी थप्न सकिएन। फेरि प्रयास गर्नुहोस्।",
     "passkeyAddUnsupported": "यो यन्त्रले पासकी बनाउन सक्दैन।",
@@ -566,7 +567,14 @@
       "deletedUser": "खाता मेटिएको प्रयोगकर्ता",
       "replyForbiddenTerm": "तपाईंसँग यो {{term}}मा जवाफ दिने अनुमति छैन।",
       "moreLinesAbove_one": "… माथि थप {{displayCount}} पङ्क्ति छ।",
-      "moreLinesAbove_other": "… माथि थप {{displayCount}} पङ्क्ति छन्।"
+      "moreLinesAbove_other": "… माथि थप {{displayCount}} पङ्क्ति छन्।",
+      "deleteComment": "टिप्पणी हटाउनुहोस्",
+      "deleteCommentTitle": "टिप्पणी हटाउने?",
+      "deleteCommentMessage": "यो टिप्पणी पुल रिक्वेस्टबाट हटाइनेछ।",
+      "commentEditFailed": "तपाईंको टिप्पणी सुरक्षित गर्न सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "commentEditUnavailable": "यो टिप्पणी सम्पादन गर्न सकिँदैन। यो हटाइएको हुन सक्छ।",
+      "commentDeleteFailed": "तपाईंको टिप्पणी हटाउन सकिएन। तपाईंको जडान जाँचेर फेरि प्रयास गर्नुहोस्।",
+      "commentDeleteUnavailable": "यो टिप्पणी हटाउन सकिँदैन।"
     },
     "couldNotOpenGitHubAppSettings": "GitHub एपको सेटिङ खोल्न सकिएन।",
     "installKiloGitHubApp": "Kilo GitHub एप स्थापना गर्नुहोस्",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "यो पुल रिक्वेस्ट वा मर्ज रिक्वेस्टको लिङ्क होइन",
     "announce": {
       "commentPosted": "टिप्पणी पोस्ट गरियो",
+      "commentUpdated": "टिप्पणी अद्यावधिक गरियो",
+      "commentDeleted": "टिप्पणी हटाइयो",
       "reviewSubmitted": "समीक्षा पठाइयो",
       "autoMergeEnabled": "स्वचालित मर्ज चालू गरियो"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
       "couldNotRefresh": "रिफ्रेस गर्न सकिएन",
       "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखिनेछन्।",
+      "viewHistory": "सत्रहरूको इतिहास",
       "noMatches": "मिल्ने कुनै सत्र छैन",
       "tryDifferentSearch": "अर्को शब्द राखेर खोज्नुहोस्।",
       "tryAdjustFilters": "फिल्टरहरू बदल्ने वा हटाउने प्रयास गर्नुहोस्।",
       "couldNotSearch": "सत्रहरू खोज्न सकिएन।",
       "completedWillAppear": "पूरा भएका सत्रहरू यहाँ देखा पर्नेछन्।",
       "noPastSessions": "पुराना सत्रहरू छैनन्",
+      "pastSessions": "पुराना सत्रहरू",
       "live": "प्रत्यक्ष",
       "updating": "अद्यावधिक हुँदै"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "सत्रको नाम",
       "transcriptAccessibility": "सत्रको कुराकानीको अभिलेख",
       "readOnly": "यो सत्र पढ्न मात्र मिल्छ।",
+      "continueInNewSession": "नयाँ सत्रमा जारी राख्नुहोस्",
       "emptyDescription": "सुरु गर्न तल सन्देश पठाउनुहोस्।",
       "emptyTranscriptDescription": "यो सत्रमा अहिलेसम्म कुनै सन्देश छैन।",
       "scrollToBottom": "तल स्क्रोल गर्नुहोस्",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
+      "selectRepositoryToStart": "सुरु गर्नको लागि रिपोजिटरी छान्नुहोस्।",
+      "connectProviderToStart": "सुरु गर्नको लागि प्रदायक जडान गर्नुहोस्।",
       "promptPlaceholder": "तपाईं केमा काम गर्न चाहनुहुन्छ?",
       "couldNotLoadModels": "मोडेलहरू लोड गर्न सकिएन।",
       "prefillRepoAndModelUnavailable": "मूल सत्रको रिपोजिटरी र मोडेल अब उपलब्ध छैनन्। तल दुवै छान्नुहोस्।",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "पछाडि फर्केर अघिल्लो स्क्रिनबाट यो छनोट सूची फेरि खोल्नुहोस्।"
   },
   "sessionRow": {
-    "needsInput": "जवाफ चाहिन्छ"
+    "needsInput": "जवाफ चाहिन्छ",
+    "scheduled": "तय भएको"
   },
   "voiceInput": {
     "listening": "सुन्दै…",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "कुनै विश्वसनीय होस्ट छैन",
     "emptyDescription": "लिङ्कको होस्टलाई विश्वसनीय मानेपछि त्यसका लिङ्कहरू फेरि अनुमति नसोधी खुल्छन्।",
     "revoke": "{{host}} को विश्वसनीयता हटाउनुहोस्",
+    "revokeMessage": "यो होस्टका लिङ्कहरूले फेरि पुष्टि माग्नेछन्।",
     "backToPreferences": "प्राथमिकताहरूमा फर्कनुहोस्"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "लक स्क्रिनमा सक्रिय एजेन्टहरू हेर्न सेटिङ्समा प्रत्यक्ष गतिविधिहरू चालू गर्नुहोस्।",
     "openSession": "खोल्नुहोस्",
     "approveFailed": "स्वीकृति गर्न सकिएन। फेरि प्रयास गर्न $t(common.approve) मा ट्याप गर्नुहोस्।",
-    "newestResult": "नवीनतम नतिजा"
+    "newestResult": "नवीनतम नतिजा",
+    "scheduledWakes": "{{time}} उठ्नेछ"
   },
   "transcriptionModel": {
     "title": "बोलीलाई पाठमा रूपान्तरण गर्ने मोडेल",
@@ -3431,5 +3449,17 @@
       "unboundToast": "रिपो अनबाउन्ड",
       "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन"
     }
+  },
+  "credits": {
+    "title": "क्रेडिट किन्नुहोस्",
+    "description": "क्रेडिट भनेको Kilo App मा AI कोडिङ सत्रहरू चलाउन तपाईंको Kilo ब्यालेन्समा थपिने एक-पटकको खरिद हो। स्टोरले तपाईंको खाताबाट शुल्क लिन्छ र स्टोरले भुक्तानी पुष्टि गरेपछि क्रेडिट थपिन्छ।",
+    "packLabel": "{{amount}} बराबरको क्रेडिट थप्नुहोस्",
+    "priceUnavailable": "मूल्य उपलब्ध छैन",
+    "purchased": "तपाईंको ब्यालेन्समा क्रेडिट थपियो।",
+    "empty": "क्रेडिट प्याकहरू अहिले उपलब्ध छैनन्।",
+    "noMatchingProducts": "App Store ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
+    "noMatchingProductsPlay": "Google Play ले कुनै मिल्दो क्रेडिट प्याक फर्काएन।",
+    "purchaseOwnedByAnotherAccount": "यो Apple Account मा रहेको क्रेडिट अर्कै Kilo खाताको हो। प्रयोग गर्न त्यही Kilo खातामा साइन इन गर्नुहोस्।",
+    "purchaseOwnedByAnotherAccountPlay": "यो Google Play खातामा रहेको क्रेडिट अर्को Kilo खातासँग सम्बन्धित छ। प्रयोग गर्न त्यो Kilo खातामा साइन इन गर्नुहोस्।"
   }
 }

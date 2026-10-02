@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "واپس جائیں",
     "idle": "فارغ",
+    "scheduled": "شیڈول شدہ",
     "keepEditing": "ترمیم جاری رکھیں",
     "keepRunning": "جاری رہنے دیں",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "بیلنس دکھائیں",
     "balanceHidden": "بیلنس چھپا ہوا ہے",
     "bonusCreditsExpiring": "{{amount}} کے بونس کریڈٹس کی میعاد {{date}} کو ختم ہو رہی ہے۔",
-    "creditBalanceEmpty": "آپ کے کریڈٹس ختم ہو گئے ہیں۔ اس اکاؤنٹ کے کریڈٹس کا انتظام iOS ایپ سے باہر ہوتا ہے۔",
     "signOutTitle": "سائن آؤٹ کریں؟",
     "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔",
     "deleteAccountTitle": "اکاؤنٹ حذف کریں؟",
@@ -240,6 +240,7 @@
     "addPasskey": "رسائی کلید شامل کریں",
     "passkeyDefaultName": "رسائی کلید",
     "passkeyAddedOn": "{{date}} کو شامل کی گئی",
+    "passkeyLastUsedOn": "آخری استعمال {{date}}",
     "passkeyAdded": "رسائی کلید شامل کر دی گئی۔",
     "passkeyAddFailed": "رسائی کلید شامل نہیں ہو سکی۔ دوبارہ کوشش کریں۔",
     "passkeyAddUnsupported": "یہ ڈیوائس رسائی کلیدیں نہیں بنا سکتی۔",
@@ -566,7 +567,14 @@
       "deletedUser": "حذف شدہ صارف",
       "replyForbiddenTerm": "آپ کو اس {{term}} پر جواب دینے کی اجازت نہیں ہے۔",
       "moreLinesAbove_one": "اوپر مزید {{displayCount}} سطر ہے…",
-      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…"
+      "moreLinesAbove_other": "اوپر مزید {{displayCount}} سطریں ہیں…",
+      "deleteComment": "تبصرہ حذف کریں",
+      "deleteCommentTitle": "تبصرہ حذف کریں؟",
+      "deleteCommentMessage": "یہ تبصرہ پل ریکویسٹ سے حذف کر دیا جائے گا۔",
+      "commentEditFailed": "آپ کا تبصرہ محفوظ نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "commentEditUnavailable": "اس تبصرے میں ترمیم نہیں کی جا سکتی۔ ہو سکتا ہے یہ حذف ہو گیا ہو۔",
+      "commentDeleteFailed": "آپ کا تبصرہ حذف نہیں ہو سکا۔ اپنا کنکشن چیک کریں اور دوبارہ کوشش کریں۔",
+      "commentDeleteUnavailable": "یہ تبصرہ حذف نہیں کیا جا سکتا۔"
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "یہ پل ریکویسٹ یا مرج ریکویسٹ کا لنک نہیں ہے۔",
     "announce": {
       "commentPosted": "تبصرہ پوسٹ ہو گیا",
+      "commentUpdated": "تبصرہ اپ ڈیٹ ہو گیا",
+      "commentDeleted": "تبصرہ حذف ہو گیا",
       "reviewSubmitted": "جائزہ جمع ہو گیا",
       "autoMergeEnabled": "خودکار مرج فعال ہو گیا"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "فعال سیشنز لوڈ نہیں ہو سکے۔",
       "couldNotRefresh": "تازہ نہیں کیا جا سکا",
       "noSessionsYetDescription": "اپنے فون سے کوڈنگ کا کام شروع کریں۔ آپ کے سیشن یہاں ظاہر ہوں گے۔",
+      "viewHistory": "سیشنوں کی سرگزشت",
       "noMatches": "کوئی سیشن نہیں ملا",
       "tryDifferentSearch": "کسی اور لفظ سے تلاش کریں۔",
       "tryAdjustFilters": "فلٹرز بدل کر یا ہٹا کر دیکھیں۔",
       "couldNotSearch": "سیشنز تلاش نہیں ہو سکے۔",
       "completedWillAppear": "مکمل شدہ سیشنز یہاں ظاہر ہوں گے۔",
       "noPastSessions": "کوئی سابقہ سیشن نہیں",
+      "pastSessions": "سابقہ سیشنز",
       "live": "لائیو",
       "updating": "اپ ڈیٹ ہو رہا ہے"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "سیشن کا نام",
       "transcriptAccessibility": "سیشن کی گفتگو کا متن",
       "readOnly": "اس سیشن کو صرف پڑھا جا سکتا ہے۔",
+      "continueInNewSession": "نئے سیشن میں جاری رکھیں",
       "emptyDescription": "شروع کرنے کے لیے نیچے پیغام بھیجیں۔",
       "emptyTranscriptDescription": "اس سیشن میں ابھی کوئی پیغام نہیں۔",
       "scrollToBottom": "آخر تک اسکرول کریں",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "تبدیلیاں رہنے دیں",
       "commitAndPush": "کمٹ اور پش کریں",
       "startSession": "سیشن شروع کریں",
+      "selectRepositoryToStart": "شروع کرنے کے لیے ایک ریپوزٹری منتخب کریں۔",
+      "connectProviderToStart": "شروع کرنے کے لیے ایک فراہم کنندہ منسلک کریں۔",
       "promptPlaceholder": "آپ کس چیز پر کام کرنا چاہیں گے؟",
       "couldNotLoadModels": "ماڈلز لوڈ نہیں ہو سکے۔",
       "prefillRepoAndModelUnavailable": "اصل سیشن کی ریپوزٹری اور ماڈل اب دستیاب نہیں ہیں۔ نیچے سے نئی ریپوزٹری اور ماڈل منتخب کریں۔",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "پچھلی اسکرین پر واپس جائیں اور انتخاب کا یہ خانہ دوبارہ کھولیں۔"
   },
   "sessionRow": {
-    "needsInput": "ان پٹ درکار"
+    "needsInput": "ان پٹ درکار",
+    "scheduled": "شیڈول شدہ"
   },
   "voiceInput": {
     "listening": "سن رہے ہیں...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "کوئی قابل اعتماد ہوسٹ نہیں",
     "emptyDescription": "کسی لنک کے ہوسٹ پر بھروسہ کرنے کے بعد اس کے لنکس دوبارہ اجازت لیے بغیر کھلتے ہیں۔",
     "revoke": "{{host}} پر اعتماد ختم کریں",
+    "revokeMessage": "اس ہوسٹ کے لنکس دوبارہ تصدیق طلب کریں گے۔",
     "backToPreferences": "ترجیحات پر واپس جائیں"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔",
     "openSession": "کھولیں",
     "approveFailed": "منظور نہیں کیا جا سکا۔ دوبارہ کوشش کرنے کے لیے $t(common.approve) پر ٹیپ کریں۔",
-    "newestResult": "تازہ ترین نتیجہ"
+    "newestResult": "تازہ ترین نتیجہ",
+    "scheduledWakes": "{{time}} بیدار ہوگا"
   },
   "transcriptionModel": {
     "title": "متن میں بدلنے کا ماڈل",
@@ -3431,5 +3449,17 @@
       "unboundToast": "ریپو انباؤنڈ",
       "unbindFailed": "ریپو کو بند نہیں کیا جا سکا"
     }
+  },
+  "credits": {
+    "title": "کریڈٹس خریدیں",
+    "description": "کریڈٹس ایک بار کی خریداری ہیں جو Kilo App میں AI کوڈنگ سیشن چلانے کے لیے آپ کے Kilo بیلنس میں شامل کیے جاتے ہیں۔ اسٹور آپ کے اکاؤنٹ سے رقم وصول کرتا ہے اور اسٹور کے ادائیگی کی تصدیق کرنے کے بعد کریڈٹس شامل کیے جاتے ہیں۔",
+    "packLabel": "{{amount}} کے کریڈٹس شامل کریں",
+    "priceUnavailable": "قیمت دستیاب نہیں",
+    "purchased": "آپ کے بیلنس میں کریڈٹس شامل کر دیے گئے ہیں۔",
+    "empty": "کریڈٹ پیک اس وقت دستیاب نہیں ہیں۔",
+    "noMatchingProducts": "App Store نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "noMatchingProductsPlay": "Google Play نے کوئی مماثل کریڈٹ پیک واپس نہیں کیا۔",
+    "purchaseOwnedByAnotherAccount": "اس Apple Account کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اسی Kilo اکاؤنٹ میں سائن ان کریں۔",
+    "purchaseOwnedByAnotherAccountPlay": "اس Google Play اکاؤنٹ کے کریڈٹس کسی دوسرے Kilo اکاؤنٹ سے تعلق رکھتے ہیں۔ انہیں استعمال کرنے کے لیے اس Kilo اکاؤنٹ میں سائن ان کریں۔"
   }
 }

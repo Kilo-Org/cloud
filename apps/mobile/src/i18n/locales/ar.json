@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "رجوع",
     "idle": "خامل",
+    "scheduled": "مجدول",
     "keepEditing": "متابعة التعديل",
     "keepRunning": "متابعة التشغيل",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
     "bonusCreditsExpiring": "تنتهي صلاحية رصيد إضافي بقيمة {{amount}} في {{date}}.",
-    "creditBalanceEmpty": "نفد رصيدك. تُدار عمليات الرصيد لهذا الحساب خارج تطبيق iOS.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
     "deleteAccountTitle": "حذف الحساب؟",
@@ -240,6 +240,7 @@
     "addPasskey": "إضافة مفتاح مرور",
     "passkeyDefaultName": "مفتاح المرور",
     "passkeyAddedOn": "أُضيف في {{date}}",
+    "passkeyLastUsedOn": "آخر استخدام في {{date}}",
     "passkeyAdded": "تمت إضافة مفتاح المرور.",
     "passkeyAddFailed": "تعذّرت إضافة مفتاح المرور. حاول مرة أخرى.",
     "passkeyAddUnsupported": "لا يمكن لهذا الجهاز إنشاء مفاتيح مرور.",
@@ -1549,12 +1550,14 @@
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة.",
       "couldNotRefresh": "تعذّر التحديث",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
+      "viewHistory": "سجل الجلسات",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب كلمة بحث أخرى.",
       "tryAdjustFilters": "جرّب تعديل عوامل التصفية أو مسحها.",
       "couldNotSearch": "تعذّر البحث في الجلسات.",
       "completedWillAppear": "ستظهر الجلسات المكتملة هنا.",
       "noPastSessions": "لا توجد جلسات سابقة",
+      "pastSessions": "الجلسات السابقة",
       "live": "مباشر",
       "updating": "جارٍ التحديث"
     },
@@ -1630,6 +1633,7 @@
       "renamePlaceholder": "اسم الجلسة",
       "transcriptAccessibility": "سجل المحادثة في الجلسة",
       "readOnly": "هذه الجلسة للقراءة فقط.",
+      "continueInNewSession": "المتابعة في جلسة جديدة",
       "emptyDescription": "أرسل رسالة أدناه للبدء.",
       "emptyTranscriptDescription": "لا تحتوي هذه الجلسة على رسائل بعد.",
       "scrollToBottom": "التمرير إلى الأسفل",
@@ -1721,6 +1725,8 @@
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
+      "selectRepositoryToStart": "اختر مستودعًا للبدء.",
+      "connectProviderToStart": "اربط مزوّدًا للبدء.",
       "promptPlaceholder": "ما الذي تريد العمل عليه؟",
       "couldNotLoadModels": "تعذّر تحميل النماذج.",
       "prefillRepoAndModelUnavailable": "لم يعد مستودع الجلسة الأصلية ونموذجها متاحين. اختر مستودعًا ونموذجًا أدناه.",
@@ -2358,7 +2364,8 @@
     "optionsExpiredDescription": "ارجع إلى الشاشة السابقة وأعد فتح قائمة الاختيار."
   },
   "sessionRow": {
-    "needsInput": "بانتظار تدخلك"
+    "needsInput": "بانتظار تدخلك",
+    "scheduled": "مجدول"
   },
   "voiceInput": {
     "listening": "جارٍ الاستماع...",
@@ -2742,7 +2749,14 @@
       "moreLinesAbove_zero": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_two": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
       "moreLinesAbove_few": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
-      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}."
+      "moreLinesAbove_many": "… توجد أسطر أخرى أعلاه، عددها {{displayCount}}.",
+      "deleteComment": "حذف التعليق",
+      "deleteCommentTitle": "حذف التعليق؟",
+      "deleteCommentMessage": "سيُحذف هذا التعليق من طلب السحب.",
+      "commentEditFailed": "تعذّر حفظ تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentEditUnavailable": "لا يمكن تعديل هذا التعليق. ربما حُذف.",
+      "commentDeleteFailed": "تعذّر حذف تعليقك. تحقق من اتصالك وحاول مرة أخرى.",
+      "commentDeleteUnavailable": "لا يمكن حذف هذا التعليق."
     },
     "entry": {
       "eyebrow": "افتح طلب سحب أو طلب دمج باستخدام عنوان URL.",
@@ -3103,6 +3117,8 @@
     "linkPasteNotAPullRequest": "هذا ليس رابط طلب سحب أو طلب دمج",
     "announce": {
       "commentPosted": "تم نشر التعليق",
+      "commentUpdated": "تم تحديث التعليق",
+      "commentDeleted": "تم حذف التعليق",
       "reviewSubmitted": "تم إرسال المراجعة",
       "autoMergeEnabled": "تم تفعيل الدمج التلقائي"
     },
@@ -3340,6 +3356,7 @@
     "emptyTitle": "لا يوجد مضيفون موثوقون",
     "emptyDescription": "عندما تعتبر مضيف الرابط موثوقًا، تُفتح روابطه دون طلب تأكيد مجددًا.",
     "revoke": "إلغاء الثقة بالمضيف {{host}}",
+    "revokeMessage": "ستطلب الروابط المؤدية إلى هذا المضيف تأكيدًا مرة أخرى.",
     "backToPreferences": "العودة إلى التفضيلات"
   },
   "quickChat": {
@@ -3369,7 +3386,8 @@
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل.",
     "openSession": "افتح",
     "approveFailed": "تعذّر الموافقة. اضغط على $t(common.approve) للمحاولة مرة أخرى.",
-    "newestResult": "أحدث نتيجة"
+    "newestResult": "أحدث نتيجة",
+    "scheduledWakes": "يستيقظ {{time}}"
   },
   "transcriptionModel": {
     "title": "نموذج التفريغ الصوتي",
@@ -3603,5 +3621,17 @@
       "unboundToast": "الريبو غير منضم",
       "unbindFailed": "تعذر إلغاء ربط الريبو"
     }
+  },
+  "credits": {
+    "title": "شراء الرصيد",
+    "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
+    "packLabel": "إضافة {{amount}} من الرصيد",
+    "priceUnavailable": "السعر غير متاح",
+    "purchased": "تمت إضافة الرصيد إلى رصيدك.",
+    "empty": "حزم الرصيد غير متاحة الآن.",
+    "noMatchingProducts": "لم يُرجِع App Store أي حزم رصيد مطابقة.",
+    "noMatchingProductsPlay": "لم يُرجِع Google Play أي حزم رصيد مطابقة.",
+    "purchaseOwnedByAnotherAccount": "الرصيد على حساب Apple Account هذا يخص حساب Kilo آخر. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه.",
+    "purchaseOwnedByAnotherAccountPlay": "الرصيد على حساب Google Play هذا يخص حساب Kilo مختلف. سجّل الدخول إلى حساب Kilo ذلك لاستخدامه."
   }
 }

@@ -15,6 +15,7 @@ const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
 vi.mock('react-native', () => ({
   Alert: { alert: alertFn },
+  Modal: 'Modal',
   Platform: {
     get OS() {
       return platform.os;
@@ -155,11 +156,6 @@ function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {
   return typeof node.type === 'string' && node.type === type;
 }
 
-function alertButtons(call: unknown): { style?: string; onPress?: () => void }[] {
-  const buttons = (call as unknown[] | undefined)?.[2];
-  return Array.isArray(buttons) ? (buttons as { style?: string; onPress?: () => void }[]) : [];
-}
-
 describe('ProfileScreen sign-out confirmation', () => {
   beforeEach(() => {
     signOutFn.mockReset();
@@ -175,49 +171,46 @@ describe('ProfileScreen sign-out confirmation', () => {
     });
   }
 
-  // The confirmation is the one shared native alert on both platforms:
-  // plugins/withAndroidAlertDialogTheme repaints Android's AppCompat dialog with
-  // the app tokens, and iOS's `UIAlertController` already follows the device
-  // appearance. No platform mounts an in-app confirmation of its own, so the
-  // same tap takes the same path whichever value the device reports.
-  for (const os of ['android', 'ios'] as const) {
-    it(`opens the shared native alert on ${os}`, async () => {
+  function dialogButton(
+    renderer: TestRenderer.ReactTestRenderer,
+    variant: 'outline' | 'destructive'
+  ) {
+    return renderer.root.find(node => isType(node, 'Button') && node.props.variant === variant);
+  }
+
+  // The request names no platform, so one destructive confirm serves both: the
+  // in-app dialog renders on iOS and Android alike, and its sign-out control
+  // carries the destructive (red) variant. The native alert cannot be the
+  // shared implementation — Android's `AlertDialog` paints every button with
+  // the theme accent, ignoring `style: 'destructive'`.
+  it.each(['android', 'ios'] as const)(
+    'opens the in-app dialog whose destructive control signs out on %s',
+    async os => {
       platform.os = os;
       const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
 
       pressSignOutTile(renderer);
 
-      expect(alertFn).toHaveBeenCalledTimes(1);
-      expect(alertFn.mock.calls[0]?.[0]).toBe('Sign out?');
-      // Opening the confirmation signs nobody out; only its own choices act.
+      // One implementation for both platforms: the confirmation is the in-app
+      // dialog everywhere; no native alert replaces it on either side.
+      expect(alertFn).not.toHaveBeenCalled();
+      // Opening the confirmation signs nobody out.
       expect(signOutFn).not.toHaveBeenCalled();
-      const buttons = alertButtons(alertFn.mock.calls[0]);
-      expect(buttons.find(button => button.style === 'cancel')?.onPress).toBeUndefined();
-      expect(buttons.some(button => button.style === 'destructive')).toBe(true);
-      // The alert is the whole confirmation: no in-app dialog renders beside it.
-      expect(
-        renderer.root.findAll(
-          node => isType(node, 'Button') && node.props.variant === 'destructive'
-        )
-      ).toHaveLength(0);
+
+      // Cancel keeps the user signed in.
+      act(() => {
+        (dialogButton(renderer, 'outline').props as { onPress?: () => void }).onPress?.();
+      });
+      expect(signOutFn).not.toHaveBeenCalled();
+
+      // Reopen: only the destructive control signs out.
+      pressSignOutTile(renderer);
+      act(() => {
+        (dialogButton(renderer, 'destructive').props as { onPress?: () => void }).onPress?.();
+      });
+      expect(signOutFn).toHaveBeenCalledTimes(1);
 
       unmount();
-    });
-  }
-
-  it("signs out only when the alert's destructive choice is pressed", async () => {
-    const { renderer, unmount } = await renderWithProviders(createElement(ProfileScreen));
-
-    pressSignOutTile(renderer);
-
-    const destructive = alertButtons(alertFn.mock.calls[0]).find(
-      button => button.style === 'destructive'
-    );
-    act(() => {
-      destructive?.onPress?.();
-    });
-    expect(signOutFn).toHaveBeenCalledTimes(1);
-
-    unmount();
-  });
+    }
+  );
 });

@@ -3,15 +3,11 @@ import { act, TestRenderer } from '@/test/renderer';
 import { describe, expect, it, vi } from 'vitest';
 import { useQuery } from '@tanstack/react-query';
 
-import {
-  resolveCombinedDefault,
-  resolvePersonalDefault,
-  useEffectiveAgentProfile,
-} from './use-effective-agent-profile';
+import { useEffectiveAgentProfile } from './use-effective-agent-profile';
 
 // The hook module imports the tRPC client (which pulls in react-native via
-// expo-secure-store); the pure resolvers under test never touch it, so stub the
-// client out to keep this suite in the DOM-free `mobile-pure` environment.
+// expo-secure-store); stub the client out to keep this suite in the DOM-free
+// `mobile-pure` environment.
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     agentProfiles: {
@@ -63,54 +59,6 @@ function profile(overrides: Partial<ProfileSummary> & { id: string }): ProfileSu
 function withOwner(p: ProfileSummary, ownerType: 'organization' | 'user'): ProfileWithOwner {
   return { ...p, ownerType };
 }
-
-describe('resolvePersonalDefault', () => {
-  it('returns the profile marked isDefault', () => {
-    const personal = [profile({ id: 'a' }), profile({ id: 'b', isDefault: true })];
-    expect(resolvePersonalDefault(personal)?.id).toBe('b');
-  });
-
-  it('returns null when no profile is the default', () => {
-    const personal = [profile({ id: 'a' }), profile({ id: 'b' })];
-    expect(resolvePersonalDefault(personal)).toBeNull();
-  });
-
-  it('returns null for an empty list', () => {
-    expect(resolvePersonalDefault([])).toBeNull();
-  });
-});
-
-describe('resolveCombinedDefault', () => {
-  it('resolves the personal default over the org default (personal wins)', () => {
-    const personalDefault = profile({ id: 'personal-default', isDefault: true });
-    const orgDefault = profile({ id: 'org-default', isDefault: true });
-    const combined = {
-      orgProfiles: [withOwner(orgDefault, 'organization')],
-      personalProfiles: [withOwner(personalDefault, 'user')],
-      effectiveDefaultId: 'personal-default',
-    };
-    expect(resolveCombinedDefault(combined)?.id).toBe('personal-default');
-  });
-
-  it('resolves the org default when no personal default exists', () => {
-    const orgDefault = profile({ id: 'org-default', isDefault: true });
-    const combined = {
-      orgProfiles: [withOwner(orgDefault, 'organization')],
-      personalProfiles: [withOwner(profile({ id: 'personal-plain' }), 'user')],
-      effectiveDefaultId: 'org-default',
-    };
-    expect(resolveCombinedDefault(combined)?.id).toBe('org-default');
-  });
-
-  it('returns null when there is no effective default', () => {
-    const combined = {
-      orgProfiles: [withOwner(profile({ id: 'org-plain' }), 'organization')],
-      personalProfiles: [withOwner(profile({ id: 'personal-plain' }), 'user')],
-      effectiveDefaultId: null,
-    };
-    expect(resolveCombinedDefault(combined)).toBeNull();
-  });
-});
 
 type ProfileResult = ReturnType<typeof useEffectiveAgentProfile>;
 

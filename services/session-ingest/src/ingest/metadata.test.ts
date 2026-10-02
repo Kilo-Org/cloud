@@ -550,6 +550,19 @@ describe('resetAttentionStatusOnCliDisconnect', () => {
     }
   );
 
+  it('leaves an unknown stored status untouched without throwing', async () => {
+    const db = createTransactionDb({ initialStatus: 'scheduled' });
+    vi.mocked(getWorkerDb).mockReturnValue(db as never);
+
+    const env = { HYPERDRIVE: { connectionString: 'postgres://unused' } } as never;
+    await expect(
+      resetAttentionStatusOnCliDisconnect(env, 'usr_1', 'ses_1')
+    ).resolves.toBeUndefined();
+
+    expect(db.applyUpdate).not.toHaveBeenCalled();
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
+  });
+
   it('no-ops when the session row is missing', async () => {
     const db = createTransactionDb({ initialStatus: 'question', rowMissing: true });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
@@ -601,15 +614,41 @@ describe('applyMetadataChanges', () => {
   it.each([
     { parentCloudAgentScopeId: 'workspace_root' },
     { parentWorktreeId: 'worktree_11111111-1111-4111-8111-111111111111' },
-  ])('does not let public parent metadata claim a Cloud Agent root: %j', identity => {
-    const db = createApplyMetadataDb({ parentExists: true, ...identity });
+  ])(
+    'records owned Cloud Agent parent lineage without claiming its scope or worktree: %j',
+    identity => {
+      const db = createApplyMetadataDb({ parentExists: true, ...identity });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      return applyMetadataChanges(
+        env,
+        'usr_1',
+        'ses_1',
+        new Map([['parentId', 'ses_parent']])
+      ).then(() => {
+        expect(db.updateSets).toEqual([{ parent_session_id: 'ses_parent' }]);
+        expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+          env,
+          'usr_1',
+          expect.objectContaining({
+            type: 'session.updated',
+            data: expect.objectContaining({
+              session: expect.objectContaining({ parentSessionId: 'ses_parent', worktreeId: null }),
+            }),
+          }),
+          undefined
+        );
+      });
+    }
+  );
+
+  it('refuses parent lineage when the authenticated user does not own the parent', async () => {
+    const db = createApplyMetadataDb({ parentExists: false });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
-    return applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_parent']])).then(
-      () => {
-        expect(db.updateSets).toEqual([]);
-        expect(notifyUserSessionEvent).not.toHaveBeenCalled();
-      }
-    );
+
+    await applyMetadataChanges(env, 'usr_1', 'ses_1', new Map([['parentId', 'ses_other_owner']]));
+
+    expect(db.updateSets).toEqual([]);
+    expect(notifyUserSessionEvent).not.toHaveBeenCalled();
   });
 
   describe('glanceable aggregate refresh', () => {
@@ -803,6 +842,39 @@ describe('applyMetadataChanges', () => {
       expect(delivery.messages).toEqual([]);
     });
   });
+
+  it.each(['scheduled', 'some-future-status'])(
+    'relays a stored %s status without throwing and reports it as the previous status',
+    async initialStatus => {
+      const db = createApplyMetadataDb({ initialStatus });
+      vi.mocked(getWorkerDb).mockReturnValue(db as never);
+      const delivery = metadataDelivery(db);
+
+      await expect(
+        applyMetadataChanges(
+          delivery.env as never,
+          'usr_1',
+          'ses_1',
+          new Map([['status', 'busy']]),
+          delivery.ctx
+        )
+      ).resolves.toBeUndefined();
+      await Promise.all(delivery.tasks);
+
+      expect(notifyUserSessionEvent).toHaveBeenCalledWith(
+        delivery.env,
+        'usr_1',
+        expect.objectContaining({
+          type: 'session.status.updated',
+          data: expect.objectContaining({
+            previousStatus: initialStatus,
+            status: 'busy',
+          }),
+        }),
+        delivery.ctx
+      );
+    }
+  );
 
   it('persists organization_id and invalidates access cache when the user is a member', async () => {
     const db = createApplyMetadataDb({ membershipRows: 1 });

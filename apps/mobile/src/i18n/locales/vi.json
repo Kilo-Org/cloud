@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Quay lại",
     "idle": "Đang rảnh",
+    "scheduled": "Đã lên lịch",
     "keepEditing": "Tiếp tục chỉnh sửa",
     "keepRunning": "Tiếp tục chạy",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Hiện số dư",
     "balanceHidden": "Số dư đã ẩn",
     "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
-    "creditBalanceEmpty": "Số dư của bạn đã hết. Với tài khoản này, bạn cần quản lý số dư bên ngoài ứng dụng iOS.",
     "signOutTitle": "Đăng xuất?",
     "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình.",
     "deleteAccountTitle": "Xóa tài khoản?",
@@ -240,6 +240,7 @@
     "addPasskey": "Thêm khóa truy cập",
     "passkeyDefaultName": "Khóa truy cập",
     "passkeyAddedOn": "Đã thêm {{date}}",
+    "passkeyLastUsedOn": "Dùng lần cuối {{date}}",
     "passkeyAdded": "Đã thêm khóa truy cập.",
     "passkeyAddFailed": "Không thể thêm khóa truy cập. Hãy thử lại.",
     "passkeyAddUnsupported": "Thiết bị này không thể tạo khóa truy cập.",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "couldNotRefresh": "Không thể làm mới",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
+      "viewHistory": "Lịch sử phiên",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
       "tryAdjustFilters": "Thử điều chỉnh hoặc bỏ bộ lọc.",
       "couldNotSearch": "Không thể tìm kiếm phiên.",
       "completedWillAppear": "Các phiên đã hoàn tất sẽ xuất hiện tại đây.",
       "noPastSessions": "Chưa có phiên đã hoàn tất",
+      "pastSessions": "Các phiên trước đây",
       "live": "TRỰC TIẾP",
       "updating": "Đang cập nhật"
     },
@@ -1582,6 +1585,7 @@
       "renamePlaceholder": "Tên phiên",
       "transcriptAccessibility": "Bản ghi phiên",
       "readOnly": "Bạn chỉ có thể xem phiên này.",
+      "continueInNewSession": "Tiếp tục trong phiên mới",
       "emptyDescription": "Gửi tin nhắn bên dưới để bắt đầu.",
       "emptyTranscriptDescription": "Phiên này chưa có tin nhắn.",
       "scrollToBottom": "Cuộn xuống dưới cùng",
@@ -1673,6 +1677,8 @@
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
+      "selectRepositoryToStart": "Chọn một kho mã để bắt đầu.",
+      "connectProviderToStart": "Kết nối nhà cung cấp để bắt đầu.",
       "promptPlaceholder": "Bạn muốn làm gì?",
       "couldNotLoadModels": "Không thể tải danh sách mô hình.",
       "prefillRepoAndModelUnavailable": "Kho mã và mô hình của phiên gốc không còn dùng được. Hãy chọn kho mã và mô hình khác bên dưới.",
@@ -2258,7 +2264,8 @@
     "optionsExpiredDescription": "Quay lại màn hình trước rồi mở lại danh sách lựa chọn này."
   },
   "sessionRow": {
-    "needsInput": "CẦN PHẢN HỒI"
+    "needsInput": "CẦN PHẢN HỒI",
+    "scheduled": "ĐÃ LÊN LỊCH"
   },
   "voiceInput": {
     "listening": "Đang nghe...",
@@ -2622,7 +2629,14 @@
       "deletedUser": "người dùng đã bị xóa",
       "replyForbiddenTerm": "Bạn không có quyền trả lời trong {{term}} này.",
       "moreLinesAbove_one": "… Còn {{displayCount}} dòng ở trên.",
-      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên."
+      "moreLinesAbove_other": "… Còn {{displayCount}} dòng ở trên.",
+      "deleteComment": "Xóa bình luận",
+      "deleteCommentTitle": "Xóa bình luận?",
+      "deleteCommentMessage": "Bình luận này sẽ bị xóa khỏi PR.",
+      "commentEditFailed": "Không thể lưu bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentEditUnavailable": "Không thể chỉnh sửa bình luận này. Có thể nó đã bị xóa.",
+      "commentDeleteFailed": "Không thể xóa bình luận của bạn. Kiểm tra kết nối và thử lại.",
+      "commentDeleteUnavailable": "Không thể xóa bình luận này."
     },
     "entry": {
       "eyebrow": "Mở PR hoặc merge request bằng URL",
@@ -2935,6 +2949,8 @@
     "linkPasteNotAPullRequest": "Đây không phải là liên kết PR hoặc merge request",
     "announce": {
       "commentPosted": "Đã đăng bình luận",
+      "commentUpdated": "Đã cập nhật bình luận",
+      "commentDeleted": "Đã xóa bình luận",
       "reviewSubmitted": "Đã gửi đánh giá",
       "autoMergeEnabled": "Đã bật tự động hợp nhất"
     },
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Chưa có máy chủ được tin cậy",
     "emptyDescription": "Khi bạn đánh dấu máy chủ là tin cậy, liên kết đến máy chủ đó sẽ mở mà không cần xác nhận lại.",
     "revoke": "Bỏ tin cậy {{host}}",
+    "revokeMessage": "Liên kết đến máy chủ này sẽ hỏi xác nhận lại.",
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa.",
     "openSession": "Mở",
     "approveFailed": "Không thể phê duyệt. Nhấn $t(common.approve) để thử lại.",
-    "newestResult": "Kết quả mới nhất"
+    "newestResult": "Kết quả mới nhất",
+    "scheduledWakes": "thức dậy {{time}}"
   },
   "transcriptionModel": {
     "title": "Mô hình chuyển giọng nói thành văn bản",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo không bị ràng buộc",
       "unbindFailed": "Không thể hủy liên kết repo"
     }
+  },
+  "credits": {
+    "title": "Mua tín dụng",
+    "description": "Tín dụng là giao dịch mua một lần được thêm vào số dư Kilo của bạn để chạy các phiên lập trình AI trong Kilo App. Cửa hàng tính phí vào tài khoản của bạn và tín dụng được thêm sau khi cửa hàng xác nhận thanh toán.",
+    "packLabel": "Thêm {{amount}} tín dụng",
+    "priceUnavailable": "Không có giá",
+    "purchased": "Đã thêm tín dụng vào số dư của bạn.",
+    "empty": "Các gói tín dụng hiện không khả dụng.",
+    "noMatchingProducts": "App Store không trả về gói tín dụng phù hợp nào.",
+    "noMatchingProductsPlay": "Google Play không trả về gói tín dụng phù hợp nào.",
+    "purchaseOwnedByAnotherAccount": "Tín dụng trên Apple Account này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng.",
+    "purchaseOwnedByAnotherAccountPlay": "Tín dụng trên Tài khoản Google Play này thuộc về một tài khoản Kilo khác. Hãy đăng nhập vào tài khoản Kilo đó để sử dụng."
   }
 }

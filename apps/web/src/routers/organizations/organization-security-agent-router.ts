@@ -5,7 +5,7 @@ import {
   organizationBillingProcedure,
   organizationBillingMutationProcedure,
   OrganizationIdInputSchema,
-} from './utils';
+} from '@/routers/organizations/utils';
 
 import {
   getIntegrationForOrganization,

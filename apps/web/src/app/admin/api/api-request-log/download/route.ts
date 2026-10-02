@@ -5,6 +5,7 @@ import { api_request_log } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
+import { getApiRequestLogBlob } from '@/lib/r2/api-request-log';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -49,10 +50,49 @@ function isJson(value: unknown): boolean {
   return false;
 }
 
-function parseDate(value: string): Date | null {
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return null;
-  return d;
+type LoadedBody = { value: string | null } | { loadError: string };
+
+async function loadBody(key: string | null): Promise<LoadedBody> {
+  if (key === null) {
+    return { value: null };
+  }
+  try {
+    return { value: await getApiRequestLogBlob(key) };
+  } catch (error) {
+    return { loadError: `Failed to load ${key} from R2: ${String(error)}` };
+  }
+}
+
+const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+type ParsedBoundary = { ok: true; value: Date | null } | { ok: false };
+
+// Dates and times are UTC. The end boundary is inclusive through the last
+// millisecond of the chosen minute (or day, when no time is given).
+function parseBoundary(
+  date: string | null,
+  time: string | null,
+  edge: 'start' | 'end'
+): ParsedBoundary {
+  if (!date) {
+    return time ? { ok: false } : { ok: true, value: null };
+  }
+  if (!DATE_PATTERN.test(date) || (time && !TIME_PATTERN.test(time))) {
+    return { ok: false };
+  }
+  const suffix = edge === 'start' ? `${time || '00:00'}:00.000Z` : `${time || '23:59'}:59.999Z`;
+  const value = new Date(`${date}T${suffix}`);
+  // Date rolls calendar-invalid days over (2026-02-30 becomes 2026-03-02).
+  if (isNaN(value.getTime()) || value.toISOString().slice(0, 10) !== date) {
+    return { ok: false };
+  }
+  return { ok: true, value };
+}
+
+function formatBoundaryForFilename(date: string | null, time: string | null, fallback: string) {
+  if (!date) return fallback;
+  return time ? `${date}T${time.replace(':', '-')}` : date;
 }
 
 function jsonError(message: string, status: number) {
@@ -109,18 +149,33 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const userId = searchParams.get('userId');
   const startDate = searchParams.get('startDate');
+  const startTime = searchParams.get('startTime');
   const endDate = searchParams.get('endDate');
+  const endTime = searchParams.get('endTime');
   const model = searchParams.get('model');
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
   const errorsOnly = searchParams.get('errorsOnly') === 'true';
 
-  const parsedStart = startDate ? parseDate(startDate) : null;
-  const parsedEnd = endDate ? parseDate(endDate + 'T23:59:59.999Z') : null;
-  if ((startDate && !parsedStart) || (endDate && !parsedEnd)) {
-    return jsonError('Invalid date format. Use YYYY-MM-DD.', 400);
+  const parsedStart = parseBoundary(startDate, startTime, 'start');
+  const parsedEnd = parseBoundary(endDate, endTime, 'end');
+  if (!parsedStart.ok || !parsedEnd.ok) {
+    return jsonError(
+      'Invalid date or time. Use YYYY-MM-DD for dates and HH:MM (UTC) for times; a time requires a date.',
+      400
+    );
+  }
+  if (parsedStart.value && parsedEnd.value && parsedStart.value > parsedEnd.value) {
+    return jsonError('Start must be before end.', 400);
   }
 
-  const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
+  const filter = buildFilter(
+    userId,
+    parsedStart.value,
+    parsedEnd.value,
+    model,
+    sessionId,
+    errorsOnly
+  );
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -174,7 +229,13 @@ export async function GET(request: NextRequest) {
     let cursor: bigint | null = null;
     for (;;) {
       const rows = await db
-        .select()
+        .select({
+          id: api_request_log.id,
+          created_at: api_request_log.created_at,
+          error: api_request_log.error,
+          request_r2_key: api_request_log.request_r2_key,
+          response_r2_key: api_request_log.response_r2_key,
+        })
         .from(api_request_log)
         .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
         .orderBy(asc(api_request_log.id))
@@ -182,22 +243,32 @@ export async function GET(request: NextRequest) {
 
       if (rows.length === 0) break;
 
-      for (const row of rows) {
+      const bodies = await Promise.all(
+        rows.map(async row => {
+          const [request, response] = await Promise.all([
+            loadBody(row.request_r2_key),
+            loadBody(row.response_r2_key),
+          ]);
+          return { request, response };
+        })
+      );
+
+      for (const [index, row] of rows.entries()) {
         const ts = formatTimestamp(row.created_at);
         const id = String(row.id);
 
-        const requestExt = isJson(row.request) ? 'json' : 'txt';
-        const requestContent = tryFormatJson(row.request);
-        if (requestContent) {
-          totalAppendedEntries += 1;
-          archive.append(requestContent, { name: `${ts}_${id}_request.${requestExt}` });
-        }
-
-        const responseExt = isJson(row.response) ? 'json' : 'txt';
-        const responseContent = tryFormatJson(row.response);
-        if (responseContent) {
-          totalAppendedEntries += 1;
-          archive.append(responseContent, { name: `${ts}_${id}_response.${responseExt}` });
+        for (const [kind, body] of Object.entries(bodies[index])) {
+          if ('loadError' in body) {
+            totalAppendedEntries += 1;
+            archive.append(body.loadError, { name: `${ts}_${id}_${kind}_load-error.txt` });
+            continue;
+          }
+          const ext = isJson(body.value) ? 'json' : 'txt';
+          const content = tryFormatJson(body.value);
+          if (content) {
+            totalAppendedEntries += 1;
+            archive.append(content, { name: `${ts}_${id}_${kind}.${ext}` });
+          }
         }
 
         if (row.error !== null && row.error !== undefined) {
@@ -237,7 +308,9 @@ export async function GET(request: NextRequest) {
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
   const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
-  const filename = `api-request-log_${safeUserId}_${startDate ?? 'any-start'}_${endDate ?? 'any-end'}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
+  const safeStart = formatBoundaryForFilename(startDate, startTime, 'any-start');
+  const safeEnd = formatBoundaryForFilename(endDate, endTime, 'any-end');
+  const filename = `api-request-log_${safeUserId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
 
   return new Response(webStream, {
     headers: {

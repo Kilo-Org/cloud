@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Артқа қайту",
     "idle": "Бос",
+    "scheduled": "Жоспарланған",
     "keepEditing": "Өңдеуді жалғастыру",
     "keepRunning": "Жұмысты жалғастыру",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Теңгерімді көрсету",
     "balanceHidden": "Теңгерім жасырылған",
     "bonusCreditsExpiring": "{{amount}} көлеміндегі бонустық кредиттердің мерзімі {{date}} күні аяқталады.",
-    "creditBalanceEmpty": "Кредит балансыңызда қаражат жоқ. Бұл тіркелгінің кредиттері iOS қолданбасынан тыс басқарылады.",
     "signOutTitle": "Шығу керек пе?",
     "signOutMessage": "Жұмыс кеңістігіңізді пайдалану үшін аккаунтыңызға қайта кіру қажет болады.",
     "deleteAccountTitle": "Тіркелгіні жою керек пе?",
@@ -240,6 +240,7 @@
     "addPasskey": "Кіру кілтін қосу",
     "passkeyDefaultName": "Кіру кілті",
     "passkeyAddedOn": "{{date}} қосылды",
+    "passkeyLastUsedOn": "Соңғы рет пайдаланылды {{date}}",
     "passkeyAdded": "Кіру кілті қосылды.",
     "passkeyAddFailed": "Кіру кілтін қосу мүмкін болмады. Қайталап көріңіз.",
     "passkeyAddUnsupported": "Бұл құрылғы кіру кілттерін жасай алмайды.",
@@ -566,7 +567,14 @@
       "deletedUser": "жойылған пайдаланушы",
       "replyForbiddenTerm": "Бұл {{term}}на жауап беруге рұқсатыңыз жоқ.",
       "moreLinesAbove_one": "… жоғарыда тағы {{displayCount}} жол бар.",
-      "moreLinesAbove_other": "… жоғарыда тағы {{displayCount}} жол бар."
+      "moreLinesAbove_other": "… жоғарыда тағы {{displayCount}} жол бар.",
+      "deleteComment": "Пікірді жою",
+      "deleteCommentTitle": "Пікір жойылсын ба?",
+      "deleteCommentMessage": "Бұл пікір біріктіру сұрауынан жойылады.",
+      "commentEditFailed": "Пікіріңізді сақтау мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+      "commentEditUnavailable": "Бұл пікірді өңдеу мүмкін емес. Ол жойылған болуы мүмкін.",
+      "commentDeleteFailed": "Пікіріңізді жою мүмкін болмады. Байланысты тексеріп, қайталап көріңіз.",
+      "commentDeleteUnavailable": "Бұл пікірді жою мүмкін емес."
     },
     "couldNotOpenGitHubAppSettings": "GitHub қолданбасының параметрлерін ашу мүмкін болмады.",
     "installKiloGitHubApp": "Kilo GitHub қолданбасын орнату",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Бұл тарту немесе біріктіру сұрауының сілтемесі емес.",
     "announce": {
       "commentPosted": "Пікір жарияланды",
+      "commentUpdated": "Пікір жаңартылды",
+      "commentDeleted": "Пікір жойылды",
       "reviewSubmitted": "Кодты тексеру нәтижесі жіберілді",
       "autoMergeEnabled": "Автоматты біріктіру қосылды"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Белсенді сеанстарды жүктеу мүмкін болмады.",
       "couldNotRefresh": "Жаңарту мүмкін болмады",
       "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз. Сеанстарыңыз осында көрсетіледі.",
+      "viewHistory": "Сеанс тарихы",
       "noMatches": "Сәйкес сеанстар жоқ",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
       "tryAdjustFilters": "Сүзгілерді реттеп немесе тазалап көріңіз.",
       "couldNotSearch": "Сеанстарды іздеу мүмкін болмады.",
       "completedWillAppear": "Аяқталған сеанстар осында көрсетіледі.",
       "noPastSessions": "Бұрынғы сеанстар жоқ",
+      "pastSessions": "Бұрынғы сеанстар",
       "live": "БЕЛСЕНДІ",
       "updating": "Жаңартылуда"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Сессия атауы",
       "transcriptAccessibility": "Сессия жазбасы",
       "readOnly": "Бұл сессия тек оқуға арналған.",
+      "continueInNewSession": "Жаңа сессияда жалғастыру",
       "emptyDescription": "Бастау үшін төмендегі өрістен хабарлама жіберіңіз.",
       "emptyTranscriptDescription": "Бұл сессияда әзірге хабарламалар жоқ.",
       "scrollToBottom": "Ең төменге айналдыру",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
+      "selectRepositoryToStart": "Бастау үшін репозиторий таңдаңыз.",
+      "connectProviderToStart": "Бастау үшін провайдерді қосыңыз.",
       "promptPlaceholder": "Немен жұмыс істегіңіз келеді?",
       "couldNotLoadModels": "Модельдерді жүктеу мүмкін болмады.",
       "prefillRepoAndModelUnavailable": "Бастапқы сессияның репозиторийі мен моделі енді қолжетімсіз. Оларды төменде таңдаңыз.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Артқа қайтып, алдыңғы экраннан бұл таңдау құралын қайта ашыңыз."
   },
   "sessionRow": {
-    "needsInput": "ЖАУАП ҚАЖЕТ"
+    "needsInput": "ЖАУАП ҚАЖЕТ",
+    "scheduled": "ЖОСПАРЛАНҒАН"
   },
   "voiceInput": {
     "listening": "Тыңдалуда...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Сенімді хосттар жоқ",
     "emptyDescription": "Хостты сенімді деп белгілесеңіз, оның сілтемелері қайта растаусыз ашылады.",
     "revoke": "Хостқа берілген сенімді қайтарып алу: {{host}}",
+    "revokeMessage": "Бұл хостқа сілтемелер қайтадан растауды сұрайды.",
     "backToPreferences": "Баптауларға оралу"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Құлыптау экранында белсенді агенттерді көру үшін баптауларда тікелей эфирдегі әрекеттерді қосыңыз.",
     "openSession": "Ашыңыз",
     "approveFailed": "Мақұлдау мүмкін болмады. Қайталап көру үшін $t(common.approve) түртіңіз.",
-    "newestResult": "Ең жаңа нәтиже"
+    "newestResult": "Ең жаңа нәтиже",
+    "scheduledWakes": "{{time}} оянады"
   },
   "transcriptionModel": {
     "title": "Дауысты мәтінге айналдыру моделі",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Репо шектелмеген",
       "unbindFailed": "Репоны ажырату мүмкін болмады"
     }
+  },
+  "credits": {
+    "title": "Кредит сатып алу",
+    "description": "Кредиттер — Kilo App-те AI бағдарламалау сессияларын жүргізу үшін Kilo балансына қосылатын бір реттік сатып алу. Дүкен шотыңыздан ақша алады және дүкен төлемді растағаннан кейін кредиттер қосылады.",
+    "packLabel": "{{amount}} сомасына кредит қосу",
+    "priceUnavailable": "Бағасы қолжетімсіз",
+    "purchased": "Кредиттер балансыңызға қосылды.",
+    "empty": "Кредит пакеттері қазір қолжетімсіз.",
+    "noMatchingProducts": "App Store сәйкес кредит пакеттерін қайтармады.",
+    "noMatchingProductsPlay": "Google Play сәйкес кредит пакеттерін қайтармады.",
+    "purchaseOwnedByAnotherAccount": "Осы Apple Account тіркелгісіндегі кредиттер басқа Kilo тіркелгісіне тиесілі. Оларды пайдалану үшін сол Kilo тіркелгісіне кіріңіз.",
+    "purchaseOwnedByAnotherAccountPlay": "Бұл Google Play аккаунтындағы кредиттер басқа Kilo аккаунтына тиесілі. Оларды пайдалану үшін сол Kilo аккаунтына кіріңіз."
   }
 }

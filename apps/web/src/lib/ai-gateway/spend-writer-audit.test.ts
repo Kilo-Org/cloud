@@ -5,12 +5,12 @@ const repositoryRoot = resolve(process.cwd(), '../..');
 const sourceRoots = ['apps', 'dev', 'packages', 'services'];
 
 const classifiedIncrementWriters = {
-  'apps/web/src/lib/ai-gateway/processUsage.ts': 'included_ai_gateway_personal',
+  'packages/web-shared/src/lib/ai-gateway/processUsage.ts': 'included_ai_gateway_personal',
   'apps/web/src/lib/coding-plans/billing-lifecycle-cron.ts': 'included_coding_plan_renewal',
   'apps/web/src/lib/coding-plans/index.ts': 'included_coding_plan_activation',
   'apps/web/src/lib/exa-usage.ts': 'included_exa_personal',
   'apps/web/src/lib/kiloclaw/credit-billing.ts': 'included_kiloclaw_enrollment',
-  'apps/web/src/lib/organizations/organization-usage.ts':
+  'packages/web-shared/src/lib/organizations/organization-usage.ts':
     'included_ai_gateway_and_exa_organization',
   'services/container-usage-meter/src/postgres.ts': 'included_container_usage_settlement',
   'services/kiloclaw-billing/src/lifecycle.ts': 'included_kiloclaw_renewal',

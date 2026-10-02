@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Zpět",
     "idle": "Nečinný",
+    "scheduled": "Naplánováno",
     "keepEditing": "Pokračovat v úpravách",
     "keepRunning": "Nechat běžet",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
     "bonusCreditsExpiring": "Platnost bonusových kreditů v hodnotě {{amount}} vyprší {{date}}.",
-    "creditBalanceEmpty": "Nemáte žádné kredity. U tohoto účtu se kredity spravují mimo aplikaci pro iOS.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -240,6 +240,7 @@
     "addPasskey": "Přidat přístupový klíč",
     "passkeyDefaultName": "Přístupový klíč",
     "passkeyAddedOn": "Přidán {{date}}",
+    "passkeyLastUsedOn": "Naposledy použito {{date}}",
     "passkeyAdded": "Přístupový klíč přidán.",
     "passkeyAddFailed": "Přístupový klíč se nepodařilo přidat. Zkuste to znovu.",
     "passkeyAddUnsupported": "Toto zařízení nemůže vytvářet přístupové klíče.",
@@ -588,7 +589,14 @@
       "moreLinesAbove_one": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_other": "… další řádky výše: {{displayCount}}",
       "moreLinesAbove_few": "… další řádky výše: {{displayCount}}",
-      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}"
+      "moreLinesAbove_many": "… další řádky výše: {{displayCount}}",
+      "deleteComment": "Smazat komentář",
+      "deleteCommentTitle": "Smazat komentář?",
+      "deleteCommentMessage": "Tento komentář bude smazán z PR.",
+      "commentEditFailed": "Tvůj komentář se nepodařilo uložit. Zkontroluj připojení a zkus to znovu.",
+      "commentEditUnavailable": "Tento komentář nelze upravit. Možná byl smazán.",
+      "commentDeleteFailed": "Tvůj komentář se nepodařilo smazat. Zkontroluj připojení a zkus to znovu.",
+      "commentDeleteUnavailable": "Tento komentář nelze smazat."
     },
     "couldNotOpenGitHubAppSettings": "Nepodařilo se otevřít nastavení aplikace GitHub.",
     "installKiloGitHubApp": "Nainstalovat aplikaci Kilo pro GitHub",
@@ -779,6 +787,8 @@
     "linkPasteNotAPullRequest": "Tohle není odkaz na PR ani merge request",
     "announce": {
       "commentPosted": "Komentář odeslán",
+      "commentUpdated": "Komentář aktualizován",
+      "commentDeleted": "Komentář smazán",
       "reviewSubmitted": "Revize odeslána",
       "autoMergeEnabled": "Automatické sloučení zapnuto"
     },
@@ -2067,12 +2077,14 @@
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
       "couldNotRefresh": "Obnovení se nezdařilo",
       "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
+      "viewHistory": "Historie relací",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",
       "tryAdjustFilters": "Zkus upravit nebo zrušit filtry.",
       "couldNotSearch": "Relace se nepodařilo vyhledat.",
       "completedWillAppear": "Dokončené relace se zde zobrazí.",
       "noPastSessions": "Žádné předchozí relace",
+      "pastSessions": "Předchozí relace",
       "live": "ŽIVĚ",
       "updating": "Aktualizace"
     },
@@ -2142,6 +2154,7 @@
       "renamePlaceholder": "Název relace",
       "transcriptAccessibility": "Přepis relace",
       "readOnly": "Tato relace je pouze pro čtení.",
+      "continueInNewSession": "Pokračovat v nové relaci",
       "emptyDescription": "Začněte odesláním zprávy v poli níže.",
       "emptyTranscriptDescription": "Tato relace zatím neobsahuje žádné zprávy.",
       "scrollToBottom": "Posunout na konec",
@@ -2233,6 +2246,8 @@
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
+      "selectRepositoryToStart": "Vyberte repozitář, abyste mohli začít.",
+      "connectProviderToStart": "Připojte poskytovatele, abyste mohli začít.",
       "promptPlaceholder": "Na čem chcete pracovat?",
       "couldNotLoadModels": "Modely se nepodařilo načíst.",
       "prefillRepoAndModelUnavailable": "Repozitář a model původní relace už nejsou dostupné. Níže vyberte jiný repozitář a model.",
@@ -2844,7 +2859,8 @@
     "optionsExpiredDescription": "Vraťte se na předchozí obrazovku a znovu otevřete tento výběr."
   },
   "sessionRow": {
-    "needsInput": "ČEKÁ NA REAKCI"
+    "needsInput": "ČEKÁ NA REAKCI",
+    "scheduled": "NAPLÁNOVÁNO"
   },
   "voiceInput": {
     "listening": "Poslouchám…",
@@ -3254,6 +3270,7 @@
     "emptyTitle": "Žádné důvěryhodné domény",
     "emptyDescription": "Odkazy na důvěryhodné domény se otevírají bez dalšího potvrzení.",
     "revoke": "Odebrat důvěru doméně {{host}}",
+    "revokeMessage": "Odkazy na tuto doménu budou znovu vyžadovat potvrzení.",
     "backToPreferences": "Zpět na předvolby"
   },
   "quickChat": {
@@ -3283,7 +3300,8 @@
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce.",
     "openSession": "Otevřít",
     "approveFailed": "Schválení se nepodařilo. Klepnutím na $t(common.approve) to zkuste znovu.",
-    "newestResult": "Nejnovější výsledek"
+    "newestResult": "Nejnovější výsledek",
+    "scheduledWakes": "probudí se {{time}}"
   },
   "transcriptionModel": {
     "title": "Model přepisu",
@@ -3517,5 +3535,17 @@
       "unboundToast": "Repo odpojeno",
       "unbindFailed": "Repo se nepodařilo zrušit"
     }
+  },
+  "credits": {
+    "title": "Koupit kredity",
+    "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
+    "packLabel": "Přidat {{amount}} v kreditech",
+    "priceUnavailable": "Cena není k dispozici",
+    "purchased": "Kredity byly přidány do vašeho zůstatku.",
+    "empty": "Balíčky kreditů teď nejsou k dispozici.",
+    "noMatchingProducts": "App Store nevrátil žádné odpovídající balíčky kreditů.",
+    "noMatchingProductsPlay": "Google Play nevrátil žádné odpovídající balíčky kreditů.",
+    "purchaseOwnedByAnotherAccount": "Kredity na tomto účtu Apple Account patří k jinému účtu Kilo. Chcete-li je použít, přihlaste se k příslušnému účtu Kilo.",
+    "purchaseOwnedByAnotherAccountPlay": "Kredity na tomto účtu Google Play patří jinému účtu Kilo. Přihlaste se k tomuto účtu Kilo pro jejich použití."
   }
 }

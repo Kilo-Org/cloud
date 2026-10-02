@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Orqaga qaytish",
     "idle": "Kutmoqda",
+    "scheduled": "Rejalashtirilgan",
     "keepEditing": "Tahrirlashni davom ettirish",
     "keepRunning": "To‘xtatmaslik",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Balansni ko'rsatish",
     "balanceHidden": "Balans yashirilgan",
     "bonusCreditsExpiring": "{{amount}} miqdoridagi bonus kreditlarning muddati {{date}} sanasida tugaydi.",
-    "creditBalanceEmpty": "Hisobingizda kredit qolmagan. Bu hisobning kreditlari iOS ilovasidan tashqarida boshqariladi.",
     "signOutTitle": "Tizimdan chiqilsinmi?",
     "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi.",
     "deleteAccountTitle": "Hisob o'chirilsinmi?",
@@ -240,6 +240,7 @@
     "addPasskey": "Kirish kaliti qoʻshish",
     "passkeyDefaultName": "Kirish kaliti",
     "passkeyAddedOn": "{{date}} qoʻshildi",
+    "passkeyLastUsedOn": "Oxirgi marta ishlatilgan {{date}}",
     "passkeyAdded": "Kirish kaliti qoʻshildi.",
     "passkeyAddFailed": "Kirish kaliti qoʻshib boʻlmadi. Qayta urinib koʻring.",
     "passkeyAddUnsupported": "Bu qurilma kirish kalitlarini yarata olmaydi.",
@@ -566,7 +567,14 @@
       "deletedUser": "o'chirilgan foydalanuvchi",
       "replyForbiddenTerm": "Bu {{term}}ga javob yozishga ruxsatingiz yo‘q.",
       "moreLinesAbove_one": "… yuqorida yana {{displayCount}} ta qator bor.",
-      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor."
+      "moreLinesAbove_other": "… yuqorida yana {{displayCount}} ta qator bor.",
+      "deleteComment": "Izohni o'chirish",
+      "deleteCommentTitle": "Izoh o'chirilsinmi?",
+      "deleteCommentMessage": "Bu izoh PRdan o'chiriladi.",
+      "commentEditFailed": "Izohingizni saqlab bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentEditUnavailable": "Bu izohni tahrirlab bo'lmaydi. U o'chirilgan bo'lishi mumkin.",
+      "commentDeleteFailed": "Izohingizni o'chirib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
+      "commentDeleteUnavailable": "Bu izohni o'chirib bo'lmaydi."
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Bu PR yoki merge so‘rovi havolasi emas",
     "announce": {
       "commentPosted": "Izoh joylashtirildi",
+      "commentUpdated": "Izoh yangilandi",
+      "commentDeleted": "Izoh o'chirildi",
       "reviewSubmitted": "Ko'rib chiqish natijasi yuborildi",
       "autoMergeEnabled": "Avtomatik birlashtirish yoqildi"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "couldNotRefresh": "Yangilab bo'lmadi",
       "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
+      "viewHistory": "Sessiyalar tarixi",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
       "tryAdjustFilters": "Filtrlarni o'zgartirib yoki tozalab ko'ring.",
       "couldNotSearch": "Sessiyalarni qidirib bo'lmadi.",
       "completedWillAppear": "Tugallangan sessiyalar shu yerda paydo bo'ladi.",
       "noPastSessions": "Oldingi sessiyalar yo'q",
+      "pastSessions": "Oldingi sessiyalar",
       "live": "JONLI",
       "updating": "Yangilanmoqda"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Sessiya nomi",
       "transcriptAccessibility": "Sessiya yozishmalari",
       "readOnly": "Bu sessiyani faqat o'qish mumkin.",
+      "continueInNewSession": "Yangi sessiyada davom etish",
       "emptyDescription": "Boshlash uchun quyida xabar yuboring.",
       "emptyTranscriptDescription": "Bu sessiyada hali xabarlar yo'q.",
       "scrollToBottom": "Eng pastga o'tish",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
+      "selectRepositoryToStart": "Boshlash uchun repozitoriya tanlang.",
+      "connectProviderToStart": "Boshlash uchun provayderni ulang.",
       "promptPlaceholder": "Nima ustida ishlashni xohlaysiz?",
       "couldNotLoadModels": "Modellarni yuklab bo'lmadi.",
       "prefillRepoAndModelUnavailable": "Asl sessiyadagi repozitoriya va model endi mavjud emas. Quyida boshqa repozitoriya va modelni tanlang.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Oldingi ekranga qayting va tanlash oynasini qayta oching."
   },
   "sessionRow": {
-    "needsInput": "JAVOB KUTILMOQDA"
+    "needsInput": "JAVOB KUTILMOQDA",
+    "scheduled": "REJALASHTIRILGAN"
   },
   "voiceInput": {
     "listening": "Tinglanmoqda...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Ishonchli saytlar yo'q",
     "emptyDescription": "Saytni ishonchli deb belgilasangiz, uning havolalari qayta tasdiq so'ramasdan ochiladi.",
     "revoke": "{{host}} saytiga berilgan ishonchni bekor qilish",
+    "revokeMessage": "Bu saytga havolalar yana tasdiq so'raydi.",
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing.",
     "openSession": "Ochish",
     "approveFailed": "Tasdiqlab bo'lmadi. Qayta urinish uchun $t(common.approve) ga teging.",
-    "newestResult": "Eng yangi natija"
+    "newestResult": "Eng yangi natija",
+    "scheduledWakes": "{{time}} uyg'onadi"
   },
   "transcriptionModel": {
     "title": "Matnga aylantirish modeli",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo cheklanmagan",
       "unbindFailed": "Reponi ajratib boʻlmadi"
     }
+  },
+  "credits": {
+    "title": "Kredit sotib olish",
+    "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
+    "packLabel": "{{amount}} qiymatidagi kredit qo'shish",
+    "priceUnavailable": "Narx mavjud emas",
+    "purchased": "Kreditlar balansingizga qo'shildi.",
+    "empty": "Kredit paketlari hozircha mavjud emas.",
+    "noMatchingProducts": "App Store mos keladigan kredit paketlarini qaytarmadi.",
+    "noMatchingProductsPlay": "Google Play mos keladigan kredit paketlarini qaytarmadi.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hisobidagi kreditlar boshqa Kilo hisobiga tegishli. Ulardan foydalanish uchun o'sha Kilo hisobiga kiring."
   }
 }

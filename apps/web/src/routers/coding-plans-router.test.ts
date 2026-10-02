@@ -1444,6 +1444,66 @@ describe('coding plans router', () => {
     });
   });
 
+  it('terminates a pending-cancellation subscription immediately and rejects canceled subscriptions', async () => {
+    const admin = await insertTestUser({ is_admin: true });
+    const user = await insertTestUser();
+    const inventory = await insertInventory({ status: 'assigned' });
+    const [installedKey] = await db
+      .insert(byok_api_keys)
+      .values({
+        kilo_user_id: user.id,
+        provider_id: 'minimax',
+        encrypted_api_key: encryptApiKey('coding-plan-secret', BYOK_ENCRYPTION_KEY),
+        management_source: 'coding_plan',
+        created_by: user.id,
+      })
+      .returning();
+    const [pendingCancellation] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          key_inventory_id: inventory.id,
+          installed_byok_key_id: installedKey.id,
+          status: 'active',
+          cancel_at_period_end: true,
+        })
+      )
+      .returning();
+    const [canceled] = await db
+      .insert(coding_plan_subscriptions)
+      .values(
+        subscriptionValues(user.id, {
+          plan_id: MAX_PLAN_ID,
+          status: 'canceled',
+          canceled_at: '2026-07-20T12:00:00.000Z',
+          cancellation_reason: 'user_cancelled',
+        })
+      )
+      .returning();
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.codingPlans.adminTerminateSubscription({ subscriptionId: pendingCancellation.id });
+    const [updated] = await db
+      .select()
+      .from(coding_plan_subscriptions)
+      .where(eq(coding_plan_subscriptions.id, pendingCancellation.id));
+    expect(updated.status).toBe('canceled');
+    expect(updated.installed_byok_key_id).toBeNull();
+
+    const [remainingKey] = await db
+      .select()
+      .from(byok_api_keys)
+      .where(eq(byok_api_keys.id, installedKey.id));
+    expect(remainingKey).toBeUndefined();
+
+    await expect(
+      caller.codingPlans.adminTerminateSubscription({ subscriptionId: canceled.id })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message: 'No live subscription found.',
+    });
+  });
+
   it('extends an active subscription period and rejects canceled or invalid days', async () => {
     const admin = await insertTestUser({ is_admin: true });
     const user = await insertTestUser();

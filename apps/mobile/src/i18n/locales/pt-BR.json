@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Voltar",
     "idle": "Em espera",
+    "scheduled": "Agendada",
     "keepEditing": "Continuar editando",
     "keepRunning": "Manter em execução",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Mostrar saldo",
     "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
-    "creditBalanceEmpty": "Seu saldo de créditos está zerado. Nesta conta, os créditos são gerenciados fora do app para iOS.",
     "signOutTitle": "Sair?",
     "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "deleteAccountTitle": "Excluir conta?",
@@ -240,6 +240,7 @@
     "addPasskey": "Adicionar uma chave de acesso",
     "passkeyDefaultName": "Chave de acesso",
     "passkeyAddedOn": "Adicionada em {{date}}",
+    "passkeyLastUsedOn": "Último uso {{date}}",
     "passkeyAdded": "Chave de acesso adicionada.",
     "passkeyAddFailed": "Não foi possível adicionar uma chave de acesso. Tente novamente.",
     "passkeyAddUnsupported": "Este dispositivo não pode criar chaves de acesso.",
@@ -1491,12 +1492,14 @@
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas.",
       "couldNotRefresh": "Não foi possível atualizar",
       "noSessionsYetDescription": "Inicie uma tarefa de programação pelo celular. Suas sessões aparecerão aqui.",
+      "viewHistory": "Histórico de sessões",
       "noMatches": "Nenhuma sessão encontrada",
       "tryDifferentSearch": "Tente outro termo de pesquisa.",
       "tryAdjustFilters": "Tente ajustar ou limpar seus filtros.",
       "couldNotSearch": "Não foi possível pesquisar as sessões.",
       "completedWillAppear": "As sessões concluídas aparecerão aqui.",
       "noPastSessions": "Nenhuma sessão anterior",
+      "pastSessions": "Sessões anteriores",
       "live": "EM TEMPO REAL",
       "updating": "Atualizando"
     },
@@ -1563,6 +1566,7 @@
       "renamePlaceholder": "Nome da sessão",
       "transcriptAccessibility": "Transcrição da sessão",
       "readOnly": "Esta sessão é somente para leitura.",
+      "continueInNewSession": "Continuar em uma nova sessão",
       "emptyDescription": "Envie uma mensagem abaixo para começar.",
       "emptyTranscriptDescription": "Esta sessão ainda não tem mensagens.",
       "scrollToBottom": "Rolar para o final",
@@ -1654,6 +1658,8 @@
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
+      "selectRepositoryToStart": "Selecione um repositório para começar.",
+      "connectProviderToStart": "Conecte um provedor para começar.",
       "promptPlaceholder": "No que você quer trabalhar?",
       "couldNotLoadModels": "Não foi possível carregar os modelos.",
       "prefillRepoAndModelUnavailable": "O repositório e o modelo da sessão original não estão mais disponíveis. Escolha-os abaixo.",
@@ -2283,7 +2289,8 @@
     "optionsExpiredDescription": "Volte e reabra este seletor na tela anterior."
   },
   "sessionRow": {
-    "needsInput": "AGUARDANDO RESPOSTA"
+    "needsInput": "AGUARDANDO RESPOSTA",
+    "scheduled": "AGENDADA"
   },
   "voiceInput": {
     "listening": "Ouvindo...",
@@ -2652,7 +2659,14 @@
       "replyForbiddenTerm": "Você não tem permissão para responder a este {{term}}.",
       "moreLinesAbove_one": "… mais {{displayCount}} linha acima",
       "moreLinesAbove_other": "… mais {{displayCount}} linhas acima",
-      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima"
+      "moreLinesAbove_many": "… mais {{displayCount}} linhas acima",
+      "deleteComment": "Excluir comentário",
+      "deleteCommentTitle": "Excluir comentário?",
+      "deleteCommentMessage": "Este comentário será excluído do pull request.",
+      "commentEditFailed": "Não foi possível salvar seu comentário. Verifique sua conexão e tente novamente.",
+      "commentEditUnavailable": "Este comentário não pode ser editado. Ele pode ter sido excluído.",
+      "commentDeleteFailed": "Não foi possível excluir seu comentário. Verifique sua conexão e tente novamente.",
+      "commentDeleteUnavailable": "Este comentário não pode ser excluído."
     },
     "entry": {
       "eyebrow": "Abra um pull request ou merge request pela URL",
@@ -2977,6 +2991,8 @@
     "linkPasteNotAPullRequest": "Este link não é de um pull request ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
+      "commentUpdated": "Comentário atualizado",
+      "commentDeleted": "Comentário excluído",
       "reviewSubmitted": "Revisão enviada",
       "autoMergeEnabled": "Mesclagem automática ativada"
     },
@@ -3211,6 +3227,7 @@
     "emptyTitle": "Nenhum domínio confiável",
     "emptyDescription": "Ao marcar um domínio como confiável, seus links abrem sem pedir confirmação novamente.",
     "revoke": "Deixar de confiar em {{host}}",
+    "revokeMessage": "Os links para este domínio voltarão a pedir confirmação.",
     "backToPreferences": "Voltar às preferências"
   },
   "quickChat": {
@@ -3240,7 +3257,8 @@
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada.",
     "openSession": "Abrir",
     "approveFailed": "Não foi possível aprovar. Toque em $t(common.approve) para tentar novamente.",
-    "newestResult": "Resultado mais recente"
+    "newestResult": "Resultado mais recente",
+    "scheduledWakes": "acorda {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo de transcrição",
@@ -3474,5 +3492,17 @@
       "unboundToast": "Repo não consolidado",
       "unbindFailed": "Não foi possível desvincular o repositório"
     }
+  },
+  "credits": {
+    "title": "Comprar créditos",
+    "description": "Os créditos são uma compra única adicionada ao seu saldo Kilo para executar sessões de codificação com IA no Kilo App. A loja cobra na sua conta e os créditos são adicionados depois que a loja confirma o pagamento.",
+    "packLabel": "Adicionar {{amount}} em créditos",
+    "priceUnavailable": "Preço indisponível",
+    "purchased": "Créditos adicionados ao seu saldo.",
+    "empty": "Os pacotes de créditos estão indisponíveis no momento.",
+    "noMatchingProducts": "A App Store não retornou nenhum pacote de créditos correspondente.",
+    "noMatchingProductsPlay": "O Google Play não retornou nenhum pacote de créditos correspondente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Conta Apple pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos nesta conta do Google Play pertencem a uma conta Kilo diferente. Entre nessa conta Kilo para usá-los."
   }
 }

@@ -1,9 +1,11 @@
 import type * as ReactQuery from '@tanstack/react-query';
+import type * as React from 'react';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   mutationActiveTitle as activeTitle,
   deferred,
+  expectMutationAccountUnchanged,
   flushQueryUpdates as flush,
   makeCached,
   makeTestQueryClient,
@@ -12,7 +14,7 @@ import {
   seedMutationSessions,
   mutationStoredTitles as titles,
 } from '@/lib/active-sessions-live-sync.test-helpers';
-import { isSignOutActive, setSignOutActive } from '@/lib/auth/sign-out-state';
+import { setSignOutActive } from '@/lib/auth/sign-out-state';
 import { setTrpcUnauthorizedHandler } from '@/lib/auth/trpc-unauthorized';
 import { getActiveSessionsQueryMetadata } from '@/lib/query-client';
 import { useSessionMutations } from './use-session-mutations';
@@ -26,6 +28,13 @@ const messages: string[] = [];
 const settled: (() => void)[] = [];
 const listKey = [['cliSessionsV2', 'list'], { type: 'infinite' }] as const;
 const activeFilter = { queryKey: [['activeSessions', 'list']] };
+
+// Directly-invoked hook: run the one real React hook it uses as identity,
+// matching the react-query mocks below.
+vi.mock('react', async () => {
+  const actual = await vi.importActual<typeof React>('react');
+  return { ...actual, useCallback: <T extends (...args: never[]) => unknown>(fn: T) => fn };
+});
 
 // Execute real mutations, including cancellation, context, and late rejection.
 vi.mock('@tanstack/react-query', async importOriginal => {
@@ -78,13 +87,6 @@ vi.mock('@/lib/a11y/announcing-toast', () => {
   return { announcingToast: { error: record, success: record } };
 });
 
-function expectAccountBUnchanged() {
-  expect(titles(client, listKey)).toEqual(['Account B', 'Other']);
-  expect(activeTitle(client)).toBe('Account B');
-  expect(messages).toEqual([]);
-  expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
-  expect(isSignOutActive()).toBe(false);
-}
 afterAll(
   setTrpcUnauthorizedHandler(() => {
     setSignOutActive(true);
@@ -206,7 +208,7 @@ describe('useSessionMutations account publication', () => {
       }
       await Promise.all(outcomes);
       await flush();
-      expectAccountBUnchanged();
+      expectMutationAccountUnchanged(client, listKey, messages);
       expect(focused).toBe('account-b');
     }
   );
@@ -237,7 +239,7 @@ describe('useSessionMutations account publication', () => {
       replaceMutationAccount(client, listKey);
       gate.resolve(undefined);
       await flush();
-      expectAccountBUnchanged();
+      expectMutationAccountUnchanged(client, listKey, messages);
       expect(rpc.rename.mock.calls).toEqual([]);
       expect(rpc.delete.mock.calls).toEqual([]);
     }
@@ -261,7 +263,7 @@ describe('useSessionMutations account publication', () => {
       replaceMutationAccount(client, listKey);
       request.resolve(undefined);
       await flush();
-      expectAccountBUnchanged();
+      expectMutationAccountUnchanged(client, listKey, messages);
       expect(rpc.rename.mock.calls.map(call => call[0])).toEqual([
         { session_id: 's1', title: 'New' },
       ]);
@@ -283,7 +285,7 @@ describe('useSessionMutations account publication', () => {
       'inactive account'
     );
     unsubscribe();
-    expectAccountBUnchanged();
+    expectMutationAccountUnchanged(client, listKey, messages);
     expect(rpc.rename.mock.calls).toEqual([]);
   });
 

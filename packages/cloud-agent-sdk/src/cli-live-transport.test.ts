@@ -297,7 +297,6 @@ describe('CliLiveTransport unified user web connection', () => {
       refresh: 'idle',
     });
 
-    // An unrelated failure must still surface as an error, not be swallowed.
     jest.mocked(connection.sendCommand).mockRejectedValueOnce(new Error('network error'));
     transport.retryRemoteModels?.();
     await Promise.resolve();
@@ -708,6 +707,56 @@ describe('CliLiveTransport unified user web connection', () => {
       { type: 'commands.available', commands: [] },
       { type: 'stopped', reason: 'disconnected' },
       { type: 'session.status', sessionId: KILO_SESSION_ID, status: { type: 'idle' } },
+    ]);
+    transport.destroy();
+  });
+
+  it('forwards a scheduled heartbeat with its wake time and re-derives on a changed wake', () => {
+    const { userWebConnection, transport, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+
+    const heartbeat = (session: {
+      id: string;
+      status: string;
+      title: string;
+      scheduledAt?: string;
+    }) => {
+      userWebConnection.emitSystem({
+        event: 'sessions.heartbeat',
+        data: { connectionId: 'owner', sessions: [session] },
+      });
+    };
+
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T09:00:00.000Z',
+    });
+    heartbeat({
+      id: KILO_SESSION_ID,
+      status: 'scheduled',
+      title: 'Tracked',
+      scheduledAt: '2026-09-24T10:00:00.000Z',
+    });
+
+    expect(serviceEvents.filter(event => event.type === 'session.status')).toEqual([
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T09:00:00.000Z' },
+      },
+      {
+        type: 'session.status',
+        sessionId: KILO_SESSION_ID,
+        status: { type: 'scheduled', scheduledAt: '2026-09-24T10:00:00.000Z' },
+      },
     ]);
     transport.destroy();
   });
@@ -2114,7 +2163,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Initial discovery: state carries the parsed commands and `idle`.
     const idleState = commandStates.at(-1);
     expect(idleState).toEqual({
       ownerConnectionId: 'owner',
@@ -2133,7 +2181,6 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: PARSED_COMMAND_CATALOG,
     });
 
-    // Transient failure: error state keeps the same cached commands.
     rejectRefresh?.(new Error('command catalog timed out'));
     await Promise.resolve();
     await Promise.resolve();
@@ -2186,7 +2233,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // Malformed refresh: cache cleared.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2197,13 +2243,11 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Reconnect, retry → recovers cache.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // CATALOG_TOO_LARGE: cache cleared.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2214,13 +2258,11 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Reconnect, retry → recovers cache.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
     expect(commandStates.at(-1)?.commands).toEqual(PARSED_COMMAND_CATALOG);
 
-    // CLI_UPGRADE_REQUIRED: cache cleared and upgrade-required surfaced.
     connection.emitReconnect();
     await Promise.resolve();
     await Promise.resolve();
@@ -2231,7 +2273,6 @@ describe('CliLiveTransport remote command catalog', () => {
       commands: [],
     });
 
-    // Owner disconnect clears the cache.
     connection.emitSystem({ event: 'cli.disconnected', data: { connectionId: 'owner' } });
     expect(commandStates.at(-1)).toEqual({
       ownerConnectionId: null,
@@ -2300,7 +2341,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     expect(transport.retryRemoteCommands).toBeDefined();
 
-    // Reconnect kicks off a refresh that we will then reject.
     connection.emitReconnect();
     await Promise.resolve();
     expect(
@@ -2312,7 +2352,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Retry must re-issue exactly one more list_commands call and recover.
     transport.retryRemoteCommands?.();
     await Promise.resolve();
     await Promise.resolve();
@@ -2322,7 +2361,6 @@ describe('CliLiveTransport remote command catalog', () => {
         .mock.calls.filter(([, command]) => command === 'list_commands')
     ).toHaveLength(3);
 
-    // After recovery the cached commands are published again.
     const finalService = transport as unknown as {
       // accessor used by serviceEvent assertion helper is not exposed;
       // the cache is observed through the state callback instead.
@@ -2398,7 +2436,6 @@ describe('CliLiveTransport remote command catalog', () => {
     await Promise.resolve();
     await Promise.resolve();
 
-    // Grab the event the transport published.
     const availableEvent = serviceEvents.find(
       (event): event is Extract<typeof event, { type: 'commands.available' }> =>
         event.type === 'commands.available'
@@ -3304,12 +3341,10 @@ describe('CliLiveTransport exitSession', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
 // Page-seam + reconnect: transport uses fetchSnapshotPage for the initial
 // bounded read AND for reconnect/delayed resync replays, but only the initial
 // read fires onInitialPageLoaded. A reconnect must never reset the user's
 // already-advanced older-pages cursor back to the latest 50.
-// ---------------------------------------------------------------------------
 
 type FetchPage = (
   kiloSessionId: KiloSessionId,

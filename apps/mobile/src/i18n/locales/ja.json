@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "戻る",
     "idle": "待機中",
+    "scheduled": "予定",
     "keepEditing": "編集を続ける",
     "keepRunning": "実行を続ける",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
     "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
-    "creditBalanceEmpty": "クレジット残高がありません。このアカウントのクレジットは、iOSアプリ外で管理します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -240,6 +240,7 @@
     "addPasskey": "パスキーを追加",
     "passkeyDefaultName": "パスキー",
     "passkeyAddedOn": "{{date}} に追加",
+    "passkeyLastUsedOn": "{{date}} に最終使用",
     "passkeyAdded": "パスキーを追加しました。",
     "passkeyAddFailed": "パスキーを追加できませんでした。もう一度お試しください。",
     "passkeyAddUnsupported": "このデバイスではパスキーを作成できません。",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
       "couldNotRefresh": "更新できませんでした",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
+      "viewHistory": "セッション履歴",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
       "tryAdjustFilters": "絞り込み条件を変更するか、解除してください。",
       "couldNotSearch": "セッションを検索できませんでした。",
       "completedWillAppear": "完了したセッションがここに表示されます。",
       "noPastSessions": "過去のセッションはありません",
+      "pastSessions": "過去のセッション",
       "live": "ライブ",
       "updating": "更新中"
     },
@@ -1582,6 +1585,7 @@
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
       "readOnly": "このセッションは読み取り専用です。",
+      "continueInNewSession": "新しいセッションで続行",
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
       "emptyTranscriptDescription": "このセッションにはまだメッセージがありません。",
       "scrollToBottom": "一番下までスクロール",
@@ -1673,6 +1677,8 @@
       "leaveChanges": "変更を残す",
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
+      "selectRepositoryToStart": "開始するにはリポジトリを選択してください。",
+      "connectProviderToStart": "開始するにはプロバイダーを接続してください。",
       "promptPlaceholder": "何に取り組みますか？",
       "couldNotLoadModels": "モデルを読み込めませんでした。",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
@@ -2258,7 +2264,8 @@
     "optionsExpiredDescription": "前の画面に戻って、この選択画面を開き直してください。"
   },
   "sessionRow": {
-    "needsInput": "入力が必要"
+    "needsInput": "入力が必要",
+    "scheduled": "予定"
   },
   "voiceInput": {
     "listening": "聞き取り中…",
@@ -2622,7 +2629,14 @@
       "deletedUser": "削除されたユーザー",
       "replyForbiddenTerm": "この{{term}}に返信する権限がありません。",
       "moreLinesAbove_one": "… この上にさらに{{displayCount}}行あります。",
-      "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。"
+      "moreLinesAbove_other": "… この上にさらに{{displayCount}}行あります。",
+      "deleteComment": "コメントを削除",
+      "deleteCommentTitle": "コメントを削除しますか?",
+      "deleteCommentMessage": "このコメントはプルリクエストから削除されます。",
+      "commentEditFailed": "コメントを保存できませんでした。接続を確認して、もう一度お試しください。",
+      "commentEditUnavailable": "このコメントは編集できません。削除された可能性があります。",
+      "commentDeleteFailed": "コメントを削除できませんでした。接続を確認して、もう一度お試しください。",
+      "commentDeleteUnavailable": "このコメントは削除できません。"
     },
     "entry": {
       "eyebrow": "URLからプルリクエストまたはマージリクエストを開く",
@@ -2935,6 +2949,8 @@
     "linkPasteNotAPullRequest": "プルリクエストまたはマージリクエストのリンクではありません",
     "announce": {
       "commentPosted": "コメントを投稿しました",
+      "commentUpdated": "コメントを更新しました",
+      "commentDeleted": "コメントを削除しました",
       "reviewSubmitted": "レビューを送信しました",
       "autoMergeEnabled": "自動マージを有効にしました"
     },
@@ -3168,6 +3184,7 @@
     "emptyTitle": "信頼済みホストはありません",
     "emptyDescription": "リンク先のホストを信頼済みにすると、次回から確認せずに開けます。",
     "revoke": "{{host}}を信頼済みホストから削除",
+    "revokeMessage": "このホストへのリンクは再び確認を求めます。",
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。",
     "openSession": "開く",
     "approveFailed": "承認できませんでした。もう一度試すには$t(common.approve)をタップしてください。",
-    "newestResult": "最新の結果"
+    "newestResult": "最新の結果",
+    "scheduledWakes": "{{time}}に起動"
   },
   "transcriptionModel": {
     "title": "文字起こしモデル",
@@ -3431,5 +3449,17 @@
       "unboundToast": "バインドされていないリポジトリ",
       "unbindFailed": "リポジトリのバインドを解除できませんでした"
     }
+  },
+  "credits": {
+    "title": "クレジットを購入",
+    "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
+    "packLabel": "{{amount}}分のクレジットを追加",
+    "priceUnavailable": "価格を取得できません",
+    "purchased": "クレジットを残高に追加しました。",
+    "empty": "現在、クレジットパックを利用できません。",
+    "noMatchingProducts": "App Storeから一致するクレジットパックが返されませんでした。",
+    "noMatchingProductsPlay": "Google Playから一致するクレジットパックが返されませんでした。",
+    "purchaseOwnedByAnotherAccount": "このApple Accountのクレジットは、別のKiloアカウントに紐付いています。使用するには、そのKiloアカウントにサインインしてください。",
+    "purchaseOwnedByAnotherAccountPlay": "このGoogle Playアカウントのクレジットは別のKiloアカウントに属しています。使用するにはそのKiloアカウントにサインインしてください。"
   }
 }

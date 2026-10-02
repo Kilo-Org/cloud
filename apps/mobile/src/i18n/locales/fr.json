@@ -39,7 +39,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Non connecté",
     "notifications": "Alertes et notifications",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Dépôts",
     "securityAgent": "Agent de sécurité",
     "unknown": "Inconnu",
@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Retour",
     "idle": "En veille",
+    "scheduled": "Planifiée",
     "keepEditing": "Continuer à modifier",
     "keepRunning": "Laisser continuer",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Afficher le solde",
     "balanceHidden": "Solde masqué",
     "bonusCreditsExpiring": "{{amount}} de crédits bonus expirent le {{date}}.",
-    "creditBalanceEmpty": "Vous n'avez plus de crédits. Pour ce compte, les crédits se gèrent en dehors de l'application iOS.",
     "signOutTitle": "Se déconnecter ?",
     "signOutMessage": "Vous devrez vous reconnecter pour accéder à votre espace de travail.",
     "deleteAccountTitle": "Supprimer le compte ?",
@@ -240,6 +240,7 @@
     "addPasskey": "Ajouter une clé d'accès",
     "passkeyDefaultName": "Clé d'accès",
     "passkeyAddedOn": "Ajoutée le {{date}}",
+    "passkeyLastUsedOn": "Dernière utilisation {{date}}",
     "passkeyAdded": "Clé d'accès ajoutée.",
     "passkeyAddFailed": "Impossible d'ajouter une clé d'accès. Réessayez.",
     "passkeyAddUnsupported": "Cet appareil ne peut pas créer de clés d'accès.",
@@ -1123,8 +1124,8 @@
       "includeExistingFindingsAnalysisSubtitle": "Analyse aussi les signalements déjà synchronisés. Cela peut consommer des crédits supplémentaires.",
       "includeExistingFindingsRemediationSubtitle": "Ajoute aussi à la file d'attente les signalements admissibles déjà analysés. Les PR en double ne sont pas créées.",
       "minimumSeverity": "Gravité minimale",
-      "queued": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
-      "queued_other": "{{displayCount}} problèmes déjà détectés ont été mis en file d'attente pour analyse.",
+      "queued": "{{displayCount}} signalements déjà détectés ont été mis en file d'attente pour analyse.",
+      "queued_other": "{{displayCount}} signalements déjà détectés ont été mis en file d'attente pour analyse.",
       "queued_one": "{{displayCount}} signalement existant ajouté à la file d'attente d'analyse.",
       "requireApproval": "Exiger une approbation avant la correction automatique",
       "requireApprovalSubtitle": "La correction automatique attend votre approbation avant d'ouvrir des PR.",
@@ -1133,7 +1134,7 @@
       "severityHighAndAbove": "Élevée ou plus",
       "severityMediumAndAbove": "Moyenne ou plus",
       "title": "Automatisation",
-      "queued_many": "{{displayCount}} vulnérabilités existantes mises en attente d'analyse."
+      "queued_many": "{{displayCount}} signalements existants mis en attente d'analyse."
     },
     "dashboard": {
       "actFirst": "Actions prioritaires",
@@ -1497,6 +1498,7 @@
       "renamePlaceholder": "Nom de la session",
       "transcriptAccessibility": "Transcription de la session",
       "readOnly": "Cette session est en lecture seule.",
+      "continueInNewSession": "Continuer dans une nouvelle session",
       "emptyDescription": "Envoyez un message ci-dessous pour commencer.",
       "emptyTranscriptDescription": "Cette session ne contient encore aucun message.",
       "scrollToBottom": "Aller en bas de la conversation",
@@ -1588,6 +1590,8 @@
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
+      "selectRepositoryToStart": "Sélectionnez un dépôt pour commencer.",
+      "connectProviderToStart": "Connectez un fournisseur pour commencer.",
       "promptPlaceholder": "Sur quoi souhaitez-vous travailler ?",
       "couldNotLoadModels": "Impossible de charger les modèles.",
       "prefillRepoAndModelUnavailable": "Le dépôt et le modèle de la session d'origine ne sont plus disponibles. Choisissez-en d'autres ci-dessous.",
@@ -2213,7 +2217,8 @@
     "optionsExpiredDescription": "Revenez en arrière et rouvrez ce sélecteur depuis l'écran précédent."
   },
   "sessionRow": {
-    "needsInput": "INTERVENTION REQUISE"
+    "needsInput": "INTERVENTION REQUISE",
+    "scheduled": "PLANIFIÉE"
   },
   "voiceInput": {
     "listening": "À l'écoute…",
@@ -2438,12 +2443,14 @@
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
       "couldNotRefresh": "Impossible d'actualiser",
       "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
+      "viewHistory": "Historique des sessions",
       "noMatches": "Aucune session ne correspond aux critères",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "tryAdjustFilters": "Modifiez vos filtres ou supprimez-les.",
       "couldNotSearch": "Impossible de rechercher des sessions.",
       "completedWillAppear": "Les sessions terminées apparaîtront ici.",
       "noPastSessions": "Aucune session terminée",
+      "pastSessions": "Sessions terminées",
       "live": "EN DIRECT",
       "updating": "Mise à jour en cours"
     },
@@ -2652,7 +2659,14 @@
       "replyForbiddenTerm": "Vous n'avez pas l'autorisation de répondre à {{term}}.",
       "moreLinesAbove_one": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
       "moreLinesAbove_other": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
-      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}."
+      "moreLinesAbove_many": "… des lignes supplémentaires se trouvent au-dessus : {{displayCount}}.",
+      "deleteComment": "Supprimer le commentaire",
+      "deleteCommentTitle": "Supprimer le commentaire ?",
+      "deleteCommentMessage": "Ce commentaire sera supprimé de la demande de fusion.",
+      "commentEditFailed": "Impossible d'enregistrer votre commentaire. Vérifiez votre connexion et réessayez.",
+      "commentEditUnavailable": "Ce commentaire ne peut pas être modifié. Il a peut-être été supprimé.",
+      "commentDeleteFailed": "Impossible de supprimer votre commentaire. Vérifiez votre connexion et réessayez.",
+      "commentDeleteUnavailable": "Ce commentaire ne peut pas être supprimé."
     },
     "entry": {
       "eyebrow": "Ouvrez une PR ou une merge request à partir de son URL",
@@ -2977,6 +2991,8 @@
     "linkPasteNotAPullRequest": "Ce n'est pas un lien de PR ou de merge request",
     "announce": {
       "commentPosted": "Commentaire publié",
+      "commentUpdated": "Commentaire mis à jour",
+      "commentDeleted": "Commentaire supprimé",
       "reviewSubmitted": "Revue envoyée",
       "autoMergeEnabled": "Fusion automatique activée"
     },
@@ -3211,6 +3227,7 @@
     "emptyTitle": "Aucun site de confiance",
     "emptyDescription": "Les liens vers les sites de confiance s'ouvrent sans nouvelle demande de confirmation.",
     "revoke": "Retirer {{host}} des sites de confiance",
+    "revokeMessage": "Les liens vers ce site demanderont à nouveau une confirmation.",
     "backToPreferences": "Retour aux préférences"
   },
   "quickChat": {
@@ -3240,7 +3257,8 @@
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé.",
     "openSession": "Ouvrir",
     "approveFailed": "Impossible d'approuver. Touchez $t(common.approve) pour réessayer.",
-    "newestResult": "Dernier résultat"
+    "newestResult": "Dernier résultat",
+    "scheduledWakes": "se réveille {{time}}"
   },
   "transcriptionModel": {
     "title": "Modèle de transcription",
@@ -3379,7 +3397,7 @@
       "name": "Nom du serveur",
       "type": "Type de serveur",
       "localType": "Locale",
-      "remoteType": "Télécommande",
+      "remoteType": "Distant",
       "command": "Ligne de commande",
       "url": "URL",
       "environment": "Environnement (JSON)",
@@ -3407,7 +3425,7 @@
       "add": "Ajouter un agent",
       "empty": "Aucun agent pour l'instant",
       "name": "Nom de l'agent",
-      "slug": "Limace d'agent",
+      "slug": "Slug de l'agent",
       "description": "Description de l'agent",
       "model": "Remplacement du modèle",
       "modelPlaceholder": "Utiliser la session par défaut",
@@ -3474,5 +3492,17 @@
       "unboundToast": "Dépôt non lié",
       "unbindFailed": "Impossible de dissocier le dépôt"
     }
+  },
+  "credits": {
+    "title": "Acheter des crédits",
+    "description": "Les crédits sont un achat unique ajouté à votre solde Kilo pour lancer des sessions de codage IA dans Kilo App. La boutique débite votre compte et les crédits sont ajoutés après confirmation du paiement par la boutique.",
+    "packLabel": "Ajouter {{amount}} en crédits",
+    "priceUnavailable": "Prix indisponible",
+    "purchased": "Des crédits ont été ajoutés à votre solde.",
+    "empty": "Les packs de crédits sont indisponibles pour le moment.",
+    "noMatchingProducts": "L'App Store n'a renvoyé aucun pack de crédits correspondant.",
+    "noMatchingProductsPlay": "Google Play n'a renvoyé aucun pack de crédits correspondant.",
+    "purchaseOwnedByAnotherAccount": "Les crédits associés à ce compte Apple Account appartiennent à un autre compte Kilo. Connectez-vous à cet autre compte Kilo pour les utiliser.",
+    "purchaseOwnedByAnotherAccountPlay": "Les crédits sur ce compte Google Play appartiennent à un autre compte Kilo. Connectez-vous à ce compte Kilo pour les utiliser."
   }
 }

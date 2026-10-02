@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
 import { Readable } from 'node:stream';
 
-jest.mock('./client', () => ({
+jest.mock('@/lib/r2/client', () => ({
   r2Client: { send: jest.fn() },
   r2CliSessionsBucketName: 'test-bucket',
 }));
@@ -37,7 +37,7 @@ import {
   getBlobContent,
   copyBlobs,
 } from './cli-sessions';
-import { r2Client } from './client';
+import { r2Client } from '@/lib/r2/client';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 const mockSend = r2Client.send as jest.Mock;

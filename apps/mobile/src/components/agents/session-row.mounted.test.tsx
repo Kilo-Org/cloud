@@ -15,6 +15,7 @@ import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { __resetSessionAttentionForTests } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
+import { formatScheduledWake } from './session-list-helpers';
 import {
   closeSessionPreviewStore,
   getSessionPreviewSnapshot,
@@ -295,6 +296,29 @@ describe('StoredSessionRow live speech', () => {
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
     }
   );
+
+  it('reads SCHEDULED (label only) for a stored scheduled row instead of Idle', () => {
+    // The scheduled branch keys off the status, not the live flag: a stored
+    // history row has no wake time, so it shows the label alone.
+    const renderer = mount(row({ session: { ...session, status: 'scheduled' } }));
+    expect(texts(renderer)).toContain('SCHEDULED');
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'scheduled' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, Scheduled, feature/live, and CLI'
+    );
+  });
+
+  it('appends the wake when a stored scheduled row carries a scheduledAt', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const renderer = mount(row({ session: { ...session, status: 'scheduled', scheduledAt } }));
+    const wake = formatScheduledWake(scheduledAt);
+    expect(wake).not.toBeNull();
+    expect(texts(renderer)).toContain(`SCHEDULED · ${wake}`);
+    expect(texts(renderer)).not.toContain('Idle');
+  });
 
   it.each(['New session - 2026-09-22T02:05:22.778Z', 'Child session - 2026-09-22T02:05:22.778Z'])(
     'paints the localized unnamed name instead of the backend placeholder %s',
@@ -666,6 +690,30 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'running' },
     ]);
+  });
+
+  it('reads SCHEDULED with the wake for a scheduled tray row, not Idle', () => {
+    const scheduledAt = '2026-09-24T09:00:00.000Z';
+    const renderer = mountRemote({ status: 'scheduled', scheduledAt });
+    const wake = formatScheduledWake(scheduledAt);
+    expect(wake).not.toBeNull();
+    expect(texts(renderer)).toContain(`SCHEDULED · ${wake}`);
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'scheduled' },
+    ]);
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      `Live work, Scheduled, feature/live, CLI, and ${wake}`
+    );
+  });
+
+  it('reads SCHEDULED alone for a scheduled tray row with no wake time', () => {
+    const renderer = mountRemote({ status: 'scheduled' });
+    expect(texts(renderer)).toContain('SCHEDULED');
+    expect(texts(renderer)).not.toContain('Idle');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Live work, Scheduled, feature/live, and CLI'
+    );
   });
 
   it('draws the idle tray row with the status glyph alone (no platform mark)', () => {

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Rudi nyuma",
     "idle": "Bila kazi",
+    "scheduled": "Imepangwa",
     "keepEditing": "Endelea kuhariri",
     "keepRunning": "Acha iendelee",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
     "bonusCreditsExpiring": "Muda wa salio la bonasi la {{amount}} unaisha {{date}}.",
-    "creditBalanceEmpty": "Salio lako limeisha. Salio la akaunti hii linasimamiwa nje ya programu ya iOS.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -240,6 +240,7 @@
     "addPasskey": "Ongeza ufunguo wa kuingia",
     "passkeyDefaultName": "Ufunguo wa kuingia",
     "passkeyAddedOn": "Umeongezwa {{date}}",
+    "passkeyLastUsedOn": "Ilitumika mara ya mwisho {{date}}",
     "passkeyAdded": "Ufunguo wa kuingia umeongezwa.",
     "passkeyAddFailed": "Imeshindikana kuongeza ufunguo wa kuingia. Jaribu tena.",
     "passkeyAddUnsupported": "Kifaa hiki hakiwezi kuunda vifunguo vya kuingia.",
@@ -566,7 +567,14 @@
       "deletedUser": "mtumiaji aliyefutwa",
       "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
       "moreLinesAbove_one": "… kuna mstari mwingine {{displayCount}} hapo juu.",
-      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu."
+      "moreLinesAbove_other": "… kuna mistari mingine {{displayCount}} hapo juu.",
+      "deleteComment": "Futa maoni",
+      "deleteCommentTitle": "Unataka kufuta maoni?",
+      "deleteCommentMessage": "Maoni haya yatafutwa kutoka kwa ombi la kuunganisha.",
+      "commentEditFailed": "Imeshindikana kuhifadhi maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentEditUnavailable": "Maoni haya hayawezi kuhaririwa. Huenda yamefutwa.",
+      "commentDeleteFailed": "Imeshindikana kufuta maoni yako. Angalia muunganisho wako kisha ujaribu tena.",
+      "commentDeleteUnavailable": "Maoni haya hayawezi kufutwa."
     },
     "couldNotOpenGitHubAppSettings": "Imeshindikana kufungua mipangilio ya programu ya GitHub.",
     "installKiloGitHubApp": "Sakinisha programu ya Kilo ya GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",
+      "commentUpdated": "Maoni yamesasishwa",
+      "commentDeleted": "Maoni yamefutwa",
       "reviewSubmitted": "Ukaguzi umewasilishwa",
       "autoMergeEnabled": "Muunganisho wa kiotomatiki umewashwa"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
       "couldNotRefresh": "Imeshindikana kuonyesha upya",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
+      "viewHistory": "Historia ya vikao",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
       "tryAdjustFilters": "Jaribu kurekebisha au kuondoa vichujio vyako.",
       "couldNotSearch": "Imeshindikana kutafuta vikao.",
       "completedWillAppear": "Vikao vilivyokamilika vitaonekana hapa.",
       "noPastSessions": "Hakuna vikao vya zamani",
+      "pastSessions": "Vikao vya zamani",
       "live": "MOJA KWA MOJA",
       "updating": "Inasasisha"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Jina la kikao",
       "transcriptAccessibility": "Nakala ya mazungumzo ya kikao",
       "readOnly": "Kikao hiki ni cha kusoma tu.",
+      "continueInNewSession": "Endelea katika kikao kipya",
       "emptyDescription": "Tuma ujumbe hapa chini ili uanze.",
       "emptyTranscriptDescription": "Kikao hiki hakina ujumbe bado.",
       "scrollToBottom": "Tembeza hadi chini",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
+      "selectRepositoryToStart": "Chagua hazina ili kuanza.",
+      "connectProviderToStart": "Unganisha mtoa huduma ili kuanza.",
       "promptPlaceholder": "Ungependa kufanya kazi gani?",
       "couldNotLoadModels": "Imeshindikana kupakia modeli.",
       "prefillRepoAndModelUnavailable": "Hazina na modeli ya kikao cha awali hazipatikani tena. Chagua hazina na modeli hapa chini.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Rudi nyuma na ufungue kichagua hiki tena kutoka kwenye skrini iliyopita."
   },
   "sessionRow": {
-    "needsInput": "INASUBIRI JIBU"
+    "needsInput": "INASUBIRI JIBU",
+    "scheduled": "IMEPANGWA"
   },
   "voiceInput": {
     "listening": "Inasikiliza...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Hakuna tovuti zinazoaminika",
     "emptyDescription": "Ukiamini tovuti ya kiungo, viungo vyake hufunguka bila kuomba ruhusa tena.",
     "revoke": "Ondoa uaminifu kwa {{host}}",
+    "revokeMessage": "Viungo vya tovuti hii vitaomba uthibitisho tena.",
     "backToPreferences": "Rudi kwenye mapendeleo"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa.",
     "openSession": "Fungua",
     "approveFailed": "Imeshindikana kuidhinisha. Gusa $t(common.approve) ili ujaribu tena.",
-    "newestResult": "Matokeo mapya zaidi"
+    "newestResult": "Matokeo mapya zaidi",
+    "scheduledWakes": "itaamka {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli ya unukuzi",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo huru",
       "unbindFailed": "Haikuweza kubandua repo"
     }
+  },
+  "credits": {
+    "title": "Nunua salio",
+    "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
+    "packLabel": "Ongeza salio la {{amount}}",
+    "priceUnavailable": "Bei haipatikani",
+    "purchased": "Salio limeongezwa kwenye usawa wako.",
+    "empty": "Pakiti za salio hazipatikani kwa sasa.",
+    "noMatchingProducts": "App Store haikurudisha pakiti za salio zinazolingana.",
+    "noMatchingProductsPlay": "Google Play haikurudisha pakiti za salio zinazolingana.",
+    "purchaseOwnedByAnotherAccount": "Salio katika Apple Account hii ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia.",
+    "purchaseOwnedByAnotherAccountPlay": "Salio kwenye Akaunti hii ya Google Play ni ya akaunti nyingine ya Kilo. Ingia kwenye akaunti hiyo ya Kilo ili kulitumia."
   }
 }

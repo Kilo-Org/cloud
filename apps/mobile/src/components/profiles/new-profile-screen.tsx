@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
-import { validateProfileName } from '@/lib/agent-profile-forms';
+import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
 import { useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useOrganization } from '@/lib/organization-context';
 import { getProfileOverviewPath } from '@/lib/profile-agent-navigation';
@@ -57,16 +57,25 @@ export function NewProfileScreen() {
   const descriptionRef = useRef('');
   const [owner, setOwner] = useState<ProfileOwnerChoice>('personal');
   const [nameError, setNameError] = useState<string | null>(null);
+  const [descriptionError, setDescriptionError] = useState<string | null>(null);
 
   const submit = async () => {
     const name = nameRef.current.trim();
-    if (validateProfileName(name) !== null) {
-      setNameError(t('profiles.nameRequired'));
+    const nameIssue = validateProfileName(name);
+    if (nameIssue !== null) {
+      setNameError(
+        nameIssue === 'empty' ? t('profiles.nameRequired') : t('agentChat.newSession.nameTooLong')
+      );
+      return;
+    }
+
+    const description = descriptionRef.current.trim();
+    if (validateProfileDescription(description) !== null) {
+      setDescriptionError(t('agentChat.newSession.descriptionTooLong'));
       return;
     }
     setNameError(null);
-
-    const description = descriptionRef.current.trim();
+    setDescriptionError(null);
     const ownerOrganizationId = createOrganizationId(organizationId, owner);
     try {
       const created = await create.mutateAsync({
@@ -109,11 +118,15 @@ export function NewProfileScreen() {
         <FormField
           label={t('profiles.descriptionLabel')}
           placeholder={t('profiles.descriptionPlaceholder')}
+          error={descriptionError ?? undefined}
           multiline
           textAlignVertical="top"
           className="min-h-20 leading-5"
           onChangeText={value => {
             descriptionRef.current = value;
+            if (descriptionError !== null && validateProfileDescription(value) === null) {
+              setDescriptionError(null);
+            }
           }}
         />
 

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Palaa takaisin",
     "idle": "Valmiina",
+    "scheduled": "Ajastettu",
     "keepEditing": "Jatka muokkausta",
     "keepRunning": "Jatka suoritusta",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Näytä saldo",
     "balanceHidden": "Saldo piilotettu",
     "bonusCreditsExpiring": "Bonuskrediittejä vanhenee {{date}}: {{amount}}.",
-    "creditBalanceEmpty": "Krediittisaldosi on nolla. Tämän tilin krediittejä hallitaan iOS-sovelluksen ulkopuolella.",
     "signOutTitle": "Kirjaudutaanko ulos?",
     "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "deleteAccountTitle": "Poistetaanko tili?",
@@ -240,6 +240,7 @@
     "addPasskey": "Lisää pääsyavain",
     "passkeyDefaultName": "Pääsyavain",
     "passkeyAddedOn": "Lisätty {{date}}",
+    "passkeyLastUsedOn": "Viimeksi käytetty {{date}}",
     "passkeyAdded": "Pääsyavain lisätty.",
     "passkeyAddFailed": "Pääsyavainta ei voitu lisätä. Yritä uudelleen.",
     "passkeyAddUnsupported": "Tämä laite ei voi luoda pääsyavaimia.",
@@ -566,7 +567,14 @@
       "deletedUser": "poistettu käyttäjä",
       "replyForbiddenTerm": "Sinulla ei ole oikeutta vastata tähän {{term}}ön.",
       "moreLinesAbove_one": "… yläpuolella on vielä {{displayCount}} rivi.",
-      "moreLinesAbove_other": "… yläpuolella on vielä {{displayCount}} riviä."
+      "moreLinesAbove_other": "… yläpuolella on vielä {{displayCount}} riviä.",
+      "deleteComment": "Poista kommentti",
+      "deleteCommentTitle": "Poistetaanko kommentti?",
+      "deleteCommentMessage": "Tämä kommentti poistetaan muutospyynnöstä.",
+      "commentEditFailed": "Kommenttiasi ei voitu tallentaa. Tarkista yhteys ja yritä uudelleen.",
+      "commentEditUnavailable": "Tätä kommenttia ei voi muokata. Se on ehkä poistettu.",
+      "commentDeleteFailed": "Kommenttiasi ei voitu poistaa. Tarkista yhteys ja yritä uudelleen.",
+      "commentDeleteUnavailable": "Tätä kommenttia ei voi poistaa."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetusten avaaminen epäonnistui.",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Tämä ei ole muutospyynnön tai yhdistämispyynnön linkki",
     "announce": {
       "commentPosted": "Kommentti julkaistu",
+      "commentUpdated": "Kommentti päivitetty",
+      "commentDeleted": "Kommentti poistettu",
       "reviewSubmitted": "Katselmointi lähetetty",
       "autoMergeEnabled": "Automaattinen yhdistäminen käytössä"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
       "couldNotRefresh": "Päivitys epäonnistui",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
+      "viewHistory": "Istuntojen historia",
       "noMatches": "Ei hakua vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
       "tryAdjustFilters": "Kokeile muuttaa tai tyhjentää suodattimet.",
       "couldNotSearch": "Istuntoja ei voitu hakea.",
       "completedWillAppear": "Päättyneet istunnot näkyvät tässä.",
       "noPastSessions": "Ei aiempia istuntoja",
+      "pastSessions": "Aiemmat istunnot",
       "live": "REAALIAJASSA",
       "updating": "Päivitetään"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Istunnon nimi",
       "transcriptAccessibility": "Istunnon viestihistoria",
       "readOnly": "Tätä istuntoa voi vain lukea.",
+      "continueInNewSession": "Jatka uudessa istunnossa",
       "emptyDescription": "Aloita lähettämällä viesti alla olevasta kentästä.",
       "emptyTranscriptDescription": "Tässä istunnossa ei ole vielä viestejä.",
       "scrollToBottom": "Vieritä alareunaan",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tallenna ja lähetä",
       "startSession": "Aloita istunto",
+      "selectRepositoryToStart": "Valitse repositorio aloittaaksesi.",
+      "connectProviderToStart": "Yhdistä palveluntarjoaja aloittaaksesi.",
       "promptPlaceholder": "Mitä haluaisit tehdä?",
       "couldNotLoadModels": "Malleja ei voitu ladata.",
       "prefillRepoAndModelUnavailable": "Alkuperäisen istunnon repositorio ja malli eivät ole enää käytettävissä. Valitse uudet alta.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Palaa takaisin ja avaa tämä valitsin uudelleen edellisestä näkymästä."
   },
   "sessionRow": {
-    "needsInput": "ODOTTAA VASTAUSTA"
+    "needsInput": "ODOTTAA VASTAUSTA",
+    "scheduled": "AJASTETTU"
   },
   "voiceInput": {
     "listening": "Kuunnellaan…",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Ei luotettuja verkkotunnuksia",
     "emptyDescription": "Kun luotat verkkotunnukseen, sen linkit avataan ilman uutta vahvistusta.",
     "revoke": "Poista luottamus verkkotunnukseen {{host}}",
+    "revokeMessage": "Tämän verkkotunnuksen linkit kysyvät jatkossa vahvistusta uudelleen.",
     "backToPreferences": "Takaisin asetuksiin"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön asetuksissa, niin näet aktiiviset agentit lukitusnäytöllä.",
     "openSession": "Avaa",
     "approveFailed": "Hyväksyminen ei onnistunut. Yritä uudelleen napauttamalla $t(common.approve).",
-    "newestResult": "Uusin tulos"
+    "newestResult": "Uusin tulos",
+    "scheduledWakes": "herää {{time}}"
   },
   "transcriptionModel": {
     "title": "Puheentunnistusmalli",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo sitomaton",
       "unbindFailed": "Repoa ei voitu purkaa"
     }
+  },
+  "credits": {
+    "title": "Osta krediittejä",
+    "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
+    "packLabel": "Lisää {{amount}} krediittejä",
+    "priceUnavailable": "Hinta ei saatavilla",
+    "purchased": "Krediitit on lisätty saldoosi.",
+    "empty": "Krediittipaketit eivät ole juuri nyt saatavilla.",
+    "noMatchingProducts": "App Store ei palauttanut yhtään sopivaa krediittipakettia.",
+    "noMatchingProductsPlay": "Google Play ei palauttanut yhtään sopivaa krediittipakettia.",
+    "purchaseOwnedByAnotherAccount": "Tämän Apple-tilin krediitit kuuluvat toiselle Kilo-tilille. Käytä niitä kirjautumalla kyseiselle Kilo-tilille.",
+    "purchaseOwnedByAnotherAccountPlay": "Tämän Google Play -tilin krediitit kuuluvat eri Kilo-tilille. Käytä niitä kirjautumalla siihen Kilo-tiliin."
   }
 }

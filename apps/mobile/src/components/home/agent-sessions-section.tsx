@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, type ScrollViewProps, View } from 'react-native';
 
@@ -7,7 +7,7 @@ import { CenteredState } from '@/components/centered-state';
 
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
-import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
 import {
   liveSessionContent,
@@ -283,29 +283,26 @@ export function LiveSessionFeedback({
 export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
   const router = useRouter();
   const { t } = useTranslation();
-  const navigateToSession = useAgentSessionNavigator();
-  // One handler shared by every card row: with the row memoised, an unchanged
-  // payload leaves each row's props referentially stable and skips its render.
-  // The handler reads only the id, so it takes the shape it needs.
-  const handleRowPress = useCallback(
-    (session: { id: string }) => {
-      navigateToSession(session.id);
-    },
-    [navigateToSession]
-  );
+  const handleRowPress = useSessionRowPress();
   const content = liveSessionContent(context, sessions);
 
   return (
     <View>
-      <SectionHeader
-        label={t('home.agentSessions')}
-        actionLabel={t('home.seeAll')}
-        onActionPress={() => {
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_INDEX_HREF as Href);
-          router.dismissTo(AGENTS_INDEX_HREF as Href);
-        }}
-      />
+      {/* An accepted empty live list renders only the `Nothing running right
+          now` card, so the `Live now` / See-all header would advertise the
+          Agents live index for sessions that do not exist. Rows and the
+          loading skeletons keep the header unchanged. */}
+      {content !== 'empty' && (
+        <SectionHeader
+          label={t('home.agentSessions')}
+          actionLabel={t('home.seeAll')}
+          onActionPress={() => {
+            // Switch tabs, then pop a previously pushed history screen to the live index.
+            router.navigate(AGENTS_INDEX_HREF as Href);
+            router.dismissTo(AGENTS_INDEX_HREF as Href);
+          }}
+        />
+      )}
       <View className="mx-4 gap-2">
         <LiveSessionFeedback
           context={context}

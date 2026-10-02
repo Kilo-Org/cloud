@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Laghachi azụ",
     "idle": "Anaghị arụ ọrụ",
+    "scheduled": "Ahaziri",
     "keepEditing": "Nọgide na-edezi",
     "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
     "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
-    "creditBalanceEmpty": "Ego ojiji gị agwụla. A na-ejikwa ego ojiji maka akaụntụ a na mpụga ngwa iOS.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -240,6 +240,7 @@
     "addPasskey": "Tinye igodo nbanye",
     "passkeyDefaultName": "Igodo nbanye",
     "passkeyAddedOn": "Etinyere {{date}}",
+    "passkeyLastUsedOn": "Oge ikpeazụ ejiri ya {{date}}",
     "passkeyAdded": "Etinyela igodo nbanye.",
     "passkeyAddFailed": "Enweghị ike ịgbakwunye igodo nbanye. Nwaa ọzọ.",
     "passkeyAddUnsupported": "Ngwaọrụ a enweghị ike ịmepụta igodo nbanye.",
@@ -566,7 +567,14 @@
       "deletedUser": "onye ọrụ ehichapụrụ",
       "replyForbiddenTerm": "Ị nweghị ikike ịzaghachi {{term}} a.",
       "moreLinesAbove_one": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
-      "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu."
+      "moreLinesAbove_other": "… ahịrị {{displayCount}} ọzọ dị n'elu.",
+      "deleteComment": "Hichapụ nkwupụta",
+      "deleteCommentTitle": "Hichapụ nkwupụta?",
+      "deleteCommentMessage": "A ga-ehichapụ nkwupụta a na arịrịọ njikọta a.",
+      "commentEditFailed": "Enweghị ike ichekwa nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentEditUnavailable": "Enweghị ike idezi nkwupụta a. O nwere ike ịbụ na ehichapụrụ ya.",
+      "commentDeleteFailed": "Enweghị ike ihichapụ nkwupụta gị. Lelee njikọ gị ma nwaa ọzọ.",
+      "commentDeleteUnavailable": "Enweghị ike ihichapụ nkwupụta a."
     },
     "couldNotOpenGitHubAppSettings": "Enweghị ike imepe ntọala ngwa GitHub.",
     "installKiloGitHubApp": "Tinye ngwa Kilo GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ọ bụghị njikọ arịrịọ ijikọ koodu ma ọ bụ arịrịọ njikọta",
     "announce": {
       "commentPosted": "Ebipụtala okwu",
+      "commentUpdated": "Emelitere nkwupụta",
+      "commentDeleted": "Ehichapụrụ nkwupụta",
       "reviewSubmitted": "Ezigala nyocha",
       "autoMergeEnabled": "Agbanyela njikọta akpaghị aka"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
       "couldNotRefresh": "Enweghị ike ibugharịa",
       "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị. Nnọkọ gị ga-apụta ebe a.",
+      "viewHistory": "Ndekọ nnọkọ",
       "noMatches": "Enweghị nnọkọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "tryAdjustFilters": "Nwaa ịgbanwe ma ọ bụ iwepụ nzacha gị.",
       "couldNotSearch": "Enweghị ike ịchọ nnọkọ.",
       "completedWillAppear": "Nnọkọ ndị emechara ga-apụta ebe a.",
       "noPastSessions": "Enweghị nnọkọ gara aga",
+      "pastSessions": "Nnọkọ gara aga",
       "live": "NA-AGA UGBU A",
       "updating": "Na-emelite"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Aha nnọkọ",
       "transcriptAccessibility": "Ndekọ nnọkọ",
       "readOnly": "Ị nwere ike ịgụ naanị ihe dị na nnọkọ a.",
+      "continueInNewSession": "Gaa n'ihu na nnọkọ ọhụrụ",
       "emptyDescription": "Ziga ozi n'okpuru iji bido.",
       "emptyTranscriptDescription": "Nnọkọ a enwebeghị ozi ọ bụla.",
       "scrollToBottom": "Pịgharịa ruo n'ala",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Hapụ mgbanwe",
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
+      "selectRepositoryToStart": "Họrọ ebe nchekwa koodu iji malite.",
+      "connectProviderToStart": "Jikọọ onye na-enye ọrụ iji malite.",
       "promptPlaceholder": "Gịnị ka ị chọrọ ịrụ ọrụ na ya?",
       "couldNotLoadModels": "Enweghị ike ibudata ihe nlereanya.",
       "prefillRepoAndModelUnavailable": "Ebe nchekwa koodu na ihe nlereanya nke nnọkọ mbụ adịkwaghị. Họrọ ha n'okpuru.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Laghachi azụ wee mepee ihe ịhọrọ a ọzọ site n'ihuenyo gara aga."
   },
   "sessionRow": {
-    "needsInput": "CHỌRỌ NZAGHACHI"
+    "needsInput": "CHỌRỌ NZAGHACHI",
+    "scheduled": "AHAZIRI"
   },
   "voiceInput": {
     "listening": "Na-ege ntị...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Enweghị saịtị a tụkwasịrị obi",
     "emptyDescription": "Mgbe ị tụkwasịrị saịtị njikọ obi, njikọ ya na-emeghe na-enweghị ịjụ gị ọzọ.",
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
+    "revokeMessage": "Njikọ ndị na-aga saịtị a ga-arịọ nkwenye ọzọ.",
     "backToPreferences": "Laghachi na nhọrọ"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi.",
     "openSession": "Meghe",
     "approveFailed": "Enweghị ike ịkwado. Pịa $t(common.approve) ka ị nwaa ọzọ.",
-    "newestResult": "Nsonaazụ kacha ọhụrụ"
+    "newestResult": "Nsonaazụ kacha ọhụrụ",
+    "scheduledWakes": "ga-eteta {{time}}"
   },
   "transcriptionModel": {
     "title": "Ihe nlereanya maka ịtụgharị okwu ka ọ bụrụ ederede",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo ewepụghị",
       "unbindFailed": "Enweghị ike iwepụ repo"
     }
+  },
+  "credits": {
+    "title": "Zụta ego ojiji",
+    "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "packLabel": "Tinye ego ojiji ruru {{amount}}",
+    "priceUnavailable": "Ọnụ ahịa adịghị",
+    "purchased": "E tinyela ego ojiji na nguzozi gị.",
+    "empty": "Ngwugwu ego ojiji adịghị ugbu a.",
+    "noMatchingProducts": "App Store eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "noMatchingProductsPlay": "Google Play eweghachighị ngwugwu ego ojiji dabara adaba.",
+    "purchaseOwnedByAnotherAccount": "Ego ojiji dị na Apple Account a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya.",
+    "purchaseOwnedByAnotherAccountPlay": "Ego ojiji dị na akaụntụ Google Play a bụ nke akaụntụ Kilo ọzọ. Banye na akaụntụ Kilo ahụ iji jiri ya."
   }
 }

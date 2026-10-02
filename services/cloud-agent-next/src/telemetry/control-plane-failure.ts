@@ -38,6 +38,18 @@ const PRE_DISPATCH_SANDBOX_CONNECT: ControlPlaneFailureClassification = {
   stage: 'pre_dispatch',
   code: 'sandbox_connect_failed',
 };
+const PRE_DISPATCH_KILO_SERVER: ControlPlaneFailureClassification = {
+  stage: 'pre_dispatch',
+  code: 'kilo_server_failed',
+};
+const POST_DISPATCH_WRAPPER_NO_OUTPUT: ControlPlaneFailureClassification = {
+  stage: 'post_dispatch_no_activity',
+  code: 'wrapper_no_output',
+};
+const POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY: ControlPlaneFailureClassification = {
+  stage: 'post_dispatch_no_activity',
+  code: 'wrapper_error_before_activity',
+};
 const POST_DISPATCH_WRAPPER_PING_TIMEOUT: ControlPlaneFailureClassification = {
   stage: 'post_dispatch_no_activity',
   code: 'wrapper_ping_timeout',
@@ -64,7 +76,9 @@ export function classifyControlPlaneFailure(
   if (status === 'interrupted') {
     // An interrupted lifecycle is a cancellation, never a platform failure,
     // even when a wrapper supplied arbitrary text as the reason.
-    return reason === 'queued_message_cancelled' || reason === 'interruption_unconfirmed'
+    return reason === 'queued_message_cancelled' ||
+      reason === 'interruption_unconfirmed' ||
+      reason === 'interrupted'
       ? INTERRUPTION_USER
       : INTERRUPTION_SYSTEM;
   }
@@ -79,6 +93,35 @@ export function classifyControlPlaneFailure(
     case 'preparation_timeout':
     case 'attach_exhausted':
       return PRE_DISPATCH;
+    // Spec §10 reasons for the new plane (the mapping's one owner).
+    case 'workspace_setup_failed':
+      return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
+    case 'billing_blocked':
+      return { stage: 'pre_dispatch', code: 'payment_required' };
+    case 'billing_unavailable':
+      return { stage: 'pre_dispatch', code: 'admission_billing_unavailable' };
+    case 'invalid_configuration':
+      return PRE_DISPATCH_SANDBOX_CONNECT;
+    case 'agent_unavailable':
+      return dispatchState === 'accepted'
+        ? POST_DISPATCH_WRAPPER_DISCONNECTED
+        : PRE_DISPATCH_KILO_SERVER;
+    case 'connection_lost':
+    case 'sandbox_lost':
+    case 'agent_restarted':
+      return POST_DISPATCH_WRAPPER_DISCONNECTED;
+    case 'no_progress':
+    case 'no_outcome':
+      return POST_DISPATCH_WRAPPER_NO_OUTPUT;
+    case 'prompt_failed':
+      return POST_DISPATCH_WRAPPER_ERROR_BEFORE_ACTIVITY;
+    case 'sandbox_stopped':
+    case 'execution_limit':
+      // Spec §10 maps both to interruption/system_interrupt. The report schema
+      // permits an interruption classification only on an interrupted run, so
+      // the report writer reports a run carrying this classification as
+      // interrupted rather than dropping the report.
+      return INTERRUPTION_SYSTEM;
     case 'prompt_exhausted':
       return dispatchState === 'accepted'
         ? POST_DISPATCH_WRAPPER_DISCONNECTED
@@ -120,9 +163,23 @@ export function classifyControlPlaneFailure(
 export type ControlPlaneRunFailure = {
   stage: CloudAgentFailureStage;
   code: CloudAgentFailureCode;
+  /**
+   * The report `run.status` this classification belongs to. It lives here, the
+   * one mapping owner, so the report writer never re-derives it: an interruption
+   * classification is only representable on an interrupted run (spec §10, report
+   * schema), so a `failed` run classified as an interruption reports as
+   * `interrupted` rather than being dropped.
+   */
+  reportStatus: 'failed' | 'interrupted';
   responsibility?: CloudAgentFailureResponsibility;
   failureReason?: CloudAgentFailureReason;
 };
+
+function reportStatusFor(
+  classification: ControlPlaneFailureClassification
+): 'failed' | 'interrupted' {
+  return classification.stage === 'interruption' ? 'interrupted' : 'failed';
+}
 
 /**
  * The control-plane counterpart of the legacy `emitRunStateReport` mapping.
@@ -146,7 +203,7 @@ export function classifyControlPlaneRunFailure(input: {
     input.status,
     input.workspaceSubtype
   );
-  if (input.status !== 'failed') return base;
+  if (input.status !== 'failed') return { ...base, reportStatus: reportStatusFor(base) };
   if (input.assistantReason === undefined) {
     const mapped = classifyCloudAgentFailure({
       source: 'run',
@@ -154,7 +211,12 @@ export function classifyControlPlaneRunFailure(input: {
       code: base.code,
       ...(input.workspaceSubtype === undefined ? {} : { workspaceSubtype: input.workspaceSubtype }),
     });
-    return { ...base, responsibility: mapped.responsibility, failureReason: mapped.reason };
+    return {
+      ...base,
+      reportStatus: reportStatusFor(base),
+      responsibility: mapped.responsibility,
+      failureReason: mapped.reason,
+    };
   }
   const stage: CloudAgentFailureStage = 'agent_activity';
   const code = assistantTerminalCode(input.assistantReason) ?? 'assistant_error';
@@ -173,6 +235,7 @@ export function classifyControlPlaneRunFailure(input: {
   return {
     stage,
     code,
+    reportStatus: 'failed',
     responsibility: mapped.responsibility,
     failureReason: mapped.reason,
   };

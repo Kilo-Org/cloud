@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Врати се назад",
     "idle": "Во мирување",
+    "scheduled": "Закажано",
     "keepEditing": "Продолжи со уредување",
     "keepRunning": "Остави да работи",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Прикажи ја состојбата",
     "balanceHidden": "Состојбата е скриена",
     "bonusCreditsExpiring": "Бонус-кредитите во износ од {{amount}} истекуваат на {{date}}.",
-    "creditBalanceEmpty": "Немаш преостанати кредити. За оваа сметка, со кредитите се управува надвор од апликацијата за iOS.",
     "signOutTitle": "Да се одјавиш?",
     "signOutMessage": "Ќе треба повторно да се најавиш за да пристапиш до твојот работен простор.",
     "deleteAccountTitle": "Да се избрише сметката?",
@@ -240,6 +240,7 @@
     "addPasskey": "Додај клуч за пристап",
     "passkeyDefaultName": "Клуч за пристап",
     "passkeyAddedOn": "Додаден {{date}}",
+    "passkeyLastUsedOn": "Последно користено {{date}}",
     "passkeyAdded": "Клучот за пристап е додаден.",
     "passkeyAddFailed": "Не успеа додавањето на клуч за пристап. Обиди се повторно.",
     "passkeyAddUnsupported": "Овој уред не може да создава клучеви за пристап.",
@@ -566,7 +567,14 @@
       "deletedUser": "избришан корисник",
       "replyForbiddenTerm": "Немате дозвола за одговор на {{term}}.",
       "moreLinesAbove_one": "… уште {{displayCount}} ред погоре",
-      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре"
+      "moreLinesAbove_other": "… уште {{displayCount}} редови погоре",
+      "deleteComment": "Избриши коментар",
+      "deleteCommentTitle": "Да се избрише коментарот?",
+      "deleteCommentMessage": "Овој коментар ќе биде избришан од барањето за спојување.",
+      "commentEditFailed": "Не успеа да се зачува твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentEditUnavailable": "Овој коментар не може да се уреди. Можеби е избришан.",
+      "commentDeleteFailed": "Не успеа да се избрише твојот коментар. Провери ја врската и обиди се повторно.",
+      "commentDeleteUnavailable": "Овој коментар не може да се избрише."
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ова не е врска до барање за спојување или merge барање",
     "announce": {
       "commentPosted": "Коментарот е објавен",
+      "commentUpdated": "Коментарот е ажуриран",
+      "commentDeleted": "Коментарот е избришан",
       "reviewSubmitted": "Прегледот е испратен",
       "autoMergeEnabled": "Автоматското спојување е овозможено"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
       "couldNotRefresh": "Не успеа освежувањето",
       "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
+      "viewHistory": "Историја на сесиите",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",
       "tryAdjustFilters": "Обиди се да ги прилагодиш или исчистиш филтрите.",
       "couldNotSearch": "Не успеа пребарувањето на сесиите.",
       "completedWillAppear": "Завршените сесии ќе се појават тука.",
       "noPastSessions": "Нема претходни сесии",
+      "pastSessions": "Претходни сесии",
       "live": "ВО ЖИВО",
       "updating": "Се ажурира"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Име на сесијата",
       "transcriptAccessibility": "Транскрипт на сесијата",
       "readOnly": "Оваа сесија е само за читање.",
+      "continueInNewSession": "Продолжи во нова сесија",
       "emptyDescription": "Испрати порака подолу за да започнеш.",
       "emptyTranscriptDescription": "Оваа сесија сè уште нема пораки.",
       "scrollToBottom": "Движи се до крајот",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
+      "selectRepositoryToStart": "Изберете репозиториум за да започнете.",
+      "connectProviderToStart": "Поврзете платформа за да започнете.",
       "promptPlaceholder": "На што сакаш да работиш?",
       "couldNotLoadModels": "Не успеа вчитувањето на моделите.",
       "prefillRepoAndModelUnavailable": "Репозиториумот и моделот од првичната сесија веќе не се достапни. Избери други подолу.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Врати се на претходниот екран и повторно отвори го овој избирач."
   },
   "sessionRow": {
-    "needsInput": "ЧЕКА ВНЕС"
+    "needsInput": "ЧЕКА ВНЕС",
+    "scheduled": "ЗАКАЖАНО"
   },
   "voiceInput": {
     "listening": "Се слуша...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Нема доверливи хостови",
     "emptyDescription": "Кога ќе додадеш хост во доверливи, линковите до него ќе се отвораат без повторна потврда.",
     "revoke": "Отстрани го {{host}} од доверливите хостови",
+    "revokeMessage": "Линковите до овој хост повторно ќе бараат потврда.",
     "backToPreferences": "Назад на поставките"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран.",
     "openSession": "Отвори",
     "approveFailed": "Одобрувањето не успеа. Допри $t(common.approve) за да се обидеш повторно.",
-    "newestResult": "Најнов резултат"
+    "newestResult": "Најнов резултат",
+    "scheduledWakes": "се буди {{time}}"
   },
   "transcriptionModel": {
     "title": "Модел за транскрипција",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Репото не е поврзано",
       "unbindFailed": "Не можеше да се одврзе репото"
     }
+  },
+  "credits": {
+    "title": "Купи кредити",
+    "description": "Кредитите се еднократна набавка што се додава на вашата Kilo состојба за извршување на AI сесии за кодирање во Kilo App. Продавницата ви го наплатува сметката и кредитите се додаваат откако продавницата ќе го потврди плаќањето.",
+    "packLabel": "Додај {{amount}} кредити",
+    "priceUnavailable": "Цената не е достапна",
+    "purchased": "Кредитите се додадени на вашата состојба.",
+    "empty": "Пакетите со кредити во моментов не се достапни.",
+    "noMatchingProducts": "App Store не врати соодветни пакети со кредити.",
+    "noMatchingProductsPlay": "Google Play не врати соодветни пакети со кредити.",
+    "purchaseOwnedByAnotherAccount": "Кредитите на оваа Apple Account припаѓаат на друга сметка на Kilo. Најави се на таа сметка на Kilo за да ги користиш.",
+    "purchaseOwnedByAnotherAccountPlay": "Кредитите на оваа Google Play сметка припаѓаат на друга Kilo сметка. Најавете се на таа Kilo сметка за да ги користите."
   }
 }

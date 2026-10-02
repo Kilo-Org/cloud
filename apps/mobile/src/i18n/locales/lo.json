@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "ກັບຄືນ",
     "idle": "ວ່າງ",
+    "scheduled": "ກຳນົດເວລາ",
     "keepEditing": "ແກ້ໄຂຕໍ່",
     "keepRunning": "ເຮັດວຽກຕໍ່",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "ສະແດງຍອດເງິນຄົງເຫຼືອ",
     "balanceHidden": "ເຊື່ອງຍອດເງິນຄົງເຫຼືອແລ້ວ",
     "bonusCreditsExpiring": "ເຄຣດິດໂບນັດ {{amount}} ຈະໝົດອາຍຸ {{date}}.",
-    "creditBalanceEmpty": "ທ່ານບໍ່ມີເຄຣດິດຄົງເຫຼືອ. ການຈັດການເຄຣດິດສຳລັບບັນຊີນີ້ຕ້ອງເຮັດນອກແອັບ iOS.",
     "signOutTitle": "ອອກຈາກລະບົບບໍ?",
     "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "deleteAccountTitle": "ລຶບບັນຊີບໍ?",
@@ -240,6 +240,7 @@
     "addPasskey": "ເພີ່ມກະແຈເຂົ້າ",
     "passkeyDefaultName": "ກະແຈເຂົ້າ",
     "passkeyAddedOn": "ເພີ່ມເມື່ອ {{date}}",
+    "passkeyLastUsedOn": "ໃຊ້ຄັ້ງສຸດທ້າຍ {{date}}",
     "passkeyAdded": "ເພີ່ມກະແຈເຂົ້າແລ້ວ.",
     "passkeyAddFailed": "ບໍ່ສາມາດເພີ່ມກະແຈເຂົ້າໄດ້. ລອງອີກຄັ້ງ.",
     "passkeyAddUnsupported": "ອຸປະກອນນີ້ສ້າງກະແຈເຂົ້າບໍ່ໄດ້.",
@@ -566,7 +567,14 @@
       "deletedUser": "ຜູ້ໃຊ້ທີ່ຖືກລຶບ",
       "replyForbiddenTerm": "ທ່ານບໍ່ມີສິດຕອບໃນ{{term}}ນີ້.",
       "moreLinesAbove_one": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
-      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ."
+      "moreLinesAbove_other": "… ຍັງມີອີກ {{displayCount}} ບັນທັດຢູ່ຂ້າງເທິງ.",
+      "deleteComment": "ລຶບຄຳເຫັນ",
+      "deleteCommentTitle": "ລຶບຄຳເຫັນ?",
+      "deleteCommentMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄຳຂໍລວມໂຄດ.",
+      "commentEditFailed": "ບໍ່ສາມາດບັນທຶກຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentEditUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດແກ້ໄຂໄດ້. ອາດຈະຖືກລຶບໄປແລ້ວ.",
+      "commentDeleteFailed": "ບໍ່ສາມາດລຶບຄຳເຫັນຂອງທ່ານໄດ້. ກວດສອບການເຊື່ອມຕໍ່ ແລ້ວລອງອີກຄັ້ງ.",
+      "commentDeleteUnavailable": "ຄຳເຫັນນີ້ບໍ່ສາມາດລຶບໄດ້."
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ບໍ່ແມ່ນລິ້ງຄຳຂໍລວມໂຄ້ດ ຫຼື merge request",
     "announce": {
       "commentPosted": "ໂພດຄຳເຫັນແລ້ວ",
+      "commentUpdated": "ອັບເດດຄຳເຫັນແລ້ວ",
+      "commentDeleted": "ລຶບຄຳເຫັນແລ້ວ",
       "reviewSubmitted": "ສົ່ງຜົນການກວດທານແລ້ວ",
       "autoMergeEnabled": "ເປີດການລວມອັດຕະໂນມັດແລ້ວ"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
       "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
       "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
+      "viewHistory": "ປະຫວັດເຊດຊັນ",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",
       "tryAdjustFilters": "ລອງປັບ ຫຼື ລ້າງຕົວກັ່ນຕອງຂອງທ່ານ.",
       "couldNotSearch": "ບໍ່ສາມາດຄົ້ນຫາເຊດຊັນໄດ້.",
       "completedWillAppear": "ເຊດຊັນທີ່ສຳເລັດແລ້ວຈະປາກົດຢູ່ນີ້.",
       "noPastSessions": "ບໍ່ມີເຊດຊັນທີ່ຜ່ານມາ",
+      "pastSessions": "ເຊດຊັນທີ່ຜ່ານມາ",
       "live": "ສົດ",
       "updating": "ກຳລັງອັບເດດ"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "ຊື່ເຊດຊັນ",
       "transcriptAccessibility": "ບັນທຶກການສົນທະນາໃນເຊດຊັນ",
       "readOnly": "ເຊດຊັນນີ້ອ່ານໄດ້ຢ່າງດຽວ.",
+      "continueInNewSession": "ສືບຕໍ່ໃນເຊດຊັນໃໝ່",
       "emptyDescription": "ສົ່ງຂໍ້ຄວາມຂ້າງລຸ່ມເພື່ອເລີ່ມຕົ້ນ.",
       "emptyTranscriptDescription": "ເຊດຊັນນີ້ຍັງບໍ່ມີຂໍ້ຄວາມ.",
       "scrollToBottom": "ເລື່ອນໄປລຸ່ມສຸດ",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
+      "selectRepositoryToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເລືອກຄັງໂຄດ.",
+      "connectProviderToStart": "ເພື່ອເລີ່ມຕົ້ນ ໃຫ້ເຊື່ອມຕໍ່ຜູ້ໃຫ້ບໍລິການ.",
       "promptPlaceholder": "ຢາກເຮັດວຽກຫຍັງ?",
       "couldNotLoadModels": "ບໍ່ສາມາດໂຫຼດໂມເດວໄດ້.",
       "prefillRepoAndModelUnavailable": "ຄັງໂຄດແລະໂມເດວຂອງເຊດຊັນເດີມໃຊ້ບໍ່ໄດ້ແລ້ວ. ເລືອກໃໝ່ຂ້າງລຸ່ມ.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "ກັບໄປທີ່ໜ້າຈໍກ່ອນໜ້າ ແລ້ວເປີດໜ້າເລືອກນີ້ອີກຄັ້ງ."
   },
   "sessionRow": {
-    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ"
+    "needsInput": "ລໍຂໍ້ມູນຈາກທ່ານ",
+    "scheduled": "ກຳນົດເວລາ"
   },
   "voiceInput": {
     "listening": "ກຳລັງຟັງ...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "ຍັງບໍ່ມີໂຮສທີ່ໄວ້ໃຈໄດ້",
     "emptyDescription": "ເມື່ອທ່ານເລືອກໄວ້ໃຈໂຮສຂອງລິ້ງ ລິ້ງຈາກໂຮສນັ້ນຈະເປີດໂດຍບໍ່ຖາມອີກ.",
     "revoke": "ຍົກເລີກການໄວ້ໃຈ {{host}}",
+    "revokeMessage": "ລິ້ງໄປຫາໂຮສນີ້ຈະຂໍການຢືນຢັນອີກຄັ້ງ.",
     "backToPreferences": "ກັບໄປທີ່ການຕັ້ງຄ່າ"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງເອເຈນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ.",
     "openSession": "ເປີດ",
     "approveFailed": "ບໍ່ສາມາດອະນຸມັດໄດ້. ແຕະ $t(common.approve) ເພື່ອລອງອີກຄັ້ງ.",
-    "newestResult": "ຜົນຫຼ້າສຸດ"
+    "newestResult": "ຜົນຫຼ້າສຸດ",
+    "scheduledWakes": "ຕື່ນ {{time}}"
   },
   "transcriptionModel": {
     "title": "ໂມເດວຖອດສຽງເປັນຂໍ້ຄວາມ",
@@ -3431,5 +3449,17 @@
       "unboundToast": "ຍົກເລີກການຜູກມັດ repo ແລ້ວ",
       "unbindFailed": "ບໍ່ສາມາດຍົກເລີກການຜູກມັດ repo ໄດ້"
     }
+  },
+  "credits": {
+    "title": "ຊື້ເຄຣດິດ",
+    "description": "ເຄຣດິດເປັນການຊື້ຄັ້ງດຽວທີ່ເພີ່ມໃສ່ຍອດ Kilo ຂອງທ່ານສຳລັບການແລ່ນເຊດຊັນການຂຽນໂຄ້ດ AI ໃນ Kilo App. ຮ້ານຄ້າຄິດຄ່າຈາກບັນຊີຂອງທ່ານ ແລະ ເຄຣດິດຈະຖືກເພີ່ມຫຼັງຈາກຮ້ານຄ້າຢືນຢັນການຊຳລະ.",
+    "packLabel": "ເພີ່ມເຄຣດິດມູນຄ່າ {{amount}}",
+    "priceUnavailable": "ບໍ່ມີລາຄາ",
+    "purchased": "ເພີ່ມເຄຣດິດໃສ່ຍອດຂອງທ່ານແລ້ວ.",
+    "empty": "ແພັກເຄຣດິດບໍ່ສາມາດໃຊ້ໄດ້ໃນຕອນນີ້.",
+    "noMatchingProducts": "App Store ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "noMatchingProductsPlay": "Google Play ບໍ່ໄດ້ສົ່ງແພັກເຄຣດິດທີ່ກົງກັນຄືນ.",
+    "purchaseOwnedByAnotherAccount": "ເຄຣດິດໃນ Apple Account ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ.",
+    "purchaseOwnedByAnotherAccountPlay": "ເຄຣດິດໃນບັນຊີ Google Play ນີ້ເປັນຂອງບັນຊີ Kilo ອື່ນ. ເຂົ້າສູ່ລະບົບບັນຊີ Kilo ນັ້ນເພື່ອໃຊ້ມັນ."
   }
 }

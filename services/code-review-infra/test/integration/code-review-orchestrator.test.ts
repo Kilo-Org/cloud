@@ -1098,6 +1098,114 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(failedStatusUpdates).toHaveLength(0);
   });
 
+  it('retries with a fresh session when initiate reports retryable billing unavailability', async () => {
+    const stub = getReviewStub();
+    let prepareCalls = 0;
+    let initiateCalls = 0;
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        prepareCalls += 1;
+        return trpcSuccess({
+          cloudAgentSessionId: `agent-billing-retry-${prepareCalls}`,
+          kiloSessionId: 'ses_billing_retry',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        initiateCalls += 1;
+        if (initiateCalls === 1) {
+          return trpcError(
+            503,
+            'Cloud Agent cannot verify compute billing right now',
+            'SERVICE_UNAVAILABLE',
+            {
+              path: 'initiateFromKilocodeSessionV2',
+              error: 'BILLING_UNAVAILABLE',
+              retryable: true,
+            }
+          );
+        }
+        return trpcSuccess({ executionId: 'exec-billing-retry', status: 'running' });
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    const retrySchedulingStartedAt = Date.now();
+    const ran = await runDurableObjectAlarm(stub);
+
+    expect(ran).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(1);
+    await expectAutoRetryScheduled(stub, retrySchedulingStartedAt);
+
+    const retryRan = await runDurableObjectAlarm(stub);
+    expect(retryRan).toBe(true);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'running' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(2);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      sandboxRetryAttempted: true,
+      status: 'running',
+    });
+    expect(lastStatusUpdateBody(fetchMock)).not.toMatchObject({ status: 'failed' });
+  });
+
+  it('fails the review when billing stays unavailable after the fresh-session retry', async () => {
+    const stub = getReviewStub();
+    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+      const url = String(request);
+      if (url.includes('/api/internal/code-review-status/')) {
+        return Response.json({ success: true });
+      }
+      if (url.includes('/trpc/prepareSession')) {
+        return trpcSuccess({
+          cloudAgentSessionId: 'agent-billing-exhausted',
+          kiloSessionId: 'ses_billing_exhausted',
+        });
+      }
+      if (url.includes('/trpc/initiateFromKilocodeSessionV2')) {
+        return trpcError(
+          503,
+          'Cloud Agent cannot verify compute billing right now',
+          'SERVICE_UNAVAILABLE',
+          {
+            path: 'initiateFromKilocodeSessionV2',
+            error: 'BILLING_UNAVAILABLE',
+            retryable: true,
+          }
+        );
+      }
+      return new Response('unexpected fetch', { status: 500 });
+    });
+    globalThis.fetch = fetchMock;
+
+    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+      await state.storage.put('state', codeReview());
+      await state.storage.setAlarm(Date.now() + 30_000);
+    });
+
+    await runDurableObjectAlarm(stub);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'queued' });
+
+    await runDurableObjectAlarm(stub);
+    await expect(stub.status()).resolves.toMatchObject({ status: 'failed' });
+    expect(fetchCalls(fetchMock, '/trpc/prepareSession')).toHaveLength(2);
+    expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(2);
+    await expect(storedReview(stub)).resolves.toMatchObject({
+      status: 'failed',
+      sandboxRetryAttempted: true,
+    });
+  });
+
   it('retries workspace mkdir prose once by default', async () => {
     const stub = getReviewStub();
     let prepareCalls = 0;

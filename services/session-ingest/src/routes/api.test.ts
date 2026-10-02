@@ -123,7 +123,10 @@ function ingestRequest(body: string, contentLength = new TextEncoder().encode(bo
 
 function r2StagingStub(env: Parameters<typeof getSessionIngestDO>[0]) {
   return {
-    stageR2Object: async (params: { key: string }, body: ReadableStream<Uint8Array>) => {
+    stageR2Object: async (
+      params: { key: string },
+      body: ReadableStream<Uint8Array> | Uint8Array
+    ) => {
       await env.SESSION_INGEST_R2.put(params.key, body);
       return true;
     },
@@ -807,7 +810,7 @@ describe('api routes', () => {
     it.each([
       ['invalid config', { DIRECT_INGEST_PERCENT: 'invalid' }, 'gate_config'],
       ['percent miss', { DIRECT_INGEST_USER_IDS: '' }, 'gate_percent'],
-    ] as const)('uses the streaming legacy path for %s', async (_name, overrides, reason) => {
+    ] as const)('uses the legacy path for %s', async (_name, overrides, reason) => {
       const { app, ingest } = prepareIngestRoute();
       const env = makeTestEnv(overrides);
       const body = JSON.stringify({ data: [{ type: 'message', data: { id: 'msg_1' } }] });
@@ -828,32 +831,41 @@ describe('api routes', () => {
     });
 
     it.each([
-      ['missing', undefined, 'no_content_length'],
-      ['negative', '-1', 'invalid_content_length'],
-      ['fractional', '1.5', 'invalid_content_length'],
-      ['non-numeric', 'abc', 'invalid_content_length'],
-      ['zero', '0', 'empty_body'],
-      ['over cap', '4194305', 'oversized_body'],
-    ])('uses the legacy path for %s Content-Length', async (_name, contentLength, reason) => {
-      const { app, ingest } = prepareIngestRoute();
-      const env = directIngestEnv();
-      const headers = contentLength === undefined ? undefined : { 'content-length': contentLength };
-      const info = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const request = new Request(
-        'http://local/session/ses_12345678901234567890123456/ingest?v=1',
-        { method: 'POST', headers, body: '{}' }
-      );
+      ['missing', undefined, 'no_content_length', 'stream'],
+      ['negative', '-1', 'invalid_content_length', 'stream'],
+      ['fractional', '1.5', 'invalid_content_length', 'stream'],
+      ['non-numeric', 'abc', 'invalid_content_length', 'stream'],
+      ['zero', '0', 'empty_body', 'bytes'],
+      ['over cap', '4194305', 'oversized_body', 'stream'],
+    ] as const)(
+      'uses the legacy path for %s Content-Length',
+      async (_name, contentLength, reason, bodyShape) => {
+        const { app, ingest } = prepareIngestRoute();
+        const env = directIngestEnv();
+        const headers =
+          contentLength === undefined ? undefined : { 'content-length': contentLength };
+        const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+        const request = new Request(
+          'http://local/session/ses_12345678901234567890123456/ingest?v=1',
+          { method: 'POST', headers, body: '{}' }
+        );
 
-      const response = await app.fetch(request, env);
+        const response = await app.fetch(request, env);
 
-      expect(response.status).toBe(200);
-      expect(ingest).not.toHaveBeenCalled();
-      expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
-      expect(info).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'direct_ingest_legacy', reason })
-      );
-      info.mockRestore();
-    });
+        expect(response.status).toBe(200);
+        expect(ingest).not.toHaveBeenCalled();
+        expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledTimes(1);
+        // A measured small body crosses the DO RPC by value; an unmeasured or
+        // over-budget body keeps streaming.
+        expect(env.SESSION_INGEST_R2.put.mock.calls[0][1]).toBeInstanceOf(
+          bodyShape === 'bytes' ? Uint8Array : ReadableStream
+        );
+        expect(info).toHaveBeenCalledWith(
+          expect.objectContaining({ event: 'direct_ingest_legacy', reason })
+        );
+        info.mockRestore();
+      }
+    );
 
     it('keeps gate-miss staging failures out of the direct fallback denominator', async () => {
       const { app } = prepareIngestRoute();
@@ -1013,7 +1025,7 @@ describe('api routes', () => {
       expect(ingest).not.toHaveBeenCalled();
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         expect.stringMatching(/\/ses_12345678901234567890123456\//),
-        expect.any(ReadableStream)
+        expect.any(Uint8Array)
       );
       expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(info).toHaveBeenCalledWith(
@@ -1068,7 +1080,7 @@ describe('api routes', () => {
       expect(ingest).toHaveBeenCalledTimes(1);
       expect(env.SESSION_INGEST_R2.put).toHaveBeenCalledWith(
         'ingest/usr_test/ses_12345678901234567890123456/11111111-1111-4111-8111-111111111111',
-        expect.any(ReadableStream)
+        expect.any(Uint8Array)
       );
       expect(await new Response(env.SESSION_INGEST_R2.put.mock.calls[0][1]).text()).toBe(body);
       expect(env.INGEST_QUEUE.send).toHaveBeenCalledWith(

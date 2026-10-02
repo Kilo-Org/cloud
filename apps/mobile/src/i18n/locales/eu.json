@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Itzuli",
     "idle": "Geldirik",
+    "scheduled": "Programatuta",
     "keepEditing": "Jarraitu editatzen",
     "keepRunning": "Jarraitu exekutatzen",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
     "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
-    "creditBalanceEmpty": "Ez duzu krediturik geratzen. Kontu honetan, kredituak iOS aplikaziotik kanpo kudeatzen dira.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -240,6 +240,7 @@
     "addPasskey": "Gehitu sarbide-gako bat",
     "passkeyDefaultName": "Sarbide-gakoa",
     "passkeyAddedOn": "Gehitua {{date}}",
+    "passkeyLastUsedOn": "Azken erabilera {{date}}",
     "passkeyAdded": "Sarbide-gakoa gehituta.",
     "passkeyAddFailed": "Ezin izan da sarbide-gako bat gehitu. Saiatu berriro.",
     "passkeyAddUnsupported": "Gailu honek ezin ditu sarbide-gakoak sortu.",
@@ -566,7 +567,14 @@
       "deletedUser": "erabiltzaile ezabatua",
       "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
       "moreLinesAbove_one": "… Beste {{displayCount}} lerro dago goian.",
-      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian."
+      "moreLinesAbove_other": "… Beste {{displayCount}} lerro daude goian.",
+      "deleteComment": "Ezabatu iruzkina",
+      "deleteCommentTitle": "Iruzkina ezabatu?",
+      "deleteCommentMessage": "Iruzkin hau bateratze-eskaeratik ezabatuko da.",
+      "commentEditFailed": "Ezin izan da zure iruzkina gorde. Egiaztatu konexioa eta saiatu berriro.",
+      "commentEditUnavailable": "Iruzkin hau ezin da editatu. Baliteke ezabatuta egotea.",
+      "commentDeleteFailed": "Ezin izan da zure iruzkina ezabatu. Egiaztatu konexioa eta saiatu berriro.",
+      "commentDeleteUnavailable": "Iruzkin hau ezin da ezabatu."
     },
     "couldNotOpenGitHubAppSettings": "Ezin izan dira GitHub aplikazioaren ezarpenak ireki.",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
@@ -712,7 +720,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editatu bidaltzeko dagoen iruzkin zaharkitua: {{location}}",
       "editA11y": "Editatu bidaltzeko dagoen iruzkina: {{location}}",
-      "staleHint": "pRa aldatu da hau idatzi zenuenetik.",
+      "staleHint": "PRa aldatu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu bidaltzeko dagoen iruzkina: {{location}}",
       "deletedAnnouncement": "Bidaltzeko zegoen iruzkina ezabatuta",
       "noCommentsQueued": "Ez dago iruzkinik ilaran. Berrikuspena goiko gertaerarekin soilik bidaliko da.",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
     "announce": {
       "commentPosted": "Iruzkina argitaratuta",
+      "commentUpdated": "Iruzkina eguneratu da",
+      "commentDeleted": "Iruzkina ezabatu da",
       "reviewSubmitted": "Berrikuspena bidalita",
       "autoMergeEnabled": "Bateratze automatikoa gaituta"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Ezin izan dira saio aktiboak kargatu.",
       "couldNotRefresh": "Ezin izan da freskatu",
       "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik. Zure saioak hemen agertuko dira.",
+      "viewHistory": "Saioen historiala",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu beste bilaketa-termino batekin.",
       "tryAdjustFilters": "Saiatu iragazkiak doitzen edo ezabatzen.",
       "couldNotSearch": "Ezin izan dira saioak bilatu.",
       "completedWillAppear": "Amaitutako saioak hemen agertuko dira.",
       "noPastSessions": "Ez dago aurreko saiorik",
+      "pastSessions": "Aurreko saioak",
       "live": "ZUZENEAN",
       "updating": "Eguneratzen"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Saioaren izena",
       "transcriptAccessibility": "Saioaren transkripzioa",
       "readOnly": "Saio hau irakurtzeko soilik da.",
+      "continueInNewSession": "Jarraitu saio berri batean",
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
       "emptyTranscriptDescription": "Saio honek oraindik ez du mezurik.",
       "scrollToBottom": "Joan behealdera",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
+      "selectRepositoryToStart": "Hautatu biltegi bat hasteko.",
+      "connectProviderToStart": "Konektatu hornitzaile bat hasteko.",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
       "couldNotLoadModels": "Ezin izan dira modeloak kargatu.",
       "prefillRepoAndModelUnavailable": "Jatorrizko saioaren biltegia eta modeloa jada ez daude erabilgarri. Aukeratu beste batzuk behean.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Itzuli aurreko pantailara eta ireki hautatzaile hau berriro."
   },
   "sessionRow": {
-    "needsInput": "ZURE ERANTZUNAREN ZAIN"
+    "needsInput": "ZURE ERANTZUNAREN ZAIN",
+    "scheduled": "PROGRAMATUTA"
   },
   "voiceInput": {
     "listening": "Entzuten...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Ez dago konfiantzako ostalaririk",
     "emptyDescription": "Esteka baten ostalariari konfiantza ematen badiozu, haren estekak berriro galdetu gabe irekiko dira.",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
+    "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko.",
     "openSession": "Ireki",
     "approveFailed": "Ezin izan da onartu. Sakatu $t(common.approve) berriro saiatzeko.",
-    "newestResult": "Emaitza berriena"
+    "newestResult": "Emaitza berriena",
+    "scheduledWakes": "{{time}} esnatuko da"
   },
   "transcriptionModel": {
     "title": "Transkripzio-eredua",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo lotu gabe",
       "unbindFailed": "Ezin izan da biltegia deslotu"
     }
+  },
+  "credits": {
+    "title": "Erosi kredituak",
+    "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "packLabel": "Gehitu {{amount}} kreditutan",
+    "priceUnavailable": "Prezioa ez dago erabilgarri",
+    "purchased": "Kredituak zure saldoari gehitu zaizkio.",
+    "empty": "Kreditu-paketeak ez daude orain erabilgarri.",
+    "noMatchingProducts": "App Store-k ez du bat datorren kreditu-paketerik itzuli.",
+    "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
+    "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
+    "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   }
 }

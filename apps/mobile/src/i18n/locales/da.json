@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gå tilbage",
     "idle": "Inaktiv",
+    "scheduled": "Planlagt",
     "keepEditing": "Fortsæt med at redigere",
     "keepRunning": "Lad køre",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
-    "creditBalanceEmpty": "Din kreditsaldo er 0. Kreditter til denne konto administreres uden for iOS-appen.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -240,6 +240,7 @@
     "addPasskey": "Tilføj en adgangsnøgle",
     "passkeyDefaultName": "Adgangsnøgle",
     "passkeyAddedOn": "Tilføjet {{date}}",
+    "passkeyLastUsedOn": "Sidst brugt {{date}}",
     "passkeyAdded": "Adgangsnøgle tilføjet.",
     "passkeyAddFailed": "Kunne ikke tilføje en adgangsnøgle. Prøv igen.",
     "passkeyAddUnsupported": "Denne enhed kan ikke oprette adgangsnøgler.",
@@ -566,7 +567,14 @@
       "deletedUser": "slettet bruger",
       "replyForbiddenTerm": "Du har ikke tilladelse til at svare på denne {{term}}.",
       "moreLinesAbove_one": "… der er flere linjer ovenfor: {{displayCount}}.",
-      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}."
+      "moreLinesAbove_other": "… der er flere linjer ovenfor: {{displayCount}}.",
+      "deleteComment": "Slet kommentar",
+      "deleteCommentTitle": "Slet kommentaren?",
+      "deleteCommentMessage": "Denne kommentar bliver slettet fra pull requesten.",
+      "commentEditFailed": "Kunne ikke gemme din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentEditUnavailable": "Denne kommentar kan ikke redigeres. Den er muligvis slettet.",
+      "commentDeleteFailed": "Kunne ikke slette din kommentar. Tjek din forbindelse, og prøv igen.",
+      "commentDeleteUnavailable": "Denne kommentar kan ikke slettes."
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Linket fører ikke til en pull request eller merge request",
     "announce": {
       "commentPosted": "Kommentar sendt",
+      "commentUpdated": "Kommentar opdateret",
+      "commentDeleted": "Kommentar slettet",
       "reviewSubmitted": "Gennemgang sendt",
       "autoMergeEnabled": "Automatisk fletning aktiveret"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
       "couldNotRefresh": "Kunne ikke opdatere",
       "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
+      "viewHistory": "Sessionshistorik",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",
       "tryAdjustFilters": "Prøv at justere eller fjerne dine filtre.",
       "couldNotSearch": "Der kunne ikke søges i sessionerne.",
       "completedWillAppear": "Afsluttede sessioner vises her.",
       "noPastSessions": "Ingen tidligere sessioner",
+      "pastSessions": "Tidligere sessioner",
       "live": "I REALTID",
       "updating": "Opdaterer"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Sessionens navn",
       "transcriptAccessibility": "Sessionens samtalehistorik",
       "readOnly": "Denne session er skrivebeskyttet.",
+      "continueInNewSession": "Fortsæt i en ny session",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
       "emptyTranscriptDescription": "Denne session har endnu ingen beskeder.",
       "scrollToBottom": "Rul til bunden",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Behold ændringer",
       "commitAndPush": "Commit og push",
       "startSession": "Start en session",
+      "selectRepositoryToStart": "Vælg et kodelager for at starte.",
+      "connectProviderToStart": "Tilslut en udbyder for at starte.",
       "promptPlaceholder": "Hvad vil du gerne arbejde med?",
       "couldNotLoadModels": "Kunne ikke indlæse modellerne.",
       "prefillRepoAndModelUnavailable": "Kodelageret og modellen fra den oprindelige session er ikke længere tilgængelige. Vælg et andet kodelager og en anden model nedenfor.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Gå tilbage til den forrige skærm og åbn valgmulighederne igen."
   },
   "sessionRow": {
-    "needsInput": "AFVENTER SVAR"
+    "needsInput": "AFVENTER SVAR",
+    "scheduled": "PLANLAGT"
   },
   "voiceInput": {
     "listening": "Lytter...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
     "revoke": "Fjern tillid til {{host}}",
+    "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen.",
     "openSession": "Åbn",
     "approveFailed": "Kunne ikke godkende. Tryk på $t(common.approve) for at prøve igen.",
-    "newestResult": "Nyeste resultat"
+    "newestResult": "Nyeste resultat",
+    "scheduledWakes": "vågner {{time}}"
   },
   "transcriptionModel": {
     "title": "Transskriptionsmodel",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Repo kunne ikke ophæves"
     }
+  },
+  "credits": {
+    "title": "Køb kreditter",
+    "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "packLabel": "Tilføj {{amount}} i kreditter",
+    "priceUnavailable": "Pris ikke tilgængelig",
+    "purchased": "Kreditter er føjet til din saldo.",
+    "empty": "Kreditpakker er ikke tilgængelige lige nu.",
+    "noMatchingProducts": "App Store returnerede ingen matchende kreditpakker.",
+    "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
+    "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   }
 }

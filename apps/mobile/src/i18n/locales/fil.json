@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Bumalik",
     "idle": "Walang ginagawa",
+    "scheduled": "Naka-iskedyul",
     "keepEditing": "Ituloy ang pag-edit",
     "keepRunning": "Hayaang tumakbo",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Ipakita ang balanse",
     "balanceHidden": "Nakatago ang balanse",
     "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
-    "creditBalanceEmpty": "Wala ka nang kredito. Para sa akawnt na ito, pinamamahalaan ang kredito sa labas ng iOS app.",
     "signOutTitle": "Mag-sign out?",
     "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "deleteAccountTitle": "Burahin ang akawnt?",
@@ -240,6 +240,7 @@
     "addPasskey": "Magdagdag ng passkey",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Idinagdag {{date}}",
+    "passkeyLastUsedOn": "Huling ginamit {{date}}",
     "passkeyAdded": "Naidagdag ang passkey.",
     "passkeyAddFailed": "Hindi maidagdag ang passkey. Subukan muli.",
     "passkeyAddUnsupported": "Hindi makakagawa ng mga passkey ang device na ito.",
@@ -566,7 +567,14 @@
       "deletedUser": "binurang user",
       "replyForbiddenTerm": "Wala kang pahintulot na sumagot sa {{term}} na ito.",
       "moreLinesAbove_one": "… may {{displayCount}} pang linya sa itaas.",
-      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas."
+      "moreLinesAbove_other": "… may {{displayCount}} pang linya sa itaas.",
+      "deleteComment": "Alisin ang komento",
+      "deleteCommentTitle": "Alisin ang komento?",
+      "deleteCommentMessage": "Aalisin ang komentong ito sa pull request.",
+      "commentEditFailed": "Hindi mai-save ang komento mo. Suriin ang koneksyon mo at subukan muli.",
+      "commentEditUnavailable": "Hindi ma-edit ang komentong ito. Maaaring naalis na ito.",
+      "commentDeleteFailed": "Hindi maalis ang komento mo. Suriin ang koneksyon mo at subukan muli.",
+      "commentDeleteUnavailable": "Hindi maalis ang komentong ito."
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Hindi ito link ng pull request o merge request",
     "announce": {
       "commentPosted": "Na-post ang komento",
+      "commentUpdated": "Na-update ang komento",
+      "commentDeleted": "Naalis ang komento",
       "reviewSubmitted": "Naisumite ang pagsusuri",
       "autoMergeEnabled": "Aktibo na ang awtomatikong pag-merge"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Hindi ma-load ang mga aktibong session.",
       "couldNotRefresh": "Hindi ma-refresh",
       "noSessionsYetDescription": "Magsimula ng gawain sa pag-code gamit ang telepono mo. Lalabas dito ang mga session mo.",
+      "viewHistory": "Kasaysayan ng mga session",
       "noMatches": "Walang session na tugma",
       "tryDifferentSearch": "Subukang maghanap gamit ang ibang salita.",
       "tryAdjustFilters": "Subukang baguhin o alisin ang mga filter mo.",
       "couldNotSearch": "Hindi mahanap ang mga session.",
       "completedWillAppear": "Lalabas dito ang mga natapos na session.",
       "noPastSessions": "Walang nakaraang session",
+      "pastSessions": "Mga nakaraang session",
       "live": "AKTIBO",
       "updating": "Ina-update"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Pangalan ng sesyon",
       "transcriptAccessibility": "Tala ng pag-uusap sa sesyon",
       "readOnly": "Mababasa lang ang sesyong ito.",
+      "continueInNewSession": "Magpatuloy sa bagong sesyon",
       "emptyDescription": "Magpadala ng mensahe sa ibaba para magsimula.",
       "emptyTranscriptDescription": "Wala pang mensahe ang sesyong ito.",
       "scrollToBottom": "I-scroll sa ibaba",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",
+      "selectRepositoryToStart": "Pumili ng imbakan ng code para magsimula.",
+      "connectProviderToStart": "Ikonekta ang isang provider para magsimula.",
       "promptPlaceholder": "Ano ang gusto mong gawin?",
       "couldNotLoadModels": "Hindi ma-load ang mga modelo.",
       "prefillRepoAndModelUnavailable": "Hindi na magamit ang imbakan ng code at modelo ng orihinal na sesyon. Pumili ng mga kapalit sa ibaba.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Bumalik sa naunang screen at muling buksan ang pagpipiliang ito."
   },
   "sessionRow": {
-    "needsInput": "NAGHIHINTAY NG SAGOT"
+    "needsInput": "NAGHIHINTAY NG SAGOT",
+    "scheduled": "NAKA-ISKEDYUL"
   },
   "voiceInput": {
     "listening": "Nakikinig...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Walang pinagkakatiwalaang host",
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
     "revoke": "Bawiin ang tiwala sa {{host}}",
+    "revokeMessage": "Muling hihingi ng kumpirmasyon ang mga link sa host na ito.",
     "backToPreferences": "Bumalik sa mga setting"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen.",
     "openSession": "Buksan",
     "approveFailed": "Hindi maaprubahan. I-tap ang $t(common.approve) para subukang muli.",
-    "newestResult": "Pinakabagong resulta"
+    "newestResult": "Pinakabagong resulta",
+    "scheduledWakes": "gigising {{time}}"
   },
   "transcriptionModel": {
     "title": "Modelo para sa pagsasalin ng boses sa teksto",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Nakalag ang repo",
       "unbindFailed": "Hindi ma-unbind ang repo"
     }
+  },
+  "credits": {
+    "title": "Bumili ng kredito",
+    "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
+    "packLabel": "Magdagdag ng {{amount}} na kredito",
+    "priceUnavailable": "Hindi available ang presyo",
+    "purchased": "Naidagdag na ang kredito sa iyong balance.",
+    "empty": "Hindi available ang mga credit pack sa ngayon.",
+    "noMatchingProducts": "Walang katugmang credit pack na ibinalik ang App Store.",
+    "noMatchingProductsPlay": "Walang katugmang credit pack na ibinalik ang Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ang kredito sa Apple Account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito.",
+    "purchaseOwnedByAnotherAccountPlay": "Ang kredito sa Google Play account na ito ay kabilang sa ibang Kilo account. Mag-sign in sa Kilo account na iyon para magamit ito."
   }
 }

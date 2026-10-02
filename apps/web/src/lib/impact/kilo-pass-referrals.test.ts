@@ -526,6 +526,53 @@ describe('Kilo Pass Impact referral conversions', () => {
     expect(await db.select().from(impact_referral_rewards)).toHaveLength(0);
   });
 
+  test('concurrent deliveries of one invoice create a single conversion and keep the affiliate SALE', async () => {
+    const referee = await insertTestUser({ created_at: '2026-01-02T00:00:00.000Z' });
+    await db.insert(user_affiliate_attributions).values({
+      user_id: referee.id,
+      provider: 'impact',
+      tracking_id: '',
+    });
+    const subscriptionId = await insertKiloPassSubscription({ userId: referee.id });
+    const invoiceId = `inv_${randomUUID()}`;
+    await seedCurrentIssuance(subscriptionId, invoiceId);
+
+    const runConversion = () =>
+      processPersonalKiloPassStripePaidConversion({
+        userId: referee.id,
+        kiloPassSubscriptionId: subscriptionId,
+        sourcePaymentId: invoiceId,
+        orderId: invoiceId,
+        amount: 49,
+        currencyCode: 'usd',
+        itemCategory: 'kilo-pass-tier-49-monthly',
+        itemName: 'Kilo Pass Tier 49 Monthly',
+        itemSku: 'price_kilo_pass_49_monthly',
+        sourceTier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        convertedAt: new Date('2026-01-03T00:00:00.000Z'),
+      });
+
+    const dispositions = await Promise.all([runConversion(), runConversion()]);
+
+    expect(dispositions).toEqual([
+      expect.objectContaining({
+        shouldEnqueueAffiliateSale: true,
+        winningTouchType: ImpactReferralWinningTouchType.Affiliate,
+      }),
+      expect.objectContaining({
+        shouldEnqueueAffiliateSale: true,
+        winningTouchType: ImpactReferralWinningTouchType.Affiliate,
+      }),
+    ]);
+    const conversions = await db
+      .select()
+      .from(impact_referral_conversions)
+      .where(eq(impact_referral_conversions.source_payment_id, invoiceId));
+    expect(conversions).toHaveLength(1);
+    expect(await db.select().from(impact_referral_rewards)).toHaveLength(0);
+  });
+
   test('missing attribution and expired product-scoped touches suppress affiliate SALE reporting', async () => {
     const noTouchReferee = await insertTestUser({ created_at: '2026-01-02T00:00:00.000Z' });
     const noTouchSubscriptionId = await insertKiloPassSubscription({

@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Torna indietro",
     "idle": "Inattivo",
+    "scheduled": "Pianificata",
     "keepEditing": "Continua a modificare",
     "keepRunning": "Continua l'esecuzione",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
     "bonusCreditsExpiring": "{{amount}} di crediti bonus scadono il {{date}}.",
-    "creditBalanceEmpty": "Hai esaurito i crediti. Per questo account, i crediti si gestiscono al di fuori dell'app iOS.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -240,6 +240,7 @@
     "addPasskey": "Aggiungi una passkey",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Aggiunta il {{date}}",
+    "passkeyLastUsedOn": "Ultimo utilizzo {{date}}",
     "passkeyAdded": "Passkey aggiunta.",
     "passkeyAddFailed": "Impossibile aggiungere una passkey. Riprova.",
     "passkeyAddUnsupported": "Questo dispositivo non può creare passkey.",
@@ -1491,12 +1492,14 @@
       "couldNotLoadActive": "Impossibile caricare le sessioni attive.",
       "couldNotRefresh": "Impossibile aggiornare",
       "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono. Le tue sessioni appariranno qui.",
+      "viewHistory": "Cronologia delle sessioni",
       "noMatches": "Nessuna sessione trovata",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
       "tryAdjustFilters": "Prova a modificare o rimuovere i filtri.",
       "couldNotSearch": "Impossibile cercare le sessioni.",
       "completedWillAppear": "Le sessioni completate appariranno qui.",
       "noPastSessions": "Nessuna sessione precedente",
+      "pastSessions": "Sessioni precedenti",
       "live": "IN TEMPO REALE",
       "updating": "Aggiornamento in corso"
     },
@@ -1563,6 +1566,7 @@
       "renamePlaceholder": "Nome della sessione",
       "transcriptAccessibility": "Trascrizione della sessione",
       "readOnly": "Questa sessione è di sola lettura.",
+      "continueInNewSession": "Continua in una nuova sessione",
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
       "emptyTranscriptDescription": "Questa sessione non ha ancora messaggi.",
       "scrollToBottom": "Scorri fino in fondo",
@@ -1654,6 +1658,8 @@
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",
+      "selectRepositoryToStart": "Seleziona un repository per iniziare.",
+      "connectProviderToStart": "Connetti una piattaforma per iniziare.",
       "promptPlaceholder": "Su cosa vuoi lavorare?",
       "couldNotLoadModels": "Impossibile caricare i modelli.",
       "prefillRepoAndModelUnavailable": "Il repository e il modello della sessione originale non sono più disponibili. Selezionali qui sotto.",
@@ -2137,7 +2143,7 @@
       "open": "apri la PR",
       "closed": "pull request chiusa",
       "merged": "pull request integrata",
-      "draft": "pR in bozza",
+      "draft": "PR in bozza",
       "updating": "Aggiornamento in corso, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2283,7 +2289,8 @@
     "optionsExpiredDescription": "Torna alla schermata precedente e riapri la selezione."
   },
   "sessionRow": {
-    "needsInput": "IN ATTESA DI RISPOSTA"
+    "needsInput": "IN ATTESA DI RISPOSTA",
+    "scheduled": "PIANIFICATA"
   },
   "voiceInput": {
     "listening": "In ascolto…",
@@ -2652,7 +2659,14 @@
       "replyForbiddenTerm": "Non hai il permesso di rispondere a {{term}}.",
       "moreLinesAbove_one": "… altre righe sopra: {{displayCount}}.",
       "moreLinesAbove_other": "… altre righe sopra: {{displayCount}}.",
-      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}."
+      "moreLinesAbove_many": "… altre righe sopra: {{displayCount}}.",
+      "deleteComment": "Elimina commento",
+      "deleteCommentTitle": "Eliminare il commento?",
+      "deleteCommentMessage": "Questo commento verrà eliminato dalla pull request.",
+      "commentEditFailed": "Impossibile salvare il tuo commento. Controlla la connessione e riprova.",
+      "commentEditUnavailable": "Questo commento non può essere modificato. Potrebbe essere stato eliminato.",
+      "commentDeleteFailed": "Impossibile eliminare il tuo commento. Controlla la connessione e riprova.",
+      "commentDeleteUnavailable": "Questo commento non può essere eliminato."
     },
     "entry": {
       "eyebrow": "Apri una pull request o una merge request tramite URL",
@@ -2977,6 +2991,8 @@
     "linkPasteNotAPullRequest": "Non è un collegamento a una pull request o merge request",
     "announce": {
       "commentPosted": "Commento pubblicato",
+      "commentUpdated": "Commento aggiornato",
+      "commentDeleted": "Commento eliminato",
       "reviewSubmitted": "Revisione inviata",
       "autoMergeEnabled": "Unione automatica attivata"
     },
@@ -3211,6 +3227,7 @@
     "emptyTitle": "Nessun sito attendibile",
     "emptyDescription": "Quando consideri attendibile un sito, i suoi link si aprono senza chiedere di nuovo conferma.",
     "revoke": "Revoca l'attendibilità di {{host}}",
+    "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
     "backToPreferences": "Torna alle preferenze"
   },
   "quickChat": {
@@ -3240,7 +3257,8 @@
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco.",
     "openSession": "Apri",
     "approveFailed": "Impossibile approvare. Tocca $t(common.approve) per riprovare.",
-    "newestResult": "Risultato più recente"
+    "newestResult": "Risultato più recente",
+    "scheduledWakes": "si risveglia {{time}}"
   },
   "transcriptionModel": {
     "title": "Modello di trascrizione",
@@ -3474,5 +3492,17 @@
       "unboundToast": "Repo non vincolato",
       "unbindFailed": "Impossibile scollegare il repository"
     }
+  },
+  "credits": {
+    "title": "Acquista crediti",
+    "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "packLabel": "Aggiungi {{amount}} in crediti",
+    "priceUnavailable": "Prezzo non disponibile",
+    "purchased": "I crediti sono stati aggiunti al tuo saldo.",
+    "empty": "I pacchetti di crediti non sono disponibili al momento.",
+    "noMatchingProducts": "L'App Store non ha restituito pacchetti di crediti corrispondenti.",
+    "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
+    "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
+    "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   }
 }

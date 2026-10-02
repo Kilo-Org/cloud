@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Grįžti",
     "idle": "Laukia",
+    "scheduled": "Suplanuota",
     "keepEditing": "Tęsti redagavimą",
     "keepRunning": "Tęsti vykdymą",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
     "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
-    "creditBalanceEmpty": "Jūsų kreditų likutis lygus nuliui. Šios paskyros kreditai valdomi ne iOS programėlėje.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -240,6 +240,7 @@
     "addPasskey": "Pridėti priėjimo raktą",
     "passkeyDefaultName": "Priėjimo raktas",
     "passkeyAddedOn": "Pridėta {{date}}",
+    "passkeyLastUsedOn": "Paskutinį kartą naudota {{date}}",
     "passkeyAdded": "Priėjimo raktas pridėtas.",
     "passkeyAddFailed": "Nepavyko pridėti priėjimo rakto. Bandykite dar kartą.",
     "passkeyAddUnsupported": "Šis įrenginys negali kurti priėjimo raktų.",
@@ -588,7 +589,14 @@
       "moreLinesAbove_one": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_other": "… Daugiau eilučių aukščiau: {{displayCount}}.",
       "moreLinesAbove_few": "… Daugiau eilučių aukščiau: {{displayCount}}.",
-      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}."
+      "moreLinesAbove_many": "… Daugiau eilučių aukščiau: {{displayCount}}.",
+      "deleteComment": "Ištrinti komentarą",
+      "deleteCommentTitle": "Ištrinti komentarą?",
+      "deleteCommentMessage": "Šis komentaras bus ištrintas iš pakeitimų užklausos.",
+      "commentEditFailed": "Nepavyko išsaugoti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentEditUnavailable": "Šio komentaro negalima redaguoti. Jis gali būti ištrintas.",
+      "commentDeleteFailed": "Nepavyko ištrinti tavo komentaro. Patikrink ryšį ir bandyk dar kartą.",
+      "commentDeleteUnavailable": "Šio komentaro negalima ištrinti."
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
@@ -779,6 +787,8 @@
     "linkPasteNotAPullRequest": "Tai ne pakeitimų užklausos ar merge request nuoroda",
     "announce": {
       "commentPosted": "Komentaras paskelbtas",
+      "commentUpdated": "Komentaras atnaujintas",
+      "commentDeleted": "Komentaras ištrintas",
       "reviewSubmitted": "Peržiūra pateikta",
       "autoMergeEnabled": "Automatinis sujungimas įjungtas"
     },
@@ -2067,12 +2077,14 @@
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "couldNotRefresh": "Nepavyko atnaujinti",
       "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
+      "viewHistory": "Sesijų istorija",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
       "tryAdjustFilters": "Pabandyk pakeisti arba išvalyti filtrus.",
       "couldNotSearch": "Nepavyko atlikti sesijų paieškos.",
       "completedWillAppear": "Baigtos sesijos bus rodomos čia.",
       "noPastSessions": "Nėra ankstesnių sesijų",
+      "pastSessions": "Ankstesnės sesijos",
       "live": "TIESIOGIAI",
       "updating": "Atnaujinama"
     },
@@ -2142,6 +2154,7 @@
       "renamePlaceholder": "Sesijos pavadinimas",
       "transcriptAccessibility": "Sesijos pokalbio išrašas",
       "readOnly": "Šią sesiją galima tik skaityti.",
+      "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
       "emptyTranscriptDescription": "Šioje sesijoje dar nėra žinučių.",
       "scrollToBottom": "Slinkti į apačią",
@@ -2233,6 +2246,8 @@
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",
+      "selectRepositoryToStart": "Norėdami pradėti, pasirinkite saugyklą.",
+      "connectProviderToStart": "Norėdami pradėti, prijunkite paslaugų teikėją.",
       "promptPlaceholder": "Ką norėtumėte atlikti?",
       "couldNotLoadModels": "Nepavyko įkelti modelių.",
       "prefillRepoAndModelUnavailable": "Pradinės sesijos saugykla ir modelis nebepasiekiami. Pasirinkite kitus žemiau.",
@@ -2844,7 +2859,8 @@
     "optionsExpiredDescription": "Grįžkite ir iš ankstesnio ekrano iš naujo atidarykite šį parinkiklį."
   },
   "sessionRow": {
-    "needsInput": "LAUKIA ATSAKYMO"
+    "needsInput": "LAUKIA ATSAKYMO",
+    "scheduled": "SUPLANUOTA"
   },
   "voiceInput": {
     "listening": "Klausomasi...",
@@ -3254,6 +3270,7 @@
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
+    "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {
@@ -3283,7 +3300,8 @@
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus.",
     "openSession": "Atidaryti",
     "approveFailed": "Nepavyko patvirtinti. Bakstelėkite $t(common.approve), kad bandytumėte dar kartą.",
-    "newestResult": "Naujausias rezultatas"
+    "newestResult": "Naujausias rezultatas",
+    "scheduledWakes": "prabunda {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkribavimo modelis",
@@ -3517,5 +3535,17 @@
       "unboundToast": "Atpirkimas neapribotas",
       "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
     }
+  },
+  "credits": {
+    "title": "Pirkti kreditus",
+    "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
+    "packLabel": "Pridėti {{amount}} kreditų",
+    "priceUnavailable": "Kaina neprieinama",
+    "purchased": "Kreditai pridėti prie jūsų balanso.",
+    "empty": "Kreditų paketai šiuo metu neprieinami.",
+    "noMatchingProducts": "App Store negrąžino jokių atitinkančių kreditų paketų.",
+    "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
+    "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
+    "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   }
 }

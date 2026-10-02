@@ -10,12 +10,16 @@ import {
   getPlanForPriceId,
 } from '@/lib/stripe';
 import { scheduleOrganizationPassCapacity } from '@/lib/kilo-pass-org/service';
+import {
+  KILO_PASS_ORG_CANCELLATION_PENDING,
+  SCHEDULE_REWRITE_UNSAFE,
+} from '@/lib/kilo-pass-org/cancellation-schedule';
 import { getScheduledSeatDecrease } from '@/components/subscriptions/seats/scheduled-seat-decrease';
 import {
   getMostRecentSeatPurchase,
   getMostRecentEndedSeatPurchase,
-  getOrganizationSeatUsage,
-} from '@/lib/organizations/organization-seats';
+} from '@/lib/organizations/organization-seat-purchases';
+import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { organization_seats_purchases, type OrganizationSeatsPurchase } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { and, eq, desc, ne } from 'drizzle-orm';
@@ -32,6 +36,7 @@ import * as z from 'zod';
 import type Stripe from 'stripe';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
 import { BillingCycleSchema } from '@/lib/organizations/organization-types';
+import { ipCountryFromHeaders } from '@/lib/bouncer/credit-events';
 import { successResult } from '@/lib/maybe-result';
 import { client } from '@/lib/stripe-client';
 import { isSeatLineItem } from '@/lib/organizations/stripe-seat-line-items';
@@ -279,6 +284,11 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
         cancelUrl: input.cancelUrl,
         plan: plan ?? org.plan,
         billingCycle: input.billingCycle,
+        attempt: {
+          accountCreatedAt: org.created_at,
+          ip: ctx.ip,
+          ipCountry: ipCountryFromHeaders(ctx.headersList),
+        },
       });
       return { url: result };
     }),
@@ -331,7 +341,7 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
   updateSeatCount: organizationBillingMutationProcedure
     .input(UpdateSeatCountInputSchema)
     .output(UpdateSeatCountResponseSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const { organizationId, newSeatCount } = input;
 
       const { used, total } = await getOrganizationSeatUsage(organizationId);
@@ -355,11 +365,36 @@ export const organizationsSubscriptionRouter = createTRPCRouter({
       }
 
       const purchase = latestPurchase;
-      const result = await handleUpdateSeatCount(
-        purchase.subscription_stripe_id,
-        newSeatCount,
-        total
-      );
+      let result: Awaited<ReturnType<typeof handleUpdateSeatCount>>;
+      try {
+        result = await handleUpdateSeatCount(
+          purchase.subscription_stripe_id,
+          newSeatCount,
+          total,
+          {},
+          {
+            userId: ctx.user.id,
+            ip: ctx.ip,
+            ipCountry: ipCountryFromHeaders(ctx.headersList),
+          }
+        );
+      } catch (error) {
+        if (error instanceof Error && error.message === KILO_PASS_ORG_CANCELLATION_PENDING) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Kilo Pass is scheduled to end. Resume Kilo Pass or wait until it ends before changing seats.',
+          });
+        }
+        if (error instanceof Error && error.message === SCHEDULE_REWRITE_UNSAFE) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message:
+              'Your subscription has a scheduled change that seat updates cannot safely modify. Cancel that change before updating seats.',
+          });
+        }
+        throw error;
+      }
       if (result.success && newSeatCount < total) {
         await scheduleOrganizationPassCapacity({ organizationId, paidSeatCount: newSeatCount });
       }

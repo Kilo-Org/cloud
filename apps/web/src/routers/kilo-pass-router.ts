@@ -28,6 +28,11 @@ import {
 } from '@/lib/service-fees/checkout';
 import { createServiceFeeStores } from '@/lib/service-fees/drizzle-store';
 import { APP_URL } from '@/lib/constants';
+import {
+  reportChargeAttempted,
+  ipCountryFromHeaders,
+  type ChargeAttemptContext,
+} from '@/lib/bouncer/credit-events';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -80,7 +85,7 @@ import {
   KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
   KILO_PASS_TIER_CONFIG,
 } from '@/lib/kilo-pass/constants';
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
   billingHistoryResponseSchema,
@@ -114,6 +119,10 @@ import { acknowledgeGooglePlaySubscriptionPurchase } from '@/lib/kilo-pass/googl
 import { reconcileGooglePlaySubscriptionState } from '@/lib/kilo-pass/google-play-subscription-state';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
+import {
+  assertAppStoreAccountTokenMatchesUser,
+  assertGooglePlayAccountTokenMatchesUser,
+} from '@/lib/credits/store-account-token';
 import {
   getInitialWelcomePromoContextForSubscription,
   getKiloPassWelcomePromoPolicy,
@@ -289,52 +298,6 @@ const KILO_PASS_PENDING_REFERRAL_REWARD_STATUSES = new Set<string>([
   ImpactReferralRewardStatus.Pending,
   ImpactReferralRewardStatus.Earned,
 ]);
-
-const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
-  'App Store purchase account token does not match the signed-in user.';
-const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
-
-function assertAppStoreAccountTokenMatchesUser(params: {
-  appAccountToken: string | null;
-  userAppStoreAccountToken: string;
-}): void {
-  if (params.appAccountToken === null) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
-    });
-  }
-  if (params.appAccountToken !== params.userAppStoreAccountToken) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
-    });
-  }
-}
-
-const GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
-  'Google Play purchase account token does not match the signed-in user.';
-const GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
-  "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again.";
-
-function assertGooglePlayAccountTokenMatchesUser(params: {
-  appAccountToken: string | null;
-  userAppStoreAccountToken: string;
-}): void {
-  if (params.appAccountToken === null) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE,
-    });
-  }
-  if (params.appAccountToken !== params.userAppStoreAccountToken) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE,
-    });
-  }
-}
 
 function mapAppStoreCompletionError(error: unknown, userId: string): TRPCError {
   if (error instanceof TRPCError) {
@@ -1340,6 +1303,8 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
+  /** Bouncer context; omitted by tests that only exercise the checkout shape. */
+  attempt?: ChargeAttemptContext;
 }): Promise<CheckoutSessionLike> {
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
@@ -1350,6 +1315,17 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     stripe: requireTopUpPriceReader(deps.stripe),
     priceId: params.priceId,
   });
+
+  if (params.attempt) {
+    reportChargeAttempted({
+      flow: 'kilo_pass',
+      userId: params.kiloUserId,
+      amountCents: principalMinor,
+      accountCreatedAt: params.attempt.accountCreatedAt,
+      ip: params.attempt.ip,
+      ipCountry: params.attempt.ipCountry,
+    });
+  }
 
   const prepared = await prepareTopUpCheckoutFee({
     flow: PERSONAL_KILO_PASS_CHECKOUT_FLOW,
@@ -2971,6 +2947,11 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
+            attempt: {
+              accountCreatedAt: ctx.user.created_at,
+              ip: ctx.ip,
+              ipCountry: ipCountryFromHeaders(ctx.headersList),
+            },
           }),
       });
     }),

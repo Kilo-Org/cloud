@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "返回",
     "idle": "閒置",
+    "scheduled": "已排程",
     "keepEditing": "繼續編輯",
     "keepRunning": "繼續執行",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "顯示餘額",
     "balanceHidden": "餘額已隱藏",
     "bonusCreditsExpiring": "{{amount}} 的加贈點數將於 {{date}} 到期。",
-    "creditBalanceEmpty": "你的點數餘額已用完。此帳戶的點數須在 iOS 應用程式外管理。",
     "signOutTitle": "登出？",
     "signOutMessage": "登出後，你需要重新登入才能存取工作區。",
     "deleteAccountTitle": "刪除帳戶？",
@@ -240,6 +240,7 @@
     "addPasskey": "新增通行密鑰",
     "passkeyDefaultName": "通行密鑰",
     "passkeyAddedOn": "新增於 {{date}}",
+    "passkeyLastUsedOn": "最後使用於 {{date}}",
     "passkeyAdded": "已新增通行密鑰。",
     "passkeyAddFailed": "無法新增通行密鑰。請重試。",
     "passkeyAddUnsupported": "此裝置無法建立通行密鑰。",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "無法載入進行中的工作階段。",
       "couldNotRefresh": "無法重新整理",
       "noSessionsYetDescription": "用手機開始程式開發任務，工作階段就會顯示在這裡。",
+      "viewHistory": "工作階段記錄",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
       "tryAdjustFilters": "請試著調整或清除篩選條件。",
       "couldNotSearch": "無法搜尋工作階段。",
       "completedWillAppear": "已完成的工作階段將顯示在這裡。",
       "noPastSessions": "尚無過往工作階段",
+      "pastSessions": "過往工作階段",
       "live": "即時",
       "updating": "更新中"
     },
@@ -1582,6 +1585,7 @@
       "renamePlaceholder": "工作階段名稱",
       "transcriptAccessibility": "工作階段對話記錄",
       "readOnly": "這是唯讀工作階段。",
+      "continueInNewSession": "在新工作階段中繼續",
       "emptyDescription": "在下方傳送訊息，即可開始。",
       "emptyTranscriptDescription": "這個工作階段還沒有訊息。",
       "scrollToBottom": "捲動到底部",
@@ -1673,6 +1677,8 @@
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
+      "selectRepositoryToStart": "選取儲存庫以開始。",
+      "connectProviderToStart": "連結平台以開始。",
       "promptPlaceholder": "你想處理什麼？",
       "couldNotLoadModels": "無法載入模型。",
       "prefillRepoAndModelUnavailable": "原工作階段的儲存庫與模型已無法使用。請在下方重新選取。",
@@ -2258,7 +2264,8 @@
     "optionsExpiredDescription": "請返回上一個畫面，再重新開啟此選擇器。"
   },
   "sessionRow": {
-    "needsInput": "等待輸入"
+    "needsInput": "等待輸入",
+    "scheduled": "已排程"
   },
   "voiceInput": {
     "listening": "正在聆聽…",
@@ -2622,7 +2629,14 @@
       "deletedUser": "已刪除的使用者",
       "replyForbiddenTerm": "你沒有權限回覆此{{term}}。",
       "moreLinesAbove_one": "…上方還有 {{displayCount}} 行。",
-      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。"
+      "moreLinesAbove_other": "…上方還有 {{displayCount}} 行。",
+      "deleteComment": "刪除留言",
+      "deleteCommentTitle": "刪除留言？",
+      "deleteCommentMessage": "此留言將從提取請求中刪除。",
+      "commentEditFailed": "無法儲存你的留言。請檢查連線後再試一次。",
+      "commentEditUnavailable": "無法編輯此留言。它可能已被刪除。",
+      "commentDeleteFailed": "無法刪除你的留言。請檢查連線後再試一次。",
+      "commentDeleteUnavailable": "無法刪除此留言。"
     },
     "entry": {
       "eyebrow": "透過 URL 開啟提取請求或合併請求",
@@ -2935,6 +2949,8 @@
     "linkPasteNotAPullRequest": "不是提取請求或合併請求連結",
     "announce": {
       "commentPosted": "留言已發佈",
+      "commentUpdated": "留言已更新",
+      "commentDeleted": "留言已刪除",
       "reviewSubmitted": "審查已送出",
       "autoMergeEnabled": "自動合併已啟用"
     },
@@ -3168,6 +3184,7 @@
     "emptyTitle": "沒有信任的主機",
     "emptyDescription": "信任連結的主機後，開啟該主機的連結時就不會再詢問。",
     "revoke": "撤銷對 {{host}} 的信任",
+    "revokeMessage": "前往此主機的連結將再次要求確認。",
     "backToPreferences": "返回偏好設定"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。",
     "openSession": "開啟",
     "approveFailed": "無法核准。點一下$t(common.approve)再試一次。",
-    "newestResult": "最新結果"
+    "newestResult": "最新結果",
+    "scheduledWakes": "{{time}}喚醒"
   },
   "transcriptionModel": {
     "title": "轉錄模型",
@@ -3431,5 +3449,17 @@
       "unboundToast": "倉庫已解除綁定",
       "unbindFailed": "無法解除倉庫綁定"
     }
+  },
+  "credits": {
+    "title": "購買點數",
+    "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
+    "packLabel": "新增 {{amount}} 點數",
+    "priceUnavailable": "價格無法取得",
+    "purchased": "點數已加入你的餘額。",
+    "empty": "目前無法取得點數包。",
+    "noMatchingProducts": "App Store 未傳回相符的點數包。",
+    "noMatchingProductsPlay": "Google Play 未傳回相符的點數包。",
+    "purchaseOwnedByAnotherAccount": "此 Apple 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。",
+    "purchaseOwnedByAnotherAccountPlay": "此 Google Play 帳戶上的點數屬於另一個 Kilo 帳戶。請登入該 Kilo 帳戶以使用。"
   }
 }

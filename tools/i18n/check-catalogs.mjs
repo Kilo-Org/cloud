@@ -72,7 +72,7 @@ const TWO_SENSE_COPY = new Map([
 
 /**
  * Proper nouns, format-only strings, and pre-existing English-identical copy
- * outside this section's five keys. Remove a key from the set when that copy
+ * outside this section's new keys. Remove a key from the set when that copy
  * is translated or the key is deleted.
  */
 const ENGLISH_IDENTICAL_ALLOWLIST = new Set([

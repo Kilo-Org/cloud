@@ -73,7 +73,7 @@ jobs:
             exit 0
           fi
           if git diff --name-only "$base" HEAD \
-            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
+            | grep -Eq '^apps/mobile/|^packages/trpc/|^apps/web/src/routers/|^packages/web-shared/src/routers/|^packages/app-shared/|^packages/kilo-chat/|^packages/kilo-chat-hooks/|^packages/event-service/|^packages/notifications/|^packages/cloud-agent-sdk/|^pnpm-lock\.yaml$|^\.github/workflows/kilo-app-ci\.yml$|^\.github/workflows/ci\.yml$|^scripts/stacked-ci\.test\.mjs$'; then
             echo "mobile=true" >> "$GITHUB_OUTPUT"
           else
             echo "mobile=false" >> "$GITHUB_OUTPUT"

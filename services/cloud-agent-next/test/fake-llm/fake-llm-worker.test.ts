@@ -334,6 +334,47 @@ describe('deployed fake llm worker', () => {
     expect(stream.elapsedMs).toBeGreaterThan(600);
   });
 
+  it('holds the first token, then completes the replayed first-token request', async () => {
+    const tag = `held-${Date.now()}`;
+
+    const pending = await chat(`__fake__:first-token:${tag}`);
+    expect(pending.status).toBe(200);
+    const reader = (pending.body as ReadableStream<Uint8Array>).getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let held = '';
+    // The first request never finishes; read only until the held token, then
+    // cancel so the parked stream cannot keep the Durable Object request open.
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const boundary = buffer.indexOf('\n\n');
+      if (boundary < 0) continue;
+      const event = buffer.slice(0, boundary);
+      buffer = buffer.slice(boundary + 2);
+      const dataLine = event.split('\n').find(line => line.startsWith('data: '));
+      if (!dataLine || dataLine.slice('data: '.length) === '[DONE]') continue;
+      if (dataLine.includes('held-first-token')) {
+        held = dataLine;
+        break;
+      }
+    }
+    expect(held).toContain('held-first-token');
+    await reader.cancel().catch(() => undefined);
+
+    const replay = await chat(`__fake__:first-token:${tag}`);
+    const stream = await readSse(replay.body as ReadableStream<Uint8Array>);
+    expect(stream.events.join('\n')).toContain(`done-${tag}`);
+    expect(stream.events.at(-1)).toContain('[DONE]');
+
+    const status = await SELF.fetch(`${ORIGIN}/test/scenario-status?tag=${tag}`, {
+      headers: adminHeaders(),
+    });
+    expect(status.status).toBe(200);
+    await expect(status.json()).resolves.toMatchObject({ tag, requests: 2 });
+  });
+
   it('rejects a missing, malformed or foreign model token on the model routes', async () => {
     const missing = await SELF.fetch(`${ORIGIN}/api/openrouter/models`);
     expect(await drain(missing)).toBe(401);

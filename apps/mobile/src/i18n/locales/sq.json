@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Kthehu",
     "idle": "Në pritje",
+    "scheduled": "E planifikuar",
     "keepEditing": "Vazhdo redaktimin",
     "keepRunning": "Vazhdo ekzekutimin",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
     "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
-    "creditBalanceEmpty": "Nuk ke më kredite. Për këtë llogari, kreditet menaxhohen jashtë aplikacionit iOS.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -240,6 +240,7 @@
     "addPasskey": "Shto një çelës hyrjeje",
     "passkeyDefaultName": "Çelës hyrjeje",
     "passkeyAddedOn": "Shtuar {{date}}",
+    "passkeyLastUsedOn": "Përdorur së fundi {{date}}",
     "passkeyAdded": "Çelësi i hyrjes u shtua.",
     "passkeyAddFailed": "Nuk u arrit të shtohej një çelës hyrjeje. Provo përsëri.",
     "passkeyAddUnsupported": "Kjo pajisje nuk mund të krijojë çelësa hyrjeje.",
@@ -566,7 +567,14 @@
       "deletedUser": "përdorues i fshirë",
       "replyForbiddenTerm": "Nuk ke leje të përgjigjesh në këtë {{term}}.",
       "moreLinesAbove_one": "… {{displayCount}} rresht tjetër më sipër",
-      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër"
+      "moreLinesAbove_other": "… {{displayCount}} rreshta të tjerë më sipër",
+      "deleteComment": "Fshi komentin",
+      "deleteCommentTitle": "Të fshihet komenti?",
+      "deleteCommentMessage": "Ky koment do të fshihet nga kërkesa për bashkim.",
+      "commentEditFailed": "Nuk u arrit të ruhej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentEditUnavailable": "Ky koment nuk mund të redaktohet. Mund të jetë fshirë.",
+      "commentDeleteFailed": "Nuk u arrit të fshihej komenti yt. Kontrollo lidhjen dhe provo përsëri.",
+      "commentDeleteUnavailable": "Ky koment nuk mund të fshihet."
     },
     "couldNotOpenGitHubAppSettings": "Cilësimet e aplikacionit GitHub nuk u hapën.",
     "installKiloGitHubApp": "Instalo aplikacionin Kilo për GitHub",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Kjo nuk është lidhje për një kërkesë për bashkim ose kërkesë integrimi",
     "announce": {
       "commentPosted": "Komenti u postua",
+      "commentUpdated": "Komenti u përditësua",
+      "commentDeleted": "Komenti u fshi",
       "reviewSubmitted": "Rishikimi u dërgua",
       "autoMergeEnabled": "Bashkimi automatik u aktivizua"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
       "couldNotRefresh": "Rifreskimi dështoi",
       "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
+      "viewHistory": "Historiku i seancave",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",
       "tryAdjustFilters": "Provo t'i ndryshosh ose t'i pastrosh filtrat.",
       "couldNotSearch": "Kërkimi i seancave dështoi.",
       "completedWillAppear": "Seancat e përfunduara do të shfaqen këtu.",
       "noPastSessions": "Asnjë seancë e kaluar",
+      "pastSessions": "Seanca të kaluara",
       "live": "DREJTPËRDREJT",
       "updating": "Po përditësohet"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "Emri i seancës",
       "transcriptAccessibility": "Transkripti i seancës",
       "readOnly": "Kjo seancë është vetëm për lexim.",
+      "continueInNewSession": "Vazhdo në një seancë të re",
       "emptyDescription": "Dërgo një mesazh më poshtë për të filluar.",
       "emptyTranscriptDescription": "Kjo seancë ende nuk ka mesazhe.",
       "scrollToBottom": "Shko në fund",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
+      "selectRepositoryToStart": "Zgjidh një depo për të filluar.",
+      "connectProviderToStart": "Lidh një ofrues për të filluar.",
       "promptPlaceholder": "Me çfarë do të punosh?",
       "couldNotLoadModels": "Nuk u ngarkuan modelet.",
       "prefillRepoAndModelUnavailable": "Depoja dhe modeli i seancës fillestare nuk janë më të disponueshëm. Zgjidhi më poshtë.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "Kthehu prapa dhe rihap këtë zgjedhës nga ekrani i mëparshëm."
   },
   "sessionRow": {
-    "needsInput": "PRET PËRGJIGJE"
+    "needsInput": "PRET PËRGJIGJE",
+    "scheduled": "E PLANIFIKUAR"
   },
   "voiceInput": {
     "listening": "Po dëgjon...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "Nuk ka serverë të besuar",
     "emptyDescription": "Kur i beson serverit të një lidhjeje, lidhja hapet pa kërkuar përsëri konfirmim.",
     "revoke": "Hiq besimin për {{host}}",
+    "revokeMessage": "Lidhjet për këtë server do të kërkojnë përsëri konfirmim.",
     "backToPreferences": "Kthehu te preferencat"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes.",
     "openSession": "Hap",
     "approveFailed": "Nuk u arrit të miratohej. Trokit $t(common.approve) për të provuar përsëri.",
-    "newestResult": "Rezultati më i ri"
+    "newestResult": "Rezultati më i ri",
+    "scheduledWakes": "zgjohet {{time}}"
   },
   "transcriptionModel": {
     "title": "Modeli i transkriptimit",
@@ -3431,5 +3449,17 @@
       "unboundToast": "Repo e palidhur",
       "unbindFailed": "Repo nuk mund të shkëputej"
     }
+  },
+  "credits": {
+    "title": "Bli kredite",
+    "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
+    "packLabel": "Shto {{amount}} në kredite",
+    "priceUnavailable": "Çmimi nuk disponohet",
+    "purchased": "Kreditet u shtuan në bilancin tuaj.",
+    "empty": "Paketat e krediteve nuk janë të disponueshme tani.",
+    "noMatchingProducts": "App Store nuk ktheu paketa kreditesh që përputhen.",
+    "noMatchingProductsPlay": "Google Play nuk ktheu paketa kreditesh që përputhen.",
+    "purchaseOwnedByAnotherAccount": "Kreditet në këtë Apple Account i përkasin një llogarie tjetër Kilo. Hyr në atë llogari Kilo për t'i përdorur.",
+    "purchaseOwnedByAnotherAccountPlay": "Kreditet në këtë llogari Google Play i përkasin një llogarie tjetër Kilo. Hyni në atë llogari Kilo për t'i përdorur."
   }
 }

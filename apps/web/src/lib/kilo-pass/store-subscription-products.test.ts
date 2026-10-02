@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 
-import { KiloPassCadence, KiloPassTier } from './enums';
+import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 import {
   getAllMobileStoreKiloPassProducts,
   getMobileStoreKiloPassProduct,

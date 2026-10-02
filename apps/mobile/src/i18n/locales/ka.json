@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "უკან დაბრუნება",
     "idle": "უმოქმედოა",
+    "scheduled": "დაგეგმილი",
     "keepEditing": "რედაქტირების გაგრძელება",
     "keepRunning": "მუშაობის გაგრძელება",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "ბალანსის ჩვენება",
     "balanceHidden": "ბალანსი დამალულია",
     "bonusCreditsExpiring": "ბონუსური კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
-    "creditBalanceEmpty": "კრედიტების ბალანსი ამოწურულია. ამ ანგარიშის კრედიტები iOS აპის გარეთ იმართება.",
     "signOutTitle": "ანგარიშიდან გასვლა?",
     "signOutMessage": "სამუშაო სივრცის გამოსაყენებლად ანგარიშში ხელახლა შესვლა დაგჭირდება.",
     "deleteAccountTitle": "ანგარიშის წაშლა?",
@@ -240,6 +240,7 @@
     "addPasskey": "წვდომის გასაღების დამატება",
     "passkeyDefaultName": "წვდომის გასაღები",
     "passkeyAddedOn": "დამატებულია {{date}}",
+    "passkeyLastUsedOn": "ბოლო გამოყენება {{date}}",
     "passkeyAdded": "წვდომის გასაღები დაემატა.",
     "passkeyAddFailed": "წვდომის გასაღების დამატება ვერ მოხერხდა. სცადეთ ხელახლა.",
     "passkeyAddUnsupported": "ეს მოწყობილობა ვერ ქმნის წვდომის გასაღებებს.",
@@ -566,7 +567,14 @@
       "deletedUser": "წაშლილი მომხმარებელი",
       "replyForbiddenTerm": "ამ {{term}}-ზე პასუხის გაცემის უფლება არ გაქვს.",
       "moreLinesAbove_one": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
-      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია."
+      "moreLinesAbove_other": "… ზემოთ კიდევ {{displayCount}} სტრიქონია.",
+      "deleteComment": "კომენტარის წაშლა",
+      "deleteCommentTitle": "წავშალო კომენტარი?",
+      "deleteCommentMessage": "ეს კომენტარი წაიშლება შერწყმის მოთხოვნიდან.",
+      "commentEditFailed": "კომენტარის შენახვა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentEditUnavailable": "ამ კომენტარის რედაქტირება შეუძლებელია. შესაძლოა ის წაშლილია.",
+      "commentDeleteFailed": "კომენტარის წაშლა ვერ მოხერხდა. შეამოწმე კავშირი და ხელახლა სცადე.",
+      "commentDeleteUnavailable": "ამ კომენტარის წაშლა შეუძლებელია."
     },
     "couldNotOpenGitHubAppSettings": "GitHub-ის აპის პარამეტრები ვერ გაიხსნა.",
     "installKiloGitHubApp": "Kilo-ს GitHub აპის დაყენება",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ეს PR-ის ან შერწყმის მოთხოვნის ბმული არ არის",
     "announce": {
       "commentPosted": "კომენტარი გამოქვეყნდა",
+      "commentUpdated": "კომენტარი განახლდა",
+      "commentDeleted": "კომენტარი წაიშალა",
       "reviewSubmitted": "განხილვა გაიგზავნა",
       "autoMergeEnabled": "ავტომატური შერწყმა ჩართულია"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
       "couldNotRefresh": "განახლება ვერ მოხერხდა",
       "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
+      "viewHistory": "სესიების ისტორია",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",
       "tryAdjustFilters": "სცადე ფილტრების შეცვლა ან გასუფთავება.",
       "couldNotSearch": "სესიების ძიება ვერ მოხერხდა.",
       "completedWillAppear": "დასრულებული სესიები აქ გამოჩნდება.",
       "noPastSessions": "დასრულებული სესიები არ არის",
+      "pastSessions": "დასრულებული სესიები",
       "live": "აქტიური",
       "updating": "ახლდება"
     },
@@ -2086,6 +2098,7 @@
       "renamePlaceholder": "სესიის სახელი",
       "transcriptAccessibility": "სესიის ჩანაწერი",
       "readOnly": "ეს სესია მხოლოდ სანახავადაა.",
+      "continueInNewSession": "გაგრძელება ახალ სესიაში",
       "emptyDescription": "დასაწყებად ქვემოთ გაგზავნეთ შეტყობინება.",
       "emptyTranscriptDescription": "ამ სესიას ჯერ არ აქვს შეტყობინებები.",
       "scrollToBottom": "ბოლომდე გადახვევა",
@@ -2177,6 +2190,8 @@
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
+      "selectRepositoryToStart": "დასაწყებად აირჩიეთ რეპოზიტორია.",
+      "connectProviderToStart": "დასაწყებად დააკავშირეთ პროვაიდერი.",
       "promptPlaceholder": "რაზე გსურთ მუშაობა?",
       "couldNotLoadModels": "მოდელების ჩატვირთვა ვერ მოხერხდა.",
       "prefillRepoAndModelUnavailable": "საწყისი სესიის რეპოზიტორია და მოდელი აღარ არის ხელმისაწვდომი. ქვემოთ აირჩიეთ სხვა რეპოზიტორია და მოდელი.",
@@ -2762,7 +2777,8 @@
     "optionsExpiredDescription": "დაბრუნდით წინა ეკრანზე და ხელახლა გახსენით არჩევის ეს ფანჯარა."
   },
   "sessionRow": {
-    "needsInput": "პასუხს ელის"
+    "needsInput": "პასუხს ელის",
+    "scheduled": "დაგეგმილი"
   },
   "voiceInput": {
     "listening": "გისმენ...",
@@ -3168,6 +3184,7 @@
     "emptyTitle": "სანდო ჰოსტები არ არის",
     "emptyDescription": "თუ ბმულის ჰოსტს სანდოდ მონიშნავთ, მისი ბმულები ხელახალი დადასტურების გარეშე გაიხსნება.",
     "revoke": "{{host}}-ის სანდო ჰოსტებიდან ამოღება",
+    "revokeMessage": "ამ ჰოსტის ბმულები კვლავ დადასტურებას მოითხოვს.",
     "backToPreferences": "პარამეტრებში დაბრუნება"
   },
   "quickChat": {
@@ -3197,7 +3214,8 @@
     "activityKitDisabledBody": "დაბლოკილ ეკრანზე აქტიური აგენტების სანახავად პარამეტრებში ჩართე მიმდინარე აქტივობები.",
     "openSession": "გახსენი",
     "approveFailed": "დამტკიცება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ $t(common.approve)-ს.",
-    "newestResult": "უახლესი შედეგი"
+    "newestResult": "უახლესი შედეგი",
+    "scheduledWakes": "{{time}} იღვიძებს"
   },
   "transcriptionModel": {
     "title": "ტრანსკრიფციის მოდელი",
@@ -3431,5 +3449,17 @@
       "unboundToast": "რეპო შეუზღუდავია",
       "unbindFailed": "რეპოს გაუქმება ვერ მოხერხდა"
     }
+  },
+  "credits": {
+    "title": "კრედიტების ყიდვა",
+    "description": "კრედიტები ერთჯერადი შენაძენია, რომელიც ემატება თქვენს Kilo ბალანსს Kilo აპში AI კოდირების სესიების გასაშვებად. მაღაზია თქვენს ანგარიშს არიცხავს თანხას და კრედიტები ემატება მას შემდეგ, რაც მაღაზია გადახდას დაადასტურებს.",
+    "packLabel": "{{amount}}-ის კრედიტების დამატება",
+    "priceUnavailable": "ფასი მიუწვდომელია",
+    "purchased": "კრედიტები დაემატა თქვენს ბალანსს.",
+    "empty": "კრედიტების პაკეტები ამჟამად მიუწვდომელია.",
+    "noMatchingProducts": "App Store-მა შესაბამისი კრედიტის პაკეტები არ დააბრუნა.",
+    "noMatchingProductsPlay": "Google Play-მა შესაბამისი კრედიტის პაკეტები არ დააბრუნა.",
+    "purchaseOwnedByAnotherAccount": "ამ Apple Account-ზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედი იმ Kilo ანგარიშში.",
+    "purchaseOwnedByAnotherAccountPlay": "ამ Google Play ანგარიშზე არსებული კრედიტები სხვა Kilo ანგარიშს ეკუთვნის. მათ გამოსაყენებლად შედით იმ Kilo ანგარიშში."
   }
 }

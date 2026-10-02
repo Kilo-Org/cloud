@@ -9,8 +9,8 @@ import {
   REFERRAL_BONUS_AMOUNT,
   PROMO_CREDIT_EXPIRY_HRS,
   OPENCLAW_SECURITY_ADVISOR_BONUS_EXPIRY_HRS,
-} from '@/lib/constants';
-import { promoCategoriesOld } from '@/lib/promoCreditCategoriesOld';
+} from '@kilocode/web-shared/lib/constants';
+import { promoCategoriesOld } from '@kilocode/web-shared/lib/promoCreditCategoriesOld';
 import {
   created_before,
   has_githubAuth,

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { randomUUID } from 'crypto';
 
-import { reportCreditEvent, type CreditFlow } from '@/lib/bouncer/client';
+import { reportCreditEvent, type CreditFlow } from '@kilocode/web-shared/lib/bouncer/client';
 
 /** `x-vercel-ip-country` from request headers, for a bouncer `ipCountry`. */
 export function ipCountryFromHeaders(headers?: Headers | null): string | null {

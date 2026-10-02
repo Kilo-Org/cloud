@@ -1,13 +1,13 @@
-import { INCEPTION_API_KEY } from '@/lib/config.server';
+import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
-import type { MicrodollarUsageContext } from '@/lib/ai-gateway/processUsage.types';
-import { validateFeatureHeader, FEATURE_HEADER } from '@/lib/feature-detection';
-import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
-import { sentryRootSpan } from '@/lib/getRootSpan';
-import { getUserFromAuth } from '@/lib/user/server';
+import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
+import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   countAndStoreEditUsage,
@@ -20,17 +20,17 @@ import {
   captureProxyError,
   extractHeaderAndLimitLength,
   modelNotAllowedResponse,
-} from '@/lib/ai-gateway/llm-proxy-helpers';
-import { ProxyErrorType } from '@/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
-import { readDb } from '@/lib/drizzle';
-import { debugSaveProxyRequest } from '@/lib/debugUtils';
-import { sentryLogger } from '@/lib/utils.server';
-import { getBYOKforOrganization, getBYOKforUser } from '@/lib/ai-gateway/byok';
-import type { UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
-import { findSupportedFimModel } from '@/lib/ai-gateway/supported-fim-models';
-import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
+} from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
+import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
+import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
+import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
+import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt

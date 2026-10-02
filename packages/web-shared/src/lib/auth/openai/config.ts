@@ -1,6 +1,6 @@
 import 'server-only';
-import { APP_URL } from '@/lib/constants';
-import { getEnvVariable } from '@/lib/dotenvx';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
 /**
  * OpenAI (Sign in with ChatGPT) OAuth/OIDC configuration.

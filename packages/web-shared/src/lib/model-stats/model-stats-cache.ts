@@ -1,7 +1,7 @@
 import 'server-only';
 
-import { ENKRYPT_PUBLICATION_ENABLED } from '@/lib/config.server';
-import { db } from '@/lib/drizzle';
+import { ENKRYPT_PUBLICATION_ENABLED } from '@kilocode/web-shared/lib/config.server';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { enkrypt_sync_state, modelStats, type ModelStats } from '@kilocode/db/schema';
 import { desc, eq, sql } from 'drizzle-orm';
 

@@ -1,20 +1,22 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
-import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   findKiloExclusiveModel,
   gemma_4_26b_a4b_it_free_model,
   stepfun_37_flash_free_model,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
-import type * as ModelsModule from '@/lib/ai-gateway/models';
-import type * as ExclusiveModelsModule from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as GatewayModelsCache from '@/lib/ai-gateway/providers/gateway-models-cache';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import type * as ModelsModule from '@kilocode/web-shared/lib/ai-gateway/models';
+import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
-jest.mock('@/lib/ai-gateway/models', () => {
-  const actual = jest.requireActual<typeof ModelsModule>('@/lib/ai-gateway/models');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/models', () => {
+  const actual = jest.requireActual<typeof ModelsModule>(
+    '@kilocode/web-shared/lib/ai-gateway/models'
+  );
   const { kiloExclusiveModels } = jest.requireActual<typeof ExclusiveModelsModule>(
-    '@/lib/ai-gateway/kilo-exclusive-models'
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
   );
   return {
     ...actual,
@@ -26,16 +28,16 @@ jest.mock('@/lib/ai-gateway/models', () => {
   };
 });
 
-jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
-    '@/lib/ai-gateway/providers/gateway-models-cache'
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
   ),
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
   const actual = jest.requireActual<typeof ExclusiveModelsModule>(
-    '@/lib/ai-gateway/kilo-exclusive-models'
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
   );
   return {
     ...actual,

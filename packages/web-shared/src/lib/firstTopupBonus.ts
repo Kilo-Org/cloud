@@ -1,8 +1,8 @@
 import type { User } from '@kilocode/db/schema';
 import { grantCreditForCategory } from './promotionalCredits';
-import { summarizeUserPayments } from '@/lib/creditTransactions';
-import { db } from '@/lib/drizzle';
-import { FIRST_TOPUP_BONUS_AMOUNT } from '@/lib/constants';
+import { summarizeUserPayments } from '@kilocode/web-shared/lib/creditTransactions';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { FIRST_TOPUP_BONUS_AMOUNT } from '@kilocode/web-shared/lib/constants';
 
 export async function processFirstTopupBonus(user: User) {
   if (FIRST_TOPUP_BONUS_AMOUNT <= 0) return;

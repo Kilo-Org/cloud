@@ -6,13 +6,13 @@ import { fingerprintEnkryptScore } from './enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
 
-jest.mock('@/lib/drizzle', () => ({ db: {} }));
+jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ db: {} }));
 
 function metadata() {
   return { observedAt: Date.now(), generation: 0 };
 }
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
   },

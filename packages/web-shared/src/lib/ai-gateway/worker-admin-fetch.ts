@@ -1,4 +1,4 @@
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 import * as z from 'zod';
 
 export type WorkerAdminResult<T> = {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
-import { MARTIAN } from '@/lib/ai-gateway/providers/definitions/martian';
-import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
+import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import {
   findKiloExclusiveModel,
   claude_opus_4_8_stealth_model,
@@ -10,7 +10,7 @@ import {
   qwen36_plus_stealth_model,
   gemma_4_26b_a4b_it_free_model,
   stepfun_37_flash_free_model,
-} from '@/lib/ai-gateway/kilo-exclusive-models';
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 describe('Kilo-exclusive model providers', () => {
   test.each([

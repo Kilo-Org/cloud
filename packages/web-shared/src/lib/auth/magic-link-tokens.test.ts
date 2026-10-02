@@ -10,7 +10,7 @@ import {
   reserveSignInCode,
   verifyAndConsumeMagicLinkToken,
 } from './magic-link-tokens';
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { sql, eq, and } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { createHash } from 'crypto';

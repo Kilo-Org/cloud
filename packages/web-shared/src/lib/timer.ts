@@ -1,4 +1,4 @@
-import { logExceptInTest } from '@/lib/utils.server';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 /**
  * Creates a timer that can be used to measure elapsed time

@@ -1,10 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
-import { insertTestUser } from '@/tests/helpers/user.helper';
+import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 import {
   getCreditTransactionsSummaryByUserId,
   summarizeUserPayments,
-} from '@/lib/creditTransactions';
+} from '@kilocode/web-shared/lib/creditTransactions';
 import { db } from './drizzle';
 import {
   credit_transactions,
@@ -17,7 +17,7 @@ import {
   KiloPassIssuanceItemKind,
   KiloPassIssuanceSource,
   KiloPassTier,
-} from '@/lib/kilo-pass/enums';
+} from '@kilocode/web-shared/lib/kilo-pass/enums';
 
 describe('Credit Transactions', () => {
   describe('getCreditTransactionsSummaryByUserId', () => {

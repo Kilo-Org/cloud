@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it } from '@jest/globals';
 
-jest.mock('@/lib/config.server', () => ({
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   BOUNCER_URL: 'https://bouncer.example.com',
   INTERNAL_API_SECRET: 'test-internal-secret',
 }));
 
-import { decide, reportCreditEvent, reportUsageEvent } from '@/lib/bouncer/client';
+import {
+  decide,
+  reportCreditEvent,
+  reportUsageEvent,
+} from '@kilocode/web-shared/lib/bouncer/client';
 
 const mockFetch = jest.fn() as jest.MockedFunction<typeof fetch>;
 global.fetch = mockFetch;

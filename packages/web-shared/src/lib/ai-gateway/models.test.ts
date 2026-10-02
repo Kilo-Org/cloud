@@ -47,6 +47,20 @@ describe('isFreeModel', () => {
       expect(await isFreeModel('openrouter/free')).toBe(true);
     });
 
+    test('recognizes inclusionai/ling-3.1-flash as free without the suffix', () => {
+      expect(isFreeModel('inclusionai/ling-3.1-flash')).toBe(true);
+    });
+
+    test.each([
+      'inclusionai/ling-3.0-flash',
+      'inclusionai/ling-3.1-flash-preview',
+      'INCLUSIONAI/LING-3.1-FLASH',
+      ' inclusionai/ling-3.1-flash',
+      'inclusionai/ling-3.1-flash ',
+    ])('does not classify %s as free', model => {
+      expect(isFreeModel(model)).toBe(false);
+    });
+
     test('should return true for OpenRouter stealth alpha models', async () => {
       expect(await isFreeModel('stealth/ox-alpha')).toBe(true);
       expect(await isFreeModel('stealth/other-alpha')).toBe(true);
@@ -228,6 +242,9 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
 
   test('requires data collection for free models', async () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('openrouter/free')).toBe(true);
+    expect(await hasBestEffortGuessDataCollectionRequirement('inclusionai/ling-3.1-flash')).toBe(
+      true
+    );
   });
 
   test('does not require data collection for regular paid models', async () => {

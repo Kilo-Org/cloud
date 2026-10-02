@@ -10,6 +10,7 @@
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "@/*": ["./src/*", "../../packages/web-shared/src/*"],
+      "@kilocode/web-shared/*": ["../../packages/web-shared/src/*"],
       "@kilocode/db": ["../../packages/db/src/index.ts"],
       "@kilocode/db/*": ["../../packages/db/src/*"],
       "@kilocode/cloud-agent-profile": ["../../packages/cloud-agent-profile/src/index.ts"],

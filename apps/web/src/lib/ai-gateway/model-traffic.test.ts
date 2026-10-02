@@ -4,7 +4,7 @@ import { getModelTraffic } from '@/lib/ai-gateway/model-traffic';
 import type { RunAnalyticsEngineQuery } from '@/lib/cloudflare/analytics-engine';
 
 const NOW = new Date('2026-10-02T12:03:20Z');
-const LAST_BUCKET = '2026-10-02 11:55:00';
+const LAST_BUCKET = '2026-10-02 11:50:00';
 const FIRST_BUCKET = '2026-10-01 12:00:00';
 
 function fakeQuery(responses: {
@@ -26,24 +26,43 @@ function fakeQuery(responses: {
 }
 
 describe('getModelTraffic', () => {
-  it('returns 288 completed five-minute buckets ending before the in-progress bucket', async () => {
-    const { runQuery, queries } = fakeQuery({ totals: [], topModels: [], modelBuckets: [] });
+  it.each([
+    {
+      range: 'day',
+      bucketMinutes: 10,
+      bucketCount: 144,
+      first: '2026-10-01T12:00:00.000Z',
+      last: '2026-10-02T11:50:00.000Z',
+      end: '2026-10-02T12:00:00Z',
+    },
+    {
+      range: 'week',
+      bucketMinutes: 60,
+      bucketCount: 168,
+      first: '2026-09-25T12:00:00.000Z',
+      last: '2026-10-02T11:00:00.000Z',
+      end: '2026-10-02T12:00:00Z',
+    },
+  ] as const)(
+    'returns $bucketCount completed $bucketMinutes-minute buckets for the $range range',
+    async ({ range, bucketMinutes, bucketCount, first, last, end }) => {
+      const { runQuery, queries } = fakeQuery({ totals: [], topModels: [], modelBuckets: [] });
 
-    const traffic = await getModelTraffic({ now: NOW, excludeByok: false }, runQuery);
+      const traffic = await getModelTraffic({ now: NOW, range, excludeByok: false }, runQuery);
 
-    expect(traffic.bucketStarts).toHaveLength(288);
-    expect(traffic.bucketStarts[0]).toBe('2026-10-01T12:00:00.000Z');
-    expect(traffic.bucketStarts.at(-1)).toBe('2026-10-02T11:55:00.000Z');
-    expect(traffic.models).toEqual([]);
-    expect(queries).toHaveLength(2);
-    expect(queries[0]).toContain(
-      `timestamp >= toDateTime(${Date.parse('2026-10-01T12:00:00Z') / 1000})`
-    );
-    expect(queries[0]).toContain(
-      `timestamp < toDateTime(${Date.parse('2026-10-02T12:00:00Z') / 1000})`
-    );
-    expect(queries[0]).not.toContain('blob6');
-  });
+      expect(traffic.range).toBe(range);
+      expect(traffic.bucketMinutes).toBe(bucketMinutes);
+      expect(traffic.bucketStarts).toHaveLength(bucketCount);
+      expect(traffic.bucketStarts[0]).toBe(first);
+      expect(traffic.bucketStarts.at(-1)).toBe(last);
+      expect(traffic.models).toEqual([]);
+      expect(queries).toHaveLength(2);
+      expect(queries[0]).toContain(`INTERVAL '${bucketMinutes}' MINUTE`);
+      expect(queries[0]).toContain(`timestamp >= toDateTime(${Date.parse(first) / 1000})`);
+      expect(queries[0]).toContain(`timestamp < toDateTime(${Date.parse(end) / 1000})`);
+      expect(queries[0]).not.toContain('blob6');
+    }
+  );
 
   it('places top-model series into buckets and derives the remainder as other models', async () => {
     const { runQuery, queries } = fakeQuery({
@@ -63,7 +82,7 @@ describe('getModelTraffic', () => {
       ],
     });
 
-    const traffic = await getModelTraffic({ now: NOW, excludeByok: true }, runQuery);
+    const traffic = await getModelTraffic({ now: NOW, range: 'day', excludeByok: true }, runQuery);
 
     const [opus, other] = traffic.models;
     expect(opus.model).toBe('anthropic/claude-opus-5.5');

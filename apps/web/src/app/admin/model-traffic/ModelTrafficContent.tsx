@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { inferRouterOutputs } from '@trpc/server';
+import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import { format } from 'date-fns';
 import {
   Area,
@@ -21,10 +21,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTRPC } from '@/lib/trpc/utils';
 import type { RootRouter } from '@/routers/root-router';
 
 type ModelTraffic = inferRouterOutputs<RootRouter>['admin']['modelTraffic']['get'];
+type ModelTrafficRange = inferRouterInputs<RootRouter>['admin']['modelTraffic']['get']['range'];
 type RequestSeries = ModelTraffic['allModels'];
 type TooltipEntry = TooltipPayload[number];
 
@@ -43,6 +45,15 @@ const CHART_HEIGHT_CLASS = 'h-[360px]';
 const CHART_STYLE = { width: '100%', height: '100%' };
 // A handful of requests in a bucket makes a single failure read as a huge error rate.
 const MIN_REQUESTS_FOR_ERROR_RATE = 20;
+
+const RANGE_OPTIONS: Array<{ value: ModelTrafficRange; label: string }> = [
+  { value: 'day', label: '24 hours' },
+  { value: 'week', label: '7 days' },
+];
+
+function isModelTrafficRange(value: string): value is ModelTrafficRange {
+  return RANGE_OPTIONS.some(option => option.value === value);
+}
 
 const MODEL_COLORS = [
   '#2563eb',
@@ -69,6 +80,10 @@ function formatBucketRange(timestamp: number, bucketMinutes: number): string {
   return `${format(timestamp, 'MMM d, HH:mm')} – ${format(end, 'HH:mm')}`;
 }
 
+function formatBucketSize(bucketMinutes: number): string {
+  return bucketMinutes % 60 === 0 ? `${bucketMinutes / 60}-hour` : `${bucketMinutes}-minute`;
+}
+
 function errorRate(series: RequestSeries, index: number): number | null {
   const requests = series.requests[index];
   if (requests < MIN_REQUESTS_FOR_ERROR_RATE) return null;
@@ -80,10 +95,10 @@ function errorRateAxisMax(dataMax: number): number {
   return Number.isFinite(dataMax) ? Math.max(1, Math.min(100, Math.ceil(dataMax))) : 100;
 }
 
-function useModelTraffic(excludeByok: boolean) {
+function useModelTraffic(range: ModelTrafficRange, excludeByok: boolean) {
   const trpc = useTRPC();
   return useQuery({
-    ...trpc.admin.modelTraffic.get.queryOptions({ excludeByok }),
+    ...trpc.admin.modelTraffic.get.queryOptions({ range, excludeByok }),
     refetchInterval: REFRESH_INTERVAL_MS,
   });
 }
@@ -106,15 +121,18 @@ function toggleLabel(hidden: ReadonlySet<string>, entry: LegendPayload): Set<str
   return next;
 }
 
-const timeAxisProps = {
-  dataKey: 'timestamp',
-  type: 'number',
-  scale: 'time',
-  domain: ['dataMin', 'dataMax'],
-  tick: { fontSize: 11 },
-  tickFormatter: (value: number) => format(value, 'HH:mm'),
-  minTickGap: 32,
-} as const;
+function timeAxisProps(traffic: ModelTraffic) {
+  const tickFormat = traffic.windowHours > 24 ? 'MMM d HH:mm' : 'HH:mm';
+  return {
+    dataKey: 'timestamp',
+    type: 'number',
+    scale: 'time',
+    domain: ['dataMin', 'dataMax'],
+    tick: { fontSize: 11 },
+    tickFormatter: (value: number) => format(value, tickFormat),
+    minTickGap: 32,
+  } as const;
+}
 
 type SeriesTooltipProps = {
   active?: boolean;
@@ -223,7 +241,7 @@ function RequestVolumeChart({
   return (
     <ChartCard
       title="Request volume"
-      description={`Successful and failed requests per ${traffic.bucketMinutes}-minute bucket, stacked by model. Click a legend entry to hide it.`}
+      description={`Successful and failed requests per ${formatBucketSize(traffic.bucketMinutes)} bucket, stacked by model. Click a legend entry to hide it.`}
     >
       <AreaChart
         responsive
@@ -232,7 +250,7 @@ function RequestVolumeChart({
         margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
       >
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-        <XAxis {...timeAxisProps} />
+        <XAxis {...timeAxisProps(traffic)} />
         <YAxis
           tick={{ fontSize: 11 }}
           tickFormatter={(value: number) => compactNumber.format(value)}
@@ -312,7 +330,7 @@ function ErrorRateChart({
   return (
     <ChartCard
       title="Error rate"
-      description={`Share of requests with HTTP status ≥ 400 per ${traffic.bucketMinutes}-minute bucket. Buckets with fewer than ${MIN_REQUESTS_FOR_ERROR_RATE} requests are left out.`}
+      description={`Share of requests with HTTP status ≥ 400 per ${formatBucketSize(traffic.bucketMinutes)} bucket. Buckets with fewer than ${MIN_REQUESTS_FOR_ERROR_RATE} requests are left out.`}
     >
       <LineChart
         responsive
@@ -321,7 +339,7 @@ function ErrorRateChart({
         margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
       >
         <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-        <XAxis {...timeAxisProps} />
+        <XAxis {...timeAxisProps(traffic)} />
         <YAxis
           tick={{ fontSize: 11 }}
           tickFormatter={(value: number) => `${value}%`}
@@ -388,9 +406,10 @@ function ChartPlaceholder({ title, message }: { title: string; message?: string 
 }
 
 export function ModelTrafficContent() {
+  const [range, setRange] = useState<ModelTrafficRange>('day');
   const [excludeByok, setExcludeByok] = useState(true);
   const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
-  const { data, error, dataUpdatedAt } = useModelTraffic(excludeByok);
+  const { data, error, dataUpdatedAt } = useModelTraffic(range, excludeByok);
   const onToggle = (entry: LegendPayload) => setHidden(current => toggleLabel(current, entry));
 
   return (
@@ -399,14 +418,30 @@ export function ModelTrafficContent() {
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold">Model Traffic</h2>
           <p className="text-muted-foreground text-sm">
-            Last 24 hours of Kilo Gateway requests from <code>o11y_api_metrics</code>, top models by
-            volume. Refreshes every minute
+            Kilo Gateway requests from <code>o11y_api_metrics</code>, top models by volume.
+            Refreshes every minute
             {dataUpdatedAt > 0 && ` (last updated ${format(dataUpdatedAt, 'HH:mm:ss')})`}.
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Switch id="exclude-byok" checked={excludeByok} onCheckedChange={setExcludeByok} />
-          <Label htmlFor="exclude-byok">Exclude BYOK</Label>
+        <div className="flex flex-wrap items-center gap-4">
+          <Tabs
+            value={range}
+            onValueChange={value => {
+              if (isModelTrafficRange(value)) setRange(value);
+            }}
+          >
+            <TabsList>
+              {RANGE_OPTIONS.map(option => (
+                <TabsTrigger key={option.value} value={option.value}>
+                  {option.label}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+          <div className="flex items-center gap-2">
+            <Switch id="exclude-byok" checked={excludeByok} onCheckedChange={setExcludeByok} />
+            <Label htmlFor="exclude-byok">Exclude BYOK</Label>
+          </div>
         </div>
       </div>
 

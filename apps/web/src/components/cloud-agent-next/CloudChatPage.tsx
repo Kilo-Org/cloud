@@ -302,6 +302,7 @@ export default function CloudChatPage({
     lastStartedSessionId,
     ownerSessionId: fetchedSessionData?.kiloSessionId ?? null,
     isLoading,
+    hasMessages: transcriptMessageCount > 0,
     terminalOpenFailure,
   });
   const transcriptReady = transcriptReadyForEffects(transcriptPhase);

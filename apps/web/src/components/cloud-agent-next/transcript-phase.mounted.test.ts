@@ -309,21 +309,48 @@ describe('CloudChatPage route-aware transcript phase', () => {
     expect(alert()?.textContent).toContain('Failed to open');
   });
 
-  it('shows the transcript and starts observing its content once the open is live', () => {
+  it('keeps the skeleton after metadata arrives until the transcript lands', () => {
     render();
     expect(mockResizeObserve).not.toHaveBeenCalled();
     expect(skeleton()).not.toBeNull();
 
     act(() => {
       mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+      root.render(createElement(CloudChatPage, { currentUserId: 'owner' }));
+    });
+
+    expect(skeleton()).not.toBeNull();
+    expect(dom.container.querySelector('[data-conversation]')).toBeNull();
+    expect(mockResizeObserve).not.toHaveBeenCalled();
+
+    act(() => {
       mockAtomValues.staticMessages = [anchorMessage('msg_1')];
-      mockAtomValues.isLoading = false;
       root.render(createElement(CloudChatPage, { currentUserId: 'owner' }));
     });
 
     expect(skeleton()).toBeNull();
     expect(dom.container.querySelector('[data-conversation]')).not.toBeNull();
     expect(mockResizeObserve).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the skeleton for a settled empty transcript', () => {
+    render();
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    mockAtomValues.isLoading = false;
+    render();
+
+    expect(skeleton()).toBeNull();
+    expect(dom.container.querySelector('[data-conversation]')).not.toBeNull();
+  });
+
+  it('surfaces a matching owner error even before any messages arrive', () => {
+    render();
+    mockAtomValues.fetchedSessionData = { kiloSessionId: 'ses_b', organizationId: null };
+    mockAtomValues.statusIndicator = { type: 'error', message: 'History unavailable' };
+    render();
+
+    expect(skeleton()).toBeNull();
+    expect(alert()?.textContent).toContain('History unavailable');
   });
 
   it('renders the transcript and composer error alert when the owner matches an error while loading', () => {

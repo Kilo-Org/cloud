@@ -10,6 +10,7 @@ const base: ResolveTranscriptPhaseInput = {
   lastStartedSessionId: 'ses_b',
   ownerSessionId: 'ses_b',
   isLoading: false,
+  hasMessages: false,
   terminalOpenFailure: false,
 };
 
@@ -81,11 +82,16 @@ describe('resolveTranscriptPhase', () => {
     ).toBe('opening');
   });
 
-  it('is live while the owner matched but the replay is still loading', () => {
+  it('keeps opening when metadata matches but the transcript is still loading', () => {
+    expect(resolveTranscriptPhase({ ...base, isLoading: true })).toBe('opening');
+  });
+
+  it('is live while the owner matched and messages landed before replay finished', () => {
     expect(
       resolveTranscriptPhase({
         ...base,
         isLoading: true,
+        hasMessages: true,
       })
     ).toBe('live');
   });

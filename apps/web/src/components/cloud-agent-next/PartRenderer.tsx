@@ -30,6 +30,7 @@ import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import type { ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
 import type { Part, StoredMessage } from './types';
 import {
@@ -85,11 +86,23 @@ const remarkPlugins = [remarkGfm];
 /**
  * Renders a TextPart as markdown
  */
-const TextPartRenderer = memo(function TextPartRenderer({ text }: { text: string }) {
+const TextPartRenderer = memo(function TextPartRenderer({
+  text,
+  isStreaming,
+}: {
+  text: string;
+  isStreaming?: boolean;
+}) {
+  const parseCache = useMarkdownParseCache();
+  const plugins =
+    parseCache && !isStreaming
+      ? [remarkGfm, createMarkdownParseCachePlugin(parseCache)]
+      : remarkPlugins;
+
   return (
     <div className="prose prose-sm prose-invert prose-p:my-2 prose-headings:mt-4 prose-headings:mb-2 prose-headings:text-sm prose-headings:font-semibold prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:text-xs max-w-none overflow-hidden px-2 leading-relaxed">
       {text ? (
-        <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+        <ReactMarkdown remarkPlugins={plugins} components={markdownComponents}>
           {text}
         </ReactMarkdown>
       ) : null}
@@ -346,7 +359,11 @@ function ReasoningPartRenderer({
 
   return (
     <ToolCardShell icon={Brain} title={header} status={streaming ? 'running' : 'completed'}>
-      <ToolMarkdown content={body} className="text-muted-foreground max-h-64" />
+      <ToolMarkdown
+        content={body}
+        className="text-muted-foreground max-h-64"
+        streaming={streaming}
+      />
     </ToolCardShell>
   );
 }
@@ -422,7 +439,10 @@ export const PartRenderer = memo(
     if (isTextPart(part)) {
       return (
         <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-          <TextPartRenderer text={part.text} />
+          <TextPartRenderer
+            text={part.text}
+            isStreaming={(isStreaming ?? true) && isPartStreaming(part)}
+          />
         </MessageErrorBoundary>
       );
     }

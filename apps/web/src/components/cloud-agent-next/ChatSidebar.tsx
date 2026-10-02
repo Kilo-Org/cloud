@@ -1,6 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+} from 'react';
 import {
   SquarePen,
   Search,
@@ -111,7 +120,7 @@ type WorktreeFolderControls = {
   onDragEnd: () => void;
 };
 
-function SessionRow({
+const SessionRow = memo(function SessionRow({
   session,
   isActive,
   isLive,
@@ -130,13 +139,13 @@ function SessionRow({
   isLive: boolean;
   onDeleteSession?: (sessionId: string) => void;
   isDeleting: boolean;
-  onStartRename?: () => void;
+  onStartRename?: (session: StoredSession) => void;
   isEditing: boolean;
   editTitle: string;
   onEditTitleChange: (value: string) => void;
   onSaveRename: () => void;
   onCancelRename: () => void;
-  onClick: () => void;
+  onClick: (sessionId: string) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -172,7 +181,7 @@ function SessionRow({
 
   return (
     <div
-      onClick={isEditing || isDeleting ? undefined : onClick}
+      onClick={isEditing || isDeleting ? undefined : () => onClick(session.sessionId)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
@@ -248,7 +257,7 @@ function SessionRow({
                         <DropdownMenuItem
                           onClick={e => {
                             e.stopPropagation();
-                            onStartRename();
+                            onStartRename(session);
                           }}
                         >
                           <Pencil className="h-4 w-4" />
@@ -277,7 +286,7 @@ function SessionRow({
       </div>
     </div>
   );
-}
+});
 
 function WorktreeGroupRow({
   group,
@@ -947,14 +956,14 @@ export function ChatSidebar({
         isActive={session.sessionId === currentSessionId}
         isLive={activeSessionIds.has(session.sessionId)}
         onDeleteSession={onDeleteSession}
-        onStartRename={onRenameSession ? () => handleStartRename(session) : undefined}
+        onStartRename={onRenameSession ? handleStartRename : undefined}
         isDeleting={deletingSessionIds?.includes(session.sessionId) ?? false}
         isEditing={editingSessionId === session.sessionId}
         editTitle={editTitle}
         onEditTitleChange={setEditTitle}
         onSaveRename={handleSaveRename}
         onCancelRename={handleCancelRename}
-        onClick={() => handleSessionClick(session.sessionId)}
+        onClick={handleSessionClick}
       />
     ),
     [

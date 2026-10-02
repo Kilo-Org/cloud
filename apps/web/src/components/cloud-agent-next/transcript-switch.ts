@@ -5,6 +5,7 @@ export type ResolveTranscriptPhaseInput = {
   lastStartedSessionId: string | null;
   ownerSessionId: string | null;
   isLoading: boolean;
+  hasMessages: boolean;
   terminalOpenFailure: boolean;
 };
 
@@ -13,11 +14,14 @@ export function resolveTranscriptPhase({
   lastStartedSessionId,
   ownerSessionId,
   isLoading,
+  hasMessages,
   terminalOpenFailure,
 }: ResolveTranscriptPhaseInput): TranscriptPhase {
   if (!requestedSessionId) return 'live';
   if (requestedSessionId !== lastStartedSessionId) return 'opening';
-  if (ownerSessionId === requestedSessionId) return 'live';
+  if (ownerSessionId === requestedSessionId) {
+    return isLoading && !hasMessages && !terminalOpenFailure ? 'opening' : 'live';
+  }
   if (ownerSessionId === null && !isLoading && terminalOpenFailure) return 'failed';
   return 'opening';
 }

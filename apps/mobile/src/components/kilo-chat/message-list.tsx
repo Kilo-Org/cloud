@@ -4,22 +4,19 @@ import { type PendingAction, pendingActionGroupIdForMessage } from '@kilocode/ki
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   AccessibilityInfo,
-  Keyboard,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   View,
   type ViewStyle,
 } from 'react-native';
+import { KeyboardChatScrollView } from 'react-native-keyboard-controller';
 
 import { MessageBubble } from '@/components/kilo-chat/message-bubble';
 import {
   getOlderMessagesArrivedAnnouncement,
   shouldAnnounceOlderMessagesArrival,
 } from '@/components/agents/older-messages-a11y';
-import {
-  createMessageListKeyboardScrollScheduler,
-  createMessageListNewestScrollScheduler,
-} from './message-list-keyboard-scroll';
+import { createMessageListNewestScrollScheduler } from './message-list-newest-scroll';
 import {
   isMessageListAtBottom,
   messageListNewestScrollKey,
@@ -68,16 +65,6 @@ export function MessageList({
   const isAtBottomRef = useRef(true);
   const isAutoFollowingNewestRef = useRef(true);
   const scrollToNewestRequestRef = useRef(scrollToNewestRequest);
-  const keyboardScrollScheduler = useMemo(
-    () =>
-      createMessageListKeyboardScrollScheduler({
-        getScrollOffset: () => scrollOffsetRef.current,
-        scrollToOffset: params => {
-          listRef.current?.scrollToOffset(params);
-        },
-      }),
-    []
-  );
   const newestScrollScheduler = useMemo(
     () =>
       createMessageListNewestScrollScheduler({
@@ -131,17 +118,12 @@ export function MessageList({
     [scrollToNewest]
   );
 
-  useEffect(() => {
-    const subscription = Keyboard.addListener('keyboardDidShow', event => {
-      keyboardScrollScheduler.schedule(event.endCoordinates.height);
-    });
-
-    return () => {
-      subscription.remove();
-      keyboardScrollScheduler.cancel();
+  useEffect(
+    () => () => {
       newestScrollScheduler.cancel();
-    };
-  }, [keyboardScrollScheduler, newestScrollScheduler]);
+    },
+    [newestScrollScheduler]
+  );
 
   useEffect(() => {
     const newestMessageKey = messageListNewestScrollKey(newestMessage);
@@ -199,6 +181,10 @@ export function MessageList({
       <FlashList
         ref={listRef}
         style={listStyle}
+        // The list's scroll container adjusts its content inset and offset from
+        // the `KeyboardProvider` on the UI thread, which replaces the JS scroll
+        // the app used to schedule on `keyboardDidShow`.
+        renderScrollComponent={KeyboardChatScrollView}
         data={chronological}
         renderItem={({ item, index }) => {
           // In chronological order, the previous message in time is data[index - 1].

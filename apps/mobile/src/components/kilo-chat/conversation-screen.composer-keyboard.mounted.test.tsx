@@ -1,10 +1,10 @@
 // Mounted coverage for the chat screen's keyboard lift. The composer's own
 // bottom padding already includes the platform's safe-area inset
-// (`resolveMessageInputBottomPadding`), so the screen's
-// `AppAwareKeyboardPaddingView` must not count that inset a second time: doing
-// so floated the composer a navigation-bar height above the keyboard on Android
+// (`resolveMessageInputBottomPadding`), so the `KeyboardAvoidingView` that
+// wraps the composer reduces its lift by that inset on Android: without the
+// correction the composer floated a navigation-bar height above the keyboard
 // (2026-09-21 review finding). Both platforms are asserted against the metric
-// the composer completes, so a caller that drops the opt-in fails here.
+// the composer completes, so a caller that drops the correction fails here.
 
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
@@ -16,28 +16,10 @@ import { ConversationScreen } from './conversation-screen';
 
 const platform = vi.hoisted(() => ({ OS: 'android' }));
 const insets = vi.hoisted(() => ({ bottom: 0 }));
-const keyboard = vi.hoisted(() => ({
-  show: null as ((event: { endCoordinates: { height: number } }) => void) | null,
-  hide: null as (() => void) | null,
-}));
 
 vi.mock('react-native', () => ({
   View: 'View',
   Platform: platform,
-  Keyboard: {
-    addListener: vi.fn((event: string, listener: (event?: unknown) => void) => {
-      if (event === 'keyboardDidShow' || event === 'keyboardWillShow') {
-        keyboard.show = listener as (event: { endCoordinates: { height: number } }) => void;
-      }
-      if (event === 'keyboardDidHide' || event === 'keyboardWillHide') {
-        keyboard.hide = listener as () => void;
-      }
-      return { remove: vi.fn() };
-    }),
-  },
-  AppState: {
-    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
-  },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -178,35 +160,30 @@ function mount() {
   return renderer;
 }
 
-/** Padding the screen's keyboard-lift view reserves (its own style slot). */
-function keyboardPadding(renderer: TestRenderer.ReactTestRenderer): number {
-  const view = renderer.root.find(
-    node => String(node.type) === 'View' && Array.isArray(node.props.style)
-  );
-  const parts = view.props.style as (Record<string, number> | undefined)[];
-  const padded = parts.find(part => part != null && 'paddingBottom' in part);
-  return padded?.paddingBottom ?? -1;
+/** The keyboard-lift wrapper the composer rides. */
+function liftView(renderer: TestRenderer.ReactTestRenderer): TestRenderer.ReactTestInstance {
+  return renderer.root.find(node => String(node.type) === 'KeyboardAvoidingView');
 }
 
 describe('ConversationScreen composer keyboard lift', () => {
   beforeEach(() => {
     platform.OS = 'android';
     insets.bottom = 0;
-    keyboard.show = null;
-    keyboard.hide = null;
   });
 
-  it("adds only the raw Android metric on top of the composer's own inset padding", () => {
+  it("reduces the Android lift by the composer's own inset padding", () => {
     platform.OS = 'android';
     insets.bottom = 63;
     const renderer = mount();
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 704 } });
-    });
-    // 767 would be the screen-bottom-anchored occlusion counting the inset the
-    // composer already pads by a second time.
-    expect(keyboardPadding(renderer)).toBe(704);
+    // The composer's own bottom padding already includes the platform's bottom
+    // inset (`resolveMessageInputBottomPadding`), so the lift is reduced by it:
+    // a negative `keyboardVerticalOffset`. Without the correction the composer
+    // floats a navigation-bar height above the keyboard.
+    const lift = liftView(renderer);
+    expect(lift.props.behavior).toBe('padding');
+    expect(lift.props.className).toBe('flex-1');
+    expect(lift.props.keyboardVerticalOffset).toBe(-63);
 
     renderer.unmount();
   });
@@ -216,19 +193,20 @@ describe('ConversationScreen composer keyboard lift', () => {
     insets.bottom = 34;
     const renderer = mount();
 
-    act(() => {
-      keyboard.show?.({ endCoordinates: { height: 300 } });
-    });
-    expect(keyboardPadding(renderer)).toBe(300);
+    // iOS reports the keyboard frame, which stops at the screen bottom, so the
+    // lift takes no inset correction here.
+    expect(liftView(renderer).props.keyboardVerticalOffset).toBe(0);
 
     renderer.unmount();
   });
 
-  it('reserves nothing while the keyboard is down', () => {
+  it('adds no JS keyboard padding of its own while the keyboard is down', () => {
     insets.bottom = 63;
     const renderer = mount();
 
-    expect(keyboardPadding(renderer)).toBe(0);
+    // The native lift contributes 0 while the keyboard is down, and the screen
+    // keeps no JS padding slot of its own: the wrapper carries no inline style.
+    expect(liftView(renderer).props.style).toBeUndefined();
 
     renderer.unmount();
   });

@@ -83,12 +83,17 @@ through `@rn-primitives/portal` lives in the app's React tree and cannot paint a
 `presentation: 'screen'` only for a path that is provably a tab or a plain stack screen with no sheet on
 its route — the portal dialog dims the whole app there.
 
-Keyboard avoidance is mid-migration. The session, history, quick-chat and session-detail screens clear the
-keyboard with `react-native-keyboard-controller`'s `KeyboardAvoidingView`, under the `KeyboardProvider` at
-the app root. Three surfaces still use `AppAwareKeyboardPaddingView`
-(`@/components/kilo-chat/app-aware-keyboard-padding`): the new-session footer, the kilo-chat conversation
-screen and the PR-review comment CTA bar. Each of those corrects its own bottom-inset double-count, and
-each correction came from a device finding, so they move only with a device pass.
+Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
+`KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
+conversation, manual-review and PR-discussion surfaces; `KeyboardChatScrollView` is the kilo-chat message
+list's scroll container; `useKeyboardState` is the app's one keyboard-height read. A surface whose content
+pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboardInsetOffset(bottom)}`
+(`@/lib/keyboard-inset-offset`) — the provider's Android height spans the translucent navigation bar, so
+without the reduction the content floats a navigation-bar height above the keyboard.
+
+The one hand-rolled piece left is `@/components/agents/use-composer-reveal-scroll`: it scrolls a
+non-focused element (the new-session composer card's pill row) into view, which the native chat scroll
+view has no equivalent for. Do not add a second keyboard listener beside the provider.
 
 ## Implementation Rules
 

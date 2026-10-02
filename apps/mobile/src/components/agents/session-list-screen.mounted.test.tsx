@@ -108,6 +108,44 @@ vi.mock('@shopify/flash-list', () => ({
       )
     ),
 }));
+// The screen reads the keyboard from `react-native-keyboard-controller`'s
+// provider, so the tests drive that store instead of React Native's `Keyboard`
+// events. `useKeyboardState` is selector-aware, as the real hook is.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useKeyboardState: (selector?: (snapshot: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const snapshot = { height, isVisible: height > 0, progress: height > 0 ? 1 : 0, duration: 0 };
+      return selector ? selector(snapshot) : snapshot;
+    },
+  };
+});
+
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
   Platform: state.platform,
@@ -454,14 +492,10 @@ function keyboardListeners(event: string) {
   return state.keyboard.get(event) ?? new Set();
 }
 function showKeyboard(height: number) {
-  for (const listener of keyboardListeners('keyboardDidShow')) {
-    listener({ endCoordinates: { height } });
-  }
+  keyboardStore.setHeight(height);
 }
 function hideKeyboard() {
-  for (const listener of keyboardListeners('keyboardDidHide')) {
-    listener({ endCoordinates: { height: 0 } });
-  }
+  keyboardStore.setHeight(0);
 }
 function surfaceBottomInset() {
   return root().findByType(StateSurfaceInsets).props.bottomInset as number;
@@ -490,6 +524,7 @@ beforeEach(() => {
   state.tabBarHeight = 60;
   state.focusCallbacks.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   state.destination = '';
   state.sessionId = '';
   state.announcements = [];
@@ -519,6 +554,7 @@ afterEach(async () => {
   mountedRenderer = undefined;
   state.listeners.clear();
   state.keyboard.clear();
+  keyboardStore.setHeight(0);
   await i18n.changeLanguage('en');
 });
 
@@ -1654,9 +1690,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(surfaceBottomInset()).toBe(320);
 
     act(() => {
-      for (const listener of keyboardListeners('keyboardDidHide')) {
-        listener({ endCoordinates: { height: 0 } });
-      }
+      hideKeyboard();
     });
     expect(surfaceBottomInset()).toBe(state.tabBarHeight);
   });
@@ -1776,19 +1810,18 @@ describe('AgentSessionListScreen live filtering', () => {
   });
 
   it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {
-    // Review finding (session-list-screen.tsx:101): the screen called
-    // `useKeyboardOcclusion` directly while `useAgentsBottomBands` already
-    // subscribes to the same events, so every band consumer added a third
-    // listener beside the app-aware container's own. Both bands — including the
-    // rows frame band — now come out of that one hook call.
+    // Review finding (session-list-screen.tsx:101): the screen read the
+    // keyboard twice, once through the band hook and once through the container
+    // beside it. Both bands — including the rows frame band — come out of the
+    // one band hook call, and both the container and the band hook read the
+    // provider, so the screen registers no React Native keyboard listener at
+    // all.
     state.platform.OS = 'android';
     state.live.activeSessions = [row];
     await renderScreen();
 
-    // The band hook's own subscription. The native keyboard container measures
-    // the IME itself, so it adds no JS listener beside that one.
-    expect(keyboardListeners('keyboardDidShow').size).toBe(1);
-    expect(keyboardListeners('keyboardDidHide').size).toBe(1);
+    expect(keyboardListeners('keyboardDidShow').size).toBe(0);
+    expect(keyboardListeners('keyboardDidHide').size).toBe(0);
   });
 
   it('narrows the live list to the search text', async () => {

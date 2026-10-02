@@ -46,8 +46,8 @@ export type ComposerRevealScroll = {
  * top edge — only the top of the pills shows — while the same row is fully
  * visible with the keyboard down.
  *
- * The keyboard-lift view (`AppAwareKeyboardPaddingView`) shrinks the scroll
- * frame to end exactly at the IME's top edge, but the content offset stays `0`:
+ * The keyboard-lift view (`KeyboardAvoidingView`) shrinks the scroll frame to
+ * end exactly at the IME's top edge, but the content offset stays `0`:
  * the composer card is the first child, so its bottom falls below that clip
  * line. `automaticallyAdjustKeyboardInsets` only scrolls the FOCUSED input into
  * view and is inert on Android, and the input's 3-line minimum floors the

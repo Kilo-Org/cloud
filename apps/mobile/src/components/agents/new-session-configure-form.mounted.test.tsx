@@ -20,10 +20,6 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
-
 // The composer card is the observation point, not the subject: its props carry
 // the frame geometry this suite asserts.
 vi.mock('@/components/agents/new-session-prompt', () => ({

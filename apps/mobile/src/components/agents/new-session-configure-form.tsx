@@ -1,6 +1,8 @@
 /* eslint-disable max-lines -- THE new-session body: one screen for every entry point, with a mutually-exclusive branch per target/state. */
 import { useState } from 'react';
 import { type LayoutChangeEvent, Pressable, ScrollView, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
@@ -16,7 +18,6 @@ import { NewSessionRepositorySection } from '@/components/agents/new-session-rep
 import { NewSessionRunTarget } from '@/components/agents/new-session-run-target';
 import { NewSessionStartButton } from '@/components/agents/new-session-start-button';
 import { useComposerRevealScroll } from '@/components/agents/use-composer-reveal-scroll';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
 import { ChevronDown } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
@@ -24,6 +25,7 @@ import { Text } from '@/components/ui/text';
 import { stripInlineCodeMarkers } from '@/i18n/plain-copy';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
+import { keyboardInsetOffset } from '@/lib/keyboard-inset-offset';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 /**
@@ -173,6 +175,7 @@ export function NewSessionConfigureForm({
   // the ScrollView, which the pinned Start no longer needs and which left dead
   // space below the last field of a long form.
   const bottomClearance = useDetailScreenBottomPadding();
+  const { bottom } = useSafeAreaInsets();
   // The ScrollView's keyboard-inset adjustment stays on for focused-field
   // scroll-into-view; it sizes against the scroll view's own frame, which
   // already ends above the footer, so the two never stack into a double lift.
@@ -181,7 +184,7 @@ export function NewSessionConfigureForm({
   // layout and never re-anchors, so the keyboard must be dismissed before
   // the sheet opens.)
   // The scroll frame's own height, reported by the ScrollView below. It already
-  // shrinks with the keyboard because `AppAwareKeyboardPaddingView` pads this
+  // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
   // parent; the prompt yields its minimum height to it so the whole composer
   // card renders above the bottom system bar.
   const [frameHeight, setFrameHeight] = useState(0);
@@ -395,12 +398,14 @@ export function NewSessionConfigureForm({
   // view wraps the footer alone, so the IME shrinks the body instead of
   // covering the action, and Start stays on screen above the navigation bar.
   // The footer's own padding already reserves the bottom inset
-  // (`bottomClearance`), so `contentReservesBottomInset` keeps the
-  // screen-bottom-anchored occlusion from counting that inset a second time.
+  // (`bottomClearance`), so the lift is reduced by that inset and never counts
+  // it a second time.
   return (
     <View className="flex-1 bg-background">
       {body}
-      <AppAwareKeyboardPaddingView contentReservesBottomInset>{footer}</AppAwareKeyboardPaddingView>
+      <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={keyboardInsetOffset(bottom)}>
+        {footer}
+      </KeyboardAvoidingView>
     </View>
   );
 }

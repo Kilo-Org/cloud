@@ -14,8 +14,8 @@
 // logical pixels over the old `pt-3`, per PR 5972 owner feedback).
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
-// NOT re-apply the full keyboard height (AppAwareKeyboardPaddingView double-
-// counted and pushed CTAs under the keyboard until the user scrolled). Body
+// NOT re-apply the full keyboard height: an extra lift beside the native one
+// double-counts and pushes CTAs under the keyboard until the user scrolls. Body
 // fields cap their height while the keyboard is open so the trailing footer
 // still fits in the inset viewport at scroll offset 0.
 

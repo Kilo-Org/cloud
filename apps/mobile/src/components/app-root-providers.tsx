@@ -6,13 +6,12 @@ import { CheckCircle2, Info, Loader, TriangleAlert, XCircle } from '@/components
 import { type ReactNode } from 'react';
 import { Platform, useWindowDimensions } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider, useKeyboardState } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Toaster } from 'sonner-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockAnnouncements } from '@/components/app-unlock-screen';
-import { useAppAwareKeyboardPadding } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { OfflineBanner } from '@/components/offline-banner';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { AuthProvider } from '@/lib/auth/auth-context';
@@ -106,11 +105,10 @@ export function AppRootProviders({
 }
 
 /**
- * The Toaster reads the keyboard through the shared
- * `useAppAwareKeyboardPadding` hook, so its height cannot drift from the one
- * the screens reserve. It is called here, in a child of `AppRootProviders`,
- * so a keyboard show/hide re-renders only the Toaster, never the app tree the
- * provider wraps.
+ * The Toaster reads the keyboard from the `KeyboardProvider` above it, so its
+ * height cannot drift from the one the screens reserve. It is called here, in a
+ * child of `AppRootProviders`, so a keyboard show/hide re-renders only the
+ * Toaster, never the app tree the provider wraps.
  *
  * Android needs this even though the app is edge-to-edge: under API 35+ the
  * window never resizes for the IME (`login-screen.tsx`), and
@@ -128,13 +126,13 @@ function AppToaster() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  // The hook reports the whole strip the IME hides, anchored to the screen
-  // bottom: Android's raw height plus the navigation bar its metric stops at
-  // (`ReactRootView` reports `imeInsets.bottom − barInsets.bottom`), iOS's
-  // overlap measured from the keyboard top. Passing the raw Android height left
-  // the toast's last line behind the IME's navigation row (2026-09-20 review
-  // finding). `lib/toast-offset.ts` stays platform-free.
-  const keyboardOcclusion = useAppAwareKeyboardPadding();
+  // The provider reports the whole strip the IME hides, anchored to the screen
+  // bottom: on Android edge-to-edge its height is the full IME inset (the
+  // navigation bar is translucent there, so nothing is subtracted), and on iOS
+  // it is the keyboard's frame. A raw Android height that stopped at the
+  // navigation bar left the toast's last line behind the IME's navigation row
+  // (2026-09-20 review finding). `lib/toast-offset.ts` stays platform-free.
+  const keyboardOcclusion = useKeyboardState(state => state.height);
   const segments = useSegments();
   const pathname = usePathname();
   // The floating tab bar is an absolute overlay over the screen bottom, so it

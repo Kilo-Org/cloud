@@ -517,9 +517,6 @@ vi.mock('@/components/agents/part-renderer', () => ({
 vi.mock('@/components/empty-state', () => ({
   EmptyState: 'EmptyState',
 }));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 vi.mock('@/components/query-error', () => ({
   QueryError: 'QueryError',
 }));

@@ -87,9 +87,6 @@ vi.mock('react-native', () => ({
   View: 'View',
   useColorScheme: () => 'light',
 }));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 
 // The profile row's loading state is asserted as a `Skeleton` node. The real
 // component's Reanimated clock cannot load under Node's ESM loader
@@ -328,7 +325,7 @@ function findOnLayoutHandler(
 
 /** The pinned footer's own bottom padding — the form's single clearance source. */
 function findFooterPaddingBottom(node: Node): number | null {
-  const lift = findElementByType(node, 'AppAwareKeyboardPaddingView');
+  const lift = findElementByType(node, 'KeyboardAvoidingView');
   const footer = findElementByType(lift?.children as Node, 'View');
   const style = footer?.style as { paddingBottom?: unknown } | undefined;
   return typeof style?.paddingBottom === 'number' ? style.paddingBottom : null;
@@ -456,7 +453,7 @@ describe('NewSessionConfigureForm', () => {
         // Neither platform resizes the window for the IME, so the footer sits
         // inside a keyboard-lift view that adds the IME height on top of the
         // safe area — the same implementation on iOS and Android.
-        expect(findElementByType(element, 'AppAwareKeyboardPaddingView')).not.toBeNull();
+        expect(findElementByType(element, 'KeyboardAvoidingView')).not.toBeNull();
       } finally {
         insetsState.bottom = 0;
         platformState.OS = 'android';
@@ -482,7 +479,7 @@ describe('NewSessionConfigureForm', () => {
 
       // It renders in the footer instead: a sibling of the body, wrapped in
       // the keyboard-lift view, so it is always on screen and the IME lifts it.
-      const liftView = findElement(element, 'AppAwareKeyboardPaddingView');
+      const liftView = findElement(element, 'KeyboardAvoidingView');
       expect(liftView).not.toBeNull();
       expect(findElementByType(liftView, 'NewSessionStartButton')).not.toBeNull();
       // The footer alone rides the lift view; the scroll body stays outside it,
@@ -496,7 +493,7 @@ describe('NewSessionConfigureForm', () => {
         child => (child as { type?: unknown } | undefined)?.type === 'ScrollView'
       );
       const footerIndex = rootChildren.findIndex(
-        child => findElementByType(child, 'AppAwareKeyboardPaddingView') !== null
+        child => findElementByType(child, 'KeyboardAvoidingView') !== null
       );
       expect(bodyIndex).toBe(0);
       expect(footerIndex).toBeGreaterThan(bodyIndex);
@@ -522,7 +519,7 @@ describe('NewSessionConfigureForm', () => {
     expect(scrollBody).not.toBeNull();
     expect(findElementByType(scrollBody, 'NewSessionCloudCreateError')).toBeNull();
     expect(findElementByType(element, 'NewSessionCloudCreateError')).not.toBeNull();
-    const lift = findElement(element, 'AppAwareKeyboardPaddingView');
+    const lift = findElement(element, 'KeyboardAvoidingView');
     expect(findElement(lift, 'NewSessionCloudCreateError')).not.toBeNull();
 
     // Switching the target to a computer must not surface the stale failure.
@@ -1124,7 +1121,7 @@ describe('NewSessionConfigureForm', () => {
 
     // Both ride the keyboard-lift footer below the body: the lift shrinks the
     // body and keeps the action above the IME on either platform.
-    const lift = findElementByType(element, 'AppAwareKeyboardPaddingView');
+    const lift = findElementByType(element, 'KeyboardAvoidingView');
     expect(lift).not.toBeNull();
     expect(findElementByType(lift?.children as Node, 'NewSessionStartButton')).not.toBeNull();
     expect(findElementByType(lift?.children as Node, 'NewSessionCloudCreateError')).not.toBeNull();

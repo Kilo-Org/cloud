@@ -336,7 +336,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
 
   // PickerSheet invariant: [header, ScrollView] as direct children (no
   // wrapper View, no sticky-footer sibling). Footer is trailing scroll
-  // content so keyboard insets + AppAwareKeyboardPaddingView keep CTAs
+  // content so the keyboard insets the scroll body and the comment CTA stays
   // tappable without overpainting the pinned header.
   return (
     <>

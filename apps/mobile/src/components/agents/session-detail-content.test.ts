@@ -322,9 +322,6 @@ vi.mock('@/components/agents/session-message-list', () => ({
     );
   },
 }));
-vi.mock('@/components/kilo-chat/app-aware-keyboard-padding', () => ({
-  AppAwareKeyboardPaddingView: 'AppAwareKeyboardPaddingView',
-}));
 vi.mock('@/components/kilo-chat/hooks/use-cli-session-presence', () => ({
   resolveLoadedCliSessionPresenceId: vi.fn(),
   useCliSessionPresence: vi.fn(),

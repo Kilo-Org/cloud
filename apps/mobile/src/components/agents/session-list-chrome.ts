@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
-import { useKeyboardOcclusion } from '@/components/kilo-chat/app-aware-keyboard-padding';
 
 /** The FAB's own height plus its fixed margin above the tab bar. */
 const FAB_BAND = FAB_SIZE + FAB_MARGIN;
@@ -48,7 +48,7 @@ export function useAgentsBottomBands(
   tabBarHeight: number,
   showFab: boolean
 ): { surfaceBand: number; rowsFrameBand: number } {
-  const { keyboardOcclusion } = useKeyboardOcclusion();
+  const keyboardOcclusion = useKeyboardState(state => state.height);
   return useMemo(() => {
     const surfaceBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
     // The band the button's overlay covers from the screen bottom, `0` while the
@@ -59,7 +59,7 @@ export function useAgentsBottomBands(
     // does not already cover: the container has moved the viewport's bottom
     // edge up by `keyboardOcclusion`. Deriving it here, beside the one
     // subscription that measures the occlusion, keeps the caller from adding a
-    // second `useKeyboardOcclusion` of its own (review finding,
+    // second keyboard subscription of its own (review finding,
     // session-list-screen.tsx:101).
     return { surfaceBand, rowsFrameBand: Math.max(0, listBand - keyboardOcclusion) };
   }, [keyboardOcclusion, tabBarHeight, showFab]);

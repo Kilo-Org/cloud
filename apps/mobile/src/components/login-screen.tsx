@@ -4,16 +4,8 @@ import { type Href, useRouter } from 'expo-router';
 import { Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  AppState,
-  I18nManager,
-  Keyboard,
-  type KeyboardEvent,
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-} from 'react-native';
+import { I18nManager, Pressable, ScrollView, View } from 'react-native';
+import { useKeyboardState } from 'react-native-keyboard-controller';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -21,10 +13,6 @@ import { toast } from 'sonner-native';
 import logo from '@/../assets/images/logo.png';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
 import { CenteredState } from '@/components/centered-state';
-import {
-  resolveAppAwareKeyboardPadding,
-  resolveKeyboardPaddingEventsForPlatform,
-} from '@/components/kilo-chat/app-aware-keyboard-padding-state';
 import { IdleAuth } from '@/components/login/idle-auth';
 import { errorMessage, resolveKeyboardBottomPadding } from '@/components/login-screen-state';
 import { Button } from '@/components/ui/button';
@@ -43,10 +31,6 @@ import {
   type SsoRecoveryDraft,
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
-
-function keyboardHeightFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
-}
 
 export function LoginScreen() {
   const { sessionEnded, signIn } = useAuth();
@@ -69,7 +53,6 @@ export function LoginScreen() {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const [persistError, setPersistError] = useState<string | undefined>(undefined);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
     email: string;
@@ -124,54 +107,11 @@ export function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
   }, [status, token]);
 
-  // The login screen owns keyboard occlusion on both platforms, so the layout is
-  // one implementation: KeyboardAvoidingView used to handle iOS alone and left
-  // Android — whose window never resizes for the IME under API 35+
-  // EDGE_TO_EDGE_ENFORCED — to this listener. The only platform difference left
-  // is which keyboard events exist: Android fires no `keyboardWillShow`/
-  // `keyboardWillHide`, so `resolveKeyboardPaddingEventsForPlatform` names the
-  // pair each platform reports.
-  useEffect(() => {
-    const keyboardEvents = resolveKeyboardPaddingEventsForPlatform(Platform.OS);
-    if (keyboardEvents === null) {
-      setKeyboardHeight(0);
-      return undefined;
-    }
-
-    const keyboardShowSubscription = Keyboard.addListener(keyboardEvents.show, event => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: {
-            type: 'keyboard-visible',
-            keyboardHeight: keyboardHeightFromEvent(event),
-          },
-        })
-      );
-    });
-    const keyboardHideSubscription = Keyboard.addListener(keyboardEvents.hide, () => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'keyboard-hidden' },
-        })
-      );
-    });
-    const appStateSubscription = AppState.addEventListener('change', appState => {
-      setKeyboardHeight(current =>
-        resolveAppAwareKeyboardPadding({
-          currentPadding: current,
-          event: { type: 'app-state-change', appState },
-        })
-      );
-    });
-
-    return () => {
-      keyboardShowSubscription.remove();
-      keyboardHideSubscription.remove();
-      appStateSubscription.remove();
-    };
-  }, []);
+  // The `KeyboardProvider` at the root measures the keyboard once in native
+  // code, so this screen reads the height instead of listening to React Native's
+  // keyboard events. The provider also clears the height when the app leaves the
+  // foreground, which the listener pair used to do itself.
+  const keyboardHeight = useKeyboardState(state => state.height);
 
   if (status === 'approved') {
     if (persistError) {
@@ -201,15 +141,13 @@ export function LoginScreen() {
   }
 
   // One padded wrapper for both platforms: the bottom inset is reserved at
-  // rest, and while the IME is up the reported keyboard occlusion is resolved
-  // from the platform's metric origin (see `resolveKeyboardBottomPadding` for
-  // the capability each platform reports). The ScrollView's centered form then
-  // re-centres in the space that stays above the keyboard, so "Continue" is
+  // rest, and while the IME is up the provider's keyboard height is reserved
+  // instead (see `resolveKeyboardBottomPadding`). The ScrollView's centered form
+  // then re-centres in the space that stays above the keyboard, so "Continue" is
   // never left under the keyboard, the navigation bar, or the home indicator.
   const bottomPadding = resolveKeyboardBottomPadding({
     keyboardHeight,
     bottomInset: insets.bottom,
-    platform: Platform.OS,
   });
   // The Globe stays enabled on idle, denied, expired, and error (those render
   // an interactive IdleAuth form); it is disabled while a device-auth flow

@@ -2,7 +2,7 @@
 import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { type AppStateStatus, Keyboard, type KeyboardEvent, Platform } from 'react-native';
+import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // login-screen.test.ts — narrow contract tests plus mounted globe tests.
@@ -35,9 +35,29 @@ const deviceAuth = vi.hoisted(() => ({
 const push = vi.hoisted(() => vi.fn());
 const clearDeviceError = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
-const addAppStateListener = vi.hoisted(() =>
-  vi.fn((_event: 'change', _listener: (state: AppStateStatus) => void) => ({ remove: vi.fn() }))
-);
+// The login screen reads the keyboard height from the root `KeyboardProvider`
+// instead of running its own `Keyboard`/`AppState` listener pair. The store
+// below is a plain object so the per-test `clear` cannot reach it, and `setHeight`
+// drives the reserved padding from a test; the app-level stub in
+// `vitest.setup.ts` always reports a hidden keyboard.
+const keyboardStore = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  return {
+    state: { height: 0 },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    setHeight: (height: number) => {
+      keyboardStore.state.height = height;
+      for (const listener of listeners) {
+        listener();
+      }
+    },
+  };
+});
 // The session-ended announcement is asserted through this spy, so it must
 // outlive a single render: the mock factory below runs per import, the spy is
 // cleared per test.
@@ -53,14 +73,33 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  AppState: { addEventListener: addAppStateListener },
   I18nManager: { isRTL: false },
-  Keyboard: { addListener: vi.fn(() => ({ remove: vi.fn() })) },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
 }));
+vi.mock('react-native-keyboard-controller', async () => {
+  // `vi.mock` factories are hoisted above the file's static imports, so `react`
+  // must be pulled in here.
+  const React = await import('react');
+  const heightOf = () => keyboardStore.state.height;
+  return {
+    KeyboardProvider: 'KeyboardProvider',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    KeyboardChatScrollView: 'KeyboardChatScrollView',
+    useKeyboardState: (selector?: (state: Record<string, unknown>) => unknown) => {
+      const height = React.useSyncExternalStore(keyboardStore.subscribe, heightOf, heightOf);
+      const state = {
+        height,
+        isVisible: height > 0,
+        progress: height > 0 ? 1 : 0,
+        duration: 0,
+      };
+      return selector ? selector(state) : state;
+    },
+  };
+});
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0, left: 0, right: 0 })),
 }));
@@ -140,12 +179,6 @@ function findButtonByLabel(
     throw new Error(`button ${label} not found`);
   }
   return control;
-}
-
-function keyboardEventsFor(platform: 'android' | 'ios') {
-  return platform === 'ios'
-    ? ({ show: 'keyboardWillShow', hide: 'keyboardWillHide' } as const)
-    : ({ show: 'keyboardDidShow', hide: 'keyboardDidHide' } as const);
 }
 
 async function mountLoginScreen(): Promise<TestRenderer.ReactTestRenderer> {
@@ -260,48 +293,31 @@ describe('login-screen error mapping', () => {
 });
 
 describe('login-screen keyboard bottom padding', () => {
-  it.each(['android', 'ios'] as const)(
-    'floors the %s keyboard-down inset at the platform bottom chrome',
-    platform => {
-      // The reported inset is not a reliable floor for the chrome the platform
-      // draws over the app: Android reports navigationBars() only and reports 0
-      // when the window does not inset for the bar, so a bare inset let the
-      // form's last control sit under the home indicator (landscape gesture
-      // bar). 48 is the tallest bottom chrome either platform draws.
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28, platform })).toBe(
-        48
-      );
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0, platform })).toBe(
-        48
-      );
-    }
-  );
-
-  it.each(['android', 'ios'] as const)(
-    'keeps a %s reported inset larger than the floor',
-    platform => {
-      expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63, platform })).toBe(
-        63
-      );
-    }
-  );
-
-  it('adds the bottom inset to Android, whose keyboard metric stops at the navigation bar', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'android' })
-    ).toBe(328);
+  it('floors the keyboard-down inset at the platform bottom chrome', () => {
+    // The reported inset is not a reliable floor for the chrome the platform
+    // draws over the app: Android reports navigationBars() only and reports 0
+    // when the window does not inset for the bar, so a bare inset let the
+    // form's last control sit under the home indicator (landscape gesture bar).
+    // 48 is the tallest bottom chrome either platform draws.
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 28 })).toBe(48);
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 0 })).toBe(48);
   });
 
-  it('keeps the iOS keyboard frame height, which already includes the home indicator', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28, platform: 'ios' })
-    ).toBe(300);
+  it('keeps a reported inset larger than the floor', () => {
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 0, bottomInset: 63 })).toBe(63);
+  });
+
+  it('reserves exactly the reported height, which already reaches the screen bottom', () => {
+    // The height comes from `react-native-keyboard-controller`, whose metric
+    // spans the whole strip the IME hides on both platforms: Android edge-to-edge
+    // keeps the navigation bar translucent, so nothing is subtracted, and iOS
+    // reports the keyboard frame, which includes the home indicator. Adding the
+    // bottom inset as well would float the form above the keyboard.
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: 300, bottomInset: 28 })).toBe(300);
   });
 
   it('ignores a negative reported height', () => {
-    expect(
-      resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28, platform: 'android' })
-    ).toBe(48);
+    expect(resolveKeyboardBottomPadding({ keyboardHeight: -1, bottomInset: 28 })).toBe(48);
   });
 });
 
@@ -637,14 +653,14 @@ describe('login-screen bottom-bar clearance', () => {
     deviceAuth.token = undefined;
     deviceAuth.code = undefined;
     Platform.OS = 'android';
-    vi.mocked(Keyboard.addListener).mockClear();
-    addAppStateListener.mockClear();
+    keyboardStore.setHeight(0);
     vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 24, bottom: 28, left: 0, right: 0 });
     vi.mocked(restoreLoginDrafts).mockResolvedValue({ email: '', ssoRecovery: null });
   });
 
   afterEach(() => {
     Platform.OS = 'ios';
+    keyboardStore.setHeight(0);
     vi.mocked(useSafeAreaInsets).mockReturnValue({ top: 0, bottom: 0, left: 0, right: 0 });
   });
 
@@ -657,26 +673,6 @@ describe('login-screen bottom-bar clearance', () => {
     expect(scroll.props.contentContainerClassName).toContain('flex-grow');
     expect(scroll.props.keyboardShouldPersistTaps).toBe('handled');
     return scroll.parent;
-  }
-
-  function emitKeyboard(
-    eventName: 'keyboardDidShow' | 'keyboardDidHide' | 'keyboardWillShow' | 'keyboardWillHide',
-    height = 0
-  ) {
-    const subscription = vi
-      .mocked(Keyboard.addListener)
-      .mock.calls.find(([name]) => name === eventName);
-    if (!subscription) {
-      throw new Error(`missing ${eventName} listener`);
-    }
-    const event: KeyboardEvent = {
-      duration: 0,
-      easing: 'keyboard',
-      endCoordinates: { height, width: 360, screenX: 0, screenY: 640 - height },
-    };
-    act(() => {
-      subscription[1](event);
-    });
   }
 
   it.each(['android', 'ios'] as const)(
@@ -728,84 +724,49 @@ describe('login-screen bottom-bar clearance', () => {
   });
 
   it.each(['android', 'ios'] as const)(
-    'pads the %s keyboard height through the same listener pair',
+    'reserves exactly the provider keyboard height on %s',
     async platform => {
-      const events = keyboardEventsFor(platform);
       Platform.OS = platform;
       const renderer = await mountLoginScreen();
 
-      // Same wrapper, one listener pair per platform: the only keyboard-event
-      // difference is which pair that platform fires.
-      expect(vi.mocked(Keyboard.addListener).mock.calls.map(([name]) => name)).toEqual([
-        events.show,
-        events.hide,
-      ]);
       expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
-      // Android's reported height excludes the navigation bar, so the reserved
-      // inset is added on top; iOS reports the keyboard window frame, whose
-      // height already covers the home indicator, so the inset is not added
-      // twice while the keyboard is up (it would leave a gap above the IME).
-      emitKeyboard(events.show, 300);
-      expect(scrollViewport(renderer).props.style).toEqual({
-        paddingBottom: platform === 'android' ? 328 : 300,
+      // The root `KeyboardProvider` reports the whole strip the IME hides,
+      // anchored to the screen bottom on both platforms, so the screen reserves
+      // that height as-is. Adding the bottom inset again (328 on Android) would
+      // leave a gap above the keyboard — the platform correction the one-rule
+      // `resolveKeyboardBottomPadding` dropped.
+      act(() => {
+        keyboardStore.setHeight(300);
       });
-
-      emitKeyboard(events.hide);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
-
-      emitKeyboard(events.show, 0);
-      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
 
       renderer.unmount();
     }
   );
 
   it.each(['android', 'ios'] as const)(
-    'clears stale %s keyboard occlusion on background without dropping the bottom bar',
+    'restores the bottom-bar floor when the provider clears the keyboard height on %s',
     async platform => {
       Platform.OS = platform;
       const renderer = await mountLoginScreen();
-      emitKeyboard(keyboardEventsFor(platform).show, 300);
-      const subscription = addAppStateListener.mock.calls[0];
-      if (!subscription) {
-        throw new Error('missing app state listener');
-      }
 
       act(() => {
-        subscription[1]('background');
+        keyboardStore.setHeight(300);
+      });
+      expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
+
+      // The provider clears the height when the app leaves the foreground; the
+      // screen must fall back to the bottom-chrome floor, never to 0, or the
+      // form's last control lands under the navigation bar or home indicator.
+      act(() => {
+        keyboardStore.setHeight(0);
       });
       expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 48 });
 
       renderer.unmount();
     }
   );
-
-  it('keeps the iOS keyboard occlusion through a transient inactive state', async () => {
-    Platform.OS = 'ios';
-    const renderer = await mountLoginScreen();
-    emitKeyboard(keyboardEventsFor('ios').show, 300);
-    const subscription = addAppStateListener.mock.calls[0];
-    if (!subscription) {
-      throw new Error('missing app state listener');
-    }
-
-    // Control Center, the app switcher preview, a call banner, and system
-    // permission alerts report `inactive` while the keyboard stays up, and no
-    // fresh `keyboardWillShow` follows on the way back to `active`; collapsing
-    // the occlusion here left the form under an open keyboard.
-    act(() => {
-      subscription[1]('inactive');
-    });
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
-
-    act(() => {
-      subscription[1]('active');
-    });
-    expect(scrollViewport(renderer).props.style).toEqual({ paddingBottom: 300 });
-
-    renderer.unmount();
-  });
 
   it('floors the reserved inset at the bottom chrome and keeps a larger reported inset', async () => {
     const renderer = await mountLoginScreen();

@@ -2294,28 +2294,19 @@ export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
 
 // --- StoredModel ---
 
-/** Model types as reported by the Vercel AI Gateway model list. */
-const ModelTypeSchema = z.enum([
-  'language',
-  'embedding',
-  'image',
-  'video',
-  'speech',
-  'transcription',
-  'reranking',
-  'realtime',
-  'evaluation',
-]);
-
-type ModelType = z.infer<typeof ModelTypeSchema>;
-
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: ModelTypeSchema.optional().catch(undefined),
+  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
   alias_target: z
     .object({
       slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
     })
     .optional()
     .catch(undefined),
@@ -2328,44 +2319,7 @@ export const ModelSchema = z.object({
     .catch(undefined),
 });
 
-const OUTPUT_MODALITY_MODEL_TYPES: Readonly<Partial<Record<string, ModelType>>> = {
-  decisions: 'evaluation',
-  embeddings: 'embedding',
-  image: 'image',
-  rerank: 'reranking',
-  speech: 'speech',
-  transcription: 'transcription',
-  video: 'video',
-};
-
-/**
- * OpenRouter reports output modalities instead of a model type, so map them
- * onto the Vercel types. Any text output, such as image generation alongside
- * text, makes it a language model, matching how Vercel types those models.
- */
-function inferModelTypeFromOutputModalities(
-  outputModalities: readonly string[]
-): ModelType | undefined {
-  if (outputModalities.includes('text')) return 'language';
-  return outputModalities
-    .map(modality => OUTPUT_MODALITY_MODEL_TYPES[modality])
-    .find(type => type !== undefined);
-}
-
-/** A gateway model list entry. Infers `type` from OpenRouter's output modalities when absent. */
-const GatewayModelSchema = ModelSchema.extend({
-  architecture: z
-    .object({ output_modalities: z.array(z.string()) })
-    .optional()
-    .catch(undefined),
-}).transform(({ architecture, ...model }) => {
-  const type =
-    model.type ??
-    (architecture && inferModelTypeFromOutputModalities(architecture.output_modalities));
-  return type ? { ...model, type } : model;
-});
-
-export const ModelsSchema = z.object({ data: z.array(GatewayModelSchema) });
+export const ModelsSchema = z.object({ data: z.array(ModelSchema) });
 
 export const EndpointSchema = z.object({
   tag: z.string().optional(),

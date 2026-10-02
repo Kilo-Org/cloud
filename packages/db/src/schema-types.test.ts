@@ -161,70 +161,27 @@ describe('ModelsSchema', () => {
     expect(result.data[0].alias_target).toBeUndefined();
   });
 
-  it.each([
-    [['text'], 'language'],
-    [['image', 'text'], 'language'],
-    [['text', 'audio'], 'language'],
-    [['decisions'], 'evaluation'],
-    [['embeddings'], 'embedding'],
-    [['image'], 'image'],
-    [['rerank'], 'reranking'],
-    [['speech'], 'speech'],
-    [['transcription'], 'transcription'],
-    [['video'], 'video'],
-  ])('infers the type of an OpenRouter model that outputs %j as %s', (outputModalities, type) => {
+  it('preserves only OpenRouter output modalities from the architecture', () => {
     const result = ModelsSchema.parse({
       data: [
         {
-          id: 'vendor/model',
-          name: 'Vendor Model',
-          type: null,
-          architecture: { input_modalities: ['text'], output_modalities: outputModalities },
+          id: 'typesafe/jev-1.13',
+          name: 'TypeSafe: Jev 1.13',
+          architecture: {
+            modality: 'text->decisions',
+            input_modalities: ['text'],
+            output_modalities: ['decisions'],
+            tokenizer: 'Other',
+          },
         },
+        { id: 'vendor/model', name: 'Vendor Model', architecture: { output_modalities: 'text' } },
       ],
     });
 
-    expect(result.data[0]).toEqual({ id: 'vendor/model', name: 'Vendor Model', type });
-  });
-
-  it('leaves the type unset for unknown output modalities', () => {
-    const result = ModelsSchema.parse({
-      data: [
-        {
-          id: 'vendor/model',
-          name: 'Vendor Model',
-          architecture: { output_modalities: ['hologram'] },
-        },
-      ],
-    });
-
-    expect(result.data[0]).toEqual({ id: 'vendor/model', name: 'Vendor Model' });
-  });
-
-  it('keeps a reported type over the inferred one', () => {
-    const result = ModelsSchema.parse({
-      data: [
-        {
-          id: 'typesafe-ai/jev',
-          name: 'Jev',
-          type: 'evaluation',
-          architecture: { output_modalities: ['text'] },
-        },
-      ],
-    });
-
-    expect(result.data[0].type).toBe('evaluation');
-  });
-
-  it('keeps Vercel model types', () => {
-    const result = ModelsSchema.parse({
-      data: [
-        { id: 'openai/gpt-realtime-2', name: 'GPT Realtime 2', type: 'realtime' },
-        { id: 'cohere/rerank-v4-pro', name: 'Rerank v4 Pro', type: 'reranking' },
-      ],
-    });
-
-    expect(result.data.map(model => model.type)).toEqual(['realtime', 'reranking']);
+    expect(result.data.map(model => model.architecture)).toEqual([
+      { output_modalities: ['decisions'] },
+      undefined,
+    ]);
   });
 });
 

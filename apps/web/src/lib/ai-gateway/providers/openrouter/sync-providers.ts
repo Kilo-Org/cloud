@@ -47,7 +47,7 @@ const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 /**
  * OpenRouter's default model list only contains text-output models. Fetching
  * every output modality also stores non-language models, such as System One
- * models, with a type inferred from their output modalities.
+ * models, which are told apart by their stored output modalities.
  */
 const OPENROUTER_MODELS_PATH = '/models?output_modalities=all';
 

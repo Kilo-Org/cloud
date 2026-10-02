@@ -5,7 +5,7 @@
   "description": "Server code shared by the web and ai-gateway Next.js apps",
   "type": "module",
   "scripts": {
-    "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit -p tsconfig.lib.json"
+    "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit -p tsconfig.lib.json && GOMEMLIMIT=2GiB tsgo --noEmit -p tsconfig.json"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "4.0.15",

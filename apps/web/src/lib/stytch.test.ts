@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach } from '@jest/globals';
-import { insertTestUser } from '../tests/helpers/user.helper';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 import { db } from '@/lib/drizzle';
 import {
   credit_campaigns,

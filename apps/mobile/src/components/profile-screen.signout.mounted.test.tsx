@@ -120,6 +120,12 @@ vi.mock('@/lib/profile-agent-navigation', () => ({
 vi.mock('@/lib/security-agent', () => ({ getSecurityAgentPath: () => '/security-agent' }));
 vi.mock('@/lib/feedback', () => ({ showFeedbackPrompt: vi.fn() }));
 
+// ProfileScreen now renders the What's New row, so it imports
+// `@/lib/external-link`; that module pulls in `expo-web-browser`, whose Expo
+// modules read the build-time `__DEV__` global this node test project does not
+// define. Stub the helper, as the other external-link consumers' suites do.
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
+
 vi.mock('@/components/ui/icons', () => ({
   BookOpenCheck: 'BookOpenCheck',
   Building2: 'Building2',
@@ -132,6 +138,7 @@ vi.mock('@/components/ui/icons', () => ({
   MessageSquare: 'MessageSquare',
   ShieldCheck: 'ShieldCheck',
   SlidersHorizontal: 'SlidersHorizontal',
+  Sparkles: 'Sparkles',
   Smartphone: 'Smartphone',
   Trash2: 'Trash2',
 }));

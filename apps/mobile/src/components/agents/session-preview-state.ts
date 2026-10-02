@@ -19,6 +19,8 @@ export type SessionPreviewTarget = {
   totalCostMicrodollars: number | null;
   /** Absent → no Rename item. */
   onRename?: (newTitle: string) => void;
+  /** Opens the session — the row's own navigation, reused by the Open menu item. */
+  onOpen: () => void;
   /** Absent → no Delete item. */
   onDelete?: () => void;
   /** Absent → no Exit item. */

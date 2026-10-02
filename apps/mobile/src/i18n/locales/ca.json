@@ -2605,7 +2605,6 @@
       "preparingPlaceholder": "Configurant l'entorn…",
       "finalizingPlaceholder": "Finalitzant…",
       "sessionLoadFailed": "No s'ha pogut carregar la sessió. Torneu-ho a provar primer.",
-      "sendUnavailable": "L'enviament no està disponible fins que la sessió estigui a punt.",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
       "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toca el botó d'enviament per tornar-ho a provar.",
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",

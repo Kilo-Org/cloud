@@ -2303,10 +2303,30 @@ export type AutoFreeConfig = z.infer<typeof AutoFreeConfigSchema>;
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
-  type: z.enum(['language', 'embedding', 'image']).optional().catch(undefined),
+  // The model types listed by Vercel AI Gateway; OpenRouter does not set a type.
+  type: z
+    .enum([
+      'language',
+      'embedding',
+      'image',
+      'video',
+      'speech',
+      'transcription',
+      'reranking',
+      'realtime',
+      'evaluation',
+    ])
+    .optional()
+    .catch(undefined),
   alias_target: z
     .object({
       slug: z.string().min(1),
+    })
+    .optional()
+    .catch(undefined),
+  architecture: z
+    .object({
+      output_modalities: z.array(z.string()),
     })
     .optional()
     .catch(undefined),

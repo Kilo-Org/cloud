@@ -218,16 +218,13 @@ export async function GET(
     const queryStartTime = Date.now();
     const anchor = anchorTime ?? new Date(queryStartTime);
     // Analytics Engine stores the resolved model without `:free`-style suffixes,
-    // so monitored models are matched on their normalized ID.
-    const statsByModel = await queryModelStats(anchor.getTime(), [
-      ...new Set(monitoredModels.map(toAnalyticsEngineModelId)),
-    ]);
+    // so free and paid variants share one normalized ID and are reported together.
+    const modelIds = [...new Set(monitoredModels.map(toAnalyticsEngineModelId))];
+    const statsByModel = await queryModelStats(anchor.getTime(), modelIds);
 
     const models: Record<string, ModelHealthMetrics> = {};
-    for (const model of monitoredModels) {
-      models[model] = evaluateModelHealth(
-        statsByModel.get(toAnalyticsEngineModelId(model)) ?? emptyModelStats()
-      );
+    for (const modelId of modelIds) {
+      models[modelId] = evaluateModelHealth(statsByModel.get(modelId) ?? emptyModelStats());
     }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;

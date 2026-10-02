@@ -1061,7 +1061,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     return this.enqueue(async () => {
       const state = await this.readAllocation();
-      if (state.kind !== 'connected') return null;
+      const fence = this.runtimeProxyFenceFor(state);
+      if (fence === null) return null;
       const owner = await this.requireOwner();
       if (owner === null || owner !== input.ownerId) return null;
       const route = await readRoute(this.db, input.sessionId);
@@ -1083,25 +1084,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         return null;
       }
-      const allocationId = state.allocationId;
-      const connectionId = state.connectionId;
-      const providerInstanceId = state.providerRef;
-      const wrapperInstanceId = state.wrapperId;
-      if (
-        allocationId === null ||
-        connectionId === null ||
-        providerInstanceId === null ||
-        wrapperInstanceId === null
-      ) {
-        return null;
-      }
-      return {
-        plane: 'control',
-        allocationId,
-        providerInstanceId,
-        connectionId,
-        wrapperInstanceId,
-      };
+      return fence;
     });
   }
 
@@ -2420,7 +2403,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private runtimeProxyFenceFor(state: AllocationState): ControlRuntimeCredentialProxyFence | null {
     const { allocationId, connectionId, providerRef, wrapperId } = state;
     if (
-      state.kind !== 'connected' ||
+      (state.kind !== 'connected' && state.kind !== 'disconnected') ||
       allocationId === null ||
       connectionId === null ||
       providerRef === null ||

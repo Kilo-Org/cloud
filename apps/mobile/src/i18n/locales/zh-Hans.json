@@ -2055,7 +2055,6 @@
       "preparingPlaceholder": "正在准备环境……",
       "finalizingPlaceholder": "正在收尾……",
       "sessionLoadFailed": "无法加载会话。请先重试。",
-      "sendUnavailable": "在会话准备就绪之前无法发送。",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
       "couldNotAttachFiles": "无法添加附件。请点击“发送”重试。",
       "discardAttachmentsMessage": "已上传但尚未用于发送消息的文件将被删除。",

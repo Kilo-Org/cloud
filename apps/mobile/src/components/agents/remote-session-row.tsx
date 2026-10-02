@@ -252,6 +252,9 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
       sessionId: session.id,
       title,
       initialRenameValue: renameInitialValue,
+      onOpen: () => {
+        onPress(session);
+      },
       live: true,
       statusKind: glanceableStatusKind(session.status),
       needsInput,

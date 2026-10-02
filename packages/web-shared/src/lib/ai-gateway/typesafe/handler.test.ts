@@ -22,6 +22,11 @@ import {
   wrapInSafeNextResponse,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
+import { getProviderSlugsForModel } from '@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import {
+  getOpenRouterSystemOneModelsFromDatabase,
+  resolveOpenRouterModelAlias,
+} from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
 import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -33,7 +38,17 @@ jest.mock('next/server', () => ({
   ...jest.requireActual<typeof NextServer>('next/server'),
   after: jest.fn(),
 }));
-jest.mock('@/lib/utils.server', () => ({ errorExceptInTest: jest.fn() }));
+jest.mock('@/lib/utils.server', () => ({
+  errorExceptInTest: jest.fn(),
+  warnExceptInTest: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/providers/openrouter/models-by-provider-index.server', () => ({
+  getProviderSlugsForModel: jest.fn(),
+}));
+jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getOpenRouterSystemOneModelsFromDatabase: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn(),
+}));
 jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
 jest.mock('@/lib/organizations/organization-usage', () => ({
   getBalanceAndOrgSettings: jest.fn(),
@@ -67,6 +82,8 @@ jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
 }));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
+const OTHER_SYSTEM_ONE_MODEL = 'respan/span-01-lite:free';
+const SYSTEM_ONE_ALIAS = '~typesafe/jev-latest';
 const user = {
   id: 'oauth/test-user',
   google_user_email: 'test@example.com',
@@ -156,6 +173,14 @@ describe('handleSystemOneRequest', () => {
     jest.mocked(isGatewayAccountRateLimited).mockResolvedValue(false);
     jest.mocked(gatewayRateLimitKey).mockReturnValue('test-rate-limit-key');
     jest.mocked(resolveOrganizationMemberModelDecision).mockResolvedValue(memberDecision);
+    jest
+      .mocked(getOpenRouterSystemOneModelsFromDatabase)
+      .mockResolvedValue(new Set([TYPESAFE_MODEL, OTHER_SYSTEM_ONE_MODEL, SYSTEM_ONE_ALIAS]));
+    jest
+      .mocked(resolveOpenRouterModelAlias)
+      .mockImplementation(async modelId =>
+        modelId === SYSTEM_ONE_ALIAS ? TYPESAFE_MODEL : modelId
+      );
     jest.mocked(generateProviderSpecificHash).mockReturnValue('hashed-user');
     jest.mocked(extractFraudAndProjectHeaders).mockReturnValue({
       fraudHeaders: EmptyFraudDetectionHeaders,
@@ -470,9 +495,53 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
+    { model: OTHER_SYSTEM_ONE_MODEL, policyModel: OTHER_SYSTEM_ONE_MODEL },
+    { model: SYSTEM_ONE_ALIAS, policyModel: TYPESAFE_MODEL },
+  ])('forwards OpenRouter System One model $model unchanged', async ({ model, policyModel }) => {
+    setAuth('org-123');
+
+    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.model).toBe(model);
+    expect(resolveOrganizationMemberModelDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ modelId: policyModel })
+    );
+    await runAfter();
+    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ requested_model: model })
+    );
+  });
+
+  it.each(['openai/gpt-4o', 'jev-latest', 'respan/span-01-lite', 'jev-2.0'])(
+    'rejects %s when it is not an OpenRouter System One model',
+    async model => {
+      const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error_type: 'model_not_found' });
+      expect(getBalanceAndOrgSettings).not.toHaveBeenCalled();
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(after).not.toHaveBeenCalled();
+    }
+  );
+
+  it('leaves model validation to OpenRouter without System One model metadata', async () => {
+    jest.mocked(getOpenRouterSystemOneModelsFromDatabase).mockResolvedValue(new Set());
+
+    const response = await handleSystemOneRequest(
+      makeRequest({ ...requestBody, model: 'vendor/unlisted-decide' })
+    );
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.model).toBe('vendor/unlisted-decide');
+  });
+
+  it.each([
     ['malformed JSON', '{'],
-    ['another model', JSON.stringify({ ...requestBody, model: 'openai/gpt-4o' })],
-    ['an unpinned alias', JSON.stringify({ ...requestBody, model: 'jev-latest' })],
+    ['an empty model', JSON.stringify({ ...requestBody, model: ' ' })],
+    ['a non-string model', JSON.stringify({ ...requestBody, model: 1 })],
     ['empty questions', JSON.stringify({ ...requestBody, questions: {} })],
     [
       'invalid data collection',
@@ -555,37 +624,11 @@ describe('handleSystemOneRequest', () => {
       organizationId: 'org-123',
       kiloUserId: user.id,
       modelId: TYPESAFE_MODEL,
-      providerLookup: expect.any(Function),
+      providerLookup: getProviderSlugsForModel,
     });
-    const [{ providerLookup }] = jest.mocked(resolveOrganizationMemberModelDecision).mock.calls[0];
-    if (!providerLookup) throw new Error('Expected the fixed TypeSafe provider lookup');
-    await expect(providerLookup(TYPESAFE_MODEL)).resolves.toEqual(new Set(['typesafe']));
     expect(modelNotAllowedResponse).toHaveBeenCalledTimes(1);
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(after).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    { model: '~typesafe/jev-latest', provider: 'typesafe' },
-    { model: 'respan/span-01-lite:free', provider: 'respan' },
-    { model: 'jaredpalmer/kev-4b', provider: 'siliconflow' },
-  ])('forwards System One model $model with its fixed provider', async ({ model, provider }) => {
-    setAuth('org-123');
-
-    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
-
-    expect(response.status).toBe(200);
-    expect(upstreamRequest().body.model).toBe(model);
-    const [{ modelId, providerLookup }] = jest.mocked(resolveOrganizationMemberModelDecision).mock
-      .calls[0];
-    expect(modelId).toBe(model);
-    if (!providerLookup) throw new Error('Expected the fixed System One provider lookup');
-    await expect(providerLookup(model)).resolves.toEqual(new Set([provider]));
-    await runAfter();
-    expect(logMicrodollarUsage).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ requested_model: model })
-    );
   });
 
   it.each([

@@ -81,9 +81,11 @@ export function OrganizationDashboard({
   const isKiloAdmin = assumedRole === 'KILO ADMIN';
 
   const trpc = useTRPC();
-  const { data: activeKiloclaws, isError: activeKiloclawsError } = useQuery(
-    trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId })
-  );
+  const canBilling = canManageOrganizationBilling(currentRole);
+  const { data: activeKiloclaws, isError: activeKiloclawsError } = useQuery({
+    ...trpc.organizations.kiloclaw.listActiveInstances.queryOptions({ organizationId }),
+    enabled: canBilling,
+  });
 
   const hasActiveKiloclaws = activeKiloclaws?.some(i => !i.isSuspended) ?? false;
 

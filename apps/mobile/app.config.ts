@@ -26,15 +26,21 @@ import {
 
 const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
 
-// The Android channel the server routes agent pushes to and the one an FCM
-// message without a `channel_id` should fall back to (packages/notifications
-// `ANDROID_NOTIFICATION_CHANNELS`). Every start creates it, and the headless
+// The Android channel Firebase falls back to when an FCM message omits
+// `channel_id` (packages/notifications `ANDROID_NOTIFICATION_CHANNELS`). The
+// server omits the id for a token whose app version it never recorded
+// (push-presentation.ts `androidChannelIdForPushDataToAppVersion`), so this
+// fallback still carries needs-input/chat alerts that must alert. It therefore
+// has to be a channel the app creates with sound and vibration. The progress
+// channel is silent by design (src/lib/notifications.ts
+// `SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS`), so naming it here would deliver
+// every unaddressed alert silently; `needs-input` is the app-owned sounding
+// channel for the alert kinds. Every start creates it, and the headless
 // background task creates it too (src/lib/notifications.ts
 // `runBackgroundNotificationTask`) because a headless start never evaluates the
 // root layout. Naming it in the manifest as Firebase's default silences
-// "Missing Default Notification Channel metadata" and keeps the fallback on a
-// channel the app actually owns.
-const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'agent-progress';
+// "Missing Default Notification Channel metadata".
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 
 // expo-task-manager resolves its headless app loader by name from
 // AndroidManifest metadata (`org.unimodules.core.AppLoader#react-native-headless`

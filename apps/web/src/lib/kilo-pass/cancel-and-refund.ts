@@ -12,7 +12,7 @@ import {
 import type { db as defaultDb } from '@/lib/drizzle';
 import { getKiloPassStateForUser } from '@/lib/kilo-pass/state';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { fromMicrodollars } from '@/lib/utils';
+import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { KiloPassPaymentProvider } from '@/lib/kilo-pass/enums';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';

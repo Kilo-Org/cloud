@@ -1584,6 +1584,7 @@
       "renamePlaceholder": "セッション名",
       "transcriptAccessibility": "セッションの会話履歴",
       "readOnly": "このセッションは読み取り専用です。",
+      "continueInNewSession": "新しいセッションで続行",
       "emptyDescription": "下の入力欄からメッセージを送信すると、開始できます。",
       "scrollToBottom": "一番下までスクロール",
       "emptyTitle": "メッセージはまだありません",

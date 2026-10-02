@@ -14,7 +14,7 @@ import { captureException } from '@sentry/nextjs';
 import { logExceptInTest, sentryLogger } from '@/lib/utils.server';
 import { failureResult, successResult, type Result } from '@/lib/maybe-result';
 import type { UserForBalance } from '@/lib/user/balance-types';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { getOrganizationById, getOrganizationMembers } from '@/lib/organizations/organizations';
 import { randomUUID } from 'crypto';
 import { sendAutoTopUpFailedEmail } from '@/lib/email';

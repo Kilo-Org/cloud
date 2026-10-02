@@ -1331,6 +1331,17 @@ export const CodeReviewAnalyticsCaptureStatus = {
 export type CodeReviewAnalyticsCaptureStatus =
   (typeof CodeReviewAnalyticsCaptureStatus)[keyof typeof CodeReviewAnalyticsCaptureStatus];
 
+export const CodeReviewPublicationStatus = {
+  Published: 'published',
+  Unchanged: 'unchanged',
+  Missing: 'missing',
+  Unknown: 'unknown',
+  NotApplicable: 'not_applicable',
+} as const;
+
+export type CodeReviewPublicationStatus =
+  (typeof CodeReviewPublicationStatus)[keyof typeof CodeReviewPublicationStatus];
+
 export const CodeReviewAnalyticsChangeType = {
   BugFix: 'bug_fix',
   Feature: 'feature',

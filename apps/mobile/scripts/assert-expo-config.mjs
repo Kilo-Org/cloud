@@ -49,8 +49,10 @@ const BUILD_PROPERTIES_PLUGIN = 'expo-build-properties';
 const NOTIFICATIONS_PLUGIN = 'expo-notifications';
 // The Android channel Firebase falls back to when an FCM message omits
 // `channel_id`, mirrored from app.config.ts. It must be a channel the app
-// creates (src/lib/notifications.ts), or Android drops the fallback push.
-const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'agent-progress';
+// creates (src/lib/notifications.ts), or Android drops the fallback push, and
+// it must be created with sound: the fallback carries needs-input/chat alerts,
+// so the silent progress channel must never be named here.
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
 // expo-task-manager instantiates its headless app loader by name from
 // AndroidManifest metadata. R8 does not keep it (its `@DoNotStrip` is on the
 // constructor, not the class), so without this rule a minified release removes
@@ -370,6 +372,14 @@ const notificationsPlugin = (config.plugins ?? []).find(
 check(
   notificationsPlugin?.[1]?.defaultChannel === ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
   `plugins "${NOTIFICATIONS_PLUGIN}" must set defaultChannel: "${ANDROID_DEFAULT_NOTIFICATION_CHANNEL}"`
+);
+// The fallback carries needs-input/chat alerts for an unversioned token, so it
+// must not name a channel the app creates silent: mirrored from
+// src/lib/notifications.ts `SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS`.
+const SILENT_ANDROID_NOTIFICATION_CHANNELS = ['agent-progress'];
+check(
+  !SILENT_ANDROID_NOTIFICATION_CHANNELS.includes(ANDROID_DEFAULT_NOTIFICATION_CHANNEL),
+  `the FCM default channel must not be silent (${SILENT_ANDROID_NOTIFICATION_CHANNELS.join(', ')})`
 );
 
 const extra = config.extra ?? {};

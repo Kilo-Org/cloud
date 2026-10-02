@@ -1,5 +1,5 @@
 import 'server-only';
-import { normalizeEmail } from '@/lib/utils';
+import { normalizeEmail } from '@/lib/email-address';
 import type { User } from '@kilocode/db/schema';
 import { getDomain } from 'tldts';
 

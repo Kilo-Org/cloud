@@ -30,8 +30,12 @@ function readInstalledReactNative(relativePath: string): string {
 
 function readInstalledRegistryLookup(): string {
   const source = readInstalledReactNative('React/Fabric/Mounting/RCTComponentViewRegistry.mm');
-  const start = source.indexOf('- (const RCTComponentViewDescriptor &)componentViewDescriptorWithTag:');
-  const end = source.indexOf('- (nullable UIView<RCTComponentViewProtocol> *)findComponentViewWithTag:');
+  const start = source.indexOf(
+    '- (const RCTComponentViewDescriptor &)componentViewDescriptorWithTag:'
+  );
+  const end = source.indexOf(
+    '- (nullable UIView<RCTComponentViewProtocol> *)findComponentViewWithTag:'
+  );
   assert.ok(
     start !== -1 && end > start,
     'the registry must keep `componentViewDescriptorWithTag:` directly before `findComponentViewWithTag:`'
@@ -102,11 +106,7 @@ test('the installed registry returns an empty descriptor and logs the tag on a m
     'the lookup must branch on the miss before returning a reference'
   );
   assert.match(lookup, /RCTLogError\(/, 'the miss must be reported');
-  assert.match(
-    lookup,
-    /\(tag: %lld\)/,
-    'the report must carry the tag that was not registered'
-  );
+  assert.match(lookup, /\(tag: %lld\)/, 'the report must carry the tag that was not registered');
   assert.match(
     lookup,
     /static const RCTComponentViewDescriptor \w+\{\};/,
@@ -150,8 +150,14 @@ test('the installed mount pass skips a mutation whose child view is gone', () =>
   const removeChildGuard = source.indexOf('if (oldChildViewDescriptor.view == nil) {');
   const removeParentGuard = source.indexOf('if (parentViewDescriptor.view == nil) {');
   const removeSend = source.indexOf('[parentViewDescriptor.view unmountChildComponentView:');
-  assert.ok(removeChildGuard !== -1, 'the Remove case must skip a mutation whose child view is gone');
-  assert.ok(removeParentGuard !== -1, 'the Remove case must skip a mutation whose parent view is gone');
+  assert.ok(
+    removeChildGuard !== -1,
+    'the Remove case must skip a mutation whose child view is gone'
+  );
+  assert.ok(
+    removeParentGuard !== -1,
+    'the Remove case must skip a mutation whose parent view is gone'
+  );
   assert.ok(
     removeChildGuard < removeSend && removeParentGuard < removeSend,
     'the Remove guards must run before the unmount send, which removes an unrelated view at a stale index'

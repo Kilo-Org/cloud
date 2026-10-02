@@ -27,6 +27,7 @@ import {
 import { captureEvent } from '@/lib/analytics/posthog';
 import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { applyStoredLanguage } from '@/lib/glanceable/apply-stored-language';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
   getLastGlanceableSnapshot,
@@ -241,6 +242,13 @@ export async function applyGlanceablePushData(
       sink.publish(snapshot);
       sink.startOrUpdate(snapshot, ctx);
     }
+    // A headless background task resolves when this function returns and its
+    // process is torn down shortly after, so hold the task open until each
+    // asynchronous surface submission landed. A native failure rejects here,
+    // which the background path relies on so the OS retries the push.
+    await Promise.all(
+      getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeStart?.())
+    );
   } else {
     for (const sink of getGlanceableSinks()) {
       sink.publish(snapshot);
@@ -449,14 +457,25 @@ async function handleBackgroundNotificationTask(
  * Executor entry for the background notification task, exported for
  * `notification-background-task.ts`, whose task executor lazy-loads this module
  * when a task fires (a headless start evaluates only the app entry, so this
- * graph must not load at entry). Loads the glanceable sinks — a fresh headless
- * process has none registered — then dispatches.
+ * graph must not load at entry). Applies the stored language, loads the
+ * glanceable sinks — a fresh headless process has none registered — creates the
+ * Android channels, then dispatches.
  */
-// eslint-disable-next-line promise-function-async -- passthrough dispatch: the executor is the async boundary
-export function runBackgroundNotificationTask(
+export async function runBackgroundNotificationTask(
   body: TaskManager.TaskManagerTaskBody<Notifications.NotificationTaskPayload>
 ): Promise<Notifications.BackgroundNotificationTaskResult> {
+  // A killed process starts on the bundled English catalog, and nothing else on
+  // this path applies the stored language. Apply it before the channels are
+  // written, or the names below revert the user's notification settings to
+  // English until the app is next opened.
+  await applyStoredLanguage();
   ensureGlanceableSinksLoaded();
+  // A headless start never evaluates the root layout, so the Android channels
+  // the server routes pushes to (`agent-progress` among them) do not exist yet.
+  // Create them before the first post: Android drops a notification addressed
+  // to a channel the app never created, and FirebaseMessaging logs the miss on
+  // every message. Idempotent and never rejecting.
+  await ensureAndroidNotificationChannels();
   return handleBackgroundNotificationTask(body);
 }
 
@@ -670,13 +689,31 @@ async function writeAndroidNotificationChannel(
   );
 }
 
+const CHANNEL_NAME_KEYS = {
+  'needs-input': 'glanceable.needsInput',
+  'agent-progress': 'notifications.channel.agentProgress',
+  kiloclaw: 'notifications.channel.kiloclaw',
+  balance: 'notifications.channel.balance',
+  security: 'notifications.channel.security',
+} as const satisfies Record<AndroidNotificationChannelId, string>;
+
+/**
+ * The user-visible name for one channel in the active catalog language. Creation
+ * and rename both read this, so a channel the headless executor creates while
+ * the process was killed carries the same translated name a foreground start
+ * installs, never the shared package's static English `channel.name`.
+ */
+function androidChannelName(channel: (typeof ANDROID_NOTIFICATION_CHANNELS)[number]): string {
+  return i18n.t(CHANNEL_NAME_KEYS[channel.id]);
+}
+
 async function createAndroidNotificationChannels(): Promise<boolean> {
   const dndAccessGranted = androidDndAccessGranted();
   let allChannelsWritten = true;
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are created sequentially so a per-channel failure is isolated
-      await writeAndroidNotificationChannel(channel, channel.name, dndAccessGranted);
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
     } catch (error) {
       allChannelsWritten = false;
       Sentry.captureException(error, {
@@ -729,14 +766,6 @@ export function ensureAndroidNotificationChannels(): Promise<void> {
   return androidChannelsPromise;
 }
 
-const CHANNEL_NAME_KEYS = {
-  'needs-input': 'glanceable.needsInput',
-  'agent-progress': 'notifications.channel.agentProgress',
-  kiloclaw: 'notifications.channel.kiloclaw',
-  balance: 'notifications.channel.balance',
-  security: 'notifications.channel.security',
-} as const satisfies Record<AndroidNotificationChannelId, string>;
-
 /**
  * Re-set every Android channel name with the active catalog translation. Not
  * single-flight and never cached: a language change must always re-write the
@@ -755,11 +784,7 @@ export async function renameAndroidNotificationChannels(): Promise<void> {
   for (const channel of ANDROID_NOTIFICATION_CHANNELS) {
     try {
       // eslint-disable-next-line no-await-in-loop -- channels are renamed sequentially so a per-channel failure is isolated
-      await writeAndroidNotificationChannel(
-        channel,
-        i18n.t(CHANNEL_NAME_KEYS[channel.id]),
-        dndAccessGranted
-      );
+      await writeAndroidNotificationChannel(channel, androidChannelName(channel), dndAccessGranted);
     } catch (error) {
       Sentry.captureException(error, {
         tags: {

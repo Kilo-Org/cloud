@@ -26,6 +26,36 @@ import {
 
 const isProductionBuild = process.env.EAS_BUILD_PROFILE === 'production';
 
+// The Android channel Firebase falls back to when an FCM message omits
+// `channel_id` (packages/notifications `ANDROID_NOTIFICATION_CHANNELS`). The
+// server omits the id for a token whose app version it never recorded
+// (push-presentation.ts `androidChannelIdForPushDataToAppVersion`), so this
+// fallback still carries needs-input/chat alerts that must alert. It therefore
+// has to be a channel the app creates with sound and vibration. The progress
+// channel is silent by design (src/lib/notifications.ts
+// `SILENT_ANDROID_NOTIFICATION_CHANNEL_IDS`), so naming it here would deliver
+// every unaddressed alert silently; `needs-input` is the app-owned sounding
+// channel for the alert kinds. Every start creates it, and the headless
+// background task creates it too (src/lib/notifications.ts
+// `runBackgroundNotificationTask`) because a headless start never evaluates the
+// root layout. Naming it in the manifest as Firebase's default silences
+// "Missing Default Notification Channel metadata".
+const ANDROID_DEFAULT_NOTIFICATION_CHANNEL = 'needs-input';
+
+// expo-task-manager resolves its headless app loader by name from
+// AndroidManifest metadata (`org.unimodules.core.AppLoader#react-native-headless`
+// in expo-modules-core). The class's `@DoNotStrip` sits on the constructor, not
+// the class, so expo-modules-core's class-level consumer keep rule does not
+// match it: R8 removes the class from a minified release, `Class.forName`
+// throws ClassNotFoundException, `TaskService.getAppLoader` returns null, and a
+// background FCM data message either NPEs in `TaskService.executeTask` or drops
+// the task. Keep the class name and its no-arg constructor so the headless task
+// runs in release builds.
+const ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES = [
+  '# expo-task-manager headless app loader, resolved reflectively by name.',
+  '-keep class expo.modules.adapters.react.apploader.RNHeadlessAppLoader { <init>(); }',
+].join('\n');
+
 // Required env is fatal by build intent: a production build must never ship
 // with a missing value, so throw under EAS_BUILD_PROFILE === 'production'.
 // Otherwise keep the old behavior: warn under GITHUB_ACTIONS, throw locally.
@@ -248,6 +278,8 @@ const config: ExpoConfig = {
       {
         android: {
           enableMinifyInReleaseBuilds: true,
+          // Keep expo-task-manager's reflectively-loaded headless app loader.
+          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -308,6 +340,10 @@ const config: ExpoConfig = {
       {
         icon: './assets/images/android-notification-icon.png',
         color: '#FAF74F',
+        // Name the channel Firebase falls back to when a message omits
+        // `channel_id`. Without it FirebaseMessaging logs "Missing Default
+        // Notification Channel metadata in AndroidManifest" on every message.
+        defaultChannel: ANDROID_DEFAULT_NOTIFICATION_CHANNEL,
         // iOS requires `remote-notification` in UIBackgroundModes for the
         // headless background task (`registerTaskAsync`) to deliver a data-only
         // `active_agents_glanceable` push while the app is not in the foreground.

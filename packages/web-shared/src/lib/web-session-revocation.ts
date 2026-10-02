@@ -1,4 +1,4 @@
-import { db, type DrizzleTransaction } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { kilocode_users, type User } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';

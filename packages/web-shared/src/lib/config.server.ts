@@ -1,5 +1,5 @@
-import { APP_URL } from '@/lib/constants';
-import { getEnvVariable, requireEnv } from '@/lib/dotenvx';
+import { APP_URL } from '@kilocode/web-shared/lib/constants';
+import { getEnvVariable, requireEnv } from '@kilocode/web-shared/lib/dotenvx';
 import 'server-only';
 
 export const IS_IN_AUTOMATED_TEST = !!getEnvVariable('IS_IN_AUTOMATED_TEST');

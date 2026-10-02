@@ -5,7 +5,7 @@ import {
   KILO_EMBEDDING_MODEL_CATALOG,
   getKiloEmbeddingModel,
   normalizeKiloEmbeddingModelId,
-} from '@/lib/ai-gateway/embeddings/kilo-embedding-models';
+} from '@kilocode/web-shared/lib/ai-gateway/embeddings/kilo-embedding-models';
 
 describe('GET /api/gateway/embedding-models', () => {
   test('returns the Kilo embedding model catalog', async () => {

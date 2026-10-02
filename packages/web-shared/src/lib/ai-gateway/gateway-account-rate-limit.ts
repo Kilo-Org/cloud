@@ -3,8 +3,8 @@ import { captureMessage } from '@sentry/nextjs';
 import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getAnonymousUserId } from '@/lib/anonymous';
-import { validateAuthorizationHeader } from '@/lib/tokens';
+import { getAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
+import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
 
 /**
  * Vercel Firewall rate limit that caps how much inference one account can ask

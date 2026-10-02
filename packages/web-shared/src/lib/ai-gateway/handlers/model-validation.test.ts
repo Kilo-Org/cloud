@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
-import { getUserFromAuth } from '@/lib/user/server';
-import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
-import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
+import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { handleModelValidationRequest } from './model-validation';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
-jest.mock('@/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
-jest.mock('@/lib/ai-gateway/providers/openrouter', () => ({
+jest.mock('@kilocode/web-shared/lib/user/server', () => ({ getUserFromAuth: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
   getEnhancedOpenRouterModels: jest.fn(),
 }));
-jest.mock('@/lib/ai-gateway/providers/direct-byok', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForUser: jest.fn(),
 }));
 

@@ -9,7 +9,10 @@ import {
   type InternalDispatchSecurityLifecycleRequest,
   type InternalDispatchSpendAlertRequest,
 } from '@kilocode/notifications';
-import { INTERNAL_API_SECRET, NOTIFICATIONS_WORKER_URL } from '@/lib/config.server';
+import {
+  INTERNAL_API_SECRET,
+  NOTIFICATIONS_WORKER_URL,
+} from '@kilocode/web-shared/lib/config.server';
 
 type DispatchBody =
   | InternalDispatchLowBalanceRequest

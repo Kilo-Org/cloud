@@ -1,13 +1,13 @@
-import { ReasoningFormat } from '@/lib/ai-gateway/custom-llm/format';
+import { ReasoningFormat } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/format';
 import {
   type ReasoningDetailEncrypted,
   type ReasoningDetailText,
   ReasoningDetailType,
-} from '@/lib/ai-gateway/custom-llm/reasoning-details';
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/reasoning-details';
 import {
   ReasoningDetailsTransform,
   type ProviderResponseTransforms,
-} from '@/lib/ai-gateway/providers/types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

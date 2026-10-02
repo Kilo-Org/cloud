@@ -4,7 +4,7 @@ import type {
   OrganizationUserLimitType,
   User,
 } from '@kilocode/db/schema';
-import type { OrganizationPlan } from '@/lib/organizations/organization-types';
+import type { OrganizationPlan } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
   organization_user_limits,
   organization_user_usage,
@@ -15,22 +15,22 @@ import {
   cloud_agent_code_reviews,
   kilocode_users,
 } from '@kilocode/db/schema';
-import type { DrizzleTransaction } from '@/lib/drizzle';
-import { db } from '@/lib/drizzle';
+import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, eq, sql, gte, lte, not, inArray, count } from 'drizzle-orm';
-import { toMicrodollars } from '@/lib/microdollars';
+import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
-import { logExceptInTest } from '@/lib/utils.server';
-import type { OrganizationSettings } from '@/lib/organizations/organization-types';
-import { getBalanceForUser } from '@/lib/user/balance';
-import { processOrganizationExpirations } from '@/lib/creditExpiration';
+import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import type { OrganizationSettings } from '@kilocode/web-shared/lib/organizations/organization-types';
+import { getBalanceForUser } from '@kilocode/web-shared/lib/user/balance';
+import { processOrganizationExpirations } from '@kilocode/web-shared/lib/creditExpiration';
 import { startInactiveSpan } from '@sentry/nextjs';
-import { AUTOCOMPLETE_MODEL } from '@/lib/constants';
-import { sendBalanceAlertEmail } from '@/lib/email';
-import { dispatchLowBalancePush } from '@/lib/notifications-worker-client';
+import { AUTOCOMPLETE_MODEL } from '@kilocode/web-shared/lib/constants';
+import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
+import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
-import { maybePerformOrganizationAutoTopUp } from '@/lib/autoTopUp';
+import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)

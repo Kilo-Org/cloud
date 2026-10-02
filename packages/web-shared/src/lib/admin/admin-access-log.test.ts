@@ -16,7 +16,7 @@ import {
   type AdminAccessEvent,
   type AdminAuditContext,
 } from './admin-access-log';
-import { defineTestUser } from '@/tests/helpers/user.helper';
+import { defineTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 
 describe('clientIpFromHeaders', () => {
   test('returns the first hop of x-forwarded-for', () => {

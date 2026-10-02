@@ -1,14 +1,14 @@
-jest.mock('@/lib/ai-gateway/openai-chatgpt/store', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
   getOpenAiChatGptStoredConnection: jest.fn(),
   openAiChatGptSharedServicesOwner: (organizationId: string) => ({
     organizationId,
     scope: 'shared_services',
   }),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/served-models', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models', () => ({
   isOpenAiModelServed: jest.fn().mockResolvedValue(true),
 }));
-jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh', () => ({
   resolveOpenAiChatGptAccessToken: jest.fn(),
   OPENAI_CHATGPT_RECONNECT_MESSAGE: 'Your ChatGPT connection has expired. Reconnect to continue.',
 }));
@@ -16,10 +16,12 @@ jest.mock('@/lib/ai-gateway/openai-chatgpt/refresh', () => ({
 // disabled, and at one point none were live at all, which silently turned the
 // exclusive cases below into ordinary-model cases. Stub a synthetic alias, but
 // preserve the real lookup for the catalog status regression tests below.
-jest.mock('@/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof gatewayModels>('@/lib/ai-gateway/kilo-exclusive-models');
+jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
+  const actual = jest.requireActual<typeof gatewayModels>(
+    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
+  );
   const { OPENROUTER } = jest.requireActual<typeof OpenRouterModule>(
-    '@/lib/ai-gateway/providers/definitions/openrouter'
+    '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter'
   );
   const testExclusiveModel: KiloExclusiveModel = {
     public_id: 'openai/kilo-exclusive-test-model',
@@ -63,19 +65,19 @@ jest.mock('next/server', () => ({
 }));
 
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import type * as gatewayModels from '@/lib/ai-gateway/kilo-exclusive-models';
-import type * as OpenRouterModule from '@/lib/ai-gateway/providers/definitions/openrouter';
-import { kiloExclusiveModels } from '@/lib/ai-gateway/kilo-exclusive-models';
-import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
-import { resolveOpenAiChatGptAccessToken } from '@/lib/ai-gateway/openai-chatgpt/refresh';
-import { getOpenAiChatGptStoredConnection } from '@/lib/ai-gateway/openai-chatgpt/store';
-import { isOpenAiModelServed } from '@/lib/ai-gateway/openai-chatgpt/served-models';
+import type * as gatewayModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type * as OpenRouterModule from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
+import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import { isOpenAiModelServed } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/served-models';
 import type {
   GatewayRequest,
   GatewayResponsesRequest,
-} from '@/lib/ai-gateway/providers/openrouter/types';
-import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
-import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import {
   buildOpenAiChatGptProvider,
   checkOpenAiChatGptByok,

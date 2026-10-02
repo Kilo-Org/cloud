@@ -3,8 +3,8 @@ import {
   modelRetainsPrompts,
   modelTrains,
   withWorstProviderDataPolicy,
-} from '@/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { OpenRouterSearchResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
+import { OpenRouterSearchResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 
 const baseModel = {
   slug: 'anthropic/claude-fable-5',

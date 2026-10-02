@@ -1,5 +1,5 @@
-import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 
 export function determineFallbackFeature(
   requestBodyParsed: GatewayRequest,

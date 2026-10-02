@@ -1,4 +1,4 @@
-import { db } from '@/lib/drizzle';
+import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { PaymentMethod, User } from '@kilocode/db/schema';
 import { payment_methods } from '@kilocode/db/schema';
 import { inArray, eq, and, isNull } from 'drizzle-orm';

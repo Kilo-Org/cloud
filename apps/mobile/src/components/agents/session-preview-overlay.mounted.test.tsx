@@ -38,7 +38,7 @@ describe('SessionPreviewOverlay', () => {
     expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(2);
     expect(textWith(renderer, BASE_TARGET.title)).toHaveLength(1);
     for (const label of [
-      i18n.t('agents.sessionRow.copyId'),
+      i18n.t('glanceable.openSession'),
       i18n.t('common.rename'),
       i18n.t('agentChat.remoteSession.exitSession'),
       i18n.t('agents.sessionRow.deleteSession'),
@@ -150,6 +150,16 @@ describe('SessionPreviewOverlay', () => {
     expect(getSessionPreviewSnapshot().target).toBeNull();
   });
 
+  it('runs the Open item through the row navigation', () => {
+    const onOpen = vi.fn<() => void>();
+    const renderer = mountOverlay();
+    openPreview(targetWith({ onOpen }));
+
+    pressByLabel(renderer, i18n.t('glanceable.openSession'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(getSessionPreviewSnapshot().target).toBeNull();
+  });
+
   it('releases the target when Cancel closes the preview', () => {
     const renderer = mountOverlay();
     openPreview(targetWith({}));
@@ -211,7 +221,7 @@ describe('SessionPreviewOverlay', () => {
       throw new Error('missing modal surface');
     }
     expect(
-      modalSurface.findAllByProps({ accessibilityLabel: i18n.t('agents.sessionRow.copyId') })
+      modalSurface.findAllByProps({ accessibilityLabel: i18n.t('glanceable.openSession') })
     ).toHaveLength(1);
     expect(
       modalSurface.findAllByProps({ accessibilityLabel: i18n.t('common.cancel') })

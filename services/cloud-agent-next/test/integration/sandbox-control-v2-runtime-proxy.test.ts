@@ -11,7 +11,10 @@ import type {
 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import { runtimeCredentialProxyFacadeBaseUrl } from '../../src/runtime-credential-proxy.js';
+import {
+  runtimeCredentialProxyFacadeBaseUrl,
+  runtimeProxyHandleGrantId,
+} from '../../src/runtime-credential-proxy.js';
 import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
 import {
   RUNTIME_AUTHORIZATION_KEY,
@@ -622,45 +625,115 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
     expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle ?? '')).not.toBeNull();
   });
 
-  it('keeps the handle valid across a socket reconnect (same wrapperId)', async () => {
-    const sessionId = newSessionId();
-    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
-    const provider = createProvider();
-    const sandboxStub = await installSandbox(sandboxId, provider);
-    const { seal, token } = await sealedRuntimeAuthorization(sessionId);
-    const sessionStub = await createVercelSession({
-      sessionId,
-      kiloId: kiloSessionId(),
-      sandboxId,
-      kiloToken: token,
-      seal,
-    });
+  it.each(['before request', 'during token resolution'] as const)(
+    'authorizes the model facade while disconnected %s and completes after same-wrapper reconnect',
+    async disconnectAt => {
+      const sessionId = newSessionId();
+      const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, sessionId);
+      const provider = createProvider();
+      const sandboxStub = await installSandbox(sandboxId, provider);
+      const { seal, token } = await sealedRuntimeAuthorization(sessionId);
+      const sessionStub = await createVercelSession({
+        sessionId,
+        kiloId: kiloSessionId(),
+        sandboxId,
+        kiloToken: token,
+        seal,
+      });
 
-    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
-    const { credential, allocationId } = launchIdentity(provider);
-    const wrapper = await FakeWrapper.connect({ sandboxId, credential });
-    await wrapper.hello({ wrapperId: 'wr_1', allocationId });
-    const frame = await wrapper.next();
-    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
-    const handle = frame.credentials?.proxy?.handle ?? '';
-    wrapper.send({ type: 'session.ready', sessionId });
-    await waitFor(async () => {
-      expect((await sandboxStub.status({ sessionId })).view.state).toBe('ready');
-    });
+      await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+      const { credential, allocationId } = launchIdentity(provider);
+      const wrapper = await FakeWrapper.connect({ sandboxId, credential });
+      await wrapper.hello({ wrapperId: 'wr_1', allocationId });
+      const frame = await wrapper.next();
+      if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+      const handle = frame.credentials?.proxy?.handle ?? '';
+      wrapper.send({ type: 'session.ready', sessionId });
+      await waitFor(async () => {
+        expect((await sandboxStub.status({ sessionId })).view.state).toBe('ready');
+      });
+      const prompt = await wrapper.next();
+      if (prompt?.type !== 'session.prompt') throw new Error('expected session.prompt');
+      const initialMessageId = prompt.payload.messageId;
+      await waitFor(async () =>
+        expect(await sessionStub.getSession()).toMatchObject({
+          messages: [{ messageId: initialMessageId, state: 'accepted' }],
+        })
+      );
 
-    wrapper.close();
-    await waitFor(async () => {
-      expect((await sandboxStub.getAllocationState()).kind).toBe('disconnected');
-    });
-    const reconnected = await FakeWrapper.connect({ sandboxId, credential });
-    expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
-      type: 'welcome',
-      protocolVersion: 2,
-    });
+      const upstream = 'https://upstream.test';
+      const upstreamFetch = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+        const request = input instanceof Request ? input : new Request(input);
+        expect(request.url).toBe(`${upstream}/chat/completions`);
+        expect(request.method).toBe('POST');
+        expect(request.headers.get('authorization') === `Bearer ${token}`).toBe(true);
+        expect(request.headers.get('x-kilocode-organizationid')).toBe(ORG_ID);
+        expect((await sandboxStub.getAllocationState()).kind).toBe('disconnected');
+        return new Response('authorized');
+      });
+      const forward = () =>
+        worker.fetch(
+          new Request(`${WORKER_URL}/api/openrouter/chat/completions`, {
+            method: 'POST',
+            headers: { authorization: `Bearer ${handle}` },
+          }),
+          { ...env, WORKER_URL, KILO_OPENROUTER_BASE: upstream } as Env,
+          createExecutionContext()
+        );
+      const tokenGate = Promise.withResolvers<void>();
+      let resolvingToken = false;
+      if (disconnectAt === 'during token resolution') {
+        await runInDurableObject(sessionStub, instance => {
+          const original = instance.getRuntimeToken.bind(instance);
+          instance.getRuntimeToken = async () => {
+            resolvingToken = true;
+            await tokenGate.promise;
+            return original();
+          };
+        });
+      }
+      const pendingResponse = disconnectAt === 'during token resolution' ? forward() : null;
+      if (pendingResponse) await waitFor(() => expect(resolvingToken).toBe(true));
 
-    // The fence ignores connectionId, so the same handle still authorizes.
-    expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
-  });
+      wrapper.close();
+      await waitFor(async () => {
+        expect((await sandboxStub.getAllocationState()).kind).toBe('disconnected');
+      });
+      tokenGate.resolve();
+      const response = await (pendingResponse ?? forward());
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe('authorized');
+      expect(upstreamFetch).toHaveBeenCalledTimes(1);
+      const reconnected = await FakeWrapper.connect({ sandboxId, credential });
+      expect(await reconnected.hello({ wrapperId: 'wr_1', allocationId })).toEqual({
+        type: 'welcome',
+        protocolVersion: 2,
+      });
+
+      expect(await sessionStub.resolveRuntimeCredentialProxyGrant(handle)).not.toBeNull();
+      await runInDurableObject(sessionStub, async instance => {
+        const grant = await instance.ctx.storage.get<{ grantId: string }>(RUNTIME_PROXY_GRANT_KEY);
+        expect(grant?.grantId).toBe(runtimeProxyHandleGrantId(handle));
+      });
+      expect(await sessionStub.getSession()).toMatchObject({
+        messages: [{ messageId: initialMessageId, state: 'accepted' }],
+      });
+      expect(await reconnected.next(100)).toBeNull();
+      expect(reconnected.receivedFrames()).toBe(1);
+      expect(provider.launchEnvs).toHaveLength(1);
+      reconnected.send({
+        type: 'session.outcome',
+        sessionId,
+        status: 'completed',
+        lastMessageId: initialMessageId,
+      });
+      await waitFor(async () =>
+        expect(await sessionStub.getSession()).toMatchObject({
+          messages: [{ messageId: initialMessageId, state: 'completed' }],
+        })
+      );
+    }
+  );
 
   it('re-prepares and mints a new handle after a wrapper restart, invalidating the old one', async () => {
     const sessionId = newSessionId();

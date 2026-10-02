@@ -1061,7 +1061,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     return this.enqueue(async () => {
       const state = await this.readAllocation();
-      if (state.kind !== 'connected') return null;
+      const fence = this.runtimeProxyFenceFor(state);
+      if (fence === null) return null;
       const owner = await this.requireOwner();
       if (owner === null || owner !== input.ownerId) return null;
       const route = await readRoute(this.db, input.sessionId);
@@ -1083,25 +1084,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         return null;
       }
-      const allocationId = state.allocationId;
-      const connectionId = state.connectionId;
-      const providerInstanceId = state.providerRef;
-      const wrapperInstanceId = state.wrapperId;
-      if (
-        allocationId === null ||
-        connectionId === null ||
-        providerInstanceId === null ||
-        wrapperInstanceId === null
-      ) {
-        return null;
-      }
-      return {
-        plane: 'control',
-        allocationId,
-        providerInstanceId,
-        connectionId,
-        wrapperInstanceId,
-      };
+      return fence;
     });
   }
 
@@ -1937,6 +1920,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   /** The managed outbound container id for the current provider/allocation. */
   private outboundContainerIdFor(state: AllocationState): string | null {
+    // The container is the containment boundary. When containment is off there
+    // is no proxy container to name, and the environment may not even bind the
+    // containment namespaces (the e2e Worker strips them).
+    if (!this.credentialContainmentEnabled()) return null;
     const provider = this.currentProvider();
     if (!providerUsesOutboundCredentialProxy(provider)) return null;
     if (provider === 'cloudflare-containers') {
@@ -1992,15 +1979,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
    * direct credentials.
    */
   private credentialContainmentEnabled(): boolean {
-    const containment = this.providerPin?.containment ?? null;
-    if (containment === null) return this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false';
+    const containment = this.resolvedContainment();
     return containment.kilocode || containment.github;
   }
 
-  private matchesContainment(required: CredentialContainmentRequirements): boolean {
-    const stored =
+  /**
+   * The one resolved containment requirement for this sandbox: the
+   * Worker-selected per-requirement value, else the environment default. Every
+   * consumer (grants and the provider create intent) reads this, so the physical
+   * container class and the grant can never disagree.
+   */
+  private resolvedContainment(): CredentialContainmentRequirements {
+    return (
       this.providerPin?.containment ??
-      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false');
+      getWorktreeCredentialContainment(this.env.CREDENTIAL_CONTAINMENT_ENABLED !== 'false')
+    );
+  }
+
+  private matchesContainment(required: CredentialContainmentRequirements): boolean {
+    const stored = this.resolvedContainment();
     return (
       stored.kilocode === required.kilocode &&
       stored.github === required.github &&
@@ -2420,7 +2417,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private runtimeProxyFenceFor(state: AllocationState): ControlRuntimeCredentialProxyFence | null {
     const { allocationId, connectionId, providerRef, wrapperId } = state;
     if (
-      state.kind !== 'connected' ||
+      (state.kind !== 'connected' && state.kind !== 'disconnected') ||
       allocationId === null ||
       connectionId === null ||
       providerRef === null ||
@@ -2595,7 +2592,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
-          ...(pin.containment === null ? {} : { containment: pin.containment }),
+          containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
           ...(pin.provider === 'vercel'
             ? { networkPolicy: buildControlNetworkPolicy(await this.activeGrants(Date.now())) }

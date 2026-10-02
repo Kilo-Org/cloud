@@ -29,6 +29,7 @@ import type {
 } from '@kilocode/worker-utils/review-agents';
 import type { RuntimeAgentInput } from '@kilocode/worker-utils/cloud-agent-next-client';
 import { enabledSpecialists, isCouncilActive } from '@kilocode/worker-utils/code-review-council';
+import { CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV } from '@kilocode/worker-utils/code-review-self-check';
 import { DEFAULT_COUNCIL_AGGREGATION_STRATEGY } from '@kilocode/db/schema-types';
 import {
   buildCouncilOrchestratorPrompt,
@@ -135,6 +136,8 @@ export type SessionInput = {
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   /** Council runs only: one inline sub-agent per specialist, each pinned to its own model. */
   runtimeAgents?: RuntimeAgentInput[];
+  /** Session environment variables, e.g. the publication self-check opt-in. */
+  envVars?: Record<string, string>;
 };
 
 /**
@@ -846,6 +849,9 @@ export async function prepareReviewPayload(
               variant,
               upstreamBranch: githubCheckoutRef,
               ...(gateThreshold !== 'off' ? { gateThreshold } : {}),
+              // The review must publish a summary to GitHub, so let the agent self-check once
+              // if its turn ends without a successful summary write.
+              envVars: { [CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV]: '1' },
             };
 
     // Council fork: a council run delegates to one sub-agent per specialist (each on its

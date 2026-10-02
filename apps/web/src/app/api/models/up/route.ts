@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 import { getEnvVariable } from '@/lib/dotenvx';
-import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
 import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 // Simple hardcoded key for authentication
@@ -212,20 +212,19 @@ export async function GET(
     anchorTime = parsed;
   }
 
+  const monitoredModels = await getMonitoredModels();
+
   try {
     const queryStartTime = Date.now();
     const anchor = anchorTime ?? new Date(queryStartTime);
     // Analytics Engine stores the resolved model without `:free`-style suffixes,
-    // so monitored models are matched on their normalized ID.
-    const statsByModel = await queryModelStats(anchor.getTime(), [
-      ...new Set(monitoredModels.map(toAnalyticsEngineModelId)),
-    ]);
+    // so free and paid variants share one normalized ID and are reported together.
+    const modelIds = [...new Set(monitoredModels.map(toAnalyticsEngineModelId))];
+    const statsByModel = await queryModelStats(anchor.getTime(), modelIds);
 
     const models: Record<string, ModelHealthMetrics> = {};
-    for (const model of monitoredModels) {
-      models[model] = evaluateModelHealth(
-        statsByModel.get(toAnalyticsEngineModelId(model)) ?? emptyModelStats()
-      );
+    for (const modelId of modelIds) {
+      models[modelId] = evaluateModelHealth(statsByModel.get(modelId) ?? emptyModelStats());
     }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;

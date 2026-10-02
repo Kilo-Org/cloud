@@ -234,9 +234,27 @@ describe('allocation socket close origin', () => {
         },
         TIMERS
       );
-      expect(state).toEqual({ ...connectedState(), kind: 'disconnected', connectionId: null });
+      expect(state).toEqual({ ...connectedState(), kind: 'disconnected' });
       expect(effects).toEqual([]);
       expect('origin' in state).toBe(false);
+      for (const event of [
+        {
+          type: 'heartbeat',
+          at: 124,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          active: true,
+        },
+        {
+          type: 'socket-closed',
+          at: 124,
+          allocationId: 'alloc-1',
+          connectionId: 'conn-1',
+          origin,
+        },
+      ] as const) {
+        expect(reduceAllocation(state, event, TIMERS)).toEqual({ state, effects: [] });
+      }
     }
   );
 

@@ -2605,7 +2605,6 @@
       "preparingPlaceholder": "Sagatavo vidi…",
       "finalizingPlaceholder": "Pabeidz darbu…",
       "sessionLoadFailed": "Sesiju nevarēja ielādēt. Vispirms mēģiniet vēlreiz.",
-      "sendUnavailable": "Sūtīšana nav pieejama, kamēr sesija nav gatava.",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
       "couldNotAttachFiles": "Neizdevās pievienot failus. Nospied nosūtīšanas pogu, lai mēģinātu vēlreiz.",
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",

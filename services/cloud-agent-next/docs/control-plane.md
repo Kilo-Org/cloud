@@ -419,8 +419,10 @@ including a new Kilo restart budget.
     completion signals. The wrapper does not keep a copy of Kilo's native prompt queue.
   - `failed`: Kilo reports a final error; 7 minutes without real progress; the 60-minute hard cap;
     Kilo restarted during the turn after real progress, or a second time; prompt submission failed.
-    For no progress and the cap, the wrapper aborts the Kilo session first. Real progress is text, reasoning or tool events from that
-    session; busy, retry and heartbeat events are not, and waiting on the user pauses the clock.
+    For no progress and the cap, the wrapper aborts the Kilo session first. Real progress is text,
+    reasoning or tool events from the routed root session or any session resolved into its
+    descendant tree; busy, retry and heartbeat events are not, and waiting on the user pauses the
+    clock.
   - `cancelled`: the turn was aborted.
 - Finalization (auto-commit, condense) runs after Kilo's completed turn-close. The wrapper sends a `finalizing`
   event when it starts. Its failures are warning events; the outcome stays `completed`. A prompt

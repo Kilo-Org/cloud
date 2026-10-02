@@ -2045,7 +2045,6 @@
       "preparingPlaceholder": "Configurando ambiente...",
       "finalizingPlaceholder": "Finalizando...",
       "sessionLoadFailed": "Não foi possível carregar a sessão. Tente novamente primeiro.",
-      "sendUnavailable": "O envio não está disponível até que a sessão esteja pronta.",
       "cannotReceiveFiles": "Esta sessão não pode receber arquivos. Remova os anexos para enviar sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar os arquivos. Toque em Enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os arquivos enviados ainda não vinculados a uma mensagem serão excluídos.",

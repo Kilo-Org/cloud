@@ -211,7 +211,7 @@ vi.mock('@/components/agents/session-detail-skeleton', () => ({
 }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 // The clipboard/haptics stubs need no promise: nothing in this suite awaits
-// them, and `copySessionId` only checks the awaited value's truthiness.
+// them; the clipboard stub only needs to resolve truthy.
 vi.mock('expo-clipboard', () => ({ setStringAsync: vi.fn(() => true) }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
@@ -253,6 +253,7 @@ vi.mock('@/components/agents/message-bubble', async () => {
 });
 
 export const BASE_TARGET: SessionPreviewTarget = {
+  onOpen: () => undefined,
   sessionId: 'ses-1',
   title: 'Fix login',
   initialRenameValue: 'Fix login',

@@ -94,6 +94,8 @@ export type UsageEvent = {
   occurredAt?: Date;
   /** `org:<id>` for an org request, else `user:<id>`. */
   accountId: string;
+  /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
+  ip?: string | null;
   inputTokens: number;
   outputTokens: number;
   /** True if the request came from a known Kilo client: a known feature value or a Kilo version header. */
@@ -112,7 +114,13 @@ export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
 
 export type DecideRequest =
   | { requestId: string; tier: 'anonymous'; ip: string }
-  | { requestId: string; tier: Exclude<DecideTier, 'anonymous'>; accountId: string };
+  | {
+      requestId: string;
+      tier: Exclude<DecideTier, 'anonymous'>;
+      accountId: string;
+      /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
+      ip?: string | null;
+    };
 
 export type DecideVerdict = {
   decision: 'allow' | 'block' | 'review' | 'throttle';
@@ -272,6 +280,7 @@ export async function reportUsageEvent(event: UsageEvent): Promise<void> {
     requestId: id(event.requestId),
     occurredAt: isoTime(event.occurredAt),
     accountId: event.accountId,
+    ip: event.ip ?? undefined,
     inputTokens: Math.max(0, Math.round(event.inputTokens)),
     outputTokens: Math.max(0, Math.round(event.outputTokens)),
     clientAttributed: event.clientAttributed,
@@ -295,6 +304,11 @@ export async function decide(
   const body =
     request.tier === 'anonymous'
       ? { requestId: id(request.requestId), tier: request.tier, ip: request.ip }
-      : { requestId: id(request.requestId), tier: request.tier, accountId: request.accountId };
+      : compact({
+          requestId: id(request.requestId),
+          tier: request.tier,
+          accountId: request.accountId,
+          ip: request.ip ?? undefined,
+        });
   return (await post(DECIDE_PATH, body, timeoutMs, signal)) as DecideVerdict | null;
 }

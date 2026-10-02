@@ -105,6 +105,7 @@ type ChatComposerInputRowProps = {
    * destructive color; `neutral` keeps a progress phase ("Setting up
    * environment…") in the status tone so it does not read as a failure.
    */
+  sendDisabledReasonTone?: 'error' | 'neutral' | null;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
   voiceInputAvailable: boolean;

@@ -24,7 +24,14 @@ export const CONTROL_PLANE_ALLOCATION_ID_ENV = 'CONTROL_PLANE_ALLOCATION_ID';
 export const CONTROL_PLANE_GIT_PLATFORMS = ['github', 'gitlab', 'bitbucket'] as const;
 export type ControlPlaneGitPlatform = (typeof CONTROL_PLANE_GIT_PLATFORMS)[number];
 
+/**
+ * Route preparation steps. `sandbox_create` and `sandbox_start` come from the
+ * Sandbox DO's allocation (provider create, then waiting for the wrapper's
+ * `hello`); the rest come from the wrapper's `session.progress`.
+ */
 export const CONTROL_PLANE_PREPARATION_STEPS = [
+  'sandbox_create',
+  'sandbox_start',
   'clone',
   'checkout',
   'setup',
@@ -39,6 +46,48 @@ export type ControlPlanePreparationStep = (typeof CONTROL_PLANE_PREPARATION_STEP
  * wrapper chunk and the Session DO agree on one name.
  */
 export const CONTROL_PLANE_WRAPPER_FINALIZING_EVENT = 'wrapper_finalizing';
+
+/**
+ * Setup-command lifecycle events the wrapper sends inside `session.events`.
+ * The Session DO renders them as per-command preparation steps. `command` is
+ * the 1-based command number in every event.
+ */
+export const CONTROL_PLANE_SETUP_EVENTS = {
+  started: 'session.setup.started',
+  output: 'session.setup.output',
+  finished: 'session.setup.finished',
+} as const;
+
+const controlPlaneSetupCommandNumberSchema = z.number().int().min(1).max(20);
+
+// Command bodies may contain inline credentials. Only these properties can be projected.
+export const controlPlaneSetupEventSchema = z.discriminatedUnion('type', [
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.started),
+    properties: z
+      .object({
+        command: controlPlaneSetupCommandNumberSchema,
+        commandCount: controlPlaneSetupCommandNumberSchema,
+      })
+      .refine(value => value.command <= value.commandCount),
+  }),
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.output),
+    properties: z.object({
+      command: controlPlaneSetupCommandNumberSchema,
+      output: z.string().min(1).max(8_192),
+    }),
+  }),
+  z.object({
+    type: z.literal(CONTROL_PLANE_SETUP_EVENTS.finished),
+    properties: z.object({
+      command: controlPlaneSetupCommandNumberSchema,
+      exitCode: z.number().int(),
+      safeError: z.string().min(1).max(4_096).optional(),
+    }),
+  }),
+]);
+export type ControlPlaneSetupEvent = z.infer<typeof controlPlaneSetupEventSchema>;
 
 export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
@@ -61,6 +110,13 @@ export type ControlPlaneFailureReason = (typeof CONTROL_PLANE_FAILURE_REASON_VAL
 export const controlPlaneFailureReasonSchema = z.enum(CONTROL_PLANE_FAILURE_REASON_VALUES);
 
 export const controlPlanePreparationStepSchema = z.enum(CONTROL_PLANE_PREPARATION_STEPS);
+
+/** Bound on a live progress line within a step ("Receiving objects: 45%"). */
+export const CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH = 200;
+const controlPlanePreparationDetailSchema = z
+  .string()
+  .min(1)
+  .max(CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH);
 
 export const CONTROL_PLANE_ASSISTANT_FAILURE_REASONS = [
   'insufficient_credits',
@@ -379,6 +435,7 @@ const controlPlaneRoutePreparingSchema = z
     state: z.literal('preparing'),
     attemptId: z.string().min(1).max(128),
     step: controlPlanePreparationStepSchema.optional(),
+    detail: controlPlanePreparationDetailSchema.optional(),
   })
   .strict();
 const controlPlaneRouteReadySchema = z
@@ -564,6 +621,7 @@ const controlPlaneSessionProgressFrameSchema = z
     type: z.literal('session.progress'),
     sessionId: z.string().min(1),
     step: controlPlanePreparationStepSchema,
+    detail: controlPlanePreparationDetailSchema.optional(),
   })
   .strict();
 

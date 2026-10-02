@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { sortRemoteModelCatalogProviders } from './remote-model-order';
 import type { KiloSessionId, SlashCommandCatalogStatus } from './types';
 
@@ -484,11 +485,7 @@ export const cliConnectionDataSchema = z.object({
 });
 export type CliConnectionData = z.infer<typeof cliConnectionDataSchema>;
 
-export const kiloSessionIdSchema = z
-  .string()
-  .startsWith('ses_')
-  .length(30)
-  .transform(id => id as KiloSessionId);
+export const kiloSessionIdSchema = sessionIdSchema.transform(id => id as KiloSessionId);
 export type KiloSessionIdInput = z.input<typeof kiloSessionIdSchema>;
 
 /**

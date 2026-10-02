@@ -20,6 +20,8 @@ import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
+import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import {
   systemOneRequestSchema,
   systemOneResponseSchema,
@@ -93,6 +95,28 @@ export async function handleSystemOneRequest(request: NextRequest) {
     }
   }
 
+  const kiloUserId = user.id;
+  const mode = extractHeaderAndLimitLength(request, 'x-kilocode-mode');
+  function emitMetrics(statusCode: number, ttfbMs: number, inferenceProvider?: string | null) {
+    emitGatewayApiMetrics({
+      kiloUserId,
+      organizationId,
+      isAnonymous: false,
+      isStreaming: false,
+      userByok: false,
+      mode: mode || undefined,
+      provider: OPENROUTER.id,
+      inferenceProvider: inferenceProvider || undefined,
+      requestedModel,
+      resolvedModel: normalizeModelId(requestedModel),
+      toolsAvailable: [],
+      toolsUsed: [],
+      ttfbMs,
+      completeRequestMs: Math.max(0, Math.round(performance.now() - startedAt)),
+      statusCode,
+    });
+  }
+
   let response: Response;
   let responseBody: unknown;
   let ttfbMs: number;
@@ -114,10 +138,14 @@ export async function handleSystemOneRequest(request: NextRequest) {
     ttfbMs = Math.max(0, Math.round(performance.now() - startedAt));
     if (response.status === 402) {
       await response.body?.cancel();
+      emitMetrics(response.status, ttfbMs);
       errorExceptInTest('OpenRouter System One balance exhausted');
       return errorResponse('Service temporarily unavailable', 'upstream_error', 503);
     }
-    if (!response.ok) return wrapInSafeNextResponse(response);
+    if (!response.ok) {
+      emitMetrics(response.status, ttfbMs);
+      return wrapInSafeNextResponse(response);
+    }
     responseBody = await response.json();
   } catch (error) {
     errorExceptInTest('OpenRouter System One request failed', error);
@@ -125,6 +153,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
   }
 
   const result = systemOneResponseSchema.safeParse(responseBody);
+  emitMetrics(response.status, ttfbMs, result.success ? result.data.provider : undefined);
   if (!result.success) {
     errorExceptInTest('Invalid OpenRouter System One response or missing usage');
     return errorResponse('Invalid upstream response', 'upstream_error', 502);

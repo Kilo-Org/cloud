@@ -42,6 +42,12 @@ export type RouteRecord = {
   reason: ControlPlaneFailureReason | null;
 };
 
+/** One preparation step and an optional live detail line within it. */
+export type RoutePreparationProgress = {
+  step: ControlPlanePreparationStep;
+  detail?: string;
+};
+
 /** The grant outcome for a route attempt: a re-projected spec plus the grant. */
 export type RouteGrantIssue = {
   spec: ControlPlaneRouteSpec;
@@ -140,9 +146,14 @@ export function newPreparingRoute(
 /**
  * The view the Sandbox DO notifies and `prepare` returns (spec §6). It is the
  * route state, except that a `ready` route with no live socket is
- * `reconnecting` and a missing route is `unknown`.
+ * `reconnecting` and a missing route is `unknown`. A preparing route carries
+ * the sandbox step when the allocation, not the wrapper, is the one progressing.
  */
-export function routeView(route: RouteRecord | null, connected: boolean): ControlPlaneRouteView {
+export function routeView(
+  route: RouteRecord | null,
+  connected: boolean,
+  sandboxProgress?: RoutePreparationProgress
+): ControlPlaneRouteView {
   if (route === null) return { state: 'unknown' };
   if (route.state === 'ready') {
     return connected
@@ -156,7 +167,7 @@ export function routeView(route: RouteRecord | null, connected: boolean): Contro
       reason: route.reason ?? 'preparation_timeout',
     };
   }
-  return { state: 'preparing', attemptId: route.attemptId };
+  return { state: 'preparing', attemptId: route.attemptId, ...sandboxProgress };
 }
 
 // --- storage -----------------------------------------------------------------
@@ -462,7 +473,7 @@ export async function routeRetryAllowed(ctx: RouteContext): Promise<boolean> {
 export async function onRouteProgress(
   ctx: RouteContext,
   sessionId: string,
-  step: ControlPlanePreparationStep,
+  progress: RoutePreparationProgress,
   current: boolean
 ): Promise<void> {
   if (!current) return;
@@ -471,9 +482,24 @@ export async function onRouteProgress(
   logControlDiagnostic('route_progress', {
     sessionId,
     attemptId: route.attemptId,
-    step,
+    step: progress.step,
   });
-  await ctx.notify(sessionId, { state: 'preparing', attemptId: route.attemptId, step });
+  await ctx.notify(sessionId, { state: 'preparing', attemptId: route.attemptId, ...progress });
+}
+
+/** Sandbox allocation progress (create, start) for every preparing route. */
+export async function notifyPreparingRoutes(
+  ctx: RouteContext,
+  progress: RoutePreparationProgress
+): Promise<void> {
+  for (const route of await listRoutes(ctx.db)) {
+    if (route.state !== 'preparing') continue;
+    await ctx.notify(route.sessionId, {
+      state: 'preparing',
+      attemptId: route.attemptId,
+      ...progress,
+    });
+  }
 }
 
 export async function onRouteReady(

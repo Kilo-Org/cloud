@@ -55,6 +55,9 @@ jobs:
       - name: Test scheduled deployment wiring
         run: node --test scripts/deployment-workflows.test.mjs
 
+      - name: Test main workflow failure notifications
+        run: node --test scripts/main-workflow-failure.test.mjs
+
       - name: Test meta-janitor approval gates
         run: node --test scripts/meta-janitor-approve.test.mjs
 
@@ -470,51 +473,3 @@ jobs:
       - name: Test native heartbeat attachment compatibility
         if: matrix.workspace.name == 'cloudflare-session-ingest'
         run: pnpm --filter cloudflare-session-ingest run test:integration test/integration/user-connection-attachment.test.ts
-
-  notify-main-failure:
-    if: ${{ always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure') }}
-    needs:
-      [typecheck, lint, format-check, drizzle-check, test, build, cloud-agent-next, workspace-tests]
-    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 5
-    steps:
-      - name: Notify Slack
-        continue-on-error: true
-        uses: slackapi/slack-github-action@91efab103c0de0a537f72a35f6b8cda0ee76bf0a # v2.1.1
-        with:
-          webhook: ${{ secrets.DEPLOY_NOTIFY_SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
-          payload: |
-            {
-              "blocks": [
-                {
-                  "type": "header",
-                  "text": {
-                    "type": "plain_text",
-                    "text": ":red_circle: CI failed on main"
-                  }
-                },
-                {
-                  "type": "section",
-                  "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Commit:*\n<${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}|`${{ github.sha }}`>"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*Author:*\n${{ github.actor }}"
-                    }
-                  ]
-                },
-                {
-                  "type": "context",
-                  "elements": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View workflow run>"
-                    }
-                  ]
-                }
-              ]
-            }

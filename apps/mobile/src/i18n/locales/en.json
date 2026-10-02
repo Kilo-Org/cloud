@@ -215,7 +215,6 @@
     "showBalance": "Show balance",
     "balanceHidden": "Balance hidden",
     "bonusCreditsExpiring": "{{amount}} in bonus credits expiring {{date}}",
-    "creditBalanceEmpty": "Your credit balance is empty. Credits are managed outside the iOS app for this account.",
     "signOutTitle": "Sign out?",
     "signOutMessage": "You will need to sign in again to access your workspace.",
     "deleteAccountTitle": "Delete account?",
@@ -2058,6 +2057,7 @@
       "idCopied": "Session ID copied",
       "couldNotCopyId": "Could not copy session ID",
       "untitled": "Untitled session",
+      "actions": "Session actions",
       "sessionDeleted": "Session deleted",
       "needsInput": "needs input",
       "fromPlatform": "from {{platform}}",
@@ -2108,6 +2108,7 @@
       "readOnly": "This is a read-only session",
       "continueInNewSession": "Continue in a new session",
       "emptyDescription": "Send a message below to get started.",
+      "emptyTranscriptDescription": "This session has no messages yet.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "renameAccessibility": "Rename session: {{title}}",
@@ -2411,7 +2412,10 @@
     "markdownImage": {
       "load": "Load",
       "loadWithHost": "Load {{host}}",
-      "httpsOnly": "HTTPS images only"
+      "httpsOnly": "HTTPS images only",
+      "trustTitle": "Load image from {{host}}?",
+      "trustMessage": "Trusting {{host}} loads its images without asking each time. You can revoke it later under Trusted hosts.",
+      "loadOnce": "Load once"
     },
     "preparation": {
       "exitCode": "Exit code: {{code}}",
@@ -2596,6 +2600,8 @@
       "selectModelBeforeSending": "Select a model before sending",
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
+      "sessionLoadFailed": "The session could not be loaded. Retry first.",
+      "sendUnavailable": "Sending isn't available until the session is ready.",
       "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
       "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
     },
@@ -2666,6 +2672,7 @@
       "provider": "Provider",
       "totalCost": "Total cost",
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
+      "usageUnavailable": "Context usage unavailable",
       "tokenUsage": "Token usage",
       "cacheRate": "Cache rate",
       "modelsCount_one": "Model ({{displayCount}})",
@@ -2739,8 +2746,12 @@
     "subtitle": "Hosts you trust to open without asking",
     "emptyTitle": "No trusted hosts",
     "emptyDescription": "When you trust a link's host, it opens without asking again.",
+    "imagesSectionTitle": "Trusted image hosts",
+    "imagesSectionDescription": "Images from these hosts load without asking again.",
+    "imagesSectionEmpty": "No trusted image hosts",
     "revoke": "Revoke {{host}}",
     "revokeMessage": "Links to this host will ask for confirmation again.",
+    "revokeImageMessage": "Images from this host will ask for confirmation again.",
     "backToPreferences": "Back to preferences"
   },
   "forceUpdate": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo unbound",
       "unbindFailed": "Couldn't unbind repo"
     }
+  },
+  "credits": {
+    "title": "Buy credits",
+    "description": "Credits are a one-time purchase added to your Kilo balance for running AI coding sessions in Kilo App. The store charges your account and credits are added after the store confirms payment.",
+    "packLabel": "Add {{amount}} of credits",
+    "priceUnavailable": "Price unavailable",
+    "purchased": "Credits added to your balance.",
+    "empty": "Credit packs are unavailable right now.",
+    "noMatchingProducts": "No matching credit packs were returned by App Store.",
+    "noMatchingProductsPlay": "No matching credit packs were returned by Google Play.",
+    "purchaseOwnedByAnotherAccount": "The credits on this Apple Account belong to a different Kilo account. Sign in to that Kilo account to use them.",
+    "purchaseOwnedByAnotherAccountPlay": "The credits on this Google Play account belong to a different Kilo account. Sign in to that Kilo account to use them."
   }
 }

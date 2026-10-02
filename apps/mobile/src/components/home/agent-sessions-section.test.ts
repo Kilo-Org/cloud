@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
 import { AgentSessionsSection } from '@/components/home/agent-sessions-section';
-import { RemoteSessionRow } from '@/components/agents/remote-session-row';
+import { LiveNowCard } from '@/components/home/live-now-card';
 import { type ActiveSession } from '@/lib/hooks/use-agent-sessions';
 
 const navigateSpy = vi.hoisted(() => vi.fn());
@@ -19,57 +19,23 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
-vi.mock('@expo/react-native-action-sheet', () => ({
-  useActionSheet: () => ({ showActionSheetWithOptions: vi.fn() }),
-}));
-vi.mock('expo-haptics', () => ({
-  impactAsync: vi.fn(),
-  ImpactFeedbackStyle: { Medium: 'medium' },
-}));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQueryClient: () => queryClient,
 }));
-vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({
-    activeSessions: {
-      list: {
-        queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
-      },
-    },
-  }),
-}));
-vi.mock('@/lib/hooks/use-session-mutations', () => ({
-  useSessionMutations: () => ({ renameSession: vi.fn() }),
-}));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedSoft: '#777777' }),
-}));
-vi.mock('@/components/rename-modal', () => ({ RenameModal: () => null }));
-vi.mock('@/components/agents/session-platform-icon', () => ({
-  selectRowPlatformPresentation: () => ({ iconKind: null, spokenPlatform: null }),
-  SessionPlatformIcon: () => null,
-}));
-vi.mock('@/components/agents/session-row-actions', () => ({
-  copySessionId: vi.fn(),
-  showRenamePrompt: vi.fn(),
-  showSessionActionMenu: vi.fn(),
-}));
-vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn(),
-}));
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
-vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/lib/hooks/use-theme-colors', () => ({
+  useThemeColors: () => ({ mutedSoft: '#777777' }),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: vi.fn() }));
 vi.mock('@/lib/organization-context', () => ({
@@ -121,24 +87,23 @@ const settled: Props['sessions'] = {
   isPaused: false,
   refetch: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
 };
-function session(id: string): ActiveSession {
-  return { id, status: 'running', title: id, connectionId: 'c1' };
+function session(id: string, status = 'running'): ActiveSession {
+  return { id, status, title: id, connectionId: 'c1' };
 }
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
-// `RemoteSessionRow` is a `memo()` component, and the test renderer reports the
-// wrapped function (not the memo object) as an instance's `type`, so the row
-// matches either identity.
-const RemoteSessionRowInner = (RemoteSessionRow as unknown as { type: unknown }).type;
 function nodes(type: string) {
   if (!renderer) {
     throw new Error('Missing renderer');
   }
   return renderer.root.findAll(
-    candidate =>
-      (type === 'RemoteSessionRow' &&
-        (candidate.type === RemoteSessionRow || candidate.type === RemoteSessionRowInner)) ||
-      (typeof candidate.type === 'string' && candidate.type === type)
+    candidate => typeof candidate.type === 'string' && candidate.type === type
   );
+}
+function cards() {
+  if (!renderer) {
+    throw new Error('Missing renderer');
+  }
+  return renderer.root.findAll(candidate => candidate.type === LiveNowCard);
 }
 function node(type: string, index = 0) {
   const result = nodes(type)[index];
@@ -146,6 +111,11 @@ function node(type: string, index = 0) {
     throw new Error(`Missing ${type}`);
   }
   return result;
+}
+function text() {
+  return nodes('Text')
+    .map(item => item.children.filter(child => typeof child === 'string').join(''))
+    .join('\n');
 }
 async function render(sessions = settled, contextOverride = context) {
   await act(async () => {
@@ -172,33 +142,52 @@ afterEach(() => {
 });
 
 describe('Home live section', () => {
-  it('renders one glanceable card row for the relevant session without stored queries', async () => {
-    await render({ ...settled, activeSessions: ['a3', 'a1', 'a4', 'a2'].map(id => session(id)) });
-    expect(nodes('RemoteSessionRow').map(row => (row.props.session as ActiveSession).id)).toEqual([
-      'a3',
+  it('renders one summary card and opens the highest-ranked session', async () => {
+    await render({
+      ...settled,
+      activeSessions: [session('a3'), session('a1'), session('a2', 'question')],
+    });
+    expect(cards()).toHaveLength(1);
+    // Ack-resolved ranked counts, zeros dropped: needs-input then working.
+    expect(nodes('SessionStatusIcon').map(icon => icon.props.kind)).toEqual([
+      'needsInput',
+      'running',
     ]);
-    const row = node('RemoteSessionRow');
-    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
-    expect(sessionDestination.id).toBe('a3');
+    expect(text()).toContain('Needs input');
+    expect(text()).toContain('Working');
+    // The newest-session line names the newest tray row.
+    expect(text()).toContain('Newest: a3');
+
+    const card = node('Pressable');
+    (card.props.onPress as () => void)();
+    expect(sessionDestination.id).toBe('a2');
   });
 
-  it('keeps row identity and navigation while refreshing cached content', async () => {
+  it('summarises every session without capping at three rows', async () => {
+    await render({
+      ...settled,
+      activeSessions: ['a3', 'a1', 'a4', 'a2'].map(id => session(id)),
+    });
+    expect(text()).toContain('4');
+    expect(nodes('SessionStatusIcon')).toHaveLength(1);
+  });
+
+  it('keeps the card identity while refreshing cached content', async () => {
     const sessions = { ...settled, activeSessions: [session('a1')] };
     await render(sessions);
-    const row = node('RemoteSessionRow');
+    const card = cards()[0];
     await render({ ...sessions, isFetching: true });
-    expect(node('RemoteSessionRow')).toBe(row);
+    expect(cards()[0]).toBe(card);
     expect(nodes('Skeleton')).toHaveLength(0);
-    (row.props.onPress as (session: ActiveSession) => void)(row.props.session as ActiveSession);
+    (node('Pressable').props.onPress as () => void)();
     expect(sessionDestination.id).toBe('a1');
   });
 
-  it('renders the pending state as a row-shaped skeleton inside the reserved frame', async () => {
+  it('renders the pending state as a card-shaped skeleton inside the reserved frame', async () => {
     await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    const skeletons = nodes('Skeleton');
-    expect(skeletons.length).toBeGreaterThan(0);
+    expect(nodes('Skeleton')).toHaveLength(2);
     expect(
-      skeletons.some(skeleton => String(skeleton.props.className ?? '').includes('w-full'))
+      nodes('Skeleton').some(skeleton => String(skeleton.props.className ?? '').includes('w-full'))
     ).toBe(false);
     expect(
       nodes('View').some(view => {
@@ -206,61 +195,47 @@ describe('Home live section', () => {
         return className.includes('min-h-[72px]') && className.includes('rounded-2xl');
       })
     ).toBe(true);
-    expect(nodes('Text').some(text => text.children.includes(i18n.t('home.noLiveSessions')))).toBe(
+    expect(nodes('Text').some(item => item.children.includes(i18n.t('home.noLiveSessions')))).toBe(
       false
     );
   });
 
-  it('places the pending placeholder on the real row geometry so the arriving row cannot reflow it', async () => {
+  it('swaps the pending skeleton for the summary card on one reserved frame', async () => {
     await render({ ...settled, activeSessions: [session('a1')] });
-    const rowGeometry = String(
-      nodes('View').find(view => String(view.props.className ?? '').includes('py-[13px]'))?.props
+    const cardFrame = String(
+      nodes('View').find(view => String(view.props.className ?? '').includes('min-h-[72px]'))?.props
         .className
     );
-    expect(rowGeometry).toContain('py-[13px]');
+    expect(cardFrame).toContain('min-h-[72px]');
 
     await render({ ...settled, hasAcceptedSuccess: false }, { ...context, isResolving: true });
-    const placeholderRow = nodes('View').find(view =>
-      String(view.props.className ?? '').includes('py-[13px]')
+    const pendingFrame = String(
+      nodes('View').find(view => String(view.props.className ?? '').includes('min-h-[72px]'))?.props
+        .className
     );
-    expect(placeholderRow).toBeDefined();
-    // The same row box the incoming SessionRow draws: the copy lands on the
-    // same x-offset, so swapping the placeholder for the row cannot shift it.
-    expect(String(placeholderRow?.props.className)).toBe(rowGeometry);
-    // The leading mark is the row's own 3px edge strip, not a 32px circle.
-    expect(
-      nodes('Skeleton').some(skeleton => {
-        const className = String(skeleton.props.className ?? '');
-        return className.includes('absolute') && className.includes('w-[3px]');
-      })
-    ).toBe(true);
+    // The same reserved frame the arriving card draws: the swap cannot shift
+    // the LIVE NOW block.
+    expect(pendingFrame).toBe(cardFrame);
   });
 
   it.each([
-    ['running', 'running', false],
-    ['idle', 'idle', false],
-    ['question', 'needsInput', true],
-  ] as const)(
-    'keeps the real %s badge when the phone disconnects',
-    async (status, kind, needsInput) => {
-      const sessions = { ...settled, activeSessions: [{ ...session('a1'), status }] };
-      await render(sessions);
-      const row = node('RemoteSessionRow');
-      connectivity.offline = true;
-      await render(sessions);
-      expect(node('RemoteSessionRow')).toBe(row);
-      expect(node('SessionStatusIcon').props.kind).toBe(kind);
-      expect(nodes('Text').some(text => text.children.includes('NEEDS INPUT'))).toBe(needsInput);
-      expect(nodes('Text').some(text => text.children.includes('No internet connection'))).toBe(
-        true
-      );
-    }
-  );
+    ['running', 'running'],
+    ['idle', 'idle'],
+    ['question', 'needsInput'],
+  ] as const)('keeps the real %s badge when the phone disconnects', async (status, kind) => {
+    const sessions = { ...settled, activeSessions: [session('a1', status)] };
+    await render(sessions);
+    connectivity.offline = true;
+    await render(sessions);
+    expect(node('SessionStatusIcon').props.kind).toBe(kind);
+    expect(nodes('Text').some(item => item.children.includes('No internet connection'))).toBe(true);
+  });
 
   it('renders no live-sessions header when the accepted live list is empty', async () => {
     await render();
     expect(nodes('SectionHeader')).toHaveLength(0);
-    expect(nodes('Text').some(text => text.children.includes('Nothing running right now'))).toBe(
+    expect(cards()).toHaveLength(0);
+    expect(nodes('Text').some(item => item.children.includes('Nothing running right now'))).toBe(
       true
     );
   });

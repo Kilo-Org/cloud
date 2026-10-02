@@ -191,6 +191,7 @@ function createHarness(
   } = {}
 ) {
   const frames: ControlPlaneWrapperFrame[] = [];
+  const logs: string[] = [];
   const clients = new Map<string, FakeClient>();
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
@@ -217,6 +218,7 @@ function createHarness(
     timers: { wrapper: SESSION_TIMERS } as never,
     emit: frame => frames.push(frame),
     runtimes: { get: key => runtimes.get(key) },
+    log: message => logs.push(message),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (message: { prompt?: string; parts?: unknown[] }) => {
@@ -254,6 +256,7 @@ function createHarness(
   return {
     manager,
     frames,
+    logs,
     scheduler,
     timeouts,
     setClock: (value: number) => {
@@ -916,6 +919,82 @@ describe('turn outcome rules', () => {
     h.manager.tick();
     await settle();
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
+  });
+
+  it('reports descendant progress observed at a no_progress expiry without changing the outcome', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    // Descendant progress arrives just before the root deadline. If it moved
+    // the root clock, the turn would not expire at the original deadline.
+    h.advance(SESSION_TIMERS.noProgressMs - 1);
+    // The root emits no progress; its descendants do. Descendant progress must
+    // not move the root clock, but the expiry must report that it was seen.
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'child-assistant-1', type: 'text' },
+      })
+    );
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'child-assistant-1', type: 'tool' },
+      })
+    );
+    // No per-event logging: only the expiry line is written.
+    expect(h.logs).toHaveLength(0);
+
+    h.advance(1);
+    h.manager.tick();
+    await settle();
+
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'failed', reason: 'no_progress' });
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(h.logs).toEqual([
+      `turn: no_progress aborting session ${KILO_SESSION} descendantProgressEvents=2`,
+    ]);
+  });
+
+  it('reports zero descendant progress for a genuinely silent turn', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
+    expect(h.logs).toEqual([
+      `turn: no_progress aborting session ${KILO_SESSION} descendantProgressEvents=0`,
+    ]);
+  });
+
+  it('does not count a descendant user-prompt text part as progress', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    const childId = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+    h.manager.observeKiloEvent(
+      kiloEvent('session.created', { info: { id: childId, parentID: KILO_SESSION } })
+    );
+    // A text part carrying the pending root prompt's messageId is the user's own
+    // prompt, not progress, and must not be counted.
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: { sessionID: childId, messageID: 'm1', type: 'text' },
+      })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(h.logs).toEqual([
+      `turn: no_progress aborting session ${KILO_SESSION} descendantProgressEvents=0`,
+    ]);
   });
 
   it('caps the turn at 60 minutes even after progress', async () => {

@@ -1,4 +1,7 @@
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  type GlanceableAgentsSnapshot,
+  type GlanceableCounts,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 /**
  * Maps the snapshot plus optional surface flags to the locked copy keys, the
@@ -46,6 +49,24 @@ const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind
 ];
 
 /**
+ * All four counts in rank order, zeros included, from a bare count object.
+ *
+ * This is the one rank order: the native surfaces reach it through
+ * `glanceableCountLines(snapshot)` and the in-app card passes the counts it
+ * derives from the same tray rows, so every surface lists the states in the
+ * same order (`needsInput`, `running`, `scheduled`, `idle`) and no caller
+ * re-spells the order.
+ *
+ * A zero row still draws where the surface does that: dropping it would move
+ * every remaining row as work changes state, and a surface the user only
+ * glances at must not reflow. A snapshot with three zeros carries the `empty`
+ * status and draws its status line instead.
+ */
+export function glanceableCountLinesFromCounts(counts: GlanceableCounts): GlanceableCountLine[] {
+  return COUNT_ORDER.map(({ key, kind }) => ({ key, kind, count: counts[kind] }));
+}
+
+/**
  * All four counts in rank order, zeros included.
  *
  * A zero row still draws: dropping it would move every remaining row as work
@@ -54,7 +75,7 @@ const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind
  * zeros carries the `empty` status and draws its status line instead.
  */
 export function glanceableCountLines(snapshot: GlanceableAgentsSnapshot): GlanceableCountLine[] {
-  return COUNT_ORDER.map(({ key, kind }) => ({ key, kind, count: snapshot[kind] }));
+  return glanceableCountLinesFromCounts(snapshot);
 }
 
 /**

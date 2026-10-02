@@ -215,7 +215,6 @@
     "showBalance": "Vis saldo",
     "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
-    "creditBalanceEmpty": "Din kreditsaldo er 0. Kreditter til denne konto administreres uden for iOS-appen.",
     "signOutTitle": "Log ud?",
     "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "deleteAccountTitle": "Slet konto?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Session-ID kopieret",
       "couldNotCopyId": "Session-ID'et kunne ikke kopieres.",
       "untitled": "Session uden titel",
+      "actions": "Handlinger for sessionen",
       "sessionDeleted": "Session slettet",
       "needsInput": "afventer svar",
       "fromPlatform": "fra {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Denne session er skrivebeskyttet.",
       "continueInNewSession": "Fortsæt i en ny session",
       "emptyDescription": "Send en besked nedenfor for at komme i gang.",
+      "emptyTranscriptDescription": "Denne session har endnu ingen beskeder.",
       "scrollToBottom": "Rul til bunden",
       "emptyTitle": "Ingen beskeder endnu",
       "renameAccessibility": "Omdøb session: {{title}}",
@@ -2566,6 +2567,8 @@
       "selectModelBeforeSending": "Vælg en model, før du sender.",
       "preparingPlaceholder": "Forbereder miljøet...",
       "finalizingPlaceholder": "Afslutter...",
+      "sessionLoadFailed": "Sessionen kunne ikke indlæses. Prøv igen først.",
+      "sendUnavailable": "Afsendelse er ikke tilgængelig, før sessionen er klar.",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern de vedhæftede filer for at sende din besked.",
       "couldNotAttachFiles": "Kunne ikke vedhæfte filerne. Tryk på sendeknappen for at prøve igen.",
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
@@ -2635,6 +2638,7 @@
       "provider": "Udbyder",
       "totalCost": "Samlet pris",
       "usageReflectsLatest": "Forbruget er opgjort efter assistentens seneste færdige svar.",
+      "usageUnavailable": "Kontekstforbrug er ikke tilgængeligt",
       "tokenUsage": "Tokenforbrug",
       "cacheRate": "Andel fra cache",
       "modelsCount": "Modeller ({{displayCount}})",
@@ -2669,7 +2673,10 @@
     "markdownImage": {
       "load": "Indlæs",
       "loadWithHost": "Indlæs {{host}}",
-      "httpsOnly": "Kun billeder via HTTPS kan indlæses."
+      "httpsOnly": "Kun billeder via HTTPS kan indlæses.",
+      "trustTitle": "Indlæs billede fra {{host}}?",
+      "trustMessage": "Når du betror {{host}}, indlæses billederne uden at spørge hver gang. Du kan trække det tilbage senere under Betroede domæner.",
+      "loadOnce": "Indlæs én gang"
     },
     "markdownLink": {
       "invalidLink": "Dette link kan ikke åbnes.",
@@ -3182,8 +3189,12 @@
     "subtitle": "Domæner, der kan åbnes uden at spørge dig først",
     "emptyTitle": "Ingen betroede domæner",
     "emptyDescription": "Hvis du har tillid til et domæne, åbnes links til det uden at spørge dig igen.",
+    "imagesSectionTitle": "Betroede billeddomæner",
+    "imagesSectionDescription": "Billeder fra disse domæner indlæses uden at spørge igen.",
+    "imagesSectionEmpty": "Ingen betroede billeddomæner",
     "revoke": "Fjern tillid til {{host}}",
     "revokeMessage": "Links til dette domæne vil igen bede om bekræftelse.",
+    "revokeImageMessage": "Billeder fra dette domæne vil igen bede om bekræftelse.",
     "backToPreferences": "Tilbage til indstillinger"
   },
   "quickChat": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo ubundet",
       "unbindFailed": "Repo kunne ikke ophæves"
     }
+  },
+  "credits": {
+    "title": "Køb kreditter",
+    "description": "Kreditter er et engangskøb, der lægges til din Kilo-saldo til at køre AI-kodningssessioner i Kilo App. Butikken opkræver betaling på din konto, og kreditterne tilføjes, når butikken bekræfter betalingen.",
+    "packLabel": "Tilføj {{amount}} i kreditter",
+    "priceUnavailable": "Pris ikke tilgængelig",
+    "purchased": "Kreditter er føjet til din saldo.",
+    "empty": "Kreditpakker er ikke tilgængelige lige nu.",
+    "noMatchingProducts": "App Store returnerede ingen matchende kreditpakker.",
+    "noMatchingProductsPlay": "Google Play returnerede ingen matchende kreditpakker.",
+    "purchaseOwnedByAnotherAccount": "Kreditterne på denne Apple-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem.",
+    "purchaseOwnedByAnotherAccountPlay": "Kreditterne på denne Google Play-konto tilhører en anden Kilo-konto. Log ind på den Kilo-konto for at bruge dem."
   }
 }

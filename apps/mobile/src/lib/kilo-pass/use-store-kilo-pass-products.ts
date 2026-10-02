@@ -36,6 +36,17 @@ export type StoreKiloPassProductsOptions = {
   connected: boolean;
   /** Fetches store SKUs. Injected by the IAP owner so this module never imports `expo-iap`. */
   fetchStoreProducts: (productSkus: string[]) => Promise<readonly StoreKiloPassProduct[]>;
+  /**
+   * Restores the IAP owner's store connection.
+   *
+   * A retry must call this before asking for prices. A failed initialization
+   * leaves the owner without purchase-update listeners and the native store
+   * without a live product query, so re-running the store fetch alone can never
+   * issue a new `ProductRequest` — the tap settles against a dead connection and
+   * the "Could not connect" card stays up. The owner injects it so this module
+   * never imports `expo-iap`.
+   */
+  reconnectStore: () => Promise<boolean>;
 };
 
 type KiloPassTrpc = ReturnType<typeof useTRPC>;
@@ -134,9 +145,16 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
     },
     enabled: isIapPlatform && options.connected && userId != null,
     staleTime: STORE_KILO_PASS_PRODUCTS_STALE_TIME_MS,
+    // The store answered this query's own fetch, so a React Query retry only
+    // re-runs it against a store that just failed and stretches the wait before
+    // the retry card appears. The screen's "Try again" is the deliberate retry
+    // (it reconnects first), and the bounded connection wait covers the
+    // handshake, so this query fails fast.
+    retry: false,
   });
 
   const { refetch: refetchProducts } = productsQuery;
+  const { reconnectStore } = options;
 
   // The retry ends when the catalog fetch settles AND the minimum busy time has
   // passed. While the store is not connected the bounded wait above owns the end
@@ -158,13 +176,22 @@ export function useStoreKiloPassProducts(options: StoreKiloPassProductsOptions) 
       retryFloorElapsedRef.current = true;
       endRetryWhenSettled();
     }, MINIMUM_RETRY_BUSY_MS);
+    // Restore the connection before asking for prices. A failed initialization
+    // leaves the owner without purchase-update listeners and the native store
+    // without a live product query, so fetching through it issues no new
+    // `ProductRequest` and the "Could not connect" card can never clear.
+    try {
+      await reconnectStore();
+    } catch {
+      // Still unreachable: the bounded store-connection wait keeps the card up.
+    }
     try {
       await refetchProducts();
     } finally {
       retrySettledRef.current = true;
       endRetryWhenSettled();
     }
-  }, [clearRetryBusyTimer, endRetryWhenSettled, refetchProducts]);
+  }, [clearRetryBusyTimer, endRetryWhenSettled, reconnectStore, refetchProducts]);
 
   // The connection can land while a retry is still waiting on it (the bounded
   // wait above is cancelled then, and no fetch had started when the retry began).

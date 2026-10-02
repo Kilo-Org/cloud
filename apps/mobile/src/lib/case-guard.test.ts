@@ -28,6 +28,7 @@ const ALLOWED_NON_DISPLAY: Readonly<Record<string, string>> = {
   'lib/github-pr-url.ts': 'URL scheme/host comparison',
   'lib/glanceable/widget-actions.ts': 'repository full-name comparison',
   'lib/hooks/use-trusted-hosts.ts': 'trusted-host comparison key',
+  'lib/hooks/use-trusted-image-hosts.ts': 'trusted-host comparison key',
   'lib/pr-review/recent-prs.ts': 'recents composition key',
   'lib/pr-review/pending-review-provider.tsx': 'draft composition key',
   'lib/route-registry.ts': 'route composition key',

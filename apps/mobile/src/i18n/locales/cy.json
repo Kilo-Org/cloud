@@ -215,7 +215,6 @@
     "showBalance": "Dangos y balans",
     "balanceHidden": "Balans wedi'i guddio",
     "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
-    "creditBalanceEmpty": "Nid oes credydau ar ôl yn eich balans. Rheolir credydau'r cyfrif hwn y tu allan i'r ap iOS.",
     "signOutTitle": "Allgofnodi?",
     "signOutMessage": "Bydd angen i ti fewngofnodi eto i gael mynediad i dy weithle.",
     "deleteAccountTitle": "Dileu cyfrif?",
@@ -2148,6 +2147,7 @@
       "idCopied": "Wedi copïo ID y sesiwn",
       "couldNotCopyId": "Ni lwyddwyd i gopïo ID y sesiwn.",
       "untitled": "Sesiwn heb deitl",
+      "actions": "Gweithredoedd sesiwn",
       "sessionDeleted": "Sesiwn wedi'i dileu",
       "needsInput": "angen mewnbwn",
       "fromPlatform": "o {{platform}}",
@@ -2212,6 +2212,7 @@
       "readOnly": "Sesiwn ddarllen yn unig yw hon.",
       "continueInNewSession": "Parhau mewn sesiwn newydd",
       "emptyDescription": "Anfonwch neges isod i ddechrau.",
+      "emptyTranscriptDescription": "Nid oes gan y sesiwn hon unrhyw negeseuon eto.",
       "scrollToBottom": "Sgrolio i'r gwaelod",
       "emptyTitle": "Dim negeseuon eto",
       "renameAccessibility": "Ailenwi sesiwn: {{title}}",
@@ -2714,6 +2715,8 @@
       "selectModelBeforeSending": "Dewiswch fodel cyn anfon.",
       "preparingPlaceholder": "Yn paratoi'r amgylchedd...",
       "finalizingPlaceholder": "Yn gorffen...",
+      "sessionLoadFailed": "Methwyd llwytho'r sesiwn. Rhowch gynnig arall arni'n gyntaf.",
+      "sendUnavailable": "Nid yw anfon ar gael nes bod y sesiwn yn barod.",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Tynnwch yr atodiadau i anfon eich neges.",
       "couldNotAttachFiles": "Methu atodi'r ffeiliau. Tapiwch Anfon i geisio eto.",
       "discardAttachmentsMessage": "Bydd ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
@@ -2787,6 +2790,7 @@
       "provider": "Darparwr",
       "totalCost": "Cyfanswm y gost",
       "usageReflectsLatest": "Mae'r defnydd yn seiliedig ar ymateb diweddaraf y cynorthwyydd sydd wedi'i gwblhau.",
+      "usageUnavailable": "Nid yw defnyddio cyd-destun ar gael",
       "tokenUsage": "Defnydd tocynnau",
       "cacheRate": "Cyfradd y storfa dros dro",
       "modelsCount": "Modelau ({{displayCount}})",
@@ -2829,7 +2833,10 @@
     "markdownImage": {
       "load": "Llwytho",
       "loadWithHost": "Llwytho {{host}}",
-      "httpsOnly": "Dim ond delweddau HTTPS a ganiateir."
+      "httpsOnly": "Dim ond delweddau HTTPS a ganiateir.",
+      "trustTitle": "Llwytho delwedd o {{host}}?",
+      "trustMessage": "Mae ymddiried yn {{host}} yn llwytho ei ddelweddau heb ofyn bob tro. Gallwch ei ddirymu'n ddiweddarach o dan Gwesteiwyr dibynadwy.",
+      "loadOnce": "Llwytho unwaith"
     },
     "markdownLink": {
       "invalidLink": "Ni ellir agor y ddolen hon.",
@@ -3354,8 +3361,12 @@
     "subtitle": "Gwesteiwyr y gall eu dolenni agor heb ofyn",
     "emptyTitle": "Dim gwesteiwyr dibynadwy",
     "emptyDescription": "Pan fyddwch yn ymddiried yng ngwesteiwr dolen, bydd y ddolen yn agor heb ofyn eto.",
+    "imagesSectionTitle": "Gwesteiwyr delwedd dibynadwy",
+    "imagesSectionDescription": "Mae delweddau o'r gwesteiwyr hyn yn llwytho heb ofyn eto.",
+    "imagesSectionEmpty": "Dim gwesteiwyr delwedd dibynadwy",
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "revokeMessage": "Bydd dolenni i'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
+    "revokeImageMessage": "Bydd delweddau o'r gwesteiwr hwn yn gofyn am gadarnhad eto.",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
   "quickChat": {
@@ -3620,5 +3631,17 @@
       "unboundToast": "Repo heb ei rwymo",
       "unbindFailed": "Ni fu modd dadrwymo repo"
     }
+  },
+  "credits": {
+    "title": "Prynu credydau",
+    "description": "Mae credydau yn bryniant un-tro sy'n cael ei ychwanegu at eich balans Kilo ar gyfer rhedeg sesiynau codio AI yn Kilo App. Mae'r siop yn codi eich cyfrif ac mae credydau'n cael eu hychwanegu ar ôl i'r siop gadarnhau'r taliad.",
+    "packLabel": "Ychwanegu {{amount}} o gredydau",
+    "priceUnavailable": "Pris ddim ar gael",
+    "purchased": "Ychwanegwyd credydau at eich balans.",
+    "empty": "Nid yw pecynnau credydau ar gael ar hyn o bryd.",
+    "noMatchingProducts": "Ni ddychwelodd yr App Store unrhyw becynnau credydau cyfatebol.",
+    "noMatchingProductsPlay": "Ni ddychwelodd Google Play unrhyw becynnau credydau cyfatebol.",
+    "purchaseOwnedByAnotherAccount": "Mae'r credydau ar yr Apple Account hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio.",
+    "purchaseOwnedByAnotherAccountPlay": "Mae'r credydau ar y cyfrif Google Play hwn yn perthyn i gyfrif Kilo gwahanol. Mewngofnodwch i'r cyfrif Kilo hwnnw i'w defnyddio."
   }
 }

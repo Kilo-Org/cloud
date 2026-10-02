@@ -27,6 +27,7 @@ const {
   requireCurrentSessionAccessMock,
   getPgDbMock,
   loggerWarnMock,
+  loggerWithFieldsMock,
 } = vi.hoisted(() => ({
   getRunningTerminalClientMock: vi.fn(),
   consumeCloudAgentReportBatchMock: vi.fn().mockResolvedValue(undefined),
@@ -36,6 +37,7 @@ const {
   requireCurrentSessionAccessMock: vi.fn(),
   getPgDbMock: vi.fn(),
   loggerWarnMock: vi.fn(),
+  loggerWithFieldsMock: vi.fn(),
 }));
 
 vi.mock('./logger.js', () => {
@@ -44,9 +46,9 @@ vi.mock('./logger.js', () => {
     info: vi.fn(),
     warn: loggerWarnMock,
     error: vi.fn(),
-    withFields: vi.fn(),
+    withFields: loggerWithFieldsMock,
   };
-  logger.withFields.mockReturnValue(logger);
+  loggerWithFieldsMock.mockReturnValue(logger);
 
   return {
     logger,
@@ -284,6 +286,7 @@ beforeEach(() => {
   runCloudAgentOutcomeCollectionMock.mockClear();
   runCloudAgentOpenStockCollectionMock.mockClear();
   loggerWarnMock.mockClear();
+  loggerWithFieldsMock.mockClear();
   getPgDbMock.mockReset();
   requireCurrentSessionAccessMock.mockReset().mockResolvedValue({
     kiloSessionId: 'ses_12345678901234567890123456',
@@ -1468,6 +1471,117 @@ describe('server runtime credential proxy', () => {
     expect(response.status).toBe(404);
     expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('emits the upstream status for a failed model-proxy request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const resolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(upstream).toHaveBeenCalledOnce();
+      expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
+      expect(loggerWithFieldsMock).toHaveBeenCalledWith({
+        logTag: 'runtime_proxy_request_failed',
+        upstreamAttempted: true,
+        upstreamStatus: 401,
+        sessionId: 'agent_proxy',
+        kiloSessionId: 'kilo_proxy',
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('emits no diagnostic for a successful model-proxy request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('attempts no upstream and emits no upstream diagnostic when credential resolution rejects', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue(null),
+    });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions',
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${await handle()}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(401);
+      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(upstream).not.toHaveBeenCalled();
+      expect(loggerWithFieldsMock).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

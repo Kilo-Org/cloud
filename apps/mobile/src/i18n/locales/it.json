@@ -215,7 +215,6 @@
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
     "bonusCreditsExpiring": "{{amount}} di crediti bonus scadono il {{date}}.",
-    "creditBalanceEmpty": "Hai esaurito i crediti. Per questo account, i crediti si gestiscono al di fuori dell'app iOS.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -1513,6 +1512,7 @@
       "idCopied": "ID della sessione copiato",
       "couldNotCopyId": "Impossibile copiare l'ID della sessione.",
       "untitled": "Sessione senza titolo",
+      "actions": "Azioni sulla sessione",
       "sessionDeleted": "Sessione eliminata",
       "needsInput": "in attesa di risposta",
       "fromPlatform": "da {{platform}}",
@@ -1568,6 +1568,7 @@
       "readOnly": "Questa sessione è di sola lettura.",
       "continueInNewSession": "Continua in una nuova sessione",
       "emptyDescription": "Invia un messaggio qui sotto per iniziare.",
+      "emptyTranscriptDescription": "Questa sessione non ha ancora messaggi.",
       "scrollToBottom": "Scorri fino in fondo",
       "emptyTitle": "Ancora nessun messaggio",
       "renameAccessibility": "Rinomina la sessione: {{title}}",
@@ -2043,6 +2044,8 @@
       "selectModelBeforeSending": "Seleziona un modello prima di inviare il messaggio.",
       "preparingPlaceholder": "Configurazione dell'ambiente...",
       "finalizingPlaceholder": "Completamento in corso…",
+      "sessionLoadFailed": "Impossibile caricare la sessione. Riprova prima.",
+      "sendUnavailable": "L'invio non è disponibile finché la sessione non è pronta.",
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
       "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
       "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
@@ -2113,6 +2116,7 @@
       "provider": "Fornitore",
       "totalCost": "Costo totale",
       "usageReflectsLatest": "I dati di utilizzo si riferiscono all'ultima risposta completata dell'assistente.",
+      "usageUnavailable": "Utilizzo del contesto non disponibile",
       "tokenUsage": "Utilizzo dei token",
       "cacheRate": "Percentuale di token in cache",
       "modelsCount": "Modelli ({{displayCount}})",
@@ -2149,7 +2153,10 @@
     "markdownImage": {
       "load": "Carica",
       "loadWithHost": "Carica {{host}}",
-      "httpsOnly": "Sono supportate solo le immagini HTTPS."
+      "httpsOnly": "Sono supportate solo le immagini HTTPS.",
+      "trustTitle": "Caricare l'immagine da {{host}}?",
+      "trustMessage": "Se consideri attendibile {{host}}, le sue immagini verranno caricate senza chiedere ogni volta. Puoi revocarlo in seguito in Siti attendibili.",
+      "loadOnce": "Carica una volta"
     },
     "markdownLink": {
       "invalidLink": "Questo link non può essere aperto.",
@@ -3225,8 +3232,12 @@
     "subtitle": "Siti che puoi aprire senza conferma",
     "emptyTitle": "Nessun sito attendibile",
     "emptyDescription": "Quando consideri attendibile un sito, i suoi link si aprono senza chiedere di nuovo conferma.",
+    "imagesSectionTitle": "Siti attendibili delle immagini",
+    "imagesSectionDescription": "Le immagini di questi siti si caricano senza chiedere di nuovo.",
+    "imagesSectionEmpty": "Nessun sito attendibile delle immagini",
     "revoke": "Revoca l'attendibilità di {{host}}",
     "revokeMessage": "I link a questo sito chiederanno di nuovo conferma.",
+    "revokeImageMessage": "Le immagini da questo sito chiederanno di nuovo conferma.",
     "backToPreferences": "Torna alle preferenze"
   },
   "quickChat": {
@@ -3491,5 +3502,17 @@
       "unboundToast": "Repo non vincolato",
       "unbindFailed": "Impossibile scollegare il repository"
     }
+  },
+  "credits": {
+    "title": "Acquista crediti",
+    "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "packLabel": "Aggiungi {{amount}} in crediti",
+    "priceUnavailable": "Prezzo non disponibile",
+    "purchased": "I crediti sono stati aggiunti al tuo saldo.",
+    "empty": "I pacchetti di crediti non sono disponibili al momento.",
+    "noMatchingProducts": "L'App Store non ha restituito pacchetti di crediti corrispondenti.",
+    "noMatchingProductsPlay": "Google Play non ha restituito pacchetti di crediti corrispondenti.",
+    "purchaseOwnedByAnotherAccount": "I crediti associati a questo Apple Account appartengono a un altro account Kilo. Accedi a quell'account Kilo per usarli.",
+    "purchaseOwnedByAnotherAccountPlay": "I crediti su questo account Google Play appartengono a un account Kilo diverso. Accedi a quell'account Kilo per usarli."
   }
 }

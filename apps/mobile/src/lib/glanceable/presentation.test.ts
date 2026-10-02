@@ -7,6 +7,7 @@ import {
 
 import {
   glanceableCountLines,
+  glanceableCountLinesFromCounts,
   glanceableScheduledAt,
   glanceableSpokenLabel,
   glanceableSpokenLabelKeys,
@@ -111,6 +112,24 @@ describe('primary rank and locked copy keys', () => {
     );
     expect(glanceableStatusCopyKey(snapshot({ status: 'privacy' }))).toBe('glanceable.privacy');
     expect(glanceableStatusCopyKey(snapshot({ status: 'happy' }))).toBeNull();
+  });
+});
+
+describe('rank order from a bare count object', () => {
+  it('lists every state in needs-input, running, scheduled, idle order, zeros included', () => {
+    expect(
+      glanceableCountLinesFromCounts({ running: 2, needsInput: 1, idle: 3, scheduled: 4 })
+    ).toEqual([
+      { key: 'glanceable.needsInput', kind: 'needsInput', count: 1 },
+      { key: 'common.working', kind: 'running', count: 2 },
+      { key: 'common.scheduled', kind: 'scheduled', count: 4 },
+      { key: 'common.idle', kind: 'idle', count: 3 },
+    ]);
+  });
+
+  it('is the same lines `glanceableCountLines` derives from a snapshot', () => {
+    const built = snapshot({ sessions: [{ status: 'busy' }, { status: 'question' }] });
+    expect(glanceableCountLinesFromCounts(built)).toEqual(glanceableCountLines(built));
   });
 });
 

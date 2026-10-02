@@ -19,7 +19,7 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatUsd } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getKiloPassLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
+import { getStoreLegalLinks, kiloPassLegalDisclosure } from '@/lib/kilo-pass/legal-links';
 import { ensureProfileAfterKiloPassPurchase } from '@/lib/kilo-pass/navigation';
 import { type AppStoreKiloPassProduct } from '@/lib/kilo-pass/store-products';
 import { useInlinePurchaseErrorOwnership } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
@@ -249,7 +249,7 @@ function KiloPassNativeIapContent() {
     preflightPurchase.isPending ||
     ownedByAnotherAccount ||
     !ownershipChecked;
-  const [privacyPolicyLink, termsOfUseLink] = getKiloPassLegalLinks(WEB_BASE_URL);
+  const [privacyPolicyLink, termsOfUseLink] = getStoreLegalLinks(WEB_BASE_URL);
   const mountedRef = useRef(true);
   useEffect(() => {
     mountedRef.current = true;

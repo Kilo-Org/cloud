@@ -215,7 +215,6 @@
     "showBalance": "Balansı göstər",
     "balanceHidden": "Balans gizlidir",
     "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
-    "creditBalanceEmpty": "Kredit balansın boşdur. Bu hesabın kreditləri iOS tətbiqindən kənarda idarə olunur.",
     "signOutTitle": "Hesabdan çıxılsın?",
     "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən.",
     "deleteAccountTitle": "Hesab silinsin?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Sessiya ID-sinin surəti çıxarıldı",
       "couldNotCopyId": "Sessiya ID-sinin surətini çıxarmaq mümkün olmadı.",
       "untitled": "Adsız sessiya",
+      "actions": "Sessiya əməliyyatları",
       "sessionDeleted": "Sessiya silindi",
       "needsInput": "cavab gözləyir",
       "fromPlatform": "{{platform}} platformasından",
@@ -2100,6 +2100,7 @@
       "readOnly": "Bu sessiyaya yalnız baxmaq olar.",
       "continueInNewSession": "Yeni sessiyada davam et",
       "emptyDescription": "Başlamaq üçün aşağıdakı sahədən mesaj göndər.",
+      "emptyTranscriptDescription": "Bu sessiyada hələ mesaj yoxdur.",
       "scrollToBottom": "Ən aşağıya sürüşdür",
       "emptyTitle": "Hələ mesaj yoxdur",
       "renameAccessibility": "Sessiyanın adını dəyiş: {{title}}",
@@ -2566,6 +2567,8 @@
       "selectModelBeforeSending": "Göndərməzdən əvvəl model seç.",
       "preparingPlaceholder": "Mühit qurulur...",
       "finalizingPlaceholder": "Tamamlanır...",
+      "sessionLoadFailed": "Sessiya yüklənə bilmədi. Əvvəlcə yenidən cəhd edin.",
+      "sendUnavailable": "Sessiya hazır olana qədər göndərmə mövcud deyil.",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajını göndərmək üçün əlavələri sil.",
       "couldNotAttachFiles": "Faylları əlavə etmək mümkün olmadı. Yenidən cəhd etmək üçün «Göndər» düyməsinə toxun.",
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
@@ -2635,6 +2638,7 @@
       "provider": "Təminatçı",
       "totalCost": "Ümumi xərc",
       "usageReflectsLatest": "İstifadə göstəriciləri köməkçinin son tamamlanmış cavabına aiddir.",
+      "usageUnavailable": "Kontekst istifadəsi əlçatmazdır",
       "tokenUsage": "Token istifadəsi",
       "cacheRate": "Keşdən istifadə faizi",
       "modelsCount": "Modellər ({{displayCount}})",
@@ -2669,7 +2673,10 @@
     "markdownImage": {
       "load": "Yüklə",
       "loadWithHost": "{{host}} ünvanından yüklə",
-      "httpsOnly": "Yalnız HTTPS üzərindən şəkil yükləmək olar."
+      "httpsOnly": "Yalnız HTTPS üzərindən şəkil yükləmək olar.",
+      "trustTitle": "{{host}} ünvanından şəkil yüklənsin?",
+      "trustMessage": "{{host}} saytına etibar etsəniz, şəkilləri hər dəfə soruşmadan yüklənir. Sonradan Etibarlı saytlar bölməsindən etibarı ləğv edə bilərsiniz.",
+      "loadOnce": "Bir dəfə yüklə"
     },
     "markdownLink": {
       "invalidLink": "Bu keçidi açmaq mümkün deyil.",
@@ -3182,8 +3189,12 @@
     "subtitle": "Təsdiq istəmədən açılmasına icazə verdiyin saytlar",
     "emptyTitle": "Etibarlı sayt yoxdur",
     "emptyDescription": "Sayta etibar etdikdə onun keçidləri bir daha təsdiq istəmədən açılır.",
+    "imagesSectionTitle": "Etibarlı şəkil saytları",
+    "imagesSectionDescription": "Bu saytlardan şəkillər bir daha soruşmadan yüklənir.",
+    "imagesSectionEmpty": "Etibarlı şəkil saytı yoxdur",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "revokeMessage": "Bu hosta olan keçidlər yenidən təsdiq tələb edəcək.",
+    "revokeImageMessage": "Bu hostdan olan şəkillər yenidən təsdiq tələb edəcək.",
     "backToPreferences": "Parametrlərə qayıt"
   },
   "quickChat": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo bağlanmamışdır",
       "unbindFailed": "Repo bağlamaq mümkün olmadı"
     }
+  },
+  "credits": {
+    "title": "Kredit al",
+    "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
+    "packLabel": "{{amount}} dəyərində kredit əlavə et",
+    "priceUnavailable": "Qiymət mövcud deyil",
+    "purchased": "Kredit balansına əlavə edildi.",
+    "empty": "Kredit paketləri hazırda əlçatan deyil.",
+    "noMatchingProducts": "App Store tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "noMatchingProductsPlay": "Google Play tərəfindən uyğun kredit paketi qaytarılmadı.",
+    "purchaseOwnedByAnotherAccount": "Bu Apple Account hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil ol.",
+    "purchaseOwnedByAnotherAccountPlay": "Bu Google Play hesabındakı kreditlər başqa Kilo hesabına aiddir. Onlardan istifadə etmək üçün həmin Kilo hesabına daxil olun."
   }
 }

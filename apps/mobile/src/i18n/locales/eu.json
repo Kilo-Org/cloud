@@ -215,7 +215,6 @@
     "showBalance": "Erakutsi saldoa",
     "balanceHidden": "Saldoa ezkutatuta dago",
     "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
-    "creditBalanceEmpty": "Ez duzu krediturik geratzen. Kontu honetan, kredituak iOS aplikaziotik kanpo kudeatzen dira.",
     "signOutTitle": "Itxi saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "deleteAccountTitle": "Ezabatu kontua?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Saio-IDa kopiatuta",
       "couldNotCopyId": "Ezin izan da saio-IDa kopiatu.",
       "untitled": "Izenik gabeko saioa",
+      "actions": "Saioaren ekintzak",
       "sessionDeleted": "Saioa ezabatuta",
       "needsInput": "zure erantzunaren zain",
       "fromPlatform": "jatorria: {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Saio hau irakurtzeko soilik da.",
       "continueInNewSession": "Jarraitu saio berri batean",
       "emptyDescription": "Hasteko, bidali mezu bat behean.",
+      "emptyTranscriptDescription": "Saio honek oraindik ez du mezurik.",
       "scrollToBottom": "Joan behealdera",
       "emptyTitle": "Oraindik ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
@@ -2566,6 +2567,8 @@
       "selectModelBeforeSending": "Hautatu modelo bat bidali aurretik.",
       "preparingPlaceholder": "Ingurunea prestatzen…",
       "finalizingPlaceholder": "Amaitzen…",
+      "sessionLoadFailed": "Ezin izan da saioa kargatu. Saiatu berriro lehenik.",
+      "sendUnavailable": "Bidaltzea ez dago erabilgarri saioa prest egon arte.",
       "cannotReceiveFiles": "Saio honek ezin du fitxategirik jaso. Kendu eranskinak zure mezua bidaltzeko.",
       "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu Bidali berriro saiatzeko.",
       "discardAttachmentsMessage": "Igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
@@ -2635,6 +2638,7 @@
       "provider": "Hornitzailea",
       "totalCost": "Kostu osoa",
       "usageReflectsLatest": "Erabilera-datuak laguntzaileak amaitu duen azken erantzunari dagozkio.",
+      "usageUnavailable": "Testuinguruaren erabilera ez dago erabilgarri",
       "tokenUsage": "Tokenen erabilera",
       "cacheRate": "Cache-tasa",
       "modelsCount": "Modeloak ({{displayCount}})",
@@ -2669,7 +2673,10 @@
     "markdownImage": {
       "load": "Kargatu",
       "loadWithHost": "Kargatu {{host}}",
-      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira."
+      "httpsOnly": "HTTPS bidezko irudiak soilik onartzen dira.",
+      "trustTitle": "Kargatu irudia {{host}}(e)tik?",
+      "trustMessage": "{{host}} ostalariari konfiantza emanez gero, haren irudiak ez dira aldi bakoitzean galdetu gabe kargatuko. Geroago konfiantza hori kendu dezakezu Konfiantzako ostalariak atalean.",
+      "loadOnce": "Kargatu behin"
     },
     "markdownLink": {
       "invalidLink": "Esteka hau ezin da ireki.",
@@ -3182,8 +3189,12 @@
     "subtitle": "Berrespenik gabe irekitzea baimendu duzun ostalariak",
     "emptyTitle": "Ez dago konfiantzako ostalaririk",
     "emptyDescription": "Esteka baten ostalariari konfiantza ematen badiozu, haren estekak berriro galdetu gabe irekiko dira.",
+    "imagesSectionTitle": "Konfiantzako irudi-ostalariak",
+    "imagesSectionDescription": "Ostalari hauetako irudiak berriro galdetu gabe kargatzen dira.",
+    "imagesSectionEmpty": "Ez dago konfiantzako irudi-ostalaririk",
     "revoke": "Kendu ostalari honi emandako konfiantza: {{host}}",
     "revokeMessage": "Ostalari honetarako estekek berriro eskatuko dute berrespena.",
+    "revokeImageMessage": "Ostalari honetako irudiek berriro eskatuko dute berrespena.",
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo lotu gabe",
       "unbindFailed": "Ezin izan da biltegia deslotu"
     }
+  },
+  "credits": {
+    "title": "Erosi kredituak",
+    "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
+    "packLabel": "Gehitu {{amount}} kreditutan",
+    "priceUnavailable": "Prezioa ez dago erabilgarri",
+    "purchased": "Kredituak zure saldoari gehitu zaizkio.",
+    "empty": "Kreditu-paketeak ez daude orain erabilgarri.",
+    "noMatchingProducts": "App Store-k ez du bat datorren kreditu-paketerik itzuli.",
+    "noMatchingProductsPlay": "Google Play-k ez du bat datorren kreditu-paketerik itzuli.",
+    "purchaseOwnedByAnotherAccount": "Apple Account honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan.",
+    "purchaseOwnedByAnotherAccountPlay": "Google Play kontu honetako kredituak beste Kilo kontu bati dagozkio. Erabiltzeko, hasi saioa Kilo kontu horretan."
   }
 }

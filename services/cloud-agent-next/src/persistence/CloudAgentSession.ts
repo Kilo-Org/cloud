@@ -701,6 +701,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const payer = metadata.identity.orgId
       ? { type: 'org' as const, id: metadata.identity.orgId }
       : { type: 'user' as const, id: metadata.identity.userId };
+    if (admission.code === 'meter_unavailable') {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.workspace?.sandboxId,
+          payerType: payer.type,
+          admissionCode: admission.code,
+          admissionMessage: admission.message,
+        })
+        .warn('Container billing admission failed');
+    }
     const billingFailure =
       admission.code === 'insufficient_credits'
         ? {

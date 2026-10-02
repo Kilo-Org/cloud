@@ -215,7 +215,6 @@
     "showBalance": "Amosar o saldo",
     "balanceHidden": "Saldo agochado",
     "bonusCreditsExpiring": "Tes {{amount}} en créditos extra que caducan o {{date}}.",
-    "creditBalanceEmpty": "Non tes créditos. Nesta conta, os créditos xestiónanse fóra da aplicación para iOS.",
     "signOutTitle": "Pechar sesión?",
     "signOutMessage": "Terás que iniciar sesión de novo para acceder ao teu espazo de traballo.",
     "deleteAccountTitle": "Eliminar a conta?",
@@ -2048,6 +2047,7 @@
       "idCopied": "ID da sesión copiado",
       "couldNotCopyId": "Non se puido copiar o ID da sesión.",
       "untitled": "Sesión sen título",
+      "actions": "Accións da sesión",
       "sessionDeleted": "Sesión eliminada",
       "needsInput": "agardando resposta",
       "fromPlatform": "desde {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Esta sesión é de só lectura.",
       "continueInNewSession": "Continuar nunha sesión nova",
       "emptyDescription": "Envía unha mensaxe a continuación para comezar.",
+      "emptyTranscriptDescription": "Esta sesión aínda non ten mensaxes.",
       "scrollToBottom": "Desprazarse ata o final",
       "emptyTitle": "Aínda non hai mensaxes",
       "renameAccessibility": "Renomear sesión: {{title}}",
@@ -2566,6 +2567,8 @@
       "selectModelBeforeSending": "Selecciona un modelo antes de enviar a mensaxe.",
       "preparingPlaceholder": "Preparando o contorno...",
       "finalizingPlaceholder": "Rematando...",
+      "sessionLoadFailed": "Non se puido cargar a sesión. Probe primeiro de novo.",
+      "sendUnavailable": "O envío non está dispoñible ata que a sesión estea lista.",
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
       "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca Enviar para tentalo de novo.",
       "discardAttachmentsMessage": "Eliminaranse os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
@@ -2635,6 +2638,7 @@
       "provider": "Provedor",
       "totalCost": "Custo total",
       "usageReflectsLatest": "O uso corresponde á última resposta rematada do asistente.",
+      "usageUnavailable": "O uso do contexto non está dispoñible",
       "tokenUsage": "Uso de tokens",
       "cacheRate": "Porcentaxe de tokens en caché",
       "modelsCount": "Modelos ({{displayCount}})",
@@ -2669,7 +2673,10 @@
     "markdownImage": {
       "load": "Cargar",
       "loadWithHost": "Cargar {{host}}",
-      "httpsOnly": "Só se admiten imaxes con HTTPS."
+      "httpsOnly": "Só se admiten imaxes con HTTPS.",
+      "trustTitle": "Cargar a imaxe de {{host}}?",
+      "trustMessage": "Se confías en {{host}}, as súas imaxes cargaranse sen preguntar cada vez. Podes revogalo máis tarde en Dominios de confianza.",
+      "loadOnce": "Cargar unha vez"
     },
     "markdownLink": {
       "invalidLink": "Non se pode abrir esta ligazón.",
@@ -3182,8 +3189,12 @@
     "subtitle": "Dominios cuxas ligazóns se abren sen pedir confirmación",
     "emptyTitle": "Non hai dominios de confianza",
     "emptyDescription": "Se confías no dominio dunha ligazón, as súas ligazóns abriranse sen pedir confirmación.",
+    "imagesSectionTitle": "Dominios de confianza de imaxes",
+    "imagesSectionDescription": "As imaxes destes dominios cárganse sen volver preguntar.",
+    "imagesSectionEmpty": "Non hai dominios de confianza de imaxes",
     "revoke": "Revogar a confianza en {{host}}",
     "revokeMessage": "As ligazóns a este dominio volverán pedir confirmación.",
+    "revokeImageMessage": "As imaxes deste dominio volverán pedir confirmación.",
     "backToPreferences": "Volver ás preferencias"
   },
   "quickChat": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo desvinculado",
       "unbindFailed": "Non se puido desvincular o repositorio"
     }
+  },
+  "credits": {
+    "title": "Mercar créditos",
+    "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
+    "packLabel": "Engadir {{amount}} en créditos",
+    "priceUnavailable": "Prezo non dispoñible",
+    "purchased": "Engadíronse créditos ao teu saldo.",
+    "empty": "Os paquetes de créditos non están dispoñibles agora mesmo.",
+    "noMatchingProducts": "A App Store non devolveu ningún paquete de créditos coincidente.",
+    "noMatchingProductsPlay": "Google Play non devolveu ningún paquete de créditos coincidente.",
+    "purchaseOwnedByAnotherAccount": "Os créditos desta Apple Account pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos.",
+    "purchaseOwnedByAnotherAccountPlay": "Os créditos desta conta de Google Play pertencen a outra conta de Kilo. Inicia sesión nesa conta de Kilo para usalos."
   }
 }

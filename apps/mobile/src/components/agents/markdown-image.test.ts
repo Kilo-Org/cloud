@@ -4,10 +4,33 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  clearTrustedImageHosts,
+  revokeImageHost,
+  trustImageHost,
+} from '@/lib/hooks/use-trusted-image-hosts';
+
 import { clearMarkdownImageConfirmMemory, confirmMarkdownImage } from './markdown-image-confirm';
 import { MarkdownImage } from './markdown-image';
 
-vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+const alertMock = vi.hoisted(() => vi.fn());
+const secureStoreMock = vi.hoisted(() => ({
+  getItemAsync: vi.fn(),
+  setItemAsync: vi.fn(),
+  deleteItemAsync: vi.fn(),
+}));
+
+vi.mock('react-native', () => ({
+  Alert: { alert: alertMock },
+  Pressable: 'Pressable',
+  View: 'View',
+}));
+// The trusted-image-host store reaches SecureStore, Sentry and the toast
+// bridge on import; stub that chain so this suite exercises the confirm memory
+// rather than the preference's disk read.
+vi.mock('expo-secure-store', () => secureStoreMock);
+vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   Download: 'Download',
@@ -23,6 +46,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 
 beforeEach(() => {
   clearMarkdownImageConfirmMemory();
+  clearTrustedImageHosts();
+  alertMock.mockClear();
 });
 
 function ofType(
@@ -62,6 +87,38 @@ function findLoadButtons(
       (node.type as string) === 'Pressable' &&
       node.props.accessibilityLabel === loadLabel(uri)
   );
+}
+
+/**
+ * Press the Load chip and answer the native trust dialog. The first press only
+ * opens the dialog; the chosen action is what confirms or trusts, so a test
+ * that expects an Image must go through here rather than the chip's onPress.
+ */
+function chooseAlertAction(action: string): void {
+  const buttons = alertMock.mock.calls.at(-1)?.[2] as
+    | { text: string; onPress?: () => void }[]
+    | undefined;
+  const button = buttons?.find(candidate => candidate.text === action);
+  if (!button?.onPress) {
+    throw new Error(`alert action "${action}" not found`);
+  }
+  button.onPress();
+}
+
+async function pressLoad(
+  root: TestRenderer.ReactTestInstance,
+  uri: string,
+  action = 'Load once'
+): Promise<void> {
+  await act(async () => {
+    await Promise.resolve();
+    const loadButton = findLoadButtons(root, uri)[0];
+    if (!loadButton) {
+      throw new Error('load button not found');
+    }
+    (loadButton.props.onPress as () => void)();
+    chooseAlertAction(action);
+  });
 }
 
 async function mount(
@@ -105,24 +162,17 @@ describe('MarkdownImage inert-until-load', () => {
 
     const loadButtons = findLoadButtons(renderer.root, 'https://example.com/a.png');
     expect(loadButtons).toHaveLength(1);
-    const loadButton = loadButtons[0];
-    if (!loadButton) {
-      throw new Error('load button not found');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (loadButton.props.onPress as () => void)();
-    });
+    await pressLoad(renderer.root, 'https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
     expect(ofType(renderer.root, 'Image')[0]?.props.recyclingKey).toBe('https://example.com/a.png');
 
     await unmount(renderer);
   });
 
-  it('remembers a confirmed HTTPS URI across remounts', async () => {
-    const first = await mount('https://example.com/a.png');
-    const loadButtons = findLoadButtons(first.root, 'https://example.com/a.png');
-    const loadButton = loadButtons[0];
+  it('asks before loading an untrusted HTTPS image and stays inert until answered', async () => {
+    const uri = 'https://example.com/a.png';
+    const renderer = await mount(uri);
+    const loadButton = findLoadButtons(renderer.root, uri)[0];
     if (!loadButton) {
       throw new Error('load button not found');
     }
@@ -130,6 +180,20 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (loadButton.props.onPress as () => void)();
     });
+    expect(alertMock).toHaveBeenCalledTimes(1);
+    expect(alertMock.mock.calls.at(-1)?.[0]).toBe('Load image from example.com?');
+    expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+
+    await act(() => {
+      chooseAlertAction('Load once');
+    });
+    expect(ofType(renderer.root, 'Image')).toHaveLength(1);
+    await unmount(renderer);
+  });
+
+  it('remembers a confirmed HTTPS URI across remounts', async () => {
+    const first = await mount('https://example.com/a.png');
+    await pressLoad(first.root, 'https://example.com/a.png');
     await unmount(first);
 
     const second = await mount('https://example.com/a.png');
@@ -159,14 +223,7 @@ describe('MarkdownImage inert-until-load', () => {
       throw new Error('renderer was not created');
     }
 
-    const load = findLoadButtons(renderer.root, uri)[0];
-    if (!load) {
-      throw new Error('load button not found');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (load.props.onPress as () => void)();
-    });
+    await pressLoad(renderer.root, uri);
 
     expect(ofType(renderer.root, 'Image')).toHaveLength(2);
     await unmount(renderer);
@@ -254,14 +311,7 @@ describe('MarkdownImage inert-until-load', () => {
     let renderer = await mount(uri, 'shot');
 
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
-    const loadButton = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
-    if (!loadButton) {
-      throw new Error('load button not found');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (loadButton.props.onPress as () => void)();
-    });
+    await pressLoad(renderer.root, uri);
     expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
@@ -346,14 +396,7 @@ describe('MarkdownImage inert-until-load', () => {
     expect(ofType(renderer.root, 'Image')).toHaveLength(0);
 
     // Confirm a.png through the Load chip.
-    const firstLoad = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
-    if (!firstLoad) {
-      throw new Error('load button not found');
-    }
-    await act(async () => {
-      await Promise.resolve();
-      (firstLoad.props.onPress as () => void)();
-    });
+    await pressLoad(renderer.root, 'https://example.com/a.png');
     expect(ofType(renderer.root, 'Image')).toHaveLength(1);
 
     // Recycle the same instance to an unconfirmed URI: a stale `confirmed`
@@ -588,5 +631,57 @@ describe('MarkdownImage inert-until-load', () => {
     expect(load.props.accessibilityLabel).toBe('Load example.com');
 
     await unmount(renderer);
+  });
+});
+
+/**
+ * The trusted-image-host preference, applied through the shared renderer both
+ * the session and PR-review pages mount. Claim coverage:
+ * - Trusting a host records its normalized key so a later image from the same
+ *   host auto-loads with no per-URL prompt.
+ * - Revoking the host removes that key and re-gates its images, so the next
+ *   mount shows the Load chip instead of fetching.
+ * - A trusted host never unlocks a non-HTTPS URI: http:// and data: stay
+ *   blocked and never auto-load.
+ */
+describe('MarkdownImage trusted-host policy', () => {
+  it('auto-loads a later image from a trusted host without another prompt', async () => {
+    const first = await mount('https://example.com/a.png');
+    await pressLoad(first.root, 'https://example.com/a.png', 'Trust this host');
+    expect(ofType(first.root, 'Image')).toHaveLength(1);
+    await unmount(first);
+
+    const second = await mount('https://example.com/b.png');
+    expect(ofType(second.root, 'Image')).toHaveLength(1);
+    expect(findLoadButtons(second.root, 'https://example.com/b.png')).toHaveLength(0);
+    await unmount(second);
+  });
+
+  it('re-gates a trusted host image after the host is revoked', async () => {
+    trustImageHost('example.com');
+    const renderer = await mount('https://example.com/a.png');
+    expect(ofType(renderer.root, 'Image')).toHaveLength(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      revokeImageHost('example.com');
+    });
+
+    expect(ofType(renderer.root, 'Image')).toHaveLength(0);
+    expect(findLoadButtons(renderer.root, 'https://example.com/a.png')).toHaveLength(1);
+    await unmount(renderer);
+  });
+
+  it('never auto-loads http or data URIs from a trusted host', async () => {
+    trustImageHost('insecure.com');
+    const httpRenderer = await mount('http://insecure.com/a.png');
+    expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
+    expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
+    await unmount(httpRenderer);
+
+    const dataRenderer = await mount('data:image/png;base64,abc');
+    expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
+    expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
+    await unmount(dataRenderer);
   });
 });

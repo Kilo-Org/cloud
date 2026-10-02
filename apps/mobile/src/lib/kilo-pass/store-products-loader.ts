@@ -1,3 +1,5 @@
+import { StoreDeadlineError, withStoreDeadline } from '@/lib/iap/store-call-deadline';
+
 import { i18n } from '@/i18n';
 
 import {
@@ -51,7 +53,17 @@ async function probeStoreProductSku(
   productSku: string
 ): Promise<StoreProductProbe> {
   try {
-    return { failure: null, productSku, products: await fetchStoreProducts([productSku]) };
+    // A probe the store never answers would hold the whole pass open, so it
+    // pays the same deadline as every other store call in the flow; the
+    // deadline rejection becomes an unresolved probe like any other failure.
+    return {
+      failure: null,
+      productSku,
+      products: await withStoreDeadline(
+        fetchStoreProducts([productSku]),
+        'the Kilo Pass price probe'
+      ),
+    };
   } catch (error) {
     return { failure: error, productSku, products: [] };
   }
@@ -132,9 +144,18 @@ async function fetchStoreKiloPassProducts(params: {
 }): Promise<readonly StoreKiloPassProduct[]> {
   let combinedProducts: readonly StoreKiloPassProduct[] = [];
   try {
-    combinedProducts = await params.fetchStoreProducts([...params.productSkus]);
+    // A store that never answers is worse than one that fails: the screen would
+    // stay on its placeholders and offer no retry. The same deadline the rest of
+    // the flow uses bounds this call, so a hung SDK reads as unavailable.
+    combinedProducts = await withStoreDeadline(
+      params.fetchStoreProducts([...params.productSkus]),
+      'the Kilo Pass price lookup'
+    );
   } catch (error) {
-    if (params.productSkus.length < 2) {
+    // A deadline means the store is hung, not that it answered badly: probing
+    // the same store per product id would only spend another deadline to learn
+    // the same thing, so the pass fails fast with the authored copy instead.
+    if (params.productSkus.length < 2 || error instanceof StoreDeadlineError) {
       throwStoreUnavailable({
         cause: error,
         kind: 'store-unavailable',

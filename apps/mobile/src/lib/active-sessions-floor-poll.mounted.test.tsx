@@ -145,34 +145,43 @@ describe('useActiveSessionsFloorPoll', () => {
     expect(queryFn).not.toHaveBeenCalled();
   });
 
-  it('polls after 30s while visible and connected, and not before', async () => {
+  it('reconciles once on arm, then polls after 30s while visible and connected', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    await settle();
+    expect(queryFn).toHaveBeenCalledTimes(1);
     await advanceBy(29_000);
-    expect(queryFn).not.toHaveBeenCalled();
+    expect(queryFn).toHaveBeenCalledTimes(1);
     await advanceBy(1000);
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(queryFn).toHaveBeenCalledTimes(2);
   });
 
-  it('polls after 10s while the socket is not connected', async () => {
+  it('reconciles once on arm, then polls every 10s while the socket is not connected', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     await render({ enabled: true, visible: true, connected: false, queryFn });
-    await advanceBy(10_000);
+    await settle();
     expect(queryFn).toHaveBeenCalledTimes(1);
+    await advanceBy(10_000);
+    expect(queryFn).toHaveBeenCalledTimes(2);
   });
 
-  it('re-arms the interval when the connection state flips', async () => {
+  it('re-arms the interval and reconciles when the connection state flips', async () => {
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    await settle();
     await advanceBy(29_000);
-    await render({ enabled: true, visible: true, connected: false, queryFn });
-    await advanceBy(10_000);
     expect(queryFn).toHaveBeenCalledTimes(1);
-    await advanceBy(20_000);
+    await render({ enabled: true, visible: true, connected: false, queryFn });
+    await settle();
+    // The re-arm reconciles immediately and cancels the pending 30s tick.
+    expect(queryFn).toHaveBeenCalledTimes(2);
+    await advanceBy(10_000);
     expect(queryFn).toHaveBeenCalledTimes(3);
+    await advanceBy(20_000);
+    expect(queryFn).toHaveBeenCalledTimes(5);
   });
 
   it('never polls before a payload is in the cache', async () => {
@@ -182,14 +191,38 @@ describe('useActiveSessionsFloorPoll', () => {
     expect(queryFn).not.toHaveBeenCalled();
   });
 
+  it('skips the arm reconcile while a query fetch for the key is already in flight', async () => {
+    // The initial React Query fetch owns the payload when the poll arms, so the
+    // arm must not fire a duplicate request for it.
+    client.setQueryData(QUERY_KEY, payload('a', 'running'));
+    const initial = deferred<CachedActiveSessionsData>();
+    void client
+      .fetchQuery({ queryKey: QUERY_KEY, queryFn: async () => initial.promise })
+      .catch(() => undefined);
+    expect(client.isFetching({ queryKey: QUERY_KEY })).toBeGreaterThan(0);
+
+    const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'idle'));
+    await render({ enabled: true, visible: true, connected: true, queryFn });
+    await settle();
+    expect(queryFn).not.toHaveBeenCalled();
+
+    // Once that fetch has settled, the next arm reconciles immediately again.
+    initial.resolve(payload('a', 'running'));
+    await settle();
+    await render({ enabled: true, visible: true, connected: false, queryFn });
+    await settle();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+  });
+
   it('does not write or notify when the polled payload is unchanged', async () => {
     client.setQueryData(QUERY_KEY, payload('a', 'running'));
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(payload('a', 'running'));
     const setData = vi.spyOn(client, 'setQueryData');
     const { events, unsubscribe } = subscribeToCacheEvents();
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    await settle();
     await advanceBy(30_000);
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(queryFn).toHaveBeenCalledTimes(2);
     expect(setData).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
     unsubscribe();
@@ -200,7 +233,7 @@ describe('useActiveSessionsFloorPoll', () => {
     const changed = payload('a', 'idle');
     const queryFn = vi.fn<QueryFn>().mockResolvedValue(changed);
     await render({ enabled: true, visible: true, connected: true, queryFn });
-    await advanceBy(30_000);
+    await settle();
     expect(client.getQueryData(QUERY_KEY)).toEqual(changed);
   });
 
@@ -219,8 +252,9 @@ describe('useActiveSessionsFloorPoll', () => {
     const setData = vi.spyOn(client, 'setQueryData');
     const { events, unsubscribe } = subscribeToCacheEvents();
     await render({ enabled: true, visible: true, connected: true, queryFn });
+    await settle();
     await advanceBy(30_000);
-    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(queryFn).toHaveBeenCalledTimes(2);
     expect(setData).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
     expect(client.getQueryData(QUERY_KEY)).toEqual(payload('a', 'running'));

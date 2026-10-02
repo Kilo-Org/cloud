@@ -215,7 +215,6 @@
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
     "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
-    "creditBalanceEmpty": "Tsy misy kireditra sisa ao amin'ny kaontinao. Ivelan'ny rindranasa iOS no itantanana ny kireditra ho an'ity kaonty ity.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -2048,6 +2047,7 @@
       "idCopied": "Voadika ny ID an'ny fotoam-piasana",
       "couldNotCopyId": "Tsy voadika ny ID an'ny fotoam-piasana.",
       "untitled": "Fotoam-piasana tsy misy lohateny",
+      "actions": "Hetsika amin'ny fotoam-piasana",
       "sessionDeleted": "Voafafa ny fotoam-piasana",
       "needsInput": "mila valiny",
       "fromPlatform": "avy amin'ny {{platform}}",
@@ -2100,6 +2100,7 @@
       "readOnly": "Azo vakina ihany ity fotoam-piasana ity.",
       "continueInNewSession": "Tohizo ao amin'ny fotoam-piasana vaovao",
       "emptyDescription": "Mandefasa hafatra etsy ambany mba hanombohana.",
+      "emptyTranscriptDescription": "Mbola tsy misy hafatra ity fotoam-piasana ity.",
       "scrollToBottom": "Mikorisa hatrany ambany",
       "emptyTitle": "Mbola tsy misy hafatra",
       "renameAccessibility": "Ovao ny anaran'ny fotoam-piasana: {{title}}",
@@ -2566,6 +2567,8 @@
       "selectModelBeforeSending": "Misafidiana modely alohan'ny handefasana.",
       "preparingPlaceholder": "Manomana ny tontolo fiasana...",
       "finalizingPlaceholder": "Mamita...",
+      "sessionLoadFailed": "Tsy afaka nampiditra ny seho. Andramo indray aloha.",
+      "sendUnavailable": "Tsy misy fandefasana raha tsy efa vonona ny seho.",
       "cannotReceiveFiles": "Tsy afaka mandray rakitra ity fotoam-piasana ity. Esory ny rakitra ampiarahina mba handefasana ny hafatrao.",
       "couldNotAttachFiles": "Tsy nahomby ny fampiarahana ny rakitra. Tsindrio ny bokotra fandefasana hanandramana indray.",
       "discardAttachmentsMessage": "Hofafana ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
@@ -2635,6 +2638,7 @@
       "provider": "Mpamatsy",
       "totalCost": "Vidiny manontolo",
       "usageReflectsLatest": "Mifototra amin'ny valiny farany vitan'ny mpanampy ny fampiasana aseho.",
+      "usageUnavailable": "Tsy misy ny fampiasana ny context",
       "tokenUsage": "Fampiasana sombin-tsoratra",
       "cacheRate": "Tahan'ny fampiasana ny tahiry vonjimaika",
       "modelsCount": "Modely ({{displayCount}})",
@@ -2669,7 +2673,10 @@
     "markdownImage": {
       "load": "Alao",
       "loadWithHost": "Alao avy amin'ny {{host}}",
-      "httpsOnly": "Sary avy amin'ny HTTPS ihany no ekena."
+      "httpsOnly": "Sary avy amin'ny HTTPS ihany no ekena.",
+      "trustTitle": "Alao ny sary avy amin'ny {{host}}?",
+      "trustMessage": "Ny fitokisana an'i {{host}} dia mampiditra ny sariny tsy manontany isaky ny mandeha. Azonao atao ny manafoana izany ao amin'ny Mpampiantrano atokisana.",
+      "loadOnce": "Alao indray mandeha"
     },
     "markdownLink": {
       "invalidLink": "Tsy azo sokafana ity rohy ity.",
@@ -3182,8 +3189,12 @@
     "subtitle": "Mpampiantrano atokisanao ka sokafana tsy mila fanamafisana",
     "emptyTitle": "Tsy misy mpampiantrano atokisana",
     "emptyDescription": "Rehefa atokisanao ny mpampiantrano ny rohy iray, dia sokafana tsy mila fanamafisana intsony ny rohy mankany aminy.",
+    "imagesSectionTitle": "Mpampiantrano sary atokisana",
+    "imagesSectionDescription": "Ny sary avy amin'ireto mpampiantrano ireto dia alaina tsy manontany intsony.",
+    "imagesSectionEmpty": "Tsy misy mpampiantrano sary atokisana",
     "revoke": "Foano ny fitokisana ny {{host}}",
     "revokeMessage": "Hangataka fanamafisana indray ny rohy mankany amin'ity mpampiantrano ity.",
+    "revokeImageMessage": "Hangataka fanamafisana indray ny sary avy amin'ity mpampiantrano ity.",
     "backToPreferences": "Miverena amin'ny safidy"
   },
   "quickChat": {
@@ -3448,5 +3459,17 @@
       "unboundToast": "Repo tsy voafatotra",
       "unbindFailed": "Tsy afaka namaha ny repo"
     }
+  },
+  "credits": {
+    "title": "Hividy kireditra",
+    "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "packLabel": "Ampio kireditra {{amount}}",
+    "priceUnavailable": "Tsy misy ny vidiny",
+    "purchased": "Nampiana tao amin'ny balananao ny kireditra.",
+    "empty": "Tsy misy ny fonosana kireditra amin'izao fotoana izao.",
+    "noMatchingProducts": "Tsy nisy fonosana kireditra mifanaraka naverin'ny App Store.",
+    "noMatchingProductsPlay": "Tsy nisy fonosana kireditra mifanaraka naverin'ny Google Play.",
+    "purchaseOwnedByAnotherAccount": "Ny kireditra amin'ity Apple Account ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy.",
+    "purchaseOwnedByAnotherAccountPlay": "Ny kireditra amin'ity kaonty Google Play ity dia an'ny kaonty Kilo hafa. Midira amin'izany kaonty Kilo izany hampiasana azy."
   }
 }

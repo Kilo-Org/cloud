@@ -18,10 +18,10 @@ import { type TokenScheme } from '@/lib/pr-review/diff/syntax-colors';
 import { useTranscriptTextSelectable } from './bubble-text-selection-context';
 import { renderChunkChildren } from './code-block-chunk-content';
 import {
-  chunkTokenLines,
+  chunkCodeLines,
+  CODE_CHUNK_MOUNT_BATCH,
   CODE_FIRST_PAINT_CHUNKS,
   nextChunkMountCount,
-  tokenizeCodeLines,
 } from './code-block-model';
 import { useMonoScrollSheet } from './mono-scroll-block';
 import {
@@ -181,13 +181,6 @@ function CodeBlockImpl({
   // app scheme; the markdown renderer passes the scheme of its own code card.
   const effectiveTokenScheme = tokenScheme ?? (isDark ? 'onDark' : 'onLight');
   const { displayText, isTruncated } = prepareMonoScrollContent(code, maxLength);
-  const tokenLines = useMemo(
-    () => tokenizeCodeLines(displayText, language),
-    [displayText, language]
-  );
-  // Memoized so the chunk array keeps its identity and the code content below
-  // is not rebuilt (and its spans re-applied) on an unrelated re-render.
-  const tokenChunks = useMemo(() => chunkTokenLines(tokenLines), [tokenLines]);
   // How much of the fence is mounted right now, remembered with the text it was
   // mounted for. The first paint mounts CODE_FIRST_PAINT_CHUNKS chunks — 128
   // lines, about a screen at this leading — so the sheet shows its header and
@@ -212,27 +205,35 @@ function CodeBlockImpl({
     setMountProgress({ text: displayText, chunks: CODE_FIRST_PAINT_CHUNKS });
   }
   const mountedChunkCount = sameFence ? mountProgress.chunks : CODE_FIRST_PAINT_CHUNKS;
+  // Highlight only the lines the mounted front needs. The lazy chunker walks
+  // the source in order and stops once `mountedChunkCount` chunks are complete,
+  // so a 200 KB fence never pays `highlightLine` for the thousands of lines
+  // below the first paint at mount — or again on a remount. `hasMoreChunks`
+  // reports a chunk past the mounted front, which schedules the next batch.
+  // Memoized so the chunk array keeps its identity and the code content below
+  // is not rebuilt (and its spans re-applied) on an unrelated re-render.
+  const { chunks: mountedChunks, hasMore: hasMoreChunks } = useMemo(
+    () => chunkCodeLines(displayText, language, mountedChunkCount),
+    [displayText, language, mountedChunkCount]
+  );
   // Add one batch per commit until the fence is fully mounted. Each batch is
   // CODE_CHUNK_MOUNT_BATCH chunks, so the spans applied in one frame stay
-  // bounded however long the file is.
+  // bounded however long the file is. `hasMoreChunks` proves at least one chunk
+  // follows the mounted front, so one batch is the cap.
   useEffect(() => {
-    if (mountedChunkCount >= tokenChunks.length) {
+    if (!hasMoreChunks) {
       return undefined;
     }
     const timer = setTimeout(() => {
       setMountProgress({
         text: displayText,
-        chunks: nextChunkMountCount(mountedChunkCount, tokenChunks.length),
+        chunks: nextChunkMountCount(mountedChunkCount, mountedChunkCount + CODE_CHUNK_MOUNT_BATCH),
       });
     }, 0);
     return () => {
       clearTimeout(timer);
     };
-  }, [displayText, mountedChunkCount, tokenChunks.length]);
-  const mountedChunks = useMemo(
-    () => tokenChunks.slice(0, Math.min(mountedChunkCount, tokenChunks.length)),
-    [tokenChunks, mountedChunkCount]
-  );
+  }, [displayText, mountedChunkCount, hasMoreChunks]);
   const [heightPin, setHeightPin] = useState<MonoScrollHeightPin | undefined>(undefined);
   // Content-space Y of the revealed copy action; null means hidden. The action
   // is anchored to the tap, not the block top: a long fence is many screens

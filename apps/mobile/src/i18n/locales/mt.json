@@ -215,7 +215,6 @@
     "showBalance": "Uri l-bilanċ",
     "balanceHidden": "Il-bilanċ huwa moħbi",
     "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
-    "creditBalanceEmpty": "M'għad fadal l-ebda kreditu fil-bilanċ tiegħek. Għal dan il-kont, il-krediti jiġu mmaniġġjati barra mill-applikazzjoni tal-iOS.",
     "signOutTitle": "Toħroġ mill-kont?",
     "signOutMessage": "Ikollok terġa' tidħol biex taċċessa l-ispazju tax-xogħol tiegħek.",
     "deleteAccountTitle": "Tħassar il-kont?",
@@ -2123,6 +2122,7 @@
       "idCopied": "L-ID tas-sessjoni ġiet ikkupjata",
       "couldNotCopyId": "Ma setgħetx tiġi kkupjata l-ID tas-sessjoni.",
       "untitled": "Sessjoni bla titlu",
+      "actions": "Azzjonijiet tas-sessjoni",
       "sessionDeleted": "Is-sessjoni tħassret",
       "needsInput": "jistenna tweġiba",
       "fromPlatform": "minn {{platform}}",
@@ -2184,6 +2184,7 @@
       "readOnly": "Din is-sessjoni hija għall-qari biss.",
       "continueInNewSession": "Kompli f'sessjoni ġdida",
       "emptyDescription": "Ibgħat messaġġ hawn taħt biex tibda.",
+      "emptyTranscriptDescription": "Din is-sessjoni għadha m'għandha l-ebda messaġġ.",
       "scrollToBottom": "Skrollja sal-qiegħ",
       "emptyTitle": "L-ebda messaġġ s'issa",
       "renameAccessibility": "Ibdel l-isem tas-sessjoni: {{title}}",
@@ -2677,6 +2678,8 @@
       "selectModelBeforeSending": "Agħżel mudell qabel ma tibgħat.",
       "preparingPlaceholder": "Qed jitħejja l-ambjent...",
       "finalizingPlaceholder": "Qed jitlesta...",
+      "sessionLoadFailed": "Is-sessjoni ma setgħetx tiġi mgħobbija. Erġa' pprova l-ewwel.",
+      "sendUnavailable": "L-ibgħat mhuwiex disponibbli sakemm is-sessjoni tkun lesta.",
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
       "couldNotAttachFiles": "Ma setgħux jiġu mehmuża l-fajls. Tektek Ibgħat biex terġa' tipprova.",
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
@@ -2749,6 +2752,7 @@
       "provider": "Fornitur",
       "totalCost": "Spiża totali",
       "usageReflectsLatest": "L-użu jirrifletti l-aħħar tweġiba tal-assistent li tlestiet.",
+      "usageUnavailable": "Użu tal-kontest mhux disponibbli",
       "tokenUsage": "Użu tal-unitajiet tat-test",
       "cacheRate": "Rata tal-memorja temporanja",
       "modelsCount": "Mudelli ({{displayCount}})",
@@ -2789,7 +2793,10 @@
     "markdownImage": {
       "load": "Għabbi",
       "loadWithHost": "Għabbi {{host}}",
-      "httpsOnly": "Jistgħu jitgħabbew biss immaġnijiet minn HTTPS."
+      "httpsOnly": "Jistgħu jitgħabbew biss immaġnijiet minn HTTPS.",
+      "trustTitle": "Għabbi l-immaġni minn {{host}}?",
+      "trustMessage": "Jekk tafda lil {{host}}, l-immaġnijiet tiegħu jitgħabbew mingħajr ma jistaqsi kull darba. Tista' tirtira dan aktar tard f'Ospitanti fdati.",
+      "loadOnce": "Għabbi darba"
     },
     "markdownLink": {
       "invalidLink": "Din ir-rabta ma tistax tinfetaħ.",
@@ -3311,8 +3318,12 @@
     "subtitle": "Ospitanti li tippermetti li jinfetħu mingħajr konferma",
     "emptyTitle": "L-ebda ospitant fdat",
     "emptyDescription": "Meta tafda lill-ospitant ta' rabta, ir-rabta tinfetaħ mingħajr ma tintalab konferma oħra.",
+    "imagesSectionTitle": "Ospitanti fdati tal-immaġnijiet",
+    "imagesSectionDescription": "L-immaġnijiet minn dawn l-ospitanti jitgħabbew mingħajr ma jerġa' jistaqsi.",
+    "imagesSectionEmpty": "L-ebda ospitant fdat tal-immaġnijiet",
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "revokeMessage": "Linkijiet lejn dan l-ospitant se jerġgħu jitolbu konferma.",
+    "revokeImageMessage": "L-immaġnijiet minn dan l-ospitant se jerġgħu jitolbu konferma.",
     "backToPreferences": "Lura għall-preferenzi"
   },
   "quickChat": {
@@ -3577,5 +3588,17 @@
       "unboundToast": "Repo mhux marbut",
       "unbindFailed": "Ma setgħetx tħoll repo"
     }
+  },
+  "credits": {
+    "title": "Ixtri krediti",
+    "description": "Il-krediti huma xiri ta' darba li jiżdied mal-bilanċ Kilo tiegħek biex imexxi sessjonijiet ta' kodifikazzjoni bl-AI fl-App Kilo. Il-ħanut jaddebita l-kont tiegħek u l-krediti jiżdiedu wara li l-ħanut jikkonferma l-ħlas.",
+    "packLabel": "Żid {{amount}} f'krediti",
+    "priceUnavailable": "Prezz mhux disponibbli",
+    "purchased": "Il-krediti ġew miżjuda mal-bilanċ tiegħek.",
+    "empty": "Il-pakketti tal-krediti mhumiex disponibbli bħalissa.",
+    "noMatchingProducts": "L-App Store ma rritornax pakketti tal-krediti li jaqblu.",
+    "noMatchingProductsPlay": "Google Play ma rritornax pakketti tal-krediti li jaqblu.",
+    "purchaseOwnedByAnotherAccount": "Il-krediti fuq dan l-Apple Account jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom.",
+    "purchaseOwnedByAnotherAccountPlay": "Il-krediti fuq dan il-kont ta' Google Play jappartjenu għal kont ieħor ta' Kilo. Idħol f'dak il-kont ta' Kilo biex tużahom."
   }
 }

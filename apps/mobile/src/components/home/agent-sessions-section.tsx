@@ -5,9 +5,9 @@ import { Platform, type ScrollViewProps, View } from 'react-native';
 
 import { CenteredState } from '@/components/centered-state';
 
+import { LiveNowCard } from '@/components/home/live-now-card';
 import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { useUserWebConnection } from '@/components/agents/user-web-connection-provider';
-import { ActiveAgentsCard } from '@/components/home/active-agents-card';
 import {
   liveSessionContent,
   type LiveSessionContext,
@@ -287,8 +287,8 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
     <View>
       {/* An accepted empty live list renders only the `Nothing running right
           now` card, so the `Live now` / See-all header would advertise the
-          Agents live index for sessions that do not exist. Rows and the
-          loading skeletons keep the header unchanged. */}
+          Agents live index for sessions that do not exist. The summary card and
+          the loading skeleton keep the header unchanged. */}
       {content !== 'empty' && (
         <SectionHeader
           label={t('home.agentSessions')}
@@ -307,20 +307,12 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
           failureLabel={t('home.couldNotLoadActiveSessions')}
         />
         {content === 'pending' && (
-          // The placeholder borrows the real row's geometry: the same card,
-          // the same row padding, and a 3px leading strip glued to the card
-          // edge like `SessionRow`'s `stripMode="edge"` in `AgentBadge`. The
-          // title/eyebrow therefore land on the same x-offset the arriving row
-          // draws, and the leading mark keeps its size, so replacing the
-          // placeholder with the row cannot reflow the LIVE NOW card.
-          <View className="min-h-[72px] overflow-hidden rounded-2xl border border-border bg-card">
-            <View className="relative flex-row items-start gap-3 py-[13px] pl-[18px] pr-3">
-              <Skeleton className="absolute left-0 top-0 bottom-0 w-[3px] rounded-[2px]" />
-              <View className="flex-1 gap-2">
-                <Skeleton className="h-3 w-2/3 rounded" />
-                <Skeleton className="h-3 w-1/3 rounded" />
-              </View>
-            </View>
+          // The placeholder borrows the summary card's geometry: the same
+          // reserved min-height, border, and card padding, so swapping it for
+          // the arriving card cannot reflow the LIVE NOW block.
+          <View className="min-h-[72px] justify-center gap-2 rounded-2xl border border-border bg-card px-4 py-3">
+            <Skeleton className="h-3 w-2/3 rounded" />
+            <Skeleton className="h-3 w-1/3 rounded" />
           </View>
         )}
         {content === 'empty' && (
@@ -330,12 +322,7 @@ export function AgentSessionsSection({ context, sessions }: LiveSessionProps) {
             </Text>
           </View>
         )}
-        {content === 'rows' && (
-          <ActiveAgentsCard
-            sessions={sessions.activeSessions}
-            organizationId={context.organizationId}
-          />
-        )}
+        {content === 'rows' && <LiveNowCard sessions={sessions} />}
       </View>
     </View>
   );

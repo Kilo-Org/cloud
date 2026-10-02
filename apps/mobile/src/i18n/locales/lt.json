@@ -215,7 +215,6 @@
     "showBalance": "Rodyti likutį",
     "balanceHidden": "Likutis paslėptas",
     "bonusCreditsExpiring": "Papildomi kreditai ({{amount}}) galioja iki {{date}}.",
-    "creditBalanceEmpty": "Jūsų kreditų likutis lygus nuliui. Šios paskyros kreditai valdomi ne iOS programėlėje.",
     "signOutTitle": "Atsijungti?",
     "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "deleteAccountTitle": "Ištrinti paskyrą?",
@@ -2098,6 +2097,7 @@
       "idCopied": "Sesijos ID nukopijuotas",
       "couldNotCopyId": "Nepavyko nukopijuoti sesijos ID.",
       "untitled": "Sesija be pavadinimo",
+      "actions": "Sesijos veiksmai",
       "sessionDeleted": "Sesija ištrinta",
       "needsInput": "laukia atsakymo",
       "fromPlatform": "iš {{platform}}",
@@ -2156,6 +2156,7 @@
       "readOnly": "Šią sesiją galima tik skaityti.",
       "continueInNewSession": "Tęsti naujoje sesijoje",
       "emptyDescription": "Norėdami pradėti, išsiųskite žinutę žemiau esančiame lauke.",
+      "emptyTranscriptDescription": "Šioje sesijoje dar nėra žinučių.",
       "scrollToBottom": "Slinkti į apačią",
       "emptyTitle": "Žinučių dar nėra",
       "renameAccessibility": "Pervadinti sesiją: {{title}}",
@@ -2640,6 +2641,8 @@
       "selectModelBeforeSending": "Prieš siųsdami pasirinkite modelį.",
       "preparingPlaceholder": "Rengiama aplinka…",
       "finalizingPlaceholder": "Baigiama…",
+      "sessionLoadFailed": "Sesijos įkelti nepavyko. Pirmiausia bandykite dar kartą.",
+      "sendUnavailable": "Siuntimas negalimas, kol sesija neparengta.",
       "cannotReceiveFiles": "Šioje sesijoje negalima gauti failų. Pašalinkite priedus, kad galėtumėte išsiųsti žinutę.",
       "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siuntimo mygtuką ir bandykite dar kartą.",
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
@@ -2711,6 +2714,7 @@
       "provider": "Teikėjas",
       "totalCost": "Bendra kaina",
       "usageReflectsLatest": "Naudojimo duomenys atitinka paskutinį baigtą asistento atsakymą.",
+      "usageUnavailable": "Konteksto naudojimas neprieinamas",
       "tokenUsage": "Žetonų naudojimas",
       "cacheRate": "Iš talpyklos gauta dalis",
       "modelsCount": "Modeliai ({{displayCount}})",
@@ -2749,7 +2753,10 @@
     "markdownImage": {
       "load": "Įkelti",
       "loadWithHost": "Įkelti iš {{host}}",
-      "httpsOnly": "Paveikslėlius galima įkelti tik per HTTPS."
+      "httpsOnly": "Paveikslėlius galima įkelti tik per HTTPS.",
+      "trustTitle": "Įkelti paveikslėlį iš {{host}}?",
+      "trustMessage": "Jei pasitikėsi svetaine {{host}}, jos paveikslėliai bus įkeliami kaskart neprašant. Vėliau galite tai atšaukti skiltyje Patikimos svetainės.",
+      "loadOnce": "Įkelti vieną kartą"
     },
     "markdownLink": {
       "invalidLink": "Šios nuorodos negalima atidaryti.",
@@ -3268,8 +3275,12 @@
     "subtitle": "Svetainės, kurias leidžiate atidaryti be patvirtinimo",
     "emptyTitle": "Patikimų svetainių nėra",
     "emptyDescription": "Pažymėjus svetainę kaip patikimą, jos nuorodos atidaromos neprašant patvirtinimo.",
+    "imagesSectionTitle": "Patikimos paveikslėlių svetainės",
+    "imagesSectionDescription": "Šių svetainių paveikslėliai įkeliami neprašant dar kartą.",
+    "imagesSectionEmpty": "Patikimų paveikslėlių svetainių nėra",
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "revokeMessage": "Nuorodos į šią svetainę vėl prašys patvirtinimo.",
+    "revokeImageMessage": "Šios svetainės paveikslėliai vėl prašys patvirtinimo.",
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {
@@ -3534,5 +3545,17 @@
       "unboundToast": "Atpirkimas neapribotas",
       "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
     }
+  },
+  "credits": {
+    "title": "Pirkti kreditus",
+    "description": "Kreditai yra vienkartinis pirkinys, pridedamas prie jūsų Kilo balanso AI kodavimo sesijoms Kilo programoje vykdyti. Parduotuvė nuskaito lėšas iš jūsų paskyros, o kreditai pridedami po to, kai parduotuvė patvirtina mokėjimą.",
+    "packLabel": "Pridėti {{amount}} kreditų",
+    "priceUnavailable": "Kaina neprieinama",
+    "purchased": "Kreditai pridėti prie jūsų balanso.",
+    "empty": "Kreditų paketai šiuo metu neprieinami.",
+    "noMatchingProducts": "App Store negrąžino jokių atitinkančių kreditų paketų.",
+    "noMatchingProductsPlay": "Google Play negrąžino jokių atitinkančių kreditų paketų.",
+    "purchaseOwnedByAnotherAccount": "Šios Apple Account paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros.",
+    "purchaseOwnedByAnotherAccountPlay": "Šios Google Play paskyros kreditai priklauso kitai Kilo paskyrai. Norėdami juos naudoti, prisijunkite prie tos Kilo paskyros."
   }
 }

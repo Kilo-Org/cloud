@@ -20,7 +20,7 @@ import {
 import { View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { ConfirmDialog, useConfirmDialog } from '@/components/ui/dialog';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -33,7 +33,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -92,13 +91,9 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // One destructive confirm for both platforms: the in-app dialog carries the
-  // destructive (red) affordance on iOS and Android alike, so the sign-out
-  // path never branches on the platform. The confirmation itself, and its
-  // rationale, live in `useSignOutConfirmation`.
-  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
-    () => void signOut()
-  );
+  // Both destructive confirms on this screen go through the app's dialog: it
+  // carries the destructive (red) affordance on iOS and Android alike, because
+  // Android's native `AlertDialog` paints every button with the theme accent.
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
@@ -132,6 +127,17 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+
+  const requestSignOut = () => {
+    confirm({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        void signOut();
+      },
+    });
+  };
 
   const {
     phase: deletePhase,
@@ -435,19 +441,6 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
-
-      <ConfirmDialog
-        open={confirmVisible}
-        onOpenChange={open => {
-          if (!open) {
-            dismissConfirm();
-          }
-        }}
-        title={t('profile.signOutTitle')}
-        message={t('profile.signOutMessage')}
-        confirmLabel={t('common.signOut')}
-        onConfirm={confirmSignOut}
-      />
 
       {confirmDialog}
 

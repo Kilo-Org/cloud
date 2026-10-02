@@ -151,7 +151,6 @@ export function ProfileSkillsScreen({
       title: t('common.delete'),
       message: skill.name,
       confirmLabel: t('common.delete'),
-      presentation: 'screen',
       onConfirm: () => {
         void runDelete(skill.id);
       },

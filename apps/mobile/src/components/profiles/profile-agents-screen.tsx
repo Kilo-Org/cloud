@@ -161,7 +161,6 @@ export function ProfileAgentsScreen({
       title: t('common.delete'),
       message: target.name,
       confirmLabel: t('common.delete'),
-      presentation: 'screen',
       onConfirm: () => {
         void runDelete(target.id);
       },

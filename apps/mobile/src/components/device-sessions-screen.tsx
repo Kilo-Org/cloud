@@ -121,7 +121,6 @@ export function DeviceSessionsScreen() {
         title: t('deviceSessions.signOutThisDeviceTitle'),
         message: t('profile.signOutMessage'),
         confirmLabel: t('common.signOut'),
-        presentation: 'screen',
         onConfirm: () => {
           void signOut();
         },
@@ -134,7 +133,6 @@ export function DeviceSessionsScreen() {
         device: deviceSessionLabel(session.user_agent),
       }),
       confirmLabel: t('common.signOut'),
-      presentation: 'screen',
       onConfirm: () => {
         revokeSession.mutate({ sessionId: session.id });
       },

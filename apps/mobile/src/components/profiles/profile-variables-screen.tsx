@@ -127,7 +127,6 @@ export function ProfileVariablesScreen({
       title: t('common.delete'),
       message: key,
       confirmLabel: t('common.delete'),
-      presentation: 'screen',
       onConfirm: () => {
         void runDelete(key);
       },

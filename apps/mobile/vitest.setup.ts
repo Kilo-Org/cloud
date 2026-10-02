@@ -51,19 +51,19 @@ vi.mock('react-native-keyboard-controller', () => ({
   },
 }));
 
-// `@rn-primitives/alert-dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs`
-// and `dist/*.js`, and its ESM entry re-exports `./alert-dialog` with no
-// extension. Metro's Babel transform parses both for the app; no Node-side test
-// transformer does, so the real module cannot be imported at all here.
+// `@rn-primitives/dialog@1.5.2` ships untranspiled JSX inside `dist/*.mjs` and
+// `dist/*.js`, and its ESM entry re-exports `./dialog` with no extension.
+// Metro's Babel transform parses both for the app; no Node-side test transformer
+// does, so the real module cannot be imported at all here.
 //
 // This stub keeps the primitive's contract so the app's own dialog stays under
-// test: `Portal` renders only while `Root` is open, `Cancel` and `Action` close
-// the dialog and then run the caller's handler, and both support `asChild`. A
-// test that wants to assert the app's dialog renders `@/components/ui/dialog`,
-// not this module.
+// test: `Portal` renders only while `Root` is open, `Close` closes the dialog
+// and then runs the caller's handler, and both support `asChild`. A test that
+// wants to assert the app's dialog renders `@/components/ui/dialog`, not this
+// module.
 import type { ReactNode } from 'react';
 
-vi.mock('@rn-primitives/alert-dialog', async () => {
+vi.mock('@rn-primitives/dialog', async () => {
   // `vi.mock` factories are hoisted above the file's static imports, so `react`
   // cannot be a static import here — it is not initialised when the factory
   // runs.
@@ -82,7 +82,7 @@ vi.mock('@rn-primitives/alert-dialog', async () => {
   function useRoot(): RootValue {
     const value = React.useContext(RootContext);
     if (value === null) {
-      throw new Error('the alert-dialog stub was rendered outside its Root');
+      throw new Error('the dialog stub was rendered outside its Root');
     }
     return value;
   }
@@ -132,18 +132,17 @@ vi.mock('@rn-primitives/alert-dialog', async () => {
     if (asChild && React.isValidElement<StubProps>(children)) {
       return React.cloneElement(children, { onPress: handlePress });
     }
-    return React.createElement('AlertDialogTrigger', { ...props, onPress: handlePress }, children);
+    return React.createElement('DialogTrigger', { ...props, onPress: handlePress }, children);
   }
 
   return {
-    Action: closing('AlertDialogAction'),
-    Cancel: closing('AlertDialogCancel'),
-    Content: passThrough('AlertDialogContent'),
-    Description: passThrough('AlertDialogDescription'),
-    Overlay: passThrough('AlertDialogOverlay'),
+    Close: closing('DialogClose'),
+    Content: passThrough('DialogContent'),
+    Description: passThrough('DialogDescription'),
+    Overlay: passThrough('DialogOverlay'),
     Portal,
     Root,
-    Title: passThrough('AlertDialogTitle'),
+    Title: passThrough('DialogTitle'),
     Trigger,
     useRootContext: useRoot,
   };

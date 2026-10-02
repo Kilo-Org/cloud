@@ -1,110 +1,66 @@
-import {
-  Action,
-  Cancel,
-  Content,
-  Description,
-  Overlay,
-  Portal,
-  Root,
-  Title,
-} from '@rn-primitives/alert-dialog';
+import { Content, Portal, Root } from '@rn-primitives/dialog';
 import { useCallback, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
-import { Button } from '@/components/ui/button';
-import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 /**
- * The app's confirmation dialog. This file is the only place that imports
- * `@rn-primitives/alert-dialog`; everything else imports from here. See the
- * "Unified Elements" table in `apps/mobile/AGENTS.md`.
+ * The app's dialog surfaces. This file is the only place that imports
+ * `@rn-primitives/dialog`; everything else imports from here. See the "Unified
+ * Elements" table in `apps/mobile/AGENTS.md`.
  *
- * Use this for a confirmation that needs the destructive (red) affordance. A
- * non-destructive system confirm stays `Alert.alert`, because the native alert
- * is the cheapest correct dialog for a plain "are you ok with this".
+ * Both surfaces render inside the app's React tree, so neither can paint above a
+ * presented native sheet: use a route with `useFormSheetScreenOptions()`, or the
+ * sheet surfaces in `@/components/ui/sheet`, when the dialog must stack over
+ * one. A confirm reached from a sheet uses `DestructiveConfirmDialog` directly,
+ * which is a native sheet and does stack.
  */
 
-type ConfirmDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  message: string;
-  confirmLabel: string;
-  /** The safe choice's label; defaults to the generic Cancel. */
-  cancelLabel?: string;
-  /**
-   * A third, non-destructive choice rendered between Cancel and the confirm —
-   * for a confirmation that offers a way out other than "do it" or "don't",
-   * such as discarding unsaved changes also offering Save.
-   */
-  extraAction?: ConfirmDialogExtraAction;
-  /** Confirm and fire the request, then close. */
-  onConfirm: () => void;
-};
-
-type ConfirmDialogExtraAction = {
-  label: string;
-  onPress: () => void;
+type DialogCardProps = {
+  /** Dismiss the card. A backdrop tap and Android Back both route here. */
+  onClose: () => void;
+  /** Where the card sits in the window. Defaults to the centre. */
+  placement?: 'top' | 'centred';
+  children: React.ReactNode;
 };
 
 /**
- * Screen-level confirmation dialog, rendered through `@rn-primitives/portal`.
- * It dims the whole app and follows the theme.
+ * A form in a card, over a dimmed app. Dismissing is the caller's, and the card
+ * hosts arbitrary content: use this for a dialog that is not a confirm — a
+ * rename field, a rating form.
  *
- * It renders inside the app's React view tree, so it can never paint above a
- * presented native sheet or a full-screen `Modal` — the caller sees nothing.
- * That is why `useConfirmDialog` renders this surface only when a request asks
- * for `presentation: 'screen'`, and otherwise uses the RN `Modal` confirm.
+ * `@rn-primitives/dialog` owns Android Back, the accessibility escape and the
+ * accessibility focus. It does not own the backdrop, so this card draws its own
+ * pressable backdrop: a tap outside dismisses, the way the RN `Modal` it
+ * replaced did.
  */
-export function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  message,
-  confirmLabel,
-  cancelLabel,
-  extraAction,
-  onConfirm,
-}: Readonly<ConfirmDialogProps>) {
-  const { t } = useTranslation();
-
+export function DialogCard({
+  onClose,
+  placement = 'centred',
+  children,
+}: Readonly<DialogCardProps>) {
   return (
-    <Root open={open} onOpenChange={onOpenChange}>
+    <Root
+      open
+      onOpenChange={open => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
       <Portal>
-        <Overlay className="absolute inset-0 bg-black/50" />
-        <Content className="absolute inset-0 items-center justify-center px-6">
-          <View
-            accessibilityViewIsModal
-            className="w-full gap-4 rounded-xl border border-border bg-card p-5"
-          >
-            <Title className="text-base font-semibold text-foreground">{title}</Title>
-            <Description className="text-sm text-muted-foreground">{message}</Description>
-            <View className="flex-row justify-end gap-3">
-              <Cancel asChild>
-                <Button variant="outline">
-                  <Text>{cancelLabel ?? t('common.cancel')}</Text>
-                </Button>
-              </Cancel>
-              {extraAction ? (
-                <Pressable
-                  onPress={() => {
-                    extraAction.onPress();
-                  }}
-                  accessibilityRole="button"
-                  className="shrink-0 flex-row items-center justify-center rounded-md active:opacity-70"
-                >
-                  <Text className="text-sm font-semibold text-foreground">{extraAction.label}</Text>
-                </Pressable>
-              ) : null}
-              <Action asChild onPress={onConfirm}>
-                <Button variant="destructive">
-                  <Text>{confirmLabel}</Text>
-                </Button>
-              </Action>
-            </View>
-          </View>
+        <Content
+          accessibilityViewIsModal
+          className={cn(
+            'absolute inset-0 px-6',
+            placement === 'top' ? 'justify-start pt-[25%]' : 'justify-center'
+          )}
+        >
+          <Pressable accessible={false} className="absolute inset-0" onPress={onClose}>
+            <View className="absolute inset-0 bg-black opacity-50" />
+          </Pressable>
+          <View className="gap-4 rounded-xl bg-card p-5">{children}</View>
         </Content>
       </Portal>
     </Root>
@@ -118,18 +74,7 @@ type ConfirmDialogRequest = {
   /** The safe choice's label; defaults to the generic Cancel. */
   cancelLabel?: string;
   /** A third, non-destructive choice rendered between Cancel and the confirm. */
-  extraAction?: ConfirmDialogExtraAction;
-  /**
-   * `'sheet'` (the default) renders the RN `Modal` confirm, which is visible
-   * above a native sheet, a full-screen `Modal` and a portal overlay alike.
-   *
-   * Pass `'screen'` only when the code path is provably a screen that nothing
-   * can be presented over — a tab, or a plain stack screen with no sheet on its
-   * route. The portal dialog then dims the whole app. It renders inside the
-   * app's React tree, so on any other path it would be invisible behind the
-   * presented surface.
-   */
-  presentation?: 'screen' | 'sheet';
+  extraAction?: { label: string; onPress: () => void };
   onConfirm: () => void;
 };
 
@@ -161,43 +106,23 @@ export function useConfirmDialog() {
     setRequest(null);
   }, []);
 
-  let dialog = null;
-  if (request !== null) {
-    dialog =
-      request.presentation === 'screen' ? (
-        <ConfirmDialog
-          open
-          onOpenChange={open => {
-            if (!open) {
-              dismiss();
-            }
-          }}
-          title={request.title}
-          message={request.message}
-          confirmLabel={request.confirmLabel}
-          cancelLabel={request.cancelLabel}
-          extraAction={request.extraAction}
-          onConfirm={() => {
-            request.onConfirm();
-          }}
-        />
-      ) : (
-        <DestructiveConfirmDialog
-          title={request.title}
-          message={request.message}
-          confirmLabel={request.confirmLabel}
-          cancelLabel={request.cancelLabel}
-          extraAction={request.extraAction}
-          onConfirm={() => {
-            setRequest(null);
-            request.onConfirm();
-          }}
-          onCancel={dismiss}
-        />
-      );
-  }
+  const dialog =
+    request === null ? null : (
+      <DestructiveConfirmDialog
+        title={request.title}
+        message={request.message}
+        confirmLabel={request.confirmLabel}
+        cancelLabel={request.cancelLabel}
+        extraAction={request.extraAction}
+        onConfirm={() => {
+          setRequest(null);
+          request.onConfirm();
+        }}
+        onCancel={dismiss}
+      />
+    );
 
   return { confirm, dialog };
 }
 
-export type { ConfirmDialogProps, ConfirmDialogRequest };
+export type { ConfirmDialogRequest, DialogCardProps };

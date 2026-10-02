@@ -191,7 +191,12 @@ describe('one implementation for both platforms on the alert dialog path', () =>
       /confirm\(\{\s*\n\s*title: t\('profile\.deleteAccountTitle'\)/
     );
     expect(profile, 'the sign-out confirmation is the shared in-app dialog').toMatch(
-      /<ConfirmDialog/
+      /confirm\(\{\s*\n\s*title: t\('profile\.signOutTitle'\)/
+    );
+    // Both destructive confirms on the Profile screen go through the app's own
+    // dialog; no path falls back to the native alert.
+    expect(profile, 'no native Alert.alert remains on the profile path').not.toMatch(
+      /Alert\.alert/
     );
     expect(PLATFORM_BRANCH.test(profile), 'profile-screen.tsx carries a per-platform branch').toBe(
       false

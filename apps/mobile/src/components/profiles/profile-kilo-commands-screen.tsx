@@ -114,7 +114,6 @@ export function ProfileKiloCommandsScreen({
       title: t('common.delete'),
       message: source.name,
       confirmLabel: t('common.delete'),
-      presentation: 'screen',
       onConfirm: () => {
         void runDelete(source.id);
       },

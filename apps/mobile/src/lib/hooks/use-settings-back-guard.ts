@@ -127,7 +127,6 @@ export function useSettingsBackGuard({
       },
       // These settings screens are plain stack screens with no sheet or modal
       // on them, so the portal dialog can never hide behind a presented surface.
-      presentation: 'screen',
     });
   });
 

@@ -200,7 +200,6 @@ export function ProfileOverviewScreen({
       title: t('profiles.deleteTitle'),
       message: t('profiles.deleteMessage'),
       confirmLabel: t('common.delete'),
-      presentation: 'screen',
       onConfirm: () => {
         void runDelete(profileName);
       },

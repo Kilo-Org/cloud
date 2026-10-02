@@ -65,7 +65,8 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 |---|---|---|
 | Bottom sheet, imperative / non-route | `Sheet` from `@/components/ui/sheet` | `Modal` from `react-native`, `@gorhom/bottom-sheet`, `react-native-modal`, `react-native-modalize` |
 | Bottom sheet, route | expo-router `formSheet` via `useFormSheetScreenOptions()` | a JS bottom-sheet library |
-| Dialog / confirm that needs the red affordance | `useConfirmDialog()` / `ConfirmDialog` from `@/components/ui/dialog` | a direct `@rn-primitives/alert-dialog` import |
+| Confirm that needs the red affordance | `useConfirmDialog()` from `@/components/ui/dialog` (a native sheet) | `Alert.alert` for a destructive confirm; a direct `@rn-primitives/dialog` import |
+| Dialog form (a field, a form) | `DialogCard` from `@/components/ui/dialog` | a direct `@rn-primitives/dialog` import |
 | System confirm, non-destructive | `Alert.alert` | — |
 | Keyboard avoidance | `react-native-keyboard-controller` | `KeyboardAvoidingView` from `react-native` |
 | Lists | `@shopify/flash-list` | `FlatList`, `VirtualizedList`, `SectionList`, `@legendapp/list` |
@@ -76,12 +77,12 @@ One element per concern. `no-restricted-imports` in `.oxlintrc.json` enforces th
 | Icons | `@/components/ui/icons` | `lucide-react-native` |
 | Markdown | `@/components/markdown/markdown-text` | `react-native-markdown-display` |
 
-A `Modal` opened from sheet content is a sanctioned exception and stays on RN `Modal`: a dialog rendered
-through `@rn-primitives/portal` lives in the app's React tree and cannot paint above a native sheet.
-`RenameModal`, `DestructiveConfirmDialog`, and `FeedbackPromptDialog` keep RN `Modal` for this reason.
-`useConfirmDialog()` therefore renders the RN `Modal` confirm by default, and takes
-`presentation: 'screen'` only for a path that is provably a tab or a plain stack screen with no sheet on
-its route — the portal dialog dims the whole app there.
+No file imports `Modal` from `react-native`, `@expo/ui/community/bottom-sheet` or `@rn-primitives/dialog`
+outside `@/components/ui/sheet` and `@/components/ui/dialog`. A sheet or a confirm must be able to stack
+above another native sheet, and a dialog rendered through `@rn-primitives/portal` lives in the app's React
+tree, so it cannot: `useConfirmDialog` therefore presents a native sheet, not a portal card. A `DialogCard`
+is a portal card and stays behind a presented sheet — never open one from sheet content. When a surface
+needs to stack and a form must host it, make it a `formSheet` route or a `Sheet`.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
 `KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,

@@ -113,8 +113,8 @@
             "message": "Use Sheet from @/components/ui/sheet."
           },
           {
-            "name": "@rn-primitives/alert-dialog",
-            "message": "Use the dialog primitives from @/components/ui/dialog."
+            "name": "@rn-primitives/dialog",
+            "message": "Use the dialog surfaces from @/components/ui/dialog."
           },
           {
             "name": "react-native-keyboard-aware-scroll-view",
@@ -372,22 +372,16 @@
     },
     {
       // Sanctioned homes for a banned import. These are the only files that may
-      // import the unified element's underlying library directly.
-      //   sheet.tsx        — the single home of RN `Modal` and `@expo/ui` BottomSheet
-      //   dialog.tsx       — the single home of `@rn-primitives/alert-dialog`
-      //   image-viewer.tsx — the single home of `react-native-zoom-toolkit`
-      // The three RN `Modal` dialogs below are kept on RN `Modal` on purpose: a
-      // portal dialog cannot paint above a native formSheet or Modal, and all
-      // three are mounted from sheet content. `session-page-sheet.tsx` is the
-      // full-height page sheet those components render inside. See
+      // import a unified element's underlying library directly.
+      //   sheet.tsx  — the single home of `@expo/ui` BottomSheet
+      //   dialog.tsx — the single home of `@rn-primitives/dialog`
+      // Test files mock `react-native` and the native libraries directly, so
+      // they are exempt permanently. No file imports `Modal` from
+      // `react-native` any more, and no exception exists for it: see
       // apps/mobile/AGENTS.md.
-      // Test files mock `react-native` directly and are exempt permanently.
       "files": [
         "src/components/ui/sheet.tsx",
         "src/components/ui/dialog.tsx",
-        "src/components/rename-modal.tsx",
-        "src/components/destructive-confirm-dialog.tsx",
-        "src/components/feedback-prompt-dialog.tsx",
         "**/*.test.ts",
         "**/*.test.tsx"
       ],

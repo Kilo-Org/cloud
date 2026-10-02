@@ -2,7 +2,7 @@ import { createElement, isValidElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { type ConfirmDialogProps } from '@/components/ui/dialog';
+import { type DestructiveConfirmDialogProps } from '@/components/destructive-confirm-dialog';
 
 import { type SettingsBackGuardResult, useSettingsBackGuard } from './use-settings-back-guard';
 
@@ -27,7 +27,7 @@ const usePreventRemoveMock = vi.hoisted(() =>
 // pieces that dialog imports are stubbed: this suite reads the request it hands
 // to `confirm` (and its dismissal callback) without mounting the native dialog.
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('@rn-primitives/alert-dialog', () => ({
+vi.mock('@rn-primitives/dialog', () => ({
   Action: 'AlertDialog.Action',
   Cancel: 'AlertDialog.Cancel',
   Content: 'AlertDialog.Content',
@@ -91,9 +91,9 @@ function triggerPreventRemove(): Action {
 }
 
 /** The confirm the guard is currently showing, or undefined while none is open. */
-function currentDialog(): ConfirmDialogProps | undefined {
+function currentDialog(): DestructiveConfirmDialogProps | undefined {
   const node = latest?.dialog;
-  return isValidElement<ConfirmDialogProps>(node) ? node.props : undefined;
+  return isValidElement<DestructiveConfirmDialogProps>(node) ? node.props : undefined;
 }
 
 async function flushMicrotasks() {
@@ -268,7 +268,7 @@ describe('useSettingsBackGuard', () => {
     // The safe choice is the dialog's cancel side: dismissing it drops the
     // captured leave, so nothing is saved and no navigation is replayed.
     act(() => {
-      dialog?.onOpenChange(false);
+      dialog?.onCancel();
     });
 
     expect(currentDialog()).toBeUndefined();

@@ -297,3 +297,83 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 });
+
+describe('messages refusal detection', () => {
+  const messageStart =
+    'event: message_start\n' +
+    'data: {"type":"message_start","message":{"id":"msg-1","type":"message","role":"assistant","content":[],"model":"claude-opus-5-5","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":10,"output_tokens":0}}}\n\n';
+
+  test.each([
+    [
+      'refusal stop reason',
+      messageStart +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"refusal","stop_sequence":null},"usage":{"output_tokens":3}}\n\n',
+      true,
+    ],
+    [
+      'refusal reported as an error event',
+      'event: error\n' +
+        'data: {"type":"error","error":{"type":"invalid_request_error","message":"Refused","error_type":"refusal"}}\n\n',
+      true,
+    ],
+    [
+      'normal stop reason',
+      messageStart +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":3}}\n\n',
+      false,
+    ],
+  ])('detects a streamed %s as refusal=%s', async (_name, body, expected) => {
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      streamFromText(body),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.refusal).toBe(expected);
+  });
+
+  test.each([
+    [
+      'refusal stop reason',
+      {
+        id: 'msg-1',
+        type: 'message',
+        role: 'assistant',
+        model: 'claude-opus-5-5',
+        content: [],
+        stop_reason: 'refusal',
+        usage: { input_tokens: 10, output_tokens: 0 },
+      },
+      true,
+    ],
+    [
+      'refusal error envelope',
+      {
+        type: 'error',
+        error: { type: 'invalid_request_error', message: 'Refused', error_type: 'refusal' },
+      },
+      true,
+    ],
+    [
+      'normal stop reason',
+      {
+        id: 'msg-1',
+        type: 'message',
+        role: 'assistant',
+        model: 'claude-opus-5-5',
+        content: [{ type: 'text', text: 'Hi' }],
+        stop_reason: 'end_turn',
+        usage: { input_tokens: 10, output_tokens: 1 },
+      },
+      false,
+    ],
+  ])('detects a non-streamed %s as refusal=%s', (_name, body, expected) => {
+    const result = parseMessagesMicrodollarUsageFromString(JSON.stringify(body), 200);
+
+    expect(result.refusal).toBe(expected);
+  });
+});

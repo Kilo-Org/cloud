@@ -44,12 +44,17 @@ export type HasLoginMethods = {
     email_relation: 'primary' | 'different' | 'conflict';
   }[];
 };
+export type HasRefusalCooldown = {
+  /** ISO timestamp when the AI gateway refusal cooldown ends; null when none is active. */
+  refusal_cooldown_expires_at: string | null;
+};
 export type UserDetailProps = UserTableProps &
   HasCreditInfo &
   UserOrganizationMembershipProps &
   HasAutoTopUpConfig &
   HasSSOProtectedDomain &
-  HasLoginMethods;
+  HasLoginMethods &
+  HasRefusalCooldown;
 export type UsersApiResponse = {
   users: UserTableProps[];
   pagination: PaginationMetadata;

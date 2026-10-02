@@ -17,6 +17,7 @@ import {
   usageTransactionIdleTimeoutQuery,
 } from './processUsage';
 import { reportUsageEvent } from '@/lib/bouncer/client';
+import { recordRefusal } from '@/lib/ai-gateway/refusal-cooldown';
 import type { OpenRouterGeneration } from '@/lib/ai-gateway/providers/openrouter/types';
 import { verifyApproval } from '@/tests/helpers/approval.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
@@ -58,6 +59,13 @@ jest.mock('@/lib/bouncer/client', () => ({
 }));
 
 const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
+
+jest.mock('@/lib/ai-gateway/refusal-cooldown', () => ({
+  ...(jest.requireActual('@/lib/ai-gateway/refusal-cooldown') as Record<string, unknown>),
+  recordRefusal: jest.fn(async () => undefined),
+}));
+
+const mockedRecordRefusal = jest.mocked(recordRefusal);
 
 describe('processOpenRouterUsage', () => {
   const coreProps = {
@@ -111,6 +119,180 @@ describe('processOpenRouterUsage', () => {
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
+  });
+});
+
+function streamFromText(text: string): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+}
+
+function sse(...events: object[]): string {
+  return events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('') + 'data: [DONE]\n\n';
+}
+
+function refusedChatCompletion(model: string) {
+  return {
+    id: `gen-refusal-${model}`,
+    object: 'chat.completion',
+    created: 1,
+    model,
+    provider: 'Anthropic',
+    choices: [
+      {
+        index: 0,
+        finish_reason: 'content_filter',
+        native_finish_reason: 'refusal',
+        message: { role: 'assistant', content: null, refusal: 'I cannot help with that.' },
+      },
+    ],
+    usage: {
+      prompt_tokens: 10,
+      completion_tokens: 5,
+      total_tokens: 15,
+      cost: 0.0001,
+      is_byok: false,
+      prompt_tokens_details: { cached_tokens: 0 },
+      completion_tokens_details: { reasoning_tokens: 0 },
+    },
+  };
+}
+
+describe('chat completions refusal detection', () => {
+  test.each([
+    [
+      'refusal delta',
+      sse(
+        { id: 'gen-1', model: 'openai/gpt-5', choices: [{ index: 0, delta: { refusal: 'No.' } }] },
+        { id: 'gen-1', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }
+      ),
+      true,
+    ],
+    [
+      'OpenRouter content_filter finish reason',
+      sse({
+        id: 'gen-1',
+        model: 'anthropic/claude-opus-5.5',
+        choices: [
+          {
+            index: 0,
+            delta: { content: '' },
+            finish_reason: 'content_filter',
+            native_finish_reason: 'refusal',
+          },
+        ],
+      }),
+      true,
+    ],
+    [
+      'refusal reported as an error',
+      sse({
+        id: 'gen-1',
+        model: 'anthropic/claude-opus-5.5',
+        choices: [{ index: 0, delta: { content: '' }, finish_reason: 'error' }],
+        error: { code: 403, message: 'Refused', metadata: { error_type: 'refusal' } },
+      }),
+      true,
+    ],
+    [
+      'normal completion',
+      sse(
+        { id: 'gen-1', model: 'openai/gpt-5', choices: [{ index: 0, delta: { content: 'Hi' } }] },
+        { id: 'gen-1', choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] }
+      ),
+      false,
+    ],
+  ])('detects a streamed %s as refusal=%s', async (_name, body, expected) => {
+    const result = await parseMicrodollarUsageFromStream(
+      streamFromText(body),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.refusal).toBe(expected);
+  });
+
+  test.each([
+    ['refusal message', refusedChatCompletion('anthropic/claude-opus-5.5'), true],
+    [
+      'refusal reported as an error body',
+      { error: { code: 403, message: 'Refused', metadata: { error_type: 'refusal' } } },
+      true,
+    ],
+    [
+      'normal completion',
+      {
+        id: 'gen-2',
+        model: 'openai/gpt-5',
+        choices: [
+          { index: 0, finish_reason: 'stop', message: { role: 'assistant', content: 'Hi' } },
+        ],
+      },
+      false,
+    ],
+  ])('detects a non-streamed %s as refusal=%s', (_name, body, expected) => {
+    const result = parseMicrodollarUsageFromString(JSON.stringify(body), 'fake-user-id', 200);
+
+    expect(result.refusal).toBe(expected);
+  });
+});
+
+describe('countAndStoreUsage refusal cooldown', () => {
+  beforeEach(() => {
+    mockedRecordRefusal.mockClear();
+  });
+
+  async function countRefusal(userId: string, model: string, body: object) {
+    const user = await insertTestUser({ id: userId, google_user_email: `${userId}@example.com` });
+    const usageContext = {
+      api_kind: 'chat_completions',
+      kiloUserId: user.id,
+      prior_microdollar_usage: user.microdollars_used,
+      provider: 'openrouter',
+      fraudHeaders: getFraudDetectionHeaders(new Headers()),
+      isStreaming: false,
+      project_id: null,
+      requested_model: model,
+      promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
+      max_tokens: null,
+      has_middle_out_transform: null,
+      status_code: 200,
+      editor_name: null,
+      machine_id: null,
+      user_byok: false,
+      has_tools: false,
+      feature: null,
+      session_id: null,
+      mode: null,
+      auto_model: null,
+      ttfb_ms: null,
+    } satisfies MicrodollarUsageContext;
+
+    await countAndStoreUsage(
+      new Response(JSON.stringify(body), { status: 200 }),
+      usageContext,
+      undefined
+    );
+  }
+
+  test('records a refusal for a personal Claude request', async () => {
+    const model = 'anthropic/claude-opus-5.5';
+    await countRefusal('refusal-claude-user', model, refusedChatCompletion(model));
+
+    expect(mockedRecordRefusal).toHaveBeenCalledWith('refusal-claude-user');
+  });
+
+  test('does not record a refusal for a model outside the cooldown', async () => {
+    const model = 'google/gemini-3-pro';
+    await countRefusal('refusal-gemini-user', model, refusedChatCompletion(model));
+
+    expect(mockedRecordRefusal).not.toHaveBeenCalled();
   });
 });
 

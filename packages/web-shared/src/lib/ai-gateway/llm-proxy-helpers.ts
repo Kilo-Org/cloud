@@ -116,6 +116,33 @@ export function invalidTokenResponse() {
   );
 }
 
+export const REFUSAL_COOLDOWN_CODE = 'REFUSAL_COOLDOWN';
+
+/**
+ * Response for a personal account whose recent Claude or GPT requests were
+ * refused often enough to start a cooldown.
+ *
+ * The status is 403, not 429: the Kilo CLI retries 429s and honors
+ * Retry-After, which would leave the session waiting silently for the whole
+ * cooldown. For the same reason, the body must not contain phrases its retry
+ * classifier treats as transient, such as "rate limit", "try again later", or
+ * 5xx status numbers.
+ */
+export function refusalCooldownResponse(expiresAt: Date) {
+  const until = `${expiresAt.toISOString().slice(0, 16).replace('T', ' ')} UTC`;
+  return NextResponse.json(
+    {
+      error: {
+        code: REFUSAL_COOLDOWN_CODE,
+        message: `Claude and GPT models are paused for your account until ${until} because the model provider refused several of your recent requests. Other models remain available.`,
+      },
+      error_type: ProxyErrorType.refusal_cooldown,
+      cooldown_expires_at: expiresAt.toISOString(),
+    },
+    { status: 403 }
+  );
+}
+
 export function temporarilyUnavailableResponse() {
   return NextResponse.json(
     {

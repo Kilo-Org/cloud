@@ -298,3 +298,93 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
     await verifyApproval(resultString, approvalFilePath);
   });
 });
+
+describe('responses refusal detection', () => {
+  function streamFromText(text: string): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(text));
+        controller.close();
+      },
+    });
+  }
+
+  const refusalOutput = [
+    {
+      type: 'message',
+      id: 'msg_1',
+      role: 'assistant',
+      status: 'completed',
+      content: [{ type: 'refusal', refusal: 'I cannot help with that.' }],
+    },
+  ];
+  const textOutput = [
+    {
+      type: 'message',
+      id: 'msg_1',
+      role: 'assistant',
+      status: 'completed',
+      content: [{ type: 'output_text', text: 'Hi', annotations: [] }],
+    },
+  ];
+
+  function response(overrides: object) {
+    return { id: 'resp_1', model: 'openai/gpt-5', status: 'completed', output: [], ...overrides };
+  }
+
+  test.each([
+    [
+      'refusal delta event',
+      { type: 'response.refusal.delta', delta: 'I cannot', item_id: 'msg_1' },
+      true,
+    ],
+    [
+      'completed response with a refusal part',
+      { type: 'response.completed', response: response({ output: refusalOutput }) },
+      true,
+    ],
+    [
+      'content-filtered incomplete response',
+      {
+        type: 'response.incomplete',
+        response: response({
+          status: 'incomplete',
+          incomplete_details: { reason: 'content_filter' },
+        }),
+      },
+      true,
+    ],
+    [
+      'failed response with a refusal error type',
+      {
+        type: 'response.failed',
+        response: response({ status: 'failed', error_type: 'refusal' }),
+      },
+      true,
+    ],
+    [
+      'completed text response',
+      { type: 'response.completed', response: response({ output: textOutput }) },
+      false,
+    ],
+  ])('detects a streamed %s as refusal=%s', async (_name, event, expected) => {
+    const result = await parseResponsesMicrodollarUsageFromStream(
+      streamFromText(`data: ${JSON.stringify(event)}\n\n`),
+      'fake-user-id',
+      undefined,
+      'openrouter',
+      200
+    );
+
+    expect(result.refusal).toBe(expected);
+  });
+
+  test.each([
+    ['refusal part', response({ output: refusalOutput }), true],
+    ['text output', response({ output: textOutput }), false],
+  ])('detects a non-streamed %s as refusal=%s', (_name, body, expected) => {
+    const result = parseResponsesMicrodollarUsageFromString(JSON.stringify(body), 200);
+
+    expect(result.refusal).toBe(expected);
+  });
+});

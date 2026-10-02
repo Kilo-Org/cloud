@@ -38,3 +38,20 @@ export function isErrorFinishReason(finish_reason: string | null | undefined): b
   if (finish_reason == null) return false;
   return errorFinishReasonSet.has(finish_reason);
 }
+
+// Anthropic reports a refusal as `refusal`. OpenRouter normalizes it to
+// `content_filter` on chat completions, and the Vercel AI Gateway to
+// `content-filter`.
+const refusalFinishReasonSet: ReadonlySet<string> = new Set([
+  'refusal',
+  'content_filter',
+  'content-filter',
+]);
+
+export function isRefusalFinishReason(finish_reason: string | null | undefined): boolean {
+  if (finish_reason == null) return false;
+  return refusalFinishReasonSet.has(finish_reason);
+}
+
+/** OpenRouter's typed `error_type` for a refusal the provider reported as an error. */
+export const REFUSAL_ERROR_TYPE = 'refusal';

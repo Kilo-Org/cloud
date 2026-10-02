@@ -66,9 +66,15 @@ export type MaybeHasOpenRouterUsage = {
   provider?: string | null;
 };
 
+/** OpenRouter keeps the provider's raw finish reason next to its normalized one. */
+export type MaybeHasNativeFinishReason = {
+  choices?: { native_finish_reason?: string | null }[];
+};
+
 export type ChatCompletionChunk = OpenAI.Chat.Completions.ChatCompletionChunk &
   MaybeHasOpenRouterUsage &
-  MaybeHasVercelProviderMetaDataChunk;
+  MaybeHasVercelProviderMetaDataChunk &
+  MaybeHasNativeFinishReason;
 
 export interface Message {
   role: string;
@@ -108,6 +114,12 @@ export type JustTheCostsUsageStats = {
 };
 
 export type MicrodollarUsageStats = NotYetCostedUsageStats & JustTheCostsUsageStats;
+
+/** Usage parsed from an upstream response, plus signals that are not billed or stored. */
+export type ParsedMicrodollarUsageStats = MicrodollarUsageStats & {
+  /** The model or its provider declined to answer. */
+  refusal: boolean;
+};
 
 export type PromptInfo = {
   system_prompt_prefix: string;

@@ -17,5 +17,6 @@
   "cacheHitTokens": 0,
   "cacheWriteTokens": 0,
   "cost_mUsd": 402,
-  "is_byok": true
+  "is_byok": true,
+  "refusal": false
 }

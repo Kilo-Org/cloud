@@ -34,6 +34,12 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
+export const refusalCountRedisKey = (kiloUserId: string) =>
+  redisKey(`ai-gateway:refusal-count:v1:${kiloUserId}`);
+
+export const refusalCooldownRedisKey = (kiloUserId: string) =>
+  redisKey(`ai-gateway:refusal-cooldown:v1:${kiloUserId}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
 

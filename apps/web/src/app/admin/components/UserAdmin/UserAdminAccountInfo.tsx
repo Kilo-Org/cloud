@@ -13,7 +13,7 @@ import PersonalAccountDisabledToggle from './PersonalAccountDisabledToggle';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
-import { AlertTriangle, Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
+import { AlertTriangle, Clock, Info, SquareArrowOutUpRight, Webhook } from 'lucide-react';
 import { createHash } from 'crypto';
 import { getProviderById } from '@/lib/auth/provider-metadata';
 import { Badge } from '@/components/ui/badge';
@@ -60,6 +60,9 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
 
           <div className="flex flex-wrap items-center gap-2">
             <UserStatusBadge is_detail={true} user={user} />
+            {user.refusal_cooldown_expires_at ? (
+              <RefusalCooldownBadge expiresAt={user.refusal_cooldown_expires_at} />
+            ) : null}
             <PaymentMethodStatusBadge paymentMethodStatus={user.paymentMethodStatus} />
             <SignOutBrowserSessionsButton userId={user.id} />
             <ResetAPIKeyButton userId={user.id} />
@@ -171,6 +174,24 @@ export function UserAdminAccountInfo(user: UserAdminAccountInfoProps) {
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function RefusalCooldownBadge({ expiresAt }: { expiresAt: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Badge variant="destructive" tabIndex={0}>
+          <Clock />
+          Refusal cooldown until {formatDate(expiresAt)}
+        </Badge>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        Too many recent Claude or GPT requests from this user were refused by the model provider.
+        Their personal Claude and GPT requests are blocked until the cooldown ends. Organization
+        requests and other models are not affected.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -29,7 +29,7 @@ import {
   useProvidersAndModelsAllowListsState,
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
-import { preferredModels } from '@/lib/ai-gateway/models';
+import { usePreferredModels } from '@/components/shared/usePreferredModels';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
@@ -117,6 +117,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     openRouterProviders,
   });
 
+  const preferredModels = usePreferredModels();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -124,7 +125,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       index.set(modelId, i);
     }
     return index;
-  }, []);
+  }, [preferredModels]);
 
   const providerIndex = selectors.modelProvidersIndex;
 

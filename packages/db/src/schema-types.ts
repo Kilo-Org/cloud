@@ -2264,7 +2264,13 @@ export const CustomLlmDefinitionSchema = z.object({
 export type CustomLlmDefinition = z.infer<typeof CustomLlmDefinitionSchema>;
 
 export const AutoFreeModelSchema = z.object({
-  model: z.string().trim().min(1),
+  model: z
+    .string()
+    .trim()
+    .regex(
+      /^[a-z0-9./:~-]+$/,
+      'Model IDs may only contain lowercase letters, digits, and . / : ~ -'
+    ),
   weight: z.number().int().positive(),
   reasoning: z.object({
     enabled: z.boolean().optional(),

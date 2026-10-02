@@ -21,6 +21,7 @@ import {
   type ModelOption,
   type ModelOptionGroup,
 } from './model-combobox-options';
+import { usePreferredModels } from './usePreferredModels';
 
 export type { ModelOption };
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -100,7 +101,11 @@ export function ModelCombobox({
     listRef.current?.scrollTo({ top: 0 });
   }, []);
 
-  const modelGroups = useMemo(() => buildModelOptionGroups(models), [models]);
+  const preferredModels = usePreferredModels();
+  const modelGroups = useMemo(
+    () => buildModelOptionGroups(models, preferredModels),
+    [models, preferredModels]
+  );
 
   const selectedModel = [pinnedModel, ...models].find(model => model?.id === value);
   const isCompact = variant === 'compact';

@@ -3586,6 +3586,32 @@ describe('SessionDetailContent fixed indicator row', () => {
   });
 });
 
+describe('session detail read-only composer', () => {
+  // A read-only session keeps the composer on screen but disabled, with the
+  // reason stated above it, so the reader has an input slot instead of a
+  // transcript with nowhere to write. The continue affordance names the
+  // destination it opens rather than a bare "Continue" that reads as an
+  // in-place action.
+  it('keeps the composer mounted and disabled with the destination-named continue control', async () => {
+    // The default fixture resolves `read-only` (cloud_agent_session_id NULL and
+    // no live CLI presence) and this mount carries messages.
+    const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
+    const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
+    expect(composer.props.disabled).toBe(true);
+    expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
+      i18n.t('agentChat.session.readOnly')
+    );
+    const continueControl = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') &&
+        node.props.accessibilityLabel === i18n.t('agentChat.session.continueInNewSession')
+    );
+    expect(renderedText(continueControl)).toContain(
+      i18n.t('agentChat.session.continueInNewSession')
+    );
+  });
+});
+
 describe('session detail composer placeholder (explorer session-detail)', () => {
   // The explorer's `session-detail.png` shows the composer field rendering the
   // literal developer string 'undefined'. Every placeholder the detail screen

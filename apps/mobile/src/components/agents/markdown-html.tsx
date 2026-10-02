@@ -7,7 +7,6 @@ import {
   Text,
   useWindowDimensions,
 } from 'react-native';
-import { MarkedLexer } from 'react-native-marked';
 import RenderHTML, {
   type CustomBlockRenderer,
   type CustomMixedRenderer,
@@ -24,12 +23,12 @@ import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
-import { createMarkdownResultCache, getLexedMarkdown } from './markdown-parse-cache';
 import {
   getMarkdownHeadingStyles,
   getMarkdownHtmlTagStyles,
   type MarkdownPalette,
 } from './markdown-palette';
+import { lexMarkdown } from './markdown-parse-cache';
 import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
@@ -57,7 +56,7 @@ const HTML_DOM_VISITORS: DomVisitorCallbacks = {
   },
 };
 
-type MarkdownHtmlSegment = {
+export type MarkdownHtmlSegment = {
   type: 'html' | 'markdown';
   raw: string;
 };
@@ -199,15 +198,8 @@ function tokenSegment(token: Token): MarkdownHtmlSegment {
   return { type: 'markdown', raw: token.raw };
 }
 
-const cachedMarkdownHtmlSegments = createMarkdownResultCache<MarkdownHtmlSegment[]>();
-const cachedMarkdownHtmlSplit = createMarkdownResultCache<MarkdownHtmlSplit>();
-
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
-  return cachedMarkdownHtmlSegments(value, () => splitMarkdownHtmlSegments(value));
-}
-
-function splitMarkdownHtmlSegments(value: string): MarkdownHtmlSegment[] {
-  const tokens = getLexedMarkdown(value);
+  const tokens = lexMarkdown(value);
   const segments: MarkdownHtmlSegment[] = [];
   for (const token of tokens) {
     pushSegment(segments, tokenSegment(token));
@@ -233,7 +225,7 @@ type MarkdownHtmlAppend = {
 };
 
 /** A segmentation of a value together with the snapshot the next call reuses. */
-type MarkdownHtmlSplit = {
+export type MarkdownHtmlSplit = {
   segments: MarkdownHtmlSegment[];
   snapshot: MarkdownHtmlSnapshot;
 };
@@ -406,8 +398,7 @@ export function splitMarkdownHtmlIncremental(
   ) {
     const headSegments = [...previous.headSegments];
     const suffix = value.slice(previous.tailStart);
-    // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
-    const tokens = MarkedLexer(suffix, { gfm: true });
+    const tokens = lexMarkdown(suffix);
     // A definition in the appended suffix can duplicate one already in the
     // head: the suffix lex emits it, the whole-value lex drops it, so the two
     // no longer agree. Fall through and re-lex the whole value in that case.
@@ -434,17 +425,7 @@ export function splitMarkdownHtmlIncremental(
 
   // No reusable prefix: lex the whole value once and keep every token before
   // the boundary as the head, so the next publish starts from a token boundary.
-  // A mount with no previous snapshot is value-pure, so its whole result is
-  // cached; a stream that fell through here still shares the lexed tokens but
-  // keeps building its own snapshot.
-  if (previous === undefined) {
-    return cachedMarkdownHtmlSplit(value, () => splitMarkdownHtmlWholeValue(value));
-  }
-  return splitMarkdownHtmlWholeValue(value);
-}
-
-function splitMarkdownHtmlWholeValue(value: string): MarkdownHtmlSplit {
-  const tokens = getLexedMarkdown(value);
+  const tokens = lexMarkdown(value);
   const headSegments: MarkdownHtmlSegment[] = [];
   const { segments, tailStart } = appendTokens(tokens, headSegments, 0);
   return {

@@ -21,7 +21,7 @@ import {
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
-import { clearMarkdownParseCache } from './markdown-parse-cache';
+import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
 import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownText } from './markdown-text';
 
@@ -43,6 +43,7 @@ const rnStub = vi.hoisted(() => ({
   useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 320, height: 640, scale: 2, fontScale: 1 }),
 }));
+const rendererSetHandlers = vi.hoisted(() => vi.fn());
 type CjsLoad = (request: string, parent: NodeJS.Module | null, isMain: boolean) => unknown;
 const ModuleWithLoad = Module as unknown as { _load: CjsLoad };
 const originalLoad = ModuleWithLoad._load.bind(ModuleWithLoad);
@@ -57,17 +58,6 @@ vi.mock('react-native-marked', async () => {
     useMarkdown: vi.fn((value: string) => [
       React.createElement('MarkdownOutput', { key: 'output', value }),
     ]),
-  };
-});
-// MarkdownSegment parses cached tokens through useMarkdownElements, which
-// deep-imports react-native-marked's real Parser. This suite stubs the element
-// renderer and react-native, so route the hook through the same mocked
-// `useMarkdown` the routing assertions already observe.
-vi.mock('./markdown-elements', async () => {
-  const marked = await import('react-native-marked');
-  return {
-    useMarkdownElements: (value: string, options?: Parameters<typeof marked.useMarkdown>[1]) =>
-      marked.useMarkdown(value, options),
   };
 });
 vi.mock('react-native-render-html', () => ({ default: 'RenderHTML' }));
@@ -89,7 +79,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => {
   return { useThemeColors: () => colors };
 });
 vi.mock('./markdown-renderer', () => ({
-  MarkdownRenderer: vi.fn(),
+  // A constructor mock: `new MarkdownRenderer(...)` returns the object, so the
+  // suite keeps asserting construction counts while the render cache can call
+  // the renderer's `setHandlers` to re-bind reused elements.
+  MarkdownRenderer: vi.fn(function MockMarkdownRenderer() {
+    return { setHandlers: rendererSetHandlers };
+  }),
 }));
 vi.mock('./markdown-table', () => ({ MarkdownTable: 'MarkdownTable' }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
@@ -118,7 +113,6 @@ const RenderHTMLType = 'RenderHTML' as unknown as ComponentType;
 const AnchorType = 'Anchor' as unknown as ComponentType;
 const MarkdownImageType = 'MarkdownImage' as unknown as ComponentType;
 const MarkdownTableType = 'MarkdownTable' as unknown as ComponentType;
-const MarkdownOutputType = 'MarkdownOutput' as unknown as ComponentType;
 const TextType = 'Text' as unknown as ComponentType;
 const ViewType = 'View' as unknown as ComponentType;
 
@@ -169,10 +163,7 @@ function requiredRenderer(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // The markdown paths share a module-level, value-keyed lex/result cache; a
-  // value cached by an earlier test would make the exact lex-count assertions
-  // read one too few. Start every case from an empty cache.
-  clearMarkdownParseCache();
+  clearMarkdownParseCachesForTests();
 });
 
 describe('MarkdownText HTML routing', () => {
@@ -225,19 +216,42 @@ describe('MarkdownText HTML routing', () => {
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
   });
 
-  it('lexes a completed markdown value once across a remount', async () => {
-    // Regression: every mount lexed the whole value again (react-native-marked
-    // runs `marked.lexer` inside a per-instance memo, and the split snapshots
-    // were per instance), so a transcript row re-entering the list window
-    // re-parsed its message from scratch. The shared, value-keyed lex cache
-    // makes a remount of an unchanged value reuse the tokens.
-    const value = 'Hello **world**\n\n```html\n<div>code only</div>\n```';
-    const first = await mount(<MarkdownText value={value} />);
-    const second = await mount(<MarkdownText value={value} />);
+  it('does not share cached render elements across message scopes', async () => {
+    // Regression: the element cache was keyed by value and render props alone,
+    // so two messages carrying identical markdown shared elements whose
+    // `onLongPressCode` closed over the first message. The render scope keeps
+    // the two apart while still letting a remount of the same message reuse.
+    const value = 'Scoped fence\n\n```ts\nconst scoped = 1;\n```';
+    const handler = vi.fn<() => void>();
 
-    expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
-    expect(first.root.findAllByType(MarkdownOutputType)).toHaveLength(1);
-    expect(second.root.findAllByType(MarkdownOutputType)).toHaveLength(1);
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={handler} />);
+    const afterFirst = vi.mocked(useMarkdown).mock.calls.length;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={handler} />);
+    expect(vi.mocked(useMarkdown).mock.calls.length).toBe(afterFirst);
+
+    await mount(<MarkdownText value={value} renderScope="message-b" onLongPressCode={handler} />);
+    expect(vi.mocked(useMarkdown).mock.calls.length).toBe(afterFirst + 1);
+  });
+
+  it('re-binds a reused render to the remount current long-press handler', async () => {
+    // Regression: a cache-hit remount reused elements whose renderer captured
+    // the previous message-bound long-press, so a fence press opened actions
+    // computed from the stale message even though the value was unchanged. The
+    // reused render must be pointed at the remount's current handler.
+    const value = 'Scoped fence\n\n```ts\nconst scoped = 1;\n```';
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={first} />);
+    rendererSetHandlers.mockClear();
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={second} />);
+
+    expect(rendererSetHandlers).toHaveBeenCalledWith(
+      expect.objectContaining({ onLongPressCode: second })
+    );
   });
 
   it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {

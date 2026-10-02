@@ -100,13 +100,6 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Modal: 'Modal',
   Pressable: 'Pressable',
-  // useMarkdownElements deep-imports react-native-marked's real getStyles,
-  // which builds its styles with StyleSheet.create/flatten.
-  StyleSheet: {
-    create: (styles: Record<string, unknown>) => styles,
-    flatten: (style: unknown) => style,
-    hairlineWidth: 1,
-  },
   Text: 'Text',
   View: 'View',
   useColorScheme: () => 'light',
@@ -1091,7 +1084,10 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
 
     const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.props.onCopyCode).toBe(onCopyCode);
+    const copyCode = blocks[0]?.props.onCopyCode as ((code: string) => void) | undefined;
+    expect(copyCode).toBeTypeOf('function');
+    copyCode?.('const x = 1;');
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
 
     await act(async () => {
       await Promise.resolve();
@@ -1149,7 +1145,10 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
 
     const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.props.onLongPressCode).toBe(onLongPressCode);
+    const longPressCode = blocks[0]?.props.onLongPressCode as (() => void) | undefined;
+    expect(longPressCode).toBeTypeOf('function');
+    longPressCode?.();
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await Promise.resolve();

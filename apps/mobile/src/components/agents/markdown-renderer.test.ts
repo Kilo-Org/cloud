@@ -575,7 +575,10 @@ describe('MarkdownRenderer code override', () => {
     const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
       Record<string, unknown>
     >;
-    expect((inner(element).props as { onCopyCode?: unknown }).onCopyCode).toBe(onCopyCode);
+    const handler = (inner(element).props as { onCopyCode?: (code: string) => void }).onCopyCode;
+    expect(handler).toBeTypeOf('function');
+    handler?.('const x = 1;');
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
 
     const plain = new RendererClass(palette, true, {});
     const plainElement = plain.code(
@@ -594,9 +597,10 @@ describe('MarkdownRenderer code override', () => {
     const element = copyable.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
       Record<string, unknown>
     >;
-    expect((inner(element).props as { onLongPressCode?: unknown }).onLongPressCode).toBe(
-      onLongPressCode
-    );
+    const handler = (inner(element).props as { onLongPressCode?: () => void }).onLongPressCode;
+    expect(handler).toBeTypeOf('function');
+    handler?.();
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
 
     const plain = new RendererClass(palette, true, {});
     const plainElement = plain.code(
@@ -608,6 +612,27 @@ describe('MarkdownRenderer code override', () => {
     expect(
       (inner(plainElement).props as { onLongPressCode?: unknown }).onLongPressCode
     ).toBeUndefined();
+  });
+
+  it('dispatches a cached code element through the handler bound after setHandlers', async () => {
+    // The render cache reuses elements across a remount while the host may have
+    // recomputed its message-bound closures (a reaction or delivery failure).
+    // The element's long-press must reach the current handler, not the one the
+    // renderer captured when it built the element.
+    const { MarkdownRenderer: RendererClass } = await import('./markdown-renderer');
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+    const renderer = new RendererClass(palette, true, { onLongPressCode: first });
+    const element = renderer.code('const x = 1;', 'ts', containerStyle, undefined) as ReactElement<
+      Record<string, unknown>
+    >;
+    const longPress = (inner(element).props as { onLongPressCode?: () => void }).onLongPressCode;
+
+    renderer.setHandlers({ onLongPressCode: second });
+    longPress?.();
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalledTimes(1);
   });
 });
 

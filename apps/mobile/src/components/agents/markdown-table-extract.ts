@@ -1,6 +1,6 @@
 import { type Tokens } from 'react-native-marked';
 
-import { createMarkdownResultCache, getLexedMarkdown } from './markdown-parse-cache';
+import { lexMarkdown } from './markdown-parse-cache';
 
 /** One extracted GFM table, rendered behind the table chip. */
 type MarkdownTableExtract = {
@@ -25,26 +25,11 @@ type MarkdownSnapshot = {
   segments: readonly MarkdownSplitSegment[];
 };
 
-const cachedMarkdownTableSegments = createMarkdownResultCache<MarkdownSplitSegment[]>();
-
 export function splitMarkdownTables(
   value: string,
   previous?: MarkdownSnapshot
 ): MarkdownSplitSegment[] {
-  // A fresh value's table keys are pure (`md-table-N` in source order), so its
-  // segmentation is safe to share across mounts. A split against a previous
-  // snapshot adopts that snapshot's keys and must not be cached.
-  if (previous === undefined) {
-    return cachedMarkdownTableSegments(value, () => splitMarkdownTablesValue(value));
-  }
-  return splitMarkdownTablesValue(value, previous);
-}
-
-function splitMarkdownTablesValue(
-  value: string,
-  previous?: MarkdownSnapshot
-): MarkdownSplitSegment[] {
-  const tokens = getLexedMarkdown(value);
+  const tokens = lexMarkdown(value);
   const segments: MarkdownSplitSegment[] = [];
   const previousTables = previous?.segments.filter(segment => segment.type === 'table') ?? [];
   let markdown = '';

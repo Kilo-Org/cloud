@@ -64,15 +64,22 @@ export const CODE_CHUNK_TOKENS = 512;
  * one commit held the UI thread for seconds while the sheet showed nothing but
  * its backdrop. The first render mounts this many chunks — 128 lines, about a
  * screen at the mono leading — so the sheet paints its header and the front of
- * the code at once, and each later commit adds `CODE_CHUNK_MOUNT_BATCH` more
- * chunks until the fence is fully consumed (see `code-block.tsx`). A fence
- * whose text only grows keeps its mounts; only a replaced fence starts over
- * from this first paint.
+ * the code at once, and `nextChunkMountCount` adds the rest in bounded batches
+ * (see `code-block.tsx`). A fence whose text only grows keeps its mounts;
+ * only a replaced fence starts over from this first paint.
  */
 export const CODE_FIRST_PAINT_CHUNKS = 4;
 
 /** Chunks added per bounded batch after the first paint. */
 export const CODE_CHUNK_MOUNT_BATCH = 4;
+
+/**
+ * The mount count after one more bounded batch: `mounted + CODE_CHUNK_MOUNT_BATCH`,
+ * never past the fence's own chunk count.
+ */
+export function nextChunkMountCount(mounted: number, totalChunks: number): number {
+  return Math.min(mounted + CODE_CHUNK_MOUNT_BATCH, totalChunks);
+}
 
 /** Tagged runs in one line or segment: the runs that cost an Android span. */
 function taggedRunCount(tokens: readonly HighlightToken[]): number {
@@ -115,13 +122,90 @@ function splitLineTokens(line: readonly HighlightToken[]): HighlightToken[][] {
 }
 
 /**
- * The result of chunking highlighted lines: the chunks, and whether the input
- * was consumed within `maxChunks`.
+ * One page of lazily chunked fence: the chunks computed so far and whether the
+ * fence has at least one more chunk past them.
  */
-type ChunkSourceLinesResult = {
+export type CodeChunkPage = {
   chunks: HighlightToken[][][];
-  consumed: boolean;
+  hasMore: boolean;
 };
+
+/**
+ * An in-progress walk of a fence's source lines into render chunks.
+ *
+ * The walk is stepped rather than run to completion: a caller that mounts one
+ * bounded batch at a time resumes where its previous batch stopped instead of
+ * re-walking — and re-highlighting — the lines before it. `pullLine` returns
+ * the next already-highlighted line, or `undefined` at the end. A run-dense
+ * line is split at token boundaries, so the walk keeps the segments it has not
+ * placed yet in `pendingSegments`.
+ */
+type ChunkWalk = {
+  pullLine: () => HighlightToken[] | undefined;
+  pendingSegments: HighlightToken[][];
+  pendingIndex: number;
+  chunks: HighlightToken[][][];
+  chunk: HighlightToken[][];
+  tagged: number;
+  done: boolean;
+};
+
+function createChunkWalk(pullLine: () => HighlightToken[] | undefined): ChunkWalk {
+  return {
+    pullLine,
+    pendingSegments: [],
+    pendingIndex: 0,
+    chunks: [],
+    chunk: [],
+    tagged: 0,
+    done: false,
+  };
+}
+
+/**
+ * Advance `walk` until it holds `maxChunks` complete chunks or the source is
+ * exhausted, keeping the partial chunk and any unplaced segment of a split line
+ * in the walk. The line and run caps and the dense-line split match the
+ * whole-file walk, so the chunk boundaries are unchanged; only the point at
+ * which the walk stops moves.
+ */
+function advanceChunkWalk(walk: ChunkWalk, maxChunks: number): void {
+  while (!walk.done && walk.chunks.length < maxChunks) {
+    let segment: HighlightToken[] = [];
+    if (walk.pendingIndex < walk.pendingSegments.length) {
+      segment = walk.pendingSegments[walk.pendingIndex] ?? [];
+      walk.pendingIndex += 1;
+    } else {
+      const line = walk.pullLine();
+      if (line === undefined) {
+        if (walk.chunk.length > 0) {
+          walk.chunks.push(walk.chunk);
+          walk.chunk = [];
+          walk.tagged = 0;
+        }
+        walk.done = true;
+        break;
+      }
+      const segments = splitLineTokens(line);
+      walk.pendingSegments = segments;
+      walk.pendingIndex = 1;
+      segment = segments[0] ?? [];
+    }
+    const runs = taggedRunCount(segment);
+    if (walk.chunk.length > 0 && walk.tagged + runs > CODE_CHUNK_TOKENS) {
+      walk.chunks.push(walk.chunk);
+      walk.chunk = [];
+      walk.tagged = 0;
+    }
+    walk.chunk.push(segment);
+    walk.tagged += runs;
+    if (walk.chunk.length >= CODE_CHUNK_LINES) {
+      walk.chunks.push(walk.chunk);
+      walk.chunk = [];
+      walk.tagged = 0;
+    }
+  }
+}
 
 /**
  * Group highlighted lines into render chunks of at most `CODE_CHUNK_LINES`
@@ -129,52 +213,116 @@ type ChunkSourceLinesResult = {
  * is split at token boundaries first, and each segment then counts as a line
  * of the chunk it lands in, so one `Text` never holds the whole run set of a
  * single-line fence. The last chunk holds the remainder.
- *
- * The lines are consumed on demand, so a caller that highlights each line as
- * it arrives only pays for the lines a chunk actually needs. Chunking stops as
- * soon as `maxChunks` chunks are complete; `consumed` is false when the input
- * has more lines beyond that point, and true when it ran out first. Stopping
- * only ever happens at a chunk boundary, so the last chunk of a stopped run is
- * complete. `chunkTokenLines` passes every line and no cap, so it always
- * consumes its input.
  */
-function groupChunks(
-  lines: Iterable<readonly HighlightToken[]>,
-  maxChunks: number
-): ChunkSourceLinesResult {
-  const chunks: HighlightToken[][][] = [];
-  let chunk: HighlightToken[][] = [];
-  let tagged = 0;
-  for (const line of lines) {
-    for (const segment of splitLineTokens(line)) {
-      const runs = taggedRunCount(segment);
-      if (
-        chunk.length > 0 &&
-        (chunk.length >= CODE_CHUNK_LINES || tagged + runs > CODE_CHUNK_TOKENS)
-      ) {
-        chunks.push(chunk);
-        chunk = [];
-        tagged = 0;
-        if (chunks.length >= maxChunks) {
-          return { chunks, consumed: false };
-        }
-      }
-      chunk.push(segment);
-      tagged += runs;
+export function chunkTokenLines(lines: readonly HighlightToken[][]): HighlightToken[][][] {
+  let index = 0;
+  const walk = createChunkWalk(() => {
+    const line = lines[index];
+    index += 1;
+    return line;
+  });
+  advanceChunkWalk(walk, Number.POSITIVE_INFINITY);
+  return walk.chunks;
+}
+
+// Bound the resumable fence walks by total source characters, the same budget
+// the markdown parse caches use. One entry per fence value is what lets a mount
+// batch continue the previous walk instead of re-highlighting its prefix.
+const CODE_FENCE_WALK_CACHE_CHARACTERS = 2_000_000;
+const fenceWalkCache = new Map<string, { walk: ChunkWalk; weight: number }>();
+let fenceWalkCacheWeight = 0;
+
+function evictFenceWalks(): void {
+  // Keep the newest entry even when it alone outweighs the budget. The key is
+  // the fence's whole source, so at 10x the audit's 200 KB fence the key is
+  // over 2,000,000 characters and the entry is heavier than the cache. Evicting
+  // it the instant it was inserted dropped the walk the current mount batch had
+  // just built, so the next batch rebuilt it from line 0 and re-highlighted the
+  // whole prefix — quadratic in the fence's line count. The newest entry is the
+  // active fence, so it must survive; dropping older entries first still bounds
+  // the cache to one oversized fence plus whatever fits beside it.
+  while (fenceWalkCacheWeight > CODE_FENCE_WALK_CACHE_CHARACTERS && fenceWalkCache.size > 1) {
+    const oldest = fenceWalkCache.keys().next();
+    if (oldest.done) {
+      return;
     }
+    const entry = fenceWalkCache.get(oldest.value);
+    fenceWalkCache.delete(oldest.value);
+    fenceWalkCacheWeight -= entry?.weight ?? 0;
   }
-  if (chunk.length > 0) {
-    chunks.push(chunk);
-  }
-  return { chunks, consumed: true };
 }
 
 /**
- * Chunk already-tokenized lines into the render chunks a fence mounts, with
- * every line consumed (see `groupChunks` for the line and run rules).
+ * The resumable walk for one fence, keyed by its language and full source.
+ * Repeated calls with a larger `maxChunks` continue the same walk, so each
+ * source line is highlighted once no matter how many mount batches it takes.
+ * The key holds the whole source, so the character budget bounds the cache.
  */
-export function chunkTokenLines(lines: readonly HighlightToken[][]): HighlightToken[][][] {
-  return groupChunks(lines, Number.POSITIVE_INFINITY).chunks;
+function getFenceChunkWalk(code: string, language: string | null): ChunkWalk {
+  const key = `${language ?? ''}\u0000${code}`;
+  const cached = fenceWalkCache.get(key);
+  if (cached !== undefined) {
+    // Refresh recency: a Map iterates in insertion order.
+    fenceWalkCache.delete(key);
+    fenceWalkCache.set(key, cached);
+    return cached.walk;
+  }
+  const lines = code.split('\n');
+  let index = 0;
+  const walk = createChunkWalk(() => {
+    const line = lines[index];
+    index += 1;
+    return line === undefined ? undefined : highlightLine(line, language);
+  });
+  const weight = key.length;
+  fenceWalkCache.set(key, { walk, weight });
+  fenceWalkCacheWeight += weight;
+  evictFenceWalks();
+  return walk;
+}
+
+/**
+ * Chunk a fence without highlighting the lines below the mounted front.
+ *
+ * `chunkTokenLines(tokenizeCodeLines(code, language))` highlights every line of
+ * the fence before the first commit renders a chunk of it. A 200 KB fenced
+ * block is thousands of `highlightLine` runs — paid again on a remount, when a
+ * FlashList row re-enters the window — even though the first commit mounts only
+ * `CODE_FIRST_PAINT_CHUNKS` chunks. This walks the source lines in order,
+ * highlighting each line only as it is placed into a chunk, and stops once
+ * `maxChunks` chunks are complete.
+ *
+ * The walk is kept per fence value, so a later mount batch continues where the
+ * previous one stopped: a fence costs one `highlightLine` per source line
+ * across all batches, never the quadratic prefix re-walk a fresh, index-zero
+ * walk per batch produced. A fence whose source is replaced starts a new walk.
+ *
+ * The chunk boundaries are exactly those of `chunkTokenLines` — the same line
+ * and run caps, and the same dense-line split — so the split fence renders
+ * identically. Only the time the highlighting happens changes.
+ */
+export function chunkCodeLines(
+  code: string,
+  language: string | null,
+  maxChunks: number
+): CodeChunkPage {
+  const walk = getFenceChunkWalk(code, language);
+  advanceChunkWalk(walk, maxChunks);
+  // Return a snapshot capped at `maxChunks`: the walk's array grows on the next
+  // batch (and may already hold more if another instance sharing the same
+  // source advanced it first), and a caller memoized on the array's identity
+  // must see a new value when it does.
+  const limit = Number.isFinite(maxChunks)
+    ? Math.max(0, Math.floor(maxChunks))
+    : walk.chunks.length;
+  const chunks = walk.chunks.slice(0, limit);
+  return { chunks, hasMore: !walk.done || walk.chunks.length > chunks.length };
+}
+
+/** For tests: drop the resumable fence walks so a suite starts cold. */
+export function clearFenceWalkCacheForTests(): void {
+  fenceWalkCache.clear();
+  fenceWalkCacheWeight = 0;
 }
 
 /**
@@ -184,80 +332,4 @@ export function chunkTokenLines(lines: readonly HighlightToken[][]): HighlightTo
  */
 export function tokenizeCodeLines(code: string, language: string | null): HighlightToken[][] {
   return code.split('\n').map(line => highlightLine(line, language));
-}
-
-/**
- * The highlighted lines already produced for one fence's source-line array.
- * `tokenLines` grows in source order; `language` guards a fence that is
- * re-rendered with a different grammar.
- */
-type SourceLineHighlightCache = {
-  language: string | null;
-  tokenLines: HighlightToken[][];
-};
-
-/**
- * Per-fence highlight memo, keyed by the identity of the source-line array.
- *
- * `CodeBlock` derives `sourceLines` with a `useMemo` on the display text, so a
- * fence that is re-rendered or re-chunked while its text is unchanged keeps the
- * same array and therefore the same highlighted lines. Without this, the lazy
- * batch path re-walked the fence from line 0 on every commit: each batch
- * re-ran `highlightLine` for every line before it, an O(lines²/batch) walk that
- * went quadratic once the per-line LRU in `highlight.ts` evicted a fence past
- * its 5,000-entry cap, re-tokenizing the whole fence in one commit. The memo is
- * a `WeakMap` so an unmounted fence's lines are collected with its array.
- */
-const sourceLineHighlightCaches = new WeakMap<readonly string[], SourceLineHighlightCache>();
-
-/**
- * Yield one highlighted line per source line, on demand, so `groupChunks` only
- * runs `highlightLine` for the lines the mounted chunks need. A line already
- * highlighted for this same source-line array is yielded from the per-fence
- * memo without calling `highlightLine` again, so raising `maxChunks` for a
- * later batch only pays for the lines that batch newly reaches.
- */
-function* cachedHighlightSourceLines(
-  sourceLines: readonly string[],
-  language: string | null
-): Generator<HighlightToken[]> {
-  let cache = sourceLineHighlightCaches.get(sourceLines);
-  if (cache === undefined || cache.language !== language) {
-    cache = { language, tokenLines: [] };
-    sourceLineHighlightCaches.set(sourceLines, cache);
-  }
-  for (let index = 0; index < sourceLines.length; index += 1) {
-    let tokens = cache.tokenLines[index];
-    if (tokens === undefined) {
-      tokens = highlightLine(sourceLines[index] ?? '', language);
-      cache.tokenLines.push(tokens);
-    }
-    yield tokens;
-  }
-}
-
-/**
- * Chunk a fence lazily for the CodeBlock renderer: highlight source lines one
- * at a time through `highlightLine` (and its per-line LRU) and stop as soon as
- * `maxChunks` chunks are complete, so a mount that paints only the first
- * `CODE_FIRST_PAINT_CHUNKS` chunks never tokenizes the rest of the fence.
- *
- * Each already-highlighted line is reused across calls for the same
- * `sourceLines` array (see `cachedHighlightSourceLines`), so a later batch that
- * raises `maxChunks` walks over the lines it already paid for without running
- * `highlightLine` on them again.
- *
- * The line and run caps, the run-dense split, and where a chunk closes are the
- * same rules `chunkTokenLines` applies to already-tokenized lines, so the
- * chunks a fence mounts are identical to the whole-fence path whichever way
- * they are produced. `consumed` is true once the whole fence was chunked
- * within `maxChunks`; while it is false the caller asks for another bounded
- * batch.
- */
-export function chunkSourceLines(
-  sourceLines: readonly string[],
-  language: string | null,
-  maxChunks: number
-): ChunkSourceLinesResult {
-  return groupChunks(cachedHighlightSourceLines(sourceLines, language), maxChunks);
 }

@@ -1,6 +1,6 @@
 import { captureMessage } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
-import { toMicrodollars } from '../utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { errorExceptInTest } from '@/lib/utils.server';
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@/lib/ai-gateway/processUsage.constants';
 import type {

@@ -1,6 +1,7 @@
+import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
-import { stripRequiredPrefix, toMicrodollars } from '@/lib/utils';
+import { toMicrodollars } from '@/lib/microdollars';
 import { extractPromptInfo } from '@/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@/lib/ai-gateway/determineFallbackFeature';
 import {
@@ -60,6 +61,9 @@ import {
   checkExclusiveModelProviderAllowed,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  lastUserPromptText,
+  requestedLogprobs,
+  requestedSamples,
 } from '@/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@/lib/proxy-error-types';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
@@ -117,11 +121,27 @@ import {
   getEffectiveModelDecision,
 } from '@/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@/lib/ai-gateway/providers/openrouter/virtual-models';
+import { bouncerAccountId, decide, type DecideTier } from '@/lib/bouncer/client';
+import { simHash64 } from '@/lib/bouncer/simhash';
+import type { OrganizationPlan } from '@/lib/organizations/organization-types';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 const PROMOTION_MODEL_LIMIT_REACHED = 'PROMOTION_MODEL_LIMIT_REACHED';
+
+/**
+ * Checks if a string starts with a required prefix and removes it.
+ * @param str The input string to check
+ * @param prefix The required prefix to check for and remove
+ * @returns The string with the prefix removed if it starts with the prefix, otherwise null
+ */
+function stripRequiredPrefix(str: string, prefix: string): string | null {
+  if (str.startsWith(prefix)) {
+    return str.slice(prefix.length);
+  }
+  return null;
+}
 
 function validatePath(
   url: URL
@@ -174,10 +194,54 @@ async function resolveRateLimit(
   };
 }
 
+/** Report-only decide runs in `after()` and never holds up the upstream request. */
+const BOUNCER_DECIDE_TIMEOUT_MS = 30_000;
+
+/**
+ * Starts bouncer's report-only `decide` call as soon as the account is known.
+ * The promise never rejects and its verdict is never read.
+ */
+function startBouncerDecide(params: {
+  requestId: string;
+  user: { id: string } | AnonymousUserContext;
+  organizationId: string | undefined;
+  ip: string;
+  balanceAndSettingsPromise: Promise<{ balance: number; plan?: OrganizationPlan }>;
+}): Promise<void> {
+  const { requestId, user, organizationId, ip, balanceAndSettingsPromise } = params;
+
+  const verdict = isAnonymousContext(user)
+    ? decide({ requestId, tier: 'anonymous', ip }, { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS })
+    : (async () => {
+        // The tier needs the balance/plan promise. It already runs in parallel
+        // with everything else here, so awaiting it inside this call moves no
+        // other work behind it.
+        const { balance, plan } = await balanceAndSettingsPromise;
+        const tier: DecideTier =
+          organizationId && (plan === 'teams' || plan === 'enterprise')
+            ? 'team'
+            : balance > 0
+              ? 'paid'
+              : 'free';
+        await decide(
+          { requestId, tier, accountId: bouncerAccountId(user.id, organizationId) },
+          { timeoutMs: BOUNCER_DECIDE_TIMEOUT_MS }
+        );
+      })();
+
+  return verdict.then(
+    () => undefined,
+    () => undefined
+  );
+}
+
 export async function handleLlmProxyRequest(
   request: NextRequest
 ): Promise<NextResponseType<unknown>> {
   const requestStartedAt = performance.now();
+  // Wall-clock start for bouncer's `occurredAt`; the monotonic clock above
+  // cannot date the event.
+  const requestStartedAtMs = Date.now();
 
   const url = new URL(request.url);
 
@@ -550,10 +614,23 @@ export async function handleLlmProxyRequest(
     user = maybeUser;
   }
 
+  // Start the report-only verdict alongside balance and provider work. Register
+  // it with after() now so early returns do not end its lifetime.
+  const bouncerRequestId = vercelRequestId ?? randomUUID();
+  after(
+    startBouncerDecide({
+      requestId: bouncerRequestId,
+      user,
+      organizationId,
+      ip: ipAddress,
+      balanceAndSettingsPromise,
+    })
+  );
+
   // Fraud/project headers are pure header parsing; resolve them here so the
   // classifier-overhead billing below can be scheduled before any downstream
   // rejection path runs.
-  const { fraudHeaders, projectId } = extractFraudAndProjectHeaders(request);
+  const { fraudHeaders, projectId, xKiloCodeVersion } = extractFraudAndProjectHeaders(request);
 
   // Bill the classifier overhead as soon as the cost is known and we have an
   // authenticated user — via after(), so the row is persisted even when the
@@ -842,6 +919,19 @@ export async function handleLlmProxyRequest(
     auto_model: autoModel,
     ttfb_ms: null,
     clientRequestId,
+    // Anonymous requests have no bouncer account, so they must not report one.
+    bouncer: isAnonymousContext(user)
+      ? undefined
+      : {
+          requestId: bouncerRequestId,
+          occurredAt: new Date(requestStartedAtMs),
+          clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
+          requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
+          samples: requestedSamples(requestBodyParsed.body),
+          // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
+          // usage context, which reaches Sentry and several helpers.
+          promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
+        },
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);
@@ -881,6 +971,7 @@ export async function handleLlmProxyRequest(
     signal: request.signal,
     vercelRequestId,
   };
+
   const attempt = await sendUpstreamAttempt({
     ...upstreamAttemptOptions,
     providerContext: effectiveProviderContext,

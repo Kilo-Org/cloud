@@ -40,7 +40,7 @@ jest.mock('@/lib/stripe-client', () => ({
 }));
 
 import jwt from 'jsonwebtoken';
-import { authOptions } from '@/lib/user/server';
+import { authOptions } from '@/lib/user/next-auth-options';
 import { createOrUpdateUser, linkAccountToExistingUser } from '@/lib/user';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { getAccountLinkingSession } from '@/lib/account-linking-session';

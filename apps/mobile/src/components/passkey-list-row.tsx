@@ -13,7 +13,8 @@ export type PasskeysResult = inferRouterOutputs<MobileRouter>['user']['getPasske
 export type PasskeyRow = PasskeysResult['passkeys'][number];
 
 /** One passkey: its name (or the default when the server stored none), the date
- * it was added, and the rename/remove controls for it. */
+ * it was added, the date it was last used when the server recorded one, and the
+ * rename/remove controls for it. */
 export function PasskeyListRow({
   passkey,
   disabled,
@@ -41,6 +42,13 @@ export function PasskeyListRow({
             date: formatDate(parseTimestamp(passkey.created_at), i18n.language),
           })}
         </Text>
+        {passkey.last_used_at !== null && (
+          <Text variant="muted" className="mt-0.5 text-xs">
+            {t('profile.passkeyLastUsedOn', {
+              date: formatDate(parseTimestamp(passkey.last_used_at), i18n.language),
+            })}
+          </Text>
+        )}
       </View>
       <Pressable
         onPress={() => {

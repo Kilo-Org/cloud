@@ -44,7 +44,11 @@ import type {
   Owner,
 } from '../core';
 import type { CloudAgentCodeReview, CloudAgentCodeReviewAttempt } from '@kilocode/db/schema';
-import type { CodeReviewCouncilResult, CodeReviewTerminalReason } from '@kilocode/db/schema-types';
+import type {
+  CodeReviewCouncilResult,
+  CodeReviewPublicationStatus,
+  CodeReviewTerminalReason,
+} from '@kilocode/db/schema-types';
 import { isCodeReviewActionRequiredReason } from '../action-required-shared';
 import {
   activeCodeReviewWorkCondition,
@@ -126,7 +130,7 @@ function reviewScopeConditions(scope: ReviewScope) {
   ];
 }
 
-function providerPublishingCondition() {
+export function providerPublishingCondition() {
   return sql`(${cloud_agent_code_reviews.manual_config} IS NULL OR ${cloud_agent_code_reviews.manual_config}->>'outputMode' = 'provider')`;
 }
 
@@ -998,6 +1002,36 @@ export async function ensureCurrentCodeReviewAttemptFromReview(
   return (await getCodeReviewAttemptForReview(review.id, attempt.id)) ?? attempt;
 }
 
+export async function recordCodeReviewAttemptPublicationStatus(
+  attemptId: string,
+  status: CodeReviewPublicationStatus
+): Promise<void> {
+  try {
+    await db
+      .update(cloud_agent_code_review_attempts)
+      .set({
+        publication_status: status,
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(cloud_agent_code_review_attempts.id, attemptId),
+          isNull(cloud_agent_code_review_attempts.publication_status)
+        )
+      );
+  } catch (error) {
+    logExceptInTest('[code-review] Failed to record attempt publication status', {
+      attemptId,
+      status,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    captureException(error, {
+      tags: { operation: 'recordCodeReviewAttemptPublicationStatus' },
+      extra: { attemptId, status },
+    });
+  }
+}
+
 /**
  * Updates code review status
  * Can optionally update session_id, cli_session_id, error_message, started_at, completed_at
@@ -1358,7 +1392,7 @@ export async function updateCodeReviewUsage(
 
 export async function updatePreviousReviewSummary(
   reviewId: string,
-  summary: { body: string | null; headSha: string | null }
+  summary: { body: string | null; headSha: string | null; observed: boolean | null }
 ): Promise<void> {
   try {
     await db
@@ -1366,6 +1400,7 @@ export async function updatePreviousReviewSummary(
       .set({
         previous_summary_body: summary.body === null ? null : sanitizePostgresString(summary.body),
         previous_summary_head_sha: summary.headSha,
+        previous_summary_observed: summary.observed,
         updated_at: new Date().toISOString(),
       })
       .where(eq(cloud_agent_code_reviews.id, reviewId));

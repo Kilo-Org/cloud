@@ -6,7 +6,7 @@ import { db, sql, type DrizzleTransaction } from '@/lib/drizzle';
 import { NEXTAUTH_URL } from '@/lib/config.server';
 import { sendCodeReviewDisabledEmail } from '@/lib/email';
 import { getOrganizationMembers } from '@/lib/organizations/organizations';
-import { findUserById } from '@/lib/user';
+import { findUserById } from '@/lib/user/find-user-by-id';
 import { logExceptInTest } from '@/lib/utils.server';
 import type { Owner } from '@/lib/code-reviews/core';
 import type { CodeReviewPlatform } from '@/lib/code-reviews/core/schemas';

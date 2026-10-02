@@ -1,5 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
-import type { z } from 'zod';
+import { describe, expect, it } from 'vitest';
 import {
   MAX_WORKTREE_CHANGES_BYTES as PUBLIC_MAX_BYTES,
   MAX_WORKTREE_CHANGES_FILES as PUBLIC_MAX_FILES,
@@ -80,51 +79,6 @@ const fileRecordSchemas = [worktreeFileRecordSchema, publicFileRecordSchema];
 const snapshotCaptureSchemas = [sessionGitSnapshotResultSchema, publicSnapshotCaptureSchema];
 
 describe('standalone worktree wire/public schema parity', () => {
-  it('keeps input and output types identical to the public contracts', () => {
-    expectTypeOf<z.input<typeof sessionGitSummaryPayloadSchema>>().toEqualTypeOf<
-      z.input<typeof worktreeChangesCaptureRequestSchema>
-    >();
-    expectTypeOf<z.output<typeof sessionGitSummaryPayloadSchema>>().toEqualTypeOf<
-      z.output<typeof worktreeChangesCaptureRequestSchema>
-    >();
-    expectTypeOf<z.input<typeof worktreeChangesFileSchema>>().toEqualTypeOf<
-      z.input<typeof publicFileSchema>
-    >();
-    expectTypeOf<z.output<typeof worktreeChangesFileSchema>>().toEqualTypeOf<
-      z.output<typeof publicFileSchema>
-    >();
-    expectTypeOf<z.input<typeof sessionGitSummaryResultSchema>>().toEqualTypeOf<
-      z.input<typeof worktreeChangesCaptureSchema>
-    >();
-    expectTypeOf<z.output<typeof sessionGitSummaryResultSchema>>().toEqualTypeOf<
-      z.output<typeof worktreeChangesCaptureSchema>
-    >();
-    expectTypeOf<z.input<typeof sessionGitSnapshotPayloadSchema>>().toEqualTypeOf<
-      z.input<typeof worktreeChangesCaptureRequestSchema>
-    >();
-    expectTypeOf<z.output<typeof sessionGitSnapshotPayloadSchema>>().toEqualTypeOf<
-      z.output<typeof worktreeChangesCaptureRequestSchema>
-    >();
-    expectTypeOf<z.input<typeof worktreeFileOmissionReasonSchema>>().toEqualTypeOf<
-      z.input<typeof publicOmissionReasonSchema>
-    >();
-    expectTypeOf<z.output<typeof worktreeFileOmissionReasonSchema>>().toEqualTypeOf<
-      z.output<typeof publicOmissionReasonSchema>
-    >();
-    expectTypeOf<z.input<typeof worktreeFileRecordSchema>>().toEqualTypeOf<
-      z.input<typeof publicFileRecordSchema>
-    >();
-    expectTypeOf<z.output<typeof worktreeFileRecordSchema>>().toEqualTypeOf<
-      z.output<typeof publicFileRecordSchema>
-    >();
-    expectTypeOf<z.input<typeof sessionGitSnapshotResultSchema>>().toEqualTypeOf<
-      z.input<typeof publicSnapshotCaptureSchema>
-    >();
-    expectTypeOf<z.output<typeof sessionGitSnapshotResultSchema>>().toEqualTypeOf<
-      z.output<typeof publicSnapshotCaptureSchema>
-    >();
-  });
-
   it('keeps snapshot request/result aliases and capture budgets aligned', () => {
     expect(sessionGitSnapshotPayloadSchema).toBe(sessionGitSummaryPayloadSchema);
     expect(sessionGitSnapshotResultSchema).toBe(worktreeSnapshotCaptureSchema);

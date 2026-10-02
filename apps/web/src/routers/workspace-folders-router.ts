@@ -135,18 +135,17 @@ function assertOwnedLiveWorktree(
 }
 
 async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, worktreeId: string) {
-  const roots = await ownedRootSessions(tx, scope, worktreeId).for('update');
-  let firstRoot: (typeof roots)[number] | undefined;
-  for (const root of roots) {
-    if (!workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success) continue;
-    if (!firstRoot || root.createdAt < firstRoot.createdAt) firstRoot = root;
-  }
-  if (!firstRoot) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
-  }
-
   let [worktree] = await worktreeForUpdate(tx, worktreeId);
   if (!worktree) {
+    const roots = await ownedRootSessions(tx, scope, worktreeId).for('update');
+    let firstRoot: (typeof roots)[number] | undefined;
+    for (const root of roots) {
+      if (!workspaceSessionIdSchema.safeParse(root.cloudAgentSessionId).success) continue;
+      if (!firstRoot || root.createdAt < firstRoot.createdAt) firstRoot = root;
+    }
+    if (!firstRoot) {
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'Worktree not found' });
+    }
     await tx
       .insert(cloud_agent_worktrees)
       .values({
@@ -160,6 +159,7 @@ async function lockMovableWorktree(tx: DrizzleTransaction, scope: FolderScope, w
   }
 
   assertOwnedLiveWorktree(worktree, scope);
+  await ownedRootSessions(tx, scope, worktreeId).for('update');
 }
 
 export const workspaceFoldersRouter = createTRPCRouter({

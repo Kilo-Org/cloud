@@ -4,6 +4,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
 import { wrapperRestoreTelemetrySchema } from './wrapper-bootstrap.js';
 
@@ -441,21 +442,21 @@ export const worktreeDeletePayloadSchema = z
   .object({
     worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
     directory: z.string().min(1).max(1024),
-    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+    sessionIds: z.array(sessionIdSchema),
   })
   .strict();
 
 export const worktreePrepareDeletionResultSchema = z
   .object({
     prepared: z.literal(true),
-    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+    sessionIds: z.array(sessionIdSchema),
   })
   .strict();
 
 export const worktreeDeleteResultSchema = z
   .object({
     deleted: z.literal(true),
-    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+    sessionIds: z.array(sessionIdSchema),
   })
   .strict();
 

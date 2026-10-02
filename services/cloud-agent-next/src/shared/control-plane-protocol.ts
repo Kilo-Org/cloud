@@ -4,6 +4,7 @@ import type {
   WorkspaceFailureSubtype,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { z } from 'zod';
+import { sessionIdSchema } from '@kilocode/session-ingest-contracts';
 import { gitAuthorSchema, sessionAttachMcpServersSchema } from './sandbox-control-protocol.js';
 import {
   sessionTerminalClosePayloadSchema,
@@ -792,7 +793,7 @@ export const controlPlaneWorktreeDeletionPayloadSchema = z
   .object({
     worktreeId: z.templateLiteral(['worktree_', z.uuid()]),
     directory: z.string().min(1).max(1024),
-    sessionIds: z.array(z.string().startsWith('ses_').length(30)),
+    sessionIds: z.array(sessionIdSchema),
   })
   .strict();
 

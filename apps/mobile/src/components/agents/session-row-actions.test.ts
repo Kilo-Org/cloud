@@ -121,21 +121,21 @@ const noop = () => undefined;
 describe('buildSessionActionMenuItems', () => {
   it('omits exit without onExit, marks delete destructive and reuses labels', () => {
     const { items, cancelLabel } = buildSessionActionMenuItems({
-      onCopySessionId: noop,
+      onOpen: noop,
       onRename: noop,
       onDelete: noop,
     });
 
-    expect(items.map(item => item.key)).toEqual(['copyId', 'rename', 'delete']);
-    expect(items.map(item => item.label)).toEqual(['Copy session ID', 'Rename', 'Delete session']);
+    expect(items.map(item => item.key)).toEqual(['open', 'rename', 'delete']);
+    expect(items.map(item => item.label)).toEqual(['Open', 'Rename', 'Delete session']);
     expect(items[2]?.destructive).toBe(true);
     expect(cancelLabel).toBe('Cancel');
   });
 
   it('marks exit destructive only when delete is absent', () => {
-    const { items } = buildSessionActionMenuItems({ onCopySessionId: noop, onExit: noop });
+    const { items } = buildSessionActionMenuItems({ onOpen: noop, onExit: noop });
 
-    expect(items.map(item => item.key)).toEqual(['copyId', 'exit']);
+    expect(items.map(item => item.key)).toEqual(['open', 'exit']);
     expect(items[1]?.destructive).toBe(true);
   });
 });

@@ -28,6 +28,13 @@ const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 /**
+ * Cap on the OS font scale applied to the cannot-send reason. The reason wraps
+ * above the controls, so a larger accessibility scale grows it vertically
+ * instead of truncating the actionable tail; capping the scale bounds how far
+ * it can grow. 1.6 keeps the longest translated reason whole on a phone.
+ */
+export const COMPOSER_REASON_MAX_FONT_SCALE = 1.6;
+/**
  * Leading gap between the controls of this row, as a class: `ms-3` is the
  * `COMPOSER_CONTROL_GAP_DP` of `@/lib/a11y/tap-target` (0.75rem at
  * NativeWind's 14pt rem). It is a START-side margin, not a physical `ml-`,
@@ -87,9 +94,10 @@ type ChatComposerInputRowProps = {
   /** Return submits the message instead of inserting a newline. */
   returnSendsMessage: boolean;
   /**
-   * Why send is unavailable, rendered as a one-line reason above the controls
-   * and announced when it changes. Null while send can proceed or when the
-   * parent knows no reason.
+   * Why send is unavailable, rendered as a reason above the controls and
+   * announced when it changes. It wraps rather than truncates: a long
+   * translation must keep its actionable tail ("Retry first.") on a phone.
+   * Null while send can proceed or when the parent knows no reason.
    */
   sendDisabledReason?: string | null;
   /**
@@ -168,15 +176,14 @@ export function ChatComposerInputRow({
 
   return (
     // The root is a column, not the old non-wrapping `flex-row`: the reason is
-    // a line of its own above the controls, so it can never squeeze the
+    // a block of its own above the controls, so it can never squeeze the
     // flex-1 input or push the trailing send control off the screen.
     <View className="p-2.5 px-3">
       {sendDisabledReason ? (
         <AccessibleStatus
           message={sendDisabledReason}
           tone={sendDisabledReasonTone === 'neutral' ? 'status' : 'error'}
-          numberOfLines={1}
-          ellipsizeMode="tail"
+          maxFontSizeMultiplier={COMPOSER_REASON_MAX_FONT_SCALE}
           className="mb-1 text-right text-xs"
         />
       ) : null}

@@ -1872,6 +1872,7 @@ export function SessionDetailContent({
   // load-failure line instead of a runtime failure class.
   const sendDisabledReason = resolveComposerSendDisabledReason({
     canSend,
+    isReadOnly,
     error,
     statusIndicator,
     cloudStatus,
@@ -1881,6 +1882,7 @@ export function SessionDetailContent({
   // environment…") never renders in the destructive error color.
   const sendDisabledReasonTone = resolveComposerSendDisabledReasonTone({
     canSend,
+    isReadOnly,
     error,
     statusIndicator,
     cloudStatus,

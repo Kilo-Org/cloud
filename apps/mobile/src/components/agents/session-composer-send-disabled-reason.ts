@@ -18,6 +18,14 @@ type ComposerStatusIndicator = {
 export type ComposerSendDisabledReasonInput = {
   /** The session's live send capability (`manager.atoms.canSend`). */
   canSend: boolean;
+  /**
+   * Whether the session resolved read-only (`manager.atoms.isReadOnly`). The
+   * SDK latches `canSend` false for a read-only session, so without this the
+   * reason collapses to the generic unresolved/connecting line and tells the
+   * reader a permanently read-only session will become ready. Omit when the
+   * caller cannot know it.
+   */
+  isReadOnly?: boolean;
   /** The load failure from the session error atom, or null. */
   error: string | null;
   /** The active status line, or null when the session has none. */
@@ -86,6 +94,15 @@ function resolveReason(
   }
   const indicator = input.statusIndicator;
   if (indicator === null) {
+    // A read-only session is a permanent fact, not a transient
+    // unresolved/connecting transport: the SDK latches `canSend` false and the
+    // reader sees the read-only banner and continue affordance. Name read-only
+    // here so the reason never reads as "not ready yet" on a session that can
+    // never send. It stays below the load-error and phase branches, so a
+    // read-only session that also carries one of those keeps that reason.
+    if (input.isReadOnly === true) {
+      return { message: i18n.t('agentChat.session.readOnly'), tone: 'neutral' };
+    }
     // Nothing more specific to say: the session is unresolved or connecting.
     return { message: i18n.t('agentChat.composer.sendUnavailable'), tone: 'neutral' };
   }
@@ -144,8 +161,9 @@ function resolveReason(
  * transcript states its own class, matching the full-screen error that offers
  * no Retry; Cloud setup and teardown state their phase; a status line with its
  * own catalog copy states it; any other terminal failure gets the class copy
- * the transcript's status indicator renders; and an unresolved/connecting
- * session gets the generic line.
+ * the transcript's status indicator renders; a read-only session names
+ * read-only instead of the generic not-ready line; and every other
+ * unresolved/connecting session gets the generic line.
  */
 export function resolveComposerSendDisabledReason(
   input: ComposerSendDisabledReasonInput

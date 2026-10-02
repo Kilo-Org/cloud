@@ -29,6 +29,12 @@ type AccessibleStatusProps = {
   numberOfLines?: number;
   /** How truncation marks overflow, forwarded to the rendered `Text`. */
   ellipsizeMode?: TextProps['ellipsizeMode'];
+  /**
+   * Cap on the OS font scale, forwarded to the rendered `Text`. A status that
+   * wraps beside other content (the composer's reason line) must not grow
+   * without bound under a large accessibility scale.
+   */
+  maxFontSizeMultiplier?: number;
 };
 
 export function AccessibleStatus({
@@ -37,6 +43,7 @@ export function AccessibleStatus({
   className,
   numberOfLines,
   ellipsizeMode,
+  maxFontSizeMultiplier,
 }: Readonly<AccessibleStatusProps>) {
   useStatusAnnouncement(message);
   if (message == null) {
@@ -47,6 +54,7 @@ export function AccessibleStatus({
       accessibilityLiveRegion={Platform.OS === 'android' ? 'polite' : undefined}
       numberOfLines={numberOfLines}
       ellipsizeMode={ellipsizeMode}
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
       className={cn(TONE_CLASS[tone], className)}
     >
       {message}

@@ -8,6 +8,7 @@ import {
   findTextInput,
   renderRow,
 } from './chat-composer-input-row.mounted.test-helpers';
+import { COMPOSER_REASON_MAX_FONT_SCALE } from './chat-composer-input-row';
 
 // `AccessibleStatus` reads `Platform.OS` at render time: Android renders a
 // polite live region, iOS announces imperatively through
@@ -58,7 +59,11 @@ describe('ChatComposerInputRow mounted — cannot-send reason', () => {
     const [status] = renderer.root.findAllByType(AccessibleStatus);
     expect(status?.props).toMatchObject({ message: REASON, tone: 'error' });
     const reason = findAllByType(renderer.root, 'Text').find(n => n.props.children === REASON);
-    expect(reason?.props).toMatchObject({ numberOfLines: 1, ellipsizeMode: 'tail' });
+    // The reason must not be clipped to one line: a longer translation has to
+    // keep its actionable tail ("Retry first.") on a phone width.
+    expect(reason?.props.numberOfLines).toBeUndefined();
+    expect(reason?.props.ellipsizeMode).toBeUndefined();
+    expect(reason?.props.maxFontSizeMultiplier).toBe(COMPOSER_REASON_MAX_FONT_SCALE);
     // The row hands the announcement to `AccessibleStatus`, so the reason Text
     // only carries a live region on Android — this iOS render has none.
     expect(reason?.props.accessibilityLiveRegion).toBeUndefined();

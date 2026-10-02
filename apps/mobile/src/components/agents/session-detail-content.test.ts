@@ -3674,6 +3674,9 @@ describe('session detail read-only composer', () => {
     const view = await mountDetails([childMessage(ROOT_ID, 'shown row')]);
     const composer = view.renderer.root.find(node => Object.is(node.type, 'ChatComposer'));
     expect(composer.props.disabled).toBe(true);
+    // The reason beside send names the permanent read-only fact, not the
+    // generic "will become ready" line the resolver used to fall through to.
+    expect(composerProps(view).sendDisabledReason).toBe(i18n.t('agentChat.session.readOnly'));
     expect(renderedTextOutsideSheet(view.renderer.root)).toContain(
       i18n.t('agentChat.session.readOnly')
     );

@@ -54,6 +54,8 @@ const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNam
 type FakeProvider = {
   adapter: ProviderAdapter;
   refs: string[];
+  /** Create intents, in call order, so tests can assert the resolved containment. */
+  intents: ProviderCreateIntent[];
   launchEnvs: Record<string, string>[];
   policyCalls: unknown[];
   /** Wrapper frames received at the moment each policy update was applied. */
@@ -77,6 +79,7 @@ function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = {
     adapter: null as unknown as ProviderAdapter,
     refs: [],
+    intents: [],
     launchEnvs: [],
     policyCalls: [],
     policyFrameCounts: [],
@@ -91,6 +94,7 @@ function createFakeProvider(): FakeProvider {
     destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
+      provider.intents.push(intent);
       const ref = encodeCloudflareProviderRef({
         sandboxId: intent.allocationName ?? SANDBOX_ID,
         containment: true,
@@ -1144,11 +1148,38 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       containmentEnabled?: boolean;
+      outboundContainerId?: string;
       kilo?: { alias?: string };
     };
     // Uncontained: no alias is minted and the grant opts out of containment.
     expect(grant.containmentEnabled).toBe(false);
     expect(grant.kilo?.alias).toBeUndefined();
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: false, github: false });
+  });
+
+  it('prepares with a containment-off selection when no containment namespaces are bound', async () => {
+    // Reproduces the deployed e2e Worker: containment is off and the containment
+    // container classes are stripped from the config, so resolving a containment
+    // proxy container would throw during prepare.
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker, { CREDENTIAL_CONTAINMENT_ENABLED: 'false' });
+    await runInDurableObject(stub, instance => {
+      const mutableEnv = instance.env as Record<string, unknown>;
+      delete mutableEnv.SandboxContainment;
+      delete mutableEnv.SandboxSmallContainment;
+    });
+    const source = credentialsSource(SESSION, {
+      repository: { type: 'git', url: 'https://github.com/acme/widgets.git' },
+    });
+
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
   });
 
   it('stays contained when the selection carries containment on', async () => {
@@ -1170,6 +1201,8 @@ describe('SandboxControlV2 credentials (B3)', () => {
     };
     expect(grant.containmentEnabled).toBeUndefined();
     expect(grant.kilo?.alias).toBeDefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({ kilocode: true, github: true });
   });
 
   it('falls back to CREDENTIAL_CONTAINMENT_ENABLED when the selection omits containment', async () => {
@@ -1184,8 +1217,18 @@ describe('SandboxControlV2 credentials (B3)', () => {
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       containmentEnabled?: boolean;
+      outboundContainerId?: string;
     };
     expect(grant.containmentEnabled).toBe(false);
+    // Containment off must not resolve a containment proxy container, which the
+    // e2e Worker does not bind and which would otherwise throw during prepare.
+    expect(grant.outboundContainerId).toBeUndefined();
+    await waitFor(() => expect(provider.intents).toHaveLength(1));
+    expect(provider.intents[0]?.containment).toEqual({
+      kilocode: false,
+      github: false,
+      worktreeScoped: true,
+    });
   });
 
   it('derives the outbound container id from a custom allocation name while stopped', async () => {

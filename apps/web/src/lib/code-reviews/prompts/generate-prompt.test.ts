@@ -106,6 +106,15 @@ describe('generateReviewPrompt', () => {
     expect(prompt).toContain('Line could not be resolved');
   });
 
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 1);
+
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+    expect(prompt).not.toContain('the review was skipped');
+  });
+
   it('does not include GitHub diff line-number safeguards for GitLab', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'group/project', 10, {
       platform: 'gitlab',
@@ -417,6 +426,19 @@ const existingReviewStateWithHistory: ExistingReviewState = {
 };
 
 describe('generateReviewPrompt (incremental review)', () => {
+  it('skips silently when custom instructions exclude the PR', async () => {
+    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+      reviewId: 'review-123',
+      existingReviewState: existingReviewStateWithSummary,
+      previousHeadSha: 'abc123prev',
+    });
+
+    expect(prompt).toContain('INCREMENTAL REVIEW MODE');
+    expect(prompt).toContain(
+      'Post no comments or summary, and end with a one-line reply saying why.'
+    );
+  });
+
   it('uses incremental workflow when previousHeadSha and summary comment are provided', async () => {
     const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
       reviewId: 'review-123',
@@ -433,7 +455,7 @@ describe('generateReviewPrompt (incremental review)', () => {
     // Should contain the active comment count (1 active, 1 outdated)
     expect(prompt).toContain('1 active');
     // Should NOT contain the standard workflow step 1
-    expect(prompt).not.toContain('gh pr diff 42\n```');
+    expect(prompt).not.toContain('gh pr diff 42 --repo owner/repo --name-only');
   });
 
   it('uses standard workflow when previousHeadSha is null', async () => {
@@ -447,18 +469,34 @@ describe('generateReviewPrompt (incremental review)', () => {
     expect(prompt).toContain('gh pr diff 42');
   });
 
-  it('allows GitHub agents to pull latest changes in standard mode', async () => {
-    const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
-      reviewId: 'review-123',
-      existingReviewState: existingReviewStateNoSummary,
-      previousHeadSha: null,
-    });
+  it('only instructs sandbox-allowlisted git and gh commands in bash blocks (GitHub)', async () => {
+    // Mirrors CODE_REVIEW_ALLOWED_COMMANDS / CODE_REVIEW_DENIED_COMMAND_PATTERNS in
+    // services/cloud-agent-next/src/session-service.ts. Any other command is rejected in
+    // non-interactive review mode, and a rejected Step 1 command used to end reviews unpublished.
+    const allowedGhLine =
+      /^gh (?:pr view 42 --repo owner\/repo --json |pr diff 42 --repo owner\/repo --(?:name-only|patch --color never)$|api repos\/owner\/repo\/(?:pulls\/42\/(?:comments|reviews)|issues\/42\/comments) --paginate --jq '|api repos\/owner\/repo\/(?:pulls\/42\/reviews|issues\/42\/comments) --input - << 'EOF'$|api repos\/owner\/repo\/issues\/comments\/\d+ -X PATCH --input - << 'EOF'$)/;
+    const allowedGitLine = /^git diff abc123prev\.\.HEAD$/;
 
-    expect(prompt).toContain('Before reading files, always fetch from remote');
-    expect(prompt).toContain('git pull origin $(git branch --show-current)');
-    expect(prompt).toContain('gh pr diff 42');
-    expect(prompt).not.toContain('DO NOT fetch or pull');
-    expect(prompt).not.toContain('Do not run `git fetch`');
+    for (const [existingReviewState, previousHeadSha] of [
+      [existingReviewStateNoSummary, null],
+      [existingReviewStateWithSummary, 'abc123prev'],
+    ] as const) {
+      const { prompt } = await generateReviewPrompt(baseConfig, 'owner/repo', 42, {
+        reviewId: 'review-123',
+        existingReviewState,
+        previousHeadSha,
+      });
+
+      const commandLines = [...prompt.matchAll(/```bash\n([\s\S]*?)```/g)]
+        .flatMap(match => match[1].split('\n'))
+        .map(line => line.trim())
+        .filter(line => line.startsWith('gh ') || line.startsWith('git '));
+
+      expect(commandLines.length).toBeGreaterThan(0);
+      for (const line of commandLines) {
+        expect(line).toMatch(line.startsWith('gh ') ? allowedGhLine : allowedGitLine);
+      }
+    }
   });
 
   it('uses standard workflow when previousHeadSha is provided but no summary comment', async () => {
@@ -604,8 +642,10 @@ describe('generateReviewPrompt (incremental review)', () => {
     });
 
     expect(prompt).toContain('Before reading files, always fetch from remote');
-    expect(prompt).toContain('git fetch origin');
-    expect(prompt).toContain('git pull origin $(git branch --show-current)');
+    // GitLab checks out a tracking branch and may continue a previous session, so a bare pull
+    // updates the workspace; `git branch` is denied by the command guard.
+    expect(prompt).toContain('git fetch origin\ngit pull\n');
+    expect(prompt).not.toContain('git branch');
     expect(prompt).toContain('glab mr diff 10');
     expect(prompt).toContain(
       'glab api --method POST "projects/group%2Fproject/merge_requests/10/notes"'

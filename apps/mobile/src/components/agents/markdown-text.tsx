@@ -188,12 +188,13 @@ function MarkdownContent({
     if (snapshot.value === value) {
       return snapshot.segments;
     }
-    // Streaming appends transfer table keys from the previous split, so the
-    // cached entry must be the keyed result, not a fresh no-previous split.
-    const cached = markdownTableSegmentsCache.get(value);
-    if (cached !== undefined) {
-      return cached;
-    }
+    // Streaming appends transfer table keys from *this* instance's previous
+    // split, and that transfer is not value-pure. The value-only cache cannot
+    // carry the snapshot context, so compute against it instead of reading the
+    // cache: a foreign no-previous entry (the `useState` initializer above
+    // stores one) would hand a newly added table the key of one this instance
+    // just invalidated, reconciling live `MarkdownTable` state onto a
+    // different table.
     const next = splitTableSegments(value, snapshot);
     markdownTableSegmentsCache.set(value, next);
     return next;

@@ -162,8 +162,15 @@ export class MarkdownRenderer extends Renderer {
   private readonly longPressCode = (): void => {
     this.onLongPressCode?.();
   };
-  private readonly linkLongPress = (href: string): void => {
-    this.onLongPressLink?.(href);
+  private readonly linkLongPress = (href: string, event?: GestureResponderEvent): void => {
+    // A table link forwards the press event so the host can stop its
+    // propagation; the image/accessibility call sites have no event and must
+    // keep invoking the host with one argument.
+    if (event === undefined) {
+      this.onLongPressLink?.(href);
+    } else {
+      this.onLongPressLink?.(href, event);
+    }
   };
   private readonly linkPress = (href: string): boolean => this.onPressLink?.(href) ?? false;
   // Ordinal host key: the parser builds every header/body cell (each consuming

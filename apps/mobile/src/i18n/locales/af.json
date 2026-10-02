@@ -2047,6 +2047,7 @@
       "idCopied": "Sessie-ID gekopieer",
       "couldNotCopyId": "Kon nie die sessie-ID kopieer nie.",
       "untitled": "Naamlose sessie",
+      "actions": "Sessieaksies",
       "sessionDeleted": "Sessie geskrap",
       "needsInput": "wag op invoer",
       "fromPlatform": "vanaf {{platform}}",
@@ -2099,6 +2100,7 @@
       "readOnly": "Jy kan hierdie sessie net lees.",
       "continueInNewSession": "Gaan voort in 'n nuwe sessie",
       "emptyDescription": "Stuur 'n boodskap hieronder om te begin.",
+      "emptyTranscriptDescription": "Hierdie sessie het nog geen boodskappe nie.",
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
@@ -2565,6 +2567,8 @@
       "selectModelBeforeSending": "Kies 'n model voordat jy 'n boodskap stuur.",
       "preparingPlaceholder": "Omgewing word opgestel...",
       "finalizingPlaceholder": "Besig om af te handel...",
+      "sessionLoadFailed": "Die sessie kon nie gelaai word nie. Probeer eers weer.",
+      "sendUnavailable": "Stuur is nie beskikbaar tot die sessie gereed is nie.",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
       "couldNotAttachFiles": "Die lêers kon nie aangeheg word nie. Tik op Stuur om weer te probeer.",
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
@@ -2634,6 +2638,7 @@
       "provider": "Verskaffer",
       "totalCost": "Totale koste",
       "usageReflectsLatest": "Die gebruik weerspieël die assistent se jongste voltooide antwoord.",
+      "usageUnavailable": "Konteksgebruik is nie beskikbaar nie",
       "tokenUsage": "Tekengebruik",
       "cacheRate": "Kasgeheutrefferkoers",
       "modelsCount": "Modelle ({{displayCount}})",
@@ -2668,7 +2673,10 @@
     "markdownImage": {
       "load": "Laai",
       "loadWithHost": "Laai {{host}}",
-      "httpsOnly": "Slegs HTTPS-afbeeldings word toegelaat."
+      "httpsOnly": "Slegs HTTPS-afbeeldings word toegelaat.",
+      "trustTitle": "Laai beeld vanaf {{host}}?",
+      "trustMessage": "As jy {{host}} vertrou, laai sy beelde sonder om elke keer te vra. Jy kan dit later onder Vertroude gashere herroep.",
+      "loadOnce": "Laai een keer"
     },
     "markdownLink": {
       "invalidLink": "Hierdie skakel kan nie oopgemaak word nie.",
@@ -3181,8 +3189,12 @@
     "subtitle": "Gashere waarvan jy skakels sonder bevestiging wil oopmaak",
     "emptyTitle": "Geen vertroude gashere nie",
     "emptyDescription": "As jy 'n skakel se gasheer vertrou, maak skakels na daardie gasheer oop sonder om weer toestemming te vra.",
+    "imagesSectionTitle": "Vertroude beeldgashere",
+    "imagesSectionDescription": "Beelde van hierdie gashere laai sonder om weer te vra.",
+    "imagesSectionEmpty": "Geen vertroude beeldgashere nie",
     "revoke": "Herroep vertroue in {{host}}",
     "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
+    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra.",
     "backToPreferences": "Terug na voorkeure"
   },
   "quickChat": {

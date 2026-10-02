@@ -2072,6 +2072,7 @@
       "idCopied": "ID sesije je kopiran",
       "couldNotCopyId": "Nije moguće kopirati ID sesije.",
       "untitled": "Sesija bez naslova",
+      "actions": "Radnje za sesiju",
       "sessionDeleted": "Sesija je obrisana",
       "needsInput": "čeka unos",
       "fromPlatform": "iz {{platform}}",
@@ -2127,6 +2128,7 @@
       "readOnly": "Ovu sesiju možeš samo da čitaš.",
       "continueInNewSession": "Nastavi u novoj sesiji",
       "emptyDescription": "Pošalji poruku u polju ispod da započneš razgovor.",
+      "emptyTranscriptDescription": "Ova sesija još nema poruka.",
       "scrollToBottom": "Pomeri se na dno",
       "emptyTitle": "Još nema poruka",
       "renameAccessibility": "Preimenuj sesiju: {{title}}",
@@ -2602,6 +2604,8 @@
       "selectModelBeforeSending": "Izaberi model pre slanja.",
       "preparingPlaceholder": "Priprema okruženja...",
       "finalizingPlaceholder": "Završavanje...",
+      "sessionLoadFailed": "Sesija nije mogla da se učita. Prvo pokušajte ponovo.",
+      "sendUnavailable": "Slanje nije dostupno dok sesija ne bude spremna.",
       "cannotReceiveFiles": "Ova sesija ne može da prima fajlove. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Prilaganje fajlova nije uspelo. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
@@ -2672,6 +2676,7 @@
       "provider": "Provajder",
       "totalCost": "Ukupan trošak",
       "usageReflectsLatest": "Prikazana potrošnja odgovara poslednjem dovršenom odgovoru asistenta.",
+      "usageUnavailable": "Korišćenje konteksta nije dostupno",
       "tokenUsage": "Potrošnja tokena",
       "cacheRate": "Udeo tokena iz keša",
       "modelsCount": "Modeli ({{displayCount}})",
@@ -2708,7 +2713,10 @@
     "markdownImage": {
       "load": "Učitaj",
       "loadWithHost": "Učitaj {{host}}",
-      "httpsOnly": "Dozvoljene su samo slike dostupne preko HTTPS veze."
+      "httpsOnly": "Dozvoljene su samo slike dostupne preko HTTPS veze.",
+      "trustTitle": "Učitati sliku sa {{host}}?",
+      "trustMessage": "Ako označiš {{host}} kao pouzdan, njegove slike će se učitavati bez pitanja svaki put. To kasnije možeš ukloniti u Pouzdani hostovi.",
+      "loadOnce": "Učitaj jednom"
     },
     "markdownLink": {
       "invalidLink": "Ovaj link se ne može otvoriti.",
@@ -3224,8 +3232,12 @@
     "subtitle": "Hostovi čije linkove otvaraš bez potvrde",
     "emptyTitle": "Nema pouzdanih hostova",
     "emptyDescription": "Kada označiš host kao pouzdan, linkovi ka njemu otvaraju se bez ponovne potvrde.",
+    "imagesSectionTitle": "Pouzdani hostovi za slike",
+    "imagesSectionDescription": "Slike sa ovih hostova učitavaju se bez ponovnog pitanja.",
+    "imagesSectionEmpty": "Nema pouzdanih hostova za slike",
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
     "revokeMessage": "Linkovi ka ovom hostu ponovo će tražiti potvrdu.",
+    "revokeImageMessage": "Slike sa ovog hosta ponovo će tražiti potvrdu.",
     "backToPreferences": "Nazad na podešavanja"
   },
   "quickChat": {

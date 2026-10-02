@@ -57,6 +57,7 @@ import {
   type RuntimeProxyHandleClaims,
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import { logRuntimeProxyRequestFailed } from './runtime-credential-proxy-diagnostics.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
 import {
   inferRuntimeCredentialProxyRoute,
@@ -511,6 +512,14 @@ async function forwardRuntimeCredentialProxy(
       createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),
       { redirect: 'manual' }
     );
+    if (!response.ok) {
+      logRuntimeProxyRequestFailed({
+        upstreamAttempted: true,
+        upstreamStatus: response.status,
+        sessionId: claims.sessionId,
+        kiloSessionId: claims.kiloSessionId,
+      });
+    }
     return sanitizeRuntimeProxyResponse(response);
   } catch {
     return c.text('Upstream unavailable', 502);

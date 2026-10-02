@@ -21,6 +21,7 @@
     "../web/src/**/*.test.ts",
     "../web/src/**/*.test.tsx",
     "../../packages/web-shared/src/**/*.test.ts",
+    "../../packages/web-shared/src/tests/**",
     "../web/src/tests/**",
     "../web/src/**/*test-utils*",
     "../web/tests/**"

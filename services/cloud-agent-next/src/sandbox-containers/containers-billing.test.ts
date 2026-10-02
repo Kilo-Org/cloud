@@ -211,10 +211,6 @@ class FakeContainer {
     return this.execHandler(cmd);
   }
 
-  async snapshotContainer(_options: ContainerSnapshotOptions): Promise<ContainerSnapshot> {
-    return { id: 'snap-1', size: 1 };
-  }
-
   async destroy(): Promise<void> {
     this.destroyCalls += 1;
     if (this.destroyBehavior === 'reject') throw new Error('container destroy failed');

@@ -7,10 +7,9 @@ import { BreadcrumbItem, BreadcrumbPage } from '@/components/ui/breadcrumb';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertingContent } from '@/app/admin/alerting/AlertingContent';
 import { TtfbAlertingContent } from '@/app/admin/alerting-ttfb/TtfbAlertingContent';
-import { ModelStatusContent } from '@/app/admin/alerting/ModelStatusContent';
 
-const VALID_TABS: readonly string[] = ['error-rate', 'ttfb', 'model-status'];
-type Tab = 'error-rate' | 'ttfb' | 'model-status';
+const VALID_TABS: readonly string[] = ['error-rate', 'ttfb'];
+type Tab = 'error-rate' | 'ttfb';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -57,18 +56,12 @@ export default function AdminAlertingPage() {
             <TabsTrigger value="ttfb" className={tabTriggerClass}>
               TTFB
             </TabsTrigger>
-            <TabsTrigger value="model-status" className={tabTriggerClass}>
-              Model Status
-            </TabsTrigger>
           </TabsList>
           <TabsContent value="error-rate" className="mt-4">
             <AlertingContent />
           </TabsContent>
           <TabsContent value="ttfb" className="mt-4">
             <TtfbAlertingContent />
-          </TabsContent>
-          <TabsContent value="model-status" className="mt-4">
-            <ModelStatusContent />
           </TabsContent>
         </Tabs>
       </div>

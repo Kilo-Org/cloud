@@ -853,6 +853,11 @@ export default function CloudChatPage({
       if (!isUserMessage(message.info)) return;
       const prompt = getUserTextContent(message.parts);
       if (prompt === '') return;
+      // A failed row from a slash command carries the literal command text
+      // (`/cmd args`), but `handleSendMessage` always sends a `prompt`
+      // payload. Re-sending it there would deliver the literal text instead
+      // of executing the command, so command rows are copy-only.
+      if (/^\s*\/[\w.-]+(?:\s+[\s\S]*)?\s*$/.test(prompt)) return;
       // The row belongs to the session this page opened. The re-send is
       // awaited and the user can switch chats while it is in flight, so the
       // owner is captured here: a resolution recorded after the switch would

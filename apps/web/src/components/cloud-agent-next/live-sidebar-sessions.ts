@@ -6,6 +6,7 @@ export type LiveSidebarSession = {
   id: string;
   title: string;
   gitUrl?: string;
+  gitBranch?: string;
   /**
    * Stored origin from `cli_sessions_v2`, absent until the session has been
    * ingested. The connection's own `platform` is deliberately not read here:
@@ -68,9 +69,13 @@ export function matchesLivePlatformFilter(
   return selected.has(bucket);
 }
 
-/** Matches what the stored list matches: the session id and its title. */
+/** Matches what the stored list matches: id, title, repository, and branch. */
 function matchesLiveSearch(session: LiveSidebarSession, needle: string): boolean {
-  return session.title.toLowerCase().includes(needle) || session.id.toLowerCase().includes(needle);
+  const normalizedNeedle = needle.startsWith('#') ? needle.slice(1) : needle;
+  if (normalizedNeedle.length === 0) return true;
+  return [session.title, session.id, session.gitUrl, session.gitBranch].some(value =>
+    value?.toLowerCase().includes(normalizedNeedle)
+  );
 }
 
 /**

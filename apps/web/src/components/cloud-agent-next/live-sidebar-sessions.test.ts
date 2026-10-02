@@ -100,7 +100,7 @@ describe('filterLiveSidebarSessions', () => {
     ).toEqual([]);
   });
 
-  it('matches the search against the title and the id', () => {
+  it('matches the search against the title, the id, and the repository', () => {
     expect(
       filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: 'legacy' }).map(
         row => row.id
@@ -111,11 +111,33 @@ describe('filterLiveSidebarSessions', () => {
         row => row.id
       )
     ).toEqual(['ses_remote']);
+    expect(
+      filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: 'widgets' }).map(
+        row => row.id
+      )
+    ).toEqual(['ses_remote', 'ses_web']);
+    expect(
+      filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: '#ses_remote' }).map(
+        row => row.id
+      )
+    ).toEqual(['ses_remote']);
   });
 
-  it('does not search the repository, which the stored list does not search either', () => {
-    expect(filterLiveSidebarSessions(liveSessions, { ...noQuery, searchQuery: 'widgets' })).toEqual(
-      []
-    );
+  it('matches the search against the branch', () => {
+    const withBranch = [
+      ...liveSessions,
+      {
+        id: 'ses_branch',
+        title: 'Branched session',
+        gitUrl: 'https://github.com/acme/other.git',
+        gitBranch: 'feature/cool-thing',
+        createdOnPlatform: 'cli',
+      },
+    ];
+    expect(
+      filterLiveSidebarSessions(withBranch, { ...noQuery, searchQuery: 'cool-thing' }).map(
+        row => row.id
+      )
+    ).toEqual(['ses_branch']);
   });
 });

@@ -35,7 +35,6 @@ export async function ensureCollectionExists(
   }
   console.log('collection does not exist...creating');
 
-  // Create collection with schema
   await client.createCollection({
     collection_name: collectionName,
     num_partitions: 256,
@@ -97,8 +96,6 @@ export async function ensureCollectionExists(
     ],
   });
 
-  // Create indexes for efficient filtering
-  // Vector index for similarity search
   await client.createIndex({
     collection_name: collectionName,
     field_name: 'vector',
@@ -106,7 +103,6 @@ export async function ensureCollectionExists(
     metric_type: 'COSINE',
   });
 
-  // Scalar indexes for filtering
   await client.createIndex({
     collection_name: collectionName,
     field_name: 'organization_id',
@@ -131,7 +127,6 @@ export async function ensureCollectionExists(
     index_type: 'INVERTED',
   });
 
-  // Load collection into memory for searching
   await client.loadCollection({ collection_name: collectionName });
 
   console.log('collection created and loaded');

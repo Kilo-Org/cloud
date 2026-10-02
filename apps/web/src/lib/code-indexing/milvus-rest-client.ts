@@ -6,10 +6,6 @@
  * API Reference: https://docs.zilliz.com/reference/restful/data-plane-v2
  */
 
-// ============================================================================
-// Types matching the MilvusClient interface
-// ============================================================================
-
 export type DataType =
   | 'None'
   | 'Bool'
@@ -105,19 +101,11 @@ type MilvusRestClientConfig = {
   timeout?: number;
 };
 
-// ============================================================================
-// REST API Response Types
-// ============================================================================
-
 type MilvusApiResponse<T = unknown> = {
   code: number;
   message?: string;
   data?: T;
 };
-
-// ============================================================================
-// MilvusRestClient Implementation
-// ============================================================================
 
 export class MilvusRestClient {
   private baseUrl: string;
@@ -125,15 +113,12 @@ export class MilvusRestClient {
   private timeout: number;
 
   constructor(config: MilvusRestClientConfig) {
-    // Normalize the address to a proper URL
     let address = config.address || '';
 
-    // If address doesn't have a protocol, add https://
     if (!address.startsWith('http://') && !address.startsWith('https://')) {
       address = `https://${address}`;
     }
 
-    // Remove trailing slash
     this.baseUrl = address.replace(/\/$/, '');
     this.token = config.token || '';
     this.timeout = config.timeout || 30000;
@@ -185,9 +170,6 @@ export class MilvusRestClient {
     }
   }
 
-  /**
-   * Check if a collection exists
-   */
   async hasCollection(params: HasCollectionParams): Promise<HasCollectionResponse> {
     const result = await this.request<{ has: boolean }>('/v2/vectordb/collections/has', {
       collectionName: params.collection_name,
@@ -196,20 +178,13 @@ export class MilvusRestClient {
     return { value: result?.has ?? false };
   }
 
-  /**
-   * Drop a collection
-   */
   async dropCollection(params: DropCollectionParams): Promise<void> {
     await this.request('/v2/vectordb/collections/drop', {
       collectionName: params.collection_name,
     });
   }
 
-  /**
-   * Create a collection with schema
-   */
   async createCollection(params: CreateCollectionParams): Promise<void> {
-    // Convert field schemas to REST API format
     const schema = {
       autoId: params.auto_id ?? false,
       enableDynamicField: false,
@@ -220,7 +195,6 @@ export class MilvusRestClient {
           isPrimary: field.is_primary_key ?? false,
         };
 
-        // Build elementTypeParams object with all applicable properties
         const elementTypeParams: Record<string, string> = {};
         if (field.max_length !== undefined) {
           elementTypeParams.max_length = String(field.max_length);
@@ -260,9 +234,6 @@ export class MilvusRestClient {
     await this.request('/v2/vectordb/collections/create', requestBody);
   }
 
-  /**
-   * Create an index on a field
-   */
   async createIndex(params: CreateIndexParams): Promise<void> {
     const indexParams: Record<string, unknown>[] = [
       {
@@ -281,18 +252,12 @@ export class MilvusRestClient {
     });
   }
 
-  /**
-   * Load a collection into memory
-   */
   async loadCollection(params: LoadCollectionParams): Promise<void> {
     await this.request('/v2/vectordb/collections/load', {
       collectionName: params.collection_name,
     });
   }
 
-  /**
-   * Delete entities by filter
-   */
   async delete(params: DeleteParams): Promise<void> {
     await this.request('/v2/vectordb/entities/delete', {
       collectionName: params.collection_name,
@@ -300,9 +265,6 @@ export class MilvusRestClient {
     });
   }
 
-  /**
-   * Upsert data into a collection
-   */
   async upsert(params: UpsertParams): Promise<void> {
     await this.request('/v2/vectordb/entities/upsert', {
       collectionName: params.collection_name,
@@ -310,9 +272,6 @@ export class MilvusRestClient {
     });
   }
 
-  /**
-   * Search for similar vectors
-   */
   async search(params: SearchParams): Promise<SearchResponse> {
     const requestBody: Record<string, unknown> = {
       collectionName: params.collection_name,
@@ -330,18 +289,15 @@ export class MilvusRestClient {
     // - Flat array: [{id, distance, ...}, ...]
     const rawResults = await this.request<unknown>('/v2/vectordb/entities/search', requestBody);
 
-    // Normalize results to a flat array
     const results: SearchResult[] = [];
 
     if (rawResults == null) {
       return { results };
     }
 
-    // Handle array response
     if (Array.isArray(rawResults)) {
       for (const item of rawResults) {
         if (Array.isArray(item)) {
-          // Nested array format: [[{...}, {...}], ...]
           for (const result of item) {
             if (result && typeof result === 'object') {
               const normalizedResult = this.normalizeSearchResult(result as SearchResult);
@@ -349,7 +305,6 @@ export class MilvusRestClient {
             }
           }
         } else if (item && typeof item === 'object') {
-          // Flat array format: [{...}, {...}, ...]
           const normalizedResult = this.normalizeSearchResult(item as SearchResult);
           results.push(normalizedResult);
         }
@@ -359,9 +314,6 @@ export class MilvusRestClient {
     return { results };
   }
 
-  /**
-   * Normalize a search result to have consistent field names
-   */
   private normalizeSearchResult(result: SearchResult): SearchResult {
     // Convert 'distance' to 'score' for compatibility with existing code
     // For COSINE similarity, distance is already the similarity score (0-1)

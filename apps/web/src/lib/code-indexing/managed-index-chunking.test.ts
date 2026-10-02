@@ -1,8 +1,5 @@
 import { streamChunks, type ChunkMetadata } from '../managed-index-chunking';
 
-/**
- * Helper to create a ReadableStream from a string
- */
 function createStreamFromString(content: string): ReadableStream<string> {
   return new ReadableStream({
     start(controller) {
@@ -12,9 +9,6 @@ function createStreamFromString(content: string): ReadableStream<string> {
   });
 }
 
-/**
- * Helper to collect all chunks from the async generator
- */
 async function collectChunks(
   stream: ReadableStream<string>,
   metadata: ChunkMetadata,
@@ -97,14 +91,11 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Should have chunks but the long line should be skipped
       expect(chunks.length).toBeGreaterThan(0);
 
-      // Verify the long line is not in any chunk
       const allContent = chunks.map(c => c.codeChunk).join('\n');
       expect(allContent).not.toContain(longLine);
 
-      // Verify line1 and line3 are present
       expect(allContent).toContain('line1');
       expect(allContent).toContain('line3');
     });
@@ -120,7 +111,6 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Should have chunks but the long line should be skipped
       expect(chunks.length).toBe(0);
     });
 
@@ -138,11 +128,9 @@ describe('streamChunks', () => {
 
       const allContent = chunks.map(c => c.codeChunk).join('\n');
 
-      // Long lines should be skipped
       expect(allContent).not.toContain(longLine1);
       expect(allContent).not.toContain(longLine2);
 
-      // Normal lines should be present
       expect(allContent).toContain('line1');
       expect(allContent).toContain('line2');
       expect(allContent).toContain('line3');
@@ -194,7 +182,6 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Should have no chunks since all lines are too long
       expect(chunks).toHaveLength(0);
     });
 
@@ -218,25 +205,21 @@ describe('streamChunks', () => {
 
   describe('overlap behavior', () => {
     it('should create overlapping chunks', async () => {
-      // Create content that will span multiple chunks
       const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`);
       const content = lines.join('\n');
       const stream = createStreamFromString(content);
 
       const chunks = await collectChunks(stream, baseMetadata, {
-        maxChunkChars: 50, // Small enough to force multiple chunks
         minChunkChars: 10,
         overlapLines: 3,
       });
 
       expect(chunks.length).toBeGreaterThan(1);
 
-      // Check that consecutive chunks have overlap
       for (let i = 0; i < chunks.length - 1; i++) {
         const currentChunkLines = chunks[i].codeChunk.split('\n');
         const nextChunkLines = chunks[i + 1].codeChunk.split('\n');
 
-        // The last few lines of current chunk should appear in the next chunk
         const overlapFound = currentChunkLines
           .slice(-3)
           .some(line => nextChunkLines.includes(line));
@@ -255,14 +238,12 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Verify line numbers are sequential and make sense
       expect(chunks[0].startLine).toBe(1);
 
       for (let i = 0; i < chunks.length; i++) {
         expect(chunks[i].endLine).toBeGreaterThanOrEqual(chunks[i].startLine);
 
         if (i > 0) {
-          // Next chunk should start at or before the end of previous chunk (due to overlap)
           expect(chunks[i].startLine).toBeLessThanOrEqual(chunks[i - 1].endLine + 1);
         }
       }
@@ -280,12 +261,10 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Verify the long line doesn't appear in any chunk
       for (const chunk of chunks) {
         expect(chunk.codeChunk).not.toContain(longLine);
       }
 
-      // Verify all normal lines are accounted for
       const allContent = chunks.map(c => c.codeChunk).join('\n');
       expect(allContent).toContain('line1');
       expect(allContent).toContain('line2');
@@ -307,7 +286,6 @@ describe('streamChunks', () => {
         overlapLines: 2,
       });
 
-      // Count unique line numbers across all chunks
       const lineNumbers = new Set<number>();
       for (const chunk of chunks) {
         for (let i = chunk.startLine; i <= chunk.endLine; i++) {
@@ -315,7 +293,6 @@ describe('streamChunks', () => {
         }
       }
 
-      // All 10 lines should be represented
       expect(lineNumbers.size).toBe(10);
       expect(Math.min(...lineNumbers)).toBe(1);
       expect(Math.max(...lineNumbers)).toBe(10);
@@ -334,21 +311,18 @@ describe('streamChunks', () => {
 
       const allContent = chunks.map(c => c.codeChunk).join('\n');
 
-      // All normal lines should be present
       expect(allContent).toContain('line1');
       expect(allContent).toContain('line2');
       expect(allContent).toContain('line4');
       expect(allContent).toContain('line5');
       expect(allContent).toContain('line7');
 
-      // Long lines should not be present
       expect(allContent).not.toContain(longLine);
     });
   });
 
   describe('edge cases', () => {
     it('should handle line exactly at maxChunkChars boundary', async () => {
-      // Line with exactly 99 chars (100 with newline)
       const exactLine = 'x'.repeat(99);
       const content = `line1\n${exactLine}\nline3`;
       const stream = createStreamFromString(content);
@@ -360,12 +334,10 @@ describe('streamChunks', () => {
       });
 
       const allContent = chunks.map(c => c.codeChunk).join('\n');
-      // Should include the line that's exactly at the boundary
       expect(allContent).toContain(exactLine);
     });
 
     it('should handle line one char over maxChunkChars', async () => {
-      // Line with 100 chars (101 with newline) - should be skipped
       const overLine = 'x'.repeat(100);
       const content = `line1\n${overLine}\nline3`;
       const stream = createStreamFromString(content);
@@ -377,7 +349,6 @@ describe('streamChunks', () => {
       });
 
       const allContent = chunks.map(c => c.codeChunk).join('\n');
-      // Should skip the line that's one char over
       expect(allContent).not.toContain(overLine);
     });
 
@@ -396,11 +367,9 @@ describe('streamChunks', () => {
 
       const allContent = chunks.map(c => c.codeChunk).join('\n');
 
-      // Short and medium lines should be present
       expect(allContent).toContain(shortLine);
       expect(allContent).toContain(mediumLine);
 
-      // Long line should be skipped
       expect(allContent).not.toContain(longLine);
     });
   });

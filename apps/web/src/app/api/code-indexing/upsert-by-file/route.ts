@@ -13,14 +13,11 @@ import { getCodeIndexOrganizationId } from '@/routers/code-indexing/code-indexin
 import { trackCodeIndexingUpsert } from '@/lib/code-indexing/posthog-tracking';
 import { createFlexibleAIAttributionTracker } from '@/lib/ai-attribution-service';
 
-// Same constants as in the router
 const MAX_CHUNK_LENGTH = 8192;
 const errorLogger = sentryLogger('code-indexing-upsert-by-file', 'error');
 
-// Batch size for embedding generation
 const BATCH_SIZE = 4;
 
-// Zod schema for form data validation
 const FormDataSchema = z.object({
   file: z.instanceof(File, { message: 'file must be a File object' }),
   organizationId: z.string().optional().nullable(),
@@ -61,10 +58,8 @@ export async function PUT(
   request: NextRequest
 ): Promise<NextResponse<ErrorResponse | SuccessResponse>> {
   try {
-    // Create tRPC context for authentication
     const ctx = await createTRPCContext();
 
-    // Parse multipart form data
     let formData: FormData | undefined;
     try {
       formData = await request.formData();
@@ -76,7 +71,6 @@ export async function PUT(
       );
     }
 
-    // Extract form fields
     const rawData = {
       file: formData.get('file'),
       organizationId: formData.get('organizationId'),
@@ -87,7 +81,6 @@ export async function PUT(
       isBaseBranch: formData.get('isBaseBranch') || 'true',
     };
 
-    // Validate with Zod
     const validationResult = FormDataSchema.safeParse(rawData);
 
     if (!validationResult.success) {
@@ -107,7 +100,6 @@ export async function PUT(
       organizationId: validationResult.data.organizationId,
     });
 
-    // Create storage instance with default provider and collection
     const storage = getIndexStorage();
 
     setTags({
@@ -119,7 +111,6 @@ export async function PUT(
     let chunksProcessed = 0;
 
     try {
-      // Delete existing chunks for this file/org/branch combination
       await storage.deleteByFilePath({
         organizationId,
         projectId,
@@ -127,7 +118,6 @@ export async function PUT(
         filePath,
       });
 
-      // Prepare metadata for chunking
       const metadata: ChunkMetadata = {
         filePath,
         organizationId,
@@ -136,7 +126,6 @@ export async function PUT(
         isBaseBranch,
       };
 
-      // Create tracker for AI attribution stats (fetches attributions before streaming)
       // On base branch: don't filter by branch so we match AI lines from any branch (merged code)
       // On feature branch: filter by this specific branch only
       const aiAttributionTracker = await createFlexibleAIAttributionTracker({
@@ -146,22 +135,18 @@ export async function PUT(
         branch: isBaseBranch ? undefined : gitBranch,
       });
 
-      // Convert file to text stream
       const fileStream = file.stream();
       const textStream = fileStream.pipeThrough(new TextDecoderStream());
 
-      // Collect chunks into batches for efficient embedding generation
       let batch: ChunkWithMetadata[] = [];
 
       const userId = validationResult.data.organizationId ? null : ctx.user.id;
 
-      // Helper function to process a batch
       const processBatch = async (batchToProcess: ChunkWithMetadata[]): Promise<number> => {
         return await storage.processBatch(batchToProcess);
       };
 
       try {
-        // Stream chunks and collect them into batches
         // Using for-await-of ensures the async generator is fully consumed
         for await (const chunk of streamChunks(textStream, metadata)) {
           // don't attempt to embed empty chunks - it causes an openAI API error
@@ -169,10 +154,8 @@ export async function PUT(
             continue;
           }
 
-          // Process AI attribution stats for this chunk
           aiAttributionTracker.processChunk(chunk);
 
-          // Truncate chunk if it exceeds max length
           const text = chunk.codeChunk.substring(0, MAX_CHUNK_LENGTH);
 
           batch.push({
@@ -188,7 +171,6 @@ export async function PUT(
             isBaseBranch,
           });
 
-          // Process batch when it reaches the batch size
           if (batch.length >= BATCH_SIZE) {
             chunksProcessed += batch.length;
             await processBatch(batch);
@@ -196,7 +178,6 @@ export async function PUT(
           }
         }
 
-        // Process any remaining chunks in the final batch
         if (batch.length > 0) {
           chunksProcessed += batch.length;
           await processBatch(batch);
@@ -206,10 +187,8 @@ export async function PUT(
         // No explicit cleanup needed as the generator's finally block handles reader.releaseLock()
       }
 
-      // Get final AI attribution stats
       const { totalLines, totalAiLines } = aiAttributionTracker.getStats();
 
-      // Upsert manifest entry for this file
       // we upsert because there could be a race between multiple uploads of the same file
       await db
         .insert(code_indexing_manifest)
@@ -240,7 +219,6 @@ export async function PUT(
           },
         });
 
-      // Track successful upsert event in PostHog
       trackCodeIndexingUpsert({
         distinctId: ctx.user.google_user_email,
         organizationId,
@@ -259,7 +237,6 @@ export async function PUT(
         chunksProcessed,
       });
     } catch (error) {
-      // Track failed upsert event in PostHog
       trackCodeIndexingUpsert({
         distinctId: ctx.user.google_user_email,
         organizationId,
@@ -273,14 +250,11 @@ export async function PUT(
         success: false,
       });
 
-      // Re-throw the error to be caught by the outer try-catch
       throw error;
     }
   } catch (error) {
-    // Outer catch for early failures (auth, form parsing, validation)
     // These don't need PostHog tracking as they're pre-processing failures
     console.log('error', error);
-    // Log to Sentry
     captureException(error, {
       extra: {
         url: request.url,

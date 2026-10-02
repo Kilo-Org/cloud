@@ -79,10 +79,8 @@ const UserIndexOperationalInfoSchema = z.object({
 });
 
 const ClusterStatusSchema = z.object({
-  // PostgreSQL stats
   totalPostgresRows: z.number(),
 
-  // System info
   distribution: z.string(),
   distributionVersion: z.string(),
   isDocker: z.boolean(),
@@ -91,24 +89,20 @@ const ClusterStatusSchema = z.object({
   totalDiskBytes: z.number(),
   cpuFlags: z.string(),
 
-  // Memory stats
   memoryActiveBytes: z.number(),
   memoryAllocatedBytes: z.number(),
   memoryMetadataBytes: z.number(),
   memoryResidentBytes: z.number(),
   memoryRetainedBytes: z.number(),
 
-  // Main collection stats (org-code-indexing)
   mainCollectionPoints: z.number(),
   mainCollectionOptimizersStatus: z.string(),
 
-  // Cluster health
   clusterRole: z.string(),
   clusterPeers: z.number(),
   clusterPendingOperations: z.number(),
   consensusStatus: z.string(),
 
-  // App info
   qdrantVersion: z.string(),
   uptime: z.string(),
 });
@@ -121,7 +115,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       const { page, pageSize, sortBy, sortOrder } = input;
       const offset = (page - 1) * pageSize;
 
-      // Map frontend field names to SQL column names
       const sortColumnMap: Record<string, string> = {
         organization_name: 'organization_name',
         chunk_count: 'chunk_count',
@@ -132,14 +125,12 @@ export const codeIndexingAdminRouter = createTRPCRouter({
         last_modified: 'last_modified',
       };
       const sortColumn = sortColumnMap[sortBy] || 'size_kb';
-      // Implementation for getting operational info for organization indexes only
       const manifestTableName = getTableName(code_indexing_manifest);
       const orgTableName = getTableName(organizations);
       const orgIdColumn = code_indexing_manifest.organization_id.name;
       const orgNameColumn = organizations.name.name;
       const userIdColumn = code_indexing_manifest.kilo_user_id.name;
 
-      // Get total count
       const { rows: countRows } = await db.execute(sql`
       SELECT COUNT(DISTINCT ${sql.identifier(orgIdColumn)})::int as total
       FROM ${sql.identifier(manifestTableName)}
@@ -147,7 +138,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     `);
       const total = Number(countRows[0]?.total || 0);
 
-      // Get paginated data
       const { rows } = await db.execute(sql`
       WITH table_stats AS (
           SELECT
@@ -210,7 +200,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
       const { page, pageSize, sortBy, sortOrder } = input;
       const offset = (page - 1) * pageSize;
 
-      // Map frontend field names to SQL column names
       const sortColumnMap: Record<string, string> = {
         user_email: 'user_email',
         chunk_count: 'chunk_count',
@@ -221,13 +210,11 @@ export const codeIndexingAdminRouter = createTRPCRouter({
         last_modified: 'last_modified',
       };
       const sortColumn = sortColumnMap[sortBy] || 'size_kb';
-      // Implementation for getting operational info for user indexes only
       const manifestTableName = getTableName(code_indexing_manifest);
       const usersTableName = getTableName(kilocode_users);
       const userIdColumn = code_indexing_manifest.kilo_user_id.name;
       const userEmailColumn = kilocode_users.google_user_email.name;
 
-      // Get total count
       const { rows: countRows } = await db.execute(sql`
       SELECT COUNT(DISTINCT ${sql.identifier(userIdColumn)})::int as total
       FROM ${sql.identifier(manifestTableName)}
@@ -235,7 +222,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     `);
       const total = Number(countRows[0]?.total || 0);
 
-      // Get paginated data
       const { rows } = await db.execute(sql`
       WITH table_stats AS (
           SELECT
@@ -292,7 +278,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     }),
 
   getClusterStatus: adminProcedure.output(ClusterStatusSchema).query(async () => {
-    // Fetch telemetry data from Qdrant with details_level=100
     const telemetryUrl = `https://${QDRANT_HOST}/telemetry?details_level=1`;
     const telemetryResponse = await fetch(telemetryUrl, {
       method: 'GET',
@@ -307,7 +292,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
 
     const telemetryData = await telemetryResponse.json();
 
-    // Extract memory statistics
     const memory = telemetryData.result?.memory || {};
     const memoryActiveBytes = memory.active_bytes || 0;
     const memoryAllocatedBytes = memory.allocated_bytes || 0;
@@ -315,7 +299,6 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     const memoryResidentBytes = memory.resident_bytes || 0;
     const memoryRetainedBytes = memory.retained_bytes || 0;
 
-    // Extract system information
     const system = telemetryData.result?.app?.system || {};
     const distribution = system.distribution || 'unknown';
     const distributionVersion = system.distribution_version || 'unknown';
@@ -327,25 +310,21 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     const totalDiskBytes = system.disk_size || 0;
     const cpuFlags = system.cpu_flags || 'unknown';
 
-    // Extract app information
     const app = telemetryData.result?.app || {};
     const qdrantVersion = app.version || 'unknown';
     const startupTime = app.startup || '';
 
-    // Calculate uptime
     const uptime = startupTime
       ? `${Math.floor((Date.now() - new Date(startupTime).getTime()) / (1000 * 60 * 60 * 24))} days`
       : 'unknown';
 
-    // Extract cluster information
     const cluster = telemetryData.result?.cluster?.status || {};
     const clusterRole = cluster.role || 'unknown';
     const clusterPeers = cluster.number_of_peers || 0;
     const clusterPendingOperations = cluster.pending_operations || 0;
     const consensusStatus = cluster.consensus_thread_status?.consensus_thread_status || 'unknown';
 
-    // Get main collection stats (org-code-indexing)
-    // Note: The telemetry response doesn't include collection names in the collections array
+    // The telemetry response doesn't include collection names in the collections array
     // We need to get this info from the cluster info or use the total vectors count
     const collectionsData = telemetryData.result?.collections || {};
     const collections = collectionsData.collections || [];
@@ -356,13 +335,11 @@ export const codeIndexingAdminRouter = createTRPCRouter({
     let mainCollectionOptimizersStatus = 'unknown';
 
     if (collections.length > 0) {
-      // Use the first/main collection's data
       const firstCollection = collections[0];
       mainCollectionPoints = firstCollection?.vectors || 0;
       mainCollectionOptimizersStatus = firstCollection?.optimizers_status || 'unknown';
     }
 
-    // Get total PostgreSQL rows from manifest table
     const manifestTableName = getTableName(code_indexing_manifest);
     const { rows } = await db.execute(sql`
       SELECT SUM(chunk_count)::int as total_rows

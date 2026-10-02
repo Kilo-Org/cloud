@@ -3,10 +3,8 @@
 export function generateFakeEmbedding(text: string): number[] {
   const embedding = new Array(1536).fill(0);
 
-  // Extract words from text (lowercase, alphanumeric only)
   const words = text.toLowerCase().match(/\b\w+\b/g) || [];
 
-  // Each word contributes to specific dimensions in the embedding
   words.forEach(word => {
     let wordHash = 0;
     for (let i = 0; i < word.length; i++) {
@@ -42,15 +40,12 @@ export function generateFakeEmbedding(text: string): number[] {
     embedding[i] += 0.1;
   }
 
-  // Normalize the embedding vector
   const magnitude = Math.sqrt(embedding.reduce((sum: number, val: number) => sum + val * val, 0));
   if (magnitude === 0) return new Array(1536).fill(0) as number[]; // Edge case: empty text
   return embedding.map((val: number) => val / magnitude);
 }
 
-// Setup mocks for AI SDK and OpenAI
 export function setupEmbeddingMocks() {
-  // Mock AI SDK
   jest.mock('ai', () => ({
     embed: jest.fn(async ({ value }: { value: string }) => ({
       embedding: generateFakeEmbedding(value),

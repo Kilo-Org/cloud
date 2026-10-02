@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode, RefObject } from 'react';
+import { memo, type ReactNode, type RefObject } from 'react';
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -110,7 +110,15 @@ const markdownComponents: Components = {
   },
 };
 
-export function ToolMarkdown({ content, className }: { content: string; className?: string }) {
+const remarkPlugins = [remarkGfm];
+
+export const ToolMarkdown = memo(function ToolMarkdown({
+  content,
+  className,
+}: {
+  content: string;
+  className?: string;
+}) {
   return (
     <div
       role="region"
@@ -122,7 +130,7 @@ export function ToolMarkdown({ content, className }: { content: string; classNam
       )}
     >
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={remarkPlugins}
         components={markdownComponents}
         urlTransform={toSafeHttpUrl}
       >
@@ -130,4 +138,4 @@ export function ToolMarkdown({ content, className }: { content: string; classNam
       </ReactMarkdown>
     </div>
   );
-}
+});

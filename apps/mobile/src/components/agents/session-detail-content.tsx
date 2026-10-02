@@ -316,11 +316,11 @@ export function SessionDetailContent({
   );
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   // The accessor handed to the transcript's rows must keep one identity across
-  // streaming publishes: the SDK re-emits `childMessages` on every
-  // `partsRevision` bump, and a changing prop would defeat `MessageBubble`'s
-  // shallow memo for every visible row. The in-transcript subagent card
-  // subscribes to the atom itself (`LiveChildSessionSection`), so it stays live
-  // without this identity changing.
+  // root streaming publishes: the SDK only re-emits `childMessages` when
+  // non-root rows change or the storage/root session changes, and a changing
+  // prop would defeat `MessageBubble`'s shallow memo for every visible row. The
+  // in-transcript subagent card subscribes to the atom itself
+  // (`LiveChildSessionSection`), so it stays live without this identity changing.
   const getChildMessagesRef = useRef(getChildMessages);
   getChildMessagesRef.current = getChildMessages;
   const getChildMessagesForRows = useCallback(

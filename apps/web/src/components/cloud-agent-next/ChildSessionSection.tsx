@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useAtomValue, type Atom } from 'jotai';
 import { ChevronRight, ChevronDown, Bot, CornerDownRight } from 'lucide-react';
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
+import { useOptionalManager } from './CloudAgentProvider';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
@@ -40,7 +42,41 @@ type ChildSessionSectionProps = {
   onOpenChildSession?: OpenChildSession;
 };
 
-export function ChildSessionSection({
+export function ChildSessionSection(props: ChildSessionSectionProps) {
+  const manager = useOptionalManager();
+  const childMessagesAtom = manager?.atoms.childMessages;
+  if (childMessagesAtom && props.sessionId) {
+    return (
+      <LiveChildSessionSection
+        childMessagesAtom={childMessagesAtom}
+        sessionId={props.sessionId}
+        {...props}
+      />
+    );
+  }
+  return <ChildSessionSectionBody {...props} />;
+}
+
+function LiveChildSessionSection({
+  childMessagesAtom,
+  sessionId,
+  ...props
+}: ChildSessionSectionProps & {
+  childMessagesAtom: Atom<(childSessionId: string) => StoredMessage[]>;
+  sessionId: KiloSessionId;
+}) {
+  const getChildMessages = useAtomValue(childMessagesAtom);
+  return (
+    <ChildSessionSectionBody
+      {...props}
+      sessionId={sessionId}
+      childMessages={getChildMessages(sessionId)}
+      getChildMessages={getChildMessages}
+    />
+  );
+}
+
+function ChildSessionSectionBody({
   subtaskPart,
   taskToolPart,
   sessionId,

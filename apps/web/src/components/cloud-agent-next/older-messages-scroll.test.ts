@@ -1,4 +1,7 @@
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, beforeEach, afterEach, beforeAll, jest } from '@jest/globals';
+import { createRequire } from 'node:module';
+import React, { act, createElement, type RefObject } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import {
   canAutoloadOlderMessages,
@@ -6,6 +9,7 @@ import {
   selectOlderMessagesHeaderState,
   shouldAnnounceOlderMessagesArrival,
   shouldTriggerOlderMessagesLoad,
+  useOlderMessagesPagination,
 } from './older-messages-scroll';
 
 function error(kind: OlderMessagesError['kind']): OlderMessagesError {
@@ -185,5 +189,238 @@ describe('shouldAnnounceOlderMessagesArrival', () => {
         nextNewestKey: 'msg_new',
       })
     ).toBe(false);
+  });
+});
+
+type PaginationApi = ReturnType<typeof useOlderMessagesPagination>;
+
+function installDom(): { container: HTMLElement; cleanup: () => void } {
+  const requireFromHere = createRequire(__filename);
+  const loadLinkedom = (): { parseHTML: (html: string) => { window: typeof globalThis } } => {
+    try {
+      return requireFromHere('linkedom') as {
+        parseHTML: (html: string) => { window: typeof globalThis };
+      };
+    } catch {
+      return requireFromHere(
+        '../../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
+      ) as { parseHTML: (html: string) => { window: typeof globalThis } };
+    }
+  };
+  const { window } = loadLinkedom().parseHTML(
+    '<!doctype html><html><body><div id="root"></div></body></html>'
+  );
+  const document = window.document;
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    HTMLElement: globalThis.HTMLElement,
+    Element: globalThis.Element,
+    Node: globalThis.Node,
+    getComputedStyle: globalThis.getComputedStyle,
+    requestAnimationFrame: globalThis.requestAnimationFrame,
+    cancelAnimationFrame: globalThis.cancelAnimationFrame,
+    IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT,
+  };
+  Object.assign(globalThis, {
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    getComputedStyle: () => ({ animationName: 'none', display: 'block' }),
+    requestAnimationFrame: (callback: FrameRequestCallback) => {
+      callback(0);
+      return 0;
+    },
+    cancelAnimationFrame: () => undefined,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const container = document.getElementById('root');
+  if (!container) throw new Error('older messages pagination test root missing');
+  return { container, cleanup: () => Object.assign(globalThis, previous) };
+}
+
+function PaginationHarness({
+  ready,
+  isLoadingOlderMessages,
+  resetKey,
+  onLoad,
+  onApi,
+  scrollElementRef,
+  isProgrammaticScrollRef,
+  lastScrollTopRef,
+}: {
+  ready: boolean;
+  isLoadingOlderMessages: boolean;
+  resetKey: string;
+  onLoad: () => void;
+  onApi: (api: PaginationApi) => void;
+  scrollElementRef: RefObject<HTMLElement | null>;
+  isProgrammaticScrollRef: RefObject<boolean>;
+  lastScrollTopRef: RefObject<number>;
+}) {
+  const api = useOlderMessagesPagination({
+    scrollElementRef,
+    hasOlderMessages: true,
+    isLoadingOlderMessages,
+    olderMessagesError: null,
+    onLoad,
+    isProgrammaticScrollRef,
+    lastScrollTopRef,
+    resetKey,
+    overflowCheckKey: resetKey,
+    ready,
+  });
+  onApi(api);
+  return null;
+}
+
+describe('useOlderMessagesPagination readiness', () => {
+  let root: Root;
+  let dom: ReturnType<typeof installDom>;
+
+  beforeAll(() => {
+    Object.assign(globalThis, { React });
+  });
+
+  beforeEach(() => {
+    dom = installDom();
+    root = createRoot(dom.container);
+  });
+
+  afterEach(() => {
+    act(() => root.unmount());
+    dom.cleanup();
+  });
+
+  function scrollingElement(height: () => number): {
+    element: HTMLElement;
+    heightReads: () => number;
+  } {
+    let reads = 0;
+    const element = {
+      hidden: false,
+      clientHeight: 100,
+      scrollTop: 0,
+      get scrollHeight() {
+        reads += 1;
+        return height();
+      },
+    };
+    return { element: element as unknown as HTMLElement, heightReads: () => reads };
+  }
+
+  function renderPagination(
+    props: Omit<React.ComponentProps<typeof PaginationHarness>, 'onApi'> & {
+      onApi: (api: PaginationApi) => void;
+    }
+  ): void {
+    act(() => {
+      root.render(createElement(PaginationHarness, props));
+    });
+  }
+
+  it('does not read scroll height or autoload while not ready', () => {
+    const { element, heightReads } = scrollingElement(() => 50);
+    const onLoad = jest.fn();
+    const scrollElementRef: RefObject<HTMLElement | null> = { current: element };
+    const isProgrammaticScrollRef = { current: false };
+    const lastScrollTopRef = { current: 0 };
+
+    renderPagination({
+      ready: false,
+      isLoadingOlderMessages: false,
+      resetKey: 'ses',
+      onLoad,
+      onApi: () => undefined,
+      scrollElementRef,
+      isProgrammaticScrollRef,
+      lastScrollTopRef,
+    });
+
+    expect(onLoad).not.toHaveBeenCalled();
+    expect(heightReads()).toBe(0);
+
+    renderPagination({
+      ready: true,
+      isLoadingOlderMessages: false,
+      resetKey: 'ses',
+      onLoad,
+      onApi: () => undefined,
+      scrollElementRef,
+      isProgrammaticScrollRef,
+      lastScrollTopRef,
+    });
+
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(heightReads()).toBeGreaterThan(0);
+  });
+
+  it('restores the prepend position when no reset intervenes', () => {
+    let height = 200;
+    const { element } = scrollingElement(() => height);
+    const onLoad = jest.fn();
+    const scrollElementRef: RefObject<HTMLElement | null> = { current: element };
+    const isProgrammaticScrollRef = { current: false };
+    const lastScrollTopRef = { current: 0 };
+    let api: PaginationApi | null = null;
+
+    const render = (loading: boolean): void =>
+      renderPagination({
+        ready: true,
+        isLoadingOlderMessages: loading,
+        resetKey: 'A',
+        onLoad,
+        onApi: next => {
+          api = next;
+        },
+        scrollElementRef,
+        isProgrammaticScrollRef,
+        lastScrollTopRef,
+      });
+
+    render(false);
+    act(() => api?.requestOlderMessages());
+    render(true);
+    height = 350;
+    render(false);
+
+    expect(lastScrollTopRef.current).toBe(150);
+  });
+
+  it('clears a pending prepend restore when the reset key changes', () => {
+    let height = 200;
+    const { element } = scrollingElement(() => height);
+    const onLoad = jest.fn();
+    const scrollElementRef: RefObject<HTMLElement | null> = { current: element };
+    const isProgrammaticScrollRef = { current: false };
+    const lastScrollTopRef = { current: 0 };
+    let api: PaginationApi | null = null;
+
+    const render = (ready: boolean, loading: boolean, resetKey: string): void =>
+      renderPagination({
+        ready,
+        isLoadingOlderMessages: loading,
+        resetKey,
+        onLoad,
+        onApi: next => {
+          api = next;
+        },
+        scrollElementRef,
+        isProgrammaticScrollRef,
+        lastScrollTopRef,
+      });
+
+    render(true, false, 'A');
+    act(() => api?.requestOlderMessages());
+    render(false, false, 'B');
+    render(true, false, 'B');
+    render(true, true, 'B');
+    height = 350;
+    render(true, false, 'B');
+
+    expect(lastScrollTopRef.current).toBe(0);
   });
 });

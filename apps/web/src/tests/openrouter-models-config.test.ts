@@ -1,12 +1,16 @@
 import { test, expect, describe } from '@jest/globals';
-import { buildPreferredModels, PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import {
+  buildMonitoredModels,
+  buildPreferredModels,
+  PRIMARY_DEFAULT_MODEL,
+} from '@/lib/ai-gateway/models';
 import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
 import type * as AutoFreeConfigModule from '@/lib/ai-gateway/auto-model/auto-free-config';
 
 jest.mock('@/lib/ai-gateway/auto-model/auto-free-config', () => ({
@@ -79,6 +83,7 @@ describe('OpenRouter Models Config', () => {
     const monitoredModels = await getMonitoredModels();
     const configuredPreferredModels = buildPreferredModels(['poolside/laguna-s-2.1:free']);
     expect(configuredPreferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
+    expect(monitoredModels).toEqual(buildMonitoredModels(['poolside/laguna-s-2.1:free']));
     expect(monitoredModels).toEqual(
       configuredPreferredModels.filter(model => !isKiloAutoModel(model))
     );

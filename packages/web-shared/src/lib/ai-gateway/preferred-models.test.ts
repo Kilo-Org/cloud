@@ -2,8 +2,8 @@ import { describe, expect, it } from '@jest/globals';
 import { getConfiguredAutoFreeModels } from '@/lib/ai-gateway/auto-model/auto-free-config';
 import type * as AutoFreeConfigModule from '@/lib/ai-gateway/auto-model/auto-free-config';
 import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
-import { buildPreferredModels } from '@/lib/ai-gateway/models';
-import { getPreferredModels } from './preferred-models';
+import { buildMonitoredModels, buildPreferredModels } from '@/lib/ai-gateway/models';
+import { getMonitoredModels, getPreferredModels } from './preferred-models';
 
 jest.mock('@/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -30,6 +30,10 @@ describe('getPreferredModels', () => {
     ]);
     expect(preferredModels).not.toContain('openrouter/free');
     expect(preferredModels).toEqual(buildPreferredModels(['provider/b:free', 'provider/a:free']));
+    expect(await getMonitoredModels()).toEqual(
+      buildMonitoredModels(['provider/b:free', 'provider/a:free'])
+    );
+    expect(await getMonitoredModels()).toEqual(preferredModels.slice(2));
   });
 
   it('has no free section when no auto-free config is stored', async () => {

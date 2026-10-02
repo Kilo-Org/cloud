@@ -18,7 +18,7 @@ import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { CRON_SECRET, ENKRYPT_SYNC_ENABLED } from '@/lib/config.server';
 import { ENKRYPT_MODEL_MAPPINGS } from '@/lib/model-stats/enkrypt-identity';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import { getMonitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { getMonitoredModels } from '@/lib/ai-gateway/preferred-models';
 
 /**
  * Vercel Cron Job: Sync Model Stats

@@ -110,18 +110,6 @@ export function formatName(model: OpenRouterModel, preferredIndex: number) {
   return name;
 }
 
-// OpenRouter lists these virtual routers with empty supported_parameters, which makes Kilo
-// clients drop them, even though they route to regular chat models that accept tools.
-const TOOL_CAPABLE_VIRTUAL_ROUTER_IDS = new Set(['typesafe/jev-router', 'openrouter/pareto-code']);
-
-function addVirtualRouterToolSupport(model: OpenRouterModel): OpenRouterModel {
-  const supportedParameters = model.supported_parameters ?? [];
-  if (supportedParameters.includes('tools') || !TOOL_CAPABLE_VIRTUAL_ROUTER_IDS.has(model.id)) {
-    return model;
-  }
-  return { ...model, supported_parameters: [...supportedParameters, 'tools'] };
-}
-
 export function shouldSuppressOpenRouterModel(model: KiloExclusiveModel): boolean {
   return model.status !== 'disabled' || model.pricing === null;
 }
@@ -160,7 +148,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         const pricing = getModelDisplayPricing(rawPricing);
         const terminalBench = terminalBenchFor(summaries, model.id);
         return {
-          ...addVirtualRouterToolSupport(model),
+          ...model,
           ...(pricing && { pricing }),
           ...(terminalBench && { terminalBench }),
         };

@@ -46,18 +46,23 @@ const PREFERRED_PAID_MODELS = [
 ];
 
 /**
- * Builds the preferred model order. The free section comes from the admin
- * auto-free configuration, which only the server can read; use
- * `getPreferredModels` on the server and `usePreferredModels` in client components.
+ * The concrete models in the preferred list; auto models route elsewhere and are not monitored.
+ * The free section comes from the admin auto-free configuration, which only the server can
+ * read; use `getMonitoredModels` on the server.
+ */
+export function buildMonitoredModels(freeModels: ReadonlyArray<string>): string[] {
+  return [...new Set([...freeModels, ...PREFERRED_PAID_MODELS])];
+}
+
+/**
+ * Builds the preferred model order; use `getPreferredModels` on the server and
+ * `usePreferredModels` in client components.
  */
 export function buildPreferredModels(freeModels: ReadonlyArray<string>): string[] {
   return [
-    ...new Set([
-      KILO_AUTO_EFFICIENT_MODEL.id,
-      KILO_AUTO_FREE_MODEL.id,
-      ...freeModels,
-      ...PREFERRED_PAID_MODELS,
-    ]),
+    KILO_AUTO_EFFICIENT_MODEL.id,
+    KILO_AUTO_FREE_MODEL.id,
+    ...buildMonitoredModels(freeModels),
   ];
 }
 

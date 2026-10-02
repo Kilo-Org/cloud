@@ -1,8 +1,9 @@
-import { db, sql } from '@/lib/drizzle';
-import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
+import { z } from 'zod';
+import { getEnvVariable } from '@/lib/dotenvx';
 import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
+import { normalizeModelId } from '@/lib/ai-gateway/model-utils';
 
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';
@@ -42,33 +43,146 @@ const LOW_BASELINE = 50;
 // inflating baselines and triggering false drops when they pause.
 const MIN_UNIQUE_USERS_FOR_ALERT = 20;
 
-// Statement timeout for the health check query. If the query takes longer,
-// we fail open (report healthy) since a timeout is not evidence of a model
-// being down.
-const STATEMENT_TIMEOUT_MS = 10_000;
+// Timeout for the Analytics Engine query. If the query takes longer, we fail
+// open (report healthy) since a timeout is not evidence of a model being down.
+const QUERY_TIMEOUT_MS = 10_000;
 
-// Models excluded from the top-level health status. They still get their
-// per-model health evaluated and returned, but can't trigger 503 responses.
-// Useful for preview models with inconsistent traffic that cause false alerts,
-// or third-party models that can be retracted without notice.
-const HEALTH_CHECK_EXCLUSIONS = new Set([
-  'google/gemini-3.1-pro-preview',
-  // We don't control when this model may be retracted by OpenRouter.
-  'openrouter/elephant-alpha',
-  'openai/gpt-5.4',
-  'openai/gpt-5.5',
-]);
+const MINUTE_MS = 60 * 1000;
+const CURRENT_WINDOW_MS = 15 * MINUTE_MS;
+const PREVIOUS_WINDOW_MS = 30 * MINUTE_MS;
+const BASELINE_WINDOW_MS = 120 * MINUTE_MS;
+// The baseline spans 90 minutes; dividing by 6 compares it per 15-minute window.
+const BASELINE_WINDOW_COUNT = 6;
 
-function emptyMetrics(): Omit<ModelHealthMetrics, 'monitored'> {
+const BucketSchema = z.enum(['current', 'previous', 'baseline']);
+type Bucket = z.infer<typeof BucketSchema>;
+
+const AnalyticsEngineResponseSchema = z.object({
+  data: z.array(
+    z.object({
+      model: z.string(),
+      bucket: BucketSchema,
+      requests: z.coerce.number(),
+      unique_users: z.coerce.number(),
+    })
+  ),
+});
+
+type BucketStats = { requests: number; uniqueUsers: number };
+type ModelStats = Record<Bucket, BucketStats>;
+
+function emptyModelStats(): ModelStats {
   return {
-    healthy: true,
-    currentRequests: 0,
-    previousRequests: 0,
-    baselineRequests: 0,
-    percentChange: 0,
-    absoluteDrop: 0,
-    uniqueUsersCurrent: 0,
-    uniqueUsersBaseline: 0,
+    current: { requests: 0, uniqueUsers: 0 },
+    previous: { requests: 0, uniqueUsers: 0 },
+    baseline: { requests: 0, uniqueUsers: 0 },
+  };
+}
+
+function toAnalyticsEngineModelId(model: string): string {
+  return normalizeModelId(model.toLowerCase());
+}
+
+function sqlString(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+function sqlDateTime(ms: number): string {
+  return `toDateTime(${Math.floor(ms / 1000)})`;
+}
+
+function buildHealthQuery(anchorMs: number, modelIds: readonly string[]): string {
+  const end = sqlDateTime(anchorMs);
+  const currentStart = sqlDateTime(anchorMs - CURRENT_WINDOW_MS);
+  const previousStart = sqlDateTime(anchorMs - PREVIOUS_WINDOW_MS);
+  const baselineStart = sqlDateTime(anchorMs - BASELINE_WINDOW_MS);
+
+  // o11y_api_metrics schema: blob2 = resolvedModel, blob4 = '1' on error,
+  // blob7 = kiloUserId. _sample_interval rescales sampled rows.
+  return `
+    SELECT
+      blob2 AS model,
+      if(timestamp >= ${currentStart}, 'current',
+        if(timestamp >= ${previousStart}, 'previous', 'baseline')) AS bucket,
+      SUM(_sample_interval) AS requests,
+      count(DISTINCT blob7) AS unique_users
+    FROM o11y_api_metrics
+    WHERE timestamp >= ${baselineStart}
+      AND timestamp <= ${end}
+      AND blob4 = '0'
+      AND blob2 IN (${modelIds.map(sqlString).join(', ')})
+    GROUP BY model, bucket
+    FORMAT JSON
+  `;
+}
+
+async function queryModelStats(
+  anchorMs: number,
+  modelIds: readonly string[]
+): Promise<Map<string, ModelStats>> {
+  const accountId = getEnvVariable('R2_ACCOUNT_ID');
+  const token = getEnvVariable('CF_ANALYTICS_ENGINE_TOKEN');
+  if (!accountId || !token) {
+    throw new Error('Missing Cloudflare Analytics Engine configuration');
+  }
+
+  const response = await fetch(
+    `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: buildHealthQuery(anchorMs, modelIds),
+      signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`Analytics Engine query failed (${response.status}): ${await response.text()}`);
+  }
+
+  const { data } = AnalyticsEngineResponseSchema.parse(await response.json());
+  const statsByModel = new Map<string, ModelStats>();
+  for (const row of data) {
+    const stats = statsByModel.get(row.model) ?? emptyModelStats();
+    stats[row.bucket] = { requests: row.requests, uniqueUsers: row.unique_users };
+    statsByModel.set(row.model, stats);
+  }
+  return statsByModel;
+}
+
+function evaluateModelHealth(stats: ModelStats): ModelHealthMetrics {
+  const currentRequests = Math.round(stats.current.requests);
+  const previousRequests = Math.round(stats.previous.requests);
+  const baselineRequests = Math.round(stats.baseline.requests / BASELINE_WINDOW_COUNT);
+  const uniqueUsersCurrent = stats.current.uniqueUsers;
+  const uniqueUsersBaseline = stats.baseline.uniqueUsers;
+  const percentChange =
+    baselineRequests > 0
+      ? Math.round(((currentRequests - baselineRequests) / baselineRequests) * 100)
+      : 0;
+  const absoluteDrop = currentRequests - baselineRequests;
+
+  // Per-model health: unhealthy when the baseline had enough distinct organic
+  // users AND the model shows a significant traffic drop.
+  const healthy = !(
+    uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
+    ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
+      (baselineRequests > LOW_BASELINE &&
+        baselineRequests < HIGH_BASELINE &&
+        currentRequests === 0 &&
+        previousRequests === 0))
+  );
+
+  return {
+    healthy,
+    monitored: true,
+    currentRequests,
+    previousRequests,
+    baselineRequests,
+    percentChange,
+    absoluteDrop,
+    uniqueUsersCurrent,
+    uniqueUsersBaseline,
   };
 }
 
@@ -83,7 +197,7 @@ export async function GET(
   }
 
   // Optional `at` parameter: ISO 8601 timestamp to anchor the query window.
-  // When omitted the query uses NOW(). Must be within the last 24 hours.
+  // When omitted the query uses the current time. Must be within the last 24 hours.
   const atParam = searchParams.get('at');
   let anchorTime: Date | null = null;
   if (atParam) {
@@ -98,116 +212,29 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const alertingModels = monitoredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
-  const excludedModels = monitoredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
-
   try {
     const queryStartTime = Date.now();
-    // When an anchor time is provided, replace NOW() with the fixed timestamp.
-    const ref = anchorTime ? sql`${anchorTime.toISOString()}::timestamptz` : sql`NOW()`;
-    const result = await db.transaction(async tx => {
-      await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${STATEMENT_TIMEOUT_MS}'`));
-      return tx.execute<{
-        requested_model: string;
-        current_requests: string;
-        previous_requests: string;
-        baseline_requests: string;
-        unique_users_current: string;
-        unique_users_baseline: string;
-      }>(sql`
-        WITH all_periods AS (
-          SELECT
-            requested_model,
-            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '15 minutes'
-                                  AND created_at <= ${ref}) AS current_requests,
-            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '30 minutes'
-                             AND created_at < ${ref} - INTERVAL '15 minutes') AS previous_requests,
-            COUNT(*) FILTER (WHERE created_at >= ${ref} - INTERVAL '2 hours'
-                             AND created_at < ${ref} - INTERVAL '30 minutes') / 6.0 AS avg_baseline,
-            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= ${ref} - INTERVAL '15 minutes'
-                                                       AND created_at <= ${ref})
-              AS unique_users_current,
-            COUNT(DISTINCT kilo_user_id) FILTER (WHERE created_at >= ${ref} - INTERVAL '2 hours'
-                                                  AND created_at < ${ref} - INTERVAL '30 minutes')
-              AS unique_users_baseline
-          FROM ${microdollar_usage}
-          WHERE
-            created_at >= ${ref} - INTERVAL '2 hours'
-            AND created_at <= ${ref}
-            AND has_error = false
-            AND requested_model IN (${sql.join(monitoredModels, sql`, `)})
-          GROUP BY requested_model
-        )
-        SELECT
-          requested_model,
-          current_requests::text AS current_requests,
-          previous_requests::text AS previous_requests,
-          ROUND(avg_baseline)::text AS baseline_requests,
-          unique_users_current::text AS unique_users_current,
-          unique_users_baseline::text AS unique_users_baseline
-        FROM all_periods
-      `);
-    });
+    const anchor = anchorTime ?? new Date(queryStartTime);
+    // Analytics Engine stores the resolved model without `:free`-style suffixes,
+    // so monitored models are matched on their normalized ID.
+    const statsByModel = await queryModelStats(anchor.getTime(), [
+      ...new Set(monitoredModels.map(toAnalyticsEngineModelId)),
+    ]);
 
     const models: Record<string, ModelHealthMetrics> = {};
-
-    result.rows.forEach(row => {
-      const currentRequests = parseInt(row.current_requests, 10);
-      const previousRequests = parseInt(row.previous_requests, 10);
-      const baselineRequests = parseInt(row.baseline_requests, 10);
-      const uniqueUsersCurrent = parseInt(row.unique_users_current, 10);
-      const uniqueUsersBaseline = parseInt(row.unique_users_baseline, 10);
-      const percentChange =
-        baselineRequests > 0
-          ? Math.round(((currentRequests - baselineRequests) / baselineRequests) * 100)
-          : 0;
-      const absoluteDrop = currentRequests - baselineRequests;
-      const isMonitored = !HEALTH_CHECK_EXCLUSIONS.has(row.requested_model);
-
-      // Per-model health: unhealthy when the baseline had enough distinct organic
-      // users AND the model shows a significant traffic drop.
-      // Non-monitored models still get their real health status — they just
-      // don't affect the top-level healthy flag or trigger 503.
-      const healthy = !(
-        uniqueUsersBaseline >= MIN_UNIQUE_USERS_FOR_ALERT &&
-        ((baselineRequests > HIGH_BASELINE && percentChange < -90) ||
-          (baselineRequests > LOW_BASELINE &&
-            baselineRequests < HIGH_BASELINE &&
-            currentRequests === 0 &&
-            previousRequests === 0))
-      );
-
-      models[row.requested_model] = {
-        healthy,
-        monitored: isMonitored,
-        currentRequests,
-        previousRequests,
-        baselineRequests,
-        percentChange,
-        absoluteDrop,
-        uniqueUsersCurrent,
-        uniqueUsersBaseline,
-      };
-    });
-
-    // Ensure all monitored models are in the response (even if no data)
     for (const model of monitoredModels) {
-      if (!models[model]) {
-        models[model] = {
-          ...emptyMetrics(),
-          monitored: !HEALTH_CHECK_EXCLUSIONS.has(model),
-        };
-      }
+      models[model] = evaluateModelHealth(
+        statsByModel.get(toAnalyticsEngineModelId(model)) ?? emptyModelStats()
+      );
     }
 
     const queryExecutionTimeMs = Date.now() - queryStartTime;
-    // Only monitored models affect the top-level health status
-    const hasSignificantDrop = Object.values(models).some(m => m.monitored && !m.healthy);
+    const hasSignificantDrop = Object.values(models).some(m => !m.healthy);
     const status = hasSignificantDrop ? 503 : 200;
 
     if (hasSignificantDrop) {
       const unhealthy = Object.entries(models)
-        .filter(([, m]) => m.monitored && !m.healthy)
+        .filter(([, m]) => !m.healthy)
         .map(([model, m]) => ({
           model,
           currentRequests: m.currentRequests,
@@ -217,7 +244,7 @@ export async function GET(
           uniqueUsersBaseline: m.uniqueUsersBaseline,
         }));
       console.error('[models/up] returning 503: unhealthy monitored models', {
-        anchorTime: (anchorTime ?? new Date()).toISOString(),
+        anchorTime: anchor.toISOString(),
         unhealthy,
       });
     }
@@ -227,7 +254,7 @@ export async function GET(
         healthy: !hasSignificantDrop,
         models,
         metadata: {
-          timestamp: (anchorTime ?? new Date()).toISOString(),
+          timestamp: anchor.toISOString(),
           queryExecutionTimeMs,
         },
       },
@@ -236,10 +263,10 @@ export async function GET(
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'models/up', source: 'model_health_check' },
-      extra: { monitoredModels: alertingModels, nonMonitoredModels: excludedModels },
+      extra: { monitoredModels },
     });
 
-    // Fail open: a query timeout or DB error is not evidence of a model being down.
+    // Fail open: a query timeout or Analytics Engine error is not evidence of a model being down.
     return NextResponse.json(
       {
         healthy: true,

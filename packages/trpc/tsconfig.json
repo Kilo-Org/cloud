@@ -17,6 +17,7 @@
     "resolveJsonModule": true,
     "paths": {
       "@/*": ["../../apps/web/src/*", "../web-shared/src/*"],
+      "@kilocode/web-shared/*": ["../web-shared/src/*"],
       "@kilocode/db": ["../db/src/index.ts"],
       "@kilocode/db/*": ["../db/src/*"],
       "@kilocode/encryption": ["../encryption/src/index.ts"]

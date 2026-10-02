@@ -41,6 +41,10 @@ const plugins = [
         if (existsSync(webDts)) return webDts;
         return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', source.slice(2)));
       }
+      if (source.startsWith('@kilocode/web-shared/')) {
+        const subpath = source.slice('@kilocode/web-shared/'.length);
+        return resolveDts(path.resolve(tscOut, 'packages/web-shared/src', subpath));
+      }
       // Resolve @kilocode/db sub-path imports
       if (source === '@kilocode/db' || source.startsWith('@kilocode/db/')) {
         const subpath = source === '@kilocode/db' ? 'index' : source.replace('@kilocode/db/', '');

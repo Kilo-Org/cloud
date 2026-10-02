@@ -184,7 +184,7 @@ export function ChatInput({
 
     setInputValue(requestedValue.text);
     textareaRef.current?.focus();
-  }, [requestedValue, setInputValue]);
+  }, [requestedValue?.token, requestedValue?.text, setInputValue]);
 
   // Resolve the pinned model's display name from the allowed models list, so the
   // locked-read-only toolbar shows the same label as the ModelCombobox. Falls

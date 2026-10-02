@@ -18,8 +18,8 @@ vi.mock('cloudflare:workers', () => ({ DurableObject: DurableObjectMock }));
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 
 import {
+  CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
-  CONTROL_WRAPPER_PATH,
 } from '../sandbox-control/container-paths.js';
 import {
   ContainersAllocationConflictError,
@@ -272,7 +272,7 @@ describe('SandboxContainers launch', () => {
       { image: 'registry.example/kilo/app:test', instance: 'standard-2', enableInternet: true },
     ]);
     expect(container.execCalls).toEqual([
-      { cmd: ['bun', 'run', CONTROL_WRAPPER_PATH], options: { env: { FOO: 'bar' }, cwd: '/' } },
+      { cmd: ['/bin/sh', CONTROL_SUPERVISOR_PATH], options: { env: { FOO: 'bar' }, cwd: '/' } },
     ]);
     expect(container.monitorCalls).toBe(0);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
@@ -325,7 +325,7 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toEqual([
       {
-        cmd: ['bun', 'run', CONTROL_WRAPPER_PATH],
+        cmd: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
         options: {
           cwd: '/',
           env: {
@@ -361,7 +361,7 @@ describe('SandboxContainers launch', () => {
     });
 
     expect(resumed).toEqual({ started: true });
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(container.execCalls[1]?.options?.env).toEqual({
       FOO: 'bar',
       SANDBOX_INTERCEPT_HTTPS: '1',
@@ -401,7 +401,7 @@ describe('SandboxContainers launch', () => {
     const reexecuted = await launch(reexecs.instance, REF_A);
     expect(reexecuted).toEqual({ started: true });
     expect(reexecs.readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
-    expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(reexecs.container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
   });
 
   it('detects a wrapper that appears late while the pid-0 handle exitCode stays pending', async () => {
@@ -439,8 +439,8 @@ describe('SandboxContainers launch', () => {
     });
     await vi.advanceTimersByTimeAsync(65_000);
     expect(settled).toBe(false);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun', 'pgrep']);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh', 'pgrep']);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -450,7 +450,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(5_000);
     await expect(pending).resolves.toEqual({ started: true });
     expect(maxActiveProbes).toBe(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('pgrep');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
@@ -474,7 +474,7 @@ describe('SandboxContainers launch', () => {
     const pending = launch(instance, REF_A);
     await vi.advanceTimersByTimeAsync(39_000);
     expect(buns).toBe(1);
-    expect(container.execCalls[0]?.cmd[0]).toBe('bun');
+    expect(container.execCalls[0]?.cmd[0]).toBe('/bin/sh');
 
     await vi.advanceTimersByTimeAsync(1_000);
     expect(buns).toBe(1);
@@ -483,7 +483,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(1);
     await expect(pending).resolves.toEqual({ started: true });
     expect(buns).toBe(2);
-    expect(container.execCalls.at(-1)?.cmd[0]).toBe('bun');
+    expect(container.execCalls.at(-1)?.cmd[0]).toBe('/bin/sh');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
@@ -561,7 +561,7 @@ describe('SandboxContainers launch', () => {
     await expect(outcome).resolves.toBe('rejected');
     expect(absentProbes).toBeGreaterThanOrEqual(1);
     expect(ambiguousProbes).toBeGreaterThanOrEqual(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -632,7 +632,7 @@ describe('SandboxContainers launch', () => {
     expect(maxActiveProbes).toBe(1);
     expect(pgrepStarts[1] ?? -1).toBeGreaterThanOrEqual(pgrepSettles[0] ?? Number.MAX_SAFE_INTEGER);
     expect(pgrepStarts[0] ?? -1).toBe(0);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
@@ -647,11 +647,11 @@ describe('SandboxContainers launch', () => {
       () => 'rejected' as const
     );
     await vi.advanceTimersByTimeAsync(89_000);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh']);
 
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['/bin/sh']);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -662,7 +662,7 @@ describe('SandboxContainers launch', () => {
     await expect(launch(instance, REF_A)).rejects.toThrow(
       'pending and the container is not running'
     );
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
   });
 
   it('does not start a second bun while a pid-0 handle exitCode is pending', async () => {
@@ -681,7 +681,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(90_000);
 
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -721,7 +721,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(40_000);
     await expect(outcome).resolves.toBe('rejected');
     expect(pgrepCalls).toBe(1);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -759,7 +759,7 @@ describe('SandboxContainers launch', () => {
 
     resolveProbe(makeExecProcess({ exitCode: 0 }));
     await expect(outcome).resolves.toBe('rejected');
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -806,7 +806,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(1_000);
     await expect(outcome).resolves.toBe('rejected');
     expect(pgrepCalls).toBe(probesAt89);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       wrapperAttempt: 'exec_pending',
@@ -845,7 +845,7 @@ describe('SandboxContainers launch', () => {
     expect(pgrepStarts.at(-1) ?? 0).toBeGreaterThanOrEqual(88_000);
     expect(execStarts.filter(start => start >= 90_000)).toEqual([]);
     expect(pgrepStarts.filter(start => start >= 90_000)).toEqual([]);
-    expect(container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(readRecord()).toMatchObject({
       state: 'launching',
       allocationRef: REF_A,
@@ -873,12 +873,12 @@ describe('SandboxContainers launch', () => {
     await expect(launch(rejected.instance, REF_A)).rejects.toThrow(
       'pending and no wrapper was found'
     );
-    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
 
     // An ambiguous probe never re-execs either.
     rejected.container.execHandler = () => makeExecProcess({ exitCode: 2 });
     await expect(launch(rejected.instance, REF_A)).rejects.toThrow('Wrapper probe was ambiguous');
-    expect(rejected.container.execCalls.filter(call => call.cmd[0] === 'bun')).toHaveLength(1);
+    expect(rejected.container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
   });
 
   it('applies the requested instance when resuming a pre-exec launch whose start never took effect', async () => {
@@ -902,7 +902,7 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toEqual([
       { image: 'registry.example/kilo/app:test', instance: 'standard-3', enableInternet: true },
     ]);
-    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', 'bun']);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['pgrep', '/bin/sh']);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
@@ -1180,7 +1180,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       containment: true,
     });
 
-    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:bun']);
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:/bin/sh']);
   });
 
   it('orders containment before start, probe and bun on a stopped pre-exec resume', async () => {
@@ -1207,7 +1207,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       'http-intercept',
       'start',
       'exec:pgrep',
-      'exec:bun',
+      'exec:/bin/sh',
     ]);
   });
 });

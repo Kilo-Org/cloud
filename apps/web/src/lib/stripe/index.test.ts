@@ -4645,6 +4645,112 @@ describe('handleUpdateSeatCount organization Kilo Pass service fee', () => {
     expect(insert).not.toHaveBeenCalled();
   });
 
+  describe('with an attached cancellation schedule', () => {
+    const periodEnd = prorationDate + 2_592_000;
+    const nextPeriodEnd = periodEnd + 2_592_000;
+
+    function cancellationSchedule(
+      phases: { start: number; end: number; items: { price: string; quantity: number }[] }[],
+      metadata: Record<string, string> = { origin: 'kilo-pass-org-cancellation' }
+    ): Stripe.SubscriptionSchedule {
+      return {
+        id: 'sub_sched_cancel',
+        object: 'subscription_schedule',
+        status: 'active',
+        metadata,
+        current_phase: { start_date: prorationDate, end_date: periodEnd },
+        phases: phases.map(phase => ({
+          start_date: phase.start,
+          end_date: phase.end,
+          items: phase.items,
+        })),
+      } as unknown as Stripe.SubscriptionSchedule;
+    }
+
+    const currentItems = (quantity: number) => [
+      { price: seatPriceId, quantity },
+      { price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID, quantity },
+    ];
+
+    function removalPendingSchedule() {
+      return cancellationSchedule([
+        { start: prorationDate, end: periodEnd, items: currentItems(5) },
+        { start: periodEnd, end: nextPeriodEnd, items: [{ price: seatPriceId, quantity: 5 }] },
+      ]);
+    }
+
+    test.each([
+      ['increase', 10],
+      ['decrease', 3],
+    ])('refuses a seat %s while a Kilo Pass removal is pending', async (_change, seats) => {
+      jest
+        .spyOn(client.subscriptions, 'retrieve')
+        .mockResolvedValue(orgSubscription({ schedule: removalPendingSchedule() }) as never);
+      const preview = jest.spyOn(client.invoices, 'createPreview');
+      const scheduleUpdate = jest.spyOn(client.subscriptionSchedules, 'update');
+      const release = jest.spyOn(client.subscriptionSchedules, 'release');
+      const update = jest.spyOn(client.subscriptions, 'update');
+
+      await expect(handleUpdateSeatCount(subscriptionId, seats, 5, { now })).rejects.toThrow(
+        'KILO_PASS_ORG_CANCELLATION_PENDING'
+      );
+      expect(preview).not.toHaveBeenCalled();
+      expect(scheduleUpdate).not.toHaveBeenCalled();
+      expect(release).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    test('releases an idle owned schedule before updating seats directly', async () => {
+      const idle = cancellationSchedule([
+        { start: prorationDate, end: periodEnd, items: currentItems(5) },
+      ]);
+      jest
+        .spyOn(client.subscriptions, 'retrieve')
+        .mockResolvedValue(orgSubscription({ schedule: idle }) as never);
+      const release = jest
+        .spyOn(client.subscriptionSchedules, 'release')
+        .mockResolvedValue({ ...idle, status: 'released' } as never);
+      const update = jest
+        .spyOn(client.subscriptions, 'update')
+        .mockResolvedValue(orgSubscription() as never);
+
+      await handleUpdateSeatCount(subscriptionId, 3, 5, { now });
+
+      expect(release).toHaveBeenCalledWith('sub_sched_cancel');
+      expect(update).toHaveBeenCalled();
+      expect(release.mock.invocationCallOrder[0]).toBeLessThan(update.mock.invocationCallOrder[0]!);
+    });
+
+    test('refuses to change seats under a schedule it cannot safely rewrite', async () => {
+      jest.spyOn(client.subscriptions, 'retrieve').mockResolvedValue(
+        orgSubscription({
+          schedule: cancellationSchedule(
+            [
+              { start: prorationDate, end: periodEnd, items: currentItems(5) },
+              {
+                start: periodEnd,
+                end: nextPeriodEnd + 28_944_000,
+                items: [
+                  { price: 'price_seat_yearly', quantity: 5 },
+                  { price: CURRENT_KILO_PASS_TIER_19_MONTHLY_PRICE_ID, quantity: 5 },
+                ],
+              },
+            ],
+            { origin: 'billing-cycle-change' }
+          ),
+        }) as never
+      );
+      const scheduleUpdate = jest.spyOn(client.subscriptionSchedules, 'update');
+      const update = jest.spyOn(client.subscriptions, 'update');
+
+      await expect(handleUpdateSeatCount(subscriptionId, 10, 5, { now })).rejects.toThrow(
+        'SCHEDULE_REWRITE_UNSAFE'
+      );
+      expect(scheduleUpdate).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
   test('tax resolution failure fails open and still updates seats', async () => {
     const store = memoryStore();
     const sendAlert = jest.fn(async () => undefined);

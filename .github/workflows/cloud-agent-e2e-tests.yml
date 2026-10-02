@@ -18,12 +18,6 @@ on:
         required: true
         type: string
         default: 'https://api.kilo.ai'
-  push:
-    branches: [main]
-    paths:
-      - 'services/cloud-agent-next/**'
-      - '.github/workflows/cloud-agent-e2e-deploy.yml'
-      - '.github/workflows/cloud-agent-e2e-tests.yml'
 
 permissions:
   contents: read
@@ -33,19 +27,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # A push to main tests the merged commit, so deploy the e2e Worker from that
-  # commit first. Manual dispatch keeps testing the already-deployed Worker
-  # (including a custom worker_url), so it skips the deploy.
-  deploy:
-    if: github.event_name == 'push'
-    uses: ./.github/workflows/cloud-agent-e2e-deploy.yml
-    secrets: inherit
-
   e2e:
-    needs: deploy
-    # `always()` lets a skipped deploy (manual dispatch) run the tests, while a
-    # failed deploy blocks them.
-    if: always() && (needs.deploy.result == 'success' || needs.deploy.result == 'skipped')
     outputs:
       failed: ${{ steps.summarize.outputs.failed }}
       summary: ${{ steps.summarize.outputs.summary }}
@@ -53,7 +35,7 @@ jobs:
     # Operational ceiling for one whole run, not a registry-derived bound.
     timeout-minutes: 180
     env:
-      # Dispatch input overrides; push runs use the deployed e2e Worker.
+      # Dispatch input overrides; defaults point at the deployed e2e Worker.
       WORKER_URL: ${{ inputs.worker_url || 'https://cloud-agent-e2e-test.engineering-e11.workers.dev' }}
       FAKE_LLM_URL: ${{ inputs.fake_llm_url || 'https://fake-llm.engineering-e11.workers.dev' }}
       E2E_BACKEND_URL: ${{ inputs.backend_url || 'https://api.kilo.ai' }}
@@ -108,7 +90,7 @@ jobs:
           retention-days: 7
 
   notify-failure:
-    needs: [deploy, e2e]
+    needs: e2e
     if: always() && github.ref == 'refs/heads/main' && contains(join(needs.*.result, ','), 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5

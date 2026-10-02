@@ -127,17 +127,6 @@ export function temporarilyUnavailableResponse() {
   );
 }
 
-export function upgradeRequiredResponse() {
-  return NextResponse.json(
-    {
-      error: 'upgrade_required',
-      error_type: ProxyErrorType.upgrade_required,
-      message: 'Please upgrade your Kilo extension to the latest version.',
-    },
-    { status: 426 }
-  );
-}
-
 export async function usageLimitExceededResponse(user: User, balance?: number) {
   const payments = await summarizeUserPayments(user.id);
 

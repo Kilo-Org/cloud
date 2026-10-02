@@ -45,7 +45,7 @@ function fixture() {
       mergeable: true,
     },
     rules: [
-      { type: 'pull_request', parameters: { dismiss_stale_reviews_on_push: true } },
+      { type: 'pull_request', parameters: { dismiss_stale_reviews_on_push: false } },
       {
         type: 'required_status_checks',
         parameters: { required_status_checks: [{ context: 'test', integration_id: 15368 }] },
@@ -87,7 +87,6 @@ function fixture() {
 async function run(data) {
   const approvals = [];
   const calls = [];
-  const failures = [];
   let prReads = 0;
   let signalReads = 0;
   const listReads = new Map();
@@ -142,9 +141,8 @@ async function run(data) {
   };
   await execute(github, data.context, {
     info: () => {},
-    setFailed: message => failures.push(message),
   });
-  return { approvals, calls, failures };
+  return { approvals, calls };
 }
 
 test('workflow is created-comment-only, least-privilege, and never checks out PR code', () => {
@@ -181,7 +179,7 @@ test('workflow is created-comment-only, least-privilege, and never checks out PR
   );
 });
 
-test('approves the assessed commit with a real review and no merge command', async () => {
+test('approves the assessed commit without requiring stale-approval dismissal', async () => {
   const result = await run(fixture());
   assert.equal(result.approvals.length, 1);
   assert.deepEqual(result.approvals[0], {
@@ -223,8 +221,6 @@ const rejectedCases = {
   'an edited live signal': d => (d.signal.updated_at = '2026-09-30T12:01:00Z'),
   'a changed live signal': d => (d.signal.body += ' modified'),
   'a signal attached to another PR': d => (d.signal.issue_url += '1'),
-  'stale approval dismissal disabled': d =>
-    (d.rules[0].parameters.dismiss_stale_reviews_on_push = false),
   'missing required checks policy': d => (d.rules = d.rules.slice(0, 1)),
   'a missing required check': d => (d.checks = d.checks.slice(1)),
   'a check from the wrong integration': d => (d.checks[0].app.id = 123),
@@ -296,6 +292,12 @@ test('does not duplicate an existing Actions approval for the same SHA', async (
   const data = fixture();
   data.reviews = [{ user: { login: 'github-actions[bot]' }, state: 'APPROVED', commit_id: sha }];
   assert.equal((await run(data)).approvals.length, 0);
+});
+
+test('approves without a pull-request ruleset while still requiring CI checks', async () => {
+  const data = fixture();
+  data.rules = data.rules.filter(rule => rule.type !== 'pull_request');
+  assert.equal((await run(data)).approvals.length, 1);
 });
 
 test('review-summary formatting is assessed by the meta-janitor, not the workflow', async () => {

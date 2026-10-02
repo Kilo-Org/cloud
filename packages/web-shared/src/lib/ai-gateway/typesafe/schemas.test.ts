@@ -41,6 +41,24 @@ describe('systemOneRequestSchema', () => {
     ).toEqual({ ...request, model: TYPESAFE_MODEL, provider });
   });
 
+  it.each([
+    [undefined, TYPESAFE_MODEL],
+    ['jev-1.13', TYPESAFE_MODEL],
+    ['~typesafe/jev-latest', '~typesafe/jev-latest'],
+    ['respan/span-01-lite:free', 'respan/span-01-lite:free'],
+  ])('maps model %j to %s', (model, expected) => {
+    expect(
+      systemOneRequestSchema.parse({ model, state: null, questions: { q: { type: 'noul' } } }).model
+    ).toBe(expected);
+  });
+
+  it.each(['jev-latest', 'typesafe/jev-router', 'openai/gpt-4o'])('rejects model %s', model => {
+    expect(
+      systemOneRequestSchema.safeParse({ model, state: null, questions: { q: { type: 'noul' } } })
+        .success
+    ).toBe(false);
+  });
+
   it('does not default provider privacy', () => {
     const request = { state: null, questions: { relevant: { type: 'noul' } } };
 

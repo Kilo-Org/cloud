@@ -325,9 +325,7 @@ export async function applyMetadataChanges(
           .where(
             and(
               eq(cli_sessions_v2.session_id, parentSessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.cloud_agent_session_scope_id} IS NULL`,
-              sql`${cli_sessions_v2.cloud_agent_worktree_id} IS NULL`
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
             )
           )
           .limit(1);

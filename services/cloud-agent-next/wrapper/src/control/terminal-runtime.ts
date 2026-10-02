@@ -154,6 +154,12 @@ export function createControlTerminalRuntime(options: {
   wrapperInstanceId: string;
   getKiloRuntime: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
   getRetainedKiloRuntime?: (identity: SessionRequestIdentity) => WorktreeKiloRuntime | undefined;
+  /**
+   * Called for each browser→PTY input frame. The control-plane wrapper uses it
+   * to keep heartbeat `active` true only while a terminal has real input
+   * (spec §6), not merely because a PTY exists.
+   */
+  onInput?: (identity: SessionRequestIdentity) => void;
 }): ControlTerminalRuntime {
   const { wrapperInstanceId } = options;
   const controlOrigin = new URL(options.controlUrl).origin;
@@ -661,7 +667,10 @@ export function createControlTerminalRuntime(options: {
         closing: false,
       };
       bridges.set(payload.ptyId, bridge);
-      reverse.onmessage = event => forwardMessage(bridge, bridge.local, event.data);
+      reverse.onmessage = event => {
+        options.onInput?.(terminal);
+        forwardMessage(bridge, bridge.local, event.data);
+      };
       reverse.onerror = () => {
         if (isCurrentBridge(bridge)) closeBridge(bridge, 1011, 'Terminal transport failed');
       };

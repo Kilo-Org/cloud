@@ -857,7 +857,6 @@ describe('createUserWebConnection', () => {
     open();
     client.destroy();
 
-    // After destroy, connect() should be a no-op
     client.connect();
 
     expect(webSocketConstructor).toHaveBeenCalledTimes(1);
@@ -870,7 +869,6 @@ describe('createUserWebConnection', () => {
 
     client.disconnect();
 
-    // After disconnect, connect() should open a new socket
     client.connect();
     open();
 
@@ -962,7 +960,6 @@ describe('createUserWebConnection', () => {
       });
       sockets[0].onclose?.({ code: 1006 } as CloseEvent);
       jest.advanceTimersByTime(60_000);
-      // The reconnect now refreshes auth before opening the new socket.
       await Promise.resolve();
       await Promise.resolve();
       open(sockets[1]);
@@ -1567,7 +1564,6 @@ describe('createUserWebConnection sendCommandToConnection', () => {
     });
     await Promise.resolve();
 
-    // An unrelated response with a different id should not settle ours.
     inbound({ type: 'response', id: 'uuid-other', result: { unrelated: true } });
     await Promise.resolve();
     // Promise is still pending — we can only check via race against a timeout.
@@ -1599,7 +1595,6 @@ describe('createUserWebConnection sendCommandToConnection', () => {
         data: { protocolVersion: 1 },
         expectedConnectionId: 'cli-owner-1',
       });
-      // Wait for the send to dispatch.
       await jest.advanceTimersByTimeAsync(0);
 
       jest.advanceTimersByTime(30_000);
@@ -1935,7 +1930,6 @@ describe('createUserWebConnection connection-state API', () => {
     expect(listener).toHaveBeenLastCalledWith(true);
 
     releaseA();
-    // Release of a non-final retain does not change state.
     expect(listener).toHaveBeenCalledTimes(1);
 
     releaseB();

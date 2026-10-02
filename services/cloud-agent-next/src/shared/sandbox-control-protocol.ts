@@ -539,12 +539,6 @@ export const sessionAttachPayloadSchema = z
       })
       .strict()
       .optional(),
-    snapshot: z
-      .object({
-        url: z.string().min(1).max(4096),
-      })
-      .strict()
-      .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
     mcp: sessionAttachMcpServersSchema.optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),

@@ -1,7 +1,6 @@
 import type { NextRequestWithAuth } from 'next-auth/middleware';
 import { NextResponse } from 'next/server';
 import { withAuthenticatedAdminApiRoutes } from './middleware/withAuthenticatedAdminApiRoutes';
-import { withBlockedClients } from '@/middleware/withBlockedClients';
 import { withKiloEditorCookie } from './middleware/withKiloEditorCookie';
 import {
   buildContentSecurityPolicy,
@@ -43,9 +42,7 @@ function baseProxy(request: NextRequestWithAuth) {
   return response;
 }
 
-export const proxy = withBlockedClients(
-  withAuthenticatedAdminApiRoutes(withKiloEditorCookie(baseProxy))
-);
+export const proxy = withAuthenticatedAdminApiRoutes(withKiloEditorCookie(baseProxy));
 
 export const config = {
   /*

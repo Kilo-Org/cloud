@@ -23,11 +23,11 @@
         "name": "USER_KILO_FACADE",
       },
       {
-        "class_name": "SandboxControl",
+        "class_name": "SandboxControlV2",
         "name": "SANDBOX_CONTROL",
       },
       {
-        "class_name": "SandboxSession",
+        "class_name": "SandboxSessionV2",
         "name": "SANDBOX_SESSION",
       },
     ],
@@ -46,11 +46,11 @@
       "tag": "v8",
     },
     {
-      "new_sqlite_classes": ["SandboxControl"],
+      "new_sqlite_classes": ["SandboxControlV2"],
       "tag": "v9",
     },
     {
-      "new_sqlite_classes": ["SandboxSession"],
+      "new_sqlite_classes": ["SandboxSessionV2"],
       "tag": "v10",
     },
   ],

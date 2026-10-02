@@ -43,6 +43,12 @@ describe('terminalReasonFromCloudAgentFailure', () => {
     );
   });
 
+  it('does not treat a billing admission outage as a user payment failure', () => {
+    expect(terminalReasonFromCloudAgentFailure({ code: 'admission_billing_unavailable' })).toBe(
+      'sandbox_connection'
+    );
+  });
+
   it('splits rate limiting by whose key was throttled', () => {
     const rateLimited = { code: 'assistant_error', assistantReason: 'rate_limited' } as const;
 

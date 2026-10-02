@@ -1977,7 +1977,6 @@
       "preparingPlaceholder": "Configuration de l'environnement…",
       "finalizingPlaceholder": "Finalisation…",
       "sessionLoadFailed": "La session n'a pas pu être chargée. Réessayez d'abord.",
-      "sendUnavailable": "L'envoi n'est pas disponible tant que la session n'est pas prête.",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Retirez les pièces jointes pour envoyer votre message.",
       "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
       "discardAttachmentsMessage": "Les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",

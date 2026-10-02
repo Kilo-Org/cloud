@@ -2568,7 +2568,6 @@
       "preparingPlaceholder": "Inihahanda ang kapaligiran...",
       "finalizingPlaceholder": "Tinatapos na…",
       "sessionLoadFailed": "Hindi ma-load ang session. Subukan munang muli.",
-      "sendUnavailable": "Hindi available ang pagpapadala hanggat hindi handa ang session.",
       "cannotReceiveFiles": "Hindi makakatanggap ng mga file ang sesyong ito. Alisin ang mga kalakip para maipadala ang mensahe mo.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang Ipadala para subukang muli.",
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",

@@ -2716,7 +2716,6 @@
       "preparingPlaceholder": "Yn paratoi'r amgylchedd...",
       "finalizingPlaceholder": "Yn gorffen...",
       "sessionLoadFailed": "Methwyd llwytho'r sesiwn. Rhowch gynnig arall arni'n gyntaf.",
-      "sendUnavailable": "Nid yw anfon ar gael nes bod y sesiwn yn barod.",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Tynnwch yr atodiadau i anfon eich neges.",
       "couldNotAttachFiles": "Methu atodi'r ffeiliau. Tapiwch Anfon i geisio eto.",
       "discardAttachmentsMessage": "Bydd ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",

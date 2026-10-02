@@ -2055,7 +2055,6 @@
       "preparingPlaceholder": "設定環境中…",
       "finalizingPlaceholder": "收尾中…",
       "sessionLoadFailed": "無法載入工作階段。請先重試。",
-      "sendUnavailable": "在工作階段準備就緒之前無法傳送。",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
       "couldNotAttachFiles": "無法附加檔案。請點一下「傳送」再試一次。",
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",

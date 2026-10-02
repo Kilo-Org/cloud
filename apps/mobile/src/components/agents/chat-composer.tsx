@@ -184,15 +184,15 @@ type ChatComposerProps = {
   /**
    * Why send is unavailable, rendered as a one-line reason beside the send
    * control and announced when it changes. Null/omitted while send can proceed
-   * or when the host knows no reason. Each cannot-send state supplies its own
-   * reason (the load-error state: "The session could not be loaded. Retry
-   * first."), so the control never renders inert without explaining itself.
+   * or when the host knows no reason — including while the session is still
+   * opening. Each actionable cannot-send state supplies its own reason (the
+   * load-error state: "The session could not be loaded. Retry first.").
    */
   sendDisabledReason?: string | null;
   /**
    * The tone for `sendDisabledReason`: `error` for a genuine failure, `neutral`
-   * for a progress phase or the generic not-ready line. Omitted defaults to the
-   * error tone, matching the previous behavior.
+   * for a progress phase. Omitted defaults to the error tone, matching the
+   * previous behavior.
    */
   sendDisabledReasonTone?: 'error' | 'neutral' | null;
   isStreaming?: boolean;

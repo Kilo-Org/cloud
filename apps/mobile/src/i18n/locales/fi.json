@@ -2568,7 +2568,6 @@
       "preparingPlaceholder": "Valmistellaan ympäristöä…",
       "finalizingPlaceholder": "Viimeistellään…",
       "sessionLoadFailed": "Istuntoa ei voitu ladata. Yritä ensin uudelleen.",
-      "sendUnavailable": "Lähettäminen ei ole käytettävissä ennen kuin istunto on valmis.",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet, jotta voit lähettää viestisi.",
       "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Yritä uudelleen napauttamalla lähetyspainiketta.",
       "discardAttachmentsMessage": "Palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",

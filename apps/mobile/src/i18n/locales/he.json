@@ -2076,7 +2076,6 @@
       "preparingPlaceholder": "מכין את הסביבה...",
       "finalizingPlaceholder": "מסיים...",
       "sessionLoadFailed": "לא ניתן היה לטעון את ההפעלה. נסו שוב תחילה.",
-      "sendUnavailable": "השליחה אינה זמינה עד שההפעלה מוכנה.",
       "cannotReceiveFiles": "הסשן הזה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה שלך.",
       "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",

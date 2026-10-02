@@ -1,5 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
-import { getModelTraffic, type RunAnalyticsEngineQuery } from '@/lib/ai-gateway/model-traffic';
+import * as z from 'zod';
+import { getModelTraffic } from '@/lib/ai-gateway/model-traffic';
+import type { RunAnalyticsEngineQuery } from '@/lib/cloudflare/analytics-engine';
 
 const NOW = new Date('2026-10-02T12:03:20Z');
 const LAST_BUCKET = '2026-10-02 11:55:00';
@@ -11,11 +13,14 @@ function fakeQuery(responses: {
   modelBuckets: unknown[];
 }): { runQuery: RunAnalyticsEngineQuery; queries: string[] } {
   const queries: string[] = [];
-  const runQuery: RunAnalyticsEngineQuery = async sql => {
-    queries.push(sql);
+  const rowsFor = (sql: string): unknown[] => {
     if (sql.includes('GROUP BY bucket, model')) return responses.modelBuckets;
     if (sql.includes('GROUP BY model')) return responses.topModels;
     return responses.totals;
+  };
+  const runQuery: RunAnalyticsEngineQuery = async (sql, rowSchema) => {
+    queries.push(sql);
+    return z.array(rowSchema).parse(rowsFor(sql));
   };
   return { runQuery, queries };
 }

@@ -1,6 +1,11 @@
 import 'server-only';
-import { z } from 'zod';
-import { getEnvVariable } from '@/lib/dotenvx';
+import * as z from 'zod';
+import {
+  queryAnalyticsEngine,
+  sqlDateTime,
+  sqlString,
+  type RunAnalyticsEngineQuery,
+} from '@/lib/cloudflare/analytics-engine';
 
 export const MODEL_TRAFFIC_BUCKET_MINUTES = 5;
 export const MODEL_TRAFFIC_WINDOW_HOURS = 24;
@@ -9,8 +14,6 @@ export const MODEL_TRAFFIC_TOP_MODEL_COUNT = 10;
 const BUCKET_MS = MODEL_TRAFFIC_BUCKET_MINUTES * 60 * 1000;
 const WINDOW_MS = MODEL_TRAFFIC_WINDOW_HOURS * 60 * 60 * 1000;
 const QUERY_TIMEOUT_MS = 15_000;
-
-export type RunAnalyticsEngineQuery = (sql: string) => Promise<unknown[]>;
 
 export type RequestSeries = {
   requests: number[];
@@ -38,39 +41,8 @@ const TopModelRowSchema = z.object({
 
 const ModelBucketRowSchema = BucketTotalsRowSchema.extend({ model: z.string() });
 
-const AnalyticsEngineResponseSchema = z.object({ data: z.array(z.unknown()) });
-
-export const queryO11yAnalyticsEngine: RunAnalyticsEngineQuery = async sql => {
-  const accountId = getEnvVariable('R2_ACCOUNT_ID');
-  const token = getEnvVariable('CF_ANALYTICS_ENGINE_TOKEN');
-  if (!accountId || !token) {
-    throw new Error('Missing Cloudflare Analytics Engine configuration');
-  }
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/analytics_engine/sql`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: sql,
-      signal: AbortSignal.timeout(QUERY_TIMEOUT_MS),
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(`Analytics Engine query failed (${response.status}): ${await response.text()}`);
-  }
-
-  return AnalyticsEngineResponseSchema.parse(await response.json()).data;
-};
-
-function sqlString(value: string): string {
-  return `'${value.replaceAll("'", "''")}'`;
-}
-
-function sqlDateTime(ms: number): string {
-  return `toDateTime(${Math.floor(ms / 1000)})`;
-}
+const queryO11yAnalyticsEngine: RunAnalyticsEngineQuery = (sql, rowSchema) =>
+  queryAnalyticsEngine(sql, rowSchema, { timeoutMs: QUERY_TIMEOUT_MS });
 
 // Analytics Engine returns DateTime values as UTC `YYYY-MM-DD HH:MM:SS`.
 function parseBucketMs(bucket: string): number {
@@ -107,36 +79,36 @@ export async function getModelTraffic(
   const bucketCount = WINDOW_MS / BUCKET_MS;
   const filter = buildFilter(startMs, endMs, excludeByok);
 
-  const [totalRows, topModelRows] = await Promise.all([
-    runQuery(`
-      SELECT ${BUCKET_SELECT}, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
-      FROM o11y_api_metrics
-      WHERE ${filter}
-      GROUP BY bucket
-      FORMAT JSON
-    `),
-    runQuery(`
-      SELECT blob2 AS model, ${REQUESTS_SELECT}
-      FROM o11y_api_metrics
-      WHERE ${filter}
-      GROUP BY model
-      ORDER BY requests DESC
-      LIMIT ${MODEL_TRAFFIC_TOP_MODEL_COUNT}
-      FORMAT JSON
-    `),
+  const totalsSql = `
+    SELECT ${BUCKET_SELECT}, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
+    FROM o11y_api_metrics
+    WHERE ${filter}
+    GROUP BY bucket
+    FORMAT JSON
+  `;
+  const topModelsSql = `
+    SELECT blob2 AS model, ${REQUESTS_SELECT}
+    FROM o11y_api_metrics
+    WHERE ${filter}
+    GROUP BY model
+    ORDER BY requests DESC
+    LIMIT ${MODEL_TRAFFIC_TOP_MODEL_COUNT}
+    FORMAT JSON
+  `;
+  const [totalRows, topModels] = await Promise.all([
+    runQuery(totalsSql, BucketTotalsRowSchema),
+    runQuery(topModelsSql, TopModelRowSchema),
   ]);
 
-  const topModels = z.array(TopModelRowSchema).parse(topModelRows);
+  const modelBucketsSql = `
+    SELECT ${BUCKET_SELECT}, blob2 AS model, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
+    FROM o11y_api_metrics
+    WHERE ${filter} AND blob2 IN (${topModels.map(row => sqlString(row.model)).join(', ')})
+    GROUP BY bucket, model
+    FORMAT JSON
+  `;
   const modelRows =
-    topModels.length === 0
-      ? []
-      : await runQuery(`
-          SELECT ${BUCKET_SELECT}, blob2 AS model, ${REQUESTS_SELECT}, ${ERRORS_SELECT}
-          FROM o11y_api_metrics
-          WHERE ${filter} AND blob2 IN (${topModels.map(row => sqlString(row.model)).join(', ')})
-          GROUP BY bucket, model
-          FORMAT JSON
-        `);
+    topModels.length === 0 ? [] : await runQuery(modelBucketsSql, ModelBucketRowSchema);
 
   const bucketIndex = (bucket: string): number | null => {
     const index = (parseBucketMs(bucket) - startMs) / BUCKET_MS;
@@ -144,7 +116,7 @@ export async function getModelTraffic(
   };
 
   const allModels = emptySeries(bucketCount);
-  for (const row of z.array(BucketTotalsRowSchema).parse(totalRows)) {
+  for (const row of totalRows) {
     const index = bucketIndex(row.bucket);
     if (index === null) continue;
     allModels.requests[index] = Math.round(row.requests);
@@ -152,7 +124,7 @@ export async function getModelTraffic(
   }
 
   const seriesByModel = new Map(topModels.map(row => [row.model, emptySeries(bucketCount)]));
-  for (const row of z.array(ModelBucketRowSchema).parse(modelRows)) {
+  for (const row of modelRows) {
     const series = seriesByModel.get(row.model);
     const index = bucketIndex(row.bucket);
     if (!series || index === null) continue;

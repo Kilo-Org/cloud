@@ -214,7 +214,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         completed = false;
         terminated = false;
       }
-      // Child session busy → no activity change
     } else if (sessionStatus.type === 'retry') {
       activity = {
         type: 'retrying',
@@ -251,7 +250,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     switch (event.reason) {
       case 'complete':
         completed = true;
-        // Status stays as-is (idle, or committed if was committing)
         if (event.branch) config.onBranchChanged?.(event.branch);
         break;
       case 'interrupted':
@@ -321,7 +319,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     if (event.info.parentID == null) {
       rootSessionId = event.info.id;
     }
-    // Only track root session info
     let info = event.info;
     if (isRootSession(event.info.id)) {
       info = preserveGoalReason(sessionInfo, event.info);
@@ -883,7 +880,6 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     // callbacks first so consumers (e.g. dock atoms) also clear.
     clearPendingInteractions();
 
-    // Clear terminated on connected
     terminated = false;
     if (
       status.type === 'disconnected' &&

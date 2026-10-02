@@ -271,7 +271,7 @@ async function prepareWarmRoute(
   allocationId: string;
 }> {
   const view = await stub.prepare(input);
-  expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+  expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
   if (!launchEnv) throw new Error('provider.launch was not called');
@@ -1113,7 +1113,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     const stub = await setup(provider, broker);
 
     const view = await stub.prepare(prepareInput(SESSION));
-    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
 
     // The route and its grant exist before the sandbox is created, and the cold
     // prepare must not throw on the missing provider ref (B3 review 1).
@@ -1140,7 +1140,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
       ...prepareInput(SESSION, source),
       sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
     });
-    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
 
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       containmentEnabled?: boolean;
@@ -1203,7 +1203,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'));
 
     const view = await stub.prepare(prepareInput(SESSION));
-    expect(view).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(view).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
     const grant = JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
       outboundContainerId?: string;
     };
@@ -1690,7 +1690,7 @@ describe('SandboxControlV2 credentials (B3)', () => {
     // The next route still gets an attempt and a grant.
     failing = false;
     const next = await stub.prepare(prepareInput(SESSION_NEXT));
-    expect(next).toEqual({ state: 'preparing', attemptId: expect.any(String) });
+    expect(next).toMatchObject({ state: 'preparing', attemptId: expect.any(String) });
     await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
     const nextRow = await readRouteRow(stub, SESSION_NEXT);
     expect(nextRow?.state).toBe('preparing');

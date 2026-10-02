@@ -40,8 +40,8 @@ import {
   profileProvesEmailOwnership,
   authOptions,
   parseSignInRedirectContext,
-} from './next-auth-options';
-import { getProfileRedirectPath } from './profile-redirect-path';
+} from '@/lib/user/next-auth-options';
+import { getProfileRedirectPath } from '@/lib/user/profile-redirect-path';
 import { db } from '@/lib/drizzle';
 import { createSignInTicket } from '@/lib/auth/passkey';
 import { setAdminAccessSinkForTest, type AdminAccessEvent } from '@/lib/admin/admin-access-log';

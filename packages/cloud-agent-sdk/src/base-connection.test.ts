@@ -147,13 +147,11 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Mark socket as not open (simulating a dead connection)
       sockets[0].readyState = 3; // WebSocket.CLOSED
 
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Should have created a new socket for reconnect
       expect(sockets).toHaveLength(2);
 
       connection.destroy();
@@ -164,19 +162,15 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Advance past the recency window so the staleness check fires
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Socket is OPEN but last message is stale — timeout is armed
       expect(sockets).toHaveLength(1);
 
-      // Advance past the staleness timeout
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
-      // Should have closed the stale socket and created a new one
       expect(sockets[0].close).toHaveBeenCalled();
       expect(onDisconnected).toHaveBeenCalled();
       expect(sockets).toHaveLength(2);
@@ -191,7 +185,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Advance time so old socket's lastMessageTime becomes stale
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS + 1000);
 
       // Force a reconnect via socket close + minimal backoff.
@@ -208,7 +201,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Advance past the staleness window — no extra reconnect should occur
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
       expect(sockets).toHaveLength(2);
       expect(onDisconnected).toHaveBeenCalledTimes(1); // only from the first close
@@ -221,11 +213,9 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Do NOT advance time — last message is within the recency window
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Advance past the timeout — nothing should happen
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets).toHaveLength(1);
@@ -244,10 +234,8 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Receive a message before the timeout fires
       sockets[0].onmessage?.({ data: 'server-reply' } as MessageEvent);
 
-      // Advance past the timeout - should NOT trigger reconnect
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets).toHaveLength(1);
@@ -263,13 +251,10 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
-      // Tab visible → arms staleness timeout
       simulateVisibilityChange('visible');
 
-      // Tab hidden → should clear the timeout
       simulateVisibilityChange('hidden');
 
-      // Advance past the timeout - nothing should happen
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets).toHaveLength(1);
@@ -307,18 +292,14 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Last message is already stale before hiding.
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       simulateVisibilityChange('hidden');
-      // Hidden only briefly — well under the staleness threshold.
       jest.advanceTimersByTime(5000);
       simulateVisibilityChange('visible');
 
-      // Not hidden long enough to skip the passive wait — timer armed, not fired yet.
       expect(sockets).toHaveLength(1);
 
-      // Advance past the staleness timeout — the timer should still govern.
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
       expect(sockets[0].close).toHaveBeenCalled();
@@ -363,15 +344,11 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
     it('resets attempts and reconnects when online fires while disconnected', () => {
       const { connection } = createTestConnection();
       connection.connect();
-      // Don't send a message, so `connected` stays false.
-      // Close the socket to simulate a disconnected state.
       closeSocket(0);
 
-      // Pending reconnect timer is scheduled. Clear it via online event.
       const socketsBeforeOnline = sockets.length;
       mockWindow.dispatchEvent(new Event('online'));
 
-      // Should have created a new socket
       expect(sockets.length).toBeGreaterThan(socketsBeforeOnline);
 
       connection.destroy();
@@ -384,7 +361,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       mockWindow.dispatchEvent(new Event('online'));
 
-      // Should not create a new socket
       expect(sockets).toHaveLength(1);
       expect(onDisconnected).not.toHaveBeenCalled();
 
@@ -447,11 +423,9 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
     function exhaustReconnectAttempts(startSocketIndex: number) {
       jest.spyOn(Math, 'random').mockReturnValue(0);
 
-      // Close 8 times without ever receiving a message to exhaust retries
       for (let i = 0; i < 8; i++) {
         const idx = startSocketIndex + i;
         closeSocket(idx);
-        // Advance timers to trigger the next scheduled reconnect
         jest.advanceTimersByTime(60_000);
       }
     }
@@ -462,17 +436,13 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       exhaustReconnectAttempts(0);
 
-      // 1 initial + 8 reconnects = 9 sockets
       const socketsAfterExhaustion = sockets.length;
 
-      // Close the last socket to hit the max-attempts guard
       closeSocket(sockets.length - 1);
       jest.advanceTimersByTime(60_000);
 
-      // No more sockets should be created (max attempts exceeded)
       expect(sockets.length).toBe(socketsAfterExhaustion);
 
-      // Now simulate tab becoming visible - should reset and reconnect
       sockets[sockets.length - 1].readyState = 3; // WebSocket.CLOSED
       simulateVisibilityChange('visible');
 
@@ -494,7 +464,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       expect(sockets.length).toBe(socketsAfterExhaustion);
 
-      // online event should reset and reconnect
       mockWindow.dispatchEvent(new Event('online'));
 
       expect(sockets.length).toBe(socketsAfterExhaustion + 1);
@@ -682,11 +651,9 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       expect(onConnected).toHaveBeenCalledTimes(1);
 
-      // Disconnect and let it reconnect
       closeSocket(0);
       jest.advanceTimersByTime(60_000);
 
-      // Second socket is now open - send a message to mark it connected
       connectSocket(1);
 
       expect(onConnected).toHaveBeenCalledTimes(1);
@@ -778,23 +745,18 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       connection.connect();
       connectSocket(0);
 
-      // Make lastMessageTime stale, then trigger visibility check
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
       simulateVisibilityChange('hidden');
       simulateVisibilityChange('visible');
 
-      // Advance past staleness timeout
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
-      // refreshAuth should be called to get a fresh ticket before reconnecting
       expect(refreshAuth).toHaveBeenCalledTimes(1);
       expect(onReplacingConnection).toHaveBeenCalledTimes(1);
 
-      // Allow the async refresh to complete
       await Promise.resolve();
       await Promise.resolve();
 
-      // A new socket should be created after refresh
       expect(sockets).toHaveLength(2);
 
       connection.destroy();
@@ -824,10 +786,8 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       const refreshAuth = jest.fn(() => Promise.resolve());
       const { connection } = createTestConnection({ refreshAuth });
       connection.connect();
-      // Don't connect — simulate being disconnected
       closeSocket(0);
 
-      // Clear the reconnect timer that was scheduled by closeSocket
       jest.advanceTimersByTime(0);
 
       refreshAuth.mockClear();
@@ -838,7 +798,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      // Should create a new socket after refresh
       const socketsAfter = sockets.length;
       expect(socketsAfter).toBeGreaterThan(1);
 
@@ -862,7 +821,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      // Should still create a new socket even if refresh failed
       expect(sockets).toHaveLength(2);
 
       connection.destroy();
@@ -879,7 +837,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
 
       jest.advanceTimersByTime(DEFAULT_STALENESS_TIMEOUT_MS);
 
-      // Should still create a new socket (direct connect, no refresh)
       expect(sockets).toHaveLength(2);
 
       connection.destroy();
@@ -950,7 +907,6 @@ describe('createBaseConnection – stale WebSocket recovery', () => {
       simulatePageshow(true);
       mockWindow.dispatchEvent(new Event('online'));
 
-      // Only the original socket should exist — no reconnect triggered
       expect(sockets).toHaveLength(1);
       expect(onDisconnected).not.toHaveBeenCalled();
 

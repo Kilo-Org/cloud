@@ -306,7 +306,10 @@ export function ProfileScreen() {
             className="rounded-lg bg-secondary px-3"
             last
             onPress={() => {
-              void openExternalUrl(CHANGELOG_URL, { label: t('kiloclaw.changelog.title') });
+              void openExternalUrl(CHANGELOG_URL, {
+                label: t('kiloclaw.changelog.title'),
+                preferSystemBrowser: true,
+              });
             }}
           />
         </View>

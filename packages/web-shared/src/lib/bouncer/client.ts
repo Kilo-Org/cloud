@@ -34,21 +34,59 @@ type CreditSubject = {
   ip?: string | null;
 };
 
-export type CreditEvent = CreditSubject &
-  (
-    | {
-        type: 'charge.attempted';
-        flow: CreditFlow;
-        amountCents: number;
-        accountCreatedAt: Date | string;
-        ipCountry?: string | null;
-        cardCountry?: string | null;
-      }
-    | { type: 'charge.succeeded'; amountCents: number }
-    | { type: 'charge.failed' }
-    | { type: 'charge.disputed' | 'charge.dispute_won'; disputeId: string }
-    | { type: 'charge.early_fraud_warning' }
-  );
+/** The store that sent a money event. */
+export type StoreProvider = 'apple' | 'google';
+
+/** The reason a store refunded, as the caller classified it from the store payload. */
+export type StoreReason = 'requested' | 'issue' | 'other';
+
+/**
+ * An App Store or Google Play money event. The caller verifies the store payload and resolves the
+ * Kilo account, so bouncer never reads a signed JWS and never looks up a user. A store event has no
+ * card and no client IP, and bouncer's typia types reject both fields.
+ */
+type StoreSubject = {
+  /** The id of one event, for example the Apple `notificationUUID`. A retry counts once. */
+  eventId: string;
+  /** When the store sent the event, for example the Apple `signedDate`. */
+  occurredAt?: Date | string;
+  userId: string;
+  /** Send it for an org purchase. The org is then the payer. */
+  orgId?: string | null;
+  provider: StoreProvider;
+  /** Apple `originalTransactionId`. Google has no stable account key, so it omits this. */
+  storeAccountKey?: string | null;
+  /** Apple `transactionId`, or the Google order id. */
+  referenceId: string;
+  /** Report production events only; bouncer logs this field. */
+  environment?: 'production' | 'sandbox';
+};
+
+export type StoreEventKind =
+  | { type: 'store.purchase'; amountCents?: number }
+  | { type: 'store.refund'; reason: StoreReason }
+  | { type: 'store.refund_reversed' }
+  | { type: 'store.revoked' };
+
+export type StoreCreditEvent = StoreSubject & StoreEventKind;
+
+export type CreditEvent =
+  | (CreditSubject &
+      (
+        | {
+            type: 'charge.attempted';
+            flow: CreditFlow;
+            amountCents: number;
+            accountCreatedAt: Date | string;
+            ipCountry?: string | null;
+            cardCountry?: string | null;
+          }
+        | { type: 'charge.succeeded'; amountCents: number }
+        | { type: 'charge.failed' }
+        | { type: 'charge.disputed' | 'charge.dispute_won'; disputeId: string }
+        | { type: 'charge.early_fraud_warning' }
+      ))
+  | StoreCreditEvent;
 
 export type UsageEvent = {
   requestId: string;
@@ -151,8 +189,43 @@ const CREDIT_EVENT_PATH = '/api/v1/credit-event';
 const USAGE_EVENT_PATH = '/api/v1/usage-event';
 const DECIDE_PATH = '/api/v1/decide';
 
+const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
+  'store.purchase': true,
+  'store.refund': true,
+  'store.refund_reversed': true,
+  'store.revoked': true,
+};
+
+function isStoreCreditEvent(event: CreditEvent): event is StoreCreditEvent {
+  return event.type in STORE_EVENT_TYPES;
+}
+
 /** Reports one charge step. Resolves on any failure. */
 export async function reportCreditEvent(event: CreditEvent): Promise<void> {
+  if (isStoreCreditEvent(event)) {
+    await post(
+      CREDIT_EVENT_PATH,
+      compact({
+        // A store event carries no card and no client IP: bouncer's typia types reject both.
+        eventId: id(event.eventId),
+        occurredAt: isoTime(event.occurredAt),
+        userId: id(event.userId),
+        orgId: id(event.orgId),
+        provider: event.provider,
+        storeAccountKey: id(event.storeAccountKey),
+        referenceId: id(event.referenceId),
+        environment: event.environment,
+        type: event.type,
+        amountCents:
+          event.type === 'store.purchase' && event.amountCents !== undefined
+            ? Math.max(0, Math.round(event.amountCents))
+            : undefined,
+        reason: event.type === 'store.refund' ? event.reason : undefined,
+      }),
+      CREDIT_TIMEOUT_MS
+    );
+    return;
+  }
   const common = {
     eventId: id(event.eventId),
     occurredAt: isoTime(event.occurredAt),

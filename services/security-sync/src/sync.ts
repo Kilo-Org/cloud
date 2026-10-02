@@ -165,7 +165,8 @@ type SecurityReviewOwner =
   | { userId: string; organizationId?: never };
 
 export const SECURITY_SYNC_OWNER_BUDGET_MS = 8 * 60 * 1000;
-export const SECURITY_SYNC_LEASE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Outlives the 15-minute queue consumer wall time, so a live chunk is never taken over. */
+export const SECURITY_SYNC_LEASE_TTL_MS = 20 * 60 * 1000;
 export const SECURITY_SYNC_NO_PROGRESS_CHUNK_LIMIT = 2;
 
 const SyncRunProgressSchema = z.object({
@@ -367,7 +368,9 @@ async function selectOwnerRuntimeState(
 /**
  * Claims the single owner-sync lease for `runId` at `chunkIndex`. Returns the
  * post-image runtime_state, or null when another run holds the lease or a
- * stricter same-run chunk is live.
+ * stricter same-run chunk is live. A different run that claims the owner
+ * adopts the previous run's completed repos and counters, so a takeover
+ * continues the remaining work instead of restarting at the first repo.
  */
 export async function claimOwnerSyncLease(
   db: WorkerDb,
@@ -402,7 +405,10 @@ export async function claimOwnerSyncLease(
         ELSE jsonb_set(
           jsonb_set(COALESCE(${agent_configs.runtime_state}, '{}'::jsonb), '{sync_lease}', ${lease}, true),
           '{sync_run}',
-          ${skeleton}::jsonb,
+          ${skeleton}::jsonb || COALESCE(
+            (${agent_configs.runtime_state}->'sync_run') - 'runId' - 'chunkIndex' - 'noProgressChunks',
+            '{}'::jsonb
+          ),
           true
         )
       END`,
@@ -570,7 +576,7 @@ type OwnerLeaseReleaseReason = 'completed' | 'incomplete' | 'no_progress' | 'aba
 /**
  * Releases the owner lease and logs the outcome. A zero-row release is logged
  * and returned; a database error propagates so the bounded queue retry runs and
- * the lease does not stay held for the 7-day TTL.
+ * the lease does not stay held until the TTL expires.
  */
 async function releaseOwnerSyncLeaseLogged(
   db: WorkerDb,

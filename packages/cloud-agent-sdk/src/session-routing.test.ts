@@ -7,10 +7,6 @@ import type { ResolvedSession } from './types';
 import type { SessionActivity, AgentStatus } from './types';
 import { kiloId, cloudAgentId, makeSnapshot, stubUserMessage, stubTextPart } from './test-helpers';
 
-// ---------------------------------------------------------------------------
-// WebSocket mock
-// ---------------------------------------------------------------------------
-
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
   onmessage: ((ev: MessageEvent) => void) | null;
@@ -47,10 +43,6 @@ afterEach(() => {
   delete global.WebSocket;
 });
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 const SES_ID = 'ses-1';
 
 type StateCapture = { activity: SessionActivity; status: AgentStatus };
@@ -65,10 +57,6 @@ function captureStates(session: ReturnType<typeof createCloudAgentSession>): Sta
   });
   return states;
 }
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 describe('session transport routing', () => {
   describe('resolveSession returning Cloud Agent session', () => {
@@ -188,19 +176,14 @@ describe('session transport routing', () => {
       });
 
       session.connect();
-      // resolveSession resolves
       await Promise.resolve();
-      // fetchSnapshot resolves
       await Promise.resolve();
 
-      // Session info set from snapshot
       expect(session.state.getSessionInfo()).toEqual({ id: 'ses-1', parentID: undefined });
 
-      // Messages in storage
       const messageIds = session.storage.getMessageIds();
       expect(messageIds).toContain('msg-1');
 
-      // Historical session should not be interactive
       expect(session.canSend).toBe(false);
       expect(session.canInterrupt).toBe(false);
 
@@ -293,7 +276,6 @@ describe('session transport routing', () => {
       });
       expect(resolveSession).toHaveBeenCalledTimes(1);
 
-      // The watched session shows up in a heartbeat → upgrade to live.
       fake.emitSystemEvent('sessions.heartbeat', {
         connectionId: 'conn-1',
         sessions: [{ id: SES_ID, status: 'busy', title: 'Review' }],
@@ -366,12 +348,10 @@ describe('session transport routing', () => {
       const states = captureStates(session);
 
       session.connect();
-      // resolveSession rejects
       await Promise.resolve();
 
       expect(onError).toHaveBeenCalledWith('Session not found');
 
-      // Should have connecting → idle+error
       const errorState = states.find(s => s.status.type === 'error');
       expect(errorState).toBeDefined();
       expect(errorState!.activity).toEqual({ type: 'idle' });

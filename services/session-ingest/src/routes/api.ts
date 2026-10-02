@@ -8,6 +8,7 @@ import {
   getSessionMessagesSchema,
   MAX_KILO_SDK_MESSAGE_HISTORY_PAGE_SIZE,
   persistedKiloSdkMessageHistorySchema,
+  sessionIdSchema,
 } from '@kilocode/session-ingest-contracts';
 
 import type { Env } from '../env';
@@ -206,10 +207,8 @@ async function deleteOwnedLeafSession(
 }
 
 const createSessionSchema = z.object({
-  sessionId: z.string().startsWith('ses_').length(30),
+  sessionId: sessionIdSchema,
 });
-
-const sessionIdSchema = z.string().startsWith('ses_').length(30);
 
 const ingestVersionSchema = z.coerce.number().int().nonnegative().catch(0);
 

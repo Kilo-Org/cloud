@@ -24,6 +24,7 @@ import {
 import { OPENROUTER } from '@/lib/ai-gateway/providers/definitions/openrouter';
 import { generateProviderSpecificHash } from '@/lib/ai-gateway/providerHash';
 import { logMicrodollarUsage } from '@/lib/ai-gateway/processUsage';
+import { emitGatewayApiMetrics } from '@/lib/ai-gateway/o11y/api-metrics.server';
 import { systemOneRequestSchema, TYPESAFE_MODEL } from '@/lib/ai-gateway/typesafe/schemas';
 import { EmptyFraudDetectionHeaders } from '@/lib/fraud-detection-headers';
 import { handleSystemOneRequest } from './handler';
@@ -61,6 +62,9 @@ jest.mock('@/lib/ai-gateway/providers/definitions/openrouter', () => ({
 }));
 jest.mock('@/lib/ai-gateway/providerHash', () => ({ generateProviderSpecificHash: jest.fn() }));
 jest.mock('@/lib/ai-gateway/processUsage', () => ({ logMicrodollarUsage: jest.fn() }));
+jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+  emitGatewayApiMetrics: jest.fn(),
+}));
 
 const routeUrl = 'http://localhost:3000/api/gateway/typesafe/v1/systemone';
 const user = {
@@ -317,6 +321,24 @@ describe('handleSystemOneRequest', () => {
         ttfb_ms: expect.any(Number),
       })
     );
+    expect(emitGatewayApiMetrics).toHaveBeenCalledTimes(1);
+    expect(emitGatewayApiMetrics).toHaveBeenCalledWith({
+      kiloUserId: user.id,
+      organizationId: 'org-123',
+      isAnonymous: false,
+      isStreaming: false,
+      userByok: false,
+      mode: 'code',
+      provider: 'openrouter',
+      inferenceProvider: 'TypeSafe upstream',
+      requestedModel: TYPESAFE_MODEL,
+      resolvedModel: TYPESAFE_MODEL,
+      toolsAvailable: [],
+      toolsUsed: [],
+      ttfbMs: expect.any(Number),
+      completeRequestMs: expect.any(Number),
+      statusCode: 200,
+    });
   });
 
   it.each([
@@ -544,6 +566,29 @@ describe('handleSystemOneRequest', () => {
   });
 
   it.each([
+    { model: '~typesafe/jev-latest', provider: 'typesafe' },
+    { model: 'respan/span-01-lite:free', provider: 'respan' },
+    { model: 'jaredpalmer/kev-4b', provider: 'siliconflow' },
+  ])('forwards System One model $model with its fixed provider', async ({ model, provider }) => {
+    setAuth('org-123');
+
+    const response = await handleSystemOneRequest(makeRequest({ ...requestBody, model }));
+
+    expect(response.status).toBe(200);
+    expect(upstreamRequest().body.model).toBe(model);
+    const [{ modelId, providerLookup }] = jest.mocked(resolveOrganizationMemberModelDecision).mock
+      .calls[0];
+    expect(modelId).toBe(model);
+    if (!providerLookup) throw new Error('Expected the fixed System One provider lookup');
+    await expect(providerLookup(model)).resolves.toEqual(new Set([provider]));
+    await runAfter();
+    expect(logMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ requested_model: model })
+    );
+  });
+
+  it.each([
     { eligible: ['typesafe'], expected: { only: ['typesafe'] } },
     { eligible: ['typesafe', 'virtual'], expected: { only: ['typesafe'] } },
     { eligible: undefined, expected: {} },
@@ -635,6 +680,9 @@ describe('handleSystemOneRequest', () => {
       expect(wrapInSafeNextResponse).toHaveBeenCalledWith(upstream);
       expect(after).not.toHaveBeenCalled();
       expect(logMicrodollarUsage).not.toHaveBeenCalled();
+      expect(emitGatewayApiMetrics).toHaveBeenCalledWith(
+        expect.objectContaining({ statusCode: status, inferenceProvider: undefined })
+      );
     }
   );
 

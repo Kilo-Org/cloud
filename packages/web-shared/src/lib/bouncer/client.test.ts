@@ -59,6 +59,104 @@ describe('reportCreditEvent', () => {
   });
 });
 
+describe('reportCreditEvent store events', () => {
+  it('sends an Apple refund without a card or client ip', async () => {
+    mockFetch.mockResolvedValue(
+      Response.json({ decision: 'review', reasons: [], enforced: false })
+    );
+    await reportCreditEvent({
+      type: 'store.refund',
+      eventId: 'note-1',
+      occurredAt: new Date('2026-03-02T01:02:03Z'),
+      userId: 'user-1',
+      orgId: null,
+      provider: 'apple',
+      storeAccountKey: 'orig-1',
+      referenceId: 'tx-1',
+      environment: 'production',
+      reason: 'issue',
+    });
+    expect(sentBody()).toStrictEqual({
+      eventId: 'note-1',
+      occurredAt: '2026-03-02T01:02:03.000Z',
+      userId: 'user-1',
+      provider: 'apple',
+      storeAccountKey: 'orig-1',
+      referenceId: 'tx-1',
+      environment: 'production',
+      type: 'store.refund',
+      reason: 'issue',
+    });
+  });
+
+  it('sends a Google purchase with a USD amount and clamps long ids', async () => {
+    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    await reportCreditEvent({
+      type: 'store.purchase',
+      eventId: 'msg-1',
+      userId: 'user-1',
+      provider: 'google',
+      referenceId: 'r'.repeat(200),
+      environment: 'production',
+      amountCents: 1900.4,
+    });
+    const body = sentBody();
+    expect(body).toStrictEqual({
+      eventId: 'msg-1',
+      userId: 'user-1',
+      provider: 'google',
+      referenceId: 'r'.repeat(128),
+      environment: 'production',
+      type: 'store.purchase',
+      amountCents: 1900,
+    });
+  });
+
+  it('sends refund reversals and revocations with no extra fields', async () => {
+    mockFetch.mockResolvedValue(Response.json({ decision: 'allow', reasons: [], enforced: false }));
+    await reportCreditEvent({
+      type: 'store.refund_reversed',
+      eventId: 'note-2',
+      userId: 'user-1',
+      provider: 'apple',
+      storeAccountKey: 'orig-2',
+      referenceId: 'tx-2',
+      environment: 'sandbox',
+    });
+    expect(sentBody()).toStrictEqual({
+      eventId: 'note-2',
+      userId: 'user-1',
+      provider: 'apple',
+      storeAccountKey: 'orig-2',
+      referenceId: 'tx-2',
+      environment: 'sandbox',
+      type: 'store.refund_reversed',
+    });
+
+    mockFetch.mockClear();
+    // A Response body reads once, so each call needs its own.
+    mockFetch.mockImplementation(async () =>
+      Response.json({ decision: 'allow', reasons: [], enforced: false })
+    );
+    await reportCreditEvent({
+      type: 'store.revoked',
+      eventId: 'msg-2',
+      userId: 'user-1',
+      provider: 'google',
+      referenceId: 'order-1',
+      environment: 'production',
+    });
+    expect(sentBody()).toStrictEqual({
+      eventId: 'msg-2',
+      userId: 'user-1',
+      provider: 'google',
+      referenceId: 'order-1',
+      environment: 'production',
+      type: 'store.revoked',
+    });
+  });
+});
+
 describe('reportUsageEvent', () => {
   it('drops an invalid sample count and caps the feature length', async () => {
     mockFetch.mockResolvedValue(Response.json({}));

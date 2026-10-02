@@ -877,7 +877,7 @@ export async function writeGlobalRules(
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
 }
 
 function shortHash(input: string): string {

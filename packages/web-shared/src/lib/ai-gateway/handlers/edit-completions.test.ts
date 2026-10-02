@@ -10,9 +10,13 @@ import type {
   MicrodollarUsageStats,
 } from '@/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@/lib/organizations/effective-model-access.server';
+import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
 
 jest.mock('@/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
+}));
+jest.mock('@/lib/ai-gateway/o11y/api-metrics.server', () => ({
+  emitApiMetricsForResponse: jest.fn(),
 }));
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/organizations/organization-usage');
@@ -284,6 +288,25 @@ describe('POST /api/edit/completions', () => {
     expect(upstreamBody.messages).toEqual(requestBody.messages);
     // Provider prefix is stripped before forwarding upstream.
     expect(upstreamBody.model).toBe('mercury-edit-2');
+
+    expect(jest.mocked(emitApiMetricsForResponse)).toHaveBeenCalledWith(
+      {
+        kiloUserId: 'user-123',
+        organizationId: 'org-123',
+        isAnonymous: false,
+        isStreaming: false,
+        userByok: false,
+        provider: 'inception',
+        requestedModel: 'inception/mercury-edit-2',
+        resolvedModel: 'inception/mercury-edit-2',
+        toolsAvailable: [],
+        toolsUsed: [],
+        ttfbMs: expect.any(Number),
+        statusCode: 200,
+      },
+      expect.any(Response),
+      expect.any(Number)
+    );
   });
 
   it('bills non-BYOK requests and records the cache discount', async () => {
@@ -322,6 +345,11 @@ describe('POST /api/edit/completions', () => {
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [stats, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(ctx.user_byok).toBe(true);
+    expect(jest.mocked(emitApiMetricsForResponse)).toHaveBeenCalledWith(
+      expect.objectContaining({ userByok: true }),
+      expect.any(Response),
+      expect.any(Number)
+    );
     expect(stats.cost_mUsd).toBe(0);
     expect(stats.cacheDiscount_mUsd).toBe(0);
     // The original cost is preserved in market_cost for reporting.

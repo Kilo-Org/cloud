@@ -1013,12 +1013,17 @@ export async function prepareCredentialGrant(
   });
   if (!targets.success) invalidCredentials();
   const existing = input.existing === undefined ? undefined : validateGrant(input.existing);
-  const payload = buildSessionAttachPayload(metadata, undefined, env.AGENT_ENV_VARS_PRIVATE_KEY);
-  const scopeId = scopeIdSchema.safeParse(
-    metadata.workspace?.worktreeId ?? metadata.identity.sessionId
-  );
-  if (!scopeId.success || !payload.directory) invalidCredentials();
-  const repository = repositoryFromMetadata(metadata, provider, existing);
+  const directory = input.directory;
+  if (!directory) invalidCredentials();
+  const scopeId = scopeIdSchema.safeParse(input.scopeId);
+  if (!scopeId.success) invalidCredentials();
+  const repository = repositoryFromSource(source.repository, provider, existing, {
+    containmentEnabled,
+    ...(source.orgId === undefined ? {} : { orgId: source.orgId }),
+    ...(source.createdOnPlatform === undefined
+      ? {}
+      : { createdOnPlatform: source.createdOnPlatform }),
+  });
   if (
     existing &&
     (isContainedSessionCredentialGrant(existing) !== containmentEnabled ||

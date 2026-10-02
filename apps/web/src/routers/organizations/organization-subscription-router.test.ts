@@ -345,6 +345,103 @@ describe('organizations subscription trpc router', () => {
         })
       ).rejects.toThrow();
     });
+
+    const periodStart = 1_775_001_600;
+    const periodEnd = 1_777_593_600;
+    it.each([
+      [
+        'an unsafe attached schedule',
+        (_seatPriceId: string, _passPriceId: string) => ({
+          id: 'sub_sched_foreign',
+          status: 'active',
+          metadata: { origin: 'billing-cycle-change' },
+          current_phase: null,
+          phases: [],
+        }),
+        'scheduled change',
+      ],
+      [
+        'a pending Kilo Pass removal',
+        (seatPriceId: string, passPriceId: string) => ({
+          id: 'sub_sched_cancel',
+          status: 'active',
+          metadata: { origin: 'kilo-pass-org-cancellation' },
+          current_phase: { start_date: periodStart, end_date: periodEnd },
+          phases: [
+            {
+              start_date: periodStart,
+              end_date: periodEnd,
+              items: [
+                { price: seatPriceId, quantity: 5 },
+                { price: passPriceId, quantity: 5 },
+              ],
+            },
+            {
+              start_date: periodEnd,
+              end_date: periodEnd + 2_592_000,
+              items: [{ price: seatPriceId, quantity: 5 }],
+            },
+          ],
+        }),
+        'Kilo Pass is scheduled to end',
+      ],
+    ])('maps %s to PRECONDITION_FAILED', async (_case, attachedSchedule, message) => {
+      const { KNOWN_SEAT_PRICE_IDS } = await import('@/lib/stripe');
+      const passPriceId =
+        process.env.STRIPE_KILO_PASS_TIER_19_MONTHLY_PRICE_ID ??
+        'price_test_kilo_pass_tier_19_monthly';
+      const seatPriceId = 'price_router_unsafe_schedule_seat';
+      KNOWN_SEAT_PRICE_IDS.add(seatPriceId);
+      const [purchase] = await db
+        .insert(organization_seats_purchases)
+        .values({
+          organization_id: testOrganization.id,
+          subscription_stripe_id: 'sub_router_unsafe_schedule',
+          subscription_status: 'active',
+          seat_count: 5,
+          amount_usd: 145,
+          starts_at: '2026-04-01T00:00:00.000Z',
+          expires_at: '2026-05-01T00:00:00.000Z',
+          billing_cycle: 'monthly',
+        })
+        .returning();
+      const item = (id: string, price: string) => ({
+        id,
+        quantity: 5,
+        price: { id: price, recurring: { interval: 'month' } },
+        current_period_start: periodStart,
+        current_period_end: periodEnd,
+      });
+      stripeMock.subscriptions.retrieve.mockResolvedValue({
+        id: 'sub_router_unsafe_schedule',
+        status: 'active',
+        metadata: { type: 'kilo-pass-org', organizationId: testOrganization.id },
+        items: {
+          data: [item('si_seat', seatPriceId), item('si_pass', passPriceId)],
+        },
+        schedule: attachedSchedule(seatPriceId, passPriceId),
+      });
+
+      try {
+        const caller = await createCallerForUser(regularUser.id);
+        await expect(
+          caller.organizations.subscription.updateSeatCount({
+            organizationId: testOrganization.id,
+            newSeatCount: 6,
+          })
+        ).rejects.toMatchObject({
+          code: 'PRECONDITION_FAILED',
+          message: expect.stringContaining(message),
+        });
+      } finally {
+        KNOWN_SEAT_PRICE_IDS.delete(seatPriceId);
+        if (purchase) {
+          await db
+            .delete(organization_seats_purchases)
+            .where(eq(organization_seats_purchases.id, purchase.id));
+        }
+      }
+    });
   });
 
   describe('getBillingHistory', () => {

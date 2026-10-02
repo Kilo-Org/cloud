@@ -9,7 +9,7 @@ import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { Button, type ButtonProps } from './button';
+import { Button, BUTTON_BUSY_SLOT_CLASS, type ButtonProps } from './button';
 import { Text } from './text';
 
 vi.mock('react-native', () => ({
@@ -17,6 +17,7 @@ vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
   Text: 'Text',
+  View: 'View',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -69,6 +70,16 @@ async function nativeDimensions(button: TestRenderer.ReactTestInstance) {
   // Match metro.config.js. The compiler keeps its default 14-point inlineRem.
   const rules = compile(css, { inlineVariables: false }).stylesheet().s;
   return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []);
+}
+
+/** The native style a single className compiles to, through the app's pipeline. */
+async function compiledStyles(className: string) {
+  const { css } = await postcss([tailwindcss()]).process(
+    `@reference "../../global.css"; .target { @apply ${className}; }`,
+    { from: import.meta.filename }
+  );
+  const rules = compile(css, { inlineVariables: false }).stylesheet().s;
+  return rules?.find(([name]) => name === 'target')?.[1].flatMap(rule => rule.d ?? []) ?? [];
 }
 
 beforeEach(() => {
@@ -157,6 +168,44 @@ describe('Button native target contract', () => {
       });
     }
   );
+
+  it('reserves a fixed-size slot for the busy spinner so the label never moves', async () => {
+    const button = renderButton({ loading: true });
+    const slots = button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS });
+    // One leading slot holds the spinner; an equal trailing spacer mirrors it so
+    // the label keeps the button's centre. Both stay in flow for the same two
+    // reasons: the spinner sits beside a content-sized label instead of over it,
+    // and neither is added or removed when `loading` flips.
+    expect(slots).toHaveLength(2);
+    for (const slot of slots) {
+      expect(slot.type).toBe('View');
+    }
+    const slotStyles = await compiledStyles(BUTTON_BUSY_SLOT_CLASS);
+    expect(slotStyles).toContainEqual(expect.objectContaining({ width: 20 }));
+    expect(slotStyles).toContainEqual(expect.objectContaining({ height: 20 }));
+    // The reservation must not shrink: a flex child defaults to flex-shrink 1,
+    // and a compressed slot collapses the spinner while the label stays put.
+    expect(slotStyles).toContainEqual(expect.objectContaining({ flexShrink: 0 }));
+
+    const spinner = button.findByType(ActivityIndicator);
+    expect(spinner.props.size).toBe('small');
+    expect(spinner.parent).toBe(slots[0]);
+
+    // The label is the same element, in the same row, once loading ends: the
+    // reserved slots stay and only the indicator leaves its slot.
+    const label = button.findByType(NativeText);
+    expect(label.children).toEqual(['Retry']);
+    const ready = renderButton({ loading: false });
+    expect(ready.findByType(NativeText)).toBe(label);
+    expect(ready.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(2);
+    expect(ready.findAllByType(ActivityIndicator)).toHaveLength(0);
+  });
+
+  it('leaves a button that never loads without a reserved slot', () => {
+    const button = renderButton({});
+    expect(button.findAllByProps({ className: BUTTON_BUSY_SLOT_CLASS })).toHaveLength(0);
+    expect(button.findByType(NativeText).children).toEqual(['Retry']);
+  });
 
   it('keeps an explicitly disabled control disabled after loading ends', () => {
     renderButton({ disabled: true, loading: true });

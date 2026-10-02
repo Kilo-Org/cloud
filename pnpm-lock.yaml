@@ -3152,9 +3152,6 @@ importers:
 
   services/kiloclaw/plugins/kilo-chat:
     dependencies:
-      '@sinclair/typebox':
-        specifier: 0.34.49
-        version: 0.34.49
       node-emoji:
         specifier: 2.2.0
         version: 2.2.0
@@ -9398,9 +9395,6 @@ packages:
 
   '@sinclair/typebox@0.34.48':
     resolution: {integrity: sha512-kKJTNuK3AQOrgjjotVxMrCn1sUJwM76wMszfq1kdU4uYVJjvEWuFQ6HgvLt4Xz3fSmZlTOxJ/Ie13KnIcWQXFA==}
-
-  '@sinclair/typebox@0.34.49':
-    resolution: {integrity: sha512-brySQQs7Jtn0joV8Xh9ZV/hZb9Ozb0pmazDIASBkYKCjXrXU3mpcFahmK/z4YDhGkQvP9mWJbVyahdtU5wQA+A==}
 
   '@sindresorhus/is@4.6.0':
     resolution: {integrity: sha512-t09vSN3MdfsyCHoFcTRCH/iUtG7OJ0CsjzB8cjAmKc/va/kIgeDI/TxsigdncE/4be734m0cvIYwNaV4i2XqAw==}
@@ -26941,8 +26935,6 @@ snapshots:
   '@sinclair/typebox@0.34.41': {}
 
   '@sinclair/typebox@0.34.48': {}
-
-  '@sinclair/typebox@0.34.49': {}
 
   '@sindresorhus/is@4.6.0': {}
 

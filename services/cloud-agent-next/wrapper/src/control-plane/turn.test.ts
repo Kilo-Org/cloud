@@ -980,9 +980,7 @@ describe('turn outcome rules', () => {
       );
       // The descendant terminal close lands just before the original deadline.
       h.advance(SESSION_TIMERS.noProgressMs - 1);
-      h.manager.observeKiloEvent(
-        kiloEvent('session.turn.close', { sessionID: childId, reason })
-      );
+      h.manager.observeKiloEvent(kiloEvent('session.turn.close', { sessionID: childId, reason }));
       await settle();
       expect(outcomeFrames(h.frames)).toHaveLength(0);
       // It did not refresh the clock: the root still expires at its own deadline.

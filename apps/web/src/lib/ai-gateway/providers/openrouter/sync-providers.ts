@@ -51,7 +51,7 @@ const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
  */
 const OPENROUTER_MODELS_PATH = '/models?output_modalities=all';
 
-async function fetchGatewayModels(gateway: Provider, modelsPath = '/models') {
+async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
@@ -383,7 +383,7 @@ export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
   const openrouter_data = await fetchGatewayModels(OPENROUTER, OPENROUTER_MODELS_PATH);
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
+  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, '/models');
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {

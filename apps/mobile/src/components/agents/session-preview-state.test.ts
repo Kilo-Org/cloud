@@ -14,6 +14,7 @@ import {
 } from './session-preview-state';
 
 const targetA: SessionPreviewTarget = {
+  onOpen: () => undefined,
   sessionId: 'ses-a',
   title: 'Fix login',
   initialRenameValue: 'Fix login',

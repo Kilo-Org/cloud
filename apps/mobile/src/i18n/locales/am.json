@@ -2568,7 +2568,6 @@
       "preparingPlaceholder": "የሥራ አካባቢውን በማዘጋጀት ላይ...",
       "finalizingPlaceholder": "በማጠናቀቅ ላይ...",
       "sessionLoadFailed": "ክፍለ ጊዜው ሊጫን አልቻለም። መጀመሪያ እንደገና ይሞክሩ።",
-      "sendUnavailable": "ክፍለ ጊዜው እስኪዘጋጅ ድረስ መላክ አይገኝም።",
       "cannotReceiveFiles": "ይህ ክፍለ ጊዜ ፋይሎችን መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
       "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር የመላኪያ አዝራሩን ይንኩ።",
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",

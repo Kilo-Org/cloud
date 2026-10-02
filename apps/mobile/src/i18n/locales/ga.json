@@ -2679,7 +2679,6 @@
       "preparingPlaceholder": "Ag socrú na timpeallachta...",
       "finalizingPlaceholder": "Ag críochnú...",
       "sessionLoadFailed": "Níorbh fhéidir an seisiún a lódáil. Bain triail eile as ar dtús.",
-      "sendUnavailable": "Níl seoladh ar fáil go dtí go mbeidh an seisiún réidh.",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
       "couldNotAttachFiles": "Níorbh fhéidir na comhaid a cheangal. Tapáil Seol chun triail eile a bhaint as.",
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",

@@ -84,7 +84,7 @@ export async function copySessionLink(
 }
 
 export type SessionActionMenuItem = {
-  key: 'copyId' | 'rename' | 'exit' | 'delete';
+  key: 'open' | 'rename' | 'exit' | 'delete';
   label: string;
   destructive: boolean;
   run: () => void;
@@ -96,23 +96,23 @@ export type SessionActionMenu = {
 };
 
 /**
- * The one session action set, in today's order: Copy session ID, optional
+ * The one session action set, in today's order: Open, optional
  * Rename, optional Exit session, optional Delete session. Delete wins when
  * both exist; Exit is destructive only when Delete is absent. The preview
  * panel builds from here so its order, copy and indices cannot diverge.
  */
 export function buildSessionActionMenuItems(input: {
-  onCopySessionId: () => void;
+  onOpen: () => void;
   onRename?: () => void;
   onExit?: () => void;
   onDelete?: () => void;
 }): SessionActionMenu {
   const items: SessionActionMenuItem[] = [
     {
-      key: 'copyId',
-      label: i18n.t('agents.sessionRow.copyId'),
+      key: 'open',
+      label: i18n.t('glanceable.openSession'),
       destructive: false,
-      run: input.onCopySessionId,
+      run: input.onOpen,
     },
   ];
 

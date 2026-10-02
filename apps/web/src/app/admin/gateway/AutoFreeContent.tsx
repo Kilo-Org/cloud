@@ -42,7 +42,7 @@ export function AutoFreeContent() {
 
   useEffect(() => {
     if (data) {
-      setJson(toJson(data.config ?? data.defaults));
+      setJson(toJson(data.config ?? data.fallback));
       setValidationError(null);
       setHasChanges(false);
     }
@@ -77,13 +77,6 @@ export function AutoFreeContent() {
     mutation.mutate({ config: null });
   }
 
-  function handleLoadDefaults() {
-    if (!data) return;
-    setJson(toJson(data.defaults));
-    setValidationError(null);
-    setHasChanges(true);
-  }
-
   if (isLoading) {
     return <div className="text-muted-foreground py-8 text-sm">Loading...</div>;
   }
@@ -98,15 +91,18 @@ export function AutoFreeContent() {
           <CardDescription>
             Candidate models for <code>kilo-auto/free</code>, stored in the <code>auto_free</code>{' '}
             column of <code>ai_gateway_config</code>. Each entry has a <code>model</code> ID, a
-            positive integer <code>weight</code>, and a <code>reasoning</code> config. This
-            configuration is not used for routing yet; requests still use the compiled defaults.
+            positive integer <code>weight</code>, and a <code>reasoning</code> config. Models must
+            be free and use the default AI SDK provider. Unavailable models are skipped per request;
+            when no configuration is stored, it is invalid, or no configured model is available,
+            requests fall back to <code>openrouter/free</code>. Changes take effect within one
+            minute on warm instances.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
             {hasStoredConfig
               ? 'Showing the stored configuration.'
-              : 'No configuration stored. Showing the compiled defaults.'}
+              : 'No configuration stored. Requests use the openrouter/free fallback shown below.'}
           </p>
           <div className="border-input overflow-hidden rounded-md border">
             <Editor
@@ -148,14 +144,6 @@ export function AutoFreeContent() {
               size="sm"
             >
               {mutation.isPending ? 'Saving...' : 'Save'}
-            </Button>
-            <Button
-              onClick={handleLoadDefaults}
-              disabled={mutation.isPending}
-              variant="outline"
-              size="sm"
-            >
-              Load defaults
             </Button>
             {hasStoredConfig && (
               <Button

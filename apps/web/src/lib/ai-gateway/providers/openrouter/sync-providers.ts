@@ -44,13 +44,13 @@ import type { OpenRouterModel as CatalogModel } from '@/lib/organizations/organi
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
 
-async function fetchGatewayModels(gateway: Provider) {
+async function fetchGatewayModels(gateway: Provider, modelsPath: string) {
   const headers = {
     ...ATTRIBUTION_HEADERS,
     authorization: `Bearer ${gateway.apiKey}`,
   };
 
-  const modelsResponse = await fetch(`${gateway.apiUrl}/models`, {
+  const modelsResponse = await fetch(`${gateway.apiUrl}${modelsPath}`, {
     method: 'GET',
     headers,
   });
@@ -375,8 +375,9 @@ export async function applySnapshotChangesAndAudit(params: {
 export async function syncAndStoreProviders() {
   const startTime = performance.now();
 
-  const openrouter_data = await fetchGatewayModels(OPENROUTER);
-  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY);
+  // The default OpenRouter list only has text-output models; System One models output decisions.
+  const openrouter_data = await fetchGatewayModels(OPENROUTER, '/models?output_modalities=all');
+  const vercel_data = await fetchGatewayModels(VERCEL_AI_GATEWAY, '/models');
 
   const openrouterProviders = await fetchProviders();
   if (openrouterProviders.length < 10) {

@@ -1,4 +1,5 @@
-import { PRIMARY_DEFAULT_MODEL, preferredModels } from '@/lib/ai-gateway/models';
+import { PRIMARY_DEFAULT_MODEL } from '@/lib/ai-gateway/models';
+import { getPreferredModels } from '@/lib/ai-gateway/preferred-models';
 import { getOrganizationById } from '@/lib/organizations/organizations';
 import {
   getEffectiveModelDecision,
@@ -47,7 +48,7 @@ export async function getDefaultAllowedModel(
   }
 
   // Try each preferred/recommended model in order
-  for (const model of preferredModels) {
+  for (const model of await getPreferredModels()) {
     if (await isAllowed(model)) {
       return model;
     }

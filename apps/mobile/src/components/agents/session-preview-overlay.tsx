@@ -39,7 +39,6 @@ import {
 import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
 import {
   buildSessionActionMenuItems,
-  copySessionId,
   showDeleteConfirm,
   showRenamePrompt,
 } from './session-row-actions';
@@ -230,9 +229,7 @@ function SessionPreviewContent({
   const menu = useMemo(
     () =>
       buildSessionActionMenuItems({
-        onCopySessionId: () => {
-          void copySessionId(sessionId);
-        },
+        onOpen: target.onOpen,
         onRename: target.onRename ? handleRename : undefined,
         onExit: target.onExit,
         onDelete: onDelete
@@ -241,7 +238,7 @@ function SessionPreviewContent({
             }
           : undefined,
       }),
-    [sessionId, target.onRename, target.onExit, onDelete, handleRename]
+    [target.onOpen, target.onRename, target.onExit, onDelete, handleRename]
   );
 
   // The header strip alone owns the pan, so the transcript keeps its own scroll.

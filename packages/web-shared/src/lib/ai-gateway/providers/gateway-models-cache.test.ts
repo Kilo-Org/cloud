@@ -15,6 +15,7 @@ jest.mock('@/lib/drizzle', () => ({
 import {
   extractVercelInferenceProviderIdsFromModel,
   getLanguageModelIds,
+  getSystemOneModelIds,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { StoredModel } from '@kilocode/db';
 
@@ -26,21 +27,78 @@ function storedModel(partial: Partial<StoredModel> & Pick<StoredModel, 'id'>): S
   };
 }
 
+function textModel(id: string): StoredModel {
+  return storedModel({ id, architecture: { output_modalities: ['text'] } });
+}
+
 describe('getLanguageModelIds', () => {
-  it('includes language models even when they have no endpoints', () => {
+  it('includes Vercel language models even when they have no endpoints', () => {
     expect(
       getLanguageModelIds({
-        'vendor/with-endpoints': storedModel({ id: 'vendor/with-endpoints' }),
-        'vendor/no-endpoints': storedModel({ id: 'vendor/no-endpoints', endpoints: [] }),
-        'vendor/untyped': storedModel({ id: 'vendor/untyped', type: undefined, endpoints: [] }),
+        'vendor/with-endpoints': storedModel({ id: 'vendor/with-endpoints', type: 'language' }),
+        'vendor/no-endpoints': storedModel({
+          id: 'vendor/no-endpoints',
+          type: 'language',
+          endpoints: [],
+        }),
+        'vendor/untyped': storedModel({ id: 'vendor/untyped', endpoints: [] }),
         'vendor/embedding': storedModel({
           id: 'vendor/embedding',
           type: 'embedding',
           endpoints: [],
         }),
-        'vendor/image': storedModel({ id: 'vendor/image', type: 'image' }),
+        'vendor/realtime': storedModel({ id: 'vendor/realtime', type: 'realtime' }),
+        'vendor/evaluation': storedModel({ id: 'vendor/evaluation', type: 'evaluation' }),
       })
-    ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints', 'vendor/untyped']);
+    ).toEqual(['vendor/with-endpoints', 'vendor/no-endpoints']);
+  });
+
+  it('includes only OpenRouter models that output text', () => {
+    const outputs = (output_modalities: string[]) => ({ architecture: { output_modalities } });
+    expect(
+      getLanguageModelIds({
+        'vendor/text': storedModel({ id: 'vendor/text', ...outputs(['text']) }),
+        'vendor/image-text': storedModel({
+          id: 'vendor/image-text',
+          ...outputs(['image', 'text']),
+        }),
+        'vendor/decide': storedModel({ id: 'vendor/decide', ...outputs(['decisions']) }),
+        'vendor/embed': storedModel({ id: 'vendor/embed', ...outputs(['embeddings']) }),
+        'vendor/image': storedModel({ id: 'vendor/image', ...outputs(['image']) }),
+      })
+    ).toEqual(['vendor/text', 'vendor/image-text']);
+  });
+});
+
+describe('getSystemOneModelIds', () => {
+  it('includes free variants and aliases of models that output decisions', () => {
+    const decisions = { output_modalities: ['decisions'] };
+    expect(
+      getSystemOneModelIds({
+        'typesafe-ai/jev': storedModel({ id: 'typesafe-ai/jev', type: 'evaluation' }),
+        'typesafe/jev-1.13': storedModel({ id: 'typesafe/jev-1.13', architecture: decisions }),
+        '~typesafe/jev-latest': storedModel({
+          id: '~typesafe/jev-latest',
+          alias_target: { slug: 'typesafe/jev-1.13' },
+          architecture: decisions,
+          endpoints: [],
+        }),
+        'respan/span-01-lite:free': storedModel({
+          id: 'respan/span-01-lite:free',
+          architecture: decisions,
+        }),
+        'typesafe/jev-router': storedModel({
+          id: 'typesafe/jev-router',
+          architecture: { output_modalities: ['text'] },
+        }),
+        'vendor/untyped': storedModel({ id: 'vendor/untyped' }),
+      })
+    ).toEqual([
+      'typesafe-ai/jev',
+      'typesafe/jev-1.13',
+      '~typesafe/jev-latest',
+      'respan/span-01-lite:free',
+    ]);
   });
 });
 
@@ -91,9 +149,7 @@ describe('isValidOpenRouterModelId', () => {
     'rejects removed transcription alias %s',
     async modelId => {
       const { isValidOpenRouterModelId } = await loadValidator();
-      mockLimit.mockResolvedValue([
-        { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
-      ]);
+      mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
 
       await expect(isValidOpenRouterModelId(modelId)).resolves.toBe(false);
     }
@@ -101,29 +157,40 @@ describe('isValidOpenRouterModelId', () => {
 
   it('rejects other legacy aliases that are not retained', async () => {
     const { isValidOpenRouterModelId } = await loadValidator();
-    mockLimit.mockResolvedValue([
-      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
-    ]);
+    mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
 
     await expect(isValidOpenRouterModelId('gpt-4o-2024-08-06')).resolves.toBe(false);
   });
 
   it('accepts ids present in the database catalog', async () => {
     const { isValidOpenRouterModelId } = await loadValidator();
-    mockLimit.mockResolvedValue([
-      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
-    ]);
+    mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
 
     await expect(isValidOpenRouterModelId('openai/gpt-4o')).resolves.toBe(true);
   });
 
   it('rejects ids missing from a non-empty database catalog', async () => {
     const { isValidOpenRouterModelId } = await loadValidator();
-    mockLimit.mockResolvedValue([
-      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
-    ]);
+    mockLimit.mockResolvedValue([{ models: { 'openai/gpt-4o': textModel('openai/gpt-4o') } }]);
 
     await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(false);
+  });
+
+  it('rejects System One models stored alongside language models', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      {
+        models: {
+          'openai/gpt-4o': textModel('openai/gpt-4o'),
+          'typesafe/jev-1.13': storedModel({
+            id: 'typesafe/jev-1.13',
+            architecture: { output_modalities: ['decisions'] },
+          }),
+        },
+      },
+    ]);
+
+    await expect(isValidOpenRouterModelId('typesafe/jev-1.13')).resolves.toBe(false);
   });
 
   it('fails open when the database has no model ids', async () => {

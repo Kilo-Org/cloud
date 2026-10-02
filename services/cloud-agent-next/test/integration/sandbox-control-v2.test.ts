@@ -663,6 +663,7 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const stub = await startAllocation(provider);
     await awaitStarting(provider, stub);
     await connectAndHello(provider, stub);
+    const before = await readState(stub);
     const records = await captureAllocationTransitions(stub, async (instance, state) => {
       const [socket] = state.getWebSockets();
       if (socket === undefined) throw new Error('Missing wrapper socket');
@@ -673,7 +674,10 @@ describe('SandboxControlV2 allocation lifecycle', () => {
     const closed = records.find(record => record.event === 'socket-closed');
     expect(closed).toMatchObject({ from: 'connected', to: 'disconnected', origin: 'peer' });
     expect(JSON.stringify(closed)).not.toMatch(/https?:\/\/|Bearer |secret|token/i);
-    expect(await readState(stub)).toMatchObject({ kind: 'disconnected', connectionId: null });
+    expect(await readState(stub)).toMatchObject({
+      kind: 'disconnected',
+      connectionId: before.connectionId,
+    });
   });
 
   it('records an owner heartbeat-timeout close as origin=heartbeat_timeout', async () => {

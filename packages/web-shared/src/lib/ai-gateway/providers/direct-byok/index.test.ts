@@ -11,8 +11,8 @@ jest.mock('@/lib/ai-gateway/byok', () => ({
   getBYOKforUser: jest.fn(),
 }));
 
-jest.mock('@/lib/ai-gateway/models', () => ({
-  preferredModels: [],
+jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+  getPreferredModels: jest.fn(async () => []),
 }));
 
 jest.mock('@/lib/ai-gateway/providers/model-settings', () => ({

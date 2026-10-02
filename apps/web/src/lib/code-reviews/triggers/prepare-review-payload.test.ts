@@ -634,6 +634,8 @@ describe('prepareReviewPayload', () => {
       gitToken: 'gitlab-project-token',
       platform: 'gitlab',
     });
+    // GitLab sessions are reused across reviews, so the publication self-check is GitHub-only.
+    expect(payload.sessionInput).not.toHaveProperty('envVars');
     expect(payload.repositorySize).toBe('100 MB');
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
     expect(mockFetchGitLabRepositorySize).toHaveBeenCalledWith(
@@ -1106,6 +1108,7 @@ describe('prepareReviewPayload', () => {
       githubRepo: REPO,
       platform: 'github',
       upstreamBranch: 'refs/pull/1234/head',
+      envVars: { KILO_CODE_REVIEW_PUBLICATION_SELF_CHECK: '1' },
     });
     expect(payload.sessionInput).not.toHaveProperty('gitlabCodeReviewTokenRef');
   });

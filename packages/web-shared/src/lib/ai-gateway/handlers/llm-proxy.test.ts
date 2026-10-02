@@ -661,7 +661,12 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     expect(mockedDecide).toHaveBeenCalledTimes(1);
     expect(mockedDecide).toHaveBeenCalledWith(
-      { requestId: 'iad1::iad1::request-id', tier: 'paid', accountId: 'user:user-123' },
+      {
+        requestId: 'iad1::iad1::request-id',
+        tier: 'paid',
+        accountId: 'user:user-123',
+        ip: '127.0.0.1',
+      },
       { timeoutMs: 30_000 }
     );
   });
@@ -739,11 +744,31 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(usageContext?.bouncer).toEqual({
       requestId: 'iad1::usage-request-id',
       occurredAt: expect.any(Date),
+      clientIp: '127.0.0.1',
       clientAttributed: true,
       requestedLogprobs: true,
       samples: 2,
       promptSimHash: simHash64('explain the failing test'),
     });
+  });
+
+  it('still reports usage and decides without an ip when the header is not an address', async () => {
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody(), { 'x-forwarded-for': 'not-an-address' }) as never
+    );
+
+    // A non-literal must not reach bouncer: its typia check rejects the whole
+    // event, which would drop the usage ledger row instead of just the field.
+    expect(response.status).toBe(200);
+    const usageContext = mockedAccountForMicrodollarUsage.mock.calls[0]?.[1];
+    expect(usageContext?.bouncer?.clientIp).toBeUndefined();
+    expect(mockedDecide).toHaveBeenCalledWith(
+      expect.objectContaining({ tier: 'paid', accountId: 'user:user-123' }),
+      { timeoutMs: 30_000 }
+    );
+    expect(mockedDecide.mock.calls[0]?.[0].ip).toBeUndefined();
   });
 
   it('sends upstream without waiting for a slow decide and keeps the work alive after response', async () => {

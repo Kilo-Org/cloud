@@ -50,7 +50,7 @@ const MODEL_COLORS = [
   '#ca8a04',
   '#9333ea',
   '#0891b2',
-  '#e11d48',
+  '#f472b6',
   '#65a30d',
   '#c026d3',
   '#ea580c',
@@ -237,7 +237,11 @@ function RequestVolumeChart({
               />
             }
           />
-          <Legend onClick={onToggle} wrapperStyle={{ fontSize: 12, cursor: 'pointer' }} />
+          <Legend
+            onClick={onToggle}
+            itemSorter={null}
+            wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+          />
           {series.map(item => (
             <Area
               key={item.key}
@@ -329,7 +333,11 @@ function ErrorRateChart({
               />
             )}
           />
-          <Legend onClick={onToggle} wrapperStyle={{ fontSize: 12, cursor: 'pointer' }} />
+          <Legend
+            onClick={onToggle}
+            itemSorter={null}
+            wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+          />
           {series.map(item => (
             <Line
               key={item.key}

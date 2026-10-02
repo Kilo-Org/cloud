@@ -51,6 +51,12 @@ type PartRendererProps = {
   onOpenChildSession?: OpenChildSession;
   modelOptions?: SessionModelOption[];
   /**
+   * Render-cache scope for the markdown text parts, so identical markdown in
+   * different messages never shares the cached elements whose handlers close
+   * over a specific message. Omitted outside a message bubble.
+   */
+  renderScope?: string;
+  /**
    * Long-press handler forwarded into rendered code fences' copy trigger. The
    * message bubble supplies its details long-press so a press-and-hold on a
    * fence still opens message details. Omitted outside a bubble.
@@ -65,6 +71,7 @@ export function PartRenderer({
   defaultReasoningExpanded,
   onOpenChildSession,
   modelOptions,
+  renderScope,
   onLongPressCode,
 }: Readonly<PartRendererProps>) {
   const { t } = useTranslation();
@@ -74,7 +81,11 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
-        <TextPartRenderer text={part.text} onLongPressCode={onLongPressCode} />
+        <TextPartRenderer
+          text={part.text}
+          renderScope={renderScope}
+          onLongPressCode={onLongPressCode}
+        />
       </MessageErrorBoundary>
     );
   }
@@ -84,7 +95,9 @@ export function PartRenderer({
         <ToolPartRenderer
           part={part}
           getChildMessages={getChildMessages}
-          renderPart={props => <PartRenderer {...props} onLongPressCode={onLongPressCode} />}
+          renderPart={props => (
+            <PartRenderer {...props} renderScope={renderScope} onLongPressCode={onLongPressCode} />
+          )}
           onOpenChildSession={onOpenChildSession}
           modelOptions={modelOptions}
         />

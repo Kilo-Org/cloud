@@ -21,6 +21,7 @@ import {
   splitMarkdownHtmlIncremental,
 } from './markdown-html';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
+import { clearMarkdownParseCachesForTests } from './markdown-parse-cache';
 import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownText } from './markdown-text';
 
@@ -42,6 +43,7 @@ const rnStub = vi.hoisted(() => ({
   useColorScheme: () => 'light',
   useWindowDimensions: () => ({ width: 320, height: 640, scale: 2, fontScale: 1 }),
 }));
+const rendererSetHandlers = vi.hoisted(() => vi.fn());
 type CjsLoad = (request: string, parent: NodeJS.Module | null, isMain: boolean) => unknown;
 const ModuleWithLoad = Module as unknown as { _load: CjsLoad };
 const originalLoad = ModuleWithLoad._load.bind(ModuleWithLoad);
@@ -77,7 +79,12 @@ vi.mock('@/lib/hooks/use-theme-colors', () => {
   return { useThemeColors: () => colors };
 });
 vi.mock('./markdown-renderer', () => ({
-  MarkdownRenderer: vi.fn(),
+  // A constructor mock: `new MarkdownRenderer(...)` returns the object, so the
+  // suite keeps asserting construction counts while the render cache can call
+  // the renderer's `setHandlers` to re-bind reused elements.
+  MarkdownRenderer: vi.fn(function MockMarkdownRenderer() {
+    return { setHandlers: rendererSetHandlers };
+  }),
 }));
 vi.mock('./markdown-table', () => ({ MarkdownTable: 'MarkdownTable' }));
 vi.mock('./markdown-image', () => ({ MarkdownImage: 'MarkdownImage' }));
@@ -156,6 +163,7 @@ function requiredRenderer(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  clearMarkdownParseCachesForTests();
 });
 
 describe('MarkdownText HTML routing', () => {
@@ -206,6 +214,44 @@ describe('MarkdownText HTML routing', () => {
       renderer.update(<MarkdownText value={value} selectable={false} />);
     });
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not share cached render elements across message scopes', async () => {
+    // Regression: the element cache was keyed by value and render props alone,
+    // so two messages carrying identical markdown shared elements whose
+    // `onLongPressCode` closed over the first message. The render scope keeps
+    // the two apart while still letting a remount of the same message reuse.
+    const value = 'Scoped fence\n\n```ts\nconst scoped = 1;\n```';
+    const handler = vi.fn<() => void>();
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={handler} />);
+    const afterFirst = vi.mocked(useMarkdown).mock.calls.length;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={handler} />);
+    expect(vi.mocked(useMarkdown).mock.calls.length).toBe(afterFirst);
+
+    await mount(<MarkdownText value={value} renderScope="message-b" onLongPressCode={handler} />);
+    expect(vi.mocked(useMarkdown).mock.calls.length).toBe(afterFirst + 1);
+  });
+
+  it('re-binds a reused render to the remount current long-press handler', async () => {
+    // Regression: a cache-hit remount reused elements whose renderer captured
+    // the previous message-bound long-press, so a fence press opened actions
+    // computed from the stale message even though the value was unchanged. The
+    // reused render must be pointed at the remount's current handler.
+    const value = 'Scoped fence\n\n```ts\nconst scoped = 1;\n```';
+    const first = vi.fn<() => void>();
+    const second = vi.fn<() => void>();
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={first} />);
+    rendererSetHandlers.mockClear();
+
+    await mount(<MarkdownText value={value} renderScope="message-a" onLongPressCode={second} />);
+
+    expect(rendererSetHandlers).toHaveBeenCalledWith(
+      expect.objectContaining({ onLongPressCode: second })
+    );
   });
 
   it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {

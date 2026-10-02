@@ -52,10 +52,18 @@ export function useEffectiveProfileCustomModes(
     (listCombined.data?.orgProfiles.some(profile => profile.id === targetProfileId) ?? false);
   const getOrg = isOrgProfile ? organizationId : undefined;
 
+  // An explicit `profileId` can enable the `get` before the combined read has
+  // resolved, so its owner is not yet known. Firing then without the
+  // organization id resolves the personal owner and throws `Profile not found`
+  // for an org profile, projecting an empty role list until the query re-keys.
+  // Gate the `get` on the ownership lookup; a personal context has no such
+  // lookup and is always resolved.
+  const ownershipResolved = !organizationId || listCombined.data !== undefined;
+
   const get = useQuery(
     trpc.agentProfiles.get.queryOptions(
       { profileId: targetProfileId ?? '', ...(getOrg ? { organizationId: getOrg } : {}) },
-      { enabled: Boolean(targetProfileId) }
+      { enabled: Boolean(targetProfileId) && ownershipResolved }
     )
   );
 

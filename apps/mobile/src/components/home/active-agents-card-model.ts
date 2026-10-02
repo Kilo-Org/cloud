@@ -15,13 +15,15 @@ import { parseTimestamp } from '@/lib/utils';
 
 /**
  * Rank order shared with `@/lib/glanceable/presentation` (`COUNT_ORDER`): what
- * the user must act on first, then what is working, then what is only connected.
- * Kept local because that const is private; the values still come from the
- * shared counts, so only this ordering can drift from the native surfaces.
+ * the user must act on first, then what is working, then what will wake later,
+ * then what is only connected. Kept local because that const is private; the
+ * values still come from the shared counts, so only this ordering can drift
+ * from the native surfaces.
  */
 const COUNT_LINE_ORDER = [
   { key: 'glanceable.needsInput', kind: 'needsInput' },
   { key: 'common.working', kind: 'running' },
+  { key: 'common.scheduled', kind: 'scheduled' },
   { key: 'common.idle', kind: 'idle' },
 ] as const satisfies readonly Pick<GlanceableCountLine, 'key' | 'kind'>[];
 

@@ -29,6 +29,17 @@ function runningSession(id: string): ActiveSession {
   };
 }
 
+function scheduledSession(id: string): ActiveSession {
+  return {
+    id,
+    status: 'scheduled',
+    statusUpdatedAt: '2026-09-27T10:00:00Z',
+    scheduledAt: '2026-09-27T12:00:00Z',
+    title: id,
+    connectionId: 'c1',
+  };
+}
+
 afterEach(() => {
   __resetSessionAttentionForTests();
 });
@@ -50,6 +61,16 @@ describe('buildActiveAgentsCardModel primary count', () => {
 
   it('has no primary line when every count is zero', () => {
     expect(buildActiveAgentsCardModel([]).primaryCountKind).toBeNull();
+  });
+
+  it('renders a scheduled count and ranks it primary for a scheduled-only card', () => {
+    const model = buildActiveAgentsCardModel([scheduledSession('s1')]);
+
+    expect(model.countLines.find(line => line.kind === 'scheduled')?.count).toBe(1);
+    expect(model.primaryCountKind).toBe('scheduled');
+    // The newest-result line in the card resolves its label from the same count
+    // lines, so a scheduled newest result must have a line to name it.
+    expect(model.countLines.find(line => line.kind === model.newestResultKind)?.count).toBe(1);
   });
 });
 

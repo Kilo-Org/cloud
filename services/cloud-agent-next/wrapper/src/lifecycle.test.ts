@@ -175,3 +175,78 @@ describe('wrapper lifecycle drain races', () => {
     expect(events.filter(event => event.streamEventType === 'complete')).toHaveLength(1);
   }, 20_000);
 });
+
+describe('wrapper lifecycle publication self-check', () => {
+  const agent = { mode: 'code', model: { modelID: 'kilo/test-model' }, variant: 'high' };
+
+  function setup(options: { sendFails?: boolean } = {}) {
+    const state = new WrapperState();
+    const events: IngestEvent[] = [];
+    const prompts: Array<{ prompt?: string; agent?: string }> = [];
+    state.bindSession({ ...sessionContext, publicationSelfCheck: true });
+    state.setSendToIngestFn(event => events.push(event));
+    state.acceptMessage('message-1', { autoCommit: false, condenseOnComplete: false, agent });
+    const kiloClient = {
+      sendPromptAsync: async (opts: { prompt?: string; agent?: string }) => {
+        if (options.sendFails) throw new Error('kilo unavailable');
+        prompts.push(opts);
+      },
+    } as unknown as WrapperKiloClient;
+    const lifecycle = createLifecycleManager(
+      { workspacePath: '/tmp' },
+      {
+        state,
+        kiloClient,
+        closeConnections: async () => {},
+        isConnected: () => true,
+        reconnectEventSubscription: () => {},
+      }
+    );
+    const types = () => events.map(event => event.streamEventType);
+    return { state, events, prompts, lifecycle, types };
+  }
+
+  it('sends one self-check instead of sealing, then completes on the next stable idle', async () => {
+    const { events, prompts, lifecycle, types } = setup();
+
+    lifecycle.onSessionIdle();
+    await wait(3_100);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]?.agent).toBe('code');
+    expect(types()).not.toContain('wrapper_finalizing');
+
+    // The self-check turn runs and goes idle like any other turn.
+    lifecycle.onRootSessionActivity();
+    lifecycle.onSessionIdle();
+    await wait(3_100);
+    await waitForStreamEvent(events, 'complete');
+    expect(types()).toContain('complete');
+    expect(prompts).toHaveLength(1);
+  }, 15_000);
+
+  it('seals without a self-check when the agent already wrote the summary', async () => {
+    const { state, events, prompts, lifecycle, types } = setup();
+    state.observeSummaryPublication();
+
+    lifecycle.onSessionIdle();
+    await wait(3_100);
+    await waitForStreamEvent(events, 'complete');
+    expect(types()).toContain('complete');
+    expect(prompts).toHaveLength(0);
+  }, 15_000);
+
+  it('still completes the turn when the self-check cannot be sent', async () => {
+    const { events, lifecycle, types } = setup({ sendFails: true });
+
+    lifecycle.onSessionIdle();
+    await wait(6_200);
+    await waitForStreamEvent(events, 'complete');
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        streamEventType: 'error',
+        data: { error: 'Publication self-check failed: kilo unavailable', fatal: false },
+      })
+    );
+    expect(types()).toContain('complete');
+  }, 20_000);
+});

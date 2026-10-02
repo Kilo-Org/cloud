@@ -56,20 +56,21 @@ export async function resolveOpenRouterModelAlias(modelId: string): Promise<stri
 export function getLanguageModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
     .filter(
-      model =>
-        (model.type ?? 'language') === 'language' &&
-        (model.architecture?.output_modalities.includes('text') ?? true)
+      model => model.type === 'language' || model.architecture?.output_modalities.includes('text')
     )
     .map(model => model.id);
 }
 
 /**
- * The ids of System One models, which output `decisions` instead of text,
- * including `:free` variants and `~` aliases.
+ * The ids of System One models, including `:free` variants and `~` aliases.
+ * Vercel types them as `evaluation`; OpenRouter models output `decisions`.
  */
 export function getSystemOneModelIds(models: StoredModelMap): string[] {
   return Object.values(models)
-    .filter(model => model.architecture?.output_modalities.includes('decisions') ?? false)
+    .filter(
+      model =>
+        model.type === 'evaluation' || model.architecture?.output_modalities.includes('decisions')
+    )
     .map(model => model.id);
 }
 

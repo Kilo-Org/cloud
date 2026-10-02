@@ -183,6 +183,25 @@ describe('ModelsSchema', () => {
       undefined,
     ]);
   });
+
+  it('preserves Vercel model types and drops unknown ones', () => {
+    const types = [
+      'language',
+      'embedding',
+      'image',
+      'video',
+      'speech',
+      'transcription',
+      'reranking',
+      'realtime',
+      'evaluation',
+    ];
+    const result = ModelsSchema.parse({
+      data: [...types, 'hologram'].map(type => ({ id: `vendor/${type}`, name: type, type })),
+    });
+
+    expect(result.data.map(model => model.type)).toEqual([...types, undefined]);
+  });
 });
 
 describe('OpenRouterPricing', () => {

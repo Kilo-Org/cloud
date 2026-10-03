@@ -756,18 +756,26 @@ export function ChatSidebar({
   // Live sessions the stored list does not carry. The live rows bypass the
   // server-side filter the stored list gets, so they have to honor the same
   // selections here or the sidebar shows rows the filters exclude.
-  const liveOnlySessions = useMemo(
-    () =>
-      filterLiveSidebarSessions(
-        activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
-        {
-          platformFilter: platformFilter ?? [],
-          projectFilter: projectFilter ?? [],
-          searchQuery,
-        }
-      ),
-    [activeSessions, sessions, platformFilter, projectFilter, searchQuery]
-  );
+  const liveOnlySessions = useMemo(() => {
+    // Heartbeats now leave every row where it was, so the order is decided
+    // here: attention first, then working, id last.
+    const remotePriority = (status: string) =>
+      status === 'question' || status === 'permission'
+        ? 2
+        : status === 'busy' || status === 'retry'
+          ? 1
+          : 0;
+    return filterLiveSidebarSessions(
+      activeSessions.filter(activeS => !sessions.some(s => s.sessionId === activeS.id)),
+      {
+        platformFilter: platformFilter ?? [],
+        projectFilter: projectFilter ?? [],
+        searchQuery,
+      }
+    ).toSorted(
+      (a, b) => remotePriority(b.status) - remotePriority(a.status) || a.id.localeCompare(b.id)
+    );
+  }, [activeSessions, sessions, platformFilter, projectFilter, searchQuery]);
 
   const hasActiveFilter = (platformFilter?.length ?? 0) > 0 || (projectFilter?.length ?? 0) > 0;
 

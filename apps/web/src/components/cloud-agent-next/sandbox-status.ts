@@ -12,7 +12,6 @@ import {
 } from '@/lib/cloudflare/container-capacity';
 import type { FetchedSessionData, ResolvedSession } from '@kilocode/cloud-agent-sdk';
 
-export const SANDBOX_STATUS_POLL_INTERVAL_MS = 5_000;
 export const SANDBOX_STATUS_FRESHNESS_MS = 15_000;
 export const SANDBOX_SLEEP_ESTIMATE_DELAY_MS = 120_000;
 export const SANDBOX_SLEEP_SOON_MS = 60_000;

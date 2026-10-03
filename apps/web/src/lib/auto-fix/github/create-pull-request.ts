@@ -7,10 +7,17 @@
 
 import 'server-only';
 import { captureException } from '@sentry/nextjs';
+import {
+  buildGitHubPullRequestHead,
+  parseGitHubRepositoryCoordinates,
+} from '@/lib/github/pull-request-head';
 import { logExceptInTest, errorExceptInTest } from '@/lib/utils.server';
 
 export type CreatePullRequestParams = {
+  /** Repository the pull request is opened against. */
   repoFullName: string;
+  /** Repository the head branch was pushed to, when it is a fork. Defaults to `repoFullName`. */
+  headRepoFullName?: string;
   baseBranch: string;
   headBranch: string;
   title: string;
@@ -37,26 +44,34 @@ export async function createPullRequest(
 
   logExceptInTest('[auto-fix:createPullRequest] Creating PR', {
     repoFullName,
+    headRepoFullName: params.headRepoFullName,
     baseBranch,
     headBranch,
     titleLength: title.length,
     bodyLength: body.length,
   });
 
-  // Parse repo owner and name
-  const [owner, repo] = repoFullName.split('/');
-
-  if (!owner || !repo) {
+  const baseRepository = parseGitHubRepositoryCoordinates(repoFullName);
+  if (!baseRepository) {
     throw new Error(`Invalid repository name format: ${repoFullName}`);
+  }
+  const { owner, repo } = baseRepository;
+
+  const headRepositoryFullName = params.headRepoFullName ?? repoFullName;
+  const headRepository = parseGitHubRepositoryCoordinates(headRepositoryFullName);
+  if (!headRepository) {
+    throw new Error(`Invalid repository name format: ${headRepositoryFullName}`);
   }
 
   try {
-    // Verify the branch exists on GitHub before creating PR
-    // The headBranch might be "session/xxx" which needs to be URL-encoded for the API
-    const branchPath = headBranch.replace(/^refs\/heads\//, '');
-    const encodedBranchPath = encodeURIComponent(branchPath);
+    const pullRequestHead = buildGitHubPullRequestHead({
+      headBranch,
+      headRepository,
+      baseRepository,
+    });
+    const encodedBranchPath = encodeURIComponent(pullRequestHead.branch);
     const branchCheckResponse = await fetch(
-      `https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${encodedBranchPath}`,
+      `https://api.github.com/repos/${pullRequestHead.repository.owner}/${pullRequestHead.repository.repo}/git/ref/heads/${encodedBranchPath}`,
       {
         headers: {
           Authorization: `Bearer ${githubToken}`,
@@ -69,16 +84,22 @@ export async function createPullRequest(
     if (!branchCheckResponse.ok) {
       const branchError = await branchCheckResponse.text();
       errorExceptInTest('[auto-fix:createPullRequest] Branch does not exist on GitHub', {
-        headBranch,
+        headBranch: pullRequestHead.branch,
+        headRepoFullName: headRepositoryFullName,
         status: branchCheckResponse.status,
         error: branchError,
       });
       throw new Error(
-        `Branch '${headBranch}' does not exist on GitHub. The branch may not have been pushed yet. Please ensure the Cloud Agent successfully pushed the branch before creating a PR.`
+        pullRequestHead.headRepo === null
+          ? `Branch '${pullRequestHead.branch}' does not exist on GitHub. The branch may not have been pushed yet. Please ensure the Cloud Agent successfully pushed the branch before creating a PR.`
+          : `Branch '${pullRequestHead.branch}' could not be read from ${pullRequestHead.headRepo} on GitHub (HTTP ${branchCheckResponse.status}). Either it was never pushed there, or the GitHub App is not installed on that repository.`
       );
     }
 
-    logExceptInTest('[auto-fix:createPullRequest] Branch verified on GitHub', { headBranch });
+    logExceptInTest('[auto-fix:createPullRequest] Branch verified on GitHub', {
+      headBranch: pullRequestHead.branch,
+      headRepoFullName: headRepositoryFullName,
+    });
 
     const response = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls`, {
       method: 'POST',
@@ -91,8 +112,9 @@ export async function createPullRequest(
       body: JSON.stringify({
         title,
         body,
-        head: headBranch,
+        head: pullRequestHead.ref,
         base: baseBranch,
+        ...(pullRequestHead.headRepo === null ? {} : { head_repo: pullRequestHead.headRepo }),
       }),
     });
 
@@ -127,7 +149,7 @@ export async function createPullRequest(
     errorExceptInTest('[auto-fix:createPullRequest] Error creating PR:', error);
     captureException(error, {
       tags: { operation: 'auto-fix-create-pull-request' },
-      extra: { repoFullName, baseBranch, headBranch },
+      extra: { repoFullName, headRepositoryFullName, baseBranch, headBranch },
     });
     throw error;
   }

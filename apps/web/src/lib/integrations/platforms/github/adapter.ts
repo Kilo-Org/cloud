@@ -5,6 +5,10 @@ import { logExceptInTest, warnExceptInTest } from '@/lib/utils.server';
 
 import crypto from 'crypto';
 import type { InstallationToken } from '@/lib/integrations/core/types';
+import {
+  buildGitHubPullRequestHead,
+  parseGitHubRepositoryCoordinates,
+} from '@/lib/github/pull-request-head';
 import { type GitHubAppType, getGitHubAppCredentials } from './app-selector';
 import { assertGitHubInstallationRuntimeAuthorized } from '../../github/runtime-authorization';
 
@@ -932,16 +936,29 @@ export async function createGitHubPullRequest(params: {
   body: string;
   headBranch: string;
   baseBranch: string;
+  /** Repository the head branch was pushed to, when it is a fork. Defaults to `owner/repo`. */
+  headRepo?: string;
 }): Promise<{ number: number; url: string }> {
   const { token, owner, repo, title, body, headBranch, baseBranch } = params;
   const octokit = new Octokit({ auth: token });
+  const headRepoFullName = params.headRepo ?? `${owner}/${repo}`;
+  const headRepository = parseGitHubRepositoryCoordinates(headRepoFullName);
+  if (!headRepository) {
+    throw new Error(`Invalid head repository name format: ${headRepoFullName}`);
+  }
+  const pullRequestHead = buildGitHubPullRequestHead({
+    headBranch,
+    headRepository,
+    baseRepository: { owner, repo },
+  });
   const { data } = await octokit.pulls.create({
     owner,
     repo,
     title,
     body,
-    head: headBranch,
+    head: pullRequestHead.ref,
     base: baseBranch,
+    ...(pullRequestHead.headRepo === null ? {} : { head_repo: pullRequestHead.headRepo }),
   });
 
   return { number: data.number, url: data.html_url };

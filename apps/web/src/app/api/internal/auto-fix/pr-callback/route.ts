@@ -49,6 +49,7 @@ const CallbackPayloadSchema = z
     status: callbackStatusEnum,
     errorMessage: z.string().optional(),
     lastSeenBranch: z.string().optional(),
+    headRepoFullName: z.string().optional(),
   })
   .refine(data => data.sessionId || data.cloudAgentSessionId, {
     message: 'Either sessionId or cloudAgentSessionId is required',
@@ -59,12 +60,14 @@ function normalizePayload(raw: z.infer<typeof CallbackPayloadSchema>): {
   status: z.infer<typeof callbackStatusEnum>;
   errorMessage?: string;
   lastSeenBranch?: string;
+  headRepoFullName?: string;
 } {
   return {
     sessionId: raw.sessionId ?? raw.cloudAgentSessionId,
     status: raw.status,
     errorMessage: raw.errorMessage,
     lastSeenBranch: raw.lastSeenBranch,
+    headRepoFullName: raw.headRepoFullName,
   };
 }
 
@@ -93,7 +96,9 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    const { sessionId, status, errorMessage, lastSeenBranch } = normalizePayload(parsed.data);
+    const { sessionId, status, errorMessage, lastSeenBranch, headRepoFullName } = normalizePayload(
+      parsed.data
+    );
 
     if (!sessionId) {
       return NextResponse.json({ error: 'Missing required fields: sessionId' }, { status: 400 });
@@ -278,6 +283,7 @@ export async function POST(req: NextRequest) {
         ticketId,
         sessionId,
         branchName: lastSeenBranch,
+        headRepoFullName,
       });
       if (!prResult.ok) {
         throw new Error(prResult.error);

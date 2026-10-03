@@ -75,7 +75,11 @@ import {
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
 import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { getManagedOutboundContainerId, getSandboxNamespace } from '../../sandbox-id.js';
+import {
+  getManagedOutboundContainerId,
+  getOutboundContainerId,
+  getSandboxNamespace,
+} from '../../sandbox-id.js';
 import { sessionDoName } from '../../session-plane.js';
 import { logger } from '../../logger.js';
 import {
@@ -2610,6 +2614,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         // N4: persist the ref before launch so an accepted `hello` never sees null.
         createdRef = created.providerRef;
+        if (pin.provider === 'cloudflare' || pin.provider === 'cloudflare-containers') {
+          try {
+            const containerInstanceId =
+              pin.provider === 'cloudflare-containers'
+                ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
+                : getOutboundContainerId(this.env, intent.allocationName, {
+                    managedScmContainment: this.credentialContainmentEnabled(),
+                  });
+            logControlDiagnostic('container_launch_identity', {
+              sandboxId: this.sandboxId,
+              allocationId,
+              allocationName: intent.allocationName,
+              provider: pin.provider,
+              containerInstanceId,
+            });
+          } catch {
+            // Observability cannot turn a successful provider create into a failed allocation.
+          }
+        }
         await this.dispatchResult({
           type: 'provider-ref',
           at: Date.now(),

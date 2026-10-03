@@ -69,6 +69,7 @@ function createFakeClient() {
   let promptImpl: (opts: PromptCall) => Promise<void> = async () => undefined;
   let commandImpl: (opts: CommandCall) => Promise<unknown> = async () => ({});
   let summaryImpl: (opts: SummaryCall) => Promise<boolean> = async () => true;
+  let probeImpl: WrapperKiloClient['probeMessagePart'];
   const client = {
     sendPromptAsync: async (opts: PromptCall) => {
       prompts.push(opts);
@@ -109,6 +110,8 @@ function createFakeClient() {
       dropped: 0,
       overLimit: false,
     }),
+    probeMessagePart: (...args: Parameters<NonNullable<WrapperKiloClient['probeMessagePart']>>) =>
+      probeImpl?.(...args) ?? Promise.resolve(null),
   } as unknown as WrapperKiloClient;
   return {
     client,
@@ -127,6 +130,9 @@ function createFakeClient() {
     },
     setSummaryImpl: (impl: (opts: SummaryCall) => Promise<boolean>) => {
       summaryImpl = impl;
+    },
+    setProbeImpl: (impl: NonNullable<WrapperKiloClient['probeMessagePart']>) => {
+      probeImpl = impl;
     },
   };
 }
@@ -192,6 +198,7 @@ function createHarness(
 ) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const logs: string[] = [];
+  const diagnostics: Array<{ event: string; fields: Record<string, unknown> }> = [];
   const clients = new Map<string, FakeClient>();
   const flags = new Map<string, Flags>();
   const runtimes = new Map<string, TurnKiloRuntime>();
@@ -219,6 +226,7 @@ function createHarness(
     emit: frame => frames.push(frame),
     runtimes: { get: key => runtimes.get(key) },
     log: message => logs.push(message),
+    onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
     now: () => clock,
     scheduler,
     materializeAttachments: (async (message: { prompt?: string; parts?: unknown[] }) => {
@@ -257,6 +265,7 @@ function createHarness(
     manager,
     frames,
     logs,
+    diagnostics,
     scheduler,
     timeouts,
     setClock: (value: number) => {
@@ -836,6 +845,98 @@ describe('turn outcome rules', () => {
     await settle();
     expect(outcomeFrames(h.frames)[0]).toMatchObject({ status: 'failed', reason: 'no_progress' });
     expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+  });
+
+  it('records deadline and native tool metadata without recording tool content', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    let nativeStatus = 'running';
+    h.client(routeSpec()).setProbeImpl(async () => ({ status: nativeStatus }));
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: {
+          id: 'part_1',
+          sessionID: KILO_SESSION,
+          messageID: 'assistant_1',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'running', input: { command: 'sensitive command' } },
+        },
+      })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs - 60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)).toHaveLength(0);
+    nativeStatus = 'completed';
+    h.advance(60_000);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
+    expect(h.diagnostics).toEqual([
+      {
+        event: 'session.execution',
+        fields: expect.objectContaining({
+          phase: 'freshness',
+          probeStage: 'pre_deadline',
+          probeStatus: 'found',
+          toolStatus: 'running',
+        }),
+      },
+      {
+        event: 'session.execution',
+        fields: expect.objectContaining({
+          phase: 'deadline_expired',
+          reason: 'no_progress',
+          kiloSessionId: KILO_SESSION,
+          eventType: 'message.part.updated',
+          messageId: 'assistant_1',
+          partId: 'part_1',
+          toolStatus: 'running',
+          elapsedMs: SESSION_TIMERS.noProgressMs,
+        }),
+      },
+      {
+        event: 'session.execution',
+        fields: expect.objectContaining({
+          phase: 'freshness',
+          probeStage: 'deadline',
+          probeStatus: 'found',
+          toolStatus: 'completed',
+          partId: 'part_1',
+        }),
+      },
+    ]);
+    expect(JSON.stringify(h.diagnostics)).not.toContain('sensitive command');
+  });
+
+  it('still aborts at seven minutes when the diagnostic probe throws', async () => {
+    const h = createHarness();
+    h.registerRoute(routeSpec());
+    h.client(routeSpec()).setProbeImpl(() => {
+      throw new Error('probe failed');
+    });
+    h.manager.submit(SESSION_ID, promptPayload('m1'));
+    await settle();
+    h.manager.observeKiloEvent(
+      kiloEvent('message.part.updated', {
+        part: {
+          id: 'part_1',
+          sessionID: KILO_SESSION,
+          messageID: 'assistant_1',
+          type: 'tool',
+          state: { status: 'running' },
+        },
+      })
+    );
+    h.advance(SESSION_TIMERS.noProgressMs);
+    h.manager.tick();
+    await settle();
+    expect(outcomeFrames(h.frames)[0]).toMatchObject({ reason: 'no_progress' });
+    expect(h.client(routeSpec()).aborts).toEqual([KILO_SESSION]);
+    expect(h.diagnostics.at(-1)?.fields).toMatchObject({ probeStatus: 'unavailable' });
   });
 
   it('pauses the no-progress clock while waiting on the user', async () => {

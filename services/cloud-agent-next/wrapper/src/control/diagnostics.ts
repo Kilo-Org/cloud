@@ -47,6 +47,7 @@ function isTerminalRecord(record: ControlDiagnosticRecord): boolean {
       fields.phase === 'deadline_expired'
     );
   }
+  if (event === 'session.execution' && fields.phase === 'deadline_expired') return true;
   if (event === 'control.socket')
     return fields.phase !== undefined && TERMINAL_SOCKET_PHASES.has(fields.phase);
   return (

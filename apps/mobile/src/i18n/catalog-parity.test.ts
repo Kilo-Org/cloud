@@ -27,15 +27,32 @@ const PLURAL_SUFFIX = /_(?:zero|one|two|few|many|other)$/;
  * cannot ship. Delete an entry the translation slice has landed in every
  * catalog.
  *
- * Empty: the `notifications.category.*Unavailable` reasons, the profile-editor
- * validation copy (the duplicate-key refusal and the MCP bound messages), and
- * the `/` suggestion list's skill-row keys
+ * Empty: the `notifications.category.*Unavailable` reasons, the Agents tab
+ * header link (`agents.sessionList.pastSessions`), the scheduled-session labels
+ * the count lines, the session list and the glanceable surfaces show
+ * (`common.scheduled`, `sessionRow.scheduled`, `glanceable.scheduledWakes`),
+ * the accepted-empty Agents history label (`agents.sessionList.viewHistory`),
+ * the `prReview.discussion.*` / `prReview.announce.*` comment-CRUD keys (the
+ * mobile comment edit/delete copy), the profile-editor validation copy (the
+ * duplicate-key refusal and the MCP bound messages), the session-preview copy,
+ * and the `/` suggestion list's skill-row keys
  * (`agentChat.slashCommands.skillBadge` and
  * `agentChat.slashCommands.useSkillCommand`, added by
- * `slash-command-suggestions.tsx`) have all landed in every catalog, so the
- * missing-key assertion is strict again.
+ * `slash-command-suggestions.tsx`), and the `credits.*` keys of the Buy
+ * credits screen have all landed in every catalog, so the missing-key
+ * assertion is strict again.
  */
 const PENDING_TRANSLATION_KEYS = new Set<string>();
+
+/**
+ * The preview card's empty-state description. English added it for the
+ * composer-less transcript card, and the reader must see it in their own
+ * words rather than the English fallback. Every catalog must carry it, so the
+ * test below reads the catalogs directly and not through
+ * `PENDING_TRANSLATION_KEYS`: re-listing the key as pending cannot turn an
+ * untranslated catalog green.
+ */
+const PREVIEW_EMPTY_DESCRIPTION_KEY = 'agentChat.session.emptyTranscriptDescription';
 
 function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<string> {
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
@@ -47,6 +64,17 @@ function keyFamilies(value: unknown, prefix = '', out = new Set<string>()): Set<
     }
   }
   return out;
+}
+
+function readCatalogKey(catalog: unknown, path: readonly string[]): unknown {
+  let value = catalog;
+  for (const key of path) {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      return undefined;
+    }
+    value = (value as Record<string, unknown>)[key];
+  }
+  return value;
 }
 
 const ENGLISH_FAMILIES = keyFamilies(CATALOG_LOADERS.en());
@@ -63,6 +91,19 @@ describe('catalog keys', () => {
       expect(keyFamilies(CATALOG_LOADERS[tag]())).not.toContain('launcher.newAgent');
     }
   });
+
+  it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
+    '%s translates the preview empty-state description',
+    tag => {
+      const path = ['agentChat', 'session', 'emptyTranscriptDescription'];
+      const description = readCatalogKey(CATALOG_LOADERS[tag](), path);
+      const englishDescription = readCatalogKey(CATALOG_LOADERS.en(), path);
+      expect(description, `${tag} lacks ${PREVIEW_EMPTY_DESCRIPTION_KEY}`).toBeTypeOf('string');
+      expect(description, `${tag} leaves ${PREVIEW_EMPTY_DESCRIPTION_KEY} in English`).not.toBe(
+        englishDescription
+      );
+    }
+  );
 
   it.each(SUPPORTED_LANGUAGES.filter(tag => tag !== 'en'))(
     '%s defines exactly the English key families',

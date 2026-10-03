@@ -1,5 +1,5 @@
 import { signIn } from 'next-auth/react';
-import { OPENAI_TOKEN_SHARING_SCOPE } from './scopes';
+import { OPENAI_TOKEN_SHARING_SCOPE } from '@/lib/auth/openai/scopes';
 
 /**
  * The connect round-trip for a delegated "Sign in with ChatGPT" connection,
@@ -31,6 +31,6 @@ export async function startOpenAiChatGptConnect(
   await signIn(
     'openai',
     { callbackUrl: openAiChatGptByokPath(organizationId) },
-    { scope: OPENAI_TOKEN_SHARING_SCOPE }
+    { scope: OPENAI_TOKEN_SHARING_SCOPE, force_reconsent: 'true' }
   );
 }

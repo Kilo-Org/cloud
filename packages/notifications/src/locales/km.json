@@ -7,7 +7,7 @@
       "instanceLifecycle": "ឧទាហរណ៍របស់អ្នកមានការធ្វើបច្ចុប្បន្នភាព",
       "scheduledAction": "សកម្មភាពដែលបានកំណត់ពេលមានការធ្វើបច្ចុប្បន្នភាព",
       "lowBalance": "សមតុល្យរបស់អ្នកត្រូវការការយកចិត្តទុកដាក់",
-      "spendAlert": "Your spend needs attention",
+      "spendAlert": "ការចំណាយរបស់អ្នកត្រូវការការយកចិត្តទុកដាក់",
       "securityFinding": "ការរកឃើញសុវត្ថិភាពត្រូវការការយកចិត្តទុកដាក់",
       "activeAgentsGlanceable": "ភ្នាក់ងារសកម្មមានការធ្វើបច្ចុប្បន្នភាព"
     }
@@ -44,8 +44,8 @@
       "body": "សមតុល្យ {{organizationName}} បានធ្លាក់ក្រោម ${{minimumBalanceUsd}}"
     },
     "spendAlert": {
-      "title": "Spend alert",
-      "body": "{{scopeName}} spend crossed ${{amountUsd}}"
+      "title": "ការជូនដំណឹងការចំណាយ",
+      "body": "ការចំណាយរបស់ {{scopeName}} បានលើស ${{amountUsd}}"
     },
     "securityFindingNew": {
       "title": "ការរកឃើញសុវត្ថិភាពថ្មី ({{severity}})",

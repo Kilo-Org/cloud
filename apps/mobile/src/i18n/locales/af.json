@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Gaan terug",
     "idle": "Onaktief",
+    "scheduled": "Geskeduleer",
     "keepEditing": "Gaan voort met wysiging",
     "keepRunning": "Laat voortgaan",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Wys saldo",
     "balanceHidden": "Saldo versteek",
     "bonusCreditsExpiring": "Bonuskrediete ter waarde van {{amount}} verval op {{date}}.",
-    "creditBalanceEmpty": "Jou kredietsaldo is nul. Krediete vir hierdie rekening word buite die iOS-toep bestuur.",
     "signOutTitle": "Teken uit?",
     "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry.",
     "deleteAccountTitle": "Skrap rekening?",
@@ -240,6 +240,7 @@
     "addPasskey": "Voeg ’n passkey by",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Bygevoeg {{date}}",
+    "passkeyLastUsedOn": "Laas gebruik {{date}}",
     "passkeyAdded": "Passkey bygevoeg.",
     "passkeyAddFailed": "Kon nie ’n passkey byvoeg nie. Probeer weer.",
     "passkeyAddUnsupported": "Hierdie toestel kan nie passkeys skep nie.",
@@ -566,7 +567,14 @@
       "deletedUser": "geskrapte gebruiker",
       "replyForbiddenTerm": "Jy het nie toestemming om op hierdie {{term}} te antwoord nie.",
       "moreLinesAbove_one": "… nog {{displayCount}} reël hierbo",
-      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo"
+      "moreLinesAbove_other": "… nog {{displayCount}} reëls hierbo",
+      "deleteComment": "Vee kommentaar uit",
+      "deleteCommentTitle": "Vee kommentaar uit?",
+      "deleteCommentMessage": "Hierdie kommentaar sal uit die trekversoek verwyder word.",
+      "commentEditFailed": "Kon nie jou kommentaar stoor nie. Kontroleer jou verbinding en probeer weer.",
+      "commentEditUnavailable": "Hierdie kommentaar kan nie gewysig word nie. Dit is dalk uitgevee.",
+      "commentDeleteFailed": "Kon nie jou kommentaar uitvee nie. Kontroleer jou verbinding en probeer weer.",
+      "commentDeleteUnavailable": "Hierdie kommentaar kan nie uitgevee word nie."
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "Dit is nie 'n skakel na 'n trekversoek of merge request nie",
     "announce": {
       "commentPosted": "Kommentaar geplaas",
+      "commentUpdated": "Kommentaar opgedateer",
+      "commentDeleted": "Kommentaar uitgevee",
       "reviewSubmitted": "Hersiening ingedien",
       "autoMergeEnabled": "Outomatiese samevoeging geaktiveer"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "Kon nie die aktiewe sessies laai nie.",
       "couldNotRefresh": "Kon nie verfris nie",
       "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon. Jou sessies sal hier verskyn.",
+      "viewHistory": "Sessiegeskiedenis",
       "noMatches": "Geen ooreenstemmende sessies nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
       "tryAdjustFilters": "Probeer jou filters aanpas of verwyder.",
       "couldNotSearch": "Kon nie die sessies deursoek nie.",
       "completedWillAppear": "Voltooide sessies sal hier verskyn.",
       "noPastSessions": "Geen vorige sessies nie",
+      "pastSessions": "Vorige sessies",
       "live": "REGSTREEKS",
       "updating": "Besig om op te dateer"
     },
@@ -2035,6 +2047,7 @@
       "idCopied": "Sessie-ID gekopieer",
       "couldNotCopyId": "Kon nie die sessie-ID kopieer nie.",
       "untitled": "Naamlose sessie",
+      "actions": "Sessieaksies",
       "sessionDeleted": "Sessie geskrap",
       "needsInput": "wag op invoer",
       "fromPlatform": "vanaf {{platform}}",
@@ -2085,7 +2098,9 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Sessietranskripsie",
       "readOnly": "Jy kan hierdie sessie net lees.",
+      "continueInNewSession": "Gaan voort in 'n nuwe sessie",
       "emptyDescription": "Stuur 'n boodskap hieronder om te begin.",
+      "emptyTranscriptDescription": "Hierdie sessie het nog geen boodskappe nie.",
       "scrollToBottom": "Rolleer na onder",
       "emptyTitle": "Nog geen boodskappe nie",
       "renameAccessibility": "Hernoem sessie: {{title}}",
@@ -2175,6 +2190,8 @@
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",
+      "selectRepositoryToStart": "Kies 'n bewaarplek om te begin.",
+      "connectProviderToStart": "Koppel 'n verskaffer om te begin.",
       "promptPlaceholder": "Waaraan wil jy werk?",
       "couldNotLoadModels": "Die modelle kon nie gelaai word nie.",
       "prefillRepoAndModelUnavailable": "Die oorspronklike sessie se bewaarplek en model is nie meer beskikbaar nie. Kies hieronder 'n nuwe bewaarplek en model.",
@@ -2550,6 +2567,7 @@
       "selectModelBeforeSending": "Kies 'n model voordat jy 'n boodskap stuur.",
       "preparingPlaceholder": "Omgewing word opgestel...",
       "finalizingPlaceholder": "Besig om af te handel...",
+      "sessionLoadFailed": "Die sessie kon nie gelaai word nie. Probeer eers weer.",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
       "couldNotAttachFiles": "Die lêers kon nie aangeheg word nie. Tik op Stuur om weer te probeer.",
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
@@ -2619,6 +2637,7 @@
       "provider": "Verskaffer",
       "totalCost": "Totale koste",
       "usageReflectsLatest": "Die gebruik weerspieël die assistent se jongste voltooide antwoord.",
+      "usageUnavailable": "Konteksgebruik is nie beskikbaar nie",
       "tokenUsage": "Tekengebruik",
       "cacheRate": "Kasgeheutrefferkoers",
       "modelsCount": "Modelle ({{displayCount}})",
@@ -2653,7 +2672,10 @@
     "markdownImage": {
       "load": "Laai",
       "loadWithHost": "Laai {{host}}",
-      "httpsOnly": "Slegs HTTPS-afbeeldings word toegelaat."
+      "httpsOnly": "Slegs HTTPS-afbeeldings word toegelaat.",
+      "trustTitle": "Laai beeld vanaf {{host}}?",
+      "trustMessage": "As jy {{host}} vertrou, laai sy beelde sonder om elke keer te vra. Jy kan dit later onder Vertroude gashere herroep.",
+      "loadOnce": "Laai een keer"
     },
     "markdownLink": {
       "invalidLink": "Hierdie skakel kan nie oopgemaak word nie.",
@@ -2760,7 +2782,8 @@
     "optionsExpiredDescription": "Gaan terug en maak hierdie kieser weer vanaf die vorige skerm oop."
   },
   "sessionRow": {
-    "needsInput": "WAG OP INVOER"
+    "needsInput": "WAG OP INVOER",
+    "scheduled": "GESKEDULEER"
   },
   "voiceInput": {
     "listening": "Luister...",
@@ -3165,7 +3188,12 @@
     "subtitle": "Gashere waarvan jy skakels sonder bevestiging wil oopmaak",
     "emptyTitle": "Geen vertroude gashere nie",
     "emptyDescription": "As jy 'n skakel se gasheer vertrou, maak skakels na daardie gasheer oop sonder om weer toestemming te vra.",
+    "imagesSectionTitle": "Vertroude beeldgashere",
+    "imagesSectionDescription": "Beelde van hierdie gashere laai sonder om weer te vra.",
+    "imagesSectionEmpty": "Geen vertroude beeldgashere nie",
     "revoke": "Herroep vertroue in {{host}}",
+    "revokeMessage": "Skakels na hierdie gasheer sal weer om bevestiging vra.",
+    "revokeImageMessage": "Beelde van hierdie gasheer sal weer om bevestiging vra.",
     "backToPreferences": "Terug na voorkeure"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "Skakel regstreekse aktiwiteite in die instellings aan om aktiewe agente op die sluitskerm te sien.",
     "openSession": "Oop",
     "approveFailed": "Kon nie goedkeur nie. Tik op $t(common.approve) om weer te probeer.",
-    "newestResult": "Nuutste resultaat"
+    "newestResult": "Nuutste resultaat",
+    "scheduledWakes": "word wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transkripsiemodel",
@@ -3429,5 +3458,17 @@
       "unboundToast": "Repo ongebonde",
       "unbindFailed": "Kon nie repo ontbind nie"
     }
+  },
+  "credits": {
+    "title": "Koop krediete",
+    "description": "Krediete is 'n eenmalige aankoop wat by jou Kilo-saldo gevoeg word om AI-koderingsessies in Kilo App te laat loop. Die winkel hef jou rekening en krediete word bygevoeg nadat die winkel betaling bevestig.",
+    "packLabel": "Voeg {{amount}} se krediete by",
+    "priceUnavailable": "Prys nie beskikbaar nie",
+    "purchased": "Krediete is by jou saldo gevoeg.",
+    "empty": "Kredietpakkette is tans nie beskikbaar nie.",
+    "noMatchingProducts": "Geen passende kredietpakkette is deur App Store terugbesorg nie.",
+    "noMatchingProductsPlay": "Geen passende kredietpakkette is deur Google Play terugbesorg nie.",
+    "purchaseOwnedByAnotherAccount": "Die krediete op hierdie Apple Account behoort aan 'n ander Kilo-rekening. Meld by daardie Kilo-rekening aan om dit te gebruik.",
+    "purchaseOwnedByAnotherAccountPlay": "Die krediete op hierdie Google Play-rekening behoort aan 'n ander Kilo-rekening. Teken in by daardie Kilo-rekening om dit te gebruik."
   }
 }

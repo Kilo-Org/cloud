@@ -1,6 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type { trackKiloPassPurchaseCompleted as trackKiloPassPurchaseCompletedType } from './posthog-tracking';
-import { KiloPassCadence, KiloPassTier } from './enums';
+import { KiloPassCadence, KiloPassTier } from '@/lib/kilo-pass/enums';
 
 jest.mock('@/lib/posthog', () => {
   const mockCapture = jest.fn();

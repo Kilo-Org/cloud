@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "వెనక్కి వెళ్లండి",
     "idle": "పని లేదు",
+    "scheduled": "షెడ్యూల్ చేయబడింది",
     "keepEditing": "సవరించడం కొనసాగించండి",
     "keepRunning": "అమలు కొనసాగించండి",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "బ్యాలెన్స్ చూపించు",
     "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
     "bonusCreditsExpiring": "{{amount}} బోనస్ క్రెడిట్ల గడువు {{date}}న ముగుస్తుంది.",
-    "creditBalanceEmpty": "మీ ఖాతాలో క్రెడిట్లు లేవు. ఈ ఖాతా క్రెడిట్లను iOS యాప్ వెలుపల నిర్వహించాలి.",
     "signOutTitle": "సైన్ అవుట్ చేయాలా?",
     "signOutMessage": "మీ వర్క్‌స్పేస్‌ను ఉపయోగించడానికి మళ్లీ సైన్ ఇన్ చేయాలి.",
     "deleteAccountTitle": "ఖాతాను తొలగించాలా?",
@@ -240,6 +240,7 @@
     "addPasskey": "పాస్‌కీ జోడించండి",
     "passkeyDefaultName": "పాస్‌కీ",
     "passkeyAddedOn": "{{date}}న జోడించబడింది",
+    "passkeyLastUsedOn": "చివరిగా ఉపయోగించబడింది {{date}}",
     "passkeyAdded": "పాస్‌కీ జోడించబడింది.",
     "passkeyAddFailed": "పాస్‌కీ జోడించలేకపోయాం. మళ్లీ ప్రయత్నించండి.",
     "passkeyAddUnsupported": "ఈ పరికరం పాస్‌కీలు సృష్టించలేదు.",
@@ -566,7 +567,14 @@
       "deletedUser": "తొలగించబడిన వినియోగదారు",
       "replyForbiddenTerm": "ఈ {{term}}‌కు ప్రత్యుత్తరం ఇవ్వడానికి మీకు అనుమతి లేదు.",
       "moreLinesAbove_one": "… పైన మరో {{displayCount}} పంక్తి ఉంది.",
-      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి."
+      "moreLinesAbove_other": "… పైన మరో {{displayCount}} పంక్తులు ఉన్నాయి.",
+      "deleteComment": "వ్యాఖ్యను తొలగించండి",
+      "deleteCommentTitle": "వ్యాఖ్యను తొలగించాలా?",
+      "deleteCommentMessage": "ఈ వ్యాఖ్య పుల్ రిక్వెస్ట్ నుండి తొలగించబడుతుంది.",
+      "commentEditFailed": "మీ వ్యాఖ్యను సేవ్ చేయలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "commentEditUnavailable": "ఈ వ్యాఖ్యను సవరించలేము. ఇది తొలగించబడి ఉండవచ్చు.",
+      "commentDeleteFailed": "మీ వ్యాఖ్యను తొలగించలేకపోయాము. మీ కనెక్షన్‌ను తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+      "commentDeleteUnavailable": "ఈ వ్యాఖ్యను తొలగించలేము."
     },
     "couldNotOpenGitHubAppSettings": "GitHub యాప్ సెట్టింగ్‌లను తెరవలేకపోయాం.",
     "installKiloGitHubApp": "Kilo GitHub యాప్‌ను ఇన్‌స్టాల్ చేయండి",
@@ -747,6 +755,8 @@
     "linkPasteNotAPullRequest": "ఇది పుల్ రిక్వెస్ట్ లేదా మెర్జ్ రిక్వెస్ట్ లింక్ కాదు",
     "announce": {
       "commentPosted": "వ్యాఖ్య పోస్ట్ చేయబడింది",
+      "commentUpdated": "వ్యాఖ్య నవీకరించబడింది",
+      "commentDeleted": "వ్యాఖ్య తొలగించబడింది",
       "reviewSubmitted": "సమీక్ష సమర్పించబడింది",
       "autoMergeEnabled": "ఆటో-మెర్జ్ ప్రారంభించబడింది"
     },
@@ -2017,12 +2027,14 @@
       "couldNotLoadActive": "కొనసాగుతున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
       "couldNotRefresh": "రిఫ్రెష్ చేయలేకపోయాము",
       "noSessionsYetDescription": "మీ ఫోన్‌లో కోడింగ్ పనిని ప్రారంభించండి. మీ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
+      "viewHistory": "సెషన్ చరిత్ర",
       "noMatches": "సరిపోలే సెషన్‌లు లేవు",
       "tryDifferentSearch": "వేరే పదంతో వెతకండి.",
       "tryAdjustFilters": "మీ ఫిల్టర్‌లను మార్చండి లేదా తీసివేయండి.",
       "couldNotSearch": "సెషన్‌లను వెతకలేకపోయాము.",
       "completedWillAppear": "పూర్తయిన సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noPastSessions": "గత సెషన్‌లు లేవు",
+      "pastSessions": "గత సెషన్‌లు",
       "live": "లైవ్",
       "updating": "నవీకరిస్తోంది"
     },
@@ -2035,6 +2047,7 @@
       "idCopied": "సెషన్ ID కాపీ చేయబడింది",
       "couldNotCopyId": "సెషన్ IDని కాపీ చేయలేకపోయాము.",
       "untitled": "పేరులేని సెషన్",
+      "actions": "సెషన్ చర్యలు",
       "sessionDeleted": "సెషన్ తొలగించబడింది",
       "needsInput": "మీ స్పందన అవసరం",
       "fromPlatform": "{{platform}} నుండి",
@@ -2085,7 +2098,9 @@
       "renamePlaceholder": "సెషన్ పేరు",
       "transcriptAccessibility": "సెషన్ సంభాషణ పాఠ్యం",
       "readOnly": "ఈ సెషన్‌ను చదవడం మాత్రమే సాధ్యం.",
+      "continueInNewSession": "కొత్త సెషన్‌లో కొనసాగించండి",
       "emptyDescription": "ప్రారంభించడానికి కింద సందేశం పంపండి.",
+      "emptyTranscriptDescription": "ఈ సెషన్‌లో ఇంకా సందేశాలు లేవు.",
       "scrollToBottom": "చివరి వరకు స్క్రోల్ చేయండి",
       "emptyTitle": "ఇంకా సందేశాలు లేవు",
       "renameAccessibility": "{{title}} సెషన్ పేరు మార్చండి",
@@ -2175,6 +2190,8 @@
       "leaveChanges": "మార్పులను అలాగే ఉంచండి",
       "commitAndPush": "కమిట్ చేసి పుష్ చేయండి",
       "startSession": "సెషన్ ప్రారంభించండి",
+      "selectRepositoryToStart": "ప్రారంభించడానికి రిపోజిటరీని ఎంచుకోండి.",
+      "connectProviderToStart": "ప్రారంభించడానికి ప్రొవైడర్‌ను కనెక్ట్ చేయండి.",
       "promptPlaceholder": "మీరు దేనిపై పని చేయాలనుకుంటున్నారు?",
       "couldNotLoadModels": "మోడళ్లను లోడ్ చేయలేకపోయాము.",
       "prefillRepoAndModelUnavailable": "అసలు సెషన్‌లోని రిపోజిటరీ, మోడల్ ఇక అందుబాటులో లేవు. కింద మరో రిపోజిటరీని, మోడల్‌ను ఎంచుకోండి.",
@@ -2550,6 +2567,7 @@
       "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి.",
       "preparingPlaceholder": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది...",
       "finalizingPlaceholder": "ముగిస్తోంది...",
+      "sessionLoadFailed": "సెషన్ను లోడ్ చేయలేకపోయాం. ముందుగా మళ్లీ ప్రయత్నించండి.",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైళ్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి జోడింపులను తీసివేయండి.",
       "couldNotAttachFiles": "ఫైళ్లను జోడించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపే బటన్‌ను నొక్కండి.",
       "discardAttachmentsMessage": "అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు తొలగిపోతాయి.",
@@ -2619,6 +2637,7 @@
       "provider": "ప్రొవైడర్",
       "totalCost": "మొత్తం ఖర్చు",
       "usageReflectsLatest": "చివరిగా పూర్తయిన సహాయకుడి ప్రతిస్పందన ఆధారంగా ఈ వినియోగాన్ని చూపిస్తున్నాము.",
+      "usageUnavailable": "సందర్భ వినియోగం అందుబాటులో లేదు",
       "tokenUsage": "టోకెన్ వినియోగం",
       "cacheRate": "కాష్ రేటు",
       "modelsCount": "మోడళ్లు ({{displayCount}})",
@@ -2653,7 +2672,10 @@
     "markdownImage": {
       "load": "లోడ్ చేయండి",
       "loadWithHost": "{{host}} నుండి లోడ్ చేయండి",
-      "httpsOnly": "HTTPS చిత్రాలను మాత్రమే లోడ్ చేయవచ్చు."
+      "httpsOnly": "HTTPS చిత్రాలను మాత్రమే లోడ్ చేయవచ్చు.",
+      "trustTitle": "{{host}} నుండి చిత్రాన్ని లోడ్ చేయాలా?",
+      "trustMessage": "{{host}} ను విశ్వసిస్తే, దాని చిత్రాలు ప్రతిసారీ అడగకుండా లోడ్ అవుతాయి. తర్వాత విశ్వసించిన హోస్ట్‌లలో దీన్ని ఉపసంహరించవచ్చు.",
+      "loadOnce": "ఒకసారి లోడ్ చేయండి"
     },
     "markdownLink": {
       "invalidLink": "ఈ లింక్‌ను తెరవలేము.",
@@ -2760,7 +2782,8 @@
     "optionsExpiredDescription": "వెనక్కి వెళ్లి మునుపటి స్క్రీన్ నుండి ఈ ఎంపిక తెరను మళ్లీ తెరవండి."
   },
   "sessionRow": {
-    "needsInput": "మీ స్పందన అవసరం"
+    "needsInput": "మీ స్పందన అవసరం",
+    "scheduled": "షెడ్యూల్ చేయబడింది"
   },
   "voiceInput": {
     "listening": "వింటోంది...",
@@ -3165,7 +3188,12 @@
     "subtitle": "అనుమతి అడగకుండా తెరవడానికి మీరు విశ్వసించిన హోస్ట్‌లు",
     "emptyTitle": "విశ్వసించిన హోస్ట్‌లు లేవు",
     "emptyDescription": "లింక్ హోస్ట్‌ను విశ్వసిస్తే, ఆ హోస్ట్ లింక్‌లు మళ్లీ అనుమతి అడగకుండా తెరుచుకుంటాయి.",
+    "imagesSectionTitle": "విశ్వసించిన చిత్ర హోస్ట్‌లు",
+    "imagesSectionDescription": "ఈ హోస్ట్‌ల చిత్రాలు మళ్లీ అడగకుండా లోడ్ అవుతాయి.",
+    "imagesSectionEmpty": "విశ్వసించిన చిత్ర హోస్ట్‌లు లేవు",
     "revoke": "{{host}}పై నమ్మకాన్ని ఉపసంహరించండి",
+    "revokeMessage": "ఈ హోస్ట్‌కు ఉన్న లింక్‌లు మళ్లీ నిర్ధారణ అడుగుతాయి.",
+    "revokeImageMessage": "ఈ హోస్ట్ నుండి వచ్చే చిత్రాలు మళ్లీ నిర్ధారణ అడుగుతాయి.",
     "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "లాక్ స్క్రీన్‌పై పనిచేస్తున్న ఏజెంట్లను చూడటానికి సెట్టింగ్‌లలో లైవ్ యాక్టివిటీస్‌ను ఆన్ చేయండి.",
     "openSession": "తెరవండి",
     "approveFailed": "ఆమోదించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి $t(common.approve) ని నొక్కండి.",
-    "newestResult": "సరికొత్త ఫలితం"
+    "newestResult": "సరికొత్త ఫలితం",
+    "scheduledWakes": "{{time}} మేల్కొంటుంది"
   },
   "transcriptionModel": {
     "title": "వచనంగా మార్చే మోడల్",
@@ -3429,5 +3458,17 @@
       "unboundToast": "రెపో అన్‌బౌండ్",
       "unbindFailed": "రెపోను అన్‌బైండ్ చేయడం సాధ్యపడలేదు"
     }
+  },
+  "credits": {
+    "title": "క్రెడిట్‌లు కొనండి",
+    "description": "క్రెడిట్‌లు అనేవి Kilo యాప్‌లో AI కోడింగ్ సెషన్‌లను నడపడానికి మీ Kilo బ్యాలెన్స్‌కు జోడించే ఒక-సారి కొనుగోలు. స్టోర్ మీ ఖాతా నుండి ఛార్జ్ చేస్తుంది మరియు స్టోర్ చెల్లింపును నిర్ధారించిన తర్వాత క్రెడిట్‌లు జోడించబడతాయి.",
+    "packLabel": "{{amount}} విలువైన క్రెడిట్‌లను జోడించండి",
+    "priceUnavailable": "ధర అందుబాటులో లేదు",
+    "purchased": "మీ బ్యాలెన్స్‌కు క్రెడిట్‌లు జోడించబడ్డాయి.",
+    "empty": "క్రెడిట్ ప్యాక్‌లు ప్రస్తుతం అందుబాటులో లేవు.",
+    "noMatchingProducts": "App Store సరిపోలే క్రెడిట్ ప్యాక్‌లను అందించలేదు.",
+    "noMatchingProductsPlay": "Google Play సరిపోలే క్రెడిట్ ప్యాక్‌లను అందించలేదు.",
+    "purchaseOwnedByAnotherAccount": "ఈ Apple Accountలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి.",
+    "purchaseOwnedByAnotherAccountPlay": "ఈ Google Play ఖాతాలోని క్రెడిట్‌లు వేరే Kilo ఖాతాకు చెందుతాయి. వాటిని ఉపయోగించడానికి ఆ Kilo ఖాతాతో సైన్ ఇన్ చేయండి."
   }
 }

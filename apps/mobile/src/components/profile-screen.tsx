@@ -15,11 +15,13 @@ import {
   MessageSquare,
   ShieldCheck,
   SlidersHorizontal,
+  Sparkles,
   Trash2,
 } from '@/components/ui/icons';
 import { Alert, type LayoutChangeEvent, type ScrollView, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
+import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -32,9 +34,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
+import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
 import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
+import { openExternalUrl } from '@/lib/external-link';
 import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useOrganization } from '@/lib/organization-context';
@@ -60,6 +64,10 @@ const PROVIDER_LABEL_KEYS = {
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
 } as const;
+
+// The app changelog lives on `main` and is written per store build by the
+// kilo-app Release workflow; never pin it to a version or a per-build copy.
+const CHANGELOG_URL = 'https://github.com/Kilo-Org/cloud/blob/main/apps/mobile/CHANGELOG.md';
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
@@ -88,6 +96,13 @@ export function ProfileScreen() {
   // the only place the signed-in address renders.
   const afterInteractions = useAfterInteractions();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  // One destructive confirm for both platforms: the in-app dialog carries the
+  // destructive (red) affordance on iOS and Android alike, so the sign-out
+  // path never branches on the platform. The confirmation itself, and its
+  // rationale, live in `useSignOutConfirmation`.
+  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
+    () => void signOut()
+  );
   const {
     data,
     isLoading,
@@ -167,22 +182,6 @@ export function ProfileScreen() {
         text: t('profile.deleteAccountConfirm'),
         style: 'destructive',
         onPress: beginDelete,
-      },
-    ]);
-  };
-
-  // The sign-out confirmation is the shared native alert on both platforms:
-  // Android's AppCompat dialog takes its panel and action accent from the
-  // activity theme, which plugins/withAndroidAlertDialogTheme points at the app
-  // tokens, and iOS renders the same call as a `UIAlertController` that already
-  // follows the device appearance.
-  const confirmSignOut = () => {
-    Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.signOut'),
-        style: 'destructive',
-        onPress: () => void signOut(),
       },
     ]);
   };
@@ -328,9 +327,20 @@ export function ProfileScreen() {
             title={t('tour.tutorialLabel')}
             hue="sage"
             className="rounded-lg bg-secondary px-3"
-            last
             onPress={() => {
               router.push('/(app)/tour' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={Sparkles}
+            title={t('kiloclaw.changelog.title')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              void openExternalUrl(CHANGELOG_URL, {
+                label: t('kiloclaw.changelog.title'),
+              });
             }}
           />
         </View>
@@ -421,7 +431,7 @@ export function ProfileScreen() {
             icon={LogOut}
             label={t('common.signOut')}
             hue="fern"
-            onPress={confirmSignOut}
+            onPress={requestSignOut}
           />
           <ActionTile
             icon={Trash2}
@@ -466,6 +476,16 @@ export function ProfileScreen() {
           </Text>
         </View>
       </TabScreenScrollView>
+
+      {confirmVisible && (
+        <DestructiveConfirmDialog
+          title={t('profile.signOutTitle')}
+          message={t('profile.signOutMessage')}
+          confirmLabel={t('common.signOut')}
+          onCancel={dismissConfirm}
+          onConfirm={confirmSignOut}
+        />
+      )}
 
       {feedbackPrompt.promptDialog}
     </View>

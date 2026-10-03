@@ -163,6 +163,10 @@ export async function applyMetadataChanges(
       status === undefined
         ? { changed: false, previousStatus: null }
         : (() => {
+            // `SessionStatusSchema` is a permissive `z.string()`: a stored status
+            // this worker does not know yet (`scheduled`, or any future value)
+            // must not throw here and must be reported faithfully as the
+            // previous status, never coerced to `idle`.
             const previousStatus = SessionStatusSchema.nullable().parse(currentRow.status);
             return { changed: status !== previousStatus, previousStatus };
           })();
@@ -321,9 +325,7 @@ export async function applyMetadataChanges(
           .where(
             and(
               eq(cli_sessions_v2.session_id, parentSessionId),
-              eq(cli_sessions_v2.kilo_user_id, kiloUserId),
-              sql`${cli_sessions_v2.cloud_agent_session_scope_id} IS NULL`,
-              sql`${cli_sessions_v2.cloud_agent_worktree_id} IS NULL`
+              eq(cli_sessions_v2.kilo_user_id, kiloUserId)
             )
           )
           .limit(1);

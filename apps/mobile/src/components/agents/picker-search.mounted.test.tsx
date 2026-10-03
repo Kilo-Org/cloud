@@ -176,13 +176,18 @@ describe('repository picker Bitbucket scope note', () => {
       throw new Error('Picker search input did not mount');
     }
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('org/repo');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Pressable')).toHaveLength(1);
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(false);
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === note)).toBe(true);
   });
@@ -215,6 +220,77 @@ describe('repository picker search placeholder', () => {
     });
     expect(hosts(renderer, 'Text').some(node => node.props.children === copy)).toBe(false);
   });
+});
+
+// RN 0.86 does not resolve `textAlign: 'auto'` from the layout direction, so
+// without a named alignment both search queries stay on the physical left of a
+// row that mirrors (the finding). `lib/rtl-text.ts` owns the rule; these tests
+// pin that each field follows it, and that the overlay box — not the Text's own
+// alignment — places the repo placeholder at the start edge.
+const PHYSICAL_ALIGNMENT_CLASSES = new Set([
+  'text-left',
+  'text-right',
+  'text-center',
+  'text-justify',
+]);
+
+describe('picker search alignment follows the interface direction', () => {
+  const repositoryPlaceholder = 'Search repositories...';
+  const cases = [
+    { name: 'model', Component: ModelPickerContent },
+    { name: 'repository', Component: RepoPickerScreen },
+  ];
+
+  it.each(cases)(
+    'right-aligns the $name search input content in a right-to-left interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = true;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBe('right');
+    }
+  );
+
+  it.each(cases)(
+    'leaves the $name search input content unaligned in a left-to-right interface',
+    async ({ Component }) => {
+      i18nManager.isRTL = false;
+      const renderer = await mount(Component);
+      const input = hosts(renderer, 'TextInput')[0];
+      if (!input) {
+        throw new Error('Picker search input did not mount');
+      }
+      expect(inputStyle(input).textAlign).toBeUndefined();
+    }
+  );
+
+  it.each([false, true])(
+    'places the repository placeholder at the field start edge as a row, never a physical text alignment (RTL=%s)',
+    async isRTL => {
+      i18nManager.isRTL = isRTL;
+      const renderer = await mount(RepoPickerScreen);
+      const placeholder = hosts(renderer, 'Text').find(
+        node => node.props.children === repositoryPlaceholder
+      );
+      if (!placeholder) {
+        throw new Error('Search placeholder overlay did not mount');
+      }
+      const wrapper = placeholder.parent;
+      if (!wrapper) {
+        throw new Error('Search placeholder overlay has no box');
+      }
+      // A `flex-row`'s start edge is the physical right in RTL and the physical
+      // left in LTR, and the hugging Text cannot float away from it.
+      const wrapperClasses = (wrapper.props.className as string).split(' ');
+      expect(wrapperClasses).toEqual(expect.arrayContaining(['flex-row', 'justify-start']));
+      const textClasses = (placeholder.props.className as string).split(' ');
+      expect(textClasses).toEqual(expect.arrayContaining(['shrink', 'max-w-full']));
+      expect(textClasses.filter(name => PHYSICAL_ALIGNMENT_CLASSES.has(name))).toEqual([]);
+    }
+  );
 });
 
 describe('repository picker query alignment', () => {
@@ -281,6 +357,15 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
+/** The style RN flattens an input's array to, or nothing when it carries none. */
+function inputStyle(input: ReturnType<typeof hosts>[number]): Record<string, unknown> {
+  const style = input.props.style;
+  if (style === undefined) {
+    return {};
+  }
+  return Object.assign({}, ...([style] as Record<string, unknown>[]).flat());
+}
+
 // The model picker hosts its rows in a FlashList and manages its own scrolling
 // (PickerSheet scrollable=false); the repository picker renders mapped rows
 // inside the shell ScrollView and so always keeps that ScrollView mounted.
@@ -307,8 +392,12 @@ describe.each([
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
-    act(() => {
+    // The filtered list trails the input through `useDeferredValue`: a plain
+    // sync `act()` can return before that low-priority render commits, so the
+    // assertion below would race the deferred value instead of reading it.
+    await act(async () => {
       changeSearch('no matching choice');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost)).toHaveLength(0);
     if (!hasShellScrollView) {
@@ -319,8 +408,9 @@ describe.each([
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
 
-    act(() => {
+    await act(async () => {
       changeSearch('');
+      await Promise.resolve();
     });
     expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);

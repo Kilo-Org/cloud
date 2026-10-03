@@ -4,6 +4,7 @@ import { TRPCError } from '@trpc/server';
 import { and, desc, eq, isNull, lt, or, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import { db } from '@/lib/drizzle';
+import { isUniqueViolation } from '@/lib/db-errors';
 import { baseProcedure, createTRPCRouter, type TRPCContext } from '@/lib/trpc/init';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
@@ -76,20 +77,6 @@ function decodeMessagesCursor(cursor: string): z.infer<typeof messagesCursorSche
   } catch {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid message cursor' });
   }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  const pgCodeFrom = (e: unknown): string | undefined =>
-    e && typeof e === 'object' && 'code' in e
-      ? ((e as { code?: unknown }).code as string | undefined)
-      : undefined;
-  if (pgCodeFrom(error) === '23505') return true;
-  const cause =
-    error && typeof error === 'object' && 'cause' in error
-      ? (error as { cause?: unknown }).cause
-      : undefined;
-  if (pgCodeFrom(cause) === '23505') return true;
-  return false;
 }
 
 /**

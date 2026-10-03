@@ -31,10 +31,8 @@ jest.mock('@/lib/model-stats/model-stats-cache', () => ({
   invalidateModelStatsCache: jest.fn(),
 }));
 jest.mock('@/lib/model-stats/sync-enkrypt', () => ({ syncEnkryptBenchmarks: jest.fn() }));
-jest.mock('@/lib/ai-gateway/monitored-models', () => ({
-  get monitoredModels() {
-    return mockMonitoredModels;
-  },
+jest.mock('@/lib/ai-gateway/preferred-models', () => ({
+  getMonitoredModels: async () => mockMonitoredModels,
 }));
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
 
@@ -323,7 +321,7 @@ describe('GET /api/cron/sync-model-stats', () => {
     jest.mocked(getEnhancedOpenRouterModels).mockResolvedValue({ data: [...models, ...models] });
 
     expect((await GET(request())).status).toBe(200);
-    expect(ids).toHaveLength(70);
+    expect(ids).toHaveLength(89);
     expect(syncOpenRouterModels).toHaveBeenCalledWith(
       [monitoredModel, ...models],
       [monitoredModel.id],

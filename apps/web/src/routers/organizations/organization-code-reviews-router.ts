@@ -7,7 +7,7 @@ import {
   organizationMemberMutationProcedure,
   OrganizationIdInputSchema,
   ensureOrganizationAccess,
-} from './utils';
+} from '@/routers/organizations/utils';
 import { createAuditLog } from '@/lib/organizations/organization-audit-logs';
 import {
   getIntegrationForOrganization,

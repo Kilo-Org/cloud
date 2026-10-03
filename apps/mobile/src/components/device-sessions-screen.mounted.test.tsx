@@ -16,6 +16,7 @@ const query = vi.hoisted(() => ({
   refetch: vi.fn(),
 }));
 const hosts = vi.hoisted(() => ({ trustedHosts: [] as string[], hasLoaded: true }));
+const imageHosts = vi.hoisted(() => ({ trustedImageHosts: [] as string[], hasLoaded: true }));
 vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
@@ -50,6 +51,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => hosts,
   revokeHost: vi.fn(),
 }));
+// The trusted-hosts screen now reads a second SecureStore preference for image
+// hosts; its real module pulls the secure-store -> sonner -> react-native chain
+// the node test environment cannot load, so it is mocked beside the link list.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  useTrustedImageHosts: () => imageHosts,
+  revokeImageHost: vi.fn(),
+}));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     user: {
@@ -69,6 +77,8 @@ beforeEach(() => {
   query.refetch.mockClear();
   hosts.hasLoaded = true;
   hosts.trustedHosts = [];
+  imageHosts.hasLoaded = true;
+  imageHosts.trustedImageHosts = [];
 });
 
 describe('account surface states', () => {

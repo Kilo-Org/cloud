@@ -11,7 +11,11 @@ import {
   verifyRuntimeCredentialProxyHandle,
   type RuntimeProxyFence,
 } from './runtime-credential-proxy.js';
-import { resolveRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  EXA_PROXY_PATHS,
+  inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyRoute,
+} from './kilo/runtime-credential-proxy-routes.js';
 
 type ControlFence = Extract<RuntimeProxyFence, { plane: 'control' }>;
 
@@ -332,6 +336,40 @@ describe('runtime credential proxy', () => {
         'agent_1'
       )
     ).toBeNull();
+  });
+
+  it('forwards only allowlisted Exa POST routes through the backend target', () => {
+    for (const path of EXA_PROXY_PATHS) {
+      expect(inferRuntimeCredentialProxyRoute(path)).toBe('exa');
+      expect(
+        runtimeCredentialProxyUpstream(
+          targets,
+          'exa',
+          'POST',
+          path.replace(/^\//, ''),
+          '',
+          'agent_1'
+        )?.toString()
+      ).toBe(`https://backend.example.test/base${path}`);
+    }
+    for (const [method, path] of [
+      ['GET', '/api/exa/search'],
+      ['GET', '/api/exa/contents'],
+      ['POST', '/api/exa/search/extra'],
+      ['POST', '/api/exa/unknown'],
+      ['POST', '/api/exa'],
+    ] as const) {
+      expect(
+        resolveRuntimeCredentialProxyRoute({
+          targets,
+          route: 'exa',
+          method,
+          pathname: path,
+          search: '',
+          kiloSessionId: 'kilo_1',
+        })
+      ).toBeNull();
+    }
   });
 
   it.each([

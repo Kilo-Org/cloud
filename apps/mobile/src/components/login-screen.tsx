@@ -63,6 +63,7 @@ export function LoginScreen() {
     start,
     cancel,
     openBrowser,
+    clearError,
   } = useDeviceAuth();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -215,6 +216,18 @@ export function LoginScreen() {
   // (pending/approved) or a busy auth action owns the screen.
   const globeDisabled = status === 'pending' || authFormBusy;
   const globeTrailing = I18nManager.isRTL ? { left: 16 } : { right: 16 };
+  // A terminal device-auth error — an expired code, denied access, or the poll
+  // timing out — renders its message above the idle form. Idle, every terminal
+  // error, and a start that has not answered yet share the same single IdleAuth
+  // slot below, so dismissing the error when a new attempt starts preserves the
+  // form's in-flight state.
+  // A start that has not answered yet (`pending` with no code yet) keeps the
+  // idle form on screen too: beginning a new attempt dismisses the old error,
+  // and the form stays in place while the attempt runs, with the starting
+  // indicator below instead of a wholesale swap to the spinner.
+  const startInFlight = status === 'pending' && !code;
+  const showTerminalError = status === 'denied' || status === 'expired' || status === 'error';
+  const showIdleForm = status === 'idle' ? draft !== null : showTerminalError || startInFlight;
 
   return (
     // One wrapper owns the vertical space on both platforms: it paints the
@@ -241,6 +254,16 @@ export function LoginScreen() {
             recovering only on relaunch — so these branches render without
             animation; status swaps are instant. */}
         <View className="w-full max-w-sm gap-3">
+          {/* A terminal device-auth error keeps the idle form on screen so the
+              user can retry. The banner is a sibling above one IdleAuth at one
+              JSX slot, so clearing the error when a new attempt starts does not
+              remount the form and lose an in-flight OTP challenge. */}
+          {showTerminalError && (
+            <Text className="text-center text-sm text-destructive">
+              {errorMessage(status, error)}
+            </Text>
+          )}
+
           {status === 'idle' && draft === null && (
             <>
               {/* Form-sized placeholder until the SecureStore draft restore finishes. */}
@@ -249,12 +272,13 @@ export function LoginScreen() {
             </>
           )}
 
-          {status === 'idle' && draft !== null && (
+          {showIdleForm && (
             <IdleAuth
               start={start}
-              initialEmail={draft.email}
-              initialSsoRecovery={draft.ssoRecovery}
+              initialEmail={draft?.email ?? ''}
+              initialSsoRecovery={draft?.ssoRecovery ?? null}
               onBusyChange={setAuthFormBusy}
+              onSignInStart={clearError}
             />
           )}
 
@@ -322,20 +346,6 @@ export function LoginScreen() {
               <Button variant="ghost" onPress={cancel} accessibilityLabel={t('login.cancelSignIn')}>
                 <Text>{t('common.cancel')}</Text>
               </Button>
-            </View>
-          )}
-
-          {(status === 'denied' || status === 'expired' || status === 'error') && (
-            <View className="w-full gap-3">
-              <Text className="text-center text-sm text-destructive">
-                {errorMessage(status, error)}
-              </Text>
-              <IdleAuth
-                start={start}
-                initialEmail={draft?.email ?? ''}
-                initialSsoRecovery={draft?.ssoRecovery ?? null}
-                onBusyChange={setAuthFormBusy}
-              />
             </View>
           )}
         </View>

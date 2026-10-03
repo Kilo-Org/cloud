@@ -223,6 +223,17 @@ describe('worktree session cleanup in Workers', () => {
     await stub.clearForWorktree(kiloUserId, sessionId);
   });
 
+  it('stages a by-value body over RPC and rejects it once the session is deleted', async () => {
+    const { kiloUserId, sessionId, stub } = identity();
+    const key = `items/${kiloUserId}/${sessionId}/message/bytes/1`;
+    const bytes = new TextEncoder().encode('by-value body');
+    await expect(stub.stageR2Object({ kiloUserId, sessionId, key }, bytes)).resolves.toBe(true);
+    expect(await (await env.SESSION_INGEST_R2.get(key))?.text()).toBe('by-value body');
+    await stub.clearForWorktree(kiloUserId, sessionId);
+    await expect(stub.stageR2Object({ kiloUserId, sessionId, key }, bytes)).resolves.toBe(false);
+    expect(await env.SESSION_INGEST_R2.head(key)).toBeNull();
+  });
+
   it('accepts large R2 bodies over streaming RPC and deletes the complete per-session prefixes', async () => {
     const { kiloUserId, sessionId, stub } = identity();
     const key = `items/${kiloUserId}/${sessionId}/large/1`;

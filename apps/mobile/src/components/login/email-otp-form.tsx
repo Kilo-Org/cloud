@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
-import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -99,17 +98,26 @@ export function EmailOtpForm({
         }}
         accessibilityLabel={t('login.verifyCode')}
       >
-        <Text className="flex-1 text-center">{t('login.verifyCode')}</Text>
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.verifyCode')}
+        </Text>
       </Button>
       <Button
         variant="outline"
         className="flex-row gap-2"
         disabled={authBusy}
+        loading={busy === 'otp-send'}
         onPress={onResend}
         accessibilityLabel={t('login.resendCode')}
       >
-        {busy === 'otp-send' ? <ActivityIndicator size="small" /> : null}
-        <Text className="flex-1 text-center">{t('login.resendCode')}</Text>
+        {/* One line, like every other label in this stack: the Arabic secondary
+            label ("إعادة إرسال الرمز") wrapped onto two lines inside the
+            full-width button, so the copy did not fit its control (2026-09-19
+            device finding). Longer locales ellipsize instead of growing a
+            second row; the full label stays the control's accessible name. */}
+        <Text className="flex-1 text-center" numberOfLines={1} adjustsFontSizeToFit>
+          {t('login.resendCode')}
+        </Text>
       </Button>
       <Button
         variant="ghost"

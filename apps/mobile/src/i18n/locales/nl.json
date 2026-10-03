@@ -98,6 +98,7 @@
     "gitlab": "GitLab",
     "goBack": "Terug",
     "idle": "Inactief",
+    "scheduled": "Gepland",
     "keepEditing": "Verder bewerken",
     "keepRunning": "Laten doorgaan",
     "kiloclaw": "KiloClaw",
@@ -214,7 +215,6 @@
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
     "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
-    "creditBalanceEmpty": "Je hebt geen tegoed meer. Het tegoed voor dit account wordt buiten de iOS-app beheerd.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -240,6 +240,7 @@
     "addPasskey": "Een passkey toevoegen",
     "passkeyDefaultName": "Passkey",
     "passkeyAddedOn": "Toegevoegd op {{date}}",
+    "passkeyLastUsedOn": "Laatst gebruikt {{date}}",
     "passkeyAdded": "Passkey toegevoegd.",
     "passkeyAddFailed": "Een passkey kon niet worden toegevoegd. Probeer het opnieuw.",
     "passkeyAddUnsupported": "Dit apparaat kan geen passkeys aanmaken.",
@@ -1513,12 +1514,14 @@
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
       "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
+      "viewHistory": "Sessiegeschiedenis",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
       "tryAdjustFilters": "Pas je filters aan of wis ze.",
       "couldNotSearch": "De sessies konden niet worden doorzocht.",
       "completedWillAppear": "Voltooide sessies verschijnen hier.",
       "noPastSessions": "Geen eerdere sessies",
+      "pastSessions": "Eerdere sessies",
       "live": "ACTIEF",
       "updating": "Bijwerken"
     },
@@ -1531,6 +1534,7 @@
       "idCopied": "Sessie-ID gekopieerd",
       "couldNotCopyId": "De sessie-ID kon niet worden gekopieerd.",
       "untitled": "Naamloze sessie",
+      "actions": "Acties voor de sessie",
       "sessionDeleted": "Sessie verwijderd",
       "needsInput": "invoer nodig",
       "fromPlatform": "van {{platform}}",
@@ -1581,7 +1585,9 @@
       "renamePlaceholder": "Sessienaam",
       "transcriptAccessibility": "Gespreksverloop van de sessie",
       "readOnly": "Je kunt deze sessie alleen lezen.",
+      "continueInNewSession": "Doorgaan in een nieuwe sessie",
       "emptyDescription": "Stuur hieronder een bericht om te beginnen.",
+      "emptyTranscriptDescription": "Deze sessie heeft nog geen berichten.",
       "scrollToBottom": "Naar beneden scrollen",
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
@@ -1671,6 +1677,8 @@
       "leaveChanges": "Niet committen",
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
+      "selectRepositoryToStart": "Selecteer een repository om te starten.",
+      "connectProviderToStart": "Koppel een platform om te starten.",
       "promptPlaceholder": "Waar wil je aan werken?",
       "couldNotLoadModels": "De modellen konden niet worden geladen.",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies hieronder een andere repository en een ander model.",
@@ -2046,6 +2054,7 @@
       "selectModelBeforeSending": "Selecteer een model voordat je het bericht verzendt.",
       "preparingPlaceholder": "Omgeving voorbereiden…",
       "finalizingPlaceholder": "Afronden…",
+      "sessionLoadFailed": "De sessie kon niet worden geladen. Probeer het eerst opnieuw.",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
       "couldNotAttachFiles": "De bestanden konden niet worden bijgevoegd. Tik op Verzenden om het opnieuw te proberen.",
       "discardAttachmentsMessage": "Uploads die nog niet zijn gebruikt, worden verwijderd.",
@@ -2115,6 +2124,7 @@
       "provider": "Aanbieder",
       "totalCost": "Totale kosten",
       "usageReflectsLatest": "Het getoonde gebruik is gebaseerd op het laatst voltooide antwoord van de assistent.",
+      "usageUnavailable": "Contextgebruik niet beschikbaar",
       "tokenUsage": "Tokenverbruik",
       "cacheRate": "Cachepercentage",
       "modelsCount": "Modellen ({{displayCount}})",
@@ -2149,7 +2159,10 @@
     "markdownImage": {
       "load": "Laden",
       "loadWithHost": "{{host}} laden",
-      "httpsOnly": "Alleen afbeeldingen via HTTPS zijn toegestaan."
+      "httpsOnly": "Alleen afbeeldingen via HTTPS zijn toegestaan.",
+      "trustTitle": "Afbeelding van {{host}} laden?",
+      "trustMessage": "Als je {{host}} vertrouwt, worden de afbeeldingen geladen zonder het elke keer te vragen. Je kunt dit later intrekken onder Vertrouwde hosts.",
+      "loadOnce": "Eenmalig laden"
     },
     "markdownLink": {
       "invalidLink": "Deze link kan niet worden geopend.",
@@ -2256,7 +2269,8 @@
     "optionsExpiredDescription": "Ga terug naar het vorige scherm en open deze keuzelijst opnieuw."
   },
   "sessionRow": {
-    "needsInput": "INVOER NODIG"
+    "needsInput": "INVOER NODIG",
+    "scheduled": "GEPLAND"
   },
   "voiceInput": {
     "listening": "Luisteren...",
@@ -2620,7 +2634,14 @@
       "deletedUser": "verwijderde gebruiker",
       "replyForbiddenTerm": "Je hebt geen toestemming om op deze {{term}} te reageren.",
       "moreLinesAbove_one": "… Hierboven staan nog regels: {{displayCount}}.",
-      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}."
+      "moreLinesAbove_other": "… Hierboven staan nog regels: {{displayCount}}.",
+      "deleteComment": "Opmerking verwijderen",
+      "deleteCommentTitle": "Opmerking verwijderen?",
+      "deleteCommentMessage": "Deze opmerking wordt uit de PR verwijderd.",
+      "commentEditFailed": "Je opmerking kon niet worden opgeslagen. Controleer je verbinding en probeer het opnieuw.",
+      "commentEditUnavailable": "Deze opmerking kan niet worden bewerkt. Mogelijk is deze verwijderd.",
+      "commentDeleteFailed": "Je opmerking kon niet worden verwijderd. Controleer je verbinding en probeer het opnieuw.",
+      "commentDeleteUnavailable": "Deze opmerking kan niet worden verwijderd."
     },
     "entry": {
       "eyebrow": "Open een PR of merge request via een URL",
@@ -2933,6 +2954,8 @@
     "linkPasteNotAPullRequest": "Dit is geen koppeling naar een PR of merge request",
     "announce": {
       "commentPosted": "Opmerking geplaatst",
+      "commentUpdated": "Opmerking bijgewerkt",
+      "commentDeleted": "Opmerking verwijderd",
       "reviewSubmitted": "Beoordeling verzonden",
       "autoMergeEnabled": "Automatisch samenvoegen ingeschakeld"
     },
@@ -3165,7 +3188,12 @@
     "subtitle": "Vertrouwde hosts die je zonder bevestiging kunt openen",
     "emptyTitle": "Geen vertrouwde hosts",
     "emptyDescription": "Als je de host van een link vertrouwt, openen links naar die host voortaan zonder bevestiging.",
+    "imagesSectionTitle": "Vertrouwde afbeeldingshosts",
+    "imagesSectionDescription": "Afbeeldingen van deze hosts worden geladen zonder opnieuw te vragen.",
+    "imagesSectionEmpty": "Geen vertrouwde afbeeldingshosts",
     "revoke": "Vertrouwen in {{host}} intrekken",
+    "revokeMessage": "Links naar deze host vragen voortaan weer om bevestiging.",
+    "revokeImageMessage": "Afbeeldingen van deze host vragen voortaan weer om bevestiging.",
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {
@@ -3195,7 +3223,8 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien.",
     "openSession": "Openen",
     "approveFailed": "Goedkeuren is niet gelukt. Tik op $t(common.approve) om het opnieuw te proberen.",
-    "newestResult": "Nieuwste resultaat"
+    "newestResult": "Nieuwste resultaat",
+    "scheduledWakes": "wordt wakker {{time}}"
   },
   "transcriptionModel": {
     "title": "Transcriptiemodel",
@@ -3429,5 +3458,17 @@
       "unboundToast": "Repo niet geconsolideerd",
       "unbindFailed": "Kan repository niet ongedaan maken"
     }
+  },
+  "credits": {
+    "title": "Credits kopen",
+    "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "packLabel": "{{amount}} aan credits toevoegen",
+    "priceUnavailable": "Prijs niet beschikbaar",
+    "purchased": "Er zijn credits aan je saldo toegevoegd.",
+    "empty": "Creditpakketten zijn momenteel niet beschikbaar.",
+    "noMatchingProducts": "De App Store heeft geen overeenkomende creditpakketten geretourneerd.",
+    "noMatchingProductsPlay": "Google Play heeft geen overeenkomende creditpakketten geretourneerd.",
+    "purchaseOwnedByAnotherAccount": "De credits op deze Apple Account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken.",
+    "purchaseOwnedByAnotherAccountPlay": "De credits op dit Google Play-account horen bij een ander Kilo-account. Meld je aan bij dat Kilo-account om ze te gebruiken."
   }
 }

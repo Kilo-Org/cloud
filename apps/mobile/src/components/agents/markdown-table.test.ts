@@ -945,6 +945,49 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
     }
   );
 
+  it('ignores a foreign value-only split so a streamed table keeps its key', async () => {
+    const { MarkdownText } = await import('./markdown-text');
+    const { MarkdownTable: Table } = await import('./markdown-table');
+    const { markdownTableSegmentsCache } = await import('./markdown-parse-cache');
+    const { splitMarkdownTables } = await import('./markdown-table-extract');
+    const stale = '| Name |\n| --- |\n| Old |';
+    const appended = '| Name |\n| --- |\n| New |';
+    const next = `${appended}\n\n${stale}`;
+    const renderer = renderTable();
+    try {
+      act(() => {
+        renderer.update(createElement(MarkdownText, { value: stale }));
+      });
+      const table = renderer.root.findAllByType(Table)[0];
+      if (!table) {
+        throw new Error('table missing');
+      }
+      act(() => {
+        (table.findByProps({ testID: table.props.tableKey }).props.onPress as () => void)();
+      });
+      expect(table.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+
+      // Another instance already cached a no-previous split of the next value.
+      // Reusing it would give the appended table key `md-table-0`, the key the
+      // open `stale` table holds, and reconcile its modal onto the new table.
+      markdownTableSegmentsCache.set(next, splitMarkdownTables(next));
+
+      act(() => {
+        renderer.update(createElement(MarkdownText, { value: next }));
+      });
+
+      const staleTable = renderer.root
+        .findAllByType(Table)
+        .find(node => (node.props.raw as string).trimEnd() === stale);
+      expect(staleTable).toBe(table);
+      expect(staleTable?.findAllByProps({ animationType: 'slide' })).toHaveLength(1);
+    } finally {
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  });
+
   it('does not move an open modal to the next table when its table is removed', async () => {
     const { MarkdownText } = await import('./markdown-text');
     const { MarkdownTable: Table } = await import('./markdown-table');
@@ -1084,7 +1127,10 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
 
     const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.props.onCopyCode).toBe(onCopyCode);
+    const copyCode = blocks[0]?.props.onCopyCode as ((code: string) => void) | undefined;
+    expect(copyCode).toBeTypeOf('function');
+    copyCode?.('const x = 1;');
+    expect(onCopyCode).toHaveBeenCalledWith('const x = 1;');
 
     await act(async () => {
       await Promise.resolve();
@@ -1142,7 +1188,10 @@ describe('MarkdownTable streaming and press paths (real parser)', () => {
 
     const blocks = renderer.root.findAll(node => (node.type as unknown) === 'CodeBlock');
     expect(blocks).toHaveLength(1);
-    expect(blocks[0]?.props.onLongPressCode).toBe(onLongPressCode);
+    const longPressCode = blocks[0]?.props.onLongPressCode as (() => void) | undefined;
+    expect(longPressCode).toBeTypeOf('function');
+    longPressCode?.();
+    expect(onLongPressCode).toHaveBeenCalledTimes(1);
 
     await act(async () => {
       await Promise.resolve();

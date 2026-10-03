@@ -32,6 +32,7 @@ import { openKiloGlobalFeed } from './global-feed.js';
 import { createGlobalFeedManager, type SessionBoundFeedPolicy } from './global-feed-manager.js';
 import { logToFile } from './utils.js';
 import { startToolCgroup } from './tool-cgroup.js';
+import { CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV } from '../../src/shared/code-review-self-check.js';
 import { abortKiloSessionForShutdown } from './shutdown.js';
 import { kiloServerBootstrapError, WrapperBootstrapError } from './bootstrap-error.js';
 import type { WrapperCommand } from '../../src/shared/protocol.js';
@@ -254,6 +255,7 @@ async function main() {
     wrapperInstanceId,
     wrapperInstanceGeneration,
     platform: process.env.KILO_PLATFORM,
+    publicationSelfCheck: process.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV] === '1',
   };
 
   // Assigned below, after the feed manager and server deps that its callbacks
@@ -559,6 +561,9 @@ async function main() {
       serverConfig.workspacePath = request.workspace.workspacePath;
       serverConfig.sessionId = request.kiloSessionId;
       serverConfig.platform = request.materialized.env.KILO_PLATFORM ?? process.env.KILO_PLATFORM;
+      serverConfig.publicationSelfCheck =
+        (request.materialized.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV] ??
+          process.env[CODE_REVIEW_PUBLICATION_SELF_CHECK_ENV]) === '1';
 
       if (!state.isConnected) {
         progressChannel = await openIngestProgressChannel(state);

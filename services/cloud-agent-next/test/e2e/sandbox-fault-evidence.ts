@@ -148,11 +148,11 @@ export function collectReapEvidence(
     if (!belongsToStop(record)) continue;
     const diagnosticEvent = record.diagnosticEvent;
     if (
-      evidence.physicalStopCause !== null &&
       diagnosticEvent === 'native_stop' &&
       record.result === 'terminal' &&
       input.allocationName !== undefined &&
-      record.allocationName === input.allocationName
+      record.allocationName === input.allocationName &&
+      (record.sandboxId === undefined || record.sandboxId === input.sandboxId)
     ) {
       evidence.providerStopObserved = true;
     } else if (
@@ -201,6 +201,12 @@ export function assertReapOutcome(input: {
   replacementAllocationRef: string;
   settledReapReason: string;
   inflight: boolean;
+  /**
+   * The new plane does not emit the legacy `allocation_transition` /
+   * heartbeat-expiry records. A terminal `native_stop` of the reaped allocation
+   * plus a distinct replacement is the stop evidence it does write.
+   */
+  controlPlane?: boolean;
 }): void {
   const { evidence } = input;
   if (evidence.reapedAllocationRef !== input.reapedAllocationRef) {
@@ -212,6 +218,15 @@ export function assertReapOutcome(input: {
     throw new Error(
       `no distinct replacement: the same allocation ${input.reapedAllocationRef} still serves the session`
     );
+  }
+  if (input.controlPlane) {
+    if (!evidence.providerStopObserved) {
+      throw new Error('no identity-matched terminal native_stop was observed');
+    }
+    if (evidence.wrapperReadyAfterFault) {
+      throw new Error('an identity-matched wrapper_ready followed the fault; the reap was vetoed');
+    }
+    return;
   }
   if (
     evidence.physicalStopFromState?.startsWith('allocated.') !== true ||

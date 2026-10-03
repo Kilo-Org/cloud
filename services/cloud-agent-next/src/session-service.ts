@@ -16,6 +16,7 @@ import {
   normalizeKilocodeModel,
 } from './persistence/model-utils.js';
 import {
+  installationGitAuthorFromEnv,
   isTemporaryManagedBitbucketTokenFailure,
   issueCloudAgentGitHubSessionCapability,
   issueCloudAgentBitbucketSessionCapability,
@@ -51,7 +52,6 @@ import { timedExec } from './sandbox-timeout-logging.js';
 import type {
   PersistenceEnv,
   CloudAgentSessionState,
-  MCPServerConfig,
   RuntimeSkill,
   RuntimeAgent,
 } from './persistence/types.js';
@@ -61,10 +61,11 @@ import {
   requiresContainmentSandbox,
 } from './persistence/session-metadata.js';
 import { withDORetry } from './utils/do-retry.js';
-import { resolveSessionStub } from './sandbox-session/session-stub.js';
+import { resolveLegacySessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { hasModernRuntimeAuthorization } from './session/runtime-authorization-persistence.js';
-import { decryptWithPrivateKey, mergeEnvVarsWithSecrets } from './utils/encryption.js';
-import { codeReviewIdFromCallbackTarget, type MCPSecretValue } from './router/schemas.js';
+import { mergeEnvVarsWithSecrets } from './utils/encryption.js';
+import { codeReviewIdFromCallbackTarget } from './router/schemas.js';
+import { materializeMcpServers } from './mcp-config.js';
 import type { SessionProfileBundle } from './session-profile.js';
 import { readProfileBundle } from './session-profile.js';
 import {
@@ -655,25 +656,6 @@ export type ResolvedWorkspaceTokens = {
   glabIsOAuth2?: boolean;
 };
 
-function installationGitAuthorFromEnv(
-  env: PersistenceEnv,
-  githubAppType: 'standard' | 'lite'
-): GitAuthorConfig | undefined {
-  const slug =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_SLUG || env.GITHUB_APP_SLUG
-      : env.GITHUB_APP_SLUG;
-  const userId =
-    githubAppType === 'lite'
-      ? env.GITHUB_LITE_APP_BOT_USER_ID || env.GITHUB_APP_BOT_USER_ID
-      : env.GITHUB_APP_BOT_USER_ID;
-  if (!slug || !userId) return undefined;
-  return {
-    name: `${slug}[bot]`,
-    email: `${userId}+${slug}[bot]@users.noreply.github.com`,
-  };
-}
-
 function parseRestoreScriptOutput(stdout: string | undefined): {
   code?: number;
   step?: string;
@@ -888,94 +870,14 @@ async function cleanupRestoreTokenFile(
 export async function writeGlobalRules(
   sandbox: SandboxInstance,
   sessionHome: string,
-  sessionId: string
+  bashDefaultTimeoutMs?: string | number | null
 ): Promise<void> {
   const rulesDir = `${sessionHome}/.kilocode/rules`;
   const rulesPath = `${rulesDir}/cloud-agent.md`;
 
   await timedExec(sandbox, `mkdir -p ${rulesDir}`, 'session.writeGlobalRules.mkdir');
 
-  await sandbox.writeFile(rulesPath, buildCloudAgentRules(sessionId));
-}
-
-/**
- * CLI-native MCP config shape (env/header values as plain strings), ready to
- * JSON-encode into KILO_CONFIG_CONTENT.mcp.
- */
-type CliMcpServer =
-  | {
-      type: 'local';
-      command: string[];
-      environment?: Record<string, string>;
-      enabled?: boolean;
-      timeout?: number;
-    }
-  | {
-      type: 'remote';
-      url: string;
-      headers?: Record<string, string>;
-      enabled?: boolean;
-      timeout?: number;
-    };
-
-function materializeSecretValueRecord(
-  values: Record<string, MCPSecretValue> | undefined,
-  privateKey: string | undefined,
-  label: string
-): Record<string, string> | undefined {
-  if (!values || Object.keys(values).length === 0) return undefined;
-  const out: Record<string, string> = {};
-  for (const [key, value] of Object.entries(values)) {
-    if (typeof value === 'string') {
-      out[key] = value;
-      continue;
-    }
-    if (!privateKey) {
-      throw new Error(
-        `${label} contains encrypted values but AGENT_ENV_VARS_PRIVATE_KEY is not configured on the worker`
-      );
-    }
-    out[key] = decryptWithPrivateKey(value, privateKey);
-  }
-  return out;
-}
-
-/** Materialize each MCP env/header value into its plaintext form for the CLI. */
-function materializeMcpServers(
-  mcpServers: Record<string, MCPServerConfig>,
-  privateKey: string | undefined
-): Record<string, CliMcpServer> {
-  const out: Record<string, CliMcpServer> = {};
-  for (const [name, server] of Object.entries(mcpServers)) {
-    if (server.type === 'local') {
-      const environment = materializeSecretValueRecord(
-        server.environment,
-        privateKey,
-        `MCP server "${name}" environment`
-      );
-      out[name] = {
-        type: 'local',
-        command: server.command,
-        ...(environment !== undefined && { environment }),
-        ...(server.enabled !== undefined && { enabled: server.enabled }),
-        ...(server.timeout !== undefined && { timeout: server.timeout }),
-      };
-    } else {
-      const headers = materializeSecretValueRecord(
-        server.headers,
-        privateKey,
-        `MCP server "${name}" headers`
-      );
-      out[name] = {
-        type: 'remote',
-        url: server.url,
-        ...(headers !== undefined && { headers }),
-        ...(server.enabled !== undefined && { enabled: server.enabled }),
-        ...(server.timeout !== undefined && { timeout: server.timeout }),
-      };
-    }
-  }
-  return out;
+  await sandbox.writeFile(rulesPath, buildCloudAgentRules(bashDefaultTimeoutMs));
 }
 
 function shortHash(input: string): string {
@@ -1379,6 +1281,9 @@ export class SessionService {
       // Platform identifier - defaults to 'cloud-agent' if not specified
       KILO_PLATFORM: createdOnPlatform ?? 'cloud-agent',
       KILO_DISABLE_AUTOUPDATE: 'true',
+      // Background subagents let a root session idle before publishing its work,
+      // which the platform treats as completion; keep subagents foreground-only.
+      KILO_EXPERIMENTAL_BACKGROUND_SUBAGENTS: 'false',
       // Feature attribution for microdollar usage tracking
       KILOCODE_FEATURE: createdOnPlatform ?? 'cloud-agent',
     };
@@ -1427,14 +1332,7 @@ export class SessionService {
     }
 
     const permission: Record<string, unknown> = {
-      external_directory: {
-        '*': 'deny',
-        [`/tmp/${sessionId}/**`]: 'allow',
-        [`/tmp/attachments/${sessionId}/**`]: 'allow',
-        [`${workspacePath}/**`]: 'allow',
-        [`${sessionHome}/.kilocode/skills/**`]: 'allow',
-        ...(bitbucketInputPath ? { [`${dirname(bitbucketInputPath)}/*`]: 'allow' } : {}),
-      },
+      external_directory: 'allow',
       ...(!isInteractive && { question: 'deny' }),
       read: 'allow',
       edit: 'allow',
@@ -1451,6 +1349,11 @@ export class SessionService {
       todowrite: 'allow',
       todoread: 'allow',
       suggest: 'deny',
+      schedule_wakeup: 'deny',
+      cancel_wakeup: 'deny',
+      cron_create: 'deny',
+      cron_list: 'deny',
+      cron_delete: 'deny',
     };
 
     if (commandGuardPolicy) {
@@ -1507,6 +1410,9 @@ export class SessionService {
       },
       autoupdate: false,
       snapshot: false,
+      // Codebase indexing would embed the repo and keep a local vector store
+      // alive for the session, which the sandbox does not budget for.
+      indexing: { enabled: false },
     };
     if (!bitbucketInputPath && mcpServers && Object.keys(mcpServers).length > 0) {
       const materialized = materializeMcpServers(mcpServers, env.AGENT_ENV_VARS_PRIVATE_KEY);
@@ -1561,6 +1467,7 @@ export class SessionService {
     const configJson = JSON.stringify(configContent);
     envVars.OPENCODE_CONFIG_CONTENT = configJson;
     envVars.KILO_CONFIG_CONTENT = configJson;
+    envVars.KILO_DISABLE_CODEBASE_INDEXING = 'vscode-no-workspace';
     if (!baseEnvVars.GH_TOKEN) {
       if (githubToken && githubRepo) {
         envVars.GH_TOKEN = githubToken;
@@ -2087,7 +1994,7 @@ export class SessionService {
       // The session-owned RPC checks the current persisted runtime fence. It is
       // deliberately called only after this delivery plan carries every fence field.
       const handle = await withDORetry(
-        () => resolveSessionStub(env, userId, sessionId),
+        () => resolveLegacySessionStub(env, userId, sessionId),
         stub => stub.issueRuntimeCredentialProxyGrant(plan.wrapper.fence),
         'issueRuntimeCredentialProxyGrant'
       );
@@ -2563,7 +2470,7 @@ export class SessionService {
       await this.sanitizeGitRemote(session, workspacePath, metadata, resolvedTokens);
 
       await writeAuthFile(sandbox, sessionHome, kiloCapability);
-      await writeGlobalRules(sandbox, sessionHome, sessionId);
+      await writeGlobalRules(sandbox, sessionHome, env.KILO_EXPERIMENTAL_BASH_DEFAULT_TIMEOUT_MS);
 
       const detectedDevcontainer = metadata.workspace?.devcontainerRequested
         ? await detectDevContainer(session, workspacePath)
@@ -2876,6 +2783,47 @@ export class SessionService {
     };
   }
 
+  private async executeRestoreCommand(
+    sandbox: SandboxInstance,
+    session: ExecutionSession,
+    kiloSessionId: string,
+    workspacePath: string,
+    options: RestoreRuntimeOptions,
+    operation: string,
+    importFilePath?: string
+  ) {
+    const restoreTokenFilePath = options.devcontainer
+      ? getRestoreTokenFilePath(options.sessionHome)
+      : undefined;
+    try {
+      if (restoreTokenFilePath) {
+        await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability);
+      }
+      const restoreCommand = buildRestoreCommand({
+        kiloSessionId,
+        importFilePath,
+        runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
+        runtimeEnv: options.devcontainer
+          ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
+          : undefined,
+        devContainer: options.devcontainer,
+      });
+      return await timedExec(session, restoreCommand, operation, {
+        timeoutMs: GIT_COMMAND_TIMEOUT_MS,
+        cwd: dirname(workspacePath),
+        env: options.devcontainer ? options.dockerEnv : undefined,
+      });
+    } finally {
+      if (restoreTokenFilePath) {
+        await cleanupRestoreTokenFile(
+          session,
+          restoreTokenFilePath,
+          options.devcontainer?.agentSessionId ?? ''
+        );
+      }
+    }
+  }
+
   private async tryRestoreKiloSessionFromSnapshot(
     sandbox: SandboxInstance,
     session: ExecutionSession,
@@ -2883,34 +2831,14 @@ export class SessionService {
     workspacePath: string,
     options: RestoreRuntimeOptions
   ): Promise<boolean> {
-    const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
-      : undefined;
-    const restoreCommand = buildRestoreCommand({
+    const restoreResult = await this.executeRestoreCommand(
+      sandbox,
+      session,
       kiloSessionId,
-      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
-      runtimeEnv: options.devcontainer
-        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
-        : undefined,
-      devContainer: options.devcontainer,
-    });
-    const restoreResult = await (async () => {
-      try {
-        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.restore', {
-          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-          cwd: dirname(workspacePath),
-          env: options.devcontainer ? options.dockerEnv : undefined,
-        });
-      } finally {
-        if (restoreTokenFilePath) {
-          await cleanupRestoreTokenFile(
-            session,
-            restoreTokenFilePath,
-            options.devcontainer?.agentSessionId ?? ''
-          );
-        }
-      }
-    })();
+      workspacePath,
+      options,
+      'session.prepareWorkspace.restore'
+    );
 
     if (restoreResult.exitCode === 0) {
       logger.info('Session snapshot restore completed');
@@ -2960,35 +2888,15 @@ export class SessionService {
       ? `${options.sessionHome}/tmp/kilo-empty-session-${kiloSessionId}.json`
       : `/tmp/kilo-empty-session-${kiloSessionId}.json`;
     await sandbox.writeFile(importFilePath, minimalSessionJson);
-    const restoreTokenFilePath = options.devcontainer
-      ? await writeRestoreTokenFile(sandbox, session, options.sessionHome, options.kiloCapability)
-      : undefined;
-    const restoreCommand = buildRestoreCommand({
+    const restoreResult = await this.executeRestoreCommand(
+      sandbox,
+      session,
       kiloSessionId,
-      importFilePath,
-      runtimeWorkspacePath: options.devcontainer?.innerWorkspaceFolder ?? workspacePath,
-      runtimeEnv: options.devcontainer
-        ? this.getDevContainerRestoreEnv(options, restoreTokenFilePath)
-        : undefined,
-      devContainer: options.devcontainer,
-    });
-    const restoreResult = await (async () => {
-      try {
-        return await timedExec(session, restoreCommand, 'session.prepareWorkspace.bootstrap', {
-          timeoutMs: GIT_COMMAND_TIMEOUT_MS,
-          cwd: dirname(workspacePath),
-          env: options.devcontainer ? options.dockerEnv : undefined,
-        });
-      } finally {
-        if (restoreTokenFilePath) {
-          await cleanupRestoreTokenFile(
-            session,
-            restoreTokenFilePath,
-            options.devcontainer?.agentSessionId ?? ''
-          );
-        }
-      }
-    })();
+      workspacePath,
+      options,
+      'session.prepareWorkspace.bootstrap',
+      importFilePath
+    );
     if (restoreResult.exitCode !== 0) {
       const parsed = parseRestoreScriptOutput(restoreResult.stdout);
       const detail = [

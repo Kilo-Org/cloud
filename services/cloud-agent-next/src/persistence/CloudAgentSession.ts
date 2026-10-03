@@ -4,18 +4,20 @@
  * Uses RPC methods for type-safe communication.
  */
 
+import { logRuntimeAuthorizationDiagnostic } from '../session/runtime-authorization-diagnostics.js';
 import {
-  logRuntimeAuthorizationDiagnostic,
-  runtimeAuthorizationRecoveryDenied,
-} from '../session/runtime-authorization-diagnostics.js';
+  loadRecoverableRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RESTORE_ERRORS,
+  replaceStoredRuntimeAuthorization,
+  unsealActiveRuntimeAuthorization,
+  type ReauthorizeRequest,
+  type RecoveryOutcome,
+  type RecoveryRequest,
+} from '../session/runtime-authorization-seal.js';
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
-import {
-  renewRuntimeAuthorization,
-  unsealRuntimeAuthorization,
-} from '@kilocode/worker-utils/runtime-authorization';
+import { renewRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
 import {
@@ -28,7 +30,6 @@ import {
   sessionRuntimeLocator,
   type SessionRuntimeLocator,
 } from '../sandbox-control/worktree-ownership.js';
-import { readProfileBundle, type SessionProfileBundle } from '../session-profile.js';
 import { fitCallbackJobToQueueLimit } from '../callbacks/queue-payload.js';
 import type { CallbackJob, CallbackTarget } from '../callbacks/index.js';
 import { projectTerminalClientError } from '../session/terminal-error-projector.js';
@@ -36,7 +37,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { commandQueue, events, executionLeases } from '../db/sqlite-schema.js';
 import { logger } from '../logger.js';
-import { BUILTIN_AGENT_MODES, Limits } from '../schema.js';
+import { Limits } from '../schema.js';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
 import {
@@ -93,20 +94,23 @@ import { withDORetry } from '../utils/do-retry.js';
 import type {
   AcceptedExecutionTurn,
   AdmissionFailure,
-  AgentSelection,
   ExecutionDeliveryContext,
-  ExecutionTurnSubmission,
   MessageDeliveryRequest,
   AdmitAcceptedSessionMessageRequest,
   LegacyRegisteredInitialAdmissionRequest,
   MessageDeliveryResult,
   SessionMessageAdmissionResult,
   SubmittedSessionMessageRequest,
-  SessionFinalization,
 } from '../execution/types.js';
 import { renderExecutionTurnContent } from '../execution/types.js';
 import type { Env as WorkerEnv, SandboxId } from '../types.js';
-import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
+import { generateSandboxId } from '../sandbox-id.js';
+import {
+  buildSessionMetadataFromRegistration,
+  validateModeAgainstRuntimeAgents,
+  validateSharedSandboxRouteAssignment,
+  type GroupedRegisterSessionInput,
+} from '../session/session-registration-metadata.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
 import { dispatchedKilocodeModelId } from './model-utils.js';
@@ -243,18 +247,6 @@ type TerminalSizeInput = {
 
 type TerminalCreateInput = Partial<TerminalSizeInput>;
 
-function validateModeAgainstRuntimeAgents(
-  metadata: SessionMetadata,
-  mode = metadata.agent?.mode
-): string | null {
-  if (!mode || BUILTIN_AGENT_MODES.has(mode)) return null;
-
-  const knownSlugs = new Set((readProfileBundle(metadata).runtimeAgents ?? []).map(a => a.slug));
-  if (knownSlugs.has(mode)) return null;
-
-  return `Mode "${mode}" is not a built-in and does not match any runtimeAgents on this session`;
-}
-
 /**
  * Concatenate text content from assistant message parts.
  * Parts have a loose `Record<string, unknown>` type; only include those with
@@ -272,111 +264,11 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
   return pieces.join('').trim();
 }
 
-type GroupedRegisterSessionInput = {
-  identity: SessionMetadata['identity'];
-  auth: SessionMetadata['auth'];
-  runtimeAuthorizationSeal?: string;
-  clone?: SessionMetadata['clone'];
-  /** Omitted for a clone-only create: no synthetic initial turn is registered. */
-  message?: {
-    initialMessageId?: string;
-    turn: ExecutionTurnSubmission;
-  };
-  agent: AgentSelection & {
-    appendSystemPrompt?: string;
-  };
-  repository?:
-    | {
-        type: 'github';
-        repo: string;
-        githubIntegrationId?: string;
-        githubAccessPurpose?: 'workflow' | 'agent';
-        branch?: string;
-      }
-    | {
-        type: 'gitlab';
-        url: string;
-        branch?: string;
-      }
-    | {
-        type: 'bitbucket';
-        url: string;
-        workspaceUuid: string;
-        repositoryUuid: string;
-        bitbucketIntegrationId?: string;
-        branch?: string;
-      }
-    | {
-        type: 'git';
-        url: string;
-        token?: string;
-        branch?: string;
-      };
-  profile?: SessionProfileBundle;
-  finalization?: SessionFinalization;
-  callback?: SessionMetadata['callback'];
-  workspace?: Pick<
-    NonNullable<SessionMetadata['workspace']>,
-    | 'sandboxId'
-    | 'sandboxRoute'
-    | 'sandboxProvider'
-    | 'shallow'
-    | 'credentialContainment'
-    | 'devcontainerRequested'
-    | 'sandboxAllocation'
-  >;
-};
-
 type CreateSessionWithInitialAdmissionInput = Omit<GroupedRegisterSessionInput, 'message'> & {
   message: {
     initialTurn: AcceptedExecutionTurn;
   };
 };
-
-function repositoryMetadataFromRegistrationInput(
-  repository: GroupedRegisterSessionInput['repository']
-): SessionMetadata['repository'] | undefined {
-  if (!repository) return undefined;
-
-  switch (repository.type) {
-    case 'github':
-      return {
-        type: 'github',
-        repo: repository.repo,
-        githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
-        ...(repository.githubIntegrationId
-          ? { githubIntegrationId: repository.githubIntegrationId }
-          : {}),
-        upstreamBranch: repository.branch,
-      };
-    case 'gitlab':
-      return {
-        type: 'gitlab',
-        url: repository.url,
-        platform: 'gitlab',
-        upstreamBranch: repository.branch,
-      };
-    case 'bitbucket':
-      return {
-        type: 'bitbucket',
-        url: repository.url,
-        platform: 'bitbucket',
-        workspaceUuid: repository.workspaceUuid,
-        repositoryUuid: repository.repositoryUuid,
-        bitbucketIntegrationId: repository.bitbucketIntegrationId,
-        upstreamBranch: repository.branch,
-      };
-    case 'git':
-      return {
-        type: 'git',
-        url: repository.url,
-        token: repository.token,
-        upstreamBranch: repository.branch,
-      };
-  }
-
-  throw new Error('repository.type must be github, gitlab, bitbucket, or git');
-}
 
 function isSameAcceptedInitialTurn(
   metadata: SessionMetadata,
@@ -396,24 +288,6 @@ function isSameAcceptedInitialTurn(
     stored.turn.prompt === initialTurn.prompt &&
     JSON.stringify(stored.turn.attachments) === JSON.stringify(initialTurn.attachments)
   );
-}
-
-async function validateSharedSandboxRouteAssignment(workspace: {
-  sandboxId?: string;
-  sandboxRoute?: NonNullable<SessionMetadata['workspace']>['sandboxRoute'];
-}): Promise<string | null> {
-  const route = workspace.sandboxRoute;
-  if (!route) return null;
-  try {
-    const expectedSandboxId = route.suffix
-      ? await deriveSharedSandboxId(route.routeKey, route.suffix)
-      : route.routeKey;
-    return workspace.sandboxId === expectedSandboxId
-      ? null
-      : 'Shared sandbox assignment does not match its route suffix';
-  } catch (error) {
-    return error instanceof Error ? error.message : String(error);
-  }
 }
 
 function isSameRegistrationRepository(
@@ -726,7 +600,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             parentMessageId
           ),
         ensureTerminalMessageEvent: event => {
-          this.ensureTerminalMessageEvent({
+          this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -827,6 +701,17 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const payer = metadata.identity.orgId
       ? { type: 'org' as const, id: metadata.identity.orgId }
       : { type: 'user' as const, id: metadata.identity.userId };
+    if (admission.code === 'meter_unavailable') {
+      logger
+        .withFields({
+          sessionId: this.sessionId,
+          sandboxId: metadata.workspace?.sandboxId,
+          payerType: payer.type,
+          admissionCode: admission.code,
+          admissionMessage: admission.message,
+        })
+        .warn('Container billing admission failed');
+    }
     const billingFailure =
       admission.code === 'insufficient_credits'
         ? {
@@ -1181,7 +1066,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
         checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
-          this.ensureQueuedMessageEvent({
+          this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -1526,34 +1411,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private ensureTerminalMessageEvent(params: {
-    executionId: EventSourceId;
-    sessionId: string;
-    streamEventType: string;
-    payload: string;
-    timestamp: number;
-    entityId: string;
-  }): void {
-    const eventId = this.eventQueries.insertUnique({
-      executionId: params.executionId,
-      sessionId: params.sessionId,
-      streamEventType: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-      entityId: params.entityId,
-    });
-    if (eventId === null) return;
-    this.broadcastEvent({
-      id: eventId,
-      execution_id: params.executionId,
-      session_id: params.sessionId,
-      stream_event_type: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-    });
-  }
-
-  private ensureQueuedMessageEvent(params: {
+  private ensureUniqueMessageEvent(params: {
     executionId: EventSourceId;
     sessionId: string;
     streamEventType: string;
@@ -1758,36 +1616,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
   }
 
-  async recoverExpiredRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    recoveryId: string;
-    runtimeAuthorizationSeal: string;
-    runtimeToken: string;
-  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
-    const metadata = await this.getMetadata();
-    const denied = (reason: Parameters<typeof runtimeAuthorizationRecoveryDenied>[1]) =>
-      runtimeAuthorizationRecoveryDenied(metadata?.identity.sessionId ?? this.sessionId, reason);
-    if (!metadata) return denied('metadata_unavailable');
-    if (metadata.identity.userId !== input.ownerId) return denied('owner_mismatch');
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return denied('missing_secret');
-    let fresh: RuntimeAuthorization;
-    try {
-      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return denied('invalid_seal');
-    }
-    if (fresh.state !== 'active') return denied('fresh_authorization_inactive');
+  async recoverExpiredRuntimeAuthorization(input: RecoveryRequest): Promise<RecoveryOutcome> {
+    const prelude = await loadRecoverableRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.sessionId,
+      this.env.NEXTAUTH_SECRET
+    );
+    if (prelude.status === 'denied') return prelude;
+    const { metadata, authorization: fresh, deny } = prelude;
     const state = await this.getRuntimeAuthorizationRecoveryState();
     if (state.state === 'legacy' || state.state === 'active') return { status: 'not-needed' };
     if (state.state !== 'expired' || state.id !== input.expectedOldId)
-      return denied('authorization_state_changed');
+      return deny('authorization_state_changed');
     const [active, pending] = await Promise.all([
       hasNonTerminalSessionMessage(this.ctx.storage),
       countPendingSessionMessages(this.ctx.storage),
@@ -1897,7 +1738,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         diagnostic('authorization_state_changed');
         return latest.state === 'active' || latest.state === 'legacy'
           ? { status: 'not-needed' }
-          : denied('authorization_state_changed');
+          : deny('authorization_state_changed');
       }
       failureReason = 'authorization_commit_failed';
       await this.ctx.storage.transaction(async transaction => {
@@ -2038,33 +1879,14 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  async reauthorizeRuntimeAuthorization(input: {
-    ownerId: string;
-    expectedOldId: string;
-    runtimeAuthorizationSeal: string;
-  }): Promise<boolean> {
-    const metadata = await this.getMetadata();
-    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return false;
-    let authorization: RuntimeAuthorization;
-    try {
-      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-        resourceKind: 'cloud-agent-next',
-        resourceId: metadata.identity.sessionId,
-        userId: metadata.identity.userId,
-        organizationId: metadata.identity.orgId,
-      });
-    } catch {
-      return false;
-    }
-    if (authorization.state !== 'active') return false;
-    const current = RuntimeAuthorizationSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+  async reauthorizeRuntimeAuthorization(input: ReauthorizeRequest): Promise<boolean> {
+    return replaceStoredRuntimeAuthorization(
+      input,
+      await this.getMetadata(),
+      this.env.NEXTAUTH_SECRET,
+      () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      authorization => this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization)
     );
-    if (!current.success || current.data.id !== input.expectedOldId) return false;
-    await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization);
-    return true;
   }
 
   async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
@@ -2912,111 +2734,25 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     }
     let runtimeAuthorization: RuntimeAuthorization | undefined;
     if (input.runtimeAuthorizationSeal) {
-      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-      if (!secret) return { success: false, error: 'Authentication unavailable' };
-      let authorization: RuntimeAuthorization;
-      try {
-        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
-          resourceKind: 'cloud-agent-next',
-          resourceId: input.identity.sessionId,
-          userId: input.identity.userId,
-          organizationId: input.identity.orgId,
-        });
-      } catch {
-        return { success: false, error: 'Invalid runtime authorization' };
+      const unsealed = await unsealActiveRuntimeAuthorization({
+        secretBinding: this.env.NEXTAUTH_SECRET,
+        seal: input.runtimeAuthorizationSeal,
+        identity: input.identity,
+      });
+      if (unsealed.status !== 'active') {
+        return { success: false, error: RUNTIME_AUTHORIZATION_RESTORE_ERRORS[unsealed.status] };
       }
-      if (authorization.state !== 'active')
-        return { success: false, error: 'Runtime authorization revoked' };
+      const authorization = unsealed.authorization;
       if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)) {
         return { success: false, error: 'Runtime authorization already installed' };
       }
       runtimeAuthorization = authorization;
     }
-    const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
-    if (routeAssignmentError) {
-      return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
+    const built = await buildSessionMetadataFromRegistration(input);
+    if (!built.ok) {
+      return { success: false, error: built.error };
     }
-
-    const now = Date.now();
-    let repository: SessionMetadata['repository'];
-    try {
-      repository = repositoryMetadataFromRegistrationInput(input.repository);
-    } catch (error) {
-      return {
-        success: false,
-        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-
-    const initialMessage: SessionMetadata['initialMessage'] = input.message
-      ? {
-          id: input.message.initialMessageId ?? input.message.turn.id ?? undefined,
-          prompt:
-            input.message.turn.type === 'prompt'
-              ? input.message.turn.prompt
-              : input.message.turn.arguments.length > 0
-                ? `/${input.message.turn.command} ${input.message.turn.arguments}`
-                : `/${input.message.turn.command}`,
-          attachments:
-            input.message.turn.type === 'prompt' ? input.message.turn.attachments : undefined,
-          turn:
-            input.message.turn.type === 'prompt'
-              ? {
-                  type: 'prompt',
-                  prompt: input.message.turn.prompt,
-                  attachments: input.message.turn.attachments,
-                }
-              : {
-                  type: 'command',
-                  command: input.message.turn.command,
-                  arguments: input.message.turn.arguments,
-                },
-        }
-      : undefined;
-
-    const metadata: SessionMetadata = {
-      metadataSchemaVersion: 2,
-      identity: input.identity,
-      auth: input.auth,
-      // Metadata without clone remains an empty-session bootstrap; remove
-      // this fallback only after old prepared sessions age out.
-      clone: input.clone,
-      repository,
-      ...(initialMessage ? { initialMessage } : {}),
-      agent: {
-        mode: input.agent.mode,
-        model: input.agent.model,
-        variant: input.agent.variant,
-        appendSystemPrompt: input.agent.appendSystemPrompt,
-      },
-      finalization: input.finalization,
-      profile: input.profile,
-      callback: input.callback,
-      workspace: {
-        ...input.workspace,
-        sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-        branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
-      },
-      lifecycle: {
-        version: now,
-        timestamp: now,
-      },
-    };
-
-    let serialized: SessionMetadata;
-    try {
-      serialized = serializeSessionMetadata(metadata);
-    } catch (error) {
-      return {
-        success: false,
-        error: `Invalid metadata: ${error instanceof Error ? error.message : String(error)}`,
-      };
-    }
-
-    const modeError = validateModeAgainstRuntimeAgents(serialized);
-    if (modeError) {
-      return { success: false, error: modeError };
-    }
+    const serialized = built.metadata;
 
     if (runtimeAuthorization) {
       await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, runtimeAuthorization);

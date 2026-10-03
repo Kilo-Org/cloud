@@ -127,6 +127,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   clearTrustedHosts: vi.fn(),
 }));
 
+// Image-host trust is a second SecureStore preference that pulls the same
+// secure-store-preference -> sonner-native -> react-native chain, so the
+// account-boundary clear needs the same mock as the link list above.
+vi.mock('@/lib/hooks/use-trusted-image-hosts', () => ({
+  clearTrustedImageHosts: vi.fn(),
+}));
+
 vi.mock('@/components/agents/markdown-image-confirm', () => ({
   clearMarkdownImageConfirmMemory: vi.fn(),
 }));

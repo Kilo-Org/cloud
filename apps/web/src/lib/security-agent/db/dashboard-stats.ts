@@ -240,7 +240,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       priorityFindingResult,
       repoHealthResult,
     ] = await Promise.all([
-      // SLA query
       db.execute<SlaRow>(sql`
           SELECT
             ${security_findings.severity} AS severity,
@@ -255,7 +254,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           GROUP BY ${security_findings.severity}
         `),
 
-      // Severity query (open only)
       db.execute<SeverityRow>(sql`
           SELECT ${security_findings.severity} AS severity, COUNT(*) AS count
           FROM ${security_findings}
@@ -263,7 +261,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           GROUP BY ${security_findings.severity}
         `),
 
-      // Status query
       db.execute<StatusRow>(sql`
           SELECT ${security_findings.status} AS status, COUNT(*) AS count
           FROM ${security_findings}
@@ -271,7 +268,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           GROUP BY ${security_findings.status}
         `),
 
-      // Analysis coverage query (open only)
       db.execute<AnalysisRow>(sql`
           SELECT
             COUNT(*) AS total,
@@ -288,7 +284,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           WHERE ${security_findings.status} = 'open' AND ${whereClause}
         `),
 
-      // MTTR query
       db.execute<MttrRow>(sql`
           SELECT
             ${security_findings.severity} AS severity,
@@ -303,7 +298,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           GROUP BY ${security_findings.severity}
         `),
 
-      // Overdue findings query
       db.execute<OverdueRow>(sql`
           SELECT
             ${security_findings.id} AS id,
@@ -322,7 +316,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           LIMIT 10
         `),
 
-      // Highest-priority open finding for guided next action
       db.execute<PriorityFindingRow>(sql`
           SELECT
             ${security_findings.id} AS id,
@@ -365,7 +358,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           LIMIT 1
         `),
 
-      // Repo health query
       db.execute<RepoHealthRow>(sql`
           SELECT
             ${security_findings.repo_full_name} AS repo_full_name,
@@ -414,7 +406,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
         `),
     ]);
 
-    // Parse SLA results
     const slaBySeverity = emptySeverityRecord(() => ({ total: 0, withinSla: 0, overdue: 0 }));
     let slaOverallTotal = 0;
     let slaOverallWithinSla = 0;
@@ -439,7 +430,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       untrackedCount += Number(row.untracked);
     }
 
-    // Parse severity results
     const severityCounts = emptySeverityRecord(() => 0);
     for (const row of severityResult.rows) {
       if (isSeverity(row.severity)) {
@@ -447,7 +437,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       }
     }
 
-    // Parse status results
     const statusCounts = { open: 0, fixed: 0, ignored: 0 };
     for (const row of statusResult.rows) {
       const s = row.status;
@@ -456,7 +445,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       }
     }
 
-    // Parse analysis results
     const analysisRow = analysisResult.rows[0];
     const analysis = analysisRow
       ? {
@@ -484,7 +472,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
           failed: 0,
         };
 
-    // Parse MTTR results
     const slaDaysMap: Record<Severity, number> = {
       critical: slaConfig.slaCriticalDays,
       high: slaConfig.slaHighDays,
@@ -513,7 +500,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
       }
     }
 
-    // Parse overdue results
     const overdue = overdueResult.rows.map(row => ({
       id: row.id,
       severity: row.severity,
@@ -542,7 +528,6 @@ export async function getDashboardStats(params: GetDashboardStatsParams): Promis
         }
       : null;
 
-    // Parse repo health results
     const repoHealth = repoHealthResult.rows.map(row => ({
       repoFullName: row.repo_full_name,
       open: Number(row.open),

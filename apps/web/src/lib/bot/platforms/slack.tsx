@@ -1,5 +1,10 @@
 import { createLinkAccountToken } from '@/lib/bot-identity';
-import { isSlackMissingScopeError, postSlackReinstallInstruction } from '@/lib/bot/helpers';
+import {
+  addSlackReaction,
+  isSlackMissingScopeError,
+  postSlackReinstallInstruction,
+  replaceSlackReaction,
+} from '@/lib/bot/helpers';
 import { getPlatformIntegrationByBotUserId } from '@/lib/bot/platform-helpers';
 import {
   collectMessages,
@@ -56,6 +61,9 @@ const SLACK_ASSISTANT_SUGGESTED_PROMPTS = [
 ] as const;
 
 const ASSISTANT_PROMPTS_TITLE = 'Try asking Kilo Bot';
+
+const SLACK_PROCESSING_REACTION = 'hourglass_flowing_sand';
+const SLACK_COMPLETED_REACTION = 'white_check_mark';
 
 const SLACK_CHANNEL_INVITE_MESSAGE = {
   markdown:
@@ -301,9 +309,21 @@ export function createSlackBotPlatform(slackAdapter: SlackAdapter): BotPlatform 
     async getRequesterInfo({ message, platformIntegration, displayName }) {
       return await getSlackRequesterInfo(message, platformIntegration, displayName);
     },
-    async startProcessingIndicator({ thread, status }) {
+    async startProcessingIndicator({ thread, messageId, status }) {
       await thread.startTyping(status);
-      return async () => {};
+      // Reactions (unlike the typing indicator) are visible to the whole
+      // channel, so everyone can see the bot picked up the message.
+      await addSlackReaction(thread.adapter, thread.id, messageId, SLACK_PROCESSING_REACTION);
+      return async outcome => {
+        if (outcome?.handedOff) return;
+        await replaceSlackReaction(
+          thread.adapter,
+          thread.id,
+          messageId,
+          SLACK_PROCESSING_REACTION,
+          SLACK_COMPLETED_REACTION
+        );
+      };
     },
     // When the user clicks the "Link Account" LinkButton, Slack fires a
     // block_actions event *in addition to* opening the URL in the browser.

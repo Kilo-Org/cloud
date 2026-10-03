@@ -1,4 +1,5 @@
 import type { SlackAdapter } from '@chat-adapter/slack';
+import { captureException } from '@sentry/nextjs';
 import { APP_URL } from '@/lib/constants';
 import type { PlatformIntegration } from '@kilocode/db';
 
@@ -62,4 +63,64 @@ export async function postSlackReinstallInstruction(
       `If you are not a Slack administrator, you may need to ask one to re-install the app. ` +
       `You can continue using Kilo Bot as usual; only features that require this new Slack permission may be unavailable until the app is re-installed.`,
   });
+}
+
+type SlackReactionCapableAdapter = Pick<SlackAdapter, 'addReaction' | 'removeReaction'>;
+
+function isSlackReactionStateError(error: unknown, stateError: string): boolean {
+  return isSlackWebApiPlatformError(error) && error.data.error === stateError;
+}
+
+async function applySlackReaction(
+  adapter: SlackReactionCapableAdapter,
+  action: 'add' | 'remove',
+  threadId: string,
+  messageId: string,
+  emoji: string
+): Promise<boolean> {
+  try {
+    if (action === 'add') {
+      await adapter.addReaction(threadId, messageId, emoji);
+    } else {
+      await adapter.removeReaction(threadId, messageId, emoji);
+    }
+    return true;
+  } catch (error) {
+    if (isSlackReactionStateError(error, action === 'add' ? 'already_reacted' : 'no_reaction')) {
+      return true;
+    }
+    console.warn(`[Bot] Failed to ${action} Slack reaction:`, error);
+    captureException(error, {
+      level: 'warning',
+      tags: { component: 'kilo-bot', op: `slack-reaction-${action}` },
+      extra: { threadId, messageId, emoji },
+    });
+    return false;
+  }
+}
+
+export async function addSlackReaction(
+  adapter: SlackReactionCapableAdapter,
+  threadId: string,
+  messageId: string,
+  emoji: string
+): Promise<boolean> {
+  return applySlackReaction(adapter, 'add', threadId, messageId, emoji);
+}
+
+/**
+ * Atomically replacing one reaction with another is not possible, so this
+ * removes the old reaction only after the replacement was applied — that way
+ * the message never briefly shows no reaction at all.
+ */
+export async function replaceSlackReaction(
+  adapter: SlackReactionCapableAdapter,
+  threadId: string,
+  messageId: string,
+  removeEmoji: string,
+  addEmoji: string
+): Promise<boolean> {
+  const added = await applySlackReaction(adapter, 'add', threadId, messageId, addEmoji);
+  if (!added) return false;
+  return applySlackReaction(adapter, 'remove', threadId, messageId, removeEmoji);
 }

@@ -1217,7 +1217,7 @@ describe('server runtime credential proxy', () => {
     }
   });
 
-  it('forwards the caller feature header while still replacing the organization header', async () => {
+  it('forwards gateway attribution headers while still replacing the organization header', async () => {
     const env = createEnv();
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
@@ -1230,6 +1230,17 @@ describe('server runtime credential proxy', () => {
         },
       }),
     });
+    const attributionHeaders = {
+      'X-Kilocode-Feature': 'code-review',
+      'X-KILOCODE-EDITORNAME': 'Kilo Cloud Agent',
+      'x-kilocode-mode': 'code',
+      'X-KILOCODE-MACHINEID': 'machine_proxy',
+      'X-KILOCODE-TASKID': 'task_proxy',
+      'X-KILOCODE-PROJECTID': 'project_proxy',
+      'X-KiloCode-Version': '7.8.1',
+      'x-kilo-session': 'session_proxy',
+      'x-kilo-request': 'request_proxy',
+    };
     const upstream = vi.fn().mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', upstream);
     try {
@@ -1240,7 +1251,7 @@ describe('server runtime credential proxy', () => {
             method: 'POST',
             headers: {
               Authorization: `Bearer ${await handle()}`,
-              'X-Kilocode-Feature': 'code-review',
+              ...attributionHeaders,
               'X-Kilocode-OrganizationId': 'attacker-org',
               'Content-Type': 'application/json',
             },
@@ -1252,7 +1263,9 @@ describe('server runtime credential proxy', () => {
       expect(response.status).toBe(200);
       expect(upstream).toHaveBeenCalledOnce();
       const forwarded = upstream.mock.calls[0][0] as Request;
-      expect(forwarded.headers.get('x-kilocode-feature')).toBe('code-review');
+      for (const [name, value] of Object.entries(attributionHeaders)) {
+        expect(forwarded.headers.get(name)).toBe(value);
+      }
       expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
     } finally {
       vi.unstubAllGlobals();

@@ -2619,7 +2619,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             const containerInstanceId =
               pin.provider === 'cloudflare-containers'
                 ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
-                : getOutboundContainerId(this.env, intent.allocationName, {
+                : getOutboundContainerId(this.env, intent.allocationName ?? this.sandboxId, {
                     managedScmContainment: this.credentialContainmentEnabled(),
                   });
             logControlDiagnostic('container_launch_identity', {

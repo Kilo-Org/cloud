@@ -63,6 +63,7 @@ import type { WorkspaceFolderController } from './hooks/useWorkspaceFolders';
 import { WorkspaceFolderSection } from './WorkspaceFolderSection';
 import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
 import {
+  controlPlaneSessionIdSchema,
   getWorkspaceFolderColor,
   getWorkspaceFolderDropAction,
   getWorkspaceFolderId,
@@ -133,6 +134,10 @@ const SessionRow = memo(function SessionRow({
   onSaveRename,
   onCancelRename,
   onClick,
+  draggable,
+  onDragStart,
+  onDragEnd,
+  isDragging,
 }: {
   session: StoredSession;
   isActive: boolean;
@@ -146,6 +151,10 @@ const SessionRow = memo(function SessionRow({
   onSaveRename?: () => void;
   onCancelRename: () => void;
   onClick: (sessionId: string) => void;
+  draggable?: boolean;
+  onDragStart?: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd?: () => void;
+  isDragging?: boolean;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -182,11 +191,15 @@ const SessionRow = memo(function SessionRow({
   return (
     <div
       onClick={isEditing || isDeleting ? undefined : () => onClick(session.sessionId)}
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={cn(
         'hover:bg-accent cursor-pointer rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
+        isDragging && 'opacity-50',
         isActive && 'bg-accent font-medium'
       )}
     >
@@ -899,6 +912,8 @@ export function ChatSidebar({
     event.stopPropagation();
     if (action.type === 'move-worktree') {
       void moveWorktree(action.worktreeId, action.folderId);
+    } else if (action.type === 'move-session') {
+      void workspaceFolders.moveSession(action.sessionId, action.folderId);
     } else {
       void workspaceFolders.reorderFolders(action.folderIds);
     }
@@ -948,8 +963,11 @@ export function ChatSidebar({
     />
   );
 
-  const renderSession = useCallback(
-    (session: StoredSession) => (
+  const renderSession = (session: StoredSession) => {
+    const parsedSessionId = controlPlaneSessionIdSchema.safeParse(session.cloudAgentSessionId);
+    const sessionId = parsedSessionId.success ? parsedSessionId.data : null;
+    const isDeleting = deletingSessionIds?.includes(session.sessionId) ?? false;
+    return (
       <SessionRow
         key={session.sessionId}
         session={session}
@@ -964,22 +982,20 @@ export function ChatSidebar({
         onSaveRename={editingSessionId === session.sessionId ? handleSaveRename : undefined}
         onCancelRename={handleCancelRename}
         onClick={handleSessionClick}
+        draggable={
+          sessionId !== null &&
+          canEditFolders &&
+          editingSessionId !== session.sessionId &&
+          !isDeleting
+        }
+        onDragStart={
+          sessionId ? event => startDrag(event, { type: 'session', id: sessionId }) : undefined
+        }
+        onDragEnd={sessionId ? clearDrag : undefined}
+        isDragging={sessionId !== null && dragItem?.type === 'session' && dragItem.id === sessionId}
       />
-    ),
-    [
-      activeSessionIds,
-      currentSessionId,
-      deletingSessionIds,
-      editingSessionId,
-      editTitle,
-      handleCancelRename,
-      handleSaveRename,
-      handleSessionClick,
-      handleStartRename,
-      onDeleteSession,
-      onRenameSession,
-    ]
-  );
+    );
+  };
 
   return (
     <div ref={sidebarRef} className="flex h-full flex-col">
@@ -1184,7 +1200,7 @@ export function ChatSidebar({
                   isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
                   dropPlacement={
                     dropTarget?.type === 'folder' && dropTarget.id === folder.id
-                      ? dragItem?.type === 'worktree'
+                      ? dragItem?.type === 'worktree' || dragItem?.type === 'session'
                         ? 'inside'
                         : dropTarget.placement
                       : null

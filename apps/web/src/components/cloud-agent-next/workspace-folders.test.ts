@@ -16,6 +16,7 @@ const folderC = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const worktreeA = `worktree_${folderA}`;
 const worktreeB = `worktree_${folderB}`;
 const hiddenWorktree = `worktree_${folderC}`;
+const standaloneSession = `workspace_${folderC}`;
 
 function makeSession(id: string, overrides: Partial<StoredSession> = {}): StoredSession {
   return {
@@ -159,6 +160,36 @@ describe('workspace folder drops', () => {
     expect(
       getWorkspaceFolderDropAction(
         { type: 'worktree', id: worktreeB },
+        { type: 'ungrouped' },
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
+  it('files a dragged session onto a folder and rejects unknown folder targets', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget(folderB),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toEqual({ type: 'move-session', sessionId: standaloneSession, folderId: folderB });
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
+        folderTarget('missing'),
+        makeFolders(),
+        visibleWorktrees
+      )
+    ).toBeNull();
+  });
+
+  it('ignores ungrouped session drops because standalone rows are already unfiled', () => {
+    expect(
+      getWorkspaceFolderDropAction(
+        { type: 'session', id: standaloneSession },
         { type: 'ungrouped' },
         makeFolders(),
         visibleWorktrees

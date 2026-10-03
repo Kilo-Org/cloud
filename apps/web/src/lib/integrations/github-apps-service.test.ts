@@ -202,6 +202,88 @@ describe('updateModel', () => {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }
   });
+
+  it('persists the thinking effort alongside the model', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub effort ${crypto.randomUUID()}` })
+      .returning();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+
+    try {
+      const result = await updateModel(
+        { type: 'org', id: organization.id },
+        'anthropic/claude-sonnet-5',
+        row.id,
+        'high'
+      );
+
+      expect(result).toEqual({ success: true });
+
+      const [updated] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, row.id));
+
+      expect(updated?.metadata).toMatchObject({
+        model_slug: 'anthropic/claude-sonnet-5',
+        thinking_effort: 'high',
+      });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('leaves the thinking effort untouched when not provided', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub effort keep ${crypto.randomUUID()}` })
+      .returning();
+    const [row] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: organization.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: crypto.randomUUID(),
+        integration_status: 'active',
+        repository_access: 'all',
+        metadata: { model_slug: 'anthropic/claude-sonnet-5', thinking_effort: 'high' },
+      })
+      .returning();
+
+    try {
+      const result = await updateModel(
+        { type: 'org', id: organization.id },
+        'anthropic/claude-sonnet-4.6',
+        row.id
+      );
+
+      expect(result).toEqual({ success: true });
+
+      const [updated] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, row.id));
+
+      expect(updated?.metadata).toMatchObject({
+        model_slug: 'anthropic/claude-sonnet-4.6',
+        thinking_effort: 'high',
+      });
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
 });
 
 describe('isInstallationGoneError', () => {

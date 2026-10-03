@@ -50,7 +50,7 @@ export type ProfileSelectorProfile = Readonly<{
  * are the fixed entries. The `none` row is the no-override choice: it clears
  * the pick, so it names the effective default when the context has one.
  */
-export type ProfileSelectorRow =
+type ProfileSelectorRow =
   | Readonly<{ kind: 'none'; key: 'none'; labelKey: string }>
   | Readonly<{ kind: 'header'; key: 'organization' | 'personal'; labelKey: string }>
   | Readonly<{

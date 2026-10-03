@@ -306,10 +306,9 @@ export function VoiceLanguagePickerSheet() {
           <Search size={18} color={colors.mutedForeground} />
           <Input
             accessibilityLabel={t('language.search')}
-            // The pill supplies the horizontal inset, so the field zeroes the
-            // shared box's `px-3` — the same `flex-1 px-0` the share and model
-            // pickers give the field in this pill.
-            className="flex-1 px-0 text-base text-foreground"
+            // The pill supplies the horizontal inset, so the field zeroes both
+            // physical sides of the shared box.
+            className="flex-1 pl-0 pr-0 text-base text-foreground"
             placeholder={t('language.search')}
             placeholderTextColor={colors.mutedForeground}
             // Uncontrolled: iOS drops keystrokes when state drives `value`;

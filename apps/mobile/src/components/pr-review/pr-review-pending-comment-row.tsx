@@ -173,11 +173,11 @@ export function ReviewSummaryField({
       }}
       multiline
       textAlignVertical="top"
-      // Compact so half-detent and keyboard-open keep footer CTAs at y=0.
+      // Keep complete summary lines visible after padding, including with the keyboard open.
       className={cn(
-        'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+        'min-h-20 rounded-md border border-input bg-background pl-3 pr-3 pt-2 pb-2 text-sm leading-5 text-foreground',
         'focus:border-ring',
-        keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-32'
+        keyboardVisible ? 'max-h-20' : 'max-h-32'
       )}
     />
   );

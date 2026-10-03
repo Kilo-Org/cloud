@@ -117,7 +117,7 @@ function SlaDayRow({
         accessibilityHint={
           isValidDayCount(days) ? undefined : t('securityAgent.sla.enterWholeNumber')
         }
-        className="w-16 rounded-lg border border-input bg-background px-2 text-sm text-foreground"
+        className="w-16 rounded-lg border border-input bg-background pl-2 pr-2 text-sm text-foreground"
         textAlign="center"
         editable={!disabled}
         accessibilityState={{ disabled }}

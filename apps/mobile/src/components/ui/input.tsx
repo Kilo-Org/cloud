@@ -4,11 +4,9 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { withRtlInputAlignment } from '@/lib/rtl-text';
 import { cn } from '@/lib/utils';
 
-// The caller's classes come after the box's shape and before its line height:
-// a caller's `px-4` beats the shared `px-3`, and every caller's own `text-*`
-// size carries a line height of its own, so the one line box has to be
-// re-asserted last (apps/mobile/AGENTS.md, Text inputs).
-const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] px-3';
+// Callers override the box's physical horizontal inset and chrome; the single-
+// line height comes last because text-* sizes carry their own line height.
+const INPUT_BOX_SHAPE_CLASS = 'min-h-[44px] pl-3 pr-3';
 const INPUT_BOX_LINE_HEIGHT_CLASS = 'leading-[normal]';
 
 /**
@@ -23,12 +21,12 @@ const INPUT_BOX_VERTICAL_STYLE: TextStyle = {
   textAlignVertical: 'center',
 };
 
-// Android TextInput ignores logical paddingInline; physical defaults remain
-// overrideable by the caller's later px/py classes through tailwind-merge.
+// Android TextInput ignores logical paddingInline: defaults and caller overrides
+// must use physical pl/pr classes, not px classes.
 const INPUT_MULTILINE_INSET_CLASS = 'pl-3 pr-3 pt-2.5 pb-2.5';
 
 /**
- * The one single-line box: `min-h-[44px] px-3 leading-[normal]`, no vertical
+ * The one single-line box: `min-h-[44px] pl-3 pr-3 leading-[normal]`, no vertical
  * padding, Android's center gravity, one line box for the placeholder and the
  * value, and RTL content alignment. A call site keeps its own chrome, text size
  * and horizontal inset; a multiline caller keeps its own gravity and line break

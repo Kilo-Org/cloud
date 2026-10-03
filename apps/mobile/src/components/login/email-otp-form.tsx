@@ -69,7 +69,7 @@ export function EmailOtpForm({
         // single-line line box; `min-h-[48px]` keeps the one-time-code
         // field's `h-12`-scale look as a floor (never a fixed height), so
         // Dynamic Type can still grow it.
-        className="min-h-[48px] rounded-md border border-input bg-background px-3 text-lg leading-[normal] tracking-widest text-foreground"
+        className="min-h-[48px] rounded-md border border-input bg-background pl-3 pr-3 text-lg leading-[normal] tracking-widest text-foreground"
         // textAlign is applied inline, not via a `text-center` class: NativeWind maps
         // textAlign to a native prop for TextInput and crashes on it in this version.
         // eslint-disable-next-line react-native/no-inline-styles -- see comment above

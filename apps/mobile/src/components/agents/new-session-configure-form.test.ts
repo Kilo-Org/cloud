@@ -3,7 +3,6 @@ import * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { type AgentMode } from '@/components/agents/mode-selector';
-import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import {
   type NewSessionRepository,
@@ -711,9 +710,6 @@ describe('NewSessionConfigureForm', () => {
     expect(findTextContent(element, t => t === '3 commands · 1 MCP · 2 skills · 4 agents')).toBe(
       true
     );
-    // The chip's own copy is covered by its mounted test; here the row must
-    // hand it a resolved (non-null) indicator state.
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).not.toBeNull();
   });
 
   it('renders "Default environment" when no profile resolves', () => {
@@ -721,8 +717,6 @@ describe('NewSessionConfigureForm', () => {
 
     expect(findTextContent(element, t => t === 'Default environment')).toBe(true);
     expect(findTextContent(element, t => t === 'Production')).toBe(false);
-    // The chip is mounted but holds no state, so it renders nothing.
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toBeNull();
   });
 
   it('renders an inline error with Retry when the profile query fails', () => {
@@ -738,10 +732,6 @@ describe('NewSessionConfigureForm', () => {
     const element = renderRow({ profile: null, overrideNeedsAttention: true });
 
     expect(findTextContent(element, t => t === 'Config needs attention')).toBe(true);
-    expect(findElementByComponent(element, ActiveProfileIndicator)?.state).toMatchObject({
-      kind: 'config-needs-attention',
-      needsAttention: true,
-    });
   });
 
   it('keeps the environment row at reserved height with skeletons while loading', () => {

@@ -949,7 +949,6 @@
       "metadataStripFailed": "Photo metadata could not be removed.",
       "networkError": "Network error",
       "uploadFailed": "Upload failed",
-      "failedToUploadFile": "Failed to upload file: {{reason}}",
       "nothingToPaste": "Nothing to paste"
     },
     "attachmentPreview": {
@@ -2108,7 +2107,6 @@
       "readOnly": "This is a read-only session",
       "continueInNewSession": "Continue in a new session",
       "emptyDescription": "Send a message below to get started.",
-      "emptyTranscriptDescription": "This session has no messages yet.",
       "scrollToBottom": "Scroll to bottom",
       "emptyTitle": "No messages yet",
       "renameAccessibility": "Rename session: {{title}}",
@@ -2230,7 +2228,6 @@
       "organizationProfiles": "Organization Profiles",
       "personalProfiles": "Personal Profiles",
       "yourProfiles": "Your Profiles",
-      "failedToLoadProfiles": "Failed to load profiles",
       "nameTooLong": "Profile name is too long",
       "descriptionTooLong": "Description is too long",
       "secretsEncrypted": "Secrets are encrypted before storage.",

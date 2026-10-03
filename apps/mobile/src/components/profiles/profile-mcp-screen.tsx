@@ -83,9 +83,6 @@ function McpServerRowView({
           </Text>
         ) : null}
       </View>
-      <Text className="text-xs text-muted-foreground">
-        {server.enabled ? t('common.enabled') : t('common.disabled')}
-      </Text>
       <Switch value={server.enabled} accessibilityLabel={server.name} onValueChange={onToggle} />
       <Pressable
         className="h-11 w-11 items-center justify-center active:opacity-70"

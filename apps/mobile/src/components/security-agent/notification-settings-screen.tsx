@@ -261,7 +261,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                       : t('securityAgent.sla.enterWholeNumber')
                   }
                   className={cn(
-                    'rounded-lg bg-secondary px-3 text-sm text-foreground',
+                    'rounded-lg bg-secondary pl-3 pr-3 text-sm text-foreground',
                     !canManage && 'opacity-50'
                   )}
                   editable={canManage}

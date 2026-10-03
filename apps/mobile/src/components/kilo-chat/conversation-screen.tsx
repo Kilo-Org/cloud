@@ -213,11 +213,9 @@ export function ConversationScreen({
           }}
         />
       ) : null}
-      {/* The composer below already pads the platform's bottom inset inside
-          this view (message-input-layout), so the keyboard lift must not add it
-          a second time and float the composer above the keyboard. On Android
-          edge-to-edge the provider reports the full IME inset, so the lift is
-          reduced by that inset here. */}
+      {/* Android keeps its bottom inset in the composer and reduces the lift by
+          the same inset. iOS uses the keyboard frame without a correction and
+          releases the composer's home-indicator padding while it is covered. */}
       <KeyboardAvoidingView
         className="flex-1"
         behavior="padding"

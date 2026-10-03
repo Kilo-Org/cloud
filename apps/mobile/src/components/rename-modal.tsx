@@ -106,7 +106,7 @@ export function RenameModal<TSaveResult>({
         // Multi-line: an explicit leading-5 plus bounded min/max heights, so the
         // value soft-wraps into the field and scrolls vertically past the cap.
         className={cn(
-          'rounded-md border border-input bg-background px-3 text-sm text-foreground',
+          'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
           multiline ? 'py-2.5 max-h-40 min-h-24 leading-5' : 'leading-[normal]',
           pending && 'opacity-50'
         )}

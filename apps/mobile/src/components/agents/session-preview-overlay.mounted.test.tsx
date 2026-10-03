@@ -49,19 +49,6 @@ describe('SessionPreviewOverlay', () => {
     }
   });
 
-  it('shows the empty copy when the transcript has no messages', () => {
-    previewState.transcript.data = { messages: [] };
-    const renderer = mountOverlay();
-    openPreview(targetWith({}));
-
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyTitle'))).toHaveLength(1);
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyTranscriptDescription'))).toHaveLength(
-      1
-    );
-    expect(textWith(renderer, i18n.t('agentChat.session.emptyDescription'))).toHaveLength(0);
-    expect(renderer.root.findAllByType('MessageBubble')).toHaveLength(0);
-  });
-
   it('shows the transcript skeleton while the first page loads', () => {
     previewState.transcript.isLoading = true;
     const renderer = mountOverlay();

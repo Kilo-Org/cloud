@@ -2464,10 +2464,7 @@ export function SessionDetailContent({
         ) : null}
 
         {isReadOnly && messages.length > 0 && !hasBlockingInteraction ? (
-          <View className="gap-3 border-t border-border bg-secondary px-4 py-3">
-            <Text className="text-center text-sm text-muted-foreground">
-              {t('agentChat.session.readOnly')}
-            </Text>
+          <View className="border-t border-border bg-secondary px-4 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -2674,7 +2671,7 @@ export function SessionDetailContent({
         <EmptyState
           icon={MessageSquare}
           title={t('agentChat.session.emptyTitle')}
-          description={t('agentChat.session.emptyDescription')}
+          description={isReadOnly ? undefined : t('agentChat.session.emptyDescription')}
         />
       );
     }

@@ -42,8 +42,8 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * One skill row: the name in mono, its source type, the enabled status, the
- * toggle, and edit/delete controls. The row carries no container
+ * One skill row: the name in mono, its source type, the enabled switch,
+ * and edit/delete controls. The row carries no container
  * `accessibilityLabel`, so the switch's label stays the only element a screen
  * reader matches by the skill's name.
  */
@@ -60,9 +60,6 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
           {skillRowSubtitle(skill)}
         </Text>
       </View>
-      <Text className="text-xs text-muted-foreground">
-        {skill.enabled ? t('common.enabled') : t('common.disabled')}
-      </Text>
       <Switch value={skill.enabled} accessibilityLabel={skill.name} onValueChange={onToggle} />
       <Pressable
         className="h-11 w-11 items-center justify-center active:opacity-70"

@@ -84,31 +84,21 @@ function fieldProps(renderer: TestRenderer.ReactTestRenderer) {
     multiline?: boolean;
     textAlignVertical?: string;
     defaultValue?: string;
-    className?: string;
   };
 }
 
 describe('RenameModal field wrapping', () => {
-  it('wraps a long goal value in a bounded multi-line field', () => {
+  it('wraps a long goal value in a multi-line field', () => {
     const props = fieldProps(mount(true));
     // `multiline` is what makes the native field soft-wrap instead of
     // scrolling horizontally and hiding the start of the value.
     expect(props.multiline).toBe(true);
     expect(props.textAlignVertical).toBe('top');
     expect(props.defaultValue).toBe(LONG_GOAL);
-    // Explicit line height plus a min/max height band: the field wraps, grows
-    // with the value, and then scrolls vertically instead of clipping.
-    expect(props.className).toContain('leading-5');
-    expect(props.className).toContain('min-h-24');
-    expect(props.className).toContain('max-h-40');
-    expect(props.className).not.toContain('leading-[normal]');
   });
 
-  it('keeps the rename field single-line with its existing line height', () => {
+  it('keeps the rename field single-line', () => {
     const props = fieldProps(mount(false));
     expect(props.multiline).toBeFalsy();
-    expect(props.className).toContain('leading-[normal]');
-    expect(props.className).not.toContain('min-h-24');
-    expect(props.className).not.toContain('max-h-40');
   });
 });

@@ -6,8 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchFolderField } from '@/components/agents/folder-selector';
-import { ActiveProfileIndicator } from '@/components/agents/active-profile-indicator';
-import { buildActiveProfileIndicatorState } from '@/components/agents/active-profile-indicator-model';
 import { AdvancedConfigPanel } from '@/components/agents/advanced-config-panel';
 import { NewSessionCloudCreateError } from '@/components/agents/new-session-cloud-create-error';
 import { type NewSessionConfigureFormProps } from '@/components/agents/new-session-configure-form-props';
@@ -29,7 +27,7 @@ import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 /**
  * The profile override the new-session screen adds to the shared contract: the
- * Environment row and the advanced-config selector drive one session-level pick.
+ * Environment row owns selection; advanced configuration edits manual drafts.
  * The base fields live in `new-session-configure-form-props`, extracted so this
  * file stays within the repo's line cap.
  */
@@ -39,11 +37,10 @@ type NewSessionProfileOverrideProps = {
   /** Opens the profile picker sheet. */
   onOpenProfilePicker: () => void;
   /**
-   * The session's profile override, shared by the Environment row and the
-   * advanced-config selector; null keeps the effective default.
+   * The session's profile override; null keeps the effective default.
    */
   selectedProfileId: string | null;
-  /** Reports a pick (or `No profile`) from the advanced-config selector. */
+  /** Selects a newly saved profile from advanced configuration. */
   onSelectProfile: (id: string | null) => void;
   /**
    * The session's manual environment variables and setup commands. Owned by the
@@ -364,14 +361,13 @@ type NewSessionProfileRowProps = {
 };
 
 /**
- * The new-session Environment row: a tappable summary of the effective profile
- * with the active-profile indicator beside its label. Loading and failure keep
- * the shared body's reserved lines, so the rows below never move when the query
- * settles and no default flashes before it does; the settled row is the entry
- * point that opens the profile picker.
+ * The new-session Environment row: a tappable summary of the effective profile.
+ * Loading and failure keep the shared body's reserved lines, so the rows below
+ * never move when the query settles and no default flashes before it does.
+ * The settled row is the entry point that opens the profile picker.
  *
  * It lives with this screen rather than in `new-session-profile-row` because
- * the indicator and the chevron reach the app's icon barrel, which the mounted
+ * the chevron reaches the app's icon barrel, which the mounted
  * suite that renders the read-only row cannot load.
  */
 export function NewSessionProfileRow({
@@ -385,24 +381,11 @@ export function NewSessionProfileRow({
   const { t } = useTranslation();
   const colors = useThemeColors();
 
-  const indicatorState = buildActiveProfileIndicatorState({
-    selectedProfileName: profile?.name ?? null,
-    repoBoundProfileName: null,
-    hasManualEnvVars: false,
-    hasManualSetupCommands: false,
-    hasSelectedProfileId: profile !== null || overrideNeedsAttention,
-    isProfilesLoading: isProfileLoading,
-    hasProfileError: isProfileError,
-  });
-
   return (
     <View className="mt-5">
-      <View className="mb-2 flex-row items-center justify-between gap-2">
-        <Text className="text-sm font-medium text-muted-foreground">
-          {t('agentChat.newSession.environment')}
-        </Text>
-        <ActiveProfileIndicator state={indicatorState} onPress={onOpenProfilePicker} />
-      </View>
+      <Text className="mb-2 text-sm font-medium text-muted-foreground">
+        {t('agentChat.newSession.environment')}
+      </Text>
       {isProfileLoading || isProfileError ? (
         renderProfileRowBody({ t, profile, isProfileLoading, isProfileError, onRetryProfile })
       ) : (

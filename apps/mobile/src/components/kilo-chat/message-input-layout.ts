@@ -49,7 +49,7 @@ export function resolveMessageInputHeight(contentHeight: number): number {
  * Width of the real text area inside the message input.
  *
  * The measured wrapper is borderless, but the TextInput itself carries both the
- * 1px border and `px-3`, so both come off. See the composer equivalent in
+ * 1px border and `pl-3 pr-3`, so both come off. See the composer equivalent in
  * `agents/chat-composer-input-height.ts` for why an over-wide measurement
  * clips a wrapped word with scrolling still disabled.
  */
@@ -60,15 +60,18 @@ export function resolveMessageInputTextContentWidth(inputWidth: number): number 
 export function resolveMessageInputBottomPadding({
   bottomSafeAreaInset = 0,
   platform,
+  keyboardVisible = false,
 }: {
   bottomSafeAreaInset?: number;
   platform?: 'android' | 'ios' | string;
+  keyboardVisible?: boolean;
 } = {}): number {
-  // The composer keeps the device's bottom inset while the keyboard is closed.
-  // Inside the keyboard-lift view its caller passes `contentReservesBottomInset`,
-  // so the lift applies only the platform's raw metric and this padding
-  // completes the strip the IME hides — one inset per screen, never two
-  // (2026-09-21 review finding).
+  // Android's inset remains paired with the screen's negative keyboard offset.
+  // iOS lifts to the keyboard frame itself, which already covers the home indicator.
+  if (platform === 'ios' && keyboardVisible) {
+    return MESSAGE_INPUT_BOTTOM_CLEARANCE;
+  }
+
   if (platform === 'android') {
     return MESSAGE_INPUT_BOTTOM_CLEARANCE + Math.max(bottomSafeAreaInset, 0);
   }

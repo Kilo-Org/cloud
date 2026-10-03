@@ -355,7 +355,7 @@ export function QuestionCard({
                           // floor (`min-h-[44px]`, never a fixed height);
                           // dropping `py-2.5` lets the box own the vertical
                           // geometry, and every other token stays.
-                          'rounded-md border px-3 text-sm shadow-sm shadow-[#0000000D]',
+                          'rounded-md border pl-3 pr-3 text-sm shadow-sm shadow-[#0000000D]',
                           isCustomActive
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-border bg-background text-foreground dark:border-neutral-700 dark:bg-secondary',

@@ -89,6 +89,7 @@ Do not use percentage dimensions inside `ResumableZoom`'s unconstrained child co
 Use explicit pixel sizes for minimum touch targets; native rem is 14 points.
 Use `TabScreenScrollView` for scrolling screens under the absolute tab bar.
 Use a concrete height and `flex: 0` for an inline `FlashList`; `maxHeight` alone does not create a viewport.
+Omit empty-state descriptions that repeat the title or tell the user to use a disabled action.
 
 Keyboard avoidance is `react-native-keyboard-controller`, wrapped in one `KeyboardProvider` at the app root.
 `KeyboardAvoidingView` clears the IME on the session, history, quick-chat, session-detail, new-session,
@@ -100,6 +101,14 @@ pads the platform's bottom inset itself passes `keyboardVerticalOffset={keyboard
 without the reduction the content floats a navigation-bar height above the keyboard.
 
 Nothing else may read the keyboard: no surface adds a listener beside the provider.
+
+Android searchable `formSheet` routes use only the existing safe-area-capped full detent.
+Model, repository, app-language, auth-language and voice-language searches must keep results above the software keyboard.
+iOS keeps native detent expansion when the search field gains focus.
+
+Scope each PR form header with a native safe-area provider outside the scroll view.
+Apply its top inset with `SafeAreaView`, not the app root inset.
+Direct full-screen entry clears the status bar; presented sheets do not add a second inset.
 
 ## Implementation Rules
 
@@ -132,8 +141,8 @@ Nothing else may read the keyboard: no surface adds a listener beside the provid
 - Use the shared `Input` for every single-line field.
 - `Input` removes vertical padding, centers Android text, and defaults iOS line breaks to `clip`.
 - A single-line caller can change horizontal padding, text size, and minimum height.
-- A multiline caller keeps its alignment and line breaks; its padding classes override the shared physical inset.
-- Multiline defaults use `pl-3 pr-3 pt-2.5 pb-2.5`; Android `TextInput` does not apply logical `paddingInline`.
+- All inputs use physical `pl-*`/`pr-*` for horizontal padding, including caller overrides and zero-inset search fields; Android `TextInput` does not apply logical `paddingInline` from `px-*`.
+- A multiline caller keeps its alignment and line breaks; its physical padding classes override the shared `pl-3 pr-3 pt-2.5 pb-2.5` inset.
 - Put input screens in a `ScrollView` with `automaticallyAdjustKeyboardInsets`.
 
 ## UI and UX Rules

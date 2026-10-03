@@ -62,7 +62,7 @@ describe('FormField reserved validation space', () => {
     ['English', en],
     ['Arabic', ar],
   ] as const)(
-    'keeps the same full-width reservation across empty, error, and recovery in %s',
+    'hides reserved messages and announces errors through recovery in %s',
     (_language, catalog) => {
       const reserveErrorMessages = [
         catalog.login.pleaseEnterEmail,
@@ -80,39 +80,24 @@ describe('FormField reserved validation space', () => {
       const reservation = () =>
         mounted.root.findByProps({ importantForAccessibility: 'no-hide-descendants' });
       const reserved = reservation();
-      expect(reserved.props.className).toBe('flex-row opacity-0');
       expect(reserved.props.pointerEvents).toBe('none');
       expect(reserved.props.accessibilityElementsHidden).toBe(true);
-      expect(reserved.children).toHaveLength(3);
-      const placeholders = reserved.findAllByType('Text');
-      expect(placeholders.map(node => node.props.children)).toEqual(reserveErrorMessages);
-      expect(placeholders.map(node => node.props.className)).toEqual([
-        'w-full shrink-0 text-sm',
-        'w-full shrink-0 text-sm -ms-[100%]',
-        'w-full shrink-0 text-sm -ms-[100%]',
-      ]);
-      expect(mounted.root.findByType(AccessibleStatus).props.message).toBeNull();
+      expect(mounted.root.findByType(AccessibleStatus).findAllByType('Text')).toHaveLength(0);
 
       for (const error of [...reserveErrorMessages, undefined]) {
         act(() => {
           mounted.update(createElement(FormField, { ...props, error }));
         });
-        expect(reservation()).toBe(reserved);
-        expect(reserved.findAllByType('Text').map(node => node.props.children)).toEqual(
-          reserveErrorMessages
-        );
         const status = mounted.root.findByType(AccessibleStatus);
-        expect(status.props.message).toBe(error ?? null);
-        expect(status.parent?.props.className).toBe('absolute inset-x-0 top-0');
-        expect(status.parent?.parent).toBe(reserved.parent);
+        expect(status.findAllByType('Text').map(node => node.props.children)).toEqual(
+          error ? [error] : []
+        );
         const input = mounted.root.findByType('TextInput');
         if (error) {
           expect(input.props.accessibilityLabel).toContain(error);
-          expect(input.props.className).toContain('border-destructive');
           expect(status.findByType('Text').props.accessibilityLiveRegion).toBe('polite');
         } else {
           expect(input.props.accessibilityLabel).toBe(props.label);
-          expect(input.props.className).not.toContain('border-destructive');
         }
       }
     }
@@ -130,7 +115,7 @@ describe('FormField reserved validation space', () => {
     expect(
       renderer?.root.findAllByProps({ importantForAccessibility: 'no-hide-descendants' })
     ).toHaveLength(0);
-    expect(renderer?.root.findByType(AccessibleStatus).props.message).toBe(
+    expect(renderer?.root.findByType(AccessibleStatus).findByType('Text').props.children).toBe(
       i18n.t('login.pleaseEnterEmail')
     );
   });

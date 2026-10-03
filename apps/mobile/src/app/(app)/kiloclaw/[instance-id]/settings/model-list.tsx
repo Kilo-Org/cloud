@@ -168,11 +168,11 @@ export default function ModelListScreen() {
             the placeholder and value low) with one `leading-[normal]` line box
             for both, and `textAlignVertical: 'center'` so Android centres the
             value as well as the placeholder. This call site keeps only its own
-            chrome and its own `px-4`, which tailwind-merge lets win over the
-            shared `px-3`. */}
+            chrome and its own physical horizontal inset, which overrides the
+            shared inset on both platforms. */}
         <Input
           ref={searchInputRef}
-          className="rounded-lg bg-secondary px-4 text-sm text-foreground"
+          className="rounded-lg bg-secondary pl-4 pr-4 text-sm text-foreground"
           placeholder={t('common.searchModels')}
           accessibilityLabel={t('common.searchModels')}
           placeholderTextColor={colors.mutedForeground}

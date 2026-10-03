@@ -127,7 +127,7 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('happy: a row shows the name, source type, and status; the switch toggles', async () => {
+  it('happy: a row shows the name and source type; the switch toggles', async () => {
     h.query.data = testProfile([testSkill()]);
     h.query.isPending = false;
 
@@ -136,10 +136,10 @@ describe('ProfileSkillsScreen', () => {
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('code-review');
     expect(texts).toContain('custom');
-    expect(texts).toContain('Enabled');
 
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');
+    expect(toggle.props.value).toBe(true);
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });

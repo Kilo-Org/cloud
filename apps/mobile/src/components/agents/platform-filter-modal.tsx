@@ -22,8 +22,9 @@ import { cn } from '@/lib/utils';
 
 export { type ProjectFilterOption };
 
-/** Two detents: the option list at half height, then nearly full. */
-const SHEET_SNAP_POINTS = ['50%', '90%'];
+// Android lays out this hosted footer at the expanded height, so use one
+// full detent rather than hiding Apply below the partially visible sheet.
+const SHEET_SNAP_POINTS = ['100%'];
 
 type SessionFilterModalProps = {
   selectedPlatforms: string[];

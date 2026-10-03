@@ -84,8 +84,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
   const wrapper = {
-    heartbeatIntervalMs: ms(15_000),
-    heartbeatAckTimeoutMs: ms(45_000),
+    heartbeatIntervalMs: ms(5_000),
+    heartbeatAckTimeoutMs: ms(15_000),
     heartbeatNegotiationMs: ms(1_000),
     cloneMs: 6 * MINUTE_MS,
     kiloRuntimeStartMs: 2 * MINUTE_MS,

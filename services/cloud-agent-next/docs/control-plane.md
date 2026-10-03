@@ -300,7 +300,7 @@ notification, so a lost notification never leaves it waiting.
 
 ### Activity, idle stop and provider lease
 
-The wrapper heartbeat (every 15 s) carries `active`. The sandbox is active while a route prepares,
+The wrapper heartbeat (every 5 s) carries `active`. The sandbox is active while a route prepares,
 a Kilo session is busy or finalizing and not waiting for the user, a terminal has input, or a message
 was delivered in the last minute. After 10 minutes without activity the Sandbox DO stops the
 sandbox. Waiting on a question or permission is not activity. While the sandbox is active, the
@@ -369,7 +369,7 @@ These keep their current owners and evidence; the rewrite ports them, it does no
   in `welcome` only when offered. It sends `{ type: 'heartbeat_ack' }` after applying each valid
   heartbeat from the current bound allocation/connection. Invalid, unbound, stale and terminal
   allocation frames are not acknowledged. Negotiation lives in the socket attachment across hibernation.
-- Only a negotiated welcome starts the wrapper's 45 s acknowledgement deadline. Each acknowledgement
+- Only a negotiated welcome starts the wrapper's 15 s acknowledgement deadline. Each acknowledgement
   resets it; other frames do not. Expiry detaches/fences the socket and schedules the existing
   reconnect backoff independently of close delivery. Old socket messages and callbacks cannot affect
   the replacement. Explicit recycle clears timers, detaches the old socket and reconnects immediately

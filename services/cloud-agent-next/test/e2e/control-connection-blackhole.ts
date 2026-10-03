@@ -9,8 +9,6 @@ import {
 import { resolveControlPlaneTimers } from '../../src/shared/control-plane-timers.js';
 
 const timers = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
-timers.wrapper.heartbeatAckTimeoutMs = 450;
-timers.wrapper.heartbeatNegotiationMs = 10;
 const budgetMs = 3_000;
 
 async function run(mode: 'bidirectional-drop' | 'uplink-drop' | 'downlink-drop'): Promise<void> {

@@ -6,6 +6,7 @@ import {
 } from '../../../src/shared/control-plane-protocol.js';
 import {
   CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
   type ControlPlaneTimers,
 } from '../../../src/shared/control-plane-timers.js';
 import {
@@ -106,10 +107,19 @@ describe('acknowledged heartbeat', () => {
     }
   );
 
-  it('uses the production 15s heartbeat and 45s acknowledgement deadline', () => {
-    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatIntervalMs).toBe(15_000);
-    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatAckTimeoutMs).toBe(45_000);
+  it('uses the production 5s heartbeat and 15s acknowledgement deadline', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatIntervalMs).toBe(5_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatAckTimeoutMs).toBe(15_000);
     expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatNegotiationMs).toBe(1_000);
+    expect(CONTROL_PLANE_TIMERS.sandbox.heartbeatMs).toBe(45_000);
+    expect(CONTROL_PLANE_TIMERS.sandbox.reconnectMs).toBe(300_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.reconnectBackoffMinMs).toBe(1_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.reconnectBackoffMaxMs).toBe(30_000);
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '100' });
+    expect(scaled.wrapper.heartbeatIntervalMs).toBe(50);
+    expect(scaled.wrapper.heartbeatAckTimeoutMs).toBe(150);
+    expect(scaled.sandbox.heartbeatMs).toBe(450);
+    expect(scaled.sandbox.reconnectMs).toBe(3_000);
   });
   it('uses a legacy hello fallback and never times out an unnegotiated peer', async () => {
     await withTestSocket(async (_connection, socket, disconnected) => {

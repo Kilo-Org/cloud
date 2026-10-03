@@ -285,6 +285,14 @@ describe('output-limit detection', () => {
     expect(assistantReportsNoActionableOutput([{ text: 'the output limit was reached' }])).toBe(
       false
     );
+    expect(
+      assistantReportsNoActionableOutput([
+        {
+          type: 'reasoning',
+          text: 'no actionable output because the output limit was reached',
+        },
+      ])
+    ).toBe(false);
   });
 });
 

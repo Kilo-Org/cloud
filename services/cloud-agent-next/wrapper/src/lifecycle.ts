@@ -468,11 +468,13 @@ export function createLifecycleManager(
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
       publicationRecoveryInFlight = false;
+      state.clearAssistantOutputLimit();
       drainPromise = null;
     },
     resetPublicationRecoveryBudget: () => {
       supersedePublicationRecovery();
       publicationRecoveryBudgetUsed = false;
+      state.clearAssistantOutputLimit();
     },
     onSseEvent: resetSseTransportTimer,
   };

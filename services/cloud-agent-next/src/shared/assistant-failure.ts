@@ -393,6 +393,8 @@ export function assistantReportsNoActionableOutput(parts: readonly unknown[]): b
   const texts: string[] = [];
   for (const part of parts) {
     if (typeof part !== 'object' || part === null || !('text' in part)) continue;
+    const type = (part as { type?: unknown }).type;
+    if (type !== undefined && type !== 'text') continue;
     const text = part.text;
     if (typeof text === 'string') texts.push(text);
   }

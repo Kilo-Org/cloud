@@ -310,6 +310,8 @@ describe('createGitHubReviewPublisher', () => {
   test('ignores a user-copied marker and creates a new owned summary', async () => {
     const { publish, calls } = makePublisher(call => {
       if (call.method === 'GET' && call.url.includes('/issues/42/comments?')) {
+        const page = Number(/[?&]page=(\d+)/.exec(call.url)?.[1] ?? '1');
+        if (page > 1) return jsonResponse([]);
         return jsonResponse([
           {
             id: 4,
@@ -338,6 +340,47 @@ describe('createGitHubReviewPublisher', () => {
     const result = await publish('New', new AbortController().signal);
     expect(result.commentId).toBe(13);
     expect(calls.some(call => call.method === 'PATCH')).toBe(false);
+  });
+
+  test('finds an owned summary on a later page after a short non-final page', async () => {
+    const { publish, calls } = makePublisher(call => {
+      if (call.method === 'GET' && call.url.includes('/issues/42/comments?')) {
+        const page = Number(/[?&]page=(\d+)/.exec(call.url)?.[1] ?? '1');
+        if (page === 2) {
+          return jsonResponse([
+            {
+              id: 21,
+              body: '<!-- kilo-review -->\nold',
+              user: { id: 9001 },
+              updated_at: '2026-01-01',
+            },
+          ]);
+        }
+        if (page > 2) return jsonResponse([]);
+        return jsonResponse([
+          { id: 20, body: 'unrelated', user: { id: 7 }, updated_at: '2026-01-01' },
+        ]);
+      }
+      if (call.method === 'PATCH' && call.url.endsWith('/issues/comments/21')) {
+        return jsonResponse({
+          id: 21,
+          body: (call.body as { body: string }).body,
+          user: { id: 9001 },
+        });
+      }
+      if (call.method === 'GET' && call.url.endsWith('/issues/comments/21')) {
+        return jsonResponse({
+          id: 21,
+          body: '<!-- kilo-review -->\n\nNew',
+          user: { id: 9001 },
+          html_url: 'https://x/21',
+        });
+      }
+      return jsonResponse({}, 500);
+    });
+    const result = await publish('New', new AbortController().signal);
+    expect(result.commentId).toBe(21);
+    expect(calls.some(call => call.method === 'POST')).toBe(false);
   });
 
   test('posts the exact body JSON with quotes, newlines, and non-ASCII characters', async () => {

@@ -495,7 +495,7 @@ export function createConnectionManager(
   let reconnectStartedAt = 0;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let generation = 0;
-  const assistantTextByMessage = new Map<string, string>();
+  const assistantTextByMessage = new Map<string, Map<string, string>>();
 
   // Event buffer for disconnection periods. Byte budget is primary; the count
   // cap is secondary. Lifecycle/terminal frames are protected from eviction.
@@ -1274,10 +1274,16 @@ export function createConnectionManager(
                 part.text.length > 0 &&
                 typeof part.messageID === 'string'
               ) {
-                assistantTextByMessage.set(
-                  part.messageID,
-                  (assistantTextByMessage.get(part.messageID) ?? '') + part.text
-                );
+                const partId =
+                  typeof part.id === 'string' && part.id.length > 0 ? part.id : part.messageID;
+                let partsById = assistantTextByMessage.get(part.messageID);
+                if (!partsById) {
+                  partsById = new Map<string, string>();
+                  assistantTextByMessage.set(part.messageID, partsById);
+                }
+                // message.part.updated carries the latest full snapshot per part,
+                // so keep the newest snapshot rather than concatenating updates.
+                partsById.set(partId, part.text);
               }
             }
           }
@@ -1317,7 +1323,7 @@ export function createConnectionManager(
             logToFile('session.idle received');
             const lastAssistantId = state.lastAssistantMessageId;
             const assistantText = lastAssistantId
-              ? (assistantTextByMessage.get(lastAssistantId) ?? '')
+              ? [...(assistantTextByMessage.get(lastAssistantId)?.values() ?? [])].join('\n')
               : '';
             if (assistantReportsNoActionableOutput([{ text: assistantText }])) {
               state.observeAssistantOutputLimit();

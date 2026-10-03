@@ -273,6 +273,10 @@ export class WrapperState {
     this._assistantOutputLimit = true;
   }
 
+  clearAssistantOutputLimit(): void {
+    this._assistantOutputLimit = false;
+  }
+
   consumeAssistantOutputLimit(): boolean {
     const observed = this._assistantOutputLimit;
     this._assistantOutputLimit = false;

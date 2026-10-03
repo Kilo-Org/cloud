@@ -27,6 +27,7 @@ const COUNCIL_BLOCK_PATTERN =
 const USAGE_FOOTER_MARKER = '<!-- kilo-usage -->';
 const GUIDANCE_FOOTER_MARKER = '<!-- kilo-review-guidance -->';
 const FOOTER_MARKERS = [USAGE_FOOTER_MARKER, GUIDANCE_FOOTER_MARKER];
+const FOOTER_TAIL_MAX_LENGTH = 2_000;
 
 export type GitHubReviewPublishErrorCode =
   | 'locked'
@@ -57,17 +58,28 @@ const GitHubCommentSchema = z.object({
 
 type GitHubComment = z.infer<typeof GitHubCommentSchema>;
 
+function isFooterTail(tail: string): boolean {
+  if (tail.length > FOOTER_TAIL_MAX_LENGTH) return false;
+  return tail.split('\n').every(line => {
+    const trimmed = line.trim();
+    return (
+      trimmed === '' ||
+      trimmed === '---' ||
+      FOOTER_MARKERS.some(marker => trimmed.includes(marker)) ||
+      /^<sub>[\s\S]*<\/sub>$/i.test(trimmed)
+    );
+  });
+}
+
 function extractFooter(body: string): { text: string; start: number } | null {
   const markerIdx = Math.max(...FOOTER_MARKERS.map(marker => body.lastIndexOf(marker)));
   if (markerIdx === -1) return null;
+  if (!isFooterTail(body.slice(markerIdx))) return null;
   const before = body.slice(0, markerIdx);
   const matches = Array.from(before.matchAll(/(^|\n)([ \t]*---[ \t]*\n)/g));
-  if (matches.length === 0) return null;
   const last = matches[matches.length - 1];
-  const start = (last.index ?? 0) + (last[1]?.length ?? 0);
-  const footer = body.slice(start);
-  if (!FOOTER_MARKERS.some(marker => footer.includes(marker))) return null;
-  return { text: footer.trimEnd(), start };
+  const start = last ? (last.index ?? 0) + (last[1]?.length ?? 0) : markerIdx;
+  return { text: body.slice(start).trimEnd(), start };
 }
 
 function firstHistoryBlock(body: string): string | null {
@@ -266,9 +278,20 @@ export function createGitHubReviewPublisher(
     expectedBody: string,
     signal: AbortSignal
   ): Promise<{ commentId: number; url: string }> {
-    const response = await request('GET', `/repos/${target.repo}/issues/comments/${commentId}`, {
+    let response = await request('GET', `/repos/${target.repo}/issues/comments/${commentId}`, {
       signal,
     });
+    if (
+      response.status === 429 ||
+      (response.status === 403 && response.headers.has('retry-after'))
+    ) {
+      const waited = await waitForRateLimit(response, signal);
+      if (waited) {
+        response = await request('GET', `/repos/${target.repo}/issues/comments/${commentId}`, {
+          signal,
+        });
+      }
+    }
     const parsed = GitHubCommentSchema.safeParse(response.json);
     if (
       !parsed.success ||
@@ -308,7 +331,7 @@ export function createGitHubReviewPublisher(
         const parsed = GitHubCommentSchema.safeParse(item);
         if (parsed.success) comments.push(parsed.data);
       }
-      if (pageItems.length < ISSUE_COMMENTS_PER_PAGE) break;
+      if (pageItems.length === 0) break;
       reachedScanLimit = page === MAX_ISSUE_COMMENT_PAGES;
     }
 

@@ -1029,6 +1029,31 @@ describe('workspaceFolders session moves', () => {
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     }
     expect(await readWorktree()).toEqual(worktree);
+
+    const orgWorkspaceId = `workspace_${crypto.randomUUID()}`;
+    const orgWorktreeId = `worktree_${orgWorkspaceId.slice('workspace_'.length)}`;
+    await insertSession({
+      organization_id: ORGANIZATION_ID,
+      cloud_agent_session_id: orgWorkspaceId,
+      cloud_agent_worktree_id: orgWorktreeId,
+    });
+    const orgWorktree = await insertWorktree({
+      worktree_id: orgWorktreeId,
+      organization_id: ORGANIZATION_ID,
+      name: 'Keep org',
+    });
+    const personalDestination = await createFolder(null, 'Personal');
+    const foreignOrgDestination = await createFolder(ORGANIZATION_ID, 'Foreign', otherUser);
+    for (const folderId of [personalDestination.id, foreignOrgDestination.id]) {
+      await expect(
+        callerFor().moveSession({
+          organizationId: ORGANIZATION_ID,
+          sessionId: orgWorkspaceId,
+          folderId,
+        })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    }
+    expect(await readWorktree(orgWorktreeId)).toEqual(orgWorktree);
   });
 });
 

@@ -1,5 +1,8 @@
 import type { IngestEvent } from '../../src/shared/protocol.js';
-import type { WrapperCommitCoAuthor } from '../../src/shared/wrapper-bootstrap.js';
+import type {
+  WrapperCommitCoAuthor,
+  WrapperPromptAgent,
+} from '../../src/shared/wrapper-bootstrap.js';
 import type { PublicationRecoverySignal } from './publication-recovery.js';
 import type { LogUploader } from './log-uploader.js';
 export type { LogUploader } from './log-uploader.js';
@@ -20,6 +23,8 @@ export type FinalizationConfig = {
   autoCommit: boolean;
   condenseOnComplete: boolean;
   model?: string;
+  /** Agent selection of the admitted prompt, reused by post-completion prompts. */
+  agent?: WrapperPromptAgent;
   upstreamBranch?: string;
   commitCoAuthor?: WrapperCommitCoAuthor;
 };

@@ -35,6 +35,8 @@ export type ControlPlaneTimers = {
   };
   wrapper: {
     heartbeatIntervalMs: number;
+    heartbeatAckTimeoutMs: number;
+    heartbeatNegotiationMs: number;
     cloneMs: number;
     kiloRuntimeStartMs: number;
     kiloSessionMs: number;
@@ -83,6 +85,8 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   };
   const wrapper = {
     heartbeatIntervalMs: ms(15_000),
+    heartbeatAckTimeoutMs: ms(45_000),
+    heartbeatNegotiationMs: ms(1_000),
     cloneMs: 6 * MINUTE_MS,
     kiloRuntimeStartMs: 2 * MINUTE_MS,
     kiloSessionMs: 2 * MINUTE_MS,

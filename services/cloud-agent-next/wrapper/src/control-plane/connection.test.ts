@@ -16,6 +16,156 @@ import {
 
 type WrapperTimerOverrides = Partial<ControlPlaneTimers['wrapper']>;
 
+class TestSocket {
+  static OPEN = 1;
+  static CONNECTING = 0;
+  static instances: TestSocket[] = [];
+  readyState = 1;
+  onopen?: () => void;
+  onmessage?: (event: { data: string }) => void;
+  onclose?: () => void;
+  onerror?: () => void;
+  frames: ControlPlaneWrapperFrame[] = [];
+  closes = 0;
+  constructor() {
+    TestSocket.instances.push(this);
+  }
+  send(text: string): void {
+    this.frames.push(JSON.parse(text));
+  }
+  close(): void {
+    this.closes += 1;
+  }
+  receive(frame: unknown): void {
+    this.onmessage?.({ data: JSON.stringify(frame) });
+  }
+}
+
+async function withTestSocket(
+  run: (
+    connection: ControlPlaneConnection,
+    socket: TestSocket,
+    disconnected: string[]
+  ) => Promise<void>
+): Promise<void> {
+  const original = globalThis.WebSocket;
+  Object.assign(globalThis, { WebSocket: TestSocket });
+  TestSocket.instances = [];
+  const disconnected: string[] = [];
+  const connection = createControlPlaneConnection({
+    url: 'ws://test',
+    credential: 'test',
+    allocationId: 'alloc-1',
+    timers: timerOverrides({
+      heartbeatIntervalMs: 10,
+      heartbeatAckTimeoutMs: 80,
+      heartbeatNegotiationMs: 10,
+      reconnectBackoffMinMs: 10,
+      reconnectBackoffMaxMs: 20,
+    }),
+    random: () => 0,
+    onDisconnected: reason => disconnected.push(reason),
+  });
+  try {
+    connection.start();
+    const socket = TestSocket.instances[0];
+    socket.onopen?.();
+    await run(connection, socket, disconnected);
+  } finally {
+    connection.close();
+    Object.assign(globalThis, { WebSocket: original });
+  }
+}
+
+describe('acknowledged heartbeat', () => {
+  it.each(['connected', 'awaiting_welcome', 'connecting'] as const)(
+    'recycles %s immediately without waiting for close or retaining old timers',
+    async phase => {
+      await withTestSocket(async (connection, socket, disconnected) => {
+        if (phase === 'connected')
+          socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+        if (phase === 'connecting') {
+          connection.recycle();
+          socket = TestSocket.instances[1];
+          socket.readyState = TestSocket.CONNECTING;
+        }
+        const sent = socket.frames.length;
+        const count = TestSocket.instances.length;
+        connection.recycle();
+        expect(TestSocket.instances).toHaveLength(count + 1);
+        expect(socket.closes).toBe(1);
+        socket.onopen?.();
+        socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+        socket.receive({ type: 'shutdown', reason: 'stale' });
+        socket.onclose?.();
+        await Bun.sleep(120);
+        expect(socket.frames).toHaveLength(sent);
+        expect(TestSocket.instances).toHaveLength(count + 1);
+        expect(disconnected).toEqual(phase === 'connected' ? ['connection recycled'] : []);
+      });
+    }
+  );
+
+  it('uses the production 15s heartbeat and 45s acknowledgement deadline', () => {
+    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatIntervalMs).toBe(15_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatAckTimeoutMs).toBe(45_000);
+    expect(CONTROL_PLANE_TIMERS.wrapper.heartbeatNegotiationMs).toBe(1_000);
+  });
+  it('uses a legacy hello fallback and never times out an unnegotiated peer', async () => {
+    await withTestSocket(async (_connection, socket, disconnected) => {
+      expect(socket.frames[0]).toMatchObject({ type: 'hello', heartbeatAck: true });
+      await waitFor(() => socket.frames.length === 2);
+      expect(socket.frames[1]).toEqual({
+        type: 'hello',
+        wrapperId: socket.frames[0].type === 'hello' ? socket.frames[0].wrapperId : '',
+        allocationId: 'alloc-1',
+        protocolVersion: 2,
+      });
+      socket.receive({ type: 'welcome', protocolVersion: 2 });
+      await Bun.sleep(120);
+      expect(disconnected).toEqual([]);
+      expect(TestSocket.instances).toHaveLength(1);
+    });
+  });
+
+  it('starts at welcome, resets only on ack and reconnects without a close callback', async () => {
+    await withTestSocket(async (_connection, socket, disconnected) => {
+      await Bun.sleep(100);
+      expect(disconnected).toEqual([]);
+      socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      await Bun.sleep(45);
+      socket.receive({ type: 'heartbeat_ack' });
+      await Bun.sleep(45);
+      expect(disconnected).toEqual([]);
+      socket.receive({ type: 'events_dropped', dropped: 1 });
+      await waitFor(() => TestSocket.instances.length === 2);
+      expect(disconnected).toEqual(['heartbeat acknowledgement timeout']);
+      expect(socket.closes).toBe(1);
+      const replacement = TestSocket.instances[1];
+      replacement.onopen?.();
+      replacement.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      socket.receive({ type: 'shutdown', reason: 'stale' });
+      socket.receive({ type: 'heartbeat_ack' });
+      socket.onclose?.();
+      await waitFor(() => TestSocket.instances.length === 3);
+      expect(disconnected).toHaveLength(2);
+    });
+  });
+
+  it('shutdown is terminal with a watchdog and pending negotiation', async () => {
+    await withTestSocket(async (connection, socket, disconnected) => {
+      socket.receive({ type: 'welcome', protocolVersion: 2, heartbeatAck: true });
+      socket.receive({ type: 'shutdown', reason: 'stopped' });
+      socket.receive({ type: 'heartbeat_ack' });
+      socket.onclose?.();
+      connection.start();
+      await Bun.sleep(120);
+      expect(TestSocket.instances).toHaveLength(1);
+      expect(disconnected).toEqual([]);
+    });
+  });
+});
+
 type HeartbeatFrame = Extract<ControlPlaneWrapperFrame, { type: 'heartbeat' }>;
 type EventsFrame = Extract<ControlPlaneWrapperFrame, { type: 'session.events' }>;
 type EventsDroppedFrame = Extract<ControlPlaneWrapperFrame, { type: 'events_dropped' }>;
@@ -203,6 +353,7 @@ describe('createControlPlaneConnection', () => {
         wrapperId: 'wrapper-1',
         allocationId: 'alloc-1',
         protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION,
+        heartbeatAck: true,
       });
       expect(sandbox.authorizations[0]).toBe('Bearer secret-credential');
 
